@@ -33,6 +33,20 @@ fn repository_root() -> Result<PathBuf, Box<dyn std::error::Error>> {
         .to_path_buf())
 }
 
+fn validation_target_directory(root: &Path) -> PathBuf {
+    match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(directory) => {
+            let directory = PathBuf::from(directory);
+            if directory.is_absolute() {
+                directory
+            } else {
+                root.join(directory)
+            }
+        }
+        None => root.join("target"),
+    }
+}
+
 fn rust_sources(root: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
     fn visit(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), std::io::Error> {
         let mut entries = fs::read_dir(path)?.collect::<Result<Vec<_>, _>>()?;
@@ -6525,7 +6539,7 @@ fn run_ownership_validation(
         Capability::parse_wire_identifier(&capability.wire_identifier()).as_ref() == Ok(capability)
     });
 
-    let cases = BTreeMap::from([
+    let mut cases = BTreeMap::from([
         (
             "task39_workspace_accounting_chain_uses_authoritative_owners",
             workspace_accounting_chain_uses_authoritative_owners()?,
@@ -8189,6 +8203,12 @@ fn run_ownership_validation(
             task_103_adapters_preserve_canonical_autograd_semantics,
         ),
     ]);
+    if validation == "VAL-OWNERSHIP-001" && case_prefix.is_none() {
+        cases.insert(
+            "native_stored_payload_boundary_is_closed",
+            validate_native_stored_payload_boundary(&root, &sources)?,
+        );
+    }
     let cases = cases
         .into_iter()
         .filter(|(name, _)| case_prefix.is_none_or(|prefix| name.starts_with(prefix)))
@@ -8516,7 +8536,9 @@ fn run_ownership_validation(
     });
     let mut bytes = serde_json::to_vec_pretty(&artifact)?;
     bytes.push(b'\n');
-    let artifact_path = root.join("target/comfy-parity").join(artifact_filename);
+    let artifact_path = validation_target_directory(&root)
+        .join("comfy-parity")
+        .join(artifact_filename);
     if let Some(parent) = artifact_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -9798,18 +9820,10 @@ fn val_ownership_001_task346_text_encoder_registry_preserves_canonical_owners()
     Ok(())
 }
 
-#[test]
-fn val_ownership_001_native_stored_payload_boundary_is_closed()
--> Result<(), Box<dyn std::error::Error>> {
-    let root = repository_root()?;
-    let sources = rust_sources(&root)?
-        .into_iter()
-        .map(|path| {
-            let source = fs::read_to_string(&path)?;
-            Ok((path, source))
-        })
-        .collect::<Result<Vec<_>, std::io::Error>>()?;
-
+fn validate_native_stored_payload_boundary(
+    root: &Path,
+    sources: &[(PathBuf, String)],
+) -> Result<bool, Box<dyn std::error::Error>> {
     for forbidden in [
         "NativeStructuredComputePayload",
         "NativeStructuredComputeRole",
@@ -9855,6 +9869,14 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
             );
         }
     }
+    assert!(
+        production_source_occurrences(&sources, "impl<T> NativeResolvedPayloadRetention")
+            .is_empty()
+    );
+    let resolved_payload_constructors =
+        production_source_occurrences(&sources, "NativeResolvedPayload::checked(");
+    assert_eq!(resolved_payload_constructors.len(), 1);
+    assert!(resolved_payload_constructors[0].contains("crates/comfy_runtime/src/executor.rs"));
 
     let owner_definitions = [
         (
@@ -9874,8 +9896,64 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
             "crates/comfy_model/src/native_node_payload.rs",
         ),
         (
+            "pub struct NativeModelResidentAllocation {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeModelTensorResidentAllocation {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeModelResidentParts {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeStructuredResidentParts {",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeRaftLarge {",
+            "crates/comfy_model/src/vision_models.rs",
+        ),
+        (
+            "pub struct NativeRaftTensorResidentAllocation {",
+            "crates/comfy_model/src/vision_models.rs",
+        ),
+        (
+            "pub struct NativeRaftResidentParts {",
+            "crates/comfy_model/src/vision_models.rs",
+        ),
+        (
+            "pub struct NativeClipVision {",
+            "crates/comfy_model/src/clip_vision.rs",
+        ),
+        (
+            "pub struct ClipVisionTensorResidentAllocation {",
+            "crates/comfy_model/src/clip_vision.rs",
+        ),
+        (
+            "pub struct ClipVisionResidentParts {",
+            "crates/comfy_model/src/clip_vision.rs",
+        ),
+        (
             "pub struct ConditioningSet {",
             "crates/comfy_model/src/conditioning.rs",
+        ),
+        (
+            "pub struct ConditioningTensorResidentAllocation {",
+            "crates/comfy_model/src/conditioning.rs",
+        ),
+        (
+            "pub struct ConditioningResidentParts {",
+            "crates/comfy_model/src/conditioning.rs",
+        ),
+        (
+            "pub struct ControlChainTensorResidentAllocation {",
+            "crates/comfy_model/src/controlnet.rs",
+        ),
+        (
+            "pub struct ControlChainResidentParts {",
+            "crates/comfy_model/src/controlnet.rs",
         ),
         (
             "pub struct NativeControlPayload {",
@@ -9890,7 +9968,27 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
         ),
         (
+            "pub enum NativeDiffusionResidentAllocationId {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
+            "pub struct NativeDiffusionResidentAllocation {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
+            "pub struct NativeDiffusionResidentParts {",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ),
+        (
             "pub struct NativeNoisePayload {",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeNoiseTensorResidentAllocation {",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeNoiseResidentParts {",
             "crates/comfy_sampler/src/native_node_payload.rs",
         ),
         (
@@ -9919,6 +10017,14 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
         ),
         (
             "pub struct NativeTracksPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeMediaTensorResidentAllocation {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeMediaResidentParts {",
             "crates/comfy_media/src/native_node_payload.rs",
         ),
         (
@@ -9989,7 +10095,296 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
         );
     }
     assert!(stored_payload_production.contains("native_source_type_projection(source_type)?"));
-    assert!(!stored_payload_production.contains("Diffusion(Arc<NativeDiffusionPayload>)"));
+
+    let stored_payload_variants = stored_payload_production
+        .split_once("pub enum NativeStoredPayload {")
+        .and_then(|(_, variants)| variants.split_once("\n}"))
+        .map(|(variants, _)| variants)
+        .ok_or("closed NativeStoredPayload declaration is missing")?;
+    assert!(!stored_payload_variants.contains("Diffusion(Arc<NativeDiffusionPayload>)"));
+    assert!(!stored_payload_variants.contains("OpticalFlow"));
+    assert!(!stored_payload_variants.contains("ClipVision("));
+    assert!(stored_payload_variants.contains("ClipVisionOutput(Arc<ClipVisionOutput>)"));
+    assert!(stored_payload_production.contains("enum NativeStoredModelResource {"));
+    assert!(!stored_payload_production.contains("pub enum NativeStoredModelResource"));
+    assert!(
+        stored_payload_production.contains("ModelResource(Arc<NativeModelPayload>)"),
+        "OPTICAL_FLOW must route through the private model-resource branch"
+    );
+    assert!(stored_payload_production.contains("fn require_model_resource_role("));
+    assert!(
+        stored_payload_production
+            .contains("NativeModelResourceRole::OpticalFlow | NativeModelResourceRole::ClipVision")
+    );
+    assert!(stored_payload_production.contains(
+        "NativeModelResourceRole::OpticalFlow => resource.optical_flow_resource().is_some()"
+    ));
+    assert!(
+        stored_payload_production
+            .contains("Err(NativeStoredPayloadError::NonCanonicalModelResourceRole { role })")
+    );
+    assert!(stored_payload_production.contains("NativeModelResourceRole::ClipVision"));
+    assert!(stored_payload_production.contains(
+        "NativeModelResourceRole::ClipVision => resource.clip_vision_resource().is_some()"
+    ));
+    assert!(
+        stored_payload_production
+            .contains("Self::ClipVisionOutput(_) => ClipVisionOutput::SOURCE_TYPE_ID")
+    );
+
+    let residency_projection = stored_payload_production
+        .split_once("pub fn residency(&self)")
+        .and_then(|(_, projection)| projection.split_once("fn arc_address"))
+        .map(|(projection, _)| projection)
+        .ok_or("NativeStoredPayload residency projection is missing")?;
+    for required_projection in [
+        "NativeStoredModelResource::Diffusion(diffusion) => {\n                    stored_diffusion_residency(payload, diffusion)?",
+        "Self::Control(payload) => control_residency(payload)?",
+        "Self::Noise(payload) => noise_residency(payload)?",
+        "Self::Sam3TrackData(payload) => media_residency(",
+        "Self::Tracks(payload) => media_residency(",
+        "Self::AudioEncoderOutput(payload) => structured_model_residency(",
+        "Self::LossMap(payload) => structured_model_residency(",
+    ] {
+        assert!(
+            residency_projection.contains(required_projection),
+            "native stored residency omits checked projection {required_projection}"
+        );
+    }
+    for forbidden_projection in [
+        "Self::Control(payload) => single_arc_residency",
+        "Self::Noise(payload) => single_arc_residency",
+        "Self::Sam3TrackData(payload) => single_arc_residency",
+        "Self::Tracks(payload) => single_arc_residency",
+        "Self::AudioEncoderOutput(payload) => single_arc_residency",
+        "Self::LossMap(payload) => single_arc_residency",
+        "NativeStoredModelResource::Diffusion(diffusion) => single_arc_residency",
+    ] {
+        assert!(
+            !residency_projection.contains(forbidden_projection),
+            "tensor-backed payload uses coarse residency: {forbidden_projection}"
+        );
+    }
+    for resident_parts_adapter in [
+        "fn media_residency<T>(",
+        "parts: NativeMediaResidentParts",
+        "fn structured_model_residency<T>(",
+        "parts: NativeStructuredResidentParts",
+        "fn noise_residency(",
+        "let parts = payload.resident_parts()?;",
+        "fn control_residency(",
+        "fn stored_diffusion_residency(",
+        "fn diffusion_allocations(",
+    ] {
+        assert!(
+            stored_payload_production.contains(resident_parts_adapter),
+            "native stored payload omits resident-parts adapter {resident_parts_adapter}"
+        );
+    }
+    let tensor_backed_adapter = stored_payload_production
+        .split_once("fn tensor_backed_arc_residency<T>(")
+        .and_then(|(_, adapter)| adapter.split_once("fn media_residency<T>("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("tensor-backed Arc residency adapter is missing")?;
+    for required in [
+        "arc_allocation(",
+        "NativeResidentAllocationId::TensorStorage { storage_id }",
+        "resident_bytes: usize::try_from(resident_bytes)",
+        "NativePayloadResidency::checked(0, allocations)",
+    ] {
+        assert!(
+            tensor_backed_adapter.contains(required),
+            "tensor-backed Arc residency omits {required}"
+        );
+    }
+    let media_adapter = stored_payload_production
+        .split_once("fn media_residency<T>(")
+        .and_then(|(_, adapter)| adapter.split_once("fn structured_model_residency<T>("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("media resident-parts adapter is missing")?;
+    let structured_adapter = stored_payload_production
+        .split_once("fn structured_model_residency<T>(")
+        .and_then(|(_, adapter)| adapter.split_once("fn noise_residency("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("structured-model resident-parts adapter is missing")?;
+    for (name, adapter) in [
+        ("media", media_adapter),
+        ("structured model", structured_adapter),
+    ] {
+        for required in [
+            "tensor_backed_arc_residency(",
+            "parts.owned_bytes()",
+            ".tensor_allocations()",
+            "allocation.storage_id().get()",
+            "allocation.resident_bytes()",
+        ] {
+            assert!(
+                adapter.contains(required),
+                "{name} resident-parts adapter omits {required}"
+            );
+        }
+        assert!(!adapter.contains("single_arc_residency"));
+    }
+    let noise_adapter = stored_payload_production
+        .split_once("fn noise_residency(")
+        .and_then(|(_, adapter)| adapter.split_once("fn translate_diffusion_allocation("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("noise resident-parts adapter is missing")?;
+    for required in [
+        "payload.resident_parts()?",
+        "tensor_backed_arc_residency(",
+        "parts.owned_bytes()",
+        ".tensor_allocation()",
+        "allocation.storage_id().get()",
+        "allocation.resident_bytes()",
+    ] {
+        assert!(
+            noise_adapter.contains(required),
+            "noise resident-parts adapter omits {required}"
+        );
+    }
+    assert!(!noise_adapter.contains("single_arc_residency"));
+
+    let diffusion_payload =
+        fs::read_to_string(root.join("crates/comfy_sampler/src/native_diffusion_payload.rs"))?;
+    let diffusion_allocation_ids = diffusion_payload
+        .split_once("pub enum NativeDiffusionResidentAllocationId {")
+        .and_then(|(_, ids)| ids.split_once("\n}"))
+        .map(|(ids, _)| ids)
+        .ok_or("NativeDiffusionResidentAllocationId declaration is missing")?;
+    let diffusion_translation = stored_payload_production
+        .split_once("fn translate_diffusion_allocation(")
+        .and_then(|(_, translation)| translation.split_once("fn diffusion_allocations("))
+        .map(|(translation, _)| translation)
+        .ok_or("native diffusion resident allocation translation is missing")?;
+    let diffusion_allocation_variants = [
+        "ModelPayloadArc",
+        "ModelBacking",
+        "ConditioningPayloadArc",
+        "PatchGraphArc",
+        "ControlExecutionArc",
+        "ControlChainArc",
+        "ControlExecutorArc",
+        "TensorStorage",
+    ];
+    for variant in diffusion_allocation_variants {
+        assert!(
+            diffusion_allocation_ids.contains(&format!("{variant} {{")),
+            "lower diffusion residency omits {variant}"
+        );
+        assert!(
+            diffusion_translation
+                .contains(&format!("NativeDiffusionResidentAllocationId::{variant}")),
+            "stored payload omits lower diffusion allocation {variant}"
+        );
+        assert!(
+            diffusion_translation.contains(&format!("NativeResidentAllocationId::{variant}")),
+            "stored payload does not preserve diffusion allocation identity {variant}"
+        );
+    }
+    assert_eq!(
+        diffusion_translation
+            .matches("NativeDiffusionResidentAllocationId::")
+            .count(),
+        diffusion_allocation_variants.len(),
+        "diffusion resident allocation translation is not exhaustive"
+    );
+    let control_adapter = stored_payload_production
+        .split_once("fn control_residency(")
+        .and_then(|(_, adapter)| adapter.split_once("fn stored_diffusion_residency("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("control resident-parts adapter is missing")?;
+    for required in [
+        "payload.resident_parts()?",
+        "parts.owned_bytes()",
+        "diffusion_allocations(&parts)?",
+    ] {
+        assert!(
+            control_adapter.contains(required),
+            "control resident-parts adapter omits {required}"
+        );
+    }
+    assert!(!control_adapter.contains("single_arc_residency"));
+    let stored_diffusion_adapter = stored_payload_production
+        .split_once("fn stored_diffusion_residency(")
+        .and_then(|(_, adapter)| adapter.split_once("fn model_allocations("))
+        .map(|(adapter, _)| adapter)
+        .ok_or("stored diffusion resident-parts adapter is missing")?;
+    for required in [
+        "diffusion.resident_parts()?",
+        "NativeResidentAllocationId::DiffusionPayloadArc",
+        "parts.owned_bytes()",
+        "diffusion_allocations(&parts)?",
+    ] {
+        assert!(
+            stored_diffusion_adapter.contains(required),
+            "stored diffusion resident-parts adapter omits {required}"
+        );
+    }
+    assert!(!stored_diffusion_adapter.contains("single_arc_residency"));
+
+    let model_payload =
+        fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    let model_payload_production = model_payload
+        .split_once("#[cfg(test)]\nmod tests")
+        .map_or(model_payload.as_str(), |(production, _)| production);
+    assert!(model_payload_production.contains("enum NativeModelResource {"));
+    assert!(!model_payload_production.contains("pub enum NativeModelResource {"));
+    assert!(model_payload_production.contains("OpticalFlow {"));
+    assert!(model_payload_production.contains(
+        "pub fn optical_flow(raft: Arc<NativeRaftLarge>) -> Result<Self, NativeModelPayloadError>"
+    ));
+    assert!(model_payload_production.contains("Self::OpticalFlow => \"OPTICAL_FLOW\""));
+    assert!(model_payload_production.contains("NativeModelBackingKind::OpticalFlow"));
+    assert!(model_payload_production.contains("Arc::as_ptr(raft) as usize"));
+    assert!(model_payload_production.contains("ClipVision {"));
+    assert!(model_payload_production.contains("pub fn clip_vision("));
+    assert!(model_payload_production.contains("clip_vision: Arc<NativeClipVision>"));
+    assert!(model_payload_production.contains("Self::ClipVision => \"CLIP_VISION\""));
+    assert!(model_payload_production.contains("NativeModelBackingKind::ClipVision"));
+    assert!(model_payload_production.contains("Arc::as_ptr(clip_vision) as usize"));
+    assert!(model_payload_production.contains("pub fn clip_vision_resource("));
+
+    let source_types = fs::read_to_string(root.join("crates/comfy_nodes/src/source_type.rs"))?;
+    assert!(source_types.contains(
+        "\"OPTICAL_FLOW\" => handle!(\"OPTICAL_FLOW\", Compute, Model, \"optical_flow\")"
+    ));
+    assert!(
+        source_types.contains(
+            "\"CLIP_VISION\" => handle!(\"CLIP_VISION\", Compute, Clip, \"clip_vision\")"
+        )
+    );
+    assert!(source_types.contains("\"CLIP_VISION_OUTPUT\" => handle!("));
+    assert!(source_types.contains("StructuredCompute,\n            \"clip_vision_output\""));
+    for forbidden in [
+        "handle!(\"OPTICAL_FLOW\", Compute, Tensor",
+        "handle!(\"OPTICAL_FLOW\", Provider",
+        "NativeStoredPayload::OpticalFlow",
+        "OpticalFlow(Arc<NativeProviderPayload>)",
+        "OpticalFlow(Arc<NativeTensorPayload>)",
+    ] {
+        assert!(
+            !stored_payload_production.contains(forbidden) && !source_types.contains(forbidden),
+            "OPTICAL_FLOW has a non-canonical stored fallback: {forbidden}"
+        );
+    }
+    for forbidden in [
+        "handle!(\"CLIP_VISION\", Compute, Tensor",
+        "handle!(\"CLIP_VISION\", Compute, StructuredCompute",
+        "handle!(\"CLIP_VISION\", Provider",
+        "NativeStoredPayload::ClipVision(",
+        "ClipVision(Arc<NativeProviderPayload>)",
+        "ClipVision(Arc<NativeTensorPayload>)",
+        "ClipVision(Arc<NativeStructuredComputePayload>)",
+        "ClipVisionOutput(Arc<NativeProviderPayload>)",
+        "ClipVisionOutput(Arc<NativeTensorPayload>)",
+        "ClipVisionOutput(Arc<NativeStructuredComputePayload>)",
+    ] {
+        assert!(
+            !stored_payload_production.contains(forbidden) && !source_types.contains(forbidden),
+            "CLIP_VISION has a non-canonical stored fallback: {forbidden}"
+        );
+    }
 
     let nodes_root = fs::read_to_string(root.join("crates/comfy_nodes/src/comfy_nodes.rs"))?;
     let runtime_root = fs::read_to_string(root.join("crates/comfy_runtime/src/comfy_runtime.rs"))?;
@@ -10003,5 +10398,20 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
         assert!(!nodes_root.contains(forbidden));
         assert!(!runtime_root.contains(forbidden));
     }
+    Ok(true)
+}
+
+#[test]
+fn val_ownership_001_native_stored_payload_boundary_is_closed()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    assert!(validate_native_stored_payload_boundary(&root, &sources)?);
     Ok(())
 }

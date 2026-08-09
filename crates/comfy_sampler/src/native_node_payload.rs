@@ -7,7 +7,8 @@ use crate::{
 use comfy_model::conditioning::{ConditioningError, ConditioningSet};
 use comfy_model::{NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole};
 use comfy_tensor::{
-    CpuBackend, DType, DeviceId, ExecutionContext, RngCheckpoint, RngError, Tensor, TensorError,
+    CpuBackend, DType, DeviceId, ExecutionContext, RngCheckpoint, RngError, StorageId, Tensor,
+    TensorError,
     generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32},
 };
 use sha2::{Digest, Sha256};
@@ -48,6 +49,45 @@ pub struct NativeNoiseGeneration {
     pub after: Option<RngCheckpoint>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeNoiseTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl NativeNoiseTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeNoiseResidentParts {
+    owned_bytes: u64,
+    tensor_allocation: Option<NativeNoiseTensorResidentAllocation>,
+}
+
+impl NativeNoiseResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocation(&self) -> Option<&NativeNoiseTensorResidentAllocation> {
+        self.tensor_allocation.as_ref()
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeSamplerPayloadError> {
+        self.tensor_allocation
+            .map_or(Ok(self.owned_bytes), |allocation| {
+                checked_add(self.owned_bytes, allocation.resident_bytes)
+            })
+    }
+}
+
 impl NativeNoisePayload {
     pub fn zero() -> Result<Self, NativeSamplerPayloadError> {
         Self::checked(NativeNoiseResource::Zero)
@@ -83,6 +123,32 @@ impl NativeNoisePayload {
 
     pub const fn resident_bytes(&self) -> u64 {
         self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeNoiseResidentParts, NativeSamplerPayloadError> {
+        let owned_bytes = checked_add(
+            usize_to_u64(mem::size_of::<Self>())?,
+            usize_to_u64(self.semantic_digest_sha256.capacity())?,
+        )?;
+        let tensor_allocation = match &self.resource {
+            NativeNoiseResource::FixedLatent { samples, .. } => {
+                Some(NativeNoiseTensorResidentAllocation {
+                    storage_id: samples.storage_id(),
+                    resident_bytes: samples.storage_byte_len(),
+                })
+            }
+            NativeNoiseResource::Zero | NativeNoiseResource::Random { .. } => None,
+        };
+        let parts = NativeNoiseResidentParts {
+            owned_bytes,
+            tensor_allocation,
+        };
+        if parts.resident_bytes()? != self.resident_bytes {
+            return Err(NativeSamplerPayloadError::ProjectionChanged(
+                "noise residency",
+            ));
+        }
+        Ok(parts)
     }
 
     pub fn validate(&self) -> Result<(), NativeSamplerPayloadError> {
@@ -911,6 +977,7 @@ mod tests {
         );
         let first_tensor = tensor_from_f32(&backend, &[1, 1, 2], &[0.25, -0.5], &default_context)?;
         let second_tensor = tensor_from_f32(&backend, &[1, 1, 2], &[0.25, -0.5], &other_context)?;
+        let shared_tensor = first_tensor.clone();
         assert_ne!(first_tensor.storage_id(), second_tensor.storage_id());
         assert_ne!(
             first_tensor.descriptor().stream(),
@@ -919,6 +986,26 @@ mod tests {
 
         let first = NativeNoisePayload::fixed_latent(19, first_tensor)?;
         let second = NativeNoisePayload::fixed_latent(19, second_tensor)?;
+        let shared = NativeNoisePayload::fixed_latent(19, shared_tensor)?;
+        let first_parts = first.resident_parts()?;
+        let second_parts = second.resident_parts()?;
+        let shared_parts = shared.resident_parts()?;
+        assert_eq!(first_parts.owned_bytes(), shared_parts.owned_bytes());
+        assert_eq!(
+            first_parts.tensor_allocation(),
+            shared_parts.tensor_allocation()
+        );
+        assert_ne!(
+            first_parts
+                .tensor_allocation()
+                .ok_or("fixed noise lost its tensor allocation")?
+                .storage_id(),
+            second_parts
+                .tensor_allocation()
+                .ok_or("distinct fixed noise lost its tensor allocation")?
+                .storage_id()
+        );
+        assert_eq!(first_parts.resident_bytes()?, first.resident_bytes());
         assert_eq!(
             first.semantic_digest_sha256(),
             second.semantic_digest_sha256()

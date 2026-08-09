@@ -120,16 +120,6 @@
       ],
       "required_mappings": [
         {
-          "name": "catalog-source-types-to-sealed-payload-identities",
-          "path": "crates/comfy_nodes/src/source_type.rs",
-          "pattern": "fn native_source_type_projection\\([\\s\\S]*NativeSourceTypeProjection[\\s\\S]*fn native_value_types_for_input_schema"
-        },
-        {
-          "name": "sealed-payload-to-handle-store",
-          "path": "crates/comfy_runtime/src/executor.rs",
-          "pattern": "StoredNativeHandle[\\s\\S]*Arc<NativeStoredPayload>[\\s\\S]*impl NativeHandleStore for RuntimeNativeHandleStoreSession"
-        },
-        {
           "name": "functional-kernels-use-canonical-device-cancellation-and-scalar-unary",
           "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
           "pattern": "use crate::[\\s\\S]*DeviceId[\\s\\S]*UnaryOperation[\\s\\S]*apply_unary_scalar[\\s\\S]*comfy_types::CancellationToken"
@@ -9418,7 +9408,7 @@
     },
     {
       "concern": "native_node_registry",
-      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for staged objects and leases; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
+      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for canonical attempt sessions, staged objects, active-execution claims, handle leases, resolved-payload retention, generations, and unique resident allocation accounting; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
       "owner_files": [
         "crates/comfy_runtime/src/executor.rs",
         "crates/comfy_nodes/src/execution.rs",
@@ -9429,28 +9419,71 @@
         "crates/comfy_model/src/native_node_payload.rs",
         "crates/comfy_model/src/conditioning.rs",
         "crates/comfy_model/src/clip_vision.rs",
+        "crates/comfy_model/src/controlnet.rs",
+        "crates/comfy_model/src/vision_models.rs",
         "crates/comfy_sampler/src/native_diffusion_payload.rs",
         "crates/comfy_sampler/src/native_node_payload.rs",
         "crates/comfy_media/src/native_node_payload.rs",
-        "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs"
+        "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+        "crates/comfy_plugin_sdk/src/type_ids.rs"
       ],
       "owner_symbols": [
         "NativeNodeRegistry",
         "NativeNodeBinding",
+        "NativeNodePresentation",
+        "NativeNodeContext",
         "NativeValue",
+        "NativeHandleType",
+        "NativeHandleStoreIdentity",
+        "NativeOpaqueHandle",
         "NativeHandleStore",
+        "NativeResolvedPayload",
+        "NativeResolvedPayloadRetention",
+        "NativeHandleLease",
+        "NativeHandleLeaseInner",
+        "RuntimeResolvedPayloadRetention",
+        "NativeHandleStoreGeneration",
+        "RuntimeNativeHandleStoreSession",
+        "NativeExecutionAttemptClaim",
+        "NativeHandleStoreSessionStage",
+        "NativeHandleStoreData",
+        "StoredResidentAllocation",
+        "StoredNativeHandle",
         "NativeSourceTypeProjection",
         "NativeStoredPayload",
         "NativeStoredModelPayload",
         "NativePayloadResidency",
         "NativeResidentAllocationId",
+        "NativeResidentPayloadKind",
+        "NativeResidentAllocation",
         "NativeTensorPayload",
         "NativeModelPayload",
+        "NativeModelResourceRole",
+        "NativeModelResourceIdentity",
+        "NativeModelBackingKind",
+        "NativeModelResidentAllocation",
+        "NativeModelResidentParts",
+        "NativeModelTensorResidentAllocation",
+        "NativeStructuredResidentParts",
         "ConditioningSet",
         "ConditioningResidentParts",
+        "ConditioningTensorResidentAllocation",
+        "NativeClipVision",
+        "ClipVisionResidentParts",
+        "ClipVisionTensorResidentAllocation",
+        "NativeRaftLarge",
+        "NativeRaftResidentParts",
+        "NativeRaftTensorResidentAllocation",
+        "ControlChainResidentParts",
+        "ControlChainTensorResidentAllocation",
         "NativeControlPayload",
         "NativeDiffusionPayload",
+        "NativeDiffusionResidentParts",
+        "NativeDiffusionResidentAllocation",
+        "NativeDiffusionResidentAllocationId",
         "NativeNoisePayload",
+        "NativeNoiseResidentParts",
+        "NativeNoiseTensorResidentAllocation",
         "NativeGuiderPayload",
         "NativeGuiderConditioningSets",
         "NativeSamplerPayload",
@@ -9459,23 +9492,26 @@
         "NativePoseKeypointPayload",
         "NativeSam3TrackDataPayload",
         "NativeTracksPayload",
+        "NativeMediaResidentParts",
+        "NativeMediaTensorResidentAllocation",
         "AudioEncoderOutput",
         "ClipVisionOutput",
         "IcLoraParameters",
         "LossMap",
         "NativeProviderPayload",
         "NodeRegistry",
+        "TypeRegistry",
         "PluginNode"
       ],
       "allowed_adapters": [
         "comfy_nodes::NodeRegistry is the generated built-in catalog owner projected into NativeNodeRegistry with exact binding disposition and checked source provenance",
         "generated_native_node_registry_projection atomically composes the compatibility image and diffusion slices with generated family bindings and validates comprehensive executable, provider-required, and unavailable closure",
         "native_image_registry_projection remains a deliberately narrow compatibility projection and is not the production comprehensive registry",
-        "comfy_runtime::NativeHandleStoreGeneration is the sole concrete store and lease owner; it atomically reference-counts the process-local allocation identities derived by NativePayloadResidency without placing addresses or residency facts in semantic digests or persisted handles; nodes receive only an attempt-scoped comfy_nodes::NativeHandleStore boundary",
+        "comfy_runtime::NativeHandleStoreGeneration is the sole concrete store, canonical per-attempt session, active-execution claim, handle-lease, and resolved-payload-retention owner; it atomically reference-counts the process-local allocation identities derived by NativePayloadResidency without placing addresses or residency facts in semantic digests or persisted handles, rolls back abandoned staged sessions, and rejects concurrent reuse of one AttemptId before mutation; nodes receive only an attempt-scoped comfy_nodes::NativeHandleStore boundary",
         "comfy_nodes::NativeStoredPayload is the closed store value; it derives exact handle type, semantic digest, and resident bytes from explicit comfy_tensor, comfy_model, comfy_sampler, comfy_media, or ProviderTask-only payload variants and exposes no generic structured record, raw Any, or downcast path",
         "the signed plugin adapter may project canonical payloads into neutral SDK values or return an exact imported handle; metadata-only tensor, model, and artifact values cannot mint canonical executable payloads",
-        "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into RuntimeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor",
-        "NativeRuntimeHttpServices serializes checked RuntimeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
+        "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into NativeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor; comfy_runtime may alias NativeNodePresentation as RuntimeNodePresentation",
+        "NativeRuntimeHttpServices serializes checked NativeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
       ],
       "definitions": [
         {
@@ -9497,10 +9533,22 @@
           "symbol": "PluginNode"
         },
         {
+          "path": "crates/comfy_plugin_sdk/src/type_ids.rs",
+          "qualified": "comfy_plugin_sdk::TypeRegistry",
+          "role": "canonical",
+          "symbol": "TypeRegistry"
+        },
+        {
           "path": "crates/comfy_nodes/src/execution.rs",
-          "qualified": "comfy_nodes::RuntimeNodePresentation",
+          "qualified": "comfy_nodes::NativeNodePresentation",
           "role": "boundary_dto",
-          "symbol": "RuntimeNodePresentation"
+          "symbol": "NativeNodePresentation"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeNodeContext",
+          "role": "boundary_dto",
+          "symbol": "NativeNodeContext"
         },
         {
           "path": "crates/comfy_nodes/src/execution.rs",
@@ -9516,9 +9564,39 @@
         },
         {
           "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeHandleType",
+          "role": "boundary_dto",
+          "symbol": "NativeHandleType"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeHandleStoreIdentity",
+          "role": "boundary_dto",
+          "symbol": "NativeHandleStoreIdentity"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeOpaqueHandle",
+          "role": "boundary_dto",
+          "symbol": "NativeOpaqueHandle"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
           "qualified": "comfy_nodes::NativeHandleStore",
           "role": "boundary_dto",
           "symbol": "NativeHandleStore"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeResolvedPayload",
+          "role": "boundary_dto",
+          "symbol": "NativeResolvedPayload"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeResolvedPayloadRetention",
+          "role": "boundary_dto",
+          "symbol": "NativeResolvedPayloadRetention"
         },
         {
           "path": "crates/comfy_nodes/src/source_type.rs",
@@ -9552,6 +9630,18 @@
         },
         {
           "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "qualified": "comfy_nodes::NativeResidentPayloadKind",
+          "role": "boundary_dto",
+          "symbol": "NativeResidentPayloadKind"
+        },
+        {
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "qualified": "comfy_nodes::NativeResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
           "qualified": "comfy_nodes::NativeProviderPayload",
           "role": "canonical",
           "symbol": "NativeProviderPayload"
@@ -9569,6 +9659,48 @@
           "symbol": "NativeModelPayload"
         },
         {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelResourceRole",
+          "role": "canonical",
+          "symbol": "NativeModelResourceRole"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelResourceIdentity",
+          "role": "canonical",
+          "symbol": "NativeModelResourceIdentity"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelBackingKind",
+          "role": "boundary_dto",
+          "symbol": "NativeModelBackingKind"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeModelResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeModelResidentParts"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeModelTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeModelTensorResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::NativeStructuredResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeStructuredResidentParts"
+        },
+        {
           "path": "crates/comfy_model/src/conditioning.rs",
           "qualified": "comfy_model::conditioning::ConditioningSet",
           "role": "canonical",
@@ -9581,6 +9713,12 @@
           "symbol": "ConditioningResidentParts"
         },
         {
+          "path": "crates/comfy_model/src/conditioning.rs",
+          "qualified": "comfy_model::conditioning::ConditioningTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "ConditioningTensorResidentAllocation"
+        },
+        {
           "path": "crates/comfy_model/src/native_node_payload.rs",
           "qualified": "comfy_model::AudioEncoderOutput",
           "role": "canonical",
@@ -9591,6 +9729,54 @@
           "qualified": "comfy_model::ClipVisionOutput",
           "role": "canonical",
           "symbol": "ClipVisionOutput"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_vision.rs",
+          "qualified": "comfy_model::NativeClipVision",
+          "role": "canonical",
+          "symbol": "NativeClipVision"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_vision.rs",
+          "qualified": "comfy_model::ClipVisionResidentParts",
+          "role": "boundary_dto",
+          "symbol": "ClipVisionResidentParts"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_vision.rs",
+          "qualified": "comfy_model::ClipVisionTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "ClipVisionTensorResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_model/src/vision_models.rs",
+          "qualified": "comfy_model::NativeRaftLarge",
+          "role": "canonical",
+          "symbol": "NativeRaftLarge"
+        },
+        {
+          "path": "crates/comfy_model/src/vision_models.rs",
+          "qualified": "comfy_model::NativeRaftResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeRaftResidentParts"
+        },
+        {
+          "path": "crates/comfy_model/src/vision_models.rs",
+          "qualified": "comfy_model::NativeRaftTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeRaftTensorResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::ControlChainResidentParts",
+          "role": "boundary_dto",
+          "symbol": "ControlChainResidentParts"
+        },
+        {
+          "path": "crates/comfy_model/src/controlnet.rs",
+          "qualified": "comfy_model::ControlChainTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "ControlChainTensorResidentAllocation"
         },
         {
           "path": "crates/comfy_model/src/native_node_payload.rs",
@@ -9617,10 +9803,40 @@
           "symbol": "NativeDiffusionPayload"
         },
         {
+          "path": "crates/comfy_sampler/src/native_diffusion_payload.rs",
+          "qualified": "comfy_sampler::NativeDiffusionResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeDiffusionResidentParts"
+        },
+        {
+          "path": "crates/comfy_sampler/src/native_diffusion_payload.rs",
+          "qualified": "comfy_sampler::NativeDiffusionResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeDiffusionResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_sampler/src/native_diffusion_payload.rs",
+          "qualified": "comfy_sampler::NativeDiffusionResidentAllocationId",
+          "role": "boundary_dto",
+          "symbol": "NativeDiffusionResidentAllocationId"
+        },
+        {
           "path": "crates/comfy_sampler/src/native_node_payload.rs",
           "qualified": "comfy_sampler::NativeNoisePayload",
           "role": "canonical",
           "symbol": "NativeNoisePayload"
+        },
+        {
+          "path": "crates/comfy_sampler/src/native_node_payload.rs",
+          "qualified": "comfy_sampler::NativeNoiseResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeNoiseResidentParts"
+        },
+        {
+          "path": "crates/comfy_sampler/src/native_node_payload.rs",
+          "qualified": "comfy_sampler::NativeNoiseTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeNoiseTensorResidentAllocation"
         },
         {
           "path": "crates/comfy_sampler/src/native_node_payload.rs",
@@ -9671,10 +9887,76 @@
           "symbol": "NativeTracksPayload"
         },
         {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeMediaResidentParts",
+          "role": "boundary_dto",
+          "symbol": "NativeMediaResidentParts"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeMediaTensorResidentAllocation",
+          "role": "boundary_dto",
+          "symbol": "NativeMediaTensorResidentAllocation"
+        },
+        {
           "path": "crates/comfy_runtime/src/executor.rs",
           "qualified": "comfy_runtime::NativeHandleStoreGeneration",
           "role": "canonical",
           "symbol": "NativeHandleStoreGeneration"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::RuntimeNativeHandleStoreSession",
+          "role": "canonical",
+          "symbol": "RuntimeNativeHandleStoreSession"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeExecutionAttemptClaim",
+          "role": "canonical",
+          "symbol": "NativeExecutionAttemptClaim"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeHandleStoreSessionStage",
+          "role": "canonical",
+          "symbol": "NativeHandleStoreSessionStage"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeHandleStoreData",
+          "role": "canonical",
+          "symbol": "NativeHandleStoreData"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::StoredResidentAllocation",
+          "role": "canonical",
+          "symbol": "StoredResidentAllocation"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::StoredNativeHandle",
+          "role": "canonical",
+          "symbol": "StoredNativeHandle"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeHandleLease",
+          "role": "canonical",
+          "symbol": "NativeHandleLease"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::NativeHandleLeaseInner",
+          "role": "canonical",
+          "symbol": "NativeHandleLeaseInner"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::RuntimeResolvedPayloadRetention",
+          "role": "canonical",
+          "symbol": "RuntimeResolvedPayloadRetention"
         },
         {
           "path": "crates/comfy_nodes/src/registry_generator.rs",
@@ -9711,21 +9993,60 @@
       "call_symbols": [
         "EarlySliceRegistry",
         "NativeHandleStore",
+        "NativeResolvedPayload",
+        "NativeResolvedPayloadRetention",
+        "NativeHandleLease",
+        "NativeHandleLeaseInner",
+        "RuntimeResolvedPayloadRetention",
         "NativeHandleStoreGeneration",
+        "RuntimeNativeHandleStoreSession",
+        "NativeExecutionAttemptClaim",
+        "NativeHandleStoreSessionStage",
+        "NativeHandleStoreData",
+        "StoredResidentAllocation",
+        "StoredNativeHandle",
         "NativeNodeBinding",
+        "NativeNodePresentation",
+        "NativeNodeContext",
         "NativeNodeRegistry",
+        "NativeHandleType",
+        "NativeHandleStoreIdentity",
+        "NativeOpaqueHandle",
         "NativeSourceTypeProjection",
         "NativeStoredPayload",
         "NativeStoredModelPayload",
         "NativePayloadResidency",
         "NativeResidentAllocationId",
+        "NativeResidentPayloadKind",
+        "NativeResidentAllocation",
         "NativeTensorPayload",
         "NativeModelPayload",
+        "NativeModelResourceRole",
+        "NativeModelResourceIdentity",
+        "NativeModelBackingKind",
+        "NativeModelResidentAllocation",
+        "NativeModelResidentParts",
+        "NativeModelTensorResidentAllocation",
+        "NativeStructuredResidentParts",
         "ConditioningSet",
         "ConditioningResidentParts",
+        "ConditioningTensorResidentAllocation",
+        "NativeClipVision",
+        "ClipVisionResidentParts",
+        "ClipVisionTensorResidentAllocation",
+        "NativeRaftLarge",
+        "NativeRaftResidentParts",
+        "NativeRaftTensorResidentAllocation",
+        "ControlChainResidentParts",
+        "ControlChainTensorResidentAllocation",
         "NativeControlPayload",
         "NativeDiffusionPayload",
+        "NativeDiffusionResidentParts",
+        "NativeDiffusionResidentAllocation",
+        "NativeDiffusionResidentAllocationId",
         "NativeNoisePayload",
+        "NativeNoiseResidentParts",
+        "NativeNoiseTensorResidentAllocation",
         "NativeGuiderPayload",
         "NativeGuiderConditioningSets",
         "NativeSamplerPayload",
@@ -9734,6 +10055,8 @@
         "NativePoseKeypointPayload",
         "NativeSam3TrackDataPayload",
         "NativeTracksPayload",
+        "NativeMediaResidentParts",
+        "NativeMediaTensorResidentAllocation",
         "AudioEncoderOutput",
         "ClipVisionOutput",
         "IcLoraParameters",
@@ -9741,10 +10064,10 @@
         "NativeProviderPayload",
         "NativeValue",
         "NodeRegistry",
+        "TypeRegistry",
         "NodeRegistryGenerator",
         "ObjectInfoRegistry",
-        "PluginNode",
-        "RuntimeNodePresentation"
+        "PluginNode"
       ],
       "call_patterns": [
         {
@@ -9780,6 +10103,21 @@
         }
       ],
       "required_mappings": [
+        {
+          "name": "catalog-source-types-to-sealed-payload-identities",
+          "path": "crates/comfy_nodes/src/source_type.rs",
+          "pattern": "fn native_source_type_projection\\([\\s\\S]*NativeSourceTypeProjection[\\s\\S]*fn native_value_types_for_input_schema"
+        },
+        {
+          "name": "sealed-payload-to-handle-store",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "StoredNativeHandle[\\s\\S]*Arc<NativeStoredPayload>[\\s\\S]*impl NativeHandleStore for RuntimeNativeHandleStoreSession"
+        },
+        {
+          "name": "native-source-projection-to-plugin-type-registry",
+          "path": "crates/comfy_plugin_sdk/src/type_ids.rs",
+          "pattern": "TypeRegistry::from_registrations[\\s\\S]*validate_native_source_projections[\\s\\S]*native_plugin_source_type_projection"
+        },
         {
           "name": "generated-registry-to-native-registry",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -9827,17 +10165,23 @@
       "design": [
         "D8",
         "D20",
+        "D25",
+        "D28",
+        "D29",
+        "D32",
         "D34",
         "D35",
+        "D39",
         "D41"
       ],
       "validation": [
+        "VAL-DOMAIN-004",
         "VAL-NODE-REGISTRY-001",
         "VAL-PLUGIN-HOST-001",
         "VAL-WORKER-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration alone owns concrete attempt staging, committed objects, leases, generation checks, and alias-aware resident-byte accounting. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, media-annotation, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeNodeBinding, NativeValue, NativeHandleStore, and presentation DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
+      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, media-annotation, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
     },
     {
       "concern": "native_rgb8_tensor_conversion",

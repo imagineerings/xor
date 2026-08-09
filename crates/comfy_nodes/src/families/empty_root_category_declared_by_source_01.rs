@@ -122,7 +122,7 @@ impl NativeNode for WanBlockSwap {
             check_cancellation(&context)?;
             let handle = model_handle(&inputs)?.clone();
             let expected_type = model_type().map_err(|error| invalid_inputs(error.to_string()))?;
-            context
+            let resolved = context
                 .handle_store()
                 .resolve(&handle, &expected_type, &context.cancellation)
                 .map_err(handle_failure)?;
@@ -135,6 +135,7 @@ impl NativeNode for WanBlockSwap {
             outcome
                 .validate()
                 .map_err(|error| invalid_inputs(error.to_string()))?;
+            drop(resolved);
             Ok(outcome)
         })
     }
@@ -204,8 +205,8 @@ fn interrupted_failure() -> NativeNodeFailure {
 mod tests {
     use super::*;
     use crate::{
-        NativeHandleStore, NativeHandleStoreIdentity, NativePrimitive, NativeStoredPayload,
-        NodeRegistry,
+        NativeHandleStore, NativeHandleStoreIdentity, NativePrimitive, NativeResolvedPayload,
+        NativeResolvedPayloadRetention, NativeStoredPayload, NodeRegistry,
     };
     use comfy_sampler::NativeNoisePayload;
     use comfy_tensor::CpuWorkspaceAuthority;
@@ -221,6 +222,12 @@ mod tests {
         env!("CARGO_MANIFEST_DIR"),
         "/../comfy_test_support/fixtures/nodes/empty-root-category-declared-by-source-comfy-node-0757/fixture.json"
     ));
+
+    #[derive(Debug)]
+    struct TestResolvedPayloadRetention;
+
+    impl NativeResolvedPayloadRetention for TestResolvedPayloadRetention {}
+
     #[derive(Debug)]
     struct TestStore {
         identity: NativeHandleStoreIdentity,
@@ -287,7 +294,7 @@ mod tests {
             handle: &NativeOpaqueHandle,
             expected_type: &NativeHandleType,
             cancellation: &CancellationToken,
-        ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
+        ) -> Result<NativeResolvedPayload, NativeHandleStoreError> {
             cancellation
                 .check()
                 .map_err(|_| NativeHandleStoreError::Cancelled)?;
@@ -315,7 +322,10 @@ mod tests {
             if self.cancel_after_resolve.load(Ordering::Acquire) {
                 cancellation.cancel();
             }
-            Ok(self.value.clone())
+            Ok(NativeResolvedPayload::checked(
+                self.value.clone(),
+                Arc::new(TestResolvedPayloadRetention),
+            )?)
         }
 
         fn publish(

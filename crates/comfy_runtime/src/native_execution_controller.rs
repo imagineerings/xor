@@ -41,8 +41,8 @@ use comfy_nodes::{
     NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
     NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeBindingDisposition,
     NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativePrimitive,
-    NativePrimitiveType, NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion,
-    NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
+    NativePrimitiveType, NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload,
+    NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
     generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
     native_source_type_projection,
 };
@@ -90,6 +90,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    ops::Deref,
     path::PathBuf,
     sync::Arc,
     thread,
@@ -1871,12 +1872,25 @@ fn required_opaque_handle<'a>(
     }
 }
 
+struct ResolvedNative<Value> {
+    value: Value,
+    _resolved_payload: NativeResolvedPayload,
+}
+
+impl<Value> Deref for ResolvedNative<Value> {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
 fn resolve_image(
     context: &NodeContext,
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
     expected_kind: NativeTensorKind,
-) -> Result<Arc<ImageTensor>, NodeFailure> {
+) -> Result<ResolvedNative<Arc<ImageTensor>>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
     let stored = context
@@ -1896,7 +1910,10 @@ fn resolve_image(
     let image = payload.image().ok_or_else(|| {
         invalid_diffusion_input("native image handle stored a non-image tensor payload")
     })?;
-    Ok(Arc::new(image.clone()))
+    Ok(ResolvedNative {
+        value: Arc::new(image.clone()),
+        _resolved_payload: stored,
+    })
 }
 
 fn publish_tensor(
@@ -1937,7 +1954,7 @@ fn resolve_conditioning(
     context: &NodeContext,
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
-) -> Result<Arc<ConditioningSet>, NodeFailure> {
+) -> Result<ResolvedNative<Arc<ConditioningSet>>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = NativeHandleType::new(NativeHandleKind::Conditioning, "CONDITIONING")
         .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
@@ -1953,7 +1970,10 @@ fn resolve_conditioning(
     payload
         .validate()
         .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
-    Ok(payload.clone())
+    Ok(ResolvedNative {
+        value: payload.clone(),
+        _resolved_payload: stored,
+    })
 }
 
 fn resolve_tensor(
@@ -1961,7 +1981,7 @@ fn resolve_tensor(
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
     expected_kind: NativeTensorKind,
-) -> Result<Tensor, NodeFailure> {
+) -> Result<ResolvedNative<Tensor>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
     let stored = context
@@ -1978,7 +1998,10 @@ fn resolve_tensor(
             "raw tensor handle kind or schema is invalid".to_owned(),
         )));
     }
-    Ok(payload.tensor().clone())
+    Ok(ResolvedNative {
+        value: payload.tensor().clone(),
+        _resolved_payload: stored,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -2082,7 +2105,7 @@ fn resolve_diffusion_bundle(
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
     role: NativeDiffusionRole,
-) -> Result<Arc<NativeDiffusionPayload>, NodeFailure> {
+) -> Result<ResolvedNative<Arc<NativeDiffusionPayload>>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
     let expected_type = native_diffusion_handle_type(role).map_err(runtime_failure)?;
     let stored = context
@@ -2094,7 +2117,9 @@ fn resolve_diffusion_bundle(
             "native diffusion handle stored the wrong object type",
         ));
     };
-    let payload = payload.diffusion();
+    let payload = payload.diffusion().ok_or_else(|| {
+        invalid_diffusion_input("native diffusion handle stored a non-diffusion model payload")
+    })?;
     if payload.role().source_type_id() != expected_type.type_id {
         return Err(invalid_diffusion_input(
             "native diffusion handle stored the wrong resource role",
@@ -2103,7 +2128,10 @@ fn resolve_diffusion_bundle(
     payload
         .validate()
         .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
-    Ok(payload.clone())
+    Ok(ResolvedNative {
+        value: payload.clone(),
+        _resolved_payload: stored,
+    })
 }
 
 impl NativeDiffusionState {
@@ -6459,7 +6487,7 @@ mod tests {
             ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
         let raw_tensor = tensor.tensor().clone();
         let first = NativeTensorPayload::from_image(NativeTensorRole::Image, tensor.clone())?;
-        let second = NativeTensorPayload::from_image(NativeTensorRole::Image, tensor.clone())?;
+        let second = NativeTensorPayload::from_image(NativeTensorRole::Image, tensor)?;
         assert_eq!(first.projection(), second.projection());
         let mask_tensor = ImageTensor::from_f32(&cpu_backend, &tensor_context, 1, 1, 1, 1, &[0.5])?;
         let mask = NativeTensorPayload::from_image(NativeTensorRole::Mask, mask_tensor)?;

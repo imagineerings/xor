@@ -137,6 +137,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id["comfy-parity-native-node-runtime-foundation"]["writes"]
         )
         schema_writes = set(tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]["writes"])
+        value_reads = set(tasks_by_id["comfy-parity-native-node-compute-value-foundation"]["reads"])
         value_writes = set(tasks_by_id["comfy-parity-native-node-compute-value-foundation"]["writes"])
         asset_writes = set(tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]["writes"])
         provider_reads = set(
@@ -186,9 +187,16 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertNotIn("VAL-NODE-002", schema_task["validations"])
         self.assertIn("crates/comfy_model/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_model/src/clip_vision.rs", value_writes)
+        self.assertIn("crates/comfy_model/src/vision_models.rs", value_writes)
+        self.assertIn("crates/comfy_model/tests/model_families.rs", value_writes)
+        self.assertIn("crates/comfy_model/src/controlnet.rs", value_writes)
+        self.assertIn("crates/comfy_model/src/conditioning.rs", value_writes)
         self.assertIn("crates/comfy_tensor/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_sampler/src/native_diffusion_payload.rs", value_writes)
         self.assertIn("crates/comfy_sampler/src/native_node_payload.rs", value_writes)
+        self.assertIn("crates/comfy_plugin_host/Cargo.toml", value_writes)
+        self.assertIn("crates/comfy_plugin_sdk/Cargo.toml", value_writes)
+        self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", value_writes)
         self.assertIn("crates/comfy_media/Cargo.toml", value_writes)
         self.assertIn("crates/comfy_media/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_runtime/src/executor.rs", value_writes)
@@ -197,7 +205,18 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", value_writes)
         self.assertIn("crates/comfy_test_support/tests/plugin_e2e.rs", value_writes)
         value_task = tasks_by_id["comfy-parity-native-node-compute-value-foundation"]
+        self.assertIn(".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", value_reads)
+        self.assertIn(39, value_task["requirements"])
+        self.assertIn(35, value_task["designs"])
+        self.assertIn("39.3", value_task["criterion_ids"])
+        self.assertIn("39.6", value_task["criterion_ids"])
         self.assertNotIn("VAL-NODE-002", value_task["validations"])
+        for validation in [
+            "VAL-PLUGIN-HOST-001",
+            "VAL-E2E-003",
+            "VAL-WORKER-PLUGIN-001",
+        ]:
+            self.assertIn(validation, value_task["validations"])
         self.assertIn("crates/comfy_media/src/native_node_payload.rs", asset_writes)
         self.assertIn("crates/comfy_media/src/gaussian_splat.rs", asset_writes)
         self.assertIn("crates/comfy_nodes/src/execution.rs", asset_writes)
@@ -219,15 +238,40 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_api/src/services.rs", registry_writes)
         self.assertIn("crates/sim/src/sim.rs", registry_writes)
 
+        schema_commands = planning.task_validation_commands(
+            tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]
+        )
+        for command in [
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
+            "ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ]:
+            self.assertIn(command, schema_commands)
+
         value_commands = planning.task_validation_commands(
             tasks_by_id["comfy-parity-native-node-compute-value-foundation"]
         )
         for command in [
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
+            "cargo test --locked -p comfy_tensor val_tensor_001 -- --nocapture",
+            "cargo test --locked -p comfy_model val_model_family_001 -- --nocapture",
+            "native_image_e2e val_native_e2e_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_model --lib clip_vision",
+            "cargo test --locked -p comfy_model --lib raft_ -- --nocapture",
+            "cargo test --locked -p comfy_model --lib controlnet -- --nocapture",
             "cargo test --locked -p comfy_sampler --lib native_node_payload",
             "cargo test --locked -p comfy_media --lib native_node_payload",
+            "cargo test --locked -p comfy_plugin_sdk --lib type_ids -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration -- --nocapture",
             "registry_adapter::tests::explicit_stored_variants_are_exhaustively_projected_or_rejected -- --exact",
             "val_ownership_001_native_stored_payload_boundary_is_closed",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "validate_spec.py .agents/specs/comfy-parity --require-complete",
         ]:
             self.assertIn(command, value_commands)

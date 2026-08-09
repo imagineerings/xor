@@ -143,10 +143,12 @@ pub use clip_tokenizer::{
     parse_prompt_weights, token_weights, unescape_important,
 };
 pub use clip_vision::{
-    CLIP_VISION_CATALOG_SYMBOLS, CLIP_VISION_SOURCE_PATH, CLIP_VISION_SOURCE_SHA256,
-    ClipVisionActivation, ClipVisionConfiguration, ClipVisionError, ClipVisionIntermediate,
-    ClipVisionLayerWeights, ClipVisionModelType, ClipVisionOutput, ClipVisionWeights,
-    NativeClipVision, clip_preprocess_with_context, siglip2_flex_resolution,
+    CLIP_VISION_CATALOG_SYMBOLS, CLIP_VISION_RESOURCE_ROLE, CLIP_VISION_SOURCE_PATH,
+    CLIP_VISION_SOURCE_SHA256, CLIP_VISION_SOURCE_TYPE_ID, ClipVisionActivation,
+    ClipVisionConfiguration, ClipVisionError, ClipVisionIntermediate, ClipVisionLayerWeights,
+    ClipVisionModelType, ClipVisionOutput, ClipVisionResidentParts,
+    ClipVisionTensorResidentAllocation, ClipVisionWeights, NativeClipVision,
+    NativeClipVisionExecutionSession, clip_preprocess_with_context, siglip2_flex_resolution,
     siglip2_preprocess_with_context,
 };
 pub use cogvideox_family::{
@@ -345,8 +347,10 @@ pub use model_store::{
     VerifiedSentencePieceVocabulary,
 };
 pub use native_node_payload::{
-    AudioEncoderOutput, AudioEncoderOutputKind, IcLoraParameters, LossMap, NativeModelPayload,
-    NativeModelPayloadError, NativeModelResourceIdentity, NativeModelResourceRole,
+    AudioEncoderOutput, AudioEncoderOutputKind, IcLoraParameters, LossMap, NativeModelBackingKind,
+    NativeModelPayload, NativeModelPayloadError, NativeModelResidentAllocation,
+    NativeModelResidentParts, NativeModelResourceIdentity, NativeModelResourceRole,
+    NativeModelTensorResidentAllocation, NativeStructuredResidentParts,
 };
 pub use native_ops::{
     CastedParameters, ConvolutionAutopad, EmbeddingOptions, GeluApproximation, LossReduction,
@@ -548,8 +552,10 @@ pub use vae_video::{
 pub use vision_models::{
     EFFICIENTNET_V2_S_OPERATION_ID, NativeEfficientNetBlockKind, NativeEfficientNetStage,
     NativeEfficientNetV2S, NativeEfficientNetV2SFeatureSource, NativeRaftLarge,
+    NativeRaftLargeExecutionSession, NativeRaftResidentParts, NativeRaftTensorResidentAllocation,
     NativeVisionModelError, NativeVisionStateKind, NativeVisionStateSpec, RAFT_LARGE_OPERATION_ID,
-    efficientnet_v2_s_exact_native, efficientnet_v2_s_features_from_module_with_context,
+    RAFT_LARGE_RESOURCE_ROLE, RAFT_LARGE_SOURCE_TYPE_ID, efficientnet_v2_s_exact_native,
+    efficientnet_v2_s_features_from_module_with_context,
     load_stage_c_efficientnet_feature_module_from_model_store_with_context,
     load_vision_state_from_model_store_with_context,
     load_vision_state_with_sibling_namespaces_from_model_store_with_context,

@@ -8656,11 +8656,11 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
     return task(
         "comfy-parity-native-node-compute-value-foundation",
         "Establish canonical native node compute values",
-        [4, 6, 7, 31, 32, 34, 35, 36, 37, 38, 41, 44],
+        [4, 6, 7, 31, 32, 34, 35, 36, 37, 38, 39, 41, 44],
         [8, 20, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 39, 41],
-        ["VAL-DOMAIN-004", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-NATIVE-E2E-001", "VAL-OWNERSHIP-001"],
+        ["VAL-DOMAIN-004", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-NATIVE-E2E-001", "VAL-PLUGIN-HOST-001", "VAL-E2E-003", "VAL-WORKER-PLUGIN-001", "VAL-OWNERSHIP-001"],
         "Define one exhaustive source socket-to-native value/handle mapping and a closed NativeStoredPayload sum over explicit role-specific tensor, model, sampler, media-annotation, and provider payload owners, then migrate the sole handle store and early image/diffusion consumers away from raw Any, runtime-private wrappers, and generic structured constructors.",
-        [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/native-compute-closure.json", "crates/comfy_nodes/src/execution.rs", "crates/comfy_tensor", "crates/comfy_model", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_sampler", "crates/comfy_media", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_test_support/fixtures/nodes/empty-root-category-declared-by-source-comfy-node-0757"],
+        [".agents/specs/comfy-parity/catalogs/backend-nodes.csv", ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", ".agents/specs/comfy-parity/catalogs/native-compute-closure.json", "crates/comfy_nodes/src/execution.rs", "crates/comfy_tensor", "crates/comfy_model", "crates/comfy_model/src/vae_architecture.rs", "crates/comfy_sampler", "crates/comfy_media", "crates/comfy_runtime/src/executor.rs", "crates/comfy_runtime/src/native_execution_controller.rs", "crates/comfy_test_support/fixtures/nodes/empty-root-category-declared-by-source-comfy-node-0757"],
         [
             "Cargo.lock",
             "crates/comfy_nodes/Cargo.toml",
@@ -8673,6 +8673,7 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
             "crates/comfy_tensor/src/comfy_tensor.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/vision_models.rs",
             "crates/comfy_model/src/clip.rs",
             "crates/comfy_model/src/conditioning.rs",
             "crates/comfy_model/src/controlnet.rs",
@@ -8685,6 +8686,7 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
             "crates/comfy_model/src/vae.rs",
             "crates/comfy_model/src/vae_architecture.rs",
             "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/model_families.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/native_node_payload.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
@@ -8697,8 +8699,11 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_plugin_host/Cargo.toml",
             "crates/comfy_plugin_host/src/registry_adapter.rs",
             "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_sdk/Cargo.toml",
+            "crates/comfy_plugin_sdk/src/type_ids.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
@@ -8708,11 +8713,11 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "The exhaustive source-type table has one case-sensitive canonical value/handle identity per catalog socket family. Family leaves publish and resolve only explicit sealed payload variants whose handle type, semantic identity, digest, resident bytes, store, and generation are checked atomically, with role-specific shape, dtype, cardinality, and topology validation wherever those facts apply. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. Exact model, conditioning, and tensor backing aliases are charged once through process-local allocation identities with atomic reference transitions, while semantic digests and persisted handles contain no address or residency placement. Existing image and diffusion producers and consumers use the same payloads; the plugin adapter exhaustively emits a truthful checked projection or rejects the value before mutation, and forged, wrong-role, stale, cancelled, failed, cache-evicted, persisted, and restarted handles publish no partial value or second store state.",
+        "The exhaustive source-type table has one case-sensitive canonical value/handle identity per catalog socket family. Family leaves publish and resolve only explicit sealed payload variants whose handle type, semantic identity, digest, resident bytes, store, and generation are checked atomically, with role-specific shape, dtype, cardinality, and topology validation wherever those facts apply. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. Exact model, conditioning, and tensor backing aliases are charged once through process-local allocation identities with atomic reference transitions, while semantic digests and persisted handles contain no address or residency placement. Existing image and diffusion producers and consumers use the same payloads; the plugin adapter exhaustively emits a truthful checked projection or rejects the value before mutation, and forged, wrong-role, stale, cancelled, failed, cache-evicted, persisted, and restarted handles publish no partial value or second store state. Native-planning unit validation, strict two-pass regeneration, and standalone complete-spec validation pass on the final tree.",
         [dependency, compute_dependency],
         locked=True,
         feature_scoped=True,
-        criterion_ids=["34.2", "34.6", "35.2", "35.3", "35.6", "38.3", "38.6", "44.3"],
+        criterion_ids=["34.2", "34.6", "35.2", "35.3", "35.6", "38.3", "38.6", "39.3", "39.6", "44.3"],
     )
 
 
@@ -11790,6 +11795,10 @@ def task_validation_commands(item: dict[str, object]) -> str:
         commands = ["python3 .agents/specs/comfy-parity/regenerate_all.py --check"]
     if identifier == "comfy-parity-native-node-schema-metadata-foundation":
         commands.extend([
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
@@ -11797,14 +11806,21 @@ def task_validation_commands(item: dict[str, object]) -> str:
         ])
     if identifier == "comfy-parity-native-node-compute-value-foundation":
         commands.extend([
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
+            "cargo test --locked -p comfy_tensor val_tensor_001 -- --nocapture",
+            "cargo test --locked -p comfy_model val_model_family_001 -- --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_image_e2e val_native_e2e_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_nodes --lib source_type::tests -- --nocapture",
             "cargo test --locked -p comfy_nodes --lib stored_payload::tests -- --nocapture",
             "cargo test --locked -p comfy_tensor --lib native_node_payload",
             "cargo test --locked -p comfy_model --lib native_node_payload",
             "cargo test --locked -p comfy_model --lib clip_vision",
+            "cargo test --locked -p comfy_model --lib raft_ -- --nocapture",
+            "cargo test --locked -p comfy_model --lib controlnet -- --nocapture",
             "cargo test --locked -p comfy_sampler --lib native_diffusion_payload",
             "cargo test --locked -p comfy_sampler --lib native_node_payload",
             "cargo test --locked -p comfy_media --lib native_node_payload",
+            "cargo test --locked -p comfy_plugin_sdk --lib type_ids -- --nocapture",
             "cargo test --locked -p comfy_runtime --lib native_handle_store -- --nocapture",
             "cargo test --locked -p comfy_plugin_host --lib registry_adapter::tests::explicit_stored_variants_are_exhaustively_projected_or_rejected -- --exact --nocapture",
             "cargo test --locked -p comfy_plugin_host --lib registry_adapter::tests::explicit_model_family_handles_round_trip_without_mutating_imports -- --exact --nocapture",
@@ -11812,8 +11828,10 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo test --locked -p comfy_test_support --test plugin_e2e val_plugin_host_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test plugin_e2e val_e2e_003 -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test plugin_e2e val_worker_plugin_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test native_conditioning_integration -- --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001_native_stored_payload_boundary_is_closed -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
         ])

@@ -121,6 +121,7 @@ impl NativeSchemaValue {
                 if !valid_sha256(sha256) {
                     return Err(NativeSchemaError::InvalidDigest);
                 }
+                validate_text(sha256, total_bytes)?;
             }
         }
         Ok(())
@@ -400,6 +401,15 @@ impl CatalogNodeSchemaMetadata {
         {
             return Err(NativeSchemaError::InvalidMetadata("catalog_schema"));
         }
+        if self.inputs.len() > MAX_SCHEMA_ITEMS
+            || self.dynamic_inputs.len() > MAX_SCHEMA_ITEMS
+            || self.outputs.len() > MAX_SCHEMA_ITEMS
+            || self.unresolved_inputs.len() > MAX_SCHEMA_ITEMS
+            || self.unresolved_outputs.len() > MAX_SCHEMA_ITEMS
+            || self.hidden.len() > MAX_SCHEMA_ITEMS
+        {
+            return Err(NativeSchemaError::ItemCountExceeded);
+        }
         self.node.validate()?;
         let mut names = BTreeSet::new();
         for input in &self.inputs {
@@ -428,6 +438,38 @@ impl CatalogNodeSchemaMetadata {
         validate_values(&self.hidden)?;
         validate_optional_text(self.presentation.display_name.as_deref())?;
         validate_optional_text(self.presentation.description.as_deref())?;
+        let mut total_bytes = 0usize;
+        let mut total_items = 0usize;
+        accumulate_text(&self.catalog_sha256, &mut total_bytes, &mut total_items)?;
+        accumulate_text(&self.definition_sha256, &mut total_bytes, &mut total_items)?;
+        accumulate_node_metadata(&self.node, &mut total_bytes, &mut total_items)?;
+        for input in &self.inputs {
+            accumulate_input_metadata(&input.schema, &mut total_bytes, &mut total_items)?;
+        }
+        for dynamic_input in &self.dynamic_inputs {
+            accumulate_dynamic_metadata(dynamic_input, &mut total_bytes, &mut total_items)?;
+        }
+        for output in &self.outputs {
+            accumulate_catalog_output_metadata(output, &mut total_bytes, &mut total_items)?;
+        }
+        for value in self
+            .unresolved_inputs
+            .iter()
+            .chain(&self.unresolved_outputs)
+            .chain(&self.hidden)
+        {
+            value.validate_bounded(0, &mut total_bytes, &mut total_items)?;
+        }
+        accumulate_optional_text(
+            self.presentation.display_name.as_deref(),
+            &mut total_bytes,
+            &mut total_items,
+        )?;
+        accumulate_optional_text(
+            self.presentation.description.as_deref(),
+            &mut total_bytes,
+            &mut total_items,
+        )?;
         Ok(())
     }
 
@@ -478,6 +520,22 @@ impl CatalogNodeSchemaMetadata {
         value.validate()?;
         Ok(value)
     }
+}
+
+fn accumulate_catalog_output_metadata(
+    metadata: &CatalogNodeOutputSchemaMetadata,
+    total_bytes: &mut usize,
+    total_items: &mut usize,
+) -> Result<(), NativeSchemaError> {
+    accumulate_optional_text(metadata.source_name.as_deref(), total_bytes, total_items)?;
+    accumulate_text(&metadata.source_type_name, total_bytes, total_items)?;
+    accumulate_optional_text(metadata.display_name.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.tooltip.as_deref(), total_bytes, total_items)?;
+    accumulate_optional_text(metadata.match_template.as_deref(), total_bytes, total_items)?;
+    for choice in &metadata.choices {
+        choice.validate_bounded(0, total_bytes, total_items)?;
+    }
+    accumulate_fields(&metadata.extra, total_bytes, total_items)
 }
 
 impl NativeDescriptorSchemaMetadata {
@@ -1041,6 +1099,19 @@ mod tests {
             .collect();
         assert_eq!(
             metadata.validate(),
+            Err(NativeSchemaError::TotalBytesExceeded)
+        );
+
+        let preserved_expressions = NativeSchemaValue::List {
+            values: (0..4_095)
+                .map(|_| NativeSchemaValue::PreservedExpression {
+                    source: "x".repeat(450),
+                    sha256: "a".repeat(64),
+                })
+                .collect(),
+        };
+        assert_eq!(
+            preserved_expressions.validate(),
             Err(NativeSchemaError::TotalBytesExceeded)
         );
     }

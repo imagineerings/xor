@@ -1,13 +1,19 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, mem, num::NonZeroU64, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+    num::NonZeroU64,
+    sync::Arc,
+};
 use thiserror::Error;
 
-use comfy_tensor::{DType, Tensor, TensorError};
+use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 
 use crate::{
-    NativeVae,
+    NativeRaftLarge, NativeVae,
     clip::{LoadedSd1Clip, NativeTokenizer},
+    clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
 };
 const NATIVE_MODEL_RESOURCE_SCHEMA_VERSION: u16 = 1;
@@ -185,7 +191,7 @@ impl NativeModelResourceIdentity {
         &self.digest_sha256
     }
 
-    fn resident_owned_bytes(&self) -> Result<u64, NativeModelPayloadError> {
+    pub(crate) fn resident_owned_bytes(&self) -> Result<u64, NativeModelPayloadError> {
         [
             &self.identifier,
             &self.format,
@@ -255,6 +261,12 @@ enum NativeModelResource {
     NativeVae {
         vae: Arc<NativeVae>,
     },
+    OpticalFlow {
+        raft: Arc<NativeRaftLarge>,
+    },
+    ClipVision {
+        clip_vision: Arc<NativeClipVision>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -263,6 +275,8 @@ pub enum NativeModelBackingKind {
     Sd1Tokenizer,
     Sd1Clip,
     NativeVae,
+    OpticalFlow,
+    ClipVision,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -286,10 +300,27 @@ impl NativeModelResidentAllocation {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeModelTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl NativeModelTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeModelResidentParts {
     owned_bytes: u64,
     backing_allocations: Vec<NativeModelResidentAllocation>,
+    tensor_allocations: Vec<NativeModelTensorResidentAllocation>,
 }
 
 impl NativeModelResidentParts {
@@ -301,13 +332,51 @@ impl NativeModelResidentParts {
         &self.backing_allocations
     }
 
+    pub fn tensor_allocations(&self) -> &[NativeModelTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
     pub fn resident_bytes(&self) -> Result<u64, NativeModelPayloadError> {
-        self.backing_allocations
+        let bytes =
+            self.backing_allocations
+                .iter()
+                .try_fold(self.owned_bytes, |bytes, allocation| {
+                    bytes
+                        .checked_add(allocation.resident_bytes)
+                        .ok_or(NativeModelPayloadError::LengthOverflow)
+                })?;
+        self.tensor_allocations
+            .iter()
+            .try_fold(bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeModelPayloadError::LengthOverflow)
+            })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeStructuredResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<NativeModelTensorResidentAllocation>,
+}
+
+impl NativeStructuredResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[NativeModelTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeModelPayloadError> {
+        self.tensor_allocations
             .iter()
             .try_fold(self.owned_bytes, |bytes, allocation| {
                 bytes
                     .checked_add(allocation.resident_bytes)
-                    .ok_or(NativeModelPayloadError::LengthOverflow)
+                    .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)
             })
     }
 }
@@ -393,6 +462,67 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn optical_flow(raft: Arc<NativeRaftLarge>) -> Result<Self, NativeModelPayloadError> {
+        if raft.is_training() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "OPTICAL_FLOW evaluation state",
+            ));
+        }
+        let cancellation = CancellationToken::default();
+        raft.validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = raft
+            .semantic_identity()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?
+            .clone();
+        if identity.role() != NativeModelResourceRole::OpticalFlow {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "OPTICAL_FLOW resource role",
+            ));
+        }
+        let resident_bytes = payload_resident_bytes(
+            &identity,
+            raft.resident_bytes()
+                .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?,
+        )?;
+        Ok(Self {
+            identity,
+            resident_bytes,
+            resource: NativeModelResource::OpticalFlow { raft },
+        })
+    }
+
+    pub fn clip_vision(
+        clip_vision: Arc<NativeClipVision>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if clip_vision.is_training() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "CLIP_VISION evaluation state",
+            ));
+        }
+        let cancellation = CancellationToken::default();
+        clip_vision
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = clip_vision.semantic_identity().clone();
+        if identity.role() != NativeModelResourceRole::ClipVision {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "CLIP_VISION resource role",
+            ));
+        }
+        let resident_bytes = payload_resident_bytes(
+            &identity,
+            clip_vision
+                .resident_bytes()
+                .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?,
+        )?;
+        Ok(Self {
+            identity,
+            resident_bytes,
+            resource: NativeModelResource::ClipVision { clip_vision },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -406,6 +536,7 @@ impl NativeModelPayload {
             .map_err(|_| NativeModelPayloadError::LengthOverflow)?
             .checked_add(self.identity.resident_owned_bytes()?)
             .ok_or(NativeModelPayloadError::LengthOverflow)?;
+        let mut tensor_allocations = Vec::new();
         let backing_allocations = match &self.resource {
             NativeModelResource::Sd15Model { model } => vec![NativeModelResidentAllocation {
                 kind: NativeModelBackingKind::Sd15Model,
@@ -437,10 +568,43 @@ impl NativeModelPayload {
                     NativeModelPayloadError::ResourceAccounting(error.to_string())
                 })?,
             }],
+            NativeModelResource::OpticalFlow { raft } => {
+                let parts = raft.resident_parts().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?;
+                tensor_allocations.extend(parts.tensor_allocations().iter().map(|allocation| {
+                    NativeModelTensorResidentAllocation {
+                        storage_id: allocation.storage_id(),
+                        resident_bytes: allocation.resident_bytes(),
+                    }
+                }));
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::OpticalFlow,
+                    address: Arc::as_ptr(raft) as usize,
+                    resident_bytes: parts.owned_bytes(),
+                }]
+            }
+            NativeModelResource::ClipVision { clip_vision } => {
+                let parts = clip_vision.resident_parts().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?;
+                tensor_allocations.extend(parts.tensor_allocations().iter().map(|allocation| {
+                    NativeModelTensorResidentAllocation {
+                        storage_id: allocation.storage_id(),
+                        resident_bytes: allocation.resident_bytes(),
+                    }
+                }));
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::ClipVision,
+                    address: Arc::as_ptr(clip_vision) as usize,
+                    resident_bytes: parts.owned_bytes(),
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
             backing_allocations,
+            tensor_allocations,
         };
         if parts.resident_bytes()? != self.resident_bytes {
             return Err(NativeModelPayloadError::ResourceMismatch(
@@ -453,7 +617,10 @@ impl NativeModelPayload {
     pub fn model(&self) -> Option<&Arc<Sd15TinyModel>> {
         match &self.resource {
             NativeModelResource::Sd15Model { model } => Some(model),
-            NativeModelResource::Sd1Clip { .. } | NativeModelResource::NativeVae { .. } => None,
+            NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::OpticalFlow { .. }
+            | NativeModelResource::ClipVision { .. } => None,
         }
     }
 
@@ -462,14 +629,40 @@ impl NativeModelPayload {
             NativeModelResource::Sd1Clip {
                 tokenizer, clip, ..
             } => Some((tokenizer, clip)),
-            NativeModelResource::Sd15Model { .. } | NativeModelResource::NativeVae { .. } => None,
+            NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::OpticalFlow { .. }
+            | NativeModelResource::ClipVision { .. } => None,
         }
     }
 
     pub fn vae(&self) -> Option<&Arc<NativeVae>> {
         match &self.resource {
             NativeModelResource::NativeVae { vae } => Some(vae),
-            NativeModelResource::Sd15Model { .. } | NativeModelResource::Sd1Clip { .. } => None,
+            NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::OpticalFlow { .. }
+            | NativeModelResource::ClipVision { .. } => None,
+        }
+    }
+
+    pub fn optical_flow_resource(&self) -> Option<&Arc<NativeRaftLarge>> {
+        match &self.resource {
+            NativeModelResource::OpticalFlow { raft } => Some(raft),
+            NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::ClipVision { .. } => None,
+        }
+    }
+
+    pub fn clip_vision_resource(&self) -> Option<&Arc<NativeClipVision>> {
+        match &self.resource {
+            NativeModelResource::ClipVision { clip_vision } => Some(clip_vision),
+            NativeModelResource::Sd15Model { .. }
+            | NativeModelResource::Sd1Clip { .. }
+            | NativeModelResource::NativeVae { .. }
+            | NativeModelResource::OpticalFlow { .. } => None,
         }
     }
 
@@ -480,6 +673,10 @@ impl NativeModelPayload {
                 tokenizer, clip, ..
             } => Self::sd1_clip(tokenizer.clone(), clip.clone())?,
             NativeModelResource::NativeVae { vae } => Self::native_vae(vae.clone())?,
+            NativeModelResource::OpticalFlow { raft } => Self::optical_flow(raft.clone())?,
+            NativeModelResource::ClipVision { clip_vision } => {
+                Self::clip_vision(clip_vision.clone())?
+            }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes
         {
@@ -622,6 +819,42 @@ impl AudioEncoderOutput {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<NativeStructuredResidentParts, NativeModelPayloadError> {
+        let owned_bytes = match &self.resource {
+            AudioEncoderOutputResource::Layered {
+                encoded_audio_all_layers,
+                ..
+            } => u64::try_from(mem::size_of::<Self>())
+                .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?
+                .checked_add(
+                    u64::try_from(
+                        mem::size_of::<Tensor>()
+                            .checked_mul(encoded_audio_all_layers.len())
+                            .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+                    )
+                    .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+                )
+                .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+            AudioEncoderOutputResource::WanDancer { .. } => {
+                u64::try_from(mem::size_of::<Self>())
+                    .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?
+            }
+        };
+        match &self.resource {
+            AudioEncoderOutputResource::Layered {
+                encoded_audio,
+                encoded_audio_all_layers,
+                ..
+            } => structured_resident_parts(
+                owned_bytes,
+                std::iter::once(encoded_audio).chain(encoded_audio_all_layers.iter()),
+            ),
+            AudioEncoderOutputResource::WanDancer { audio_feature, .. } => {
+                structured_resident_parts(owned_bytes, std::iter::once(audio_feature))
+            }
+        }
+    }
+
     pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
         let (semantic_digest_sha256, resident_bytes) =
             project_audio_encoder_output(&self.resource)?;
@@ -630,7 +863,11 @@ impl AudioEncoderOutput {
             semantic_digest_sha256,
             self.resident_bytes,
             resident_bytes,
-        )
+        )?;
+        if self.resident_parts()?.resident_bytes()? != self.resident_bytes {
+            return Err(NativeModelPayloadError::StructuredProjectionChanged);
+        }
+        Ok(())
     }
 }
 
@@ -715,6 +952,21 @@ impl LossMap {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<NativeStructuredResidentParts, NativeModelPayloadError> {
+        let owned_bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?
+            .checked_add(
+                u64::try_from(
+                    mem::size_of::<Tensor>()
+                        .checked_mul(self.losses.len())
+                        .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+                )
+                .map_err(|_| NativeModelPayloadError::StructuredResidentBytesOverflow)?,
+            )
+            .ok_or(NativeModelPayloadError::StructuredResidentBytesOverflow)?;
+        structured_resident_parts(owned_bytes, self.losses.iter())
+    }
+
     pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
         let (semantic_digest_sha256, resident_bytes) = project_loss_map(&self.losses)?;
         require_structured_projection(
@@ -722,8 +974,42 @@ impl LossMap {
             semantic_digest_sha256,
             self.resident_bytes,
             resident_bytes,
-        )
+        )?;
+        if self.resident_parts()?.resident_bytes()? != self.resident_bytes {
+            return Err(NativeModelPayloadError::StructuredProjectionChanged);
+        }
+        Ok(())
     }
+}
+
+fn structured_resident_parts<'a>(
+    owned_bytes: u64,
+    tensors: impl IntoIterator<Item = &'a Tensor>,
+) -> Result<NativeStructuredResidentParts, NativeModelPayloadError> {
+    let mut storages = BTreeMap::new();
+    for tensor in tensors {
+        let storage_id = tensor.storage_id();
+        let resident_bytes = tensor.storage_byte_len();
+        if let Some(existing) = storages.insert(storage_id.get(), (storage_id, resident_bytes))
+            && existing.1 != resident_bytes
+        {
+            return Err(NativeModelPayloadError::StructuredProjectionChanged);
+        }
+    }
+    let parts = NativeStructuredResidentParts {
+        owned_bytes,
+        tensor_allocations: storages
+            .into_values()
+            .map(
+                |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                    storage_id,
+                    resident_bytes,
+                },
+            )
+            .collect(),
+    };
+    parts.resident_bytes()?;
+    Ok(parts)
 }
 
 fn project_audio_encoder_output(
@@ -1135,7 +1421,7 @@ mod tests {
         CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
         TensorDescriptor,
     };
-    use std::error::Error;
+    use std::{collections::BTreeMap, error::Error};
 
     const TEST_MEMORY_LIMIT_BYTES: u64 = 1024 * 1024;
 
@@ -1162,6 +1448,54 @@ mod tests {
             TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
         let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
         Ok(tensor)
+    }
+
+    fn loaded_zero_raft() -> Result<Arc<NativeRaftLarge>, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+        let mut raft = crate::raft_large_exact_native(false, false, &cancellation)?;
+        let mut shared_tensors: Vec<(Vec<u64>, DType, Tensor)> = Vec::new();
+        let mut state = BTreeMap::new();
+        for spec in raft.state_schema() {
+            let tensor = match shared_tensors
+                .iter()
+                .find(|(shape, dtype, _)| shape == &spec.shape && *dtype == spec.dtype)
+            {
+                Some((_, _, tensor)) => tensor.clone(),
+                None => {
+                    let encoded_bytes = spec
+                        .shape
+                        .iter()
+                        .try_fold(spec.dtype.byte_width(), |bytes, dimension| {
+                            bytes.checked_mul(*dimension)
+                        })
+                        .ok_or(NativeModelPayloadError::LengthOverflow)?;
+                    let descriptor = TensorDescriptor::contiguous(
+                        spec.shape.clone(),
+                        spec.dtype,
+                        DeviceId::CPU,
+                        StreamId::DEFAULT,
+                    )?;
+                    let context = backend.execution_context(
+                        StreamId::DEFAULT,
+                        authority.authorize_workspace(encoded_bytes.max(1))?,
+                        &cancellation,
+                    );
+                    let bytes = vec![
+                        0_u8;
+                        usize::try_from(encoded_bytes)
+                            .map_err(|_| NativeModelPayloadError::LengthOverflow)?
+                    ];
+                    let tensor = backend.upload_bytes(descriptor, &bytes, &context)?.0;
+                    shared_tensors.push((spec.shape.clone(), spec.dtype, tensor.clone()));
+                    tensor
+                }
+            };
+            state.insert(spec.name.clone(), tensor);
+        }
+        raft.load_state_dict(state, &cancellation)?;
+        raft.eval();
+        Ok(Arc::new(raft))
     }
 
     #[test]
@@ -1234,6 +1568,59 @@ mod tests {
     }
 
     #[test]
+    fn optical_flow_payload_binds_canonical_raft_identity_and_exact_backing_arc()
+    -> Result<(), Box<dyn Error>> {
+        let raft = loaded_zero_raft()?;
+        let payload = NativeModelPayload::optical_flow(raft.clone())?;
+        payload.validate()?;
+        assert_eq!(payload.identity(), raft.semantic_identity()?);
+        assert_eq!(
+            payload.identity().role(),
+            NativeModelResourceRole::OpticalFlow
+        );
+        assert_eq!(payload.identity().role().source_type_id(), "OPTICAL_FLOW");
+        assert_eq!(
+            payload.identity().digest_sha256(),
+            raft.semantic_digest_sha256()?
+        );
+        assert!(
+            payload
+                .optical_flow_resource()
+                .is_some_and(|stored| Arc::ptr_eq(stored, &raft))
+        );
+        assert!(payload.model().is_none());
+        assert!(payload.clip().is_none());
+        assert!(payload.vae().is_none());
+
+        let parts = payload.resident_parts()?;
+        assert_eq!(parts.backing_allocations().len(), 1);
+        let backing = parts.backing_allocations().first().ok_or(
+            NativeModelPayloadError::ResourceMismatch("OPTICAL_FLOW backing allocation"),
+        )?;
+        assert_eq!(backing.kind(), NativeModelBackingKind::OpticalFlow);
+        assert_eq!(backing.address(), Arc::as_ptr(&raft) as usize);
+        assert_eq!(
+            backing.resident_bytes(),
+            raft.resident_parts()?.owned_bytes()
+        );
+        assert_eq!(
+            parts.tensor_allocations().len(),
+            raft.resident_parts()?.tensor_allocations().len()
+        );
+        assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
+
+        let mut training_raft = (*raft).clone();
+        training_raft.train();
+        assert!(matches!(
+            NativeModelPayload::optical_flow(Arc::new(training_raft)),
+            Err(NativeModelPayloadError::ResourceMismatch(
+                "OPTICAL_FLOW evaluation state"
+            ))
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn audio_encoder_output_preserves_both_exact_source_shapes_and_alias_accounting()
     -> Result<(), Box<dyn Error>> {
         with_context(|backend, context| {
@@ -1260,6 +1647,9 @@ mod tests {
                     + first_layer.storage_byte_len()
                     + encoded_audio.storage_byte_len()
             );
+            let layered_parts = layered.resident_parts()?;
+            assert_eq!(layered_parts.tensor_allocations().len(), 2);
+            assert_eq!(layered_parts.resident_bytes()?, layered.resident_bytes());
 
             let audio_feature = f32_tensor(backend, context, vec![1, 2, 35], &[0.25; 70])?;
             let dancer = AudioEncoderOutput::wan_dancer(audio_feature, 30.0, 1.5)?;
@@ -1289,6 +1679,15 @@ mod tests {
             assert_eq!(
                 first_output.semantic_digest_sha256(),
                 second_output.semantic_digest_sha256()
+            );
+            assert_ne!(
+                first_output.resident_parts()?.tensor_allocations(),
+                second_output.resident_parts()?.tensor_allocations()
+            );
+            let shared_output = first_output.clone();
+            assert_eq!(
+                first_output.resident_parts()?.tensor_allocations(),
+                shared_output.resident_parts()?.tensor_allocations()
             );
 
             let non_finite = f32_tensor(backend, context, vec![1], &[f32::NAN])?;
@@ -1336,6 +1735,37 @@ mod tests {
                     + scalar.storage_byte_len()
                     + matrix.storage_byte_len()
             );
+            let loss_parts = loss_map.resident_parts()?;
+            assert_eq!(loss_parts.tensor_allocations().len(), 2);
+            assert_eq!(loss_parts.resident_bytes()?, loss_map.resident_bytes());
+
+            let aliased = LossMap::checked(vec![scalar.clone(), scalar.clone()])?;
+            assert_eq!(aliased.resident_parts()?.tensor_allocations().len(), 1);
+            let distinct_scalar = f32_tensor(backend, context, Vec::new(), &[0.5])?;
+            let first_scalar = LossMap::checked(vec![scalar])?;
+            let second_scalar = LossMap::checked(vec![distinct_scalar])?;
+            assert_eq!(
+                first_scalar.semantic_digest_sha256(),
+                second_scalar.semantic_digest_sha256()
+            );
+            assert_ne!(
+                first_scalar.resident_parts()?.tensor_allocations(),
+                second_scalar.resident_parts()?.tensor_allocations()
+            );
+
+            let overflow = NativeStructuredResidentParts {
+                owned_bytes: u64::MAX,
+                tensor_allocations: vec![
+                    *loss_parts
+                        .tensor_allocations()
+                        .first()
+                        .ok_or(NativeModelPayloadError::StructuredProjectionChanged)?,
+                ],
+            };
+            assert!(matches!(
+                overflow.resident_bytes(),
+                Err(NativeModelPayloadError::StructuredResidentBytesOverflow)
+            ));
             assert!(LossMap::checked(Vec::new()).is_err());
             Ok(())
         })

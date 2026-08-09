@@ -24,8 +24,9 @@ pub use execution::{
     NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
     NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
     NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeTypeUnion, NativeValue, NativeValueType,
-    native_value_matches_input_schema, validate_generated_family_bindings,
+    NativePrimitiveType, NativeResolvedPayload, NativeResolvedPayloadRetention, NativeTypeUnion,
+    NativeValue, NativeValueType, native_value_matches_input_schema,
+    validate_generated_family_bindings,
 };
 pub use object_info::{
     OBJECT_INFO_SCHEMA_VERSION, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,

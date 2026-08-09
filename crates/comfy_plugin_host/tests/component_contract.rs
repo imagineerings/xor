@@ -1947,7 +1947,10 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
             .ok_or("installed native input is absent")?;
         let canonical =
             native_plugin_source_type_projection(plugin_port.type_id.name())?.value_type()?;
-        assert_eq!(native_input.accepted_types.members(), &[canonical.clone()]);
+        assert_eq!(
+            native_input.accepted_types.members(),
+            std::slice::from_ref(&canonical)
+        );
         assert_eq!(
             native_input.allows_literal,
             !matches!(canonical, NativeValueType::Handle(_))

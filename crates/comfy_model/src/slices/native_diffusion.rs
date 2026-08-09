@@ -1570,6 +1570,20 @@ mod tests {
             .to_path_buf())
     }
 
+    fn target_directory(workspace_root: &Path) -> PathBuf {
+        match std::env::var_os("CARGO_TARGET_DIR") {
+            Some(directory) => {
+                let directory = PathBuf::from(directory);
+                if directory.is_absolute() {
+                    directory
+                } else {
+                    workspace_root.join(directory)
+                }
+            }
+            None => workspace_root.join("target"),
+        }
+    }
+
     fn valid_projection() -> Sd15DetectorProjection {
         let source_shapes = BTreeMap::from([
             (
@@ -1617,7 +1631,7 @@ mod tests {
         cases: serde_json::Value,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let root = workspace()?;
-        let directory = root.join("target/comfy-parity");
+        let directory = target_directory(&root).join("comfy-parity");
         fs::create_dir_all(&directory)?;
         let passed = cases
             .as_object()
@@ -1864,8 +1878,8 @@ mod tests {
         assert!(tensor_from_f32(&tiny_backend, &[1, 4, 4, 4], &[0.0; 64], &tiny_context,).is_err());
 
         write_artifact(
-            "val-model-family-001.json",
-            "VAL-MODEL-FAMILY-001",
+            "val-model-family-foundation-001.json",
+            "VAL-MODEL-FAMILY-FOUNDATION-001",
             "comfy-parity-native-diffusion-foundation pinned SD15 detector, tokenizer, topology, checkpoints, cancellation, and OOM slice",
             json!({
                 "catalog": digest(&catalog_path)?, "manifest": digest(&manifest_path)?,

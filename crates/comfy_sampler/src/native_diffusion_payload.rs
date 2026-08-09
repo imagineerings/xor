@@ -1,5 +1,6 @@
 use comfy_model::{
-    NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole, NativeVae, PatchGraph,
+    NativeModelBackingKind, NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole,
+    NativeVae, PatchGraph,
     conditioning::{ConditioningError, ConditioningIdentity},
     controlnet::{
         ControlChain, ControlConditioning, ControlIsolation, ControlModelExecutor, ControlNetError,
@@ -18,6 +19,101 @@ use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error;
 
 use crate::GUIDANCE_ADAPTER_ID;
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NativeDiffusionResidentAllocationId {
+    ModelPayloadArc {
+        address: usize,
+    },
+    ModelBacking {
+        kind: NativeModelBackingKind,
+        address: usize,
+    },
+    ConditioningPayloadArc {
+        address: usize,
+    },
+    PatchGraphArc {
+        address: usize,
+    },
+    ControlExecutionArc {
+        address: usize,
+    },
+    ControlChainArc {
+        address: usize,
+    },
+    ControlExecutorArc {
+        address: usize,
+    },
+    TensorStorage {
+        storage_id: u64,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeDiffusionResidentAllocation {
+    id: NativeDiffusionResidentAllocationId,
+    resident_bytes: u64,
+}
+
+impl NativeDiffusionResidentAllocation {
+    pub fn id(&self) -> &NativeDiffusionResidentAllocationId {
+        &self.id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeDiffusionResidentParts {
+    owned_bytes: u64,
+    shared_allocations: Vec<NativeDiffusionResidentAllocation>,
+}
+
+impl NativeDiffusionResidentParts {
+    fn checked(
+        owned_bytes: u64,
+        allocations: impl IntoIterator<Item = NativeDiffusionResidentAllocation>,
+    ) -> Result<Self, NativeDiffusionPayloadError> {
+        let mut unique = BTreeMap::new();
+        for allocation in allocations {
+            if let Some(existing) = unique.insert(allocation.id, allocation.resident_bytes)
+                && existing != allocation.resident_bytes
+            {
+                return Err(NativeDiffusionPayloadError::ResidentAllocationChanged);
+            }
+        }
+        let shared_allocations = unique
+            .into_iter()
+            .map(|(id, resident_bytes)| NativeDiffusionResidentAllocation { id, resident_bytes })
+            .collect::<Vec<_>>();
+        let parts = Self {
+            owned_bytes,
+            shared_allocations,
+        };
+        parts.resident_bytes()?;
+        Ok(parts)
+    }
+
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn shared_allocations(&self) -> &[NativeDiffusionResidentAllocation] {
+        &self.shared_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeDiffusionPayloadError> {
+        self.shared_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)
+            })
+    }
+}
 
 #[derive(Clone)]
 pub struct NativeControlExecution {
@@ -71,14 +167,24 @@ impl NativeControlPayload {
     }
 
     pub fn resident_bytes(&self) -> Result<usize, NativeDiffusionPayloadError> {
-        let wrapper_bytes = u64::try_from(mem::size_of::<Self>())
-            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?;
-        usize::try_from(
-            wrapper_bytes
-                .checked_add(self.execution.resident_bytes()?)
-                .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?,
-        )
-        .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+        usize::try_from(self.resident_parts()?.resident_bytes()?)
+            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+    }
+
+    pub fn resident_parts(
+        &self,
+    ) -> Result<NativeDiffusionResidentParts, NativeDiffusionPayloadError> {
+        let owned_bytes = resident_size::<Self>()?
+            .checked_add(resident_capacity(&self.digest_sha256)?)
+            .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+        let mut allocations = vec![NativeDiffusionResidentAllocation {
+            id: NativeDiffusionResidentAllocationId::ControlExecutionArc {
+                address: arc_address(&self.execution),
+            },
+            resident_bytes: self.execution.owned_resident_bytes()?,
+        }];
+        allocations.extend(self.execution.shared_resident_allocations()?);
+        NativeDiffusionResidentParts::checked(owned_bytes, allocations)
     }
 
     pub fn validate(&self) -> Result<(), NativeDiffusionPayloadError> {
@@ -160,29 +266,75 @@ impl NativeControlExecution {
     }
 
     pub fn resident_bytes(&self) -> Result<u64, NativeDiffusionPayloadError> {
-        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
-            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?;
-        let chain_bytes = self
-            .chain
-            .resident_bytes()
-            .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?;
-        let executor_bytes = self
-            .executor
-            .resident_bytes()
-            .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?;
-        bytes = bytes
-            .checked_add(chain_bytes)
-            .and_then(|bytes| bytes.checked_add(executor_bytes))
+        NativeDiffusionResidentParts::checked(
+            self.owned_resident_bytes()?,
+            self.shared_resident_allocations()?,
+        )?
+        .resident_bytes()
+    }
+
+    fn owned_resident_bytes(&self) -> Result<u64, NativeDiffusionPayloadError> {
+        let mut bytes = resident_size::<Self>()?
+            .checked_add(resident_capacity(&self.execution_digest)?)
             .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
-        if let Some(vae) = &self.vae {
+        if let Some(digest) = &self.vae_execution_digest {
             bytes = bytes
-                .checked_add(
-                    vae.resident_storage_bytes()
-                        .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?,
-                )
+                .checked_add(resident_capacity(digest)?)
                 .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
         }
         Ok(bytes)
+    }
+
+    fn embedded_owned_resident_bytes(&self) -> Result<u64, NativeDiffusionPayloadError> {
+        self.owned_resident_bytes()?
+            .checked_sub(resident_size::<Self>()?)
+            .ok_or(NativeDiffusionPayloadError::ResidentAllocationChanged)
+    }
+
+    fn shared_resident_allocations(
+        &self,
+    ) -> Result<Vec<NativeDiffusionResidentAllocation>, NativeDiffusionPayloadError> {
+        let chain_parts = self
+            .chain
+            .resident_parts()
+            .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?;
+        let mut allocations = vec![
+            NativeDiffusionResidentAllocation {
+                id: NativeDiffusionResidentAllocationId::ControlChainArc {
+                    address: arc_address(&self.chain),
+                },
+                resident_bytes: chain_parts.owned_bytes(),
+            },
+            NativeDiffusionResidentAllocation {
+                id: NativeDiffusionResidentAllocationId::ControlExecutorArc {
+                    address: trait_arc_address(&self.executor),
+                },
+                resident_bytes: self
+                    .executor
+                    .resident_bytes()
+                    .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?,
+            },
+        ];
+        allocations.extend(chain_parts.tensor_allocations().iter().map(|allocation| {
+            NativeDiffusionResidentAllocation {
+                id: NativeDiffusionResidentAllocationId::TensorStorage {
+                    storage_id: allocation.storage_id().get(),
+                },
+                resident_bytes: allocation.resident_bytes(),
+            }
+        }));
+        if let Some(vae) = &self.vae {
+            allocations.push(NativeDiffusionResidentAllocation {
+                id: NativeDiffusionResidentAllocationId::ModelBacking {
+                    kind: NativeModelBackingKind::NativeVae,
+                    address: arc_address(vae),
+                },
+                resident_bytes: vae
+                    .resident_bytes()
+                    .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?,
+            });
+        }
+        Ok(allocations)
     }
 
     pub fn vae_execution_digest(&self) -> Option<&str> {
@@ -289,20 +441,44 @@ impl NativeConditioningPayload {
     }
 
     pub fn resident_bytes(&self) -> Result<u64, NativeDiffusionPayloadError> {
-        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
-            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?
-            .checked_add(
-                self.patch_graph
-                    .resident_bytes()
-                    .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?,
-            )
-            .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
-        if let Some(control) = &self.control {
-            bytes = bytes
-                .checked_add(control.resident_bytes()?)
+        self.resident_parts()?.resident_bytes()
+    }
+
+    pub fn resident_parts(
+        &self,
+    ) -> Result<NativeDiffusionResidentParts, NativeDiffusionPayloadError> {
+        let mut owned_bytes = resident_size::<Self>()?;
+        let identity_owned_bytes = self
+            .identity
+            .resident_bytes()?
+            .checked_sub(resident_size::<ConditioningIdentity>()?)
+            .ok_or(NativeDiffusionPayloadError::ResidentAllocationChanged)?;
+        for bytes in [
+            identity_owned_bytes,
+            resident_capacity(&self.identity_digest)?,
+            resident_capacity(&self.model_execution_digest)?,
+            resident_capacity(&self.execution_digest)?,
+        ] {
+            owned_bytes = owned_bytes
+                .checked_add(bytes)
                 .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
         }
-        Ok(bytes)
+        let mut allocations = vec![NativeDiffusionResidentAllocation {
+            id: NativeDiffusionResidentAllocationId::PatchGraphArc {
+                address: arc_address(&self.patch_graph),
+            },
+            resident_bytes: self
+                .patch_graph
+                .resident_bytes()
+                .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?,
+        }];
+        if let Some(control) = &self.control {
+            owned_bytes = owned_bytes
+                .checked_add(control.embedded_owned_resident_bytes()?)
+                .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+            allocations.extend(control.shared_resident_allocations()?);
+        }
+        NativeDiffusionResidentParts::checked(owned_bytes, allocations)
     }
 
     pub fn validate(&self) -> Result<(), NativeDiffusionPayloadError> {
@@ -312,6 +488,7 @@ impl NativeConditioningPayload {
         if let Some(control) = &self.control {
             control.validate()?;
         }
+        self.resident_parts()?;
         Ok(())
     }
 
@@ -485,25 +662,33 @@ impl NativeDiffusionPayload {
     }
 
     pub fn resident_bytes(&self) -> Result<usize, NativeDiffusionPayloadError> {
-        let resource_bytes = match &self.resource {
+        usize::try_from(self.resident_parts()?.resident_bytes()?)
+            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+    }
+
+    pub fn resident_parts(
+        &self,
+    ) -> Result<NativeDiffusionResidentParts, NativeDiffusionPayloadError> {
+        let owned_bytes = resident_size::<Self>()?
+            .checked_add(resident_capacity(&self.digest_sha256)?)
+            .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+        let mut allocations = Vec::new();
+        match &self.resource {
             NativeDiffusionResource::Model {
                 model,
                 conditioning,
-            } => model
-                .resident_bytes()
-                .checked_add(conditioning.resident_bytes()?)
-                .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?,
-            NativeDiffusionResource::Clip { clip } => clip.resident_bytes(),
-            NativeDiffusionResource::Vae { vae } => vae.resident_bytes(),
-        };
-        let wrapper_bytes = u64::try_from(mem::size_of::<Self>())
-            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?;
-        usize::try_from(
-            wrapper_bytes
-                .checked_add(resource_bytes)
-                .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?,
-        )
-        .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+            } => {
+                append_model_allocations(&mut allocations, model)?;
+                append_conditioning_allocations(&mut allocations, conditioning)?;
+            }
+            NativeDiffusionResource::Clip { clip } => {
+                append_model_allocations(&mut allocations, clip)?;
+            }
+            NativeDiffusionResource::Vae { vae } => {
+                append_model_allocations(&mut allocations, vae)?;
+            }
+        }
+        NativeDiffusionResidentParts::checked(owned_bytes, allocations)
     }
 
     pub fn validate(&self) -> Result<(), NativeDiffusionPayloadError> {
@@ -537,6 +722,71 @@ pub enum NativeDiffusionPayloadError {
     Invalid(String),
     #[error("native diffusion payload resident byte accounting overflowed")]
     ResidentBytesOverflow,
+    #[error("native diffusion payload resident allocation identity changed its byte count")]
+    ResidentAllocationChanged,
+}
+
+fn resident_size<Value>() -> Result<u64, NativeDiffusionPayloadError> {
+    u64::try_from(mem::size_of::<Value>())
+        .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+}
+
+fn resident_capacity(value: &String) -> Result<u64, NativeDiffusionPayloadError> {
+    u64::try_from(value.capacity()).map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)
+}
+
+fn arc_address<Value>(value: &Arc<Value>) -> usize {
+    Arc::as_ptr(value) as usize
+}
+
+fn trait_arc_address(value: &Arc<dyn ControlModelExecutor>) -> usize {
+    Arc::as_ptr(value) as *const () as usize
+}
+
+fn append_model_allocations(
+    allocations: &mut Vec<NativeDiffusionResidentAllocation>,
+    model: &Arc<NativeModelPayload>,
+) -> Result<(), NativeDiffusionPayloadError> {
+    let parts = model.resident_parts()?;
+    allocations.push(NativeDiffusionResidentAllocation {
+        id: NativeDiffusionResidentAllocationId::ModelPayloadArc {
+            address: arc_address(model),
+        },
+        resident_bytes: parts.owned_bytes(),
+    });
+    allocations.extend(parts.backing_allocations().iter().map(|allocation| {
+        NativeDiffusionResidentAllocation {
+            id: NativeDiffusionResidentAllocationId::ModelBacking {
+                kind: allocation.kind(),
+                address: allocation.address(),
+            },
+            resident_bytes: allocation.resident_bytes(),
+        }
+    }));
+    allocations.extend(parts.tensor_allocations().iter().map(|allocation| {
+        NativeDiffusionResidentAllocation {
+            id: NativeDiffusionResidentAllocationId::TensorStorage {
+                storage_id: allocation.storage_id().get(),
+            },
+            resident_bytes: allocation.resident_bytes(),
+        }
+    }));
+    Ok(())
+}
+
+fn append_conditioning_allocations(
+    allocations: &mut Vec<NativeDiffusionResidentAllocation>,
+    conditioning: &Arc<NativeConditioningPayload>,
+) -> Result<(), NativeDiffusionPayloadError> {
+    let parts = conditioning.resident_parts()?;
+    allocations.push(NativeDiffusionResidentAllocation {
+        id: NativeDiffusionResidentAllocationId::ConditioningPayloadArc {
+            address: arc_address(conditioning),
+        },
+        resident_bytes: parts.owned_bytes(),
+    });
+    allocations.extend_from_slice(parts.shared_allocations());
+    Ok(())
 }
 
 fn require_role(
@@ -696,12 +946,110 @@ mod tests {
         let payload =
             NativeControlPayload::checked(NativeModelResourceRole::ControlNet, execution.clone())?;
         assert!(payload.resident_bytes()? > usize::try_from(chain.resident_bytes()?)?);
+        let aliased =
+            NativeControlPayload::checked(NativeModelResourceRole::ControlNet, execution.clone())?;
+        assert_eq!(payload.resident_parts()?, aliased.resident_parts()?);
+
+        let distinct_chain = Arc::new(ControlChain::checked(chain.nodes().to_vec())?);
+        let distinct_execution = Arc::new(NativeControlExecution::checked(
+            distinct_chain,
+            executor.clone(),
+        )?);
+        let distinct =
+            NativeControlPayload::checked(NativeModelResourceRole::ControlNet, distinct_execution)?;
+        let shared_parts = payload.resident_parts()?;
+        let distinct_parts = distinct.resident_parts()?;
+        assert_ne!(shared_parts, distinct_parts);
+        let shared_ids = shared_parts
+            .shared_allocations()
+            .iter()
+            .map(NativeDiffusionResidentAllocation::id)
+            .collect::<Vec<_>>();
+        let distinct_ids = distinct_parts
+            .shared_allocations()
+            .iter()
+            .map(NativeDiffusionResidentAllocation::id)
+            .collect::<Vec<_>>();
+        assert!(shared_ids.iter().any(|identity| {
+            matches!(
+                identity,
+                NativeDiffusionResidentAllocationId::ControlChainArc { .. }
+            ) && !distinct_ids.contains(identity)
+        }));
+        assert!(shared_ids.iter().any(|identity| {
+            matches!(
+                identity,
+                NativeDiffusionResidentAllocationId::ControlExecutorArc { .. }
+            ) && distinct_ids.contains(identity)
+        }));
+        assert!(shared_ids.iter().any(|identity| {
+            matches!(
+                identity,
+                NativeDiffusionResidentAllocationId::TensorStorage { .. }
+            ) && distinct_ids.contains(identity)
+        }));
+        assert!(shared_ids.iter().any(|identity| {
+            matches!(
+                identity,
+                NativeDiffusionResidentAllocationId::ControlExecutionArc { .. }
+            ) && !distinct_ids.contains(identity)
+        }));
+        assert_eq!(
+            u64::try_from(payload.resident_bytes()?)?,
+            shared_parts.resident_bytes()?
+        );
         payload.validate()?;
 
         executor.changed.store(true, Ordering::SeqCst);
         assert!(matches!(
             execution.validate(),
             Err(NativeDiffusionPayloadError::Invalid(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn diffusion_resident_parts_sort_deduplicate_and_reject_changed_bytes()
+    -> Result<(), Box<dyn Error>> {
+        let chain = NativeDiffusionResidentAllocationId::ControlChainArc { address: 7 };
+        let model = NativeDiffusionResidentAllocationId::ModelPayloadArc { address: 3 };
+        let parts = NativeDiffusionResidentParts::checked(
+            11,
+            [
+                NativeDiffusionResidentAllocation {
+                    id: chain.clone(),
+                    resident_bytes: 13,
+                },
+                NativeDiffusionResidentAllocation {
+                    id: model.clone(),
+                    resident_bytes: 17,
+                },
+                NativeDiffusionResidentAllocation {
+                    id: chain.clone(),
+                    resident_bytes: 13,
+                },
+            ],
+        )?;
+        assert_eq!(parts.shared_allocations().len(), 2);
+        assert_eq!(parts.shared_allocations()[0].id(), &model);
+        assert_eq!(parts.shared_allocations()[1].id(), &chain);
+        assert_eq!(parts.resident_bytes()?, 41);
+
+        assert!(matches!(
+            NativeDiffusionResidentParts::checked(
+                0,
+                [
+                    NativeDiffusionResidentAllocation {
+                        id: chain.clone(),
+                        resident_bytes: 13,
+                    },
+                    NativeDiffusionResidentAllocation {
+                        id: chain,
+                        resident_bytes: 14,
+                    },
+                ],
+            ),
+            Err(NativeDiffusionPayloadError::ResidentAllocationChanged)
         ));
         Ok(())
     }

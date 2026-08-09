@@ -1,13 +1,15 @@
 use crate::native_node_payload::{
-    NativeModelPayloadError, NativeStructuredProjection, require_structured_projection,
+    NativeModelPayloadError, NativeModelResourceIdentity, NativeModelResourceRole,
+    NativeStructuredProjection, require_structured_projection,
 };
 use crate::native_ops::{
     GeluApproximation, NativeExecutionRequirements, NativeModule, NativeOpsError,
 };
 use comfy_tensor::{
-    BinaryOperation, CpuBackend, DType, DeviceId, ExecutionContext, Layout, MemoryFormatReference,
-    OperationSupport, ResizeCrop, ResizeMode, ResizeSpec, Scalar, ScalarSide, StreamId, Tensor,
-    TensorBackend, TensorDescriptor, TensorError, UnaryOperation, ViewAccess,
+    BinaryOperation, CancellationToken, CpuBackend, DType, DeviceId, ExecutionContext, Layout,
+    MemoryFormatReference, OperationSupport, ResizeCrop, ResizeMode, ResizeSpec, Scalar,
+    ScalarSide, StorageId, StreamId, Tensor, TensorBackend, TensorDescriptor, TensorError,
+    UnaryOperation, ViewAccess,
     generated_comfy_operator_indirection_01::{
         OperatorIndirectionError, cast_to_with_context_exact_native,
     },
@@ -29,11 +31,16 @@ use comfy_tensor::{
         StorageDTypeDeviceError, contiguous_with_context_exact_native,
     },
 };
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, mem};
 use thiserror::Error;
 
 pub const CLIP_VISION_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/clip_model.py";
 pub const CLIP_VISION_SOURCE_SHA256: &str =
     "08be993d86c3b494b58305fb868638b4b525bbe40abead89e9c94da021716845";
+pub const CLIP_VISION_SOURCE_TYPE_ID: &str = "CLIP_VISION";
+pub const CLIP_VISION_RESOURCE_ROLE: &str = "clip_vision";
+const CLIP_VISION_RESOURCE_FORMAT: &str = "sim-native-comfy-clip-vision-v1";
 pub const CLIP_VISION_CATALOG_SYMBOLS: [&str; 9] = [
     "clip_preprocess",
     "siglip2_flex_calc_resolution",
@@ -194,6 +201,57 @@ pub struct NativeClipVision {
     llava_linear_1: Option<NativeModule>,
     llava_activation: NativeModule,
     llava_linear_2: Option<NativeModule>,
+    canonical_state: Vec<(String, Tensor)>,
+    semantic_identity: NativeModelResourceIdentity,
+    module_state_digest_sha256: String,
+    training: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeClipVisionExecutionSession {
+    model: NativeClipVision,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ClipVisionTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl ClipVisionTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClipVisionResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<ClipVisionTensorResidentAllocation>,
+}
+
+impl ClipVisionResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[ClipVisionTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipVisionError> {
+        self.tensor_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(ClipVisionError::Overflow("resident total bytes"))
+            })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -248,6 +306,16 @@ impl ClipVisionOutput {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<ClipVisionResidentParts, ClipVisionError> {
+        clip_vision_output_resident_parts(
+            &self.last_hidden_state,
+            self.intermediate.as_ref(),
+            &self.image_embeds,
+            self.projected_intermediate.as_ref(),
+            &self.image_sizes,
+        )
+    }
+
     pub fn validate(&self) -> Result<(), ClipVisionError> {
         let (semantic_digest_sha256, resident_bytes) = project_clip_vision_output(
             &self.last_hidden_state,
@@ -262,6 +330,11 @@ impl ClipVisionOutput {
             self.resident_bytes,
             resident_bytes,
         )?;
+        if self.resident_parts()?.resident_bytes()? != self.resident_bytes {
+            return Err(ClipVisionError::StructuredPayload(
+                NativeModelPayloadError::StructuredProjectionChanged,
+            ));
+        }
         Ok(())
     }
 }
@@ -318,6 +391,10 @@ pub enum ClipVisionError {
     MissingLlavaIntermediate,
     #[error("CLIP vision shape arithmetic overflowed while computing {0}")]
     Overflow(&'static str),
+    #[error("CLIP vision semantic identity changed")]
+    SemanticIdentityChanged,
+    #[error("CLIP vision model is in training mode; call eval() before native execution")]
+    EvaluationRequired,
     #[error("CLIP vision execution was cancelled")]
     Cancelled,
 }
@@ -449,6 +526,65 @@ fn project_clip_vision_output(
     Ok(projection.finish())
 }
 
+fn clip_vision_resident_parts<'a>(
+    owned_bytes: u64,
+    tensors: impl IntoIterator<Item = &'a Tensor>,
+) -> Result<ClipVisionResidentParts, ClipVisionError> {
+    let mut storages = BTreeMap::new();
+    for tensor in tensors {
+        let storage_id = tensor.storage_id();
+        let resident_bytes = tensor.storage_byte_len();
+        if let Some(existing) = storages.insert(storage_id.get(), (storage_id, resident_bytes))
+            && existing.1 != resident_bytes
+        {
+            return Err(ClipVisionError::Overflow(
+                "resident tensor allocation changed",
+            ));
+        }
+    }
+    let parts = ClipVisionResidentParts {
+        owned_bytes,
+        tensor_allocations: storages
+            .into_values()
+            .map(
+                |(storage_id, resident_bytes)| ClipVisionTensorResidentAllocation {
+                    storage_id,
+                    resident_bytes,
+                },
+            )
+            .collect(),
+    };
+    parts.resident_bytes()?;
+    Ok(parts)
+}
+
+fn clip_vision_output_resident_parts(
+    last_hidden_state: &Tensor,
+    intermediate: Option<&Tensor>,
+    image_embeds: &Tensor,
+    projected_intermediate: Option<&Tensor>,
+    image_sizes: &[[u64; 3]],
+) -> Result<ClipVisionResidentParts, ClipVisionError> {
+    let owned_bytes = u64::try_from(mem::size_of::<ClipVisionOutput>())
+        .map_err(|_| ClipVisionError::Overflow("resident output bytes"))?
+        .checked_add(
+            u64::try_from(
+                mem::size_of::<[u64; 3]>()
+                    .checked_mul(image_sizes.len())
+                    .ok_or(ClipVisionError::Overflow("resident image sizes"))?,
+            )
+            .map_err(|_| ClipVisionError::Overflow("resident image sizes"))?,
+        )
+        .ok_or(ClipVisionError::Overflow("resident output bytes"))?;
+    clip_vision_resident_parts(
+        owned_bytes,
+        std::iter::once(last_hidden_state)
+            .chain(intermediate)
+            .chain(std::iter::once(image_embeds))
+            .chain(projected_intermediate),
+    )
+}
+
 fn require_clip_output_target(
     reference: &Tensor,
     tensor: &Tensor,
@@ -465,6 +601,237 @@ fn require_clip_output_target(
     Ok(())
 }
 
+struct ClipVisionSemanticHasher(Sha256);
+
+impl ClipVisionSemanticHasher {
+    fn new(domain: &[u8]) -> Result<Self, ClipVisionError> {
+        let mut hasher = Self(Sha256::new());
+        hasher.field(domain)?;
+        Ok(hasher)
+    }
+
+    fn field(&mut self, value: &[u8]) -> Result<(), ClipVisionError> {
+        self.0.update(
+            u64::try_from(value.len())
+                .map_err(|_| ClipVisionError::Overflow("semantic digest field"))?
+                .to_le_bytes(),
+        );
+        self.0.update(value);
+        Ok(())
+    }
+
+    fn u64(&mut self, value: u64) {
+        self.0.update(value.to_le_bytes());
+    }
+
+    fn finish(self) -> String {
+        format!("{:x}", self.0.finalize())
+    }
+}
+
+fn clip_vision_architecture_digest(
+    configuration: &ClipVisionConfiguration,
+) -> Result<String, ClipVisionError> {
+    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-architecture.v1")?;
+    digest.field(CLIP_VISION_SOURCE_SHA256.as_bytes())?;
+    digest.field(CLIP_VISION_SOURCE_TYPE_ID.as_bytes())?;
+    digest.field(CLIP_VISION_RESOURCE_ROLE.as_bytes())?;
+    digest.field(&[match configuration.model_type {
+        ClipVisionModelType::Clip => 1,
+        ClipVisionModelType::Siglip => 2,
+        ClipVisionModelType::Siglip2 => 3,
+    }])?;
+    digest.field(&[match configuration.activation {
+        ClipVisionActivation::QuickGelu => 1,
+        ClipVisionActivation::Gelu => 2,
+        ClipVisionActivation::GeluTanh => 3,
+    }])?;
+    for value in [
+        configuration.hidden_size,
+        configuration.intermediate_size,
+        configuration.attention_heads,
+        configuration.layer_count,
+        configuration.image_size,
+        configuration.patch_size,
+        configuration.num_channels,
+        configuration.max_num_patches,
+        configuration.projection_dimension.unwrap_or(0),
+        configuration.llava_projection_dimension.unwrap_or(0),
+    ] {
+        digest.u64(
+            u64::try_from(value)
+                .map_err(|_| ClipVisionError::Overflow("architecture dimension"))?,
+        );
+    }
+    Ok(digest.finish())
+}
+
+fn clip_vision_canonical_state(
+    weights: &ClipVisionWeights,
+) -> Result<Vec<(String, Tensor)>, ClipVisionError> {
+    let mut state = Vec::new();
+    state
+        .try_reserve_exact(
+            14_usize
+                .checked_add(
+                    weights
+                        .layers
+                        .len()
+                        .checked_mul(16)
+                        .ok_or(ClipVisionError::Overflow("canonical state entries"))?,
+                )
+                .ok_or(ClipVisionError::Overflow("canonical state entries"))?,
+        )
+        .map_err(|_| ClipVisionError::Overflow("canonical state entries"))?;
+    let mut push = |name: &str, tensor: Option<&Tensor>| {
+        if let Some(tensor) = tensor {
+            state.push((name.to_owned(), tensor.clone()));
+        }
+    };
+    push(
+        "patch_embedding.weight",
+        Some(&weights.patch_embedding_weight),
+    );
+    push(
+        "patch_embedding.bias",
+        weights.patch_embedding_bias.as_ref(),
+    );
+    push("class_embedding", weights.class_embedding.as_ref());
+    push("position_embedding", Some(&weights.position_embedding));
+    push(
+        "pre_layer_norm.weight",
+        weights.pre_layer_norm_weight.as_ref(),
+    );
+    push("pre_layer_norm.bias", weights.pre_layer_norm_bias.as_ref());
+    for (index, layer) in weights.layers.iter().enumerate() {
+        for (name, tensor) in layer_tensors(layer) {
+            push(&format!("layers.{index}.{name}"), Some(tensor));
+        }
+    }
+    push(
+        "post_layer_norm.weight",
+        Some(&weights.post_layer_norm_weight),
+    );
+    push("post_layer_norm.bias", Some(&weights.post_layer_norm_bias));
+    push(
+        "visual_projection.weight",
+        weights.visual_projection_weight.as_ref(),
+    );
+    push(
+        "llava_linear_1.weight",
+        weights.llava_linear_1_weight.as_ref(),
+    );
+    push("llava_linear_1.bias", weights.llava_linear_1_bias.as_ref());
+    push(
+        "llava_linear_2.weight",
+        weights.llava_linear_2_weight.as_ref(),
+    );
+    push("llava_linear_2.bias", weights.llava_linear_2_bias.as_ref());
+    Ok(state)
+}
+
+fn clip_vision_state_digest(
+    state: &[(String, Tensor)],
+    cancellation: &CancellationToken,
+) -> Result<String, ClipVisionError> {
+    cancellation.check()?;
+    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-state.v1")?;
+    digest.u64(u64::try_from(state.len()).map_err(|_| ClipVisionError::Overflow("state entries"))?);
+    for (name, tensor) in state {
+        cancellation.check()?;
+        digest.field(name.as_bytes())?;
+        let descriptor = tensor.descriptor();
+        digest.u64(
+            u64::try_from(descriptor.shape().len())
+                .map_err(|_| ClipVisionError::Overflow("state rank"))?,
+        );
+        for dimension in descriptor.shape() {
+            digest.u64(*dimension);
+        }
+        for bytes in tensor.contiguous_bytes()?.chunks(64 * 1024) {
+            cancellation.check()?;
+            digest.field(bytes)?;
+        }
+    }
+    Ok(digest.finish())
+}
+
+fn clip_vision_identity(
+    configuration: &ClipVisionConfiguration,
+    state: &[(String, Tensor)],
+    cancellation: &CancellationToken,
+) -> Result<NativeModelResourceIdentity, ClipVisionError> {
+    Ok(NativeModelResourceIdentity::checked(
+        NativeModelResourceRole::ClipVision,
+        "comfy.clip_model.CLIPVision",
+        CLIP_VISION_RESOURCE_FORMAT,
+        clip_vision_state_digest(state, cancellation)?,
+        clip_vision_architecture_digest(configuration)?,
+    )?)
+}
+
+fn append_module_digest(
+    digest: &mut ClipVisionSemanticHasher,
+    name: &str,
+    module: &NativeModule,
+    cancellation: &CancellationToken,
+) -> Result<(), ClipVisionError> {
+    digest.field(name.as_bytes())?;
+    digest.field(module.semantic_state_digest(cancellation)?.as_bytes())?;
+    Ok(())
+}
+
+fn clip_vision_module_state_digest(
+    model: &NativeClipVision,
+    cancellation: &CancellationToken,
+) -> Result<String, ClipVisionError> {
+    cancellation.check()?;
+    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-modules.v1")?;
+    append_module_digest(
+        &mut digest,
+        "patch_embedding",
+        &model.patch_embedding,
+        cancellation,
+    )?;
+    if let Some(module) = &model.pre_layer_norm {
+        append_module_digest(&mut digest, "pre_layer_norm", module, cancellation)?;
+    }
+    for (index, layer) in model.layers.iter().enumerate() {
+        for (name, module) in [
+            ("layer_norm_1", &layer.layer_norm_1),
+            ("attention", &layer.attention),
+            ("layer_norm_2", &layer.layer_norm_2),
+            ("feed_forward_1", &layer.feed_forward_1),
+            ("activation", &layer.activation),
+            ("feed_forward_2", &layer.feed_forward_2),
+        ] {
+            append_module_digest(
+                &mut digest,
+                &format!("layers.{index}.{name}"),
+                module,
+                cancellation,
+            )?;
+        }
+    }
+    append_module_digest(
+        &mut digest,
+        "post_layer_norm",
+        &model.post_layer_norm,
+        cancellation,
+    )?;
+    for (name, module) in [
+        ("visual_projection", model.visual_projection.as_ref()),
+        ("llava_linear_1", model.llava_linear_1.as_ref()),
+        ("llava_linear_2", model.llava_linear_2.as_ref()),
+    ] {
+        if let Some(module) = module {
+            append_module_digest(&mut digest, name, module, cancellation)?;
+        }
+    }
+    cancellation.check()?;
+    Ok(digest.finish())
+}
+
 impl NativeClipVision {
     pub fn new(
         configuration: ClipVisionConfiguration,
@@ -476,6 +843,10 @@ impl NativeClipVision {
                 "configured layer count does not match the weight graph",
             ));
         }
+        let cancellation = CancellationToken::default();
+        let canonical_state = clip_vision_canonical_state(&weights)?;
+        let semantic_identity =
+            clip_vision_identity(&configuration, &canonical_state, &cancellation)?;
         let stream = weights.position_embedding.descriptor().stream();
         validate_parameter_target(
             "position embedding",
@@ -676,7 +1047,7 @@ impl NativeClipVision {
         let llava_activation =
             NativeModule::gelu("multi_modal_projector.gelu", GeluApproximation::None)?;
 
-        Ok(Self {
+        let mut model = Self {
             configuration,
             stream,
             patch_embedding,
@@ -689,7 +1060,14 @@ impl NativeClipVision {
             llava_linear_1,
             llava_activation,
             llava_linear_2,
-        })
+            canonical_state,
+            semantic_identity,
+            module_state_digest_sha256: String::new(),
+            training: false,
+        };
+        model.module_state_digest_sha256 = clip_vision_module_state_digest(&model, &cancellation)?;
+        model.validate(&cancellation)?;
+        Ok(model)
     }
 
     pub fn configuration(&self) -> &ClipVisionConfiguration {
@@ -702,6 +1080,149 @@ impl NativeClipVision {
 
     pub fn device(&self) -> DeviceId {
         self.configuration.device
+    }
+
+    pub const fn is_training(&self) -> bool {
+        self.training
+    }
+
+    pub fn train(&mut self) {
+        self.set_training(true);
+    }
+
+    pub fn eval(&mut self) {
+        self.set_training(false);
+    }
+
+    pub fn semantic_identity(&self) -> &NativeModelResourceIdentity {
+        &self.semantic_identity
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        self.semantic_identity.digest_sha256()
+    }
+
+    pub fn resident_storage_bytes(&self) -> Result<u64, ClipVisionError> {
+        self.resident_parts()?
+            .tensor_allocations()
+            .iter()
+            .try_fold(0_u64, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes())
+                    .ok_or(ClipVisionError::Overflow("resident storage bytes"))
+            })
+    }
+
+    fn resident_owned_bytes(&self) -> Result<u64, ClipVisionError> {
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| ClipVisionError::Overflow("resident object bytes"))?;
+        for allocation in [
+            self.layers
+                .capacity()
+                .checked_mul(mem::size_of::<ClipVisionLayer>()),
+            self.canonical_state
+                .capacity()
+                .checked_mul(mem::size_of::<(String, Tensor)>()),
+        ] {
+            bytes = bytes
+                .checked_add(
+                    u64::try_from(
+                        allocation.ok_or(ClipVisionError::Overflow("resident allocations"))?,
+                    )
+                    .map_err(|_| ClipVisionError::Overflow("resident allocations"))?,
+                )
+                .ok_or(ClipVisionError::Overflow("resident allocations"))?;
+        }
+        for (name, _) in &self.canonical_state {
+            bytes = bytes
+                .checked_add(
+                    u64::try_from(name.capacity())
+                        .map_err(|_| ClipVisionError::Overflow("resident state names"))?,
+                )
+                .ok_or(ClipVisionError::Overflow("resident state names"))?;
+        }
+        bytes = bytes
+            .checked_add(
+                self.semantic_identity
+                    .resident_owned_bytes()
+                    .map_err(|_| ClipVisionError::Overflow("resident identity"))?,
+            )
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(self.module_state_digest_sha256.capacity()).ok()?)
+            })
+            .ok_or(ClipVisionError::Overflow("resident identity"))?;
+        Ok(bytes)
+    }
+
+    pub fn resident_parts(&self) -> Result<ClipVisionResidentParts, ClipVisionError> {
+        clip_vision_resident_parts(
+            self.resident_owned_bytes()?,
+            self.canonical_state.iter().map(|(_, tensor)| tensor),
+        )
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipVisionError> {
+        self.resident_parts()?.resident_bytes()
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), ClipVisionError> {
+        cancellation.check()?;
+        self.configuration.validate()?;
+        self.semantic_identity.validate()?;
+        let expected_identity =
+            clip_vision_identity(&self.configuration, &self.canonical_state, cancellation)?;
+        if self.semantic_identity != expected_identity
+            || self.module_state_digest_sha256
+                != clip_vision_module_state_digest(self, cancellation)?
+        {
+            return Err(ClipVisionError::SemanticIdentityChanged);
+        }
+        self.resident_bytes()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn execution_session(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeClipVisionExecutionSession, ClipVisionError> {
+        self.validate(cancellation)?;
+        if self.training {
+            return Err(ClipVisionError::EvaluationRequired);
+        }
+        Ok(NativeClipVisionExecutionSession {
+            model: self.clone(),
+        })
+    }
+
+    fn set_training(&mut self, training: bool) {
+        self.training = training;
+        for module in [
+            Some(&mut self.patch_embedding),
+            self.pre_layer_norm.as_mut(),
+            Some(&mut self.post_layer_norm),
+            self.visual_projection.as_mut(),
+            self.llava_linear_1.as_mut(),
+            Some(&mut self.llava_activation),
+            self.llava_linear_2.as_mut(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            module.set_training(training);
+        }
+        for layer in &mut self.layers {
+            for module in [
+                &mut layer.layer_norm_1,
+                &mut layer.attention,
+                &mut layer.layer_norm_2,
+                &mut layer.feed_forward_1,
+                &mut layer.activation,
+                &mut layer.feed_forward_2,
+            ] {
+                module.set_training(training);
+            }
+        }
     }
 
     fn execution_requirements(&self) -> NativeExecutionRequirements {
@@ -1011,6 +1532,23 @@ impl NativeClipVision {
                 add_position_embedding(backend, &embeds, &self.position_embedding, context)
             }
         }
+    }
+}
+
+impl NativeClipVisionExecutionSession {
+    pub fn semantic_identity(&self) -> &NativeModelResourceIdentity {
+        self.model.semantic_identity()
+    }
+
+    pub fn forward(
+        &mut self,
+        backend: &CpuBackend,
+        pixel_values: &Tensor,
+        intermediate: ClipVisionIntermediate,
+        context: &ExecutionContext<'_>,
+    ) -> Result<ClipVisionOutput, ClipVisionError> {
+        self.model
+            .forward(backend, pixel_values, intermediate, context)
     }
 }
 
@@ -2094,7 +2632,7 @@ fn u64_to_usize(value: u64, operation: &'static str) -> Result<usize, ClipVision
 mod tests {
     use super::*;
     use comfy_tensor::{CancellationToken, CpuWorkspaceAuthority};
-    use std::{error::Error, mem};
+    use std::{collections::BTreeSet, error::Error, mem, sync::Arc};
 
     const TEST_MEMORY_LIMIT_BYTES: u64 = 1024 * 1024;
 
@@ -2111,6 +2649,28 @@ mod tests {
         run(&backend, &context)
     }
 
+    fn with_stream_contexts<ResultType>(
+        run: impl FnOnce(
+            &CpuBackend,
+            &ExecutionContext<'_>,
+            &ExecutionContext<'_>,
+        ) -> Result<ResultType, Box<dyn Error>>,
+    ) -> Result<ResultType, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(TEST_MEMORY_LIMIT_BYTES)?;
+        let default_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        let alternate_context = backend.execution_context(
+            StreamId::new(7),
+            authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        run(&backend, &default_context, &alternate_context)
+    }
+
     fn f32_tensor(
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
@@ -2118,9 +2678,195 @@ mod tests {
         values: &[f32],
     ) -> Result<Tensor, Box<dyn Error>> {
         let descriptor =
-            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, context.stream)?;
         let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
         Ok(tensor)
+    }
+
+    fn filled_tensor(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        shape: Vec<u64>,
+        value: f32,
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let count = shape
+            .iter()
+            .try_fold(1_u64, |count, dimension| count.checked_mul(*dimension))
+            .ok_or(ClipVisionError::Overflow("test tensor elements"))?;
+        f32_tensor(
+            backend,
+            context,
+            shape,
+            &vec![value; usize::try_from(count)?],
+        )
+    }
+
+    fn tiny_clip_vision(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeClipVision, Box<dyn Error>> {
+        let zero_2 = filled_tensor(backend, context, vec![2], 0.0)?;
+        let zero_2x2 = filled_tensor(backend, context, vec![2, 2], 0.0)?;
+        let layer = ClipVisionLayerWeights {
+            layer_norm_1_weight: filled_tensor(backend, context, vec![2], 1.0)?,
+            layer_norm_1_bias: zero_2.clone(),
+            query_weight: zero_2x2.clone(),
+            query_bias: zero_2.clone(),
+            key_weight: zero_2x2.clone(),
+            key_bias: zero_2.clone(),
+            value_weight: zero_2x2.clone(),
+            value_bias: zero_2.clone(),
+            output_weight: zero_2x2.clone(),
+            output_bias: zero_2.clone(),
+            layer_norm_2_weight: filled_tensor(backend, context, vec![2], 1.0)?,
+            layer_norm_2_bias: zero_2.clone(),
+            feed_forward_1_weight: zero_2x2.clone(),
+            feed_forward_1_bias: zero_2.clone(),
+            feed_forward_2_weight: zero_2x2,
+            feed_forward_2_bias: zero_2.clone(),
+        };
+        Ok(NativeClipVision::new(
+            ClipVisionConfiguration {
+                model_type: ClipVisionModelType::Clip,
+                dtype: DType::F32,
+                device: DeviceId::CPU,
+                hidden_size: 2,
+                intermediate_size: 2,
+                attention_heads: 1,
+                layer_count: 1,
+                image_size: 2,
+                patch_size: 1,
+                num_channels: 3,
+                max_num_patches: 4,
+                activation: ClipVisionActivation::QuickGelu,
+                projection_dimension: None,
+                llava_projection_dimension: None,
+            },
+            ClipVisionWeights {
+                patch_embedding_weight: filled_tensor(backend, context, vec![2, 3, 1, 1], 0.0)?,
+                patch_embedding_bias: None,
+                class_embedding: Some(zero_2.clone()),
+                position_embedding: filled_tensor(backend, context, vec![5, 2], 0.0)?,
+                pre_layer_norm_weight: Some(filled_tensor(backend, context, vec![2], 1.0)?),
+                pre_layer_norm_bias: Some(zero_2.clone()),
+                layers: vec![layer],
+                post_layer_norm_weight: filled_tensor(backend, context, vec![2], 1.0)?,
+                post_layer_norm_bias: zero_2,
+                visual_projection_weight: None,
+                llava_linear_1_weight: None,
+                llava_linear_1_bias: None,
+                llava_linear_2_weight: None,
+                llava_linear_2_bias: None,
+            },
+        )?)
+    }
+
+    #[test]
+    fn clip_vision_resource_identity_sessions_and_alias_accounting_are_owner_derived()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(2 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let model = tiny_clip_vision(&backend, &context)?;
+        model.validate(&cancellation)?;
+        assert!(!model.is_training());
+        assert_eq!(
+            model.semantic_identity().role(),
+            NativeModelResourceRole::ClipVision
+        );
+        assert_eq!(
+            model.semantic_identity().role().source_type_id(),
+            CLIP_VISION_SOURCE_TYPE_ID
+        );
+        assert_eq!(model.semantic_digest_sha256().len(), 64);
+
+        let unique_storage =
+            model
+                .canonical_state
+                .iter()
+                .fold(BTreeSet::new(), |mut storages, (_, tensor)| {
+                    storages.insert(tensor.storage_id().get());
+                    storages
+                });
+        assert!(unique_storage.len() < model.canonical_state.len());
+        assert!(model.resident_bytes()? > model.resident_storage_bytes()?);
+
+        let payload = crate::NativeModelPayload::clip_vision(Arc::new(model.clone()))?;
+        payload.validate()?;
+        assert_eq!(payload.identity(), model.semantic_identity());
+        let retained =
+            payload
+                .clip_vision_resource()
+                .ok_or(ClipVisionError::InvalidConfiguration(
+                    "CLIP vision resource is missing",
+                ))?;
+        let backing = payload
+            .resident_parts()?
+            .backing_allocations()
+            .first()
+            .copied()
+            .ok_or(ClipVisionError::InvalidConfiguration(
+                "CLIP vision backing allocation is missing",
+            ))?;
+        assert_eq!(backing.kind(), crate::NativeModelBackingKind::ClipVision);
+        assert_eq!(
+            backing.resident_bytes(),
+            retained.resident_parts()?.owned_bytes()
+        );
+        assert_eq!(
+            payload.resident_parts()?.tensor_allocations().len(),
+            retained.resident_parts()?.tensor_allocations().len()
+        );
+
+        let input = filled_tensor(&backend, &context, vec![1, 3, 2, 2], 0.0)?;
+        let mut first = model.execution_session(&cancellation)?;
+        let mut second = model.execution_session(&cancellation)?;
+        let first_output =
+            first.forward(&backend, &input, ClipVisionIntermediate::None, &context)?;
+        let second_output =
+            second.forward(&backend, &input, ClipVisionIntermediate::None, &context)?;
+        assert_eq!(
+            first_output.semantic_digest_sha256(),
+            second_output.semantic_digest_sha256()
+        );
+        assert_eq!(
+            first.semantic_identity().digest_sha256(),
+            model.semantic_digest_sha256()
+        );
+
+        let mut training = model.clone();
+        training.train();
+        assert!(matches!(
+            crate::NativeModelPayload::clip_vision(Arc::new(training.clone())),
+            Err(NativeModelPayloadError::ResourceMismatch(
+                "CLIP_VISION evaluation state"
+            ))
+        ));
+        assert!(matches!(
+            training.execution_session(&cancellation),
+            Err(ClipVisionError::EvaluationRequired)
+        ));
+        training.eval();
+        training.validate(&cancellation)?;
+
+        let mut drifted = model.clone();
+        drifted.module_state_digest_sha256 = "0".repeat(64);
+        assert!(matches!(
+            drifted.validate(&cancellation),
+            Err(ClipVisionError::SemanticIdentityChanged)
+        ));
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            model.execution_session(&cancelled),
+            Err(ClipVisionError::Cancelled)
+        ));
+        model.validate(&cancellation)?;
+        Ok(())
     }
 
     #[test]
@@ -2132,20 +2878,20 @@ mod tests {
             let projected_intermediate = f32_tensor(backend, context, vec![1, 4, 6], &[0.75; 24])?;
             let output = ClipVisionOutput::checked(
                 last_hidden_state.clone(),
-                Some(last_hidden_state.clone()),
-                image_embeds.clone(),
-                Some(projected_intermediate.clone()),
+                Some(last_hidden_state),
+                image_embeds,
+                Some(projected_intermediate),
                 vec![[3, 224, 224]],
             )?;
             output.validate()?;
             assert_eq!(output.image_sizes(), &[[3, 224, 224]]);
+            let resident_parts = output.resident_parts()?;
+            assert_eq!(resident_parts.tensor_allocations().len(), 3);
+            assert_eq!(output.resident_bytes(), resident_parts.resident_bytes()?);
             assert_eq!(
-                output.resident_bytes(),
+                resident_parts.owned_bytes(),
                 u64::try_from(mem::size_of::<ClipVisionOutput>())?
                     + u64::try_from(mem::size_of::<[u64; 3]>())?
-                    + last_hidden_state.storage_byte_len()
-                    + image_embeds.storage_byte_len()
-                    + projected_intermediate.storage_byte_len()
             );
             Ok(())
         })
@@ -2154,7 +2900,7 @@ mod tests {
     #[test]
     fn clip_vision_output_digest_excludes_storage_identity_and_rejects_nonfinite_content()
     -> Result<(), Box<dyn Error>> {
-        with_context(|backend, context| {
+        with_stream_contexts(|backend, default_context, alternate_context| {
             let output = |backend: &CpuBackend,
                           context: &ExecutionContext<'_>|
              -> Result<ClipVisionOutput, Box<dyn Error>> {
@@ -2168,20 +2914,57 @@ mod tests {
                     vec![[3, 32, 32]],
                 )?)
             };
-            let first = output(backend, context)?;
-            let second = output(backend, context)?;
+            let first = output(backend, default_context)?;
+            let second = output(backend, alternate_context)?;
             assert_ne!(
                 first.last_hidden_state.storage_id(),
                 second.last_hidden_state.storage_id()
+            );
+            assert_ne!(
+                first.last_hidden_state.descriptor().stream(),
+                second.last_hidden_state.descriptor().stream()
             );
             assert_eq!(
                 first.semantic_digest_sha256(),
                 second.semantic_digest_sha256()
             );
             assert_eq!(first.resident_bytes(), second.resident_bytes());
+            assert_ne!(
+                first.resident_parts()?.tensor_allocations(),
+                second.resident_parts()?.tensor_allocations()
+            );
 
-            let non_finite = f32_tensor(backend, context, vec![1, 1, 1], &[f32::INFINITY])?;
-            let embeds = f32_tensor(backend, context, vec![1, 1], &[0.0])?;
+            let changed_content = ClipVisionOutput::checked(
+                f32_tensor(backend, default_context, vec![1, 2, 2], &[1.5; 4])?,
+                Some(f32_tensor(
+                    backend,
+                    default_context,
+                    vec![1, 2, 2],
+                    &[1.0; 4],
+                )?),
+                f32_tensor(backend, default_context, vec![1, 2], &[2.0; 2])?,
+                None,
+                vec![[3, 32, 32]],
+            )?;
+            assert_ne!(
+                first.semantic_digest_sha256(),
+                changed_content.semantic_digest_sha256()
+            );
+
+            let changed_shape = ClipVisionOutput::checked(
+                f32_tensor(backend, default_context, vec![1, 3, 2], &[1.0; 6])?,
+                None,
+                f32_tensor(backend, default_context, vec![1, 2], &[2.0; 2])?,
+                None,
+                vec![[3, 32, 32]],
+            )?;
+            assert_ne!(
+                first.semantic_digest_sha256(),
+                changed_shape.semantic_digest_sha256()
+            );
+
+            let non_finite = f32_tensor(backend, default_context, vec![1, 1, 1], &[f32::INFINITY])?;
+            let embeds = f32_tensor(backend, default_context, vec![1, 1], &[0.0])?;
             assert!(
                 ClipVisionOutput::checked(non_finite, None, embeds, None, vec![[3, 16, 16]],)
                     .is_err()

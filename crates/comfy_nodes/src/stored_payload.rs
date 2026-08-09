@@ -2,17 +2,19 @@ use crate::{
     NativeHandleKind, NativeHandleType, NativeNodeContractError, native_source_type_projection,
 };
 use comfy_media::{
-    NativeBoundingBoxPayload, NativeFaceLandmarksPayload, NativePoseKeypointPayload,
-    NativeSam3TrackDataPayload, NativeTracksPayload,
+    NativeBoundingBoxPayload, NativeFaceLandmarksPayload, NativeMediaResidentParts,
+    NativePoseKeypointPayload, NativeSam3TrackDataPayload, NativeTracksPayload,
 };
 use comfy_model::{
     AudioEncoderOutput, IcLoraParameters, LossMap, NativeModelBackingKind, NativeModelPayload,
+    NativeModelResourceRole, NativeStructuredResidentParts,
     clip_vision::ClipVisionOutput,
     conditioning::{ConditioningError, ConditioningSet},
 };
 use comfy_sampler::{
-    NativeControlPayload, NativeDiffusionPayload, NativeGuiderConditioningSets,
-    NativeGuiderPayload, NativeNoisePayload, NativeSamplerPayload,
+    NativeControlPayload, NativeDiffusionPayload, NativeDiffusionResidentAllocation,
+    NativeDiffusionResidentAllocationId, NativeGuiderConditioningSets, NativeGuiderPayload,
+    NativeNoisePayload, NativeSamplerPayload,
 };
 use comfy_tensor::{NativeTensorPayload, NativeTensorRole};
 use sha2::{Digest, Sha256};
@@ -111,40 +113,125 @@ impl NativeProviderPayload {
 
 #[derive(Clone)]
 pub struct NativeStoredModelPayload {
-    diffusion: Arc<NativeDiffusionPayload>,
+    resource: NativeStoredModelResource,
+}
+
+#[derive(Clone)]
+enum NativeStoredModelResource {
+    Diffusion(Arc<NativeDiffusionPayload>),
+    ModelResource(Arc<NativeModelPayload>),
 }
 
 impl NativeStoredModelPayload {
     pub fn native_diffusion(
         diffusion: Arc<NativeDiffusionPayload>,
     ) -> Result<Self, NativeStoredPayloadError> {
-        let payload = Self { diffusion };
+        let payload = Self {
+            resource: NativeStoredModelResource::Diffusion(diffusion),
+        };
         payload.validate()?;
         Ok(payload)
     }
 
-    pub fn diffusion(&self) -> &Arc<NativeDiffusionPayload> {
-        &self.diffusion
+    pub fn model_resource(
+        resource: Arc<NativeModelPayload>,
+    ) -> Result<Self, NativeStoredPayloadError> {
+        require_model_resource_role(resource.identity().role())?;
+        if !model_resource_is_concrete(&resource) {
+            return Err(NativeStoredPayloadError::NonCanonicalModelResourceRole {
+                role: resource.identity().role(),
+            });
+        }
+        let payload = Self {
+            resource: NativeStoredModelResource::ModelResource(resource),
+        };
+        payload.validate()?;
+        Ok(payload)
+    }
+
+    pub fn diffusion(&self) -> Option<&Arc<NativeDiffusionPayload>> {
+        match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => Some(diffusion),
+            NativeStoredModelResource::ModelResource(_) => None,
+        }
+    }
+
+    pub fn model_payload(&self) -> &Arc<NativeModelPayload> {
+        match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => diffusion.model_payload(),
+            NativeStoredModelResource::ModelResource(resource) => resource,
+        }
     }
 
     pub fn validate(&self) -> Result<(), NativeStoredPayloadError> {
-        self.diffusion.validate()?;
+        match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => diffusion.validate()?,
+            NativeStoredModelResource::ModelResource(resource) => {
+                resource.validate()?;
+                require_model_resource_role(resource.identity().role())?;
+                if !model_resource_is_concrete(resource) {
+                    return Err(NativeStoredPayloadError::NonCanonicalModelResourceRole {
+                        role: resource.identity().role(),
+                    });
+                }
+            }
+        }
         Ok(())
     }
 
     pub fn handle_type(&self) -> Result<NativeHandleType, NativeStoredPayloadError> {
-        let source_type = self.diffusion.role().source_type_id();
+        let source_type = match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => diffusion.role().source_type_id(),
+            NativeStoredModelResource::ModelResource(resource) => {
+                resource.identity().role().source_type_id()
+            }
+        };
         native_source_type_projection(source_type)?
             .handle_type()?
             .ok_or_else(|| NativeStoredPayloadError::MissingHandleType(source_type.to_owned()))
     }
 
     pub fn digest_sha256(&self) -> &str {
-        self.diffusion.digest_sha256()
+        match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => diffusion.digest_sha256(),
+            NativeStoredModelResource::ModelResource(resource) => {
+                resource.identity().digest_sha256()
+            }
+        }
     }
 
     pub fn resident_bytes(&self) -> Result<usize, NativeStoredPayloadError> {
-        Ok(self.diffusion.resident_bytes()?)
+        let resource_bytes = match &self.resource {
+            NativeStoredModelResource::Diffusion(diffusion) => diffusion.resident_bytes()?,
+            NativeStoredModelResource::ModelResource(resource) => {
+                usize::try_from(resource.resident_bytes())
+                    .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?
+            }
+        };
+        mem::size_of::<Self>()
+            .checked_add(resource_bytes)
+            .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)
+    }
+}
+
+fn require_model_resource_role(
+    role: NativeModelResourceRole,
+) -> Result<(), NativeStoredPayloadError> {
+    if matches!(
+        role,
+        NativeModelResourceRole::OpticalFlow | NativeModelResourceRole::ClipVision
+    ) {
+        Ok(())
+    } else {
+        Err(NativeStoredPayloadError::NonCanonicalModelResourceRole { role })
+    }
+}
+
+fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
+    match resource.identity().role() {
+        NativeModelResourceRole::OpticalFlow => resource.optical_flow_resource().is_some(),
+        NativeModelResourceRole::ClipVision => resource.clip_vision_resource().is_some(),
+        _ => false,
     }
 }
 
@@ -202,6 +289,24 @@ pub enum NativeResidentAllocationId {
         address: usize,
     },
     ConditioningSetArc {
+        address: usize,
+    },
+    DiffusionPayloadArc {
+        address: usize,
+    },
+    ConditioningPayloadArc {
+        address: usize,
+    },
+    PatchGraphArc {
+        address: usize,
+    },
+    ControlExecutionArc {
+        address: usize,
+    },
+    ControlChainArc {
+        address: usize,
+    },
+    ControlExecutorArc {
         address: usize,
     },
     TensorStorage {
@@ -400,44 +505,33 @@ impl NativeStoredPayload {
             Self::Tensor(payload) => {
                 NativePayloadResidency::checked(0, [tensor_storage_allocation(payload)?])?
             }
-            Self::Model(payload) => {
-                let model_payload = payload.diffusion().model_payload();
-                let model_allocations = model_allocations(model_payload)?;
-                let model_bytes = model_payload.resident_parts()?.resident_bytes()?;
-                let wrapper_bytes = payload
-                    .resident_bytes()?
-                    .checked_sub(
-                        usize::try_from(model_bytes)
-                            .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
-                    )
-                    .ok_or(NativeStoredPayloadError::ResidentAllocationChanged)?;
-                let mut allocations = vec![arc_allocation(
-                    NativeResidentPayloadKind::Model,
-                    payload,
-                    wrapper_bytes,
-                )];
-                allocations.extend(model_allocations);
-                NativePayloadResidency::checked(0, allocations)?
-            }
+            Self::Model(payload) => match &payload.resource {
+                NativeStoredModelResource::Diffusion(diffusion) => {
+                    stored_diffusion_residency(payload, diffusion)?
+                }
+                NativeStoredModelResource::ModelResource(model_payload) => {
+                    let model_allocations = model_allocations(model_payload)?;
+                    let model_bytes = model_payload.resident_parts()?.resident_bytes()?;
+                    let wrapper_bytes = payload
+                        .resident_bytes()?
+                        .checked_sub(
+                            usize::try_from(model_bytes)
+                                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+                        )
+                        .ok_or(NativeStoredPayloadError::ResidentAllocationChanged)?;
+                    let mut allocations = vec![arc_allocation(
+                        NativeResidentPayloadKind::Model,
+                        payload,
+                        wrapper_bytes,
+                    )];
+                    allocations.extend(model_allocations);
+                    NativePayloadResidency::checked(0, allocations)?
+                }
+            },
             Self::Conditioning(payload) => conditioning_residency(payload)?,
             Self::Guider(payload) => guider_residency(payload)?,
-            Self::Control(payload) => NativePayloadResidency::checked(
-                0,
-                [arc_allocation(
-                    NativeResidentPayloadKind::Control,
-                    payload,
-                    payload.resident_bytes()?,
-                )],
-            )?,
-            Self::Noise(payload) => NativePayloadResidency::checked(
-                0,
-                [arc_allocation(
-                    NativeResidentPayloadKind::Noise,
-                    payload,
-                    usize::try_from(payload.resident_bytes())
-                        .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
-                )],
-            )?,
+            Self::Control(payload) => control_residency(payload)?,
+            Self::Noise(payload) => noise_residency(payload)?,
             Self::Sampler(payload) => NativePayloadResidency::checked(
                 0,
                 [arc_allocation(
@@ -462,35 +556,31 @@ impl NativeStoredPayload {
                 payload,
                 payload.resident_bytes(),
             )?,
-            Self::Sam3TrackData(payload) => single_arc_residency(
+            Self::Sam3TrackData(payload) => media_residency(
                 NativeResidentPayloadKind::Sam3TrackData,
                 payload,
-                payload.resident_bytes(),
+                payload.resident_parts()?,
             )?,
-            Self::Tracks(payload) => single_arc_residency(
+            Self::Tracks(payload) => media_residency(
                 NativeResidentPayloadKind::Tracks,
                 payload,
-                payload.resident_bytes(),
+                payload.resident_parts()?,
             )?,
-            Self::AudioEncoderOutput(payload) => single_arc_residency(
+            Self::AudioEncoderOutput(payload) => structured_model_residency(
                 NativeResidentPayloadKind::AudioEncoderOutput,
                 payload,
-                payload.resident_bytes(),
+                payload.resident_parts()?,
             )?,
-            Self::ClipVisionOutput(payload) => single_arc_residency(
-                NativeResidentPayloadKind::ClipVisionOutput,
-                payload,
-                payload.resident_bytes(),
-            )?,
+            Self::ClipVisionOutput(payload) => clip_vision_output_residency(payload)?,
             Self::IcLoraParameters(payload) => single_arc_residency(
                 NativeResidentPayloadKind::IcLoraParameters,
                 payload,
                 payload.resident_bytes(),
             )?,
-            Self::LossMap(payload) => single_arc_residency(
+            Self::LossMap(payload) => structured_model_residency(
                 NativeResidentPayloadKind::LossMap,
                 payload,
-                payload.resident_bytes(),
+                payload.resident_parts()?,
             )?,
             Self::Provider(payload) => NativePayloadResidency::checked(
                 0,
@@ -606,6 +696,189 @@ fn guider_residency(
     NativePayloadResidency::checked(0, allocations)
 }
 
+fn clip_vision_output_residency(
+    payload: &Arc<ClipVisionOutput>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let parts = payload.resident_parts()?;
+    let mut allocations = Vec::with_capacity(parts.tensor_allocations().len() + 1);
+    allocations.push(arc_allocation(
+        NativeResidentPayloadKind::ClipVisionOutput,
+        payload,
+        usize::try_from(parts.owned_bytes())
+            .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+    ));
+    for allocation in parts.tensor_allocations() {
+        allocations.push(NativeResidentAllocation {
+            id: NativeResidentAllocationId::TensorStorage {
+                storage_id: allocation.storage_id().get(),
+            },
+            resident_bytes: usize::try_from(allocation.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+        });
+    }
+    NativePayloadResidency::checked(0, allocations)
+}
+
+fn tensor_backed_arc_residency<T>(
+    kind: NativeResidentPayloadKind,
+    payload: &Arc<T>,
+    owned_bytes: u64,
+    tensor_allocations: impl IntoIterator<Item = (u64, u64)>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let mut allocations = vec![arc_allocation(
+        kind,
+        payload,
+        usize::try_from(owned_bytes)
+            .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+    )];
+    for (storage_id, resident_bytes) in tensor_allocations {
+        allocations.push(NativeResidentAllocation {
+            id: NativeResidentAllocationId::TensorStorage { storage_id },
+            resident_bytes: usize::try_from(resident_bytes)
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+        });
+    }
+    NativePayloadResidency::checked(0, allocations)
+}
+
+fn media_residency<T>(
+    kind: NativeResidentPayloadKind,
+    payload: &Arc<T>,
+    parts: NativeMediaResidentParts,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    tensor_backed_arc_residency(
+        kind,
+        payload,
+        parts.owned_bytes(),
+        parts
+            .tensor_allocations()
+            .iter()
+            .map(|allocation| (allocation.storage_id().get(), allocation.resident_bytes())),
+    )
+}
+
+fn structured_model_residency<T>(
+    kind: NativeResidentPayloadKind,
+    payload: &Arc<T>,
+    parts: NativeStructuredResidentParts,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    tensor_backed_arc_residency(
+        kind,
+        payload,
+        parts.owned_bytes(),
+        parts
+            .tensor_allocations()
+            .iter()
+            .map(|allocation| (allocation.storage_id().get(), allocation.resident_bytes())),
+    )
+}
+
+fn noise_residency(
+    payload: &Arc<NativeNoisePayload>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let parts = payload.resident_parts()?;
+    tensor_backed_arc_residency(
+        NativeResidentPayloadKind::Noise,
+        payload,
+        parts.owned_bytes(),
+        parts
+            .tensor_allocation()
+            .into_iter()
+            .map(|allocation| (allocation.storage_id().get(), allocation.resident_bytes())),
+    )
+}
+
+fn translate_diffusion_allocation(
+    allocation: &NativeDiffusionResidentAllocation,
+) -> Result<NativeResidentAllocation, NativeStoredPayloadError> {
+    let id = match allocation.id() {
+        NativeDiffusionResidentAllocationId::ModelPayloadArc { address } => {
+            NativeResidentAllocationId::ModelPayloadArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::ModelBacking { kind, address } => {
+            NativeResidentAllocationId::ModelBacking {
+                kind: *kind,
+                address: *address,
+            }
+        }
+        NativeDiffusionResidentAllocationId::ConditioningPayloadArc { address } => {
+            NativeResidentAllocationId::ConditioningPayloadArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::PatchGraphArc { address } => {
+            NativeResidentAllocationId::PatchGraphArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::ControlExecutionArc { address } => {
+            NativeResidentAllocationId::ControlExecutionArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::ControlChainArc { address } => {
+            NativeResidentAllocationId::ControlChainArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::ControlExecutorArc { address } => {
+            NativeResidentAllocationId::ControlExecutorArc { address: *address }
+        }
+        NativeDiffusionResidentAllocationId::TensorStorage { storage_id } => {
+            NativeResidentAllocationId::TensorStorage {
+                storage_id: *storage_id,
+            }
+        }
+    };
+    Ok(NativeResidentAllocation {
+        id,
+        resident_bytes: usize::try_from(allocation.resident_bytes())
+            .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+    })
+}
+
+fn diffusion_allocations(
+    parts: &comfy_sampler::NativeDiffusionResidentParts,
+) -> Result<Vec<NativeResidentAllocation>, NativeStoredPayloadError> {
+    parts
+        .shared_allocations()
+        .iter()
+        .map(translate_diffusion_allocation)
+        .collect()
+}
+
+fn control_residency(
+    payload: &Arc<NativeControlPayload>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let parts = payload.resident_parts()?;
+    let mut allocations = vec![arc_allocation(
+        NativeResidentPayloadKind::Control,
+        payload,
+        usize::try_from(parts.owned_bytes())
+            .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+    )];
+    allocations.extend(diffusion_allocations(&parts)?);
+    NativePayloadResidency::checked(0, allocations)
+}
+
+fn stored_diffusion_residency(
+    payload: &Arc<NativeStoredModelPayload>,
+    diffusion: &Arc<NativeDiffusionPayload>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let parts = diffusion.resident_parts()?;
+    let wrapper_bytes = payload
+        .resident_bytes()?
+        .checked_sub(
+            usize::try_from(parts.resident_bytes()?)
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+        )
+        .ok_or(NativeStoredPayloadError::ResidentAllocationChanged)?;
+    let mut allocations = vec![
+        arc_allocation(NativeResidentPayloadKind::Model, payload, wrapper_bytes),
+        NativeResidentAllocation {
+            id: NativeResidentAllocationId::DiffusionPayloadArc {
+                address: arc_address(diffusion),
+            },
+            resident_bytes: usize::try_from(parts.owned_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+        },
+    ];
+    allocations.extend(diffusion_allocations(&parts)?);
+    NativePayloadResidency::checked(0, allocations)
+}
+
 fn model_allocations(
     payload: &Arc<NativeModelPayload>,
 ) -> Result<Vec<NativeResidentAllocation>, NativeStoredPayloadError> {
@@ -623,6 +896,15 @@ fn model_allocations(
             id: NativeResidentAllocationId::ModelBacking {
                 kind: allocation.kind(),
                 address: allocation.address(),
+            },
+            resident_bytes: usize::try_from(allocation.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
+        });
+    }
+    for allocation in parts.tensor_allocations() {
+        allocations.push(NativeResidentAllocation {
+            id: NativeResidentAllocationId::TensorStorage {
+                storage_id: allocation.storage_id().get(),
             },
             resident_bytes: usize::try_from(allocation.resident_bytes())
                 .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
@@ -674,6 +956,8 @@ pub enum NativeStoredPayloadError {
     InvalidProviderPayload,
     #[error("native tensor role must use its canonical stored payload owner")]
     NonCanonicalTensorRole,
+    #[error("native model role {role:?} has no canonical non-diffusion stored payload owner")]
+    NonCanonicalModelResourceRole { role: NativeModelResourceRole },
 }
 
 const fn native_handle_kind_tag(kind: NativeHandleKind) -> u8 {
@@ -716,6 +1000,392 @@ fn hex_sha256(value: &[u8; 32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_model::{
+        ClipVisionActivation, ClipVisionConfiguration, ClipVisionLayerWeights, ClipVisionModelType,
+        ClipVisionWeights, NativeClipVision, NativeRaftLarge, raft_large_exact_native,
+    };
+    use comfy_sampler::NativeDiffusionPayloadError;
+    use comfy_tensor::{
+        CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, StreamId, Tensor,
+        TensorDescriptor,
+    };
+    use std::{collections::BTreeSet, error::Error};
+
+    fn tensor_storage_ids(residency: &NativePayloadResidency) -> BTreeSet<u64> {
+        residency
+            .shared_allocations()
+            .iter()
+            .filter_map(|allocation| match allocation.id() {
+                NativeResidentAllocationId::TensorStorage { storage_id } => Some(*storage_id),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn loaded_zero_raft() -> Result<Arc<NativeRaftLarge>, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+        let mut raft = raft_large_exact_native(false, false, &cancellation)?;
+        let mut shared_tensors: Vec<(Vec<u64>, DType, Tensor)> = Vec::new();
+        let mut state = BTreeMap::new();
+        for spec in raft.state_schema() {
+            let tensor = match shared_tensors
+                .iter()
+                .find(|(shape, dtype, _)| shape == &spec.shape && *dtype == spec.dtype)
+            {
+                Some((_, _, tensor)) => tensor.clone(),
+                None => {
+                    let encoded_bytes = spec
+                        .shape
+                        .iter()
+                        .try_fold(spec.dtype.byte_width(), |bytes, dimension| {
+                            bytes.checked_mul(*dimension)
+                        })
+                        .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)?;
+                    let descriptor = TensorDescriptor::contiguous(
+                        spec.shape.clone(),
+                        spec.dtype,
+                        DeviceId::CPU,
+                        StreamId::DEFAULT,
+                    )?;
+                    let context = backend.execution_context(
+                        StreamId::DEFAULT,
+                        authority.authorize_workspace(encoded_bytes.max(1))?,
+                        &cancellation,
+                    );
+                    let bytes = vec![
+                        0_u8;
+                        usize::try_from(encoded_bytes).map_err(|_| {
+                            NativeStoredPayloadError::ResidentBytesOverflow
+                        })?
+                    ];
+                    let tensor = backend.upload_bytes(descriptor, &bytes, &context)?.0;
+                    shared_tensors.push((spec.shape.clone(), spec.dtype, tensor.clone()));
+                    tensor
+                }
+            };
+            state.insert(spec.name.clone(), tensor);
+        }
+        raft.load_state_dict(state, &cancellation)?;
+        raft.eval();
+        Ok(Arc::new(raft))
+    }
+
+    fn clip_tensor(
+        backend: &comfy_tensor::CpuBackend,
+        authority: &CpuWorkspaceAuthority,
+        cancellation: &CancellationToken,
+        shape: Vec<u64>,
+        value: f32,
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let elements = shape
+            .iter()
+            .try_fold(1_u64, |total, dimension| total.checked_mul(*dimension))
+            .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)?;
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(
+                elements
+                    .checked_mul(4)
+                    .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)?,
+            )?,
+            cancellation,
+        );
+        Ok(backend
+            .upload_f32(
+                descriptor,
+                &vec![value; usize::try_from(elements)?],
+                &context,
+            )?
+            .0)
+    }
+
+    fn tiny_clip_vision() -> Result<Arc<NativeClipVision>, Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let zero_2 = clip_tensor(&backend, &authority, &cancellation, vec![2], 0.0)?;
+        let zero_2x2 = clip_tensor(&backend, &authority, &cancellation, vec![2, 2], 0.0)?;
+        let layer = ClipVisionLayerWeights {
+            layer_norm_1_weight: clip_tensor(&backend, &authority, &cancellation, vec![2], 1.0)?,
+            layer_norm_1_bias: zero_2.clone(),
+            query_weight: zero_2x2.clone(),
+            query_bias: zero_2.clone(),
+            key_weight: zero_2x2.clone(),
+            key_bias: zero_2.clone(),
+            value_weight: zero_2x2.clone(),
+            value_bias: zero_2.clone(),
+            output_weight: zero_2x2.clone(),
+            output_bias: zero_2.clone(),
+            layer_norm_2_weight: clip_tensor(&backend, &authority, &cancellation, vec![2], 1.0)?,
+            layer_norm_2_bias: zero_2.clone(),
+            feed_forward_1_weight: zero_2x2.clone(),
+            feed_forward_1_bias: zero_2.clone(),
+            feed_forward_2_weight: zero_2x2,
+            feed_forward_2_bias: zero_2.clone(),
+        };
+        Ok(Arc::new(NativeClipVision::new(
+            ClipVisionConfiguration {
+                model_type: ClipVisionModelType::Clip,
+                dtype: DType::F32,
+                device: DeviceId::CPU,
+                hidden_size: 2,
+                intermediate_size: 2,
+                attention_heads: 1,
+                layer_count: 1,
+                image_size: 2,
+                patch_size: 1,
+                num_channels: 3,
+                max_num_patches: 4,
+                activation: ClipVisionActivation::QuickGelu,
+                projection_dimension: None,
+                llava_projection_dimension: None,
+            },
+            ClipVisionWeights {
+                patch_embedding_weight: clip_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2, 3, 1, 1],
+                    0.0,
+                )?,
+                patch_embedding_bias: None,
+                class_embedding: Some(zero_2.clone()),
+                position_embedding: clip_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![5, 2],
+                    0.0,
+                )?,
+                pre_layer_norm_weight: Some(clip_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2],
+                    1.0,
+                )?),
+                pre_layer_norm_bias: Some(zero_2.clone()),
+                layers: vec![layer],
+                post_layer_norm_weight: clip_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2],
+                    1.0,
+                )?,
+                post_layer_norm_bias: zero_2,
+                visual_projection_weight: None,
+                llava_linear_1_weight: None,
+                llava_linear_1_bias: None,
+                llava_linear_2_weight: None,
+                llava_linear_2_bias: None,
+            },
+        )?))
+    }
+
+    #[test]
+    fn clip_vision_model_resource_keeps_input_model_distinct_from_structured_output()
+    -> Result<(), Box<dyn Error>> {
+        let clip_vision = tiny_clip_vision()?;
+        let model = Arc::new(NativeModelPayload::clip_vision(clip_vision.clone())?);
+        let stored = Arc::new(NativeStoredModelPayload::model_resource(model.clone())?);
+        let payload = NativeStoredPayload::Model(stored.clone());
+        payload.validate()?;
+        let handle_type = payload.handle_type()?;
+        assert_eq!(handle_type.kind, NativeHandleKind::Clip);
+        assert_eq!(handle_type.type_id, "CLIP_VISION");
+        assert_ne!(handle_type.type_id, ClipVisionOutput::SOURCE_TYPE_ID);
+        assert_eq!(
+            payload.digest_sha256(),
+            clip_vision.semantic_digest_sha256()
+        );
+        assert!(Arc::ptr_eq(stored.model_payload(), &model));
+        assert!(stored.diffusion().is_none());
+        assert!(
+            payload
+                .residency()?
+                .shared_allocations()
+                .iter()
+                .any(|allocation| {
+                    matches!(
+                        allocation.id(),
+                        NativeResidentAllocationId::ModelBacking {
+                            kind: NativeModelBackingKind::ClipVision,
+                            address,
+                        } if *address == Arc::as_ptr(&clip_vision) as usize
+                    )
+                })
+        );
+        let residency = payload.residency()?;
+        let storage_ids = tensor_storage_ids(&residency);
+        assert!(!storage_ids.is_empty());
+
+        let shared_storage_resource = Arc::new(clip_vision.as_ref().clone());
+        assert!(!Arc::ptr_eq(&clip_vision, &shared_storage_resource));
+        let shared_storage_payload =
+            NativeStoredPayload::Model(Arc::new(NativeStoredModelPayload::model_resource(
+                Arc::new(NativeModelPayload::clip_vision(shared_storage_resource)?),
+            )?));
+        assert_eq!(
+            payload.digest_sha256(),
+            shared_storage_payload.digest_sha256()
+        );
+        assert_eq!(
+            storage_ids,
+            tensor_storage_ids(&shared_storage_payload.residency()?)
+        );
+
+        let distinct_storage_resource = tiny_clip_vision()?;
+        let distinct_storage_payload =
+            NativeStoredPayload::Model(Arc::new(NativeStoredModelPayload::model_resource(
+                Arc::new(NativeModelPayload::clip_vision(distinct_storage_resource)?),
+            )?));
+        assert_eq!(
+            payload.digest_sha256(),
+            distinct_storage_payload.digest_sha256()
+        );
+        assert!(
+            storage_ids.is_disjoint(&tensor_storage_ids(&distinct_storage_payload.residency()?))
+        );
+        assert!(matches!(
+            NativeDiffusionPayload::clip(model.clone()),
+            Err(NativeDiffusionPayloadError::RoleMismatch)
+        ));
+        assert!(matches!(
+            NativeDiffusionPayload::vae(model),
+            Err(NativeDiffusionPayloadError::RoleMismatch)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn clip_vision_output_residency_splits_owned_state_from_tensor_storage()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let hidden = clip_tensor(&backend, &authority, &cancellation, vec![1, 2, 2], 1.0)?;
+        let embeds = clip_tensor(&backend, &authority, &cancellation, vec![1, 2], 2.0)?;
+        let output = Arc::new(ClipVisionOutput::checked(
+            hidden.clone(),
+            Some(hidden),
+            embeds,
+            None,
+            vec![[3, 32, 32]],
+        )?);
+        let parts = output.resident_parts()?;
+        assert_eq!(parts.tensor_allocations().len(), 2);
+
+        let payload = NativeStoredPayload::ClipVisionOutput(output.clone());
+        payload.validate()?;
+        let residency = payload.residency()?;
+        assert_eq!(residency.resident_bytes()?, payload.resident_bytes()?);
+        assert_eq!(tensor_storage_ids(&residency).len(), 2);
+        let owned_bytes = usize::try_from(parts.owned_bytes())?;
+        assert!(residency.shared_allocations().iter().any(|allocation| {
+            matches!(
+                allocation.id(),
+                NativeResidentAllocationId::PayloadArc {
+                    kind: NativeResidentPayloadKind::ClipVisionOutput,
+                    address,
+                } if *address == Arc::as_ptr(&output) as usize
+            ) && allocation.resident_bytes() == owned_bytes
+        }));
+        Ok(())
+    }
+
+    #[test]
+    fn optical_flow_model_resource_derives_exact_handle_identity_and_residency()
+    -> Result<(), Box<dyn Error>> {
+        let raft = loaded_zero_raft()?;
+        let model = Arc::new(NativeModelPayload::optical_flow(raft.clone())?);
+        let stored = Arc::new(NativeStoredModelPayload::model_resource(model.clone())?);
+        let payload = NativeStoredPayload::Model(stored.clone());
+        payload.validate()?;
+
+        let handle_type = payload.handle_type()?;
+        assert_eq!(handle_type.kind, NativeHandleKind::Model);
+        assert_eq!(handle_type.type_id, "OPTICAL_FLOW");
+        assert_eq!(payload.digest_sha256(), model.identity().digest_sha256());
+        assert!(stored.diffusion().is_none());
+        assert!(Arc::ptr_eq(stored.model_payload(), &model));
+        assert_eq!(
+            stored.resident_bytes()?,
+            mem::size_of::<NativeStoredModelPayload>()
+                .checked_add(usize::try_from(model.resident_bytes())?)
+                .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)?
+        );
+
+        let residency = payload.residency()?;
+        assert_eq!(residency.resident_bytes()?, payload.resident_bytes()?);
+        assert_eq!(
+            residency.shared_allocations().len(),
+            model
+                .resident_parts()?
+                .tensor_allocations()
+                .len()
+                .checked_add(3)
+                .ok_or(NativeStoredPayloadError::ResidentBytesOverflow)?
+        );
+        assert!(residency.shared_allocations().iter().any(|allocation| {
+            matches!(
+                allocation.id(),
+                NativeResidentAllocationId::PayloadArc {
+                    kind: NativeResidentPayloadKind::Model,
+                    address,
+                } if *address == Arc::as_ptr(&stored) as usize
+            )
+        }));
+        assert!(residency.shared_allocations().iter().any(|allocation| {
+            matches!(
+                allocation.id(),
+                NativeResidentAllocationId::ModelPayloadArc { address }
+                    if *address == Arc::as_ptr(&model) as usize
+            )
+        }));
+        assert!(residency.shared_allocations().iter().any(|allocation| {
+            matches!(
+                allocation.id(),
+                NativeResidentAllocationId::ModelBacking {
+                    kind: NativeModelBackingKind::OpticalFlow,
+                    address,
+                } if *address == Arc::as_ptr(&raft) as usize
+            )
+        }));
+        Ok(())
+    }
+
+    #[test]
+    fn model_resource_admission_is_closed_to_optical_flow_and_cannot_fall_back_to_diffusion()
+    -> Result<(), Box<dyn Error>> {
+        for role in [
+            NativeModelResourceRole::Model,
+            NativeModelResourceRole::Clip,
+            NativeModelResourceRole::Vae,
+        ] {
+            assert!(matches!(
+                require_model_resource_role(role),
+                Err(NativeStoredPayloadError::NonCanonicalModelResourceRole {
+                    role: rejected,
+                }) if rejected == role
+            ));
+        }
+        require_model_resource_role(NativeModelResourceRole::OpticalFlow)?;
+        require_model_resource_role(NativeModelResourceRole::ClipVision)?;
+
+        let raft = loaded_zero_raft()?;
+        let optical_flow = Arc::new(NativeModelPayload::optical_flow(raft)?);
+        assert!(matches!(
+            NativeDiffusionPayload::clip(optical_flow.clone()),
+            Err(NativeDiffusionPayloadError::RoleMismatch)
+        ));
+        assert!(matches!(
+            NativeDiffusionPayload::vae(optical_flow),
+            Err(NativeDiffusionPayloadError::RoleMismatch)
+        ));
+        Ok(())
+    }
 
     #[test]
     fn provider_resident_bytes_charge_owned_capacity() -> Result<(), Box<dyn std::error::Error>> {

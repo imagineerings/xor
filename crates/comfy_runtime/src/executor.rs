@@ -15,8 +15,8 @@ pub use comfy_nodes::{
 use comfy_nodes::{
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
     NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle,
-    NativePayloadResidency, NativeResidentAllocationId, NativeStoredPayload, NativeValue,
-    NodeRegistry,
+    NativePayloadResidency, NativeResidentAllocationId, NativeResolvedPayload,
+    NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue, NodeRegistry,
 };
 use comfy_tensor::{BackendCapabilityMatrix, ScratchReservation};
 #[cfg(test)]
@@ -33,7 +33,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     sync::{
-        Arc,
+        Arc, Weak,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -767,6 +767,8 @@ struct NativeHandleStoreGenerationState {
     identity: NativeHandleStoreIdentity,
     next_generation: AtomicU64,
     data: Mutex<NativeHandleStoreData>,
+    sessions: Mutex<BTreeMap<Uuid, Weak<RuntimeNativeHandleStoreSession>>>,
+    active_attempts: Mutex<BTreeSet<Uuid>>,
     capacity: usize,
     byte_capacity: usize,
     #[cfg(test)]
@@ -777,6 +779,7 @@ struct NativeHandleStoreGenerationState {
 #[derive(Default)]
 struct NativeHandleStoreTestHooks {
     after_publish_insert: Option<Arc<dyn Fn() + Send + Sync>>,
+    after_resolve_increment: Option<Arc<dyn Fn() + Send + Sync>>,
     after_cache_insert: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
@@ -835,6 +838,21 @@ fn remove_stored_handle(
     Some(removed)
 }
 
+fn retire_stored_handle(data: &mut NativeHandleStoreData, identifier: &str) -> bool {
+    let should_remove = match data.values.get_mut(identifier) {
+        Some(record) => {
+            record.retired = true;
+            record.roots == 0 && record.resolved_roots == 0
+        }
+        None => return false,
+    };
+    if should_remove {
+        remove_stored_handle(data, identifier).is_some()
+    } else {
+        true
+    }
+}
+
 #[derive(Clone)]
 struct StoredNativeHandle {
     handle_type: NativeHandleType,
@@ -845,6 +863,8 @@ struct StoredNativeHandle {
     published_by: AttemptId,
     residency: NativePayloadResidency,
     roots: usize,
+    resolved_roots: usize,
+    retired: bool,
 }
 
 #[derive(Clone)]
@@ -856,6 +876,14 @@ struct NativeHandleLeaseInner {
     generation: NativeHandleStoreGeneration,
     handles: Vec<NativeOpaqueHandle>,
 }
+
+#[derive(Debug)]
+struct RuntimeResolvedPayloadRetention {
+    generation: NativeHandleStoreGeneration,
+    handle: NativeOpaqueHandle,
+}
+
+impl NativeResolvedPayloadRetention for RuntimeResolvedPayloadRetention {}
 
 impl fmt::Debug for NativeHandleLease {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -869,6 +897,12 @@ impl fmt::Debug for NativeHandleLease {
 impl Drop for NativeHandleLeaseInner {
     fn drop(&mut self) {
         self.generation.release_roots(&self.handles);
+    }
+}
+
+impl Drop for RuntimeResolvedPayloadRetention {
+    fn drop(&mut self) {
+        self.generation.release_resolved_root(&self.handle);
     }
 }
 
@@ -938,6 +972,8 @@ impl NativeHandleStoreGeneration {
                 identity: NativeHandleStoreIdentity::new(Uuid::new_v4(), Uuid::new_v4())?,
                 next_generation: AtomicU64::new(1),
                 data: Mutex::new(NativeHandleStoreData::default()),
+                sessions: Mutex::new(BTreeMap::new()),
+                active_attempts: Mutex::new(BTreeSet::new()),
                 capacity,
                 byte_capacity,
                 #[cfg(test)]
@@ -992,11 +1028,17 @@ impl NativeHandleStoreGeneration {
                 .values
                 .get(identifier)
                 .ok_or_else(|| NativeHandleStoreError::Missing(identifier.clone()))?;
-            if !record.committed
-                || record.generation != *generation
-                || record.handle_type != *handle.handle_type()
-            {
+            if record.retired {
+                return Err(NativeHandleStoreError::Missing(identifier.clone()));
+            }
+            if !record.committed || record.generation != *generation {
                 return Err(NativeHandleStoreError::WrongGeneration);
+            }
+            if record.handle_type != *handle.handle_type() {
+                return Err(NativeHandleStoreError::WrongType {
+                    expected: record.handle_type.type_id.clone(),
+                    actual: handle.handle_type().type_id.clone(),
+                });
             }
             if Some(record.digest_sha256.as_str()) != handle.digest_sha256() {
                 return Err(NativeHandleStoreError::DigestMismatch);
@@ -1035,7 +1077,28 @@ impl NativeHandleStoreGeneration {
             }
         }
         for identifier in removals {
-            remove_stored_handle(&mut data, &identifier);
+            retire_stored_handle(&mut data, &identifier);
+        }
+    }
+
+    fn release_resolved_root(&self, handle: &NativeOpaqueHandle) {
+        let mut data = self.state.data.lock();
+        let should_remove = if let Some(record) = data.values.get_mut(handle.identifier()) {
+            if record.generation != handle.generation()
+                || record.handle_type != *handle.handle_type()
+                || Some(record.digest_sha256.as_str()) != handle.digest_sha256()
+                || record.resolved_roots == 0
+            {
+                false
+            } else {
+                record.resolved_roots -= 1;
+                record.retired && record.roots == 0 && record.resolved_roots == 0
+            }
+        } else {
+            false
+        };
+        if should_remove {
+            debug_assert!(remove_stored_handle(&mut data, handle.identifier()).is_some());
         }
     }
 
@@ -1045,30 +1108,64 @@ impl NativeHandleStoreGeneration {
             .values
             .iter()
             .filter(|(_, record)| {
-                record.committed && record.published_by == attempt_id && record.roots == 0
+                record.committed
+                    && !record.retired
+                    && record.published_by == attempt_id
+                    && record.roots == 0
             })
             .map(|(identifier, _)| identifier.clone())
             .collect::<Vec<_>>();
         for identifier in identifiers {
-            remove_stored_handle(&mut data, &identifier);
+            retire_stored_handle(&mut data, &identifier);
         }
     }
 
     fn session(&self, attempt_id: AttemptId) -> Arc<RuntimeNativeHandleStoreSession> {
-        Arc::new(RuntimeNativeHandleStoreSession {
-            generation: self.clone(),
-            attempt_id,
-            staged: Mutex::new(NativeHandleStoreSessionStage::default()),
-        })
+        loop {
+            let mut sessions = self.state.sessions.lock();
+            match sessions.get(&attempt_id.0) {
+                Some(session) => {
+                    if let Some(session) = session.upgrade() {
+                        return session;
+                    }
+                    drop(sessions);
+                    std::thread::yield_now();
+                }
+                None => {
+                    let session = Arc::new(RuntimeNativeHandleStoreSession {
+                        generation: self.clone(),
+                        attempt_id,
+                        staged: Mutex::new(NativeHandleStoreSessionStage::default()),
+                    });
+                    sessions.insert(attempt_id.0, Arc::downgrade(&session));
+                    return session;
+                }
+            }
+        }
     }
 
     pub fn handle_store_for_attempt(&self, attempt_id: AttemptId) -> Arc<dyn NativeHandleStore> {
         self.session(attempt_id)
     }
 
+    fn try_claim_attempt(&self, attempt_id: AttemptId) -> Option<NativeExecutionAttemptClaim> {
+        let mut active_attempts = self.state.active_attempts.lock();
+        active_attempts
+            .insert(attempt_id.0)
+            .then(|| NativeExecutionAttemptClaim {
+                generation: self.clone(),
+                attempt_id,
+            })
+    }
+
     #[cfg(test)]
     fn set_after_publish_insert_hook(&self, hook: Arc<dyn Fn() + Send + Sync>) {
         self.state.test_hooks.lock().after_publish_insert = Some(hook);
+    }
+
+    #[cfg(test)]
+    fn set_after_resolve_increment_hook(&self, hook: Arc<dyn Fn() + Send + Sync>) {
+        self.state.test_hooks.lock().after_resolve_increment = Some(hook);
     }
 
     #[cfg(test)]
@@ -1079,6 +1176,14 @@ impl NativeHandleStoreGeneration {
     #[cfg(test)]
     fn run_after_publish_insert_hook(&self) {
         let hook = self.state.test_hooks.lock().after_publish_insert.clone();
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    #[cfg(test)]
+    fn run_after_resolve_increment_hook(&self) {
+        let hook = self.state.test_hooks.lock().after_resolve_increment.clone();
         if let Some(hook) = hook {
             hook();
         }
@@ -1099,6 +1204,21 @@ struct RuntimeNativeHandleStoreSession {
     staged: Mutex<NativeHandleStoreSessionStage>,
 }
 
+struct NativeExecutionAttemptClaim {
+    generation: NativeHandleStoreGeneration,
+    attempt_id: AttemptId,
+}
+
+impl Drop for NativeExecutionAttemptClaim {
+    fn drop(&mut self) {
+        self.generation
+            .state
+            .active_attempts
+            .lock()
+            .remove(&self.attempt_id.0);
+    }
+}
+
 #[derive(Default)]
 struct NativeHandleStoreSessionStage {
     identifiers: Vec<String>,
@@ -1112,6 +1232,19 @@ impl fmt::Debug for RuntimeNativeHandleStoreSession {
             .field("identity", &self.generation.identity())
             .field("attempt_id", &self.attempt_id)
             .finish_non_exhaustive()
+    }
+}
+
+impl Drop for RuntimeNativeHandleStoreSession {
+    fn drop(&mut self) {
+        let mut sessions = self.generation.state.sessions.lock();
+        self.rollback_all();
+        let registered_self = sessions
+            .get(&self.attempt_id.0)
+            .is_some_and(|session| std::ptr::eq(session.as_ptr(), self));
+        if registered_self {
+            sessions.remove(&self.attempt_id.0);
+        }
     }
 }
 
@@ -1135,7 +1268,7 @@ impl RuntimeNativeHandleStoreSession {
                 .get(&identifier)
                 .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
             {
-                remove_stored_handle(&mut data, &identifier);
+                retire_stored_handle(&mut data, &identifier);
             }
         }
     }
@@ -1153,7 +1286,7 @@ impl RuntimeNativeHandleStoreSession {
                 .get(&identifier)
                 .is_some_and(|record| !record.committed && record.published_by == self.attempt_id)
             {
-                remove_stored_handle(&mut data, &identifier);
+                retire_stored_handle(&mut data, &identifier);
             }
         }
     }
@@ -1168,6 +1301,7 @@ impl RuntimeNativeHandleStoreSession {
         for identifier in identifiers {
             if let Some(record) = data.values.get_mut(&identifier)
                 && record.published_by == self.attempt_id
+                && !record.retired
             {
                 record.committed = true;
             }
@@ -1215,20 +1349,31 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
+    ) -> Result<NativeResolvedPayload, NativeHandleStoreError> {
         self.validate_handle(handle, expected_type, cancellation)?;
-        let data = self.generation.state.data.lock();
+        let mut data = self.generation.state.data.lock();
         let record = data
             .values
-            .get(handle.identifier())
+            .get_mut(handle.identifier())
             .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))?;
+        if record.retired {
+            return Err(NativeHandleStoreError::Missing(
+                handle.identifier().to_owned(),
+            ));
+        }
         if !record.committed && record.published_by != self.attempt_id {
             return Err(NativeHandleStoreError::Missing(
                 handle.identifier().to_owned(),
             ));
         }
-        if record.generation != handle.generation() || record.handle_type != *expected_type {
+        if record.generation != handle.generation() {
             return Err(NativeHandleStoreError::WrongGeneration);
+        }
+        if record.handle_type != *expected_type {
+            return Err(NativeHandleStoreError::WrongType {
+                expected: record.handle_type.type_id.clone(),
+                actual: expected_type.type_id.clone(),
+            });
         }
         if Some(record.digest_sha256.as_str()) != handle.digest_sha256() {
             return Err(NativeHandleStoreError::DigestMismatch);
@@ -1243,7 +1388,26 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
                 comfy_nodes::NativeStoredPayloadError::ProjectionChanged,
             ));
         }
-        Ok(record.value.clone())
+        record.resolved_roots = record.resolved_roots.checked_add(1).ok_or_else(|| {
+            NativeHandleStoreError::Rejected(
+                "native resolved payload root count overflowed".to_owned(),
+            )
+        })?;
+        let payload = record.value.clone();
+        drop(data);
+        let resolved = NativeResolvedPayload::checked(
+            payload,
+            Arc::new(RuntimeResolvedPayloadRetention {
+                generation: self.generation.clone(),
+                handle: handle.clone(),
+            }),
+        )?;
+        #[cfg(test)]
+        self.generation.run_after_resolve_increment_hook();
+        cancellation
+            .check()
+            .map_err(|_| NativeHandleStoreError::Cancelled)?;
+        Ok(resolved)
     }
 
     fn publish(
@@ -1350,6 +1514,8 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
                 published_by: self.attempt_id,
                 residency,
                 roots: 0,
+                resolved_roots: 0,
+                retired: false,
             },
         );
         data.resident_bytes = next_resident_bytes;
@@ -1360,7 +1526,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
         if cancellation.is_cancelled() {
             staged.identifiers.pop();
             let mut data = self.generation.state.data.lock();
-            remove_stored_handle(&mut data, handle.identifier());
+            retire_stored_handle(&mut data, handle.identifier());
             return Err(NativeHandleStoreError::Cancelled);
         }
         drop(staged);
@@ -1380,18 +1546,16 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             ));
         }
         let mut data = self.generation.state.data.lock();
-        let removable = data
-            .values
-            .get(handle.identifier())
-            .is_some_and(|record| !record.committed && record.published_by == self.attempt_id);
+        let removable = data.values.get(handle.identifier()).is_some_and(|record| {
+            !record.committed && !record.retired && record.published_by == self.attempt_id
+        });
         if !removable {
             return Err(NativeHandleStoreError::Rejected(
                 "native handles may only be revoked by their publishing attempt before commit"
                     .to_owned(),
             ));
         }
-        let removed = remove_stored_handle(&mut data, handle.identifier());
-        if removed.is_none() {
+        if !retire_stored_handle(&mut data, handle.identifier()) {
             return Err(NativeHandleStoreError::Missing(
                 handle.identifier().to_owned(),
             ));
@@ -1535,6 +1699,8 @@ pub enum ExecutionError {
     Interrupted { node: NodeId, failure: NodeFailure },
     #[error("execution was cancelled")]
     Cancelled,
+    #[error("execution attempt {0:?} is already active")]
+    AttemptAlreadyActive(AttemptId),
     #[error("expansion depth exceeds {MAX_EXPANSION_DEPTH}")]
     ExpansionDepth,
     #[error("expanded plan does not contain output node {0:?}")]
@@ -1729,6 +1895,23 @@ impl ExecutionEngine {
         attempt_id: AttemptId,
         cancellation: CancellationToken,
     ) -> ExecutionReport {
+        let _attempt_claim = match self.handle_store_generation.try_claim_attempt(attempt_id) {
+            Some(claim) => claim,
+            None => {
+                return ExecutionReport {
+                    profile_id: self.profile_id,
+                    prompt_id: plan.prompt_id,
+                    attempt_id,
+                    state: AttemptState::Failed,
+                    outputs: BTreeMap::new(),
+                    ui_outputs: BTreeMap::new(),
+                    events: Vec::new(),
+                    cache_hits: 0,
+                    error: Some(ExecutionError::AttemptAlreadyActive(attempt_id).to_string()),
+                    handle_lease: None,
+                };
+            }
+        };
         let handle_store = self.handle_store_generation.session(attempt_id);
         let mut report_handle_lease = None;
         let mut state = RunState::new(
@@ -2693,11 +2876,16 @@ impl From<EventBusError> for ExecutionError {
 pub(crate) mod tests {
     use super::*;
     use crate::{InputMode, PromptCompiler, RuntimeNodeDescriptor, RuntimeOutputDescriptor};
+    use comfy_model::{
+        ClipVisionActivation, ClipVisionConfiguration, ClipVisionLayerWeights, ClipVisionModelType,
+        ClipVisionOutput, ClipVisionWeights, NativeClipVision, NativeModelPayload,
+    };
     use comfy_nodes::{
         NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeInputDescriptor,
-        NativePrimitive, NativePrimitiveType, NativeProviderPayload, NativeTypeUnion,
-        NativeValueType,
+        NativePrimitive, NativePrimitiveType, NativeProviderPayload, NativeStoredModelPayload,
+        NativeTypeUnion, NativeValueType,
     };
+    use comfy_tensor::{DType, StreamId, Tensor, TensorDescriptor};
     use comfy_types::{ApiPrompt, PromptNode, PromptSubmission};
     use serde_json::json;
     use std::mem;
@@ -2761,6 +2949,133 @@ pub(crate) mod tests {
                 abi_bytes,
             )?,
         )))
+    }
+
+    fn clip_vision_test_tensor(
+        backend: &comfy_tensor::CpuBackend,
+        authority: &CpuWorkspaceAuthority,
+        cancellation: &CancellationToken,
+        shape: Vec<u64>,
+        value: f32,
+    ) -> Result<Tensor, Box<dyn std::error::Error>> {
+        let elements = shape
+            .iter()
+            .try_fold(1_u64, |total, dimension| total.checked_mul(*dimension))
+            .ok_or("clip vision test tensor element count overflowed")?;
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(
+                elements
+                    .checked_mul(4)
+                    .ok_or("clip vision test tensor workspace byte count overflowed")?,
+            )?,
+            cancellation,
+        );
+        Ok(backend
+            .upload_f32(
+                descriptor,
+                &vec![value; usize::try_from(elements)?],
+                &context,
+            )?
+            .0)
+    }
+
+    fn tiny_clip_vision_resource() -> Result<Arc<NativeClipVision>, Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let zero_2 = clip_vision_test_tensor(&backend, &authority, &cancellation, vec![2], 0.0)?;
+        let zero_2x2 =
+            clip_vision_test_tensor(&backend, &authority, &cancellation, vec![2, 2], 0.0)?;
+        let layer = ClipVisionLayerWeights {
+            layer_norm_1_weight: clip_vision_test_tensor(
+                &backend,
+                &authority,
+                &cancellation,
+                vec![2],
+                1.0,
+            )?,
+            layer_norm_1_bias: zero_2.clone(),
+            query_weight: zero_2x2.clone(),
+            query_bias: zero_2.clone(),
+            key_weight: zero_2x2.clone(),
+            key_bias: zero_2.clone(),
+            value_weight: zero_2x2.clone(),
+            value_bias: zero_2.clone(),
+            output_weight: zero_2x2.clone(),
+            output_bias: zero_2.clone(),
+            layer_norm_2_weight: clip_vision_test_tensor(
+                &backend,
+                &authority,
+                &cancellation,
+                vec![2],
+                1.0,
+            )?,
+            layer_norm_2_bias: zero_2.clone(),
+            feed_forward_1_weight: zero_2x2.clone(),
+            feed_forward_1_bias: zero_2.clone(),
+            feed_forward_2_weight: zero_2x2,
+            feed_forward_2_bias: zero_2.clone(),
+        };
+        Ok(Arc::new(NativeClipVision::new(
+            ClipVisionConfiguration {
+                model_type: ClipVisionModelType::Clip,
+                dtype: DType::F32,
+                device: DeviceId::CPU,
+                hidden_size: 2,
+                intermediate_size: 2,
+                attention_heads: 1,
+                layer_count: 1,
+                image_size: 2,
+                patch_size: 1,
+                num_channels: 3,
+                max_num_patches: 4,
+                activation: ClipVisionActivation::QuickGelu,
+                projection_dimension: None,
+                llava_projection_dimension: None,
+            },
+            ClipVisionWeights {
+                patch_embedding_weight: clip_vision_test_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2, 3, 1, 1],
+                    0.0,
+                )?,
+                patch_embedding_bias: None,
+                class_embedding: Some(zero_2.clone()),
+                position_embedding: clip_vision_test_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![5, 2],
+                    0.0,
+                )?,
+                pre_layer_norm_weight: Some(clip_vision_test_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2],
+                    1.0,
+                )?),
+                pre_layer_norm_bias: Some(zero_2.clone()),
+                layers: vec![layer],
+                post_layer_norm_weight: clip_vision_test_tensor(
+                    &backend,
+                    &authority,
+                    &cancellation,
+                    vec![2],
+                    1.0,
+                )?,
+                post_layer_norm_bias: zero_2,
+                visual_projection_weight: None,
+                llava_linear_1_weight: None,
+                llava_linear_1_bias: None,
+                llava_linear_2_weight: None,
+                llava_linear_2_bias: None,
+            },
+        )?))
     }
 
     fn test_cache_key(node_class: &str) -> Result<CacheKey, crate::NativeCacheError> {
@@ -2945,6 +3260,13 @@ pub(crate) mod tests {
         cancel_after_publish: bool,
     }
 
+    struct BlockingPublishingHandleNode {
+        calls: Arc<AtomicUsize>,
+        entered: Arc<Barrier>,
+        release: Arc<Barrier>,
+        published_handle: Arc<Mutex<Option<NativeOpaqueHandle>>>,
+    }
+
     impl NativeNode for PublishingHandleNode {
         fn class_type(&self) -> &str {
             "PublishingHandle"
@@ -2982,6 +3304,52 @@ pub(crate) mod tests {
                 if self.cancel_after_publish {
                     context.cancellation.cancel();
                 }
+                Ok(NodeOutcome::Values {
+                    outputs: vec![NativeValue::Handle { value: handle }],
+                    ui: None,
+                    effects: Vec::new(),
+                })
+            })
+        }
+    }
+
+    impl NativeNode for BlockingPublishingHandleNode {
+        fn class_type(&self) -> &str {
+            "PublishingHandle"
+        }
+
+        fn implementation_version(&self) -> &str {
+            "1"
+        }
+
+        fn execute<'a>(
+            &'a self,
+            context: NodeContext,
+            _inputs: BTreeMap<String, NativeValue>,
+        ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async move {
+                let payload =
+                    stored_test_payload(b"claimed-attempt".to_vec()).map_err(|error| {
+                        NodeFailure {
+                            code: "test_payload".to_owned(),
+                            message: error.to_string(),
+                            kind: NodeFailureKind::Failure,
+                            retryable: false,
+                        }
+                    })?;
+                let handle = context
+                    .handle_store()
+                    .publish(payload, &context.cancellation)
+                    .map_err(|error| NodeFailure {
+                        code: "publish".to_owned(),
+                        message: error.to_string(),
+                        kind: NodeFailureKind::Failure,
+                        retryable: false,
+                    })?;
+                *self.published_handle.lock() = Some(handle.clone());
+                self.entered.wait();
+                self.release.wait();
                 Ok(NodeOutcome::Values {
                     outputs: vec![NativeValue::Handle { value: handle }],
                     ui: None,
@@ -3473,6 +3841,371 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn native_handle_store_abandoned_session_rolls_back_staged_values()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(b"abandoned-session".to_vec())?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x2f20));
+        let session = generation.handle_store_for_attempt(attempt_id);
+        session.publish(payload, &CancellationToken::default())?;
+        assert_eq!(generation.len(), 1);
+
+        drop(session);
+
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_duplicate_attempt_reuses_one_session_and_close_state()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(b"duplicate-attempt".to_vec())?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x2f21));
+        let first = generation.session(attempt_id);
+        let duplicate = generation.session(attempt_id);
+        assert!(Arc::ptr_eq(&first, &duplicate));
+
+        let handle = first.publish(payload, &CancellationToken::default())?;
+        let resolved =
+            duplicate.resolve(&handle, handle.handle_type(), &CancellationToken::default())?;
+        assert!(matches!(
+            resolved.as_ref(),
+            NativeStoredPayload::Provider(_)
+        ));
+        drop(resolved);
+
+        duplicate.rollback_all();
+        assert!(generation.is_empty());
+        assert!(matches!(
+            first.publish(
+                stored_test_payload(b"closed-duplicate".to_vec())?,
+                &CancellationToken::default(),
+            ),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        drop(duplicate);
+        drop(first);
+
+        let reopened = generation.session(attempt_id);
+        let reopened_handle = reopened.publish(
+            stored_test_payload(b"reopened-attempt".to_vec())?,
+            &CancellationToken::default(),
+        )?;
+        reopened.revoke(&reopened_handle, &CancellationToken::default())?;
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_executor_rejects_concurrent_duplicate_attempt_before_store_mutation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let descriptor = publishing_handle_descriptor()?;
+        let plan = Arc::new(compile_plan(
+            vec![descriptor.clone()],
+            BTreeMap::from([(
+                NodeId("publish".to_owned()),
+                PromptNode {
+                    class_type: descriptor.class_type.clone(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            )]),
+        )?);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let published_handle = Arc::new(Mutex::new(None));
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(descriptor)?;
+        registry.register(Arc::new(BlockingPublishingHandleNode {
+            calls: calls.clone(),
+            entered: entered.clone(),
+            release: release.clone(),
+            published_handle: published_handle.clone(),
+        }))?;
+        let payload_bytes = stored_test_payload(b"claimed-attempt".to_vec())?.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(1, payload_bytes)?;
+        let cache = Arc::new(Mutex::new(NativeCache::new(1)?));
+        let (_backend, workspace_authority) =
+            CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+        let engine = Arc::new(ExecutionEngine::new_with_handle_store_generation(
+            ProfileId(Uuid::from_u128(0x2f24)),
+            Arc::new(registry),
+            cache.clone(),
+            Arc::new(RecordingEffectCoordinator::default()),
+            "registry-v1",
+            workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+            generation.clone(),
+        )?);
+        let attempt_id = AttemptId(Uuid::from_u128(0x2f25));
+        let first_execution = std::thread::spawn({
+            let engine = engine.clone();
+            let plan = plan.clone();
+            move || {
+                smol::block_on(engine.execute(
+                    plan.as_ref(),
+                    attempt_id,
+                    CancellationToken::default(),
+                ))
+            }
+        });
+        entered.wait();
+
+        let duplicate =
+            smol::block_on(engine.execute(plan.as_ref(), attempt_id, CancellationToken::default()));
+        assert_eq!(duplicate.state, AttemptState::Failed);
+        assert!(duplicate.outputs.is_empty());
+        assert!(duplicate.events.is_empty());
+        assert!(
+            duplicate
+                .error
+                .as_deref()
+                .is_some_and(|error| error.contains("already active"))
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let handle = published_handle
+            .lock()
+            .clone()
+            .ok_or("first execution did not publish its staged handle")?;
+        {
+            let data = generation.state.data.lock();
+            let record = data
+                .values
+                .get(handle.identifier())
+                .ok_or("duplicate execution removed the first execution's handle")?;
+            assert!(!record.committed);
+            assert!(!record.retired);
+        }
+        let shared_session = generation.session(attempt_id);
+        let resolved =
+            shared_session.resolve(&handle, handle.handle_type(), &CancellationToken::default())?;
+        drop(resolved);
+
+        release.wait();
+        let first = first_execution
+            .join()
+            .map_err(|_| "first execution thread panicked")?;
+        assert_eq!(first.state, AttemptState::Succeeded);
+        assert_eq!(report_handle(&first), Some(handle.clone()));
+        {
+            let data = generation.state.data.lock();
+            let record = data
+                .values
+                .get(handle.identifier())
+                .ok_or("successful first execution lost its handle")?;
+            assert!(record.committed);
+            assert!(!record.retired);
+        }
+        drop(shared_session);
+        drop(first);
+        cache.lock().clear();
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_resolve_cancellation_after_root_increment_is_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(b"resolve-cancellation".to_vec())?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(0x2f22)));
+        let handle = session.publish(payload, &CancellationToken::default())?;
+        let cancellation = CancellationToken::default();
+        generation.set_after_resolve_increment_hook(Arc::new({
+            let cancellation = cancellation.clone();
+            move || {
+                cancellation.cancel();
+            }
+        }));
+
+        assert!(matches!(
+            session.resolve(&handle, handle.handle_type(), &cancellation),
+            Err(NativeHandleStoreError::Cancelled)
+        ));
+        let data = generation.state.data.lock();
+        let record = data
+            .values
+            .get(handle.identifier())
+            .ok_or("cancelled resolve removed its staged handle")?;
+        assert_eq!(record.resolved_roots, 0);
+        drop(data);
+        session.revoke(&handle, &CancellationToken::default())?;
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_root_overflow_rejection_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
+        let payload = stored_test_payload(b"root-overflow".to_vec())?;
+        let generation =
+            NativeHandleStoreGeneration::with_capacities(1, payload.resident_bytes()?)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x2f23));
+        let session = generation.session(attempt_id);
+        let handle = session.publish(payload, &CancellationToken::default())?;
+        session.commit();
+        {
+            let mut data = generation.state.data.lock();
+            let record = data
+                .values
+                .get_mut(handle.identifier())
+                .ok_or("committed handle was missing")?;
+            record.roots = usize::MAX;
+        }
+        assert!(matches!(
+            generation.acquire_lease([&handle]),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        {
+            let mut data = generation.state.data.lock();
+            let record = data
+                .values
+                .get_mut(handle.identifier())
+                .ok_or("committed handle was missing after lease overflow")?;
+            assert_eq!(record.roots, usize::MAX);
+            record.roots = 0;
+            record.resolved_roots = usize::MAX;
+        }
+        assert!(matches!(
+            session.resolve(&handle, handle.handle_type(), &CancellationToken::default(),),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        {
+            let mut data = generation.state.data.lock();
+            let record = data
+                .values
+                .get_mut(handle.identifier())
+                .ok_or("committed handle was missing after resolve overflow")?;
+            assert_eq!(record.resolved_roots, usize::MAX);
+            record.resolved_roots = 0;
+        }
+        generation.collect_unrooted_attempt(attempt_id);
+        assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn native_handle_store_clip_vision_payloads_enforce_identity_and_alias_residency()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let clip_vision = tiny_clip_vision_resource()?;
+        let model_owner = Arc::new(NativeModelPayload::clip_vision(clip_vision)?);
+        let stored_model = Arc::new(NativeStoredModelPayload::model_resource(
+            model_owner.clone(),
+        )?);
+        let model_payload = NativeStoredPayload::Model(stored_model);
+        let model_type = model_payload.handle_type()?;
+        assert_eq!(model_type.type_id, "CLIP_VISION");
+
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let hidden =
+            clip_vision_test_tensor(&backend, &authority, &cancellation, vec![1, 2, 2], 1.0)?;
+        let embeds = clip_vision_test_tensor(&backend, &authority, &cancellation, vec![1, 2], 2.0)?;
+        let output_owner = Arc::new(ClipVisionOutput::checked(
+            hidden.clone(),
+            Some(hidden),
+            embeds,
+            None,
+            vec![[3, 32, 32]],
+        )?);
+        let output_parts = output_owner.resident_parts()?;
+        assert_eq!(output_parts.tensor_allocations().len(), 2);
+        let output_payload = NativeStoredPayload::ClipVisionOutput(output_owner.clone());
+        let output_type = output_payload.handle_type()?;
+        assert_eq!(output_type.type_id, ClipVisionOutput::SOURCE_TYPE_ID);
+        assert_ne!(model_type, output_type);
+        assert_eq!(
+            output_payload.residency()?.resident_bytes()?,
+            usize::try_from(output_parts.resident_bytes()?)?
+        );
+        assert_eq!(
+            output_payload.resident_bytes()?,
+            usize::try_from(output_owner.resident_bytes())?
+        );
+
+        let byte_capacity = model_payload
+            .resident_bytes()?
+            .checked_add(output_payload.resident_bytes()?)
+            .ok_or("clip vision store capacity overflowed")?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, byte_capacity)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(0x2f26)));
+        let model_handle = session.publish(model_payload, &CancellationToken::default())?;
+        let output_handle =
+            session.publish(output_payload.clone(), &CancellationToken::default())?;
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), byte_capacity);
+
+        let resolved_model =
+            session.resolve(&model_handle, &model_type, &CancellationToken::default())?;
+        let NativeStoredPayload::Model(resolved_model_payload) = resolved_model.as_ref() else {
+            return Err("CLIP vision model handle resolved to the wrong payload".into());
+        };
+        assert!(Arc::ptr_eq(
+            resolved_model_payload.model_payload(),
+            &model_owner
+        ));
+        let resolved_output =
+            session.resolve(&output_handle, &output_type, &CancellationToken::default())?;
+        let NativeStoredPayload::ClipVisionOutput(resolved_output_payload) =
+            resolved_output.as_ref()
+        else {
+            return Err("CLIP vision output handle resolved to the wrong payload".into());
+        };
+        assert!(Arc::ptr_eq(resolved_output_payload, &output_owner));
+        assert!(matches!(
+            session.resolve(&model_handle, &output_type, &CancellationToken::default(),),
+            Err(NativeHandleStoreError::WrongType { .. })
+        ));
+        assert!(matches!(
+            session.resolve(&output_handle, &model_type, &CancellationToken::default(),),
+            Err(NativeHandleStoreError::WrongType { .. })
+        ));
+        let forged_output = NativeOpaqueHandle::new(
+            output_type,
+            generation.identity(),
+            output_handle.identifier(),
+            output_handle.generation(),
+            Some("f".repeat(64)),
+        )?;
+        assert!(matches!(
+            session.resolve(
+                &forged_output,
+                forged_output.handle_type(),
+                &CancellationToken::default(),
+            ),
+            Err(NativeHandleStoreError::DigestMismatch)
+        ));
+        drop(resolved_output);
+        drop(resolved_model);
+        session.rollback_all();
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+
+        let cancelled_generation =
+            NativeHandleStoreGeneration::with_capacities(1, output_payload.resident_bytes()?)?;
+        let cancelled_session = cancelled_generation.session(AttemptId(Uuid::from_u128(0x2f27)));
+        let late_cancellation = CancellationToken::default();
+        cancelled_generation.set_after_publish_insert_hook(Arc::new({
+            let late_cancellation = late_cancellation.clone();
+            move || {
+                late_cancellation.cancel();
+            }
+        }));
+        assert!(matches!(
+            cancelled_session.publish(output_payload, &late_cancellation),
+            Err(NativeHandleStoreError::Cancelled)
+        ));
+        assert!(cancelled_generation.is_empty());
+        assert_eq!(cancelled_generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn native_handle_store_capacity_and_lease_validation_are_atomic()
     -> Result<(), Box<dyn std::error::Error>> {
         let first_payload = stored_test_payload(vec![1])?;
@@ -3553,6 +4286,61 @@ pub(crate) mod tests {
         assert_eq!(generation.len(), 1);
         assert_eq!(generation.resident_bytes(), payload_bytes);
         drop(second_lease);
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn resolved_payload_guard_retires_logically_and_releases_shared_capacity_on_final_drop()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"guarded-shared-payload"));
+        let shared = Arc::new(NativeProviderPayload::checked(
+            NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
+            "sim.test.provider",
+            semantic_digest_sha256,
+            b"guarded-shared-payload".to_vec(),
+        )?);
+        let payload = NativeStoredPayload::Provider(shared.clone());
+        let payload_bytes = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(3, payload_bytes)?;
+        let cancellation = CancellationToken::default();
+        let first_session = generation.session(AttemptId(Uuid::from_u128(0x2f10)));
+        let first = first_session.publish(payload, &cancellation)?;
+        let resolved = first_session.resolve(&first, first.handle_type(), &cancellation)?;
+        let resolved_clone = resolved.clone();
+
+        first_session.rollback_all();
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        assert!(matches!(
+            first_session.resolve(&first, first.handle_type(), &cancellation),
+            Err(NativeHandleStoreError::Missing(_))
+        ));
+
+        let second_session = generation.session(AttemptId(Uuid::from_u128(0x2f11)));
+        let second = second_session.publish(
+            NativeStoredPayload::Provider(shared),
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        assert!(matches!(
+            second_session.publish(
+                stored_test_payload(b"distinct-capacity-allocation".to_vec())?,
+                &CancellationToken::default(),
+            ),
+            Err(NativeHandleStoreError::Rejected(_))
+        ));
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+
+        second_session.revoke(&second, &CancellationToken::default())?;
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        drop(resolved);
+        assert_eq!(generation.len(), 1);
+        drop(resolved_clone);
         assert!(generation.is_empty());
         assert_eq!(generation.resident_bytes(), 0);
         Ok(())
@@ -3769,6 +4557,13 @@ pub(crate) mod tests {
             handle.digest_sha256().map(ToOwned::to_owned),
         )?;
         let wrong_type = NativeHandleType::new(NativeHandleKind::Model, "MODEL")?;
+        let wrong_type_handle = NativeOpaqueHandle::new(
+            wrong_type.clone(),
+            generation.identity(),
+            handle.identifier(),
+            handle.generation(),
+            handle.digest_sha256().map(ToOwned::to_owned),
+        )?;
         let wrong_digest = NativeOpaqueHandle::new(
             expected.clone(),
             generation.identity(),
@@ -3786,6 +4581,14 @@ pub(crate) mod tests {
         ));
         assert!(matches!(
             session.resolve(&handle, &wrong_type, &CancellationToken::default()),
+            Err(NativeHandleStoreError::WrongType { .. })
+        ));
+        assert!(matches!(
+            session.resolve(
+                &wrong_type_handle,
+                &wrong_type,
+                &CancellationToken::default(),
+            ),
             Err(NativeHandleStoreError::WrongType { .. })
         ));
         assert!(matches!(
@@ -3880,6 +4683,70 @@ pub(crate) mod tests {
         assert_eq!(generation.len(), 1);
         assert_eq!(cache.invalidate_node("Second"), 1);
         assert!(generation.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn cache_eviction_retires_handles_but_resolved_guard_retains_shared_bytes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"cache-shared-payload"));
+        let shared = Arc::new(NativeProviderPayload::checked(
+            NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
+            "sim.test.provider",
+            semantic_digest_sha256,
+            b"cache-shared-payload".to_vec(),
+        )?);
+        let payload_bytes = NativeStoredPayload::Provider(shared.clone()).resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(2, payload_bytes)?;
+        let session = generation.session(AttemptId(Uuid::from_u128(0x2f12)));
+        let first = session.publish(
+            NativeStoredPayload::Provider(shared.clone()),
+            &CancellationToken::default(),
+        )?;
+        let second = session.publish(
+            NativeStoredPayload::Provider(shared),
+            &CancellationToken::default(),
+        )?;
+        session.commit();
+        let reader = generation.session(AttemptId(Uuid::from_u128(0x2f13)));
+        let resolved =
+            reader.resolve(&first, first.handle_type(), &CancellationToken::default())?;
+        let first_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: first.clone(),
+            }],
+            ui: None,
+        };
+        let second_entry = CacheEntry {
+            outputs: vec![NativeValue::Handle {
+                value: second.clone(),
+            }],
+            ui: None,
+        };
+        let mut cache = NativeCache::new(1)?;
+        assert!(cache.insert_with_handle_lease(
+            test_cache_key("GuardedFirst")?,
+            first_entry,
+            generation.acquire_lease([&first])?,
+        ));
+        assert!(cache.insert_with_handle_lease(
+            test_cache_key("GuardedSecond")?,
+            second_entry,
+            generation.acquire_lease([&second])?,
+        ));
+        assert_eq!(generation.len(), 2);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        assert!(matches!(
+            reader.resolve(&first, first.handle_type(), &CancellationToken::default(),),
+            Err(NativeHandleStoreError::Missing(_))
+        ));
+
+        cache.clear();
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), payload_bytes);
+        drop(resolved);
+        assert!(generation.is_empty());
+        assert_eq!(generation.resident_bytes(), 0);
         Ok(())
     }
 
@@ -4409,6 +5276,35 @@ pub(crate) mod tests {
             assert!(second_generation.is_empty());
             Ok::<(), Box<dyn std::error::Error>>(())
         })
+    }
+
+    fn val_domain_004_native_handle_lifecycle_is_atomic() -> Result<(), Box<dyn std::error::Error>>
+    {
+        native_handle_store_sessions_isolate_stage_commit_and_revoke()?;
+        native_handle_store_abandoned_session_rolls_back_staged_values()?;
+        native_handle_store_duplicate_attempt_reuses_one_session_and_close_state()?;
+        native_executor_rejects_concurrent_duplicate_attempt_before_store_mutation()?;
+        native_handle_resolve_cancellation_after_root_increment_is_atomic()?;
+        native_handle_root_overflow_rejection_is_atomic()?;
+        native_handle_store_clip_vision_payloads_enforce_identity_and_alias_residency()?;
+        native_handle_store_capacity_and_lease_validation_are_atomic()?;
+        native_handle_store_deduplicates_shared_allocations_until_final_owner()?;
+        resolved_payload_guard_retires_logically_and_releases_shared_capacity_on_final_drop()?;
+        native_handle_store_allocation_capacity_rejection_is_atomic()?;
+        native_handle_store_accepts_zero_byte_payloads_and_never_wraps_generation()?;
+        native_handle_publish_cancellation_is_atomic_before_validation_and_after_insert()?;
+        native_handle_publish_racing_session_close_never_leaks_staged_values()?;
+        native_handle_resolve_rejects_forged_store_generation_type_and_digest()?;
+        native_cache_leases_cover_aliases_and_release_on_lru_and_invalidation()?;
+        cache_eviction_retires_handles_but_resolved_guard_retains_shared_bytes()?;
+        native_cache_same_key_replacement_transfers_exact_handle_roots()?;
+        cancelled_cache_publication_restores_replaced_entry_and_exact_roots()?;
+        cloned_native_handle_lease_releases_roots_once_under_concurrent_drop()?;
+        malformed_expansion_rolls_back_published_handles_and_cache_state()?;
+        cancellation_before_store_commit_rolls_back_handles_and_cache()?;
+        cache_and_report_hold_independent_handle_leases()?;
+        stale_store_generation_cache_entry_is_evicted_and_recomputed()?;
+        Ok(())
     }
 
     fn compile_plan(
@@ -5304,6 +6200,7 @@ pub(crate) mod tests {
         val_domain_004_cancellation_and_blockers_publish_no_partial_outputs()?;
         val_domain_004_lazy_dependencies_execute_only_when_demanded()?;
         val_domain_004_expansion_and_transactional_effect_batches_are_real_execution_paths()?;
+        val_domain_004_native_handle_lifecycle_is_atomic()?;
         Ok(vec![
             ("executor_graph_list_async_cache_effects", true),
             ("executor_repeat_last_output_list", true),
@@ -5312,6 +6209,30 @@ pub(crate) mod tests {
             ("executor_blocker_output_fence", true),
             ("executor_lazy_demand", true),
             ("executor_expansion_effect_atomicity", true),
+            ("native_handle_session_commit_rollback_revoke", true),
+            ("native_handle_abandoned_session_rollback", true),
+            ("native_handle_duplicate_attempt_single_session", true),
+            ("native_handle_concurrent_attempt_claim", true),
+            ("native_handle_resolve_cancellation_atomicity", true),
+            ("native_handle_root_overflow_atomicity", true),
+            ("native_handle_clip_vision_payload_lifecycle", true),
+            ("native_handle_capacity_lease_atomicity", true),
+            ("native_handle_shared_allocation_dedup", true),
+            ("native_handle_resolved_guard_retirement", true),
+            ("native_handle_allocation_capacity_atomicity", true),
+            ("native_handle_zero_byte_identifier_exhaustion", true),
+            ("native_handle_publish_cancellation_atomicity", true),
+            ("native_handle_publish_session_close_race", true),
+            ("native_handle_forged_identity_type_digest_rejection", true),
+            ("native_handle_cache_alias_lru_invalidation_leases", true),
+            ("native_handle_cache_eviction_resolved_guard", true),
+            ("native_handle_cache_same_key_replacement", true),
+            ("native_handle_cancelled_cache_publication_rollback", true),
+            ("native_handle_cloned_lease_final_drop", true),
+            ("native_handle_failed_expansion_rollback", true),
+            ("native_handle_precommit_cancellation_rollback", true),
+            ("native_handle_cache_report_independent_leases", true),
+            ("native_handle_restart_generation_recompute", true),
         ])
     }
 

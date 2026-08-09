@@ -296,10 +296,16 @@ pub fn built_in_source_schema(
 
 fn parse_built_in_contract_schemas()
 -> Result<Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>, NodeRegistryError> {
-    if NODE_CONTRACT_CATALOG.len() > MAX_CATALOG_BYTES {
+    parse_contract_schemas(NODE_CONTRACT_CATALOG)
+}
+
+fn parse_contract_schemas(
+    bytes: &[u8],
+) -> Result<Arc<BTreeMap<String, CatalogNodeSchemaMetadata>>, NodeRegistryError> {
+    if bytes.len() > MAX_CATALOG_BYTES {
         return Err(NodeRegistryError::CatalogTooLarge);
     }
-    let mut deserializer = serde_json::Deserializer::from_slice(NODE_CONTRACT_CATALOG);
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let catalog = NodeContractCatalogWire::deserialize(&mut deserializer).map_err(|error| {
         NodeRegistryError::InvalidNativeBinding {
             identifier: "backend-node-contracts.json".to_owned(),
@@ -1081,8 +1087,8 @@ mod tests {
         NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeDescriptorSchemaMetadata,
         NativeEffectClass, NativeHandleKind, NativeHandleType, NativeInputDescriptor, NativeNode,
         NativeNodeContext, NativeNodeDescriptor, NativeNodeFailure, NativeNodeOutcome,
-        NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality, NativeSchemaValue,
-        NativeTypeUnion, NativeValue, NativeValueType, ObjectInfoRegistry,
+        NativeNodePresentation, NativeOutputDescriptor, NativePortCardinality, NativeSchemaError,
+        NativeSchemaValue, NativeTypeUnion, NativeValue, NativeValueType, ObjectInfoRegistry,
     };
     use futures::future::BoxFuture;
     use serde::Serialize;
@@ -1207,17 +1213,44 @@ mod tests {
         ))
     }
 
-    const REGISTERED_CATALOG_SHA256: &str =
-        "2fd562212e8f79335b619ff0fd1844d263a05fc85839366072046173129aefe1";
-    const INACTIVE_CATALOG_SHA256: &str =
-        "35e53171a424c0404351abffae4d36540872bc4ddfaf1a4b29e56cf5638c86aa";
-    const GENERATED_DESCRIPTOR_IDS_SHA256: &str =
-        "5c6a488a452a1e1e1d002cd0c1e7005f296030b857dedc7bb394cedb677ddbc4";
+    fn object_info_matches_descriptor(
+        registry: &NodeRegistry,
+        object_info: &ObjectInfoRegistry,
+        identifier: &str,
+        descriptor: &CatalogNodeDescriptor,
+    ) -> bool {
+        object_info
+            .nodes()
+            .get(identifier)
+            .is_some_and(|projected| {
+                projected.schema_version == crate::OBJECT_INFO_SCHEMA_VERSION
+                    && projected.node_identifier == descriptor.node_identifier
+                    && projected.display_name == descriptor.display_name
+                    && projected.category == descriptor.category
+                    && projected.source_python_module
+                        == registry
+                            .source_python_module(identifier)
+                            .unwrap_or_default()
+                    && projected.schema_source == descriptor.schema_source
+                    && projected.source_schema.as_ref() == registry.source_schema(identifier)
+                    && projected.input.raw == descriptor.inputs
+                    && projected.input.input_is_list == descriptor.input_is_list
+                    && projected.input.lazy_inputs == descriptor.lazy_inputs
+                    && projected.output.raw == descriptor.outputs
+                    && projected.output.output_is_list == descriptor.output_is_list
+                    && projected.output.output_node == descriptor.output_node
+                    && projected.availability == descriptor.availability
+                    && projected.catalog_status == descriptor.catalog_status
+                    && projected.inactive_reason == descriptor.inactive_reason
+                    && projected.feature_id == descriptor.feature_id
+            })
+    }
 
     #[derive(Serialize)]
     struct ValidationEnvironment<'a> {
         operating_system: &'a str,
         architecture: &'a str,
+        backend_identity: &'a str,
         registry_role: &'a str,
     }
 
@@ -1236,9 +1269,10 @@ mod tests {
         validation_id: &'a str,
         registered_rows: usize,
         inactive_rows: usize,
-        registered_catalog_sha256: &'a str,
-        inactive_catalog_sha256: &'a str,
-        generated_descriptor_ids_sha256: &'a str,
+        registered_catalog_sha256: String,
+        inactive_catalog_sha256: String,
+        generated_descriptor_ids_sha256: String,
+        generated_descriptor_ids_encoding: &'a str,
         generated_descriptor_ids: &'a [&'a str],
         image_slice: &'a [&'a str],
         diffusion_slice: &'a [&'a str],
@@ -1249,12 +1283,57 @@ mod tests {
         skipped: usize,
     }
 
-    fn write_validation_artifact(artifact: &ValidationArtifact<'_>) -> Result<(), Box<dyn Error>> {
+    #[derive(Serialize)]
+    struct NodeSchemaValidationCase {
+        identifier: String,
+        feature_id: String,
+        source_kind: String,
+        binding_disposition: String,
+        input_count: usize,
+        dynamic_input_count: usize,
+        output_count: usize,
+        definition_sha256: String,
+        source_sha256: Option<String>,
+        passed: bool,
+    }
+
+    #[derive(Serialize)]
+    struct NodeSchemaValidationSummary {
+        catalog_csv_round_trip_is_exact: bool,
+        registered_contracts_are_exact: bool,
+        inactive_descriptors_are_exact: bool,
+        object_info_projection_is_exact: bool,
+        csv_parser_bounds_fail_closed: bool,
+        contract_catalog_bounds_fail_closed: bool,
+        portable_schema_bounds_fail_closed: bool,
+    }
+
+    #[derive(Serialize)]
+    struct NodeSchemaValidationArtifact {
+        validation_id: &'static str,
+        contract_catalog_sha256: String,
+        registered_catalog_sha256: String,
+        inactive_catalog_sha256: String,
+        registered_rows: usize,
+        inactive_rows: usize,
+        normalized_v1: usize,
+        normalized_v3: usize,
+        executable_rows: usize,
+        provider_required_rows: usize,
+        environment: ValidationEnvironment<'static>,
+        summary: NodeSchemaValidationSummary,
+        cases: Vec<NodeSchemaValidationCase>,
+        passed: usize,
+        failed: usize,
+        skipped: usize,
+    }
+
+    fn validation_target_directory() -> Result<std::path::PathBuf, Box<dyn Error>> {
         let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .and_then(Path::parent)
             .ok_or("workspace root is unavailable")?;
-        let target_directory = match std::env::var_os("CARGO_TARGET_DIR") {
+        Ok(match std::env::var_os("CARGO_TARGET_DIR") {
             Some(directory) => {
                 let directory = std::path::PathBuf::from(directory);
                 if directory.is_absolute() {
@@ -1264,12 +1343,27 @@ mod tests {
                 }
             }
             None => workspace_root.join("target"),
-        };
+        })
+    }
+
+    fn write_validation_artifact(artifact: &ValidationArtifact<'_>) -> Result<(), Box<dyn Error>> {
+        let target_directory = validation_target_directory()?;
         let artifact_directory = target_directory.join("comfy-parity");
         fs::create_dir_all(&artifact_directory)?;
         let mut bytes = serde_json::to_vec_pretty(artifact)?;
         bytes.push(b'\n');
         fs::write(artifact_directory.join("val-node-registry-001.json"), bytes)?;
+        Ok(())
+    }
+
+    fn write_node_schema_validation_artifact(
+        artifact: &NodeSchemaValidationArtifact,
+    ) -> Result<(), Box<dyn Error>> {
+        let artifact_directory = validation_target_directory()?.join("comfy-parity");
+        fs::create_dir_all(&artifact_directory)?;
+        let mut bytes = serde_json::to_vec_pretty(artifact)?;
+        bytes.push(b'\n');
+        fs::write(artifact_directory.join("val-node-001.json"), bytes)?;
         Ok(())
     }
 
@@ -1687,6 +1781,308 @@ mod tests {
     }
 
     #[test]
+    fn val_node_001() -> Result<(), Box<dyn Error>> {
+        let mut deserializer = serde_json::Deserializer::from_slice(NODE_CONTRACT_CATALOG);
+        let catalog = NodeContractCatalogWire::deserialize(&mut deserializer)?;
+        deserializer.end()?;
+        let registry = NodeRegistry::built_in()?;
+        let object_info = ObjectInfoRegistry::from_node_registry(&registry)?;
+        let registered_rows = parse_csv(REGISTERED_NODE_CATALOG)?;
+        let inactive_rows = parse_csv(INACTIVE_NODE_CATALOG)?;
+        let (reconstructed_registered, reconstructed_inactive) =
+            reconstruct_catalogs(&registry, &registered_rows, &inactive_rows)?;
+        let catalog_csv_round_trip_is_exact = reconstructed_registered == REGISTERED_NODE_CATALOG
+            && reconstructed_inactive == INACTIVE_NODE_CATALOG;
+        let registered_rows_by_identifier = registered_rows
+            .iter()
+            .skip(1)
+            .filter_map(|row| row.first().map(|identifier| (identifier.as_str(), row)))
+            .collect::<BTreeMap<_, _>>();
+        let mut cases = Vec::with_capacity(catalog.contracts.len() + registry.inactive().len());
+
+        for (index, contract) in catalog.contracts.iter().enumerate() {
+            let descriptor = registry.registered().get(&contract.node_identifier);
+            let schema = registry.source_schema(&contract.node_identifier);
+            let expected_status = if contract.availability == "deprecated/dead" {
+                CatalogNodeStatus::Inactive
+            } else if contract.binding_disposition == "provider_required" {
+                CatalogNodeStatus::ProviderRequired
+            } else {
+                CatalogNodeStatus::DescriptorOnly
+            };
+            let passed = descriptor.is_some_and(|descriptor| {
+                descriptor.node_identifier == contract.node_identifier
+                    && descriptor.feature_id == contract.feature_id
+                    && descriptor.category == contract.category
+                    && descriptor.classification == contract.classification
+                    && descriptor.availability == contract.availability
+                    && descriptor.schema_api.as_deref() == Some(contract.schema_api.as_str())
+                    && descriptor.input_is_list == contract.input_is_list
+                    && descriptor.lazy_inputs == contract.lazy_inputs
+                    && descriptor.output_is_list == contract.output_is_list
+                    && descriptor.output_node == contract.output_node
+                    && descriptor.source_file == contract.source.path
+                    && descriptor.source_symbol == contract.source.symbol.symbol
+                    && descriptor.source_line == Some(contract.source.symbol.line)
+                    && descriptor.catalog_status == expected_status
+                    && registered_rows_by_identifier
+                        .get(contract.node_identifier.as_str())
+                        .is_some_and(|row| {
+                            registered_catalog_row(descriptor).as_slice() == row.as_slice()
+                        })
+                    && object_info_matches_descriptor(
+                        &registry,
+                        &object_info,
+                        &contract.node_identifier,
+                        descriptor,
+                    )
+            }) && schema == Some(&contract.schema.portable)
+                && contract.schema.portable.validate().is_ok()
+                && validate_contract_wire(index + 1, contract).is_ok();
+            cases.push(NodeSchemaValidationCase {
+                identifier: contract.node_identifier.clone(),
+                feature_id: contract.feature_id.clone(),
+                source_kind: contract.schema_api.clone(),
+                binding_disposition: contract.binding_disposition.clone(),
+                input_count: contract.schema.portable.inputs.len(),
+                dynamic_input_count: contract.schema.portable.dynamic_inputs.len(),
+                output_count: contract.schema.portable.outputs.len(),
+                definition_sha256: contract.schema.definition_sha256.clone(),
+                source_sha256: Some(contract.source.sha256.clone()),
+                passed,
+            });
+        }
+
+        for row in inactive_rows.iter().skip(1) {
+            let identifier = row.first().ok_or("inactive row has no identifier")?;
+            let descriptor = registry
+                .inactive()
+                .get(identifier)
+                .ok_or("inactive descriptor is absent")?;
+            let passed = descriptor.catalog_status == CatalogNodeStatus::Inactive
+                && descriptor.source == CatalogNodeSource::Inactive
+                && registry.source_schema(identifier).is_none()
+                && inactive_catalog_row(descriptor).as_slice() == row.as_slice()
+                && object_info_matches_descriptor(&registry, &object_info, identifier, descriptor);
+            cases.push(NodeSchemaValidationCase {
+                identifier: descriptor.node_identifier.clone(),
+                feature_id: descriptor.feature_id.clone(),
+                source_kind: "inactive".to_owned(),
+                binding_disposition: "inactive".to_owned(),
+                input_count: 0,
+                dynamic_input_count: 0,
+                output_count: 0,
+                definition_sha256: sha256_hex(descriptor.schema_source.as_bytes()),
+                source_sha256: None,
+                passed,
+            });
+        }
+
+        let catalog_identifiers = catalog
+            .contracts
+            .iter()
+            .map(|contract| contract.node_identifier.as_str())
+            .collect::<BTreeSet<_>>();
+        let registered_identifiers = registry
+            .registered()
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        let registered_contracts_are_exact = registry.registered().len() == 789
+            && catalog.contracts.len() == 789
+            && catalog_identifiers == registered_identifiers
+            && cases
+                .iter()
+                .take(catalog.contracts.len())
+                .all(|case| case.passed);
+        let inactive_descriptors_are_exact = registry.inactive().len() == 12
+            && cases
+                .iter()
+                .skip(catalog.contracts.len())
+                .all(|case| case.passed);
+        let object_info_projection_is_exact = object_info.nodes().len()
+            == registry.registered().len() + registry.inactive().len()
+            && registry.registered().iter().chain(registry.inactive()).all(
+                |(identifier, descriptor)| {
+                    object_info_matches_descriptor(&registry, &object_info, identifier, descriptor)
+                },
+            );
+        let oversized_field = "x".repeat(MAX_FIELD_BYTES + 1);
+        let csv_parser_bounds_fail_closed = matches!(
+            parse_csv("a,b\n\"unterminated"),
+            Err(NodeRegistryError::MalformedCsv { .. })
+        ) && matches!(
+            parse_csv(&format!("field\n{oversized_field}\n")),
+            Err(NodeRegistryError::FieldTooLarge { .. })
+        );
+        let mut trailing_contract_catalog = NODE_CONTRACT_CATALOG.to_vec();
+        trailing_contract_catalog.extend_from_slice(b"{}");
+        let oversized_contract_catalog = vec![b' '; MAX_CATALOG_BYTES + 1];
+        let mut duplicate_contract_catalog: serde_json::Value =
+            serde_json::from_slice(NODE_CONTRACT_CATALOG)?;
+        let contracts = duplicate_contract_catalog
+            .get_mut("contracts")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or("node contract catalog has no contracts array")?;
+        let duplicate_identifier = contracts
+            .first()
+            .and_then(|contract| contract.get("node_identifier"))
+            .and_then(serde_json::Value::as_str)
+            .ok_or("first node contract has no identifier")?
+            .to_owned();
+        let second_contract = contracts
+            .get_mut(1)
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or("node contract catalog has no second contract")?;
+        second_contract.insert(
+            "node_identifier".to_owned(),
+            serde_json::Value::String(duplicate_identifier),
+        );
+        let duplicate_contract_catalog = serde_json::to_vec(&duplicate_contract_catalog)?;
+        let contract_catalog_bounds_fail_closed =
+            matches!(
+                parse_contract_schemas(&oversized_contract_catalog),
+                Err(NodeRegistryError::CatalogTooLarge)
+            ) && parse_contract_schemas(b"{\"unknown\":true}").is_err()
+                && parse_contract_schemas(&trailing_contract_catalog).is_err()
+                && matches!(
+                    parse_contract_schemas(&duplicate_contract_catalog),
+                    Err(NodeRegistryError::InvalidDescriptor {
+                        field: "node_contract_identity",
+                        ..
+                    })
+                );
+        let first_input = catalog
+            .contracts
+            .iter()
+            .find_map(|contract| contract.schema.portable.inputs.first())
+            .ok_or("node contract catalog has no input schema")?;
+        let base_schema = catalog
+            .contracts
+            .first()
+            .ok_or("node contract catalog is empty")?
+            .schema
+            .portable
+            .clone();
+        let mut oversized_schema = base_schema.clone();
+        oversized_schema.inputs = vec![first_input.clone(); 4_097];
+        let item_bound_fails = matches!(
+            oversized_schema.validate(),
+            Err(NativeSchemaError::ItemCountExceeded)
+        );
+        let mut nested_value = NativeSchemaValue::Null;
+        for _ in 0..18 {
+            nested_value = NativeSchemaValue::List {
+                values: vec![nested_value],
+            };
+        }
+        let mut deep_schema = base_schema.clone();
+        deep_schema.hidden = vec![nested_value];
+        let depth_bound_fails = matches!(
+            deep_schema.validate(),
+            Err(NativeSchemaError::DepthExceeded)
+        );
+        let mut text_schema = base_schema.clone();
+        text_schema.presentation.description = Some("x".repeat(256 * 1024 + 1));
+        let text_bound_fails =
+            matches!(text_schema.validate(), Err(NativeSchemaError::TextTooLarge));
+        let mut total_schema = base_schema.clone();
+        total_schema.inputs = (0..9)
+            .map(|index| {
+                let mut input = first_input.clone();
+                input.schema.name = format!("aggregate_value_{index}");
+                input.schema.choices = vec![NativeSchemaValue::String {
+                    value: "x".repeat(250_000),
+                }];
+                input
+            })
+            .collect();
+        let total_bound_fails = matches!(
+            total_schema.validate(),
+            Err(NativeSchemaError::TotalBytesExceeded)
+        );
+        let mut preserved_expression_schema = base_schema;
+        preserved_expression_schema.hidden = (0..4_095)
+            .map(|_| NativeSchemaValue::PreservedExpression {
+                source: "x".repeat(450),
+                sha256: "a".repeat(64),
+            })
+            .collect();
+        let preserved_expression_bound_fails = matches!(
+            preserved_expression_schema.validate(),
+            Err(NativeSchemaError::TotalBytesExceeded)
+        );
+        let portable_schema_bounds_fail_closed = item_bound_fails
+            && depth_bound_fails
+            && text_bound_fails
+            && total_bound_fails
+            && preserved_expression_bound_fails;
+        assert!(catalog_csv_round_trip_is_exact);
+        let failed_registered = cases
+            .iter()
+            .take(catalog.contracts.len())
+            .filter(|case| !case.passed)
+            .map(|case| case.identifier.as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            registered_contracts_are_exact,
+            "registered schema correlations failed for {failed_registered:?}"
+        );
+        assert!(inactive_descriptors_are_exact);
+        assert!(object_info_projection_is_exact);
+        assert!(csv_parser_bounds_fail_closed);
+        assert!(contract_catalog_bounds_fail_closed);
+        assert!(portable_schema_bounds_fail_closed);
+
+        let summary_passed = [
+            catalog_csv_round_trip_is_exact,
+            registered_contracts_are_exact,
+            inactive_descriptors_are_exact,
+            object_info_projection_is_exact,
+            csv_parser_bounds_fail_closed,
+            contract_catalog_bounds_fail_closed,
+            portable_schema_bounds_fail_closed,
+        ]
+        .into_iter()
+        .filter(|passed| *passed)
+        .count();
+        let row_passed = cases.iter().filter(|case| case.passed).count();
+        let row_failed = cases.len() - row_passed;
+        write_node_schema_validation_artifact(&NodeSchemaValidationArtifact {
+            validation_id: "VAL-NODE-001",
+            contract_catalog_sha256: sha256_hex(NODE_CONTRACT_CATALOG),
+            registered_catalog_sha256: sha256_hex(REGISTERED_NODE_CATALOG.as_bytes()),
+            inactive_catalog_sha256: sha256_hex(INACTIVE_NODE_CATALOG.as_bytes()),
+            registered_rows: registry.registered().len(),
+            inactive_rows: registry.inactive().len(),
+            normalized_v1: catalog.summary.normalized_v1,
+            normalized_v3: catalog.summary.normalized_v3,
+            executable_rows: catalog.summary.executable,
+            provider_required_rows: catalog.summary.provider_required,
+            environment: ValidationEnvironment {
+                operating_system: std::env::consts::OS,
+                architecture: std::env::consts::ARCH,
+                backend_identity: "portable-source-schema-v2",
+                registry_role: "schema-v2 source projection and read-only object-info",
+            },
+            summary: NodeSchemaValidationSummary {
+                catalog_csv_round_trip_is_exact,
+                registered_contracts_are_exact,
+                inactive_descriptors_are_exact,
+                object_info_projection_is_exact,
+                csv_parser_bounds_fail_closed,
+                contract_catalog_bounds_fail_closed,
+                portable_schema_bounds_fail_closed,
+            },
+            passed: row_passed + summary_passed,
+            failed: row_failed + 7 - summary_passed,
+            skipped: 0,
+            cases,
+        })?;
+        Ok(())
+    }
+
+    #[test]
     fn val_node_registry_001() -> Result<(), Box<dyn Error>> {
         let registered_rows = parse_csv(REGISTERED_NODE_CATALOG)?;
         let inactive_rows = parse_csv(INACTIVE_NODE_CATALOG)?;
@@ -1812,19 +2208,25 @@ mod tests {
             && !descriptor_source.contains(&["Signed", "Plugin"].concat());
         assert!(mutable_plugin_and_execution_apis_are_absent);
 
+        let mut generated_descriptor_ids_bytes =
+            crate::GENERATED_DESCRIPTOR_IDS.join("\n").into_bytes();
+        generated_descriptor_ids_bytes.push(b'\n');
+
         write_validation_artifact(&ValidationArtifact {
             validation_id: "VAL-NODE-REGISTRY-001",
             registered_rows: registry.registered().len(),
             inactive_rows: registry.inactive().len(),
-            registered_catalog_sha256: REGISTERED_CATALOG_SHA256,
-            inactive_catalog_sha256: INACTIVE_CATALOG_SHA256,
-            generated_descriptor_ids_sha256: GENERATED_DESCRIPTOR_IDS_SHA256,
+            registered_catalog_sha256: sha256_hex(REGISTERED_NODE_CATALOG.as_bytes()),
+            inactive_catalog_sha256: sha256_hex(INACTIVE_NODE_CATALOG.as_bytes()),
+            generated_descriptor_ids_sha256: sha256_hex(&generated_descriptor_ids_bytes),
+            generated_descriptor_ids_encoding: "utf8-lines-lf",
             generated_descriptor_ids: crate::GENERATED_DESCRIPTOR_IDS,
             image_slice: IMAGE_SLICE_NODE_IDS,
             diffusion_slice: DIFFUSION_SLICE_NODE_IDS,
             environment: ValidationEnvironment {
                 operating_system: std::env::consts::OS,
                 architecture: std::env::consts::ARCH,
+                backend_identity: "read-only-native-node-registry",
                 registry_role: "read-side compatibility descriptors only",
             },
             cases: ValidationCases {

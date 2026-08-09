@@ -3,8 +3,8 @@ use crate::{
     NativeModelResourceRole, NativeModule, NativeOpsError,
 };
 use comfy_tensor::{
-    CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Tensor,
-    TensorDescriptor, TensorError,
+    CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, StorageId,
+    Tensor, TensorDescriptor, TensorError,
     generated_activation_normalization_functional_01::{
         FunctionalError, batch_norm_with_context_exact_native,
         group_norm_with_context_exact_native, relu_with_context_exact_native_in_place,
@@ -1049,22 +1049,6 @@ fn raft_semantic_identity(
     .map_err(|error| NativeVisionModelError::Invalid(error.to_string()))
 }
 
-fn raft_identity_resident_bytes(
-    identity: &NativeModelResourceIdentity,
-) -> Result<u64, NativeVisionModelError> {
-    [
-        identity.identifier(),
-        identity.format(),
-        identity.artifact_sha256(),
-        identity.execution_sha256(),
-        identity.digest_sha256(),
-    ]
-    .into_iter()
-    .try_fold(0_u64, |total, value| {
-        checked_resident_add(total, value.len(), "RAFT identity strings")
-    })
-}
-
 #[derive(Clone, Debug)]
 pub struct NativeRaftLarge {
     root: NativeModule,
@@ -1081,6 +1065,48 @@ pub struct NativeRaftLarge {
 #[derive(Clone, Debug)]
 pub struct NativeRaftLargeExecutionSession {
     model: NativeRaftLarge,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeRaftTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl NativeRaftTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeRaftResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<NativeRaftTensorResidentAllocation>,
+}
+
+impl NativeRaftResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[NativeRaftTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeVisionModelError> {
+        self.tensor_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeVisionModelError::ShapeOverflow)
+            })
+    }
 }
 
 impl NativeRaftLargeExecutionSession {
@@ -1140,23 +1166,17 @@ impl NativeRaftLarge {
     }
 
     pub fn resident_storage_bytes(&self) -> Result<u64, NativeVisionModelError> {
-        if !self.parameters_loaded {
-            return Err(NativeVisionModelError::ParametersNotLoaded);
-        }
-        let mut storages = BTreeSet::new();
-        self.canonical_state
-            .values()
-            .try_fold(0_u64, |total, tensor| {
-                if !storages.insert(tensor.storage_id().get()) {
-                    return Ok(total);
-                }
-                total
-                    .checked_add(tensor.storage_byte_len())
+        self.resident_parts()?
+            .tensor_allocations()
+            .iter()
+            .try_fold(0_u64, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes())
                     .ok_or(NativeVisionModelError::ShapeOverflow)
             })
     }
 
-    pub fn resident_bytes(&self) -> Result<u64, NativeVisionModelError> {
+    fn resident_owned_bytes(&self) -> Result<u64, NativeVisionModelError> {
         let identity = self.semantic_identity()?;
         let mut bytes = u64::try_from(mem::size_of::<Self>())
             .map_err(|_| NativeVisionModelError::ShapeOverflow)?;
@@ -1199,12 +1219,47 @@ impl NativeRaftLarge {
             bytes = checked_resident_add(bytes, digest.capacity(), "RAFT module digest")?;
         }
         bytes = bytes
-            .checked_add(raft_identity_resident_bytes(identity)?)
-            .ok_or(NativeVisionModelError::ShapeOverflow)?;
-        bytes = bytes
-            .checked_add(self.resident_storage_bytes()?)
+            .checked_add(
+                identity
+                    .resident_owned_bytes()
+                    .map_err(|_| NativeVisionModelError::ShapeOverflow)?,
+            )
             .ok_or(NativeVisionModelError::ShapeOverflow)?;
         Ok(bytes)
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeRaftResidentParts, NativeVisionModelError> {
+        if !self.parameters_loaded {
+            return Err(NativeVisionModelError::ParametersNotLoaded);
+        }
+        let mut storages = BTreeMap::new();
+        for tensor in self.canonical_state.values() {
+            let storage_id = tensor.storage_id();
+            let resident_bytes = tensor.storage_byte_len();
+            if let Some(existing) = storages.insert(storage_id.get(), (storage_id, resident_bytes))
+                && existing.1 != resident_bytes
+            {
+                return Err(NativeVisionModelError::ShapeOverflow);
+            }
+        }
+        let parts = NativeRaftResidentParts {
+            owned_bytes: self.resident_owned_bytes()?,
+            tensor_allocations: storages
+                .into_values()
+                .map(
+                    |(storage_id, resident_bytes)| NativeRaftTensorResidentAllocation {
+                        storage_id,
+                        resident_bytes,
+                    },
+                )
+                .collect(),
+        };
+        parts.resident_bytes()?;
+        Ok(parts)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeVisionModelError> {
+        self.resident_parts()?.resident_bytes()
     }
 
     pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), NativeVisionModelError> {
@@ -3412,7 +3467,8 @@ const fn make_divisible(value: usize, divisor: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::{
-        NativeModelResourceRole, NativeRaftLarge, NativeValues, NativeVisionModelError,
+        NativeModelResourceRole, NativeRaftLarge, NativeRaftResidentParts,
+        NativeRaftTensorResidentAllocation, NativeValues, NativeVisionModelError,
         RAFT_LARGE_ARCHITECTURE_ID, RAFT_LARGE_OPERATION_ID, RAFT_LARGE_RESOURCE_FORMAT,
         RAFT_LARGE_RESOURCE_ROLE, RAFT_LARGE_SOURCE_TYPE_ID, VisionExecution, normalize_raft_image,
         raft_large_exact_native,
@@ -3421,7 +3477,10 @@ mod tests {
         CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
         StreamId, Tensor, TensorDescriptor,
     };
-    use std::{collections::BTreeMap, mem};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        mem,
+    };
 
     fn loaded_zero_raft(
         backend: &CpuBackend,
@@ -3456,7 +3515,10 @@ mod tests {
                     )?;
                     let context = ExecutionContext {
                         stream: StreamId::DEFAULT,
-                        scratch: workspace_authority.authorize_workspace(encoded_bytes.max(1))?,
+                        scratch: workspace_authority.authorize_workspace(
+                            u64::try_from(encoded_bytes.max(1))
+                                .map_err(|_| NativeVisionModelError::ShapeOverflow)?,
+                        )?,
                         rng_phase: None,
                         cancellation,
                     };
@@ -3494,9 +3556,12 @@ mod tests {
         let context = ExecutionContext {
             stream: StreamId::DEFAULT,
             scratch: workspace_authority.authorize_workspace(
-                elements
-                    .checked_mul(mem::size_of::<f32>())
-                    .ok_or(NativeVisionModelError::ShapeOverflow)?,
+                u64::try_from(
+                    elements
+                        .checked_mul(mem::size_of::<f32>())
+                        .ok_or(NativeVisionModelError::ShapeOverflow)?,
+                )
+                .map_err(|_| NativeVisionModelError::ShapeOverflow)?,
             )?,
             rng_phase: None,
             cancellation,
@@ -3511,7 +3576,7 @@ mod tests {
     -> Result<(), NativeVisionModelError> {
         let cancellation = CancellationToken::default();
         let (backend, workspace_authority) =
-            CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+            CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
         let model = loaded_zero_raft(&backend, &workspace_authority, &cancellation)?;
         model.validate(&cancellation)?;
 
@@ -3553,6 +3618,60 @@ mod tests {
         assert_eq!(model.resident_storage_bytes()?, expected_storage);
         assert!(expected_storage < unaliased_storage);
         assert!(model.resident_bytes()? > expected_storage);
+        let parts = model.resident_parts()?;
+        assert_eq!(parts.resident_bytes()?, model.resident_bytes()?);
+        assert_eq!(parts.tensor_allocations().len(), unique_storage.len());
+        assert_eq!(
+            parts
+                .tensor_allocations()
+                .iter()
+                .map(|allocation| (allocation.storage_id().get(), allocation.resident_bytes()))
+                .collect::<BTreeMap<_, _>>(),
+            unique_storage
+        );
+
+        let shared_storage = model.clone();
+        assert_eq!(
+            parts.tensor_allocations(),
+            shared_storage.resident_parts()?.tensor_allocations()
+        );
+        let (distinct_backend, distinct_authority) =
+            CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+        let distinct_storage =
+            loaded_zero_raft(&distinct_backend, &distinct_authority, &cancellation)?;
+        assert_eq!(
+            model.semantic_digest_sha256()?,
+            distinct_storage.semantic_digest_sha256()?
+        );
+        let distinct_ids = distinct_storage
+            .resident_parts()?
+            .tensor_allocations()
+            .iter()
+            .map(|allocation| allocation.storage_id().get())
+            .collect::<BTreeSet<_>>();
+        assert!(
+            unique_storage
+                .keys()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .is_disjoint(&distinct_ids)
+        );
+
+        let overflow = NativeRaftResidentParts {
+            owned_bytes: u64::MAX,
+            tensor_allocations: vec![NativeRaftTensorResidentAllocation {
+                storage_id: parts
+                    .tensor_allocations()
+                    .first()
+                    .ok_or(NativeVisionModelError::ParametersNotLoaded)?
+                    .storage_id(),
+                resident_bytes: 1,
+            }],
+        };
+        assert!(matches!(
+            overflow.resident_bytes(),
+            Err(NativeVisionModelError::ShapeOverflow)
+        ));
 
         let mut drifted = model.clone();
         let removed_name = drifted
@@ -3583,7 +3702,7 @@ mod tests {
     -> Result<(), NativeVisionModelError> {
         let cancellation = CancellationToken::default();
         let (backend, workspace_authority) =
-            CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+            CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
         let model = loaded_zero_raft(&backend, &workspace_authority, &cancellation)?;
         let source_digest = model.semantic_digest_sha256()?.to_owned();
         let image = test_image(&backend, &workspace_authority, &cancellation, 64)?;

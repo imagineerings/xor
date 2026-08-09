@@ -209,7 +209,7 @@ fn write_model_family_row_artifact(
 }
 
 #[test]
-fn every_generated_model_family_fixture_executes_the_canonical_harness()
+fn val_model_family_001_every_generated_model_family_fixture_executes_the_canonical_harness()
 -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         GENERATED_MODEL_FAMILY_TEST_FIXTURES.len(),
@@ -443,10 +443,24 @@ fn write_model_family_breadth_artifact(
     };
     let mut bytes = serde_json::to_vec_pretty(&artifact)?;
     bytes.push(b'\n');
-    let output = root.join("target/comfy-parity/val-model-family-001.json");
+    let output = validation_target_directory(&root).join("comfy-parity/val-model-family-001.json");
     std::fs::create_dir_all(output.parent().ok_or("validation output has no parent")?)?;
     std::fs::write(output, bytes)?;
     Ok(())
+}
+
+fn validation_target_directory(root: &std::path::Path) -> std::path::PathBuf {
+    match std::env::var_os("CARGO_TARGET_DIR") {
+        Some(directory) => {
+            let directory = std::path::PathBuf::from(directory);
+            if directory.is_absolute() {
+                directory
+            } else {
+                root.join(directory)
+            }
+        }
+        None => root.join("target"),
+    }
 }
 
 fn sha256_file(path: &std::path::Path) -> Result<String, std::io::Error> {

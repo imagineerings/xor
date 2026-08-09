@@ -25,4 +25,6 @@ wasmtime.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+comfy_model.workspace = true
 comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }
+comfy_tensor.workspace = true

@@ -856,6 +856,49 @@ pub enum NativeHandleStoreError {
     InvalidPayload(#[from] NativeStoredPayloadError),
 }
 
+pub trait NativeResolvedPayloadRetention: fmt::Debug + Send + Sync {}
+
+#[derive(Clone)]
+pub struct NativeResolvedPayload {
+    payload: Arc<NativeStoredPayload>,
+    _retention: Arc<dyn NativeResolvedPayloadRetention>,
+}
+
+impl NativeResolvedPayload {
+    pub fn checked(
+        payload: Arc<NativeStoredPayload>,
+        retention: Arc<dyn NativeResolvedPayloadRetention>,
+    ) -> Result<Self, NativeStoredPayloadError> {
+        payload.validate()?;
+        Ok(Self {
+            payload,
+            _retention: retention,
+        })
+    }
+}
+
+impl AsRef<NativeStoredPayload> for NativeResolvedPayload {
+    fn as_ref(&self) -> &NativeStoredPayload {
+        self.payload.as_ref()
+    }
+}
+
+impl std::ops::Deref for NativeResolvedPayload {
+    type Target = NativeStoredPayload;
+
+    fn deref(&self) -> &Self::Target {
+        self.payload.as_ref()
+    }
+}
+
+impl fmt::Debug for NativeResolvedPayload {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeResolvedPayload")
+            .finish_non_exhaustive()
+    }
+}
+
 pub trait NativeHandleStore: Send + Sync + fmt::Debug {
     fn identity(&self) -> NativeHandleStoreIdentity;
     fn attempt_id(&self) -> AttemptId;
@@ -865,7 +908,7 @@ pub trait NativeHandleStore: Send + Sync + fmt::Debug {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError>;
+    ) -> Result<NativeResolvedPayload, NativeHandleStoreError>;
 
     fn publish(
         &self,
@@ -1341,6 +1384,11 @@ mod tests {
         atomic::{AtomicU64, Ordering},
     };
 
+    #[derive(Debug)]
+    struct TestResolvedPayloadRetention;
+
+    impl NativeResolvedPayloadRetention for TestResolvedPayloadRetention {}
+
     struct TestHandleStore {
         identity: NativeHandleStoreIdentity,
         attempt_id: AttemptId,
@@ -1415,7 +1463,7 @@ mod tests {
             handle: &NativeOpaqueHandle,
             expected_type: &NativeHandleType,
             cancellation: &CancellationToken,
-        ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
+        ) -> Result<NativeResolvedPayload, NativeHandleStoreError> {
             self.check_handle(handle, expected_type, cancellation)?;
             let values = self.values.lock().map_err(|_| {
                 NativeHandleStoreError::Rejected("test store is poisoned".to_owned())
@@ -1426,7 +1474,10 @@ mod tests {
             if value.digest_sha256() != handle.digest_sha256().unwrap_or_default() {
                 return Err(NativeHandleStoreError::DigestMismatch);
             }
-            Ok(value.clone())
+            Ok(NativeResolvedPayload::checked(
+                value.clone(),
+                Arc::new(TestResolvedPayloadRetention),
+            )?)
         }
 
         fn publish(

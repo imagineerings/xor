@@ -1,6 +1,9 @@
 use comfy_tensor::{DType, StorageId, Tensor, TensorError};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 use thiserror::Error;
 
 const MAX_FRAMES: usize = 65_536;
@@ -696,6 +699,48 @@ pub struct NativeTracksPayload {
     resident_bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeMediaTensorResidentAllocation {
+    storage_id: StorageId,
+    resident_bytes: u64,
+}
+
+impl NativeMediaTensorResidentAllocation {
+    pub const fn storage_id(&self) -> StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeMediaResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<NativeMediaTensorResidentAllocation>,
+}
+
+impl NativeMediaResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[NativeMediaTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeMediaPayloadError> {
+        self.tensor_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |bytes, allocation| {
+                bytes
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)
+            })
+    }
+}
+
 impl NativeTracksPayload {
     pub const SOURCE_TYPE_ID: &'static str = "TRACKS";
 
@@ -730,6 +775,16 @@ impl NativeTracksPayload {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let owned_bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeMediaPayloadError::ResidentBytesOverflow)?;
+        let parts = media_resident_parts(owned_bytes, [&self.track_path, &self.track_visibility])?;
+        if parts.resident_bytes()? != self.resident_bytes {
+            return Err(NativeMediaPayloadError::ProjectionChanged);
+        }
+        Ok(parts)
+    }
+
     pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
         validate_tracks(&self.track_path, &self.track_visibility)?;
         let (digest, resident_bytes) = project_tracks(&self.track_path, &self.track_visibility)?;
@@ -738,7 +793,9 @@ impl NativeTracksPayload {
             digest,
             self.resident_bytes,
             resident_bytes,
-        )
+        )?;
+        self.resident_parts()?;
+        Ok(())
     }
 }
 
@@ -812,6 +869,24 @@ impl NativeSam3TrackDataPayload {
         self.resident_bytes
     }
 
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let scores_bytes = mem::size_of::<f64>()
+            .checked_mul(self.scores.len())
+            .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
+        let owned_bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeMediaPayloadError::ResidentBytesOverflow)?
+            .checked_add(
+                u64::try_from(scores_bytes)
+                    .map_err(|_| NativeMediaPayloadError::ResidentBytesOverflow)?,
+            )
+            .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
+        let parts = media_resident_parts(owned_bytes, self.packed_masks.iter())?;
+        if parts.resident_bytes()? != self.resident_bytes {
+            return Err(NativeMediaPayloadError::ProjectionChanged);
+        }
+        Ok(parts)
+    }
+
     pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
         require_image_size(self.original_height, self.original_width)?;
         validate_sam3_track_data(self.packed_masks.as_ref(), self.frame_count, &self.scores)?;
@@ -827,7 +902,9 @@ impl NativeSam3TrackDataPayload {
             digest,
             self.resident_bytes,
             resident_bytes,
-        )
+        )?;
+        self.resident_parts()?;
+        Ok(())
     }
 }
 
@@ -875,6 +952,8 @@ pub enum NativeMediaPayloadError {
     InvalidSam3TrackData,
     #[error("payload resident-byte accounting overflowed")]
     ResidentBytesOverflow,
+    #[error("resident tensor allocation changed")]
+    ResidentAllocationChanged,
     #[error("payload digest or resident-byte projection changed")]
     ProjectionChanged,
     #[error(transparent)]
@@ -1055,10 +1134,40 @@ fn project_tracks(
     track_visibility: &Tensor,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     let mut projection = Projection::new::<NativeTracksPayload>(b"sim.comfy.media.tracks.v1")?;
-    projection.hash_tensor(track_path)?;
-    projection.hash_tensor(track_visibility)?;
+    projection.hash_tensor(b"track-path", track_path)?;
+    projection.hash_tensor(b"track-visibility", track_visibility)?;
     projection.add_tensor_storages([track_path, track_visibility])?;
     Ok(projection.finish())
+}
+
+fn media_resident_parts<'a>(
+    owned_bytes: u64,
+    tensors: impl IntoIterator<Item = &'a Tensor>,
+) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+    let mut storages = BTreeMap::new();
+    for tensor in tensors {
+        let storage_id = tensor.storage_id();
+        let resident_bytes = tensor.storage_byte_len();
+        if let Some(existing) = storages.insert(storage_id.get(), (storage_id, resident_bytes))
+            && existing.1 != resident_bytes
+        {
+            return Err(NativeMediaPayloadError::ResidentAllocationChanged);
+        }
+    }
+    let parts = NativeMediaResidentParts {
+        owned_bytes,
+        tensor_allocations: storages
+            .into_values()
+            .map(
+                |(storage_id, resident_bytes)| NativeMediaTensorResidentAllocation {
+                    storage_id,
+                    resident_bytes,
+                },
+            )
+            .collect(),
+    };
+    parts.resident_bytes()?;
+    Ok(parts)
 }
 
 fn validate_sam3_track_data(
@@ -1115,7 +1224,7 @@ fn project_sam3_track_data(
     match packed_masks {
         Some(packed_masks) => {
             projection.hasher.update([1]);
-            projection.hash_tensor(packed_masks)?;
+            projection.hash_tensor(b"packed-masks", packed_masks)?;
             projection.add_tensor_storages([packed_masks])?;
         }
         None => projection.hasher.update([0]),
@@ -1182,10 +1291,17 @@ impl Projection {
         }
     }
 
-    fn hash_tensor(&mut self, tensor: &Tensor) -> Result<(), NativeMediaPayloadError> {
-        let descriptor = serde_json::to_vec(tensor.descriptor())?;
-        self.hash_len(descriptor.len())?;
-        self.hasher.update(descriptor);
+    fn hash_tensor(&mut self, role: &[u8], tensor: &Tensor) -> Result<(), NativeMediaPayloadError> {
+        self.hash_len(role.len())?;
+        self.hasher.update(role);
+        let descriptor = tensor.descriptor();
+        let dtype = descriptor.dtype().catalog_name().as_bytes();
+        self.hash_len(dtype.len())?;
+        self.hasher.update(dtype);
+        self.hash_len(descriptor.shape().len())?;
+        for dimension in descriptor.shape() {
+            self.hasher.update(dimension.to_le_bytes());
+        }
         let bytes = tensor.contiguous_bytes()?;
         self.hash_len(bytes.len())?;
         self.hasher.update(bytes);
@@ -1317,23 +1433,31 @@ mod tests {
         CancellationToken, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
         TensorDescriptor,
     };
-    use std::{error::Error, mem};
+    use std::{error::Error, mem, sync::Arc};
 
-    fn tensor(shape: Vec<u64>, dtype: DType, bytes: Vec<u8>) -> Result<Tensor, Box<dyn Error>> {
-        let descriptor =
-            TensorDescriptor::contiguous(shape, dtype, DeviceId::CPU, StreamId::DEFAULT)?;
+    fn tensor_on_stream(
+        shape: Vec<u64>,
+        dtype: DType,
+        bytes: Vec<u8>,
+        stream: StreamId,
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let descriptor = TensorDescriptor::contiguous(shape, dtype, DeviceId::CPU, stream)?;
         let byte_count = u64::try_from(bytes.len())?;
         let (backend, authority) =
             CpuWorkspaceAuthority::create_backend(byte_count.saturating_add(64))?;
         let cancellation = CancellationToken::default();
         let context = ExecutionContext {
-            stream: StreamId::DEFAULT,
+            stream,
             scratch: authority.authorize_workspace(0)?,
             rng_phase: None,
             cancellation: &cancellation,
         };
         let (tensor, _) = backend.upload_bytes(descriptor, &bytes, &context)?;
         Ok(tensor)
+    }
+
+    fn tensor(shape: Vec<u64>, dtype: DType, bytes: Vec<u8>) -> Result<Tensor, Box<dyn Error>> {
+        tensor_on_stream(shape, dtype, bytes, StreamId::DEFAULT)
     }
 
     fn keypoints(count: usize) -> Result<Vec<NativePoseKeypoint>, NativeMediaPayloadError> {
@@ -1478,11 +1602,29 @@ mod tests {
     fn tracks_require_exact_tensor_roles_and_account_storage() -> Result<(), Box<dyn Error>> {
         let path = tensor(vec![2, 3, 2], DType::F32, vec![0; 2 * 3 * 2 * 4])?;
         let visibility = tensor(vec![2, 3], DType::Bool, vec![1; 2 * 3])?;
+        let path_storage_id = path.storage_id();
+        let visibility_storage_id = visibility.storage_id();
         let expected_storage = path.storage_byte_len() + visibility.storage_byte_len();
         let payload = NativeTracksPayload::checked(path, visibility)?;
 
         payload.validate()?;
+        let parts = payload.resident_parts()?;
         assert_eq!(payload.track_path().descriptor().shape(), &[2, 3, 2]);
+        assert_eq!(
+            parts.owned_bytes(),
+            u64::try_from(mem::size_of::<NativeTracksPayload>())?
+        );
+        let mut expected_storage_ids = vec![path_storage_id, visibility_storage_id];
+        expected_storage_ids.sort_unstable_by_key(|storage_id| storage_id.get());
+        assert_eq!(
+            parts
+                .tensor_allocations()
+                .iter()
+                .map(NativeMediaTensorResidentAllocation::storage_id)
+                .collect::<Vec<_>>(),
+            expected_storage_ids
+        );
+        assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
         assert_eq!(
             payload.resident_bytes(),
             u64::try_from(mem::size_of::<NativeTracksPayload>())? + expected_storage
@@ -1499,14 +1641,35 @@ mod tests {
         let empty = NativeSam3TrackDataPayload::checked(None, 3, vec![], 720, 1280)?;
         empty.validate()?;
         assert!(empty.packed_masks().is_none());
+        assert!(empty.resident_parts()?.tensor_allocations().is_empty());
+        assert_eq!(
+            empty.resident_parts()?.owned_bytes(),
+            empty.resident_bytes()
+        );
 
         let packed = tensor(vec![3, 2, 8, 16], DType::U8, vec![0; 3 * 2 * 8 * 16])?;
         let packed_bytes = packed.storage_byte_len();
         let payload =
             NativeSam3TrackDataPayload::checked(Some(packed), 3, vec![1.0, 0.25], 720, 1280)?;
         payload.validate()?;
+        let parts = payload.resident_parts()?;
         assert_eq!(payload.frame_count(), 3);
         assert_eq!(payload.scores(), &[1.0, 0.25]);
+        assert_eq!(
+            parts.owned_bytes(),
+            u64::try_from(mem::size_of::<NativeSam3TrackDataPayload>())?
+                + u64::try_from(2 * mem::size_of::<f64>())?
+        );
+        assert_eq!(parts.tensor_allocations().len(), 1);
+        assert_eq!(
+            parts
+                .tensor_allocations()
+                .first()
+                .ok_or("SAM3 resident tensor allocation is absent")?
+                .resident_bytes(),
+            packed_bytes
+        );
+        assert_eq!(parts.resident_bytes()?, payload.resident_bytes());
         assert_eq!(
             payload.resident_bytes(),
             u64::try_from(mem::size_of::<NativeSam3TrackDataPayload>())?
@@ -1520,6 +1683,74 @@ mod tests {
                 .is_err()
         );
         assert!(NativeSam3TrackDataPayload::checked(None, 3, vec![1.0], 720, 1280).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn resident_parts_deduplicate_aliases_and_preserve_distinct_storage_identity()
+    -> Result<(), Box<dyn Error>> {
+        let packed_bytes = vec![0; 3 * 2 * 8 * 16];
+        let first_tensor = tensor(vec![3, 2, 8, 16], DType::U8, packed_bytes.clone())?;
+        let second_tensor = tensor(vec![3, 2, 8, 16], DType::U8, packed_bytes)?;
+        assert_ne!(first_tensor.storage_id(), second_tensor.storage_id());
+
+        let aliased_parts = media_resident_parts(7, [&first_tensor, &first_tensor])?;
+        assert_eq!(aliased_parts.tensor_allocations().len(), 1);
+        assert_eq!(
+            aliased_parts
+                .tensor_allocations()
+                .first()
+                .ok_or("aliased resident tensor allocation is absent")?
+                .storage_id(),
+            first_tensor.storage_id()
+        );
+
+        let distinct_parts = media_resident_parts(7, [&first_tensor, &second_tensor])?;
+        assert_eq!(distinct_parts.tensor_allocations().len(), 2);
+        let mut distinct_allocations = distinct_parts.tensor_allocations().iter();
+        let first_allocation = distinct_allocations
+            .next()
+            .ok_or("first distinct resident tensor allocation is absent")?;
+        let second_allocation = distinct_allocations
+            .next()
+            .ok_or("second distinct resident tensor allocation is absent")?;
+        assert!(first_allocation.storage_id().get() < second_allocation.storage_id().get());
+
+        let first = Arc::new(NativeSam3TrackDataPayload::checked(
+            Some(first_tensor),
+            3,
+            vec![1.0, 0.25],
+            720,
+            1280,
+        )?);
+        let outer_alias = first.clone();
+        assert!(Arc::ptr_eq(&first, &outer_alias));
+        assert_eq!(first.resident_parts()?, outer_alias.resident_parts()?);
+
+        let second = NativeSam3TrackDataPayload::checked(
+            Some(second_tensor),
+            3,
+            vec![1.0, 0.25],
+            720,
+            1280,
+        )?;
+        assert_eq!(
+            first.semantic_digest_sha256(),
+            second.semantic_digest_sha256()
+        );
+        let first_storage_id = first
+            .resident_parts()?
+            .tensor_allocations()
+            .first()
+            .ok_or("first SAM3 resident tensor allocation is absent")?
+            .storage_id();
+        let second_storage_id = second
+            .resident_parts()?
+            .tensor_allocations()
+            .first()
+            .ok_or("second SAM3 resident tensor allocation is absent")?
+            .storage_id();
+        assert_ne!(first_storage_id, second_storage_id);
         Ok(())
     }
 
@@ -1547,6 +1778,142 @@ mod tests {
             "SAM3_TRACK_DATA"
         );
         assert_eq!(NativeTracksPayload::SOURCE_TYPE_ID, "TRACKS");
+        Ok(())
+    }
+
+    #[test]
+    fn tensor_semantic_digests_ignore_stream_and_bind_role_shape_and_content()
+    -> Result<(), Box<dyn Error>> {
+        let tracks = |stream,
+                      path_shape: Vec<u64>,
+                      visibility_shape: Vec<u64>,
+                      path_bytes,
+                      visibility_bytes| {
+            NativeTracksPayload::checked(
+                tensor_on_stream(path_shape, DType::F32, path_bytes, stream)?,
+                tensor_on_stream(visibility_shape, DType::Bool, visibility_bytes, stream)?,
+            )
+            .map_err(Box::<dyn Error>::from)
+        };
+        let default_tracks = tracks(
+            StreamId::DEFAULT,
+            vec![2, 3, 2],
+            vec![2, 3],
+            vec![0; 2 * 3 * 2 * 4],
+            vec![1; 2 * 3],
+        )?;
+        let other_stream_tracks = tracks(
+            StreamId::new(17),
+            vec![2, 3, 2],
+            vec![2, 3],
+            vec![0; 2 * 3 * 2 * 4],
+            vec![1; 2 * 3],
+        )?;
+        assert_eq!(
+            default_tracks.semantic_digest_sha256(),
+            other_stream_tracks.semantic_digest_sha256()
+        );
+
+        let mut changed_path_bytes = vec![0; 2 * 3 * 2 * 4];
+        *changed_path_bytes
+            .first_mut()
+            .ok_or("TRACKS content fixture must not be empty")? = 1;
+        let changed_tracks = tracks(
+            StreamId::DEFAULT,
+            vec![2, 3, 2],
+            vec![2, 3],
+            changed_path_bytes,
+            vec![1; 2 * 3],
+        )?;
+        assert_ne!(
+            default_tracks.semantic_digest_sha256(),
+            changed_tracks.semantic_digest_sha256()
+        );
+        let reshaped_tracks = tracks(
+            StreamId::DEFAULT,
+            vec![3, 2, 2],
+            vec![3, 2],
+            vec![0; 2 * 3 * 2 * 4],
+            vec![1; 2 * 3],
+        )?;
+        assert_ne!(
+            default_tracks.semantic_digest_sha256(),
+            reshaped_tracks.semantic_digest_sha256()
+        );
+
+        let sam3 = |stream, shape: Vec<u64>, bytes| {
+            NativeSam3TrackDataPayload::checked(
+                Some(tensor_on_stream(shape, DType::U8, bytes, stream)?),
+                3,
+                vec![1.0, 0.25],
+                720,
+                1280,
+            )
+            .map_err(Box::<dyn Error>::from)
+        };
+        let default_sam3 = sam3(
+            StreamId::DEFAULT,
+            vec![3, 2, 8, 16],
+            vec![0; 3 * 2 * 8 * 16],
+        )?;
+        let other_stream_sam3 = sam3(
+            StreamId::new(17),
+            vec![3, 2, 8, 16],
+            vec![0; 3 * 2 * 8 * 16],
+        )?;
+        assert_eq!(
+            default_sam3.semantic_digest_sha256(),
+            other_stream_sam3.semantic_digest_sha256()
+        );
+
+        let mut changed_mask_bytes = vec![0; 3 * 2 * 8 * 16];
+        *changed_mask_bytes
+            .first_mut()
+            .ok_or("SAM3 content fixture must not be empty")? = 1;
+        let changed_sam3 = sam3(StreamId::DEFAULT, vec![3, 2, 8, 16], changed_mask_bytes)?;
+        assert_ne!(
+            default_sam3.semantic_digest_sha256(),
+            changed_sam3.semantic_digest_sha256()
+        );
+        let reshaped_sam3 = sam3(
+            StreamId::DEFAULT,
+            vec![3, 2, 4, 32],
+            vec![0; 3 * 2 * 8 * 16],
+        )?;
+        assert_ne!(
+            default_sam3.semantic_digest_sha256(),
+            reshaped_sam3.semantic_digest_sha256()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_tensor_projection_binds_domain_role_and_dtype() -> Result<(), Box<dyn Error>> {
+        fn digest(
+            domain: &[u8],
+            role: &[u8],
+            tensor: &Tensor,
+        ) -> Result<[u8; 32], NativeMediaPayloadError> {
+            let mut projection = Projection::new::<NativeTracksPayload>(domain)?;
+            projection.hash_tensor(role, tensor)?;
+            Ok(projection.finish().0)
+        }
+
+        let f32_tensor = tensor(vec![1], DType::F32, vec![0; 4])?;
+        let u32_tensor = tensor(vec![1], DType::U32, vec![0; 4])?;
+        let baseline = digest(b"media-domain-a", b"tensor-role-a", &f32_tensor)?;
+        assert_ne!(
+            baseline,
+            digest(b"media-domain-b", b"tensor-role-a", &f32_tensor)?
+        );
+        assert_ne!(
+            baseline,
+            digest(b"media-domain-a", b"tensor-role-b", &f32_tensor)?
+        );
+        assert_ne!(
+            baseline,
+            digest(b"media-domain-a", b"tensor-role-a", &u32_tensor)?
+        );
         Ok(())
     }
 }

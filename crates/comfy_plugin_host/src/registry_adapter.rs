@@ -422,7 +422,7 @@ fn plugin_value(
                 }
                 _ => None,
             };
-            let stored = plugin_value_from_stored(port, family, stored, registry)?;
+            let stored = plugin_value_from_stored(port, family, stored.as_ref(), registry)?;
             if stored.type_id() != &port.type_id || stored.family() != family {
                 return Err(invalid_value(&port.id));
             }
@@ -447,10 +447,10 @@ fn plugin_value(
 fn plugin_value_from_stored(
     port: &PluginPort,
     family: ValueFamily,
-    stored: Arc<NativeStoredPayload>,
+    stored: &NativeStoredPayload,
     registry: &TypeRegistry,
 ) -> Result<PluginValue, NativeNodeFailure> {
-    match stored.as_ref() {
+    match stored {
         NativeStoredPayload::Provider(stored) => {
             let expected_type = native_handle_type(port).map_err(plugin_failure)?;
             if expected_type.kind != NativeHandleKind::ProviderTask
@@ -482,7 +482,7 @@ fn plugin_value_from_stored(
             if family != ValueFamily::Model {
                 return Err(invalid_value(&port.id));
             }
-            let identity = stored.diffusion().model_payload().identity();
+            let identity = stored.model_payload().identity();
             let value = ModelValue::new(
                 identity.identifier(),
                 identity.format(),
@@ -852,10 +852,14 @@ fn plugin_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_model::ClipVisionOutput;
     use comfy_nodes::NativePrimitiveType;
     use comfy_plugin_sdk::{
         ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
     };
+    use comfy_runtime::{AttemptId, NativeHandleStoreGeneration, PromptId};
+    use comfy_tensor::{CancellationToken, CpuBackend, CpuWorkspaceAuthority, Tensor};
+    use comfy_types::NodeId;
     use std::error::Error;
 
     fn artifact_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
@@ -961,6 +965,37 @@ mod tests {
         )?)
     }
 
+    fn clip_vision_output_tensor(
+        backend: &CpuBackend,
+        authority: &CpuWorkspaceAuthority,
+        cancellation: &CancellationToken,
+        shape: Vec<u64>,
+        value: f32,
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let elements = shape
+            .iter()
+            .try_fold(1_u64, |total, dimension| total.checked_mul(*dimension))
+            .ok_or("clip vision output tensor element count overflowed")?;
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(
+                elements
+                    .checked_mul(4)
+                    .ok_or("clip vision output tensor byte count overflowed")?,
+            )?,
+            cancellation,
+        );
+        Ok(backend
+            .upload_f32(
+                descriptor,
+                &vec![value; usize::try_from(elements)?],
+                &context,
+            )?
+            .0)
+    }
+
     #[test]
     fn signed_plugin_families_delegate_to_canonical_source_projections()
     -> Result<(), Box<dyn Error>> {
@@ -1054,9 +1089,17 @@ mod tests {
     fn explicit_model_family_handles_round_trip_without_mutating_imports()
     -> Result<(), Box<dyn Error>> {
         let registry = TypeRegistry::built_in()?;
-        for (index, type_name) in ["Model", "Clip", "Vae", "ControlNet", "Guider", "Sampler"]
-            .into_iter()
-            .enumerate()
+        for (index, type_name) in [
+            "Model",
+            "Clip",
+            "Vae",
+            "ControlNet",
+            "Guider",
+            "Sampler",
+            "ClipVision",
+        ]
+        .into_iter()
+        .enumerate()
         {
             let digest = format!("{index:x}").repeat(64);
             let port = input_port(&registry, type_name, PortSerialization::Handle)?;
@@ -1085,6 +1128,72 @@ mod tests {
             );
             assert_eq!(imported, before);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn clip_vision_output_input_rejection_preserves_the_canonical_store_entry()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let port = input_port(&registry, "ClipVisionOutput", PortSerialization::Handle)?;
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let hidden =
+            clip_vision_output_tensor(&backend, &authority, &cancellation, vec![1, 2, 2], 1.0)?;
+        let embeds =
+            clip_vision_output_tensor(&backend, &authority, &cancellation, vec![1, 2], 2.0)?;
+        let output = Arc::new(ClipVisionOutput::checked(
+            hidden,
+            None,
+            embeds,
+            None,
+            vec![[3, 32, 32]],
+        )?);
+        let payload = NativeStoredPayload::ClipVisionOutput(output.clone());
+        let payload_bytes = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(1, payload_bytes)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x300));
+        let store = generation.handle_store_for_attempt(attempt_id);
+        let handle = store.publish(payload, &cancellation)?;
+        let expected_type = NativeHandleType::new(
+            NativeHandleKind::StructuredCompute,
+            ClipVisionOutput::SOURCE_TYPE_ID,
+        )?;
+        assert_eq!(handle.handle_type(), &expected_type);
+        let before_len = generation.len();
+        let before_resident_bytes = generation.resident_bytes();
+        let context = NativeNodeContext::new(
+            PromptId(Uuid::from_u128(0x400)),
+            attempt_id,
+            NodeId::from("clip-vision-output-plugin-input"),
+            cancellation.clone(),
+            authority.authorize_workspace(0)?,
+            store.clone(),
+        )?;
+
+        let failure = plugin_value(
+            &port,
+            NativeValue::Handle {
+                value: handle.clone(),
+            },
+            &registry,
+            "profile-a",
+            &context,
+        )
+        .expect_err("CLIP_VISION_OUTPUT has no lossless plugin SDK representation");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert_eq!(generation.len(), before_len);
+        assert_eq!(generation.resident_bytes(), before_resident_bytes);
+
+        let resolved = store.resolve(&handle, &expected_type, &cancellation)?;
+        let NativeStoredPayload::ClipVisionOutput(resolved_output) = resolved.as_ref() else {
+            return Err("resolved CLIP_VISION_OUTPUT changed stored payload variant".into());
+        };
+        assert!(Arc::ptr_eq(resolved_output, &output));
+        assert_eq!(
+            resolved_output.semantic_digest_sha256(),
+            output.semantic_digest_sha256()
+        );
         Ok(())
     }
 
@@ -1134,6 +1243,8 @@ mod tests {
         assert!(!projection.contains("remember_imported_handle"));
         assert!(!projection.contains(".publish("));
         assert!(!projection.contains(".revoke("));
+        assert!(projection.contains("stored.model_payload().identity()"));
+        assert!(!projection.contains("stored.diffusion()"));
 
         let failure = unmaterialized_plugin_input("tracks");
         assert_eq!(failure.code, "unmaterialized_plugin_payload");
@@ -1253,9 +1364,8 @@ mod tests {
                 "1".repeat(64),
                 vec![1],
             )?));
-        let failure =
-            plugin_value_from_stored(&port, ValueFamily::Tensor, Arc::new(payload), &registry)
-                .expect_err("an unrelated sealed payload must not satisfy an IMAGE input");
+        let failure = plugin_value_from_stored(&port, ValueFamily::Tensor, &payload, &registry)
+            .expect_err("an unrelated sealed payload must not satisfy an IMAGE input");
         assert_eq!(failure.code, "invalid_plugin_value");
 
         let failure = unmaterialized_plugin_output("image");
@@ -1274,7 +1384,7 @@ mod tests {
         let failure = plugin_value_from_stored(
             &artifact_port,
             ValueFamily::Artifact,
-            Arc::new(NativeStoredPayload::Provider(Arc::new(provider))),
+            &NativeStoredPayload::Provider(Arc::new(provider)),
             &registry,
         )
         .expect_err("artifact provider payloads are not provider-task identities");

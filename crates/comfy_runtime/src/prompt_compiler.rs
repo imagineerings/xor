@@ -1140,6 +1140,8 @@ pub(crate) mod tests {
             ("prompt_graph_lazy_demand_closure", true),
             ("prompt_node_addressable_validation", true),
             ("prompt_host_hidden_input_injection", true),
+            ("prompt_integer_literal_signed_unsigned_exactness", true),
+            ("prompt_dynamic_input_template_resolution", true),
         ])
     }
 }

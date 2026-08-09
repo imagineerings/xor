@@ -31,14 +31,15 @@ use comfy_runtime::{
     ExecutionDataSource, ExecutionEventBus, ExecutionPresentationService, ExecutionSnapshotStatus,
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreGeneration,
     NativeHandleStoreIdentity, NativeHandleType, NativeNodeRegistry, NativeOpaqueHandle,
-    NativePrimitive, NativeStoredModelPayload, NativeStoredPayload, NativeValue, NodeContext,
-    NodeOutcome, OutputCommitter, OutputExecutionScope, PermissionGrant, PermissionPolicy,
-    PluginAuthorization, PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
-    PluginServiceOperationContext, PluginTrustPolicy, PluginVerificationKey, ProfileId,
-    ProviderEndpoint, ProviderMode, ProviderPolicy, ProviderRequestActuator, SecretId, SecretValue,
-    SharedAssetService, WorkerLaunchConfig, authorize_native_output_committer,
-    authorize_native_plugin_asset_broker, native_image_catalog_bindings,
-    native_image_registry_projection, open_native_profile_asset_service,
+    NativePrimitive, NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload,
+    NativeValue, NodeContext, NodeOutcome, OutputCommitter, OutputExecutionScope, PermissionGrant,
+    PermissionPolicy, PluginAuthorization, PluginCapabilityBroker, PluginRngPolicy,
+    PluginServiceActuatorError, PluginServiceOperationContext, PluginTrustPolicy,
+    PluginVerificationKey, ProfileId, ProviderEndpoint, ProviderMode, ProviderPolicy,
+    ProviderRequestActuator, SecretId, SecretValue, SharedAssetService, WorkerLaunchConfig,
+    authorize_native_output_committer, authorize_native_plugin_asset_broker,
+    native_image_catalog_bindings, native_image_registry_projection,
+    open_native_profile_asset_service,
 };
 use comfy_sampler::{NativeConditioningPayload, NativeDiffusionPayload};
 use comfy_tensor::{
@@ -995,7 +996,7 @@ impl NativeHandleStore for RejectingPublishStore {
         handle: &NativeOpaqueHandle,
         expected_type: &NativeHandleType,
         cancellation: &CancellationToken,
-    ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
+    ) -> Result<NativeResolvedPayload, NativeHandleStoreError> {
         self.inner.resolve(handle, expected_type, cancellation)
     }
 

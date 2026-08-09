@@ -1,3 +1,4 @@
+use comfy_nodes::{NativeSourceTypeError, native_plugin_source_type_projection};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, error::Error, fmt, str::FromStr};
 
@@ -182,6 +183,11 @@ pub enum TypeRegistryError {
         expected: ValueRepresentation,
         actual: ValueRepresentation,
     },
+    SourceProjection {
+        type_id: String,
+        source_socket: String,
+        reason: String,
+    },
 }
 
 impl fmt::Display for TypeRegistryError {
@@ -231,6 +237,14 @@ impl fmt::Display for TypeRegistryError {
                 formatter,
                 "type `{type_id}` uses {actual:?}, not expected {expected:?}"
             ),
+            Self::SourceProjection {
+                type_id,
+                source_socket,
+                reason,
+            } => write!(
+                formatter,
+                "type `{type_id}` source socket `{source_socket}` is not canonical: {reason}"
+            ),
         }
     }
 }
@@ -253,7 +267,9 @@ struct RegisteredType {
 
 impl TypeRegistry {
     pub fn built_in() -> Result<Self, TypeRegistryError> {
-        Self::from_registrations(BUILT_IN_TYPES)
+        let registry = Self::from_registrations(BUILT_IN_TYPES)?;
+        validate_native_source_projections(BUILT_IN_TYPES)?;
+        Ok(registry)
     }
 
     pub fn from_registrations(
@@ -445,6 +461,39 @@ impl TypeRegistry {
     }
 }
 
+fn validate_native_source_projections(
+    registrations: &[TypeRegistration],
+) -> Result<(), TypeRegistryError> {
+    for registration in registrations {
+        let type_id = registration.canonical.parse::<CanonicalTypeId>()?;
+        let projection = match native_plugin_source_type_projection(type_id.name()) {
+            Ok(projection) => projection,
+            Err(NativeSourceTypeError::SourceIdentityRequired(_))
+                if matches!(type_id.name(), "autogrow" | "custom" | "multi-type") =>
+            {
+                continue;
+            }
+            Err(error) => {
+                return Err(TypeRegistryError::SourceProjection {
+                    type_id: registration.canonical.to_owned(),
+                    source_socket: registration.source_socket.to_owned(),
+                    reason: error.to_string(),
+                });
+            }
+        };
+        let source_type = projection.source_type();
+        if registration.source_socket != source_type && !registration.aliases.contains(&source_type)
+        {
+            return Err(TypeRegistryError::SourceProjection {
+                type_id: registration.canonical.to_owned(),
+                source_socket: registration.source_socket.to_owned(),
+                reason: format!("authoritative source identity is `{source_type}`"),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn insert_alias(
     aliases: &mut BTreeMap<String, CanonicalTypeId>,
     alias: &str,
@@ -488,7 +537,7 @@ macro_rules! plugin_types {
 
 plugin_types!(
     ("comfy:any@1", "AnyType", Scalar, ["*"]),
-    ("comfy:array@1", "Array", Scalar, []),
+    ("comfy:array@1", "Array", Scalar, ["ARRAY"]),
     ("comfy:audio@1", "Audio", Tensor, ["AUDIO"]),
     (
         "comfy:audio-encoder@1",
@@ -547,13 +596,13 @@ plugin_types!(
         "comfy:dynamic-combo@1",
         "DynamicCombo",
         Scalar,
-        ["DYNAMIC_COMBO"]
+        ["DYNAMIC_COMBO", "COMFY_DYNAMICCOMBO_V3"]
     ),
     (
         "comfy:file-3d-any@1",
         "File3DAny",
         Artifact,
-        ["FILE_3D_ANY"]
+        ["FILE_3D", "FILE_3D_ANY"]
     ),
     (
         "comfy:file-3d-fbx@1",
@@ -602,7 +651,7 @@ plugin_types!(
         "comfy:image-compare@1",
         "ImageCompare",
         Scalar,
-        ["IMAGE_COMPARE"]
+        ["IMAGECOMPARE", "IMAGE_COMPARE"]
     ),
     ("comfy:integer@1", "Int", Scalar, ["INT"]),
     ("comfy:latent@1", "Latent", Tensor, ["LATENT"]),
@@ -623,16 +672,21 @@ plugin_types!(
         "comfy:load-3d-camera@1",
         "Load3DCamera",
         Scalar,
-        ["LOAD_3D_CAMERA"]
+        ["LOAD3D_CAMERA", "LOAD_3D_CAMERA"]
     ),
     (
         "comfy:load-3d-model-info@1",
         "Load3DModelInfo",
         Scalar,
-        ["LOAD_3D_MODEL_INFO"]
+        ["LOAD3D_MODEL_INFO", "LOAD_3D_MODEL_INFO"]
     ),
     ("comfy:mask@1", "Mask", Tensor, ["MASK"]),
-    ("comfy:match-type@1", "MatchType", Scalar, ["MATCH_TYPE"]),
+    (
+        "comfy:match-type@1",
+        "MatchType",
+        Scalar,
+        ["COMFY_MATCHTYPE_V3", "MATCH_TYPE"]
+    ),
     ("comfy:mesh@1", "Mesh", Artifact, ["MESH"]),
     ("comfy:model@1", "Model", Model, ["MODEL"]),
     ("comfy:model-patch@1", "ModelPatch", Model, ["MODEL_PATCH"]),
@@ -836,7 +890,7 @@ mod tests {
         );
         assert_eq!(
             format!("{:x}", Sha256::digest(projection.as_bytes())),
-            "2bcd8a4d945632d3b1a67179682e40ab8ccd2d208d78eceed936edfa0e04e446"
+            "65f095269833bbc4b646ed9180dcf07d6c4203387aa22072cf0f994e1bcb708c"
         );
         assert_eq!(
             registry.representation(registry.resolve("IMAGE")?)?,
@@ -908,7 +962,7 @@ mod tests {
             (
                 include_bytes!("../../../.agents/specs/comfy-parity/catalogs/backend-nodes.csv")
                     .as_slice(),
-                "2fd562212e8f79335b619ff0fd1844d263a05fc85839366072046173129aefe1",
+                "3fe43e8978f55500dcebd7faf91a376f0c9606d66ebcda6f5be791c20474bc6e",
                 b"schema_api".as_slice(),
             ),
             (
@@ -916,7 +970,7 @@ mod tests {
                     "../../../.agents/specs/comfy-parity/catalogs/cross-compatibility.csv"
                 )
                 .as_slice(),
-                "fcecaa34f05405d6a6af6d4608a157928d44d25be3dca1c0cafa1e9eeab8ec67",
+                "f4da570033a2174f3124b88bb1e4ddbc4a811cbb7311cbf19b2288dcbfdef45c",
                 b"Version and capability negotiation".as_slice(),
             ),
             (
@@ -924,7 +978,7 @@ mod tests {
                     "../../../.agents/specs/comfy-parity/catalogs/frontend-extensions.csv"
                 )
                 .as_slice(),
-                "83bdcb612379801617d42a1bb2713025794b75ccfc8b2f1874c7b3c75e96a223",
+                "14280a8d1907a49292735692667eecff579fa5d4bf462dc8ef3287ec3bd7141b",
                 b"Unique extension name".as_slice(),
             ),
             (
@@ -940,7 +994,7 @@ mod tests {
                     "../../../.agents/specs/comfy-parity/catalogs/backend-external-services.csv"
                 )
                 .as_slice(),
-                "6920e13329868700eb665aa3bd8586ce46f7d45d1d0754490f28b1fc601c3837",
+                "120541f2d6c7b128886d3e5c95b49b23d0c42280a2c452a55f5042afc3081a59",
                 b"provider".as_slice(),
             ),
         ];
