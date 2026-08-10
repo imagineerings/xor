@@ -165,6 +165,10 @@ pub struct WorkerPluginInvocation {
     registry_generation: WorkerRegistryGeneration,
     registry_digest_sha256: WorkerSha256Digest,
     extension_id: String,
+    extension_version: String,
+    plugin_identifier: String,
+    plugin_version: String,
+    manifest_digest_sha256: WorkerSha256Digest,
     component_digest_sha256: WorkerSha256Digest,
     authorization_generation: WorkerSha256Digest,
     node_id: String,
@@ -209,6 +213,22 @@ impl WorkerPluginInvocation {
         &self.extension_id
     }
 
+    pub fn extension_version(&self) -> &str {
+        &self.extension_version
+    }
+
+    pub fn plugin_identifier(&self) -> &str {
+        &self.plugin_identifier
+    }
+
+    pub fn plugin_version(&self) -> &str {
+        &self.plugin_version
+    }
+
+    pub fn manifest_digest_sha256(&self) -> &WorkerSha256Digest {
+        &self.manifest_digest_sha256
+    }
+
     pub fn component_digest_sha256(&self) -> &WorkerSha256Digest {
         &self.component_digest_sha256
     }
@@ -243,6 +263,9 @@ impl WorkerPluginInvocation {
 
     fn validate(&self) -> Result<(), ComponentHostError> {
         if !valid_worker_plugin_identity(&self.extension_id)
+            || !valid_worker_plugin_identity(&self.extension_version)
+            || !valid_worker_plugin_identity(&self.plugin_identifier)
+            || !valid_worker_plugin_identity(&self.plugin_version)
             || !valid_worker_plugin_identity(&self.node_id)
             || self.timeout_milliseconds == 0
             || self.timeout_milliseconds > MAX_WORKER_PLUGIN_TIMEOUT_MILLISECONDS
@@ -314,6 +337,10 @@ impl VerifiedComponentGeneration {
             registry_generation: deployment.begin().generation(),
             registry_digest_sha256: deployment.begin().registry_digest_sha256().clone(),
             extension_id: extension_id.to_owned(),
+            extension_version: descriptor.extension_version().to_owned(),
+            plugin_identifier: descriptor.plugin_identifier().to_owned(),
+            plugin_version: descriptor.plugin_version().to_owned(),
+            manifest_digest_sha256: descriptor.manifest_digest_sha256().clone(),
             component_digest_sha256: descriptor.component_digest_sha256().clone(),
             authorization_generation: descriptor.authorization_generation().clone(),
             node_id: node_id.to_owned(),

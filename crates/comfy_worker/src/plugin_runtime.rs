@@ -343,6 +343,10 @@ pub(crate) struct WorkerPluginRegistry {
 }
 
 struct WorkerCompiledPlugin {
+    extension_version: String,
+    plugin_identifier: String,
+    plugin_version: String,
+    manifest_digest_sha256: comfy_types::WorkerSha256Digest,
     component_digest_sha256: comfy_types::WorkerSha256Digest,
     authorization_generation: comfy_types::WorkerSha256Digest,
     manifest: Arc<PluginManifest>,
@@ -402,6 +406,10 @@ impl WorkerPluginRegistry {
                 .insert(
                     extension_id,
                     WorkerCompiledPlugin {
+                        extension_version: component.extension_version().to_owned(),
+                        plugin_identifier: component.plugin_identifier().to_owned(),
+                        plugin_version: component.plugin_version().to_owned(),
+                        manifest_digest_sha256: component.manifest_digest_sha256().clone(),
                         component_digest_sha256: component.component_digest_sha256().clone(),
                         authorization_generation: component.authorization_generation().clone(),
                         manifest: Arc::new(manifest),
@@ -486,6 +494,10 @@ impl WorkerPluginRegistry {
             .get(invocation.extension_id())
             .ok_or(WorkerPluginRuntimeError::MissingComponent)?;
         if invocation.component_digest_sha256() != &component.component_digest_sha256
+            || invocation.extension_version() != component.extension_version
+            || invocation.plugin_identifier() != component.plugin_identifier
+            || invocation.plugin_version() != component.plugin_version
+            || invocation.manifest_digest_sha256() != &component.manifest_digest_sha256
             || invocation.authorization_generation() != &component.authorization_generation
             || component.authorization.capabilities().profile_id() != self.profile_id.0.to_string()
         {
@@ -674,6 +686,10 @@ mod tests {
             "registry_generation": 1,
             "registry_digest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "extension_id": "test.echo-extension",
+            "extension_version": "1.0.0",
+            "plugin_identifier": "test.echo-plugin",
+            "plugin_version": "1.0.0",
+            "manifest_digest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "component_digest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
             "authorization_generation": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "node_id": "echo",

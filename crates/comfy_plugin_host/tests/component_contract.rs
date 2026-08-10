@@ -7,7 +7,7 @@ use comfy_plugin_host::{
     ComponentExecutionBoundary, ComponentHost, ComponentHostError, ComponentHostRouter,
     ComponentLimits, InvocationInputs, LegacyInputSourceProjection, LegacyMappingResolver,
     LegacyNodeReference, LegacyResolution, MappingCandidate, MappingSource, MappingTarget,
-    PluginCapabilityServices, PluginError, PluginHost,
+    PluginCapabilityServices, PluginError, PluginHost, WorkerPluginInvocation,
 };
 use comfy_plugin_sdk::{
     ApiRequirement, ApiVersion, ArtifactValue, CachePolicy, CancelReason, CapabilityCall,
@@ -1906,6 +1906,30 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
             .policy_generation(),
         "test-profile",
     )?;
+    let worker_invocation = generation.prepare_worker_invocation(
+        "test-extension",
+        "echo",
+        invocation_inputs(true)?,
+        1_000,
+        1_024,
+        conformance_component_limits(),
+    )?;
+    assert_eq!(worker_invocation.extension_id(), "test-extension");
+    assert_eq!(worker_invocation.extension_version(), "1.2.3");
+    assert_eq!(worker_invocation.plugin_identifier(), "test.echo-plugin");
+    assert_eq!(worker_invocation.plugin_version(), "1.2.3");
+    assert_eq!(
+        worker_invocation.manifest_digest_sha256().as_str(),
+        deployment.manifest_sha256()
+    );
+    assert_eq!(
+        worker_invocation.component_digest_sha256().as_str(),
+        deployment.component_sha256()
+    );
+    assert_eq!(
+        WorkerPluginInvocation::from_bytes(&worker_invocation.to_bytes()?)?,
+        worker_invocation
+    );
     let mut tampered_authorization = deployment.authorization_bytes().to_vec();
     let last = tampered_authorization
         .last_mut()
