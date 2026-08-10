@@ -1587,9 +1587,7 @@ mod tests {
                 context.cancellation().cancel();
             }
             if self.fail_call.load(Ordering::Acquire) {
-                return Err(PluginServiceActuatorError::new(
-                    "injected provider failure",
-                ));
+                return Err(PluginServiceActuatorError::new("injected provider failure"));
             }
             Ok(self.response.lock().clone())
         }
@@ -2224,11 +2222,8 @@ mod tests {
         ])?;
         let clock = Arc::new(TestClock::new(Instant::now()));
         let issuer = ProviderCostAcceptanceIssuer::from_seed([41; 32], clock.now())?;
-        let (_directory, broker, provider, credential) = broker_with_cost_acceptance(
-            &authorization,
-            clock.clone(),
-            Some(issuer.verifier()?),
-        )?;
+        let (_directory, broker, provider, credential) =
+            broker_with_cost_acceptance(&authorization, clock.clone(), Some(issuer.verifier()?))?;
         provider.set_response(b"provider-response".to_vec());
         let binding = "d".repeat(64);
         let price = ProviderPriceBound::new("USD", 40_000)?;
@@ -2241,8 +2236,7 @@ mod tests {
         )?;
         let secret = SecretId::new(SECRET)?;
 
-        let invocation =
-            broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
@@ -2260,8 +2254,7 @@ mod tests {
         assert_eq!(credential.calls.load(Ordering::Acquire), 1);
 
         credential.present.store(true, Ordering::Release);
-        let invocation =
-            broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
@@ -2284,8 +2277,7 @@ mod tests {
             failed_nonce,
         )?;
         provider.set_fail_call(true);
-        let invocation =
-            broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
