@@ -14,11 +14,15 @@ pub use comfy_nodes::{
 };
 use comfy_nodes::{
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeNodeBindingDisposition, NativeNodeContractError, NativeOpaqueHandle,
-    NativePayloadResidency, NativeResidentAllocationId, NativeResolvedPayload,
-    NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue, NodeRegistry,
+    NativeNodeBindingDisposition, NativeNodeComputeSession, NativeNodeContractError,
+    NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency,
+    NativePreparedEffectKind, NativePreparedEffectService, NativeResidentAllocationId,
+    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue,
+    NodeRegistry,
 };
-use comfy_tensor::{BackendCapabilityMatrix, ScratchReservation};
+#[cfg(test)]
+use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
+use comfy_tensor::{BackendCapabilityMatrix, CpuBackend, ScratchReservation, StreamId};
 #[cfg(test)]
 use comfy_tensor::{CpuWorkspaceAuthority, DeviceId, NativeDeviceProperties};
 use comfy_types::{
@@ -42,7 +46,6 @@ use uuid::Uuid;
 
 pub const MAX_EXPANSION_DEPTH: usize = 64;
 pub const MAX_EFFECTS_PER_NODE: usize = 4_096;
-pub const MAX_EFFECT_METADATA_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_NATIVE_COMPILE_OPTIONS: usize = 64;
 pub const MAX_NATIVE_COMPILE_TEXT_BYTES: usize = 4_096;
 pub const MAX_RUNTIME_NATIVE_HANDLES: usize = 1_000_000;
@@ -276,8 +279,10 @@ pub struct PreparedEffect {
     pub prompt_id: PromptId,
     pub attempt_id: AttemptId,
     pub node_id: NodeId,
+    pub service_id: Uuid,
     pub transaction_id: Uuid,
-    pub metadata: Vec<u8>,
+    pub kind: NativePreparedEffectKind,
+    pub request_digest_sha256: String,
 }
 
 #[derive(Clone, Default)]
@@ -1568,7 +1573,18 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
 }
 
 pub trait EffectCoordinator: Send + Sync {
-    fn prepare(&self, effect: PreparedEffect) -> Result<PreparedEffect, String>;
+    fn node_service(
+        &self,
+        identity: NativeNodeServiceIdentity,
+        prompt_id: PromptId,
+    ) -> Result<Arc<dyn NativePreparedEffectService>, String>;
+    fn prepared_effect(
+        &self,
+        ticket: &PreparedEffectRequest,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: &NodeId,
+    ) -> Result<PreparedEffect, String>;
     fn commit_batch(
         &self,
         effects: &[PreparedEffect],
@@ -1578,7 +1594,38 @@ pub trait EffectCoordinator: Send + Sync {
 }
 
 #[cfg(test)]
-#[derive(Default)]
+fn prepared_effect_transaction_id(
+    identity: &NativeNodeServiceIdentity,
+    ordinal: u64,
+    request_digest_sha256: &str,
+) -> Uuid {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sim.comfy.prepared-effect-transaction.v1");
+    hasher.update(identity.service_id().as_bytes());
+    hasher.update(identity.attempt_id().0.as_bytes());
+    hasher.update(identity.node_id().0.as_bytes());
+    hasher.update(ordinal.to_le_bytes());
+    hasher.update(request_digest_sha256.as_bytes());
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Uuid::from_bytes(bytes)
+}
+
+fn node_effect_service_id(prompt_id: PromptId, attempt_id: AttemptId, node_id: &NodeId) -> Uuid {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sim.comfy.node-effect-service.v1");
+    hasher.update(prompt_id.0.as_bytes());
+    hasher.update(attempt_id.0.as_bytes());
+    hasher.update(node_id.0.as_bytes());
+    let digest = hasher.finalize();
+    let mut bytes = [0_u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Uuid::from_bytes(bytes)
+}
+
+#[cfg(test)]
+#[derive(Debug, Default)]
 struct EffectCoordinatorCalls {
     prepared: Vec<PreparedEffect>,
     committed_batches: Vec<Vec<PreparedEffect>>,
@@ -1588,7 +1635,93 @@ struct EffectCoordinatorCalls {
 #[cfg(test)]
 #[derive(Default)]
 struct RecordingEffectCoordinator {
-    calls: Mutex<EffectCoordinatorCalls>,
+    calls: Arc<Mutex<EffectCoordinatorCalls>>,
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct RecordingPreparedEffectService {
+    identity: NativeNodeServiceIdentity,
+    prompt_id: PromptId,
+    ordinal: AtomicU64,
+    calls: Arc<Mutex<EffectCoordinatorCalls>>,
+}
+
+#[cfg(test)]
+impl NativePreparedEffectService for RecordingPreparedEffectService {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn maximum_output_bytes(&self) -> u64 {
+        2 * 1024 * 1024 * 1024
+    }
+
+    fn prepare_output(
+        &self,
+        request: NativeOutputEffectRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<PreparedEffectRequest, comfy_nodes::NativeEffectServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| comfy_nodes::NativeEffectServiceError::Cancelled)?;
+        let ordinal = self
+            .ordinal
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                value.checked_add(1)
+            })
+            .map_err(|_| comfy_nodes::NativeEffectServiceError::Rejected)?;
+        let transaction_id = prepared_effect_transaction_id(
+            &self.identity,
+            ordinal,
+            request.request_digest_sha256(),
+        );
+        let ticket = PreparedEffectRequest::checked(
+            self.identity.service_id(),
+            transaction_id,
+            NativePreparedEffectKind::Output,
+            request.request_digest_sha256(),
+        )
+        .map_err(|_| comfy_nodes::NativeEffectServiceError::Rejected)?;
+        let prepared = PreparedEffect {
+            prompt_id: self.prompt_id,
+            attempt_id: self.identity.attempt_id(),
+            node_id: self.identity.node_id().clone(),
+            service_id: self.identity.service_id(),
+            transaction_id,
+            kind: NativePreparedEffectKind::Output,
+            request_digest_sha256: request.request_digest_sha256().to_owned(),
+        };
+        self.calls.lock().prepared.push(prepared.clone());
+        if cancellation.check().is_err() {
+            self.calls
+                .lock()
+                .prepared
+                .retain(|candidate| candidate != &prepared);
+            return Err(comfy_nodes::NativeEffectServiceError::Cancelled);
+        }
+        Ok(ticket)
+    }
+
+    fn rollback_prepared(
+        &self,
+        request: &PreparedEffectRequest,
+    ) -> Result<(), comfy_nodes::NativeEffectServiceError> {
+        if request.service_id() != self.identity.service_id() {
+            return Err(comfy_nodes::NativeEffectServiceError::InvalidTicket);
+        }
+        let mut calls = self.calls.lock();
+        let Some(index) = calls.prepared.iter().position(|prepared| {
+            prepared.transaction_id == request.transaction_id()
+                && prepared.service_id == request.service_id()
+                && prepared.kind == request.kind()
+                && prepared.request_digest_sha256 == request.request_digest_sha256()
+        }) else {
+            return Err(comfy_nodes::NativeEffectServiceError::InvalidTicket);
+        };
+        calls.prepared.remove(index);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1625,9 +1758,41 @@ impl RecordingEffectCoordinator {
 
 #[cfg(test)]
 impl EffectCoordinator for RecordingEffectCoordinator {
-    fn prepare(&self, effect: PreparedEffect) -> Result<PreparedEffect, String> {
-        self.calls.lock().prepared.push(effect.clone());
-        Ok(effect)
+    fn node_service(
+        &self,
+        identity: NativeNodeServiceIdentity,
+        prompt_id: PromptId,
+    ) -> Result<Arc<dyn NativePreparedEffectService>, String> {
+        Ok(Arc::new(RecordingPreparedEffectService {
+            identity,
+            prompt_id,
+            ordinal: AtomicU64::new(0),
+            calls: self.calls.clone(),
+        }))
+    }
+
+    fn prepared_effect(
+        &self,
+        ticket: &PreparedEffectRequest,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: &NodeId,
+    ) -> Result<PreparedEffect, String> {
+        self.calls
+            .lock()
+            .prepared
+            .iter()
+            .find(|effect| {
+                effect.prompt_id == prompt_id
+                    && effect.attempt_id == attempt_id
+                    && &effect.node_id == node_id
+                    && effect.service_id == ticket.service_id()
+                    && effect.transaction_id == ticket.transaction_id()
+                    && effect.kind == ticket.kind()
+                    && effect.request_digest_sha256 == ticket.request_digest_sha256()
+            })
+            .cloned()
+            .ok_or_else(|| "prepared effect ticket is absent or belongs to another node".to_owned())
     }
 
     fn commit_batch(
@@ -1723,8 +1888,6 @@ pub enum ExecutionError {
     ExpansionSequenceExhausted,
     #[error("node {node:?} returned too many transactional effects")]
     TooManyEffects { node: NodeId },
-    #[error("node {node:?} returned oversized effect metadata for transaction {transaction_id}")]
-    OversizedEffect { node: NodeId, transaction_id: Uuid },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1768,6 +1931,7 @@ pub struct ExecutionEngine {
     dtype_policy: String,
     configuration_token: String,
     scratch: ScratchReservation,
+    compute_backend: Option<Arc<CpuBackend>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
 
@@ -1818,6 +1982,7 @@ impl ExecutionEngine {
             dtype_policy: "default".to_owned(),
             configuration_token: "default".to_owned(),
             scratch,
+            compute_backend: None,
             handle_store_generation,
         })
     }
@@ -1829,6 +1994,17 @@ impl ExecutionEngine {
     pub fn with_event_bus(mut self, event_bus: ExecutionEventBus) -> Self {
         self.event_bus = Some(event_bus);
         self
+    }
+
+    pub fn with_compute_backend(
+        mut self,
+        backend: Arc<CpuBackend>,
+    ) -> Result<Self, ExecutionError> {
+        backend
+            .validate_scratch_reservation(&self.scratch)
+            .map_err(|error| ExecutionError::Cache(error.to_string()))?;
+        self.compute_backend = Some(backend);
+        Ok(self)
     }
 
     pub fn with_backend(mut self, backend: impl Into<String>) -> Result<Self, ExecutionError> {
@@ -2137,13 +2313,39 @@ impl ExecutionEngine {
                 actual: implementation.implementation_version().to_owned(),
             });
         }
-        let context = NodeContext::new(
+        let service_identity = NativeNodeServiceIdentity::checked(
+            node_effect_service_id(plan.prompt_id, state.attempt_id, node_id),
+            state.attempt_id,
+            node_id.clone(),
+        )
+        .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        let effect_service = self
+            .effects
+            .node_service(service_identity.clone(), plan.prompt_id)
+            .map_err(ExecutionError::Effect)?;
+        let compute = self
+            .compute_backend
+            .as_ref()
+            .map(|backend| {
+                NativeNodeComputeSession::checked(
+                    service_identity,
+                    backend.clone(),
+                    StreamId::DEFAULT,
+                    &self.scratch,
+                )
+            })
+            .transpose()
+            .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        let services = NativeNodeServices::checked(None, Some(effect_service), compute)
+            .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        let context = NodeContext::new_with_services(
             plan.prompt_id,
             state.attempt_id,
             node_id.clone(),
             state.cancellation.clone(),
             self.scratch.clone(),
             state.handle_store.clone(),
+            services,
         )
         .map_err(|error| ExecutionError::HandleStore(error.to_string()))?;
         let mut inputs = BTreeMap::new();
@@ -2298,22 +2500,20 @@ impl ExecutionEngine {
                 node: node_id.clone(),
             });
         }
+        let mut effect_transactions = BTreeSet::new();
         for effect in effects {
-            if effect.metadata.len() > MAX_EFFECT_METADATA_BYTES {
-                return Err(ExecutionError::OversizedEffect {
-                    node: node_id.clone(),
-                    transaction_id: effect.transaction_id,
-                });
+            effect
+                .validate()
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+            if !effect_transactions.insert(effect.transaction_id()) {
+                return Err(ExecutionError::Effect(format!(
+                    "duplicate prepared effect ticket {}",
+                    effect.transaction_id()
+                )));
             }
             let prepared = self
                 .effects
-                .prepare(PreparedEffect {
-                    prompt_id: plan.prompt_id,
-                    attempt_id: state.attempt_id,
-                    node_id: node_id.clone(),
-                    transaction_id: effect.transaction_id,
-                    metadata: effect.metadata,
-                })
+                .prepared_effect(&effect, plan.prompt_id, state.attempt_id, node_id)
                 .map_err(ExecutionError::Effect)?;
             state.prepared_effects.push(prepared.clone());
             state.emit(
@@ -2937,6 +3137,41 @@ pub(crate) mod tests {
         }
     }
 
+    fn prepare_test_effect(
+        context: &NodeContext,
+        content: &'static [u8],
+    ) -> Result<PreparedEffectRequest, NodeFailure> {
+        let service = context.prepared_effects().map_err(|error| NodeFailure {
+            code: "test_effect_service_unavailable".to_owned(),
+            message: error.to_string(),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        })?;
+        let request = NativeOutputEffectRequest::checked(
+            NativeOutputNamespace::Temporary,
+            "test-effect",
+            "bin",
+            0,
+            NativeOutputShape::File,
+            Arc::from(content),
+            service.maximum_output_bytes(),
+        )
+        .map_err(|error| NodeFailure {
+            code: "test_effect_request_invalid".to_owned(),
+            message: error.to_string(),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        })?;
+        service
+            .prepare_output(request, &context.cancellation)
+            .map_err(|error| NodeFailure {
+                code: "test_effect_prepare_failed".to_owned(),
+                message: error.to_string(),
+                kind: NodeFailureKind::Failure,
+                retryable: false,
+            })
+    }
+
     fn stored_test_payload(
         abi_bytes: Vec<u8>,
     ) -> Result<NativeStoredPayload, comfy_nodes::NativeStoredPayloadError> {
@@ -3227,10 +3462,7 @@ pub(crate) mod tests {
                         return Ok(NodeOutcome::Values {
                             outputs: vec![native_string("prepared")],
                             ui: None,
-                            effects: vec![PreparedEffectRequest {
-                                transaction_id: Uuid::from_u128(99),
-                                metadata: b"output".to_vec(),
-                            }],
+                            effects: vec![prepare_test_effect(&context, b"output")?],
                         });
                     }
                     "Block" => {
@@ -3501,10 +3733,7 @@ pub(crate) mod tests {
                 Ok(NodeOutcome::Values {
                     outputs: vec![native_integer(1)],
                     ui: Some(json!({"preview": "must-not-publish"})),
-                    effects: vec![PreparedEffectRequest {
-                        transaction_id: Uuid::from_u128(100),
-                        metadata: b"must-not-publish".to_vec(),
-                    }],
+                    effects: Vec::new(),
                 })
             })
         }
@@ -6085,7 +6314,8 @@ pub(crate) mod tests {
                 )
                 .await;
             assert_eq!(committed.state, AttemptState::Succeeded);
-            assert_eq!(effects.committed(), BTreeSet::from([Uuid::from_u128(99)]));
+            assert_eq!(effects.committed(), effects.prepared());
+            assert_eq!(effects.committed().len(), 1);
             assert!(effects.rolled_back().is_empty());
 
             let failed_write = compile_plan(
@@ -6151,10 +6381,8 @@ pub(crate) mod tests {
             assert_eq!(failed.state, AttemptState::Failed);
             assert!(failed.outputs.is_empty());
             assert!(failed_effects.committed().is_empty());
-            assert_eq!(
-                failed_effects.rolled_back(),
-                BTreeSet::from([Uuid::from_u128(99)])
-            );
+            assert_eq!(failed_effects.rolled_back(), failed_effects.prepared());
+            assert_eq!(failed_effects.rolled_back().len(), 1);
 
             let mut event_failure_registry = NativeNodeRegistry::default();
             event_failure_registry.register(Arc::new(FixtureNode {
@@ -6185,8 +6413,9 @@ pub(crate) mod tests {
             assert!(event_failure_effects.committed().is_empty());
             assert_eq!(
                 event_failure_effects.rolled_back(),
-                BTreeSet::from([Uuid::from_u128(99)])
+                event_failure_effects.prepared()
             );
+            assert_eq!(event_failure_effects.rolled_back().len(), 1);
             Ok::<(), Box<dyn std::error::Error>>(())
         })
     }

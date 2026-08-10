@@ -2,8 +2,10 @@ use crate::{
     NativeHandleKind, NativeHandleType, NativeNodeContractError, native_source_type_projection,
 };
 use comfy_media::{
-    NativeBoundingBoxPayload, NativeFaceLandmarksPayload, NativeMediaResidentParts,
-    NativePoseKeypointPayload, NativeSam3TrackDataPayload, NativeTracksPayload,
+    NativeArtifactPayload, NativeAudioPayload, NativeBoundingBoxPayload, NativeCameraPayload,
+    NativeFaceLandmarksPayload, NativeFile3DPayload, NativeMediaResidentParts, NativeMeshPayload,
+    NativePoseKeypointPayload, NativeSam3TrackDataPayload, NativeSplatPayload, NativeTracksPayload,
+    NativeVideoPayload, NativeVoxelPayload,
 };
 use comfy_model::{
     AudioEncoderOutput, IcLoraParameters, LossMap, NativeModelBackingKind, NativeModelPayload,
@@ -253,6 +255,14 @@ pub enum NativeStoredPayload {
     ClipVisionOutput(Arc<ClipVisionOutput>),
     IcLoraParameters(Arc<IcLoraParameters>),
     LossMap(Arc<LossMap>),
+    Audio(Arc<NativeAudioPayload>),
+    Video(Arc<NativeVideoPayload>),
+    Artifact(Arc<NativeArtifactPayload>),
+    File3D(Arc<NativeFile3DPayload>),
+    Camera(Arc<NativeCameraPayload>),
+    Splat(Arc<NativeSplatPayload>),
+    Mesh(Arc<NativeMeshPayload>),
+    Voxel(Arc<NativeVoxelPayload>),
     Provider(Arc<NativeProviderPayload>),
 }
 
@@ -272,6 +282,14 @@ pub enum NativeResidentPayloadKind {
     ClipVisionOutput,
     IcLoraParameters,
     LossMap,
+    Audio,
+    Video,
+    Artifact,
+    File3D,
+    Camera,
+    Splat,
+    Mesh,
+    Voxel,
     Provider,
 }
 
@@ -407,6 +425,14 @@ impl NativeStoredPayload {
             Self::ClipVisionOutput(payload) => payload.validate()?,
             Self::IcLoraParameters(payload) => payload.validate()?,
             Self::LossMap(payload) => payload.validate()?,
+            Self::Audio(payload) => payload.validate()?,
+            Self::Video(payload) => payload.validate()?,
+            Self::Artifact(payload) => payload.validate()?,
+            Self::File3D(payload) => payload.validate()?,
+            Self::Camera(payload) => payload.validate()?,
+            Self::Splat(payload) => payload.validate()?,
+            Self::Mesh(payload) => payload.validate()?,
+            Self::Voxel(payload) => payload.validate()?,
             Self::Provider(payload) => payload.validate()?,
         }
         let handle_type = self.handle_type()?;
@@ -435,6 +461,14 @@ impl NativeStoredPayload {
             Self::ClipVisionOutput(_) => ClipVisionOutput::SOURCE_TYPE_ID,
             Self::IcLoraParameters(_) => IcLoraParameters::SOURCE_TYPE_ID,
             Self::LossMap(_) => LossMap::SOURCE_TYPE_ID,
+            Self::Audio(_) => NativeAudioPayload::SOURCE_TYPE_ID,
+            Self::Video(_) => NativeVideoPayload::SOURCE_TYPE_ID,
+            Self::Artifact(payload) => payload.source_type_id(),
+            Self::File3D(payload) => payload.source_type_id(),
+            Self::Camera(payload) => payload.source_type_id(),
+            Self::Splat(_) => NativeSplatPayload::SOURCE_TYPE_ID,
+            Self::Mesh(_) => NativeMeshPayload::SOURCE_TYPE_ID,
+            Self::Voxel(_) => NativeVoxelPayload::SOURCE_TYPE_ID,
             Self::Provider(payload) => return Ok(payload.handle_type().clone()),
         };
         native_source_type_projection(source_type)?
@@ -460,6 +494,14 @@ impl NativeStoredPayload {
             Self::ClipVisionOutput(payload) => hex_sha256(payload.semantic_digest_sha256()),
             Self::IcLoraParameters(payload) => hex_sha256(payload.semantic_digest_sha256()),
             Self::LossMap(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Audio(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Video(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Artifact(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::File3D(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Camera(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Splat(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Mesh(payload) => hex_sha256(payload.semantic_digest_sha256()),
+            Self::Voxel(payload) => hex_sha256(payload.semantic_digest_sha256()),
             Self::Provider(payload) => payload.identity_digest_sha256(),
         }
     }
@@ -495,6 +537,22 @@ impl NativeStoredPayload {
             Self::IcLoraParameters(payload) => usize::try_from(payload.resident_bytes())
                 .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
             Self::LossMap(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Audio(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Video(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Artifact(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::File3D(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Camera(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Splat(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Mesh(payload) => usize::try_from(payload.resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Voxel(payload) => usize::try_from(payload.resident_bytes())
                 .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
             Self::Provider(payload) => payload.resident_bytes(),
         }
@@ -579,6 +637,46 @@ impl NativeStoredPayload {
             )?,
             Self::LossMap(payload) => structured_model_residency(
                 NativeResidentPayloadKind::LossMap,
+                payload,
+                payload.resident_parts()?,
+            )?,
+            Self::Audio(payload) => media_residency(
+                NativeResidentPayloadKind::Audio,
+                payload,
+                payload.resident_parts()?,
+            )?,
+            Self::Video(payload) => media_residency(
+                NativeResidentPayloadKind::Video,
+                payload,
+                payload.resident_parts()?,
+            )?,
+            Self::Artifact(payload) => single_arc_residency(
+                NativeResidentPayloadKind::Artifact,
+                payload,
+                payload.resident_bytes(),
+            )?,
+            Self::File3D(payload) => single_arc_residency(
+                NativeResidentPayloadKind::File3D,
+                payload,
+                payload.resident_bytes(),
+            )?,
+            Self::Camera(payload) => single_arc_residency(
+                NativeResidentPayloadKind::Camera,
+                payload,
+                payload.resident_bytes(),
+            )?,
+            Self::Splat(payload) => media_residency(
+                NativeResidentPayloadKind::Splat,
+                payload,
+                payload.resident_parts()?,
+            )?,
+            Self::Mesh(payload) => media_residency(
+                NativeResidentPayloadKind::Mesh,
+                payload,
+                payload.resident_parts()?,
+            )?,
+            Self::Voxel(payload) => media_residency(
+                NativeResidentPayloadKind::Voxel,
                 payload,
                 payload.resident_parts()?,
             )?,

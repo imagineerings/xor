@@ -285,6 +285,12 @@ pub struct ScratchReservation {
     authority: Arc<ScratchAuthorization>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ScratchBindingIdentity {
+    pub(crate) backend_id: u64,
+    pub(crate) authority_id: u64,
+}
+
 #[derive(Debug)]
 pub(crate) struct ScratchAuthorization {
     backend_id: u64,
@@ -325,6 +331,13 @@ impl ScratchReservation {
 
     pub fn peak_bytes(&self) -> u64 {
         self.authority.peak_bytes.load(Ordering::Acquire)
+    }
+
+    pub fn binding_identity(&self) -> ScratchBindingIdentity {
+        ScratchBindingIdentity {
+            backend_id: self.authority.backend_id,
+            authority_id: self.authority.authority_id,
+        }
     }
 
     pub(crate) fn bound(bytes: u64, backend_id: u64, authority_id: u64) -> Self {

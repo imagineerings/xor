@@ -7,12 +7,13 @@ use comfy_api::{
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore},
 };
 use comfy_model::NativeModelPayload;
+use comfy_nodes::NativePreparedEffectKind;
 use comfy_nodes::NodeRegistry as CatalogNodeRegistry;
 use comfy_plugin_host::{
     CancellationToken, ComponentExecutionBoundary, ComponentHost, ComponentHostError,
     ComponentHostRouter, ComponentLimits, InvocationInputs, LegacyInputSourceProjection,
     LegacyMappingResolver, LegacyNodeReference, LegacyResolution, MappingCandidate, MappingSource,
-    MappingTarget, PluginCapabilityServices, PluginError, PluginHost,
+    MappingTarget, PluginCapabilityServices, PluginError, PluginHost, PluginOutputProposal,
     PluginOutputPublicationAdapter, PrivateWorkerPluginExecutor,
 };
 use comfy_plugin_sdk::{
@@ -2033,9 +2034,8 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
         assert_eq!(first_ui, second_ui);
         assert_eq!(first_effects, second_effects);
         assert_eq!(first_effects.len(), 1);
-        let capability_effects: comfy_plugin_host::CapabilityEffects =
-            serde_json::from_slice(&first_effects[0].metadata)?;
-        assert_eq!(capability_effects.outputs.len(), 1);
+        first_effects[0].validate()?;
+        assert_eq!(first_effects[0].kind(), NativePreparedEffectKind::Output);
         assert_eq!(provider.calls.load(Ordering::Acquire), 2);
         assert_eq!(credentials.read_calls.load(Ordering::Acquire), 2);
         assert_eq!(credentials.presence_calls.load(Ordering::Acquire), 2);
@@ -2091,13 +2091,19 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             prompt_id: PromptId(Uuid::from_u128(1)),
             attempt_id: AttemptId(Uuid::from_u128(2)),
         };
+        let output_proposals = vec![PluginOutputProposal {
+            identifier: "private-worker-output".to_owned(),
+            namespace: "outputs".to_owned(),
+            name: "guest.bin".to_owned(),
+            bytes: b"guest-output".to_vec(),
+        }];
         let receipts = {
             let mut assets = assets
                 .lock()
                 .map_err(|_| "worker plugin asset service lock is unavailable")?;
             PluginOutputPublicationAdapter.publish(
                 &scope,
-                &capability_effects.outputs,
+                &output_proposals,
                 &mut committer,
                 &mut assets,
                 &output_authorization,
@@ -2112,7 +2118,7 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
                 .map_err(|_| "worker plugin asset service lock is unavailable")?;
             PluginOutputPublicationAdapter.publish(
                 &scope,
-                &capability_effects.outputs,
+                &output_proposals,
                 &mut committer,
                 &mut assets,
                 &output_authorization,

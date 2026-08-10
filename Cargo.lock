@@ -3742,6 +3742,7 @@ dependencies = [
  "comfy_tensor",
  "comfy_types",
  "flate2",
+ "half",
  "image",
  "serde",
  "serde_json",

@@ -2,11 +2,14 @@ use crate::{
     NativeDescriptorSchemaMetadata, NativeInputSchemaMetadata, NativeSchemaValue,
     NativeStoredPayload, NativeStoredPayloadError,
 };
-use comfy_tensor::ScratchReservation;
+use comfy_tensor::{
+    CpuBackend, ExecutionContext, ScratchBindingIdentity, ScratchReservation, StreamId,
+};
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -26,7 +29,6 @@ const MAX_VALUE_DEPTH: usize = 32;
 const MAX_LIST_VALUES: usize = 1_000_000;
 const MAX_PORTS: usize = 65_536;
 const MAX_TYPE_UNION_MEMBERS: usize = 128;
-const MAX_EFFECT_METADATA_BYTES: usize = 4 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -299,7 +301,7 @@ impl NativeTypeUnion {
                 *expected == value.primitive_type()
             }
             (NativeValueType::Handle(expected), NativeValue::Handle { value }) => {
-                expected == value.handle_type()
+                crate::native_handle_type_accepts(expected, value.handle_type())
             }
             (NativeValueType::PreservedUnknown, NativeValue::PreservedUnknown { .. }) => true,
             (
@@ -923,6 +925,434 @@ pub trait NativeHandleStore: Send + Sync + fmt::Debug {
     ) -> Result<(), NativeHandleStoreError>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeNodeServiceIdentity {
+    service_id: Uuid,
+    attempt_id: AttemptId,
+    node_id: NodeId,
+}
+
+impl NativeNodeServiceIdentity {
+    pub fn checked(
+        service_id: Uuid,
+        attempt_id: AttemptId,
+        node_id: NodeId,
+    ) -> Result<Self, NativeNodeContractError> {
+        if service_id.is_nil() || attempt_id.0.is_nil() {
+            return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+        }
+        validate_identifier("native node service node ID", &node_id.0)?;
+        Ok(Self {
+            service_id,
+            attempt_id,
+            node_id,
+        })
+    }
+
+    pub const fn service_id(&self) -> Uuid {
+        self.service_id
+    }
+
+    pub const fn attempt_id(&self) -> AttemptId {
+        self.attempt_id
+    }
+
+    pub const fn node_id(&self) -> &NodeId {
+        &self.node_id
+    }
+
+    fn matches(&self, attempt_id: AttemptId, node_id: &NodeId) -> bool {
+        self.attempt_id == attempt_id && &self.node_id == node_id
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetReference {
+    service_id: Uuid,
+    reference_id: Uuid,
+    source_type_id: String,
+    byte_length: u64,
+    sha256: String,
+}
+
+impl NativeAssetReference {
+    pub fn checked(
+        service_id: Uuid,
+        reference_id: Uuid,
+        source_type_id: impl Into<String>,
+        byte_length: u64,
+        sha256: impl Into<String>,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let source_type_id = source_type_id.into();
+        let sha256 = sha256.into();
+        if service_id.is_nil()
+            || reference_id.is_nil()
+            || byte_length == 0
+            || byte_length > 2 * 1024 * 1024 * 1024
+            || validate_identifier("native asset source type", &source_type_id).is_err()
+            || !valid_sha256(&sha256)
+        {
+            return Err(NativeAssetServiceError::InvalidReference);
+        }
+        Ok(Self {
+            service_id,
+            reference_id,
+            source_type_id,
+            byte_length,
+            sha256,
+        })
+    }
+
+    pub const fn service_id(&self) -> Uuid {
+        self.service_id
+    }
+
+    pub const fn reference_id(&self) -> Uuid {
+        self.reference_id
+    }
+
+    pub fn source_type_id(&self) -> &str {
+        &self.source_type_id
+    }
+
+    pub const fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetReadRequest {
+    reference: NativeAssetReference,
+    maximum_bytes: u64,
+}
+
+impl NativeAssetReadRequest {
+    pub fn checked(
+        reference: NativeAssetReference,
+        maximum_bytes: u64,
+    ) -> Result<Self, NativeAssetServiceError> {
+        if maximum_bytes == 0
+            || maximum_bytes > 2 * 1024 * 1024 * 1024
+            || reference.byte_length() > maximum_bytes
+        {
+            return Err(NativeAssetServiceError::InvalidRequest);
+        }
+        Ok(Self {
+            reference,
+            maximum_bytes,
+        })
+    }
+
+    pub const fn reference(&self) -> &NativeAssetReference {
+        &self.reference
+    }
+
+    pub const fn maximum_bytes(&self) -> u64 {
+        self.maximum_bytes
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeResolvedAsset {
+    reference: NativeAssetReference,
+    bytes: Arc<[u8]>,
+    byte_length: u64,
+    sha256: String,
+}
+
+impl NativeResolvedAsset {
+    pub fn checked(
+        reference: NativeAssetReference,
+        bytes: Arc<[u8]>,
+        sha256: impl Into<String>,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let sha256 = sha256.into();
+        let byte_length =
+            u64::try_from(bytes.len()).map_err(|_| NativeAssetServiceError::TooLarge)?;
+        if byte_length > 2 * 1024 * 1024 * 1024
+            || byte_length != reference.byte_length()
+            || !valid_sha256(&sha256)
+            || sha256 != reference.sha256()
+            || sha256 != format!("{:x}", Sha256::digest(&bytes))
+        {
+            return Err(NativeAssetServiceError::DigestMismatch);
+        }
+        Ok(Self {
+            reference,
+            bytes,
+            byte_length,
+            sha256,
+        })
+    }
+
+    pub const fn reference(&self) -> &NativeAssetReference {
+        &self.reference
+    }
+
+    pub fn bytes(&self) -> &Arc<[u8]> {
+        &self.bytes
+    }
+
+    pub const fn byte_length(&self) -> u64 {
+        self.byte_length
+    }
+
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum NativeAssetServiceError {
+    #[error("native asset service is unavailable")]
+    Unavailable,
+    #[error("native asset operation was cancelled")]
+    Cancelled,
+    #[error("native asset reference is invalid")]
+    InvalidReference,
+    #[error("native asset read request is invalid")]
+    InvalidRequest,
+    #[error("native asset permission was denied")]
+    PermissionDenied,
+    #[error("native asset is missing")]
+    Missing,
+    #[error("native asset exceeds the authorized byte limit")]
+    TooLarge,
+    #[error("native asset digest changed or did not match")]
+    DigestMismatch,
+    #[error("native asset changed during the verified read")]
+    ChangedDuringRead,
+    #[error("native asset service rejected the operation")]
+    Rejected,
+}
+
+pub trait NativeAssetResolver: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeNodeServiceIdentity;
+
+    fn read_verified(
+        &self,
+        request: &NativeAssetReadRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeResolvedAsset, NativeAssetServiceError>;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeOutputNamespace {
+    Output,
+    Temporary,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeOutputShape {
+    File,
+    Image { width: u32, height: u32 },
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeOutputEffectRequest {
+    namespace: NativeOutputNamespace,
+    filename_prefix: String,
+    extension: String,
+    batch_index: u32,
+    shape: NativeOutputShape,
+    content: Arc<[u8]>,
+    request_digest_sha256: String,
+}
+
+impl NativeOutputEffectRequest {
+    pub fn checked(
+        namespace: NativeOutputNamespace,
+        filename_prefix: impl Into<String>,
+        extension: impl Into<String>,
+        batch_index: u32,
+        shape: NativeOutputShape,
+        content: Arc<[u8]>,
+        maximum_bytes: u64,
+    ) -> Result<Self, NativeEffectServiceError> {
+        let filename_prefix = filename_prefix.into();
+        let extension = extension.into();
+        if filename_prefix.is_empty()
+            || filename_prefix.len() > MAX_IDENTIFIER_BYTES
+            || filename_prefix
+                .bytes()
+                .any(|byte| byte.is_ascii_control() || matches!(byte, b'/' | b'\\'))
+            || extension.is_empty()
+            || extension.len() > 32
+            || !extension
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+            || content.is_empty()
+            || u64::try_from(content.len()).map_or(true, |length| {
+                length > maximum_bytes || length > 2 * 1024 * 1024 * 1024
+            })
+            || matches!(shape, NativeOutputShape::Image { width: 0, .. })
+            || matches!(shape, NativeOutputShape::Image { height: 0, .. })
+        {
+            return Err(NativeEffectServiceError::InvalidRequest);
+        }
+        let request_digest_sha256 = output_request_digest(
+            namespace,
+            &filename_prefix,
+            &extension,
+            batch_index,
+            shape,
+            &content,
+        );
+        Ok(Self {
+            namespace,
+            filename_prefix,
+            extension,
+            batch_index,
+            shape,
+            content,
+            request_digest_sha256,
+        })
+    }
+
+    pub const fn namespace(&self) -> NativeOutputNamespace {
+        self.namespace
+    }
+
+    pub fn filename_prefix(&self) -> &str {
+        &self.filename_prefix
+    }
+
+    pub fn extension(&self) -> &str {
+        &self.extension
+    }
+
+    pub const fn batch_index(&self) -> u32 {
+        self.batch_index
+    }
+
+    pub const fn shape(&self) -> NativeOutputShape {
+        self.shape
+    }
+
+    pub fn content(&self) -> &Arc<[u8]> {
+        &self.content
+    }
+
+    pub fn request_digest_sha256(&self) -> &str {
+        &self.request_digest_sha256
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativePreparedEffectKind {
+    Output,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum NativeEffectServiceError {
+    #[error("native prepared-effect service is unavailable")]
+    Unavailable,
+    #[error("native prepared-effect operation was cancelled")]
+    Cancelled,
+    #[error("native output effect request is invalid")]
+    InvalidRequest,
+    #[error("native prepared-effect service rejected the operation")]
+    Rejected,
+    #[error("native effect ticket is duplicated or belongs to another node attempt")]
+    InvalidTicket,
+}
+
+pub trait NativePreparedEffectService: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeNodeServiceIdentity;
+    fn maximum_output_bytes(&self) -> u64;
+
+    fn prepare_output(
+        &self,
+        request: NativeOutputEffectRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativePreparedEffectRequest, NativeEffectServiceError>;
+
+    fn rollback_prepared(
+        &self,
+        request: &NativePreparedEffectRequest,
+    ) -> Result<(), NativeEffectServiceError>;
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeNodeComputeSession {
+    identity: NativeNodeServiceIdentity,
+    backend: Arc<CpuBackend>,
+    stream: StreamId,
+    scratch_binding: ScratchBindingIdentity,
+}
+
+impl NativeNodeComputeSession {
+    pub fn checked(
+        identity: NativeNodeServiceIdentity,
+        backend: Arc<CpuBackend>,
+        stream: StreamId,
+        scratch: &ScratchReservation,
+    ) -> Result<Self, NativeNodeContractError> {
+        backend
+            .validate_scratch_reservation(scratch)
+            .map_err(|_| NativeNodeContractError::InvalidComputeSession)?;
+        Ok(Self {
+            identity,
+            backend,
+            stream,
+            scratch_binding: scratch.binding_identity(),
+        })
+    }
+
+    pub const fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    pub fn backend(&self) -> &CpuBackend {
+        &self.backend
+    }
+
+    pub const fn stream(&self) -> StreamId {
+        self.stream
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct NativeNodeServices {
+    assets: Option<Arc<dyn NativeAssetResolver>>,
+    effects: Option<Arc<dyn NativePreparedEffectService>>,
+    compute: Option<NativeNodeComputeSession>,
+}
+
+impl NativeNodeServices {
+    pub fn checked(
+        assets: Option<Arc<dyn NativeAssetResolver>>,
+        effects: Option<Arc<dyn NativePreparedEffectService>>,
+        compute: Option<NativeNodeComputeSession>,
+    ) -> Result<Self, NativeNodeContractError> {
+        for identity in assets
+            .as_deref()
+            .map(NativeAssetResolver::identity)
+            .into_iter()
+            .chain(
+                effects
+                    .as_deref()
+                    .map(NativePreparedEffectService::identity),
+            )
+            .chain(compute.as_ref().map(NativeNodeComputeSession::identity))
+        {
+            if identity.service_id().is_nil() {
+                return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+            }
+        }
+        Ok(Self {
+            assets,
+            effects,
+            compute,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeNodeContext {
     pub prompt_id: PromptId,
@@ -931,6 +1361,7 @@ pub struct NativeNodeContext {
     pub cancellation: CancellationToken,
     pub scratch: ScratchReservation,
     handle_store: Arc<dyn NativeHandleStore>,
+    services: NativeNodeServices,
 }
 
 impl NativeNodeContext {
@@ -942,6 +1373,26 @@ impl NativeNodeContext {
         scratch: ScratchReservation,
         handle_store: Arc<dyn NativeHandleStore>,
     ) -> Result<Self, NativeNodeContractError> {
+        Self::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            cancellation,
+            scratch,
+            handle_store,
+            NativeNodeServices::default(),
+        )
+    }
+
+    pub fn new_with_services(
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: NodeId,
+        cancellation: CancellationToken,
+        scratch: ScratchReservation,
+        handle_store: Arc<dyn NativeHandleStore>,
+        services: NativeNodeServices,
+    ) -> Result<Self, NativeNodeContractError> {
         let context = Self {
             prompt_id,
             attempt_id,
@@ -949,6 +1400,7 @@ impl NativeNodeContext {
             cancellation,
             scratch,
             handle_store,
+            services,
         };
         context.validate()?;
         Ok(context)
@@ -956,6 +1408,29 @@ impl NativeNodeContext {
 
     pub fn handle_store(&self) -> &dyn NativeHandleStore {
         self.handle_store.as_ref()
+    }
+
+    pub fn asset_resolver(&self) -> Result<&dyn NativeAssetResolver, NativeAssetServiceError> {
+        self.services
+            .assets
+            .as_deref()
+            .ok_or(NativeAssetServiceError::Unavailable)
+    }
+
+    pub fn prepared_effects(
+        &self,
+    ) -> Result<&dyn NativePreparedEffectService, NativeEffectServiceError> {
+        self.services
+            .effects
+            .as_deref()
+            .ok_or(NativeEffectServiceError::Unavailable)
+    }
+
+    pub fn compute_session(&self) -> Result<&NativeNodeComputeSession, NativeNodeContractError> {
+        self.services
+            .compute
+            .as_ref()
+            .ok_or(NativeNodeContractError::InvalidComputeSession)
     }
 
     pub fn validate(&self) -> Result<(), NativeNodeContractError> {
@@ -966,7 +1441,62 @@ impl NativeNodeContext {
             return Err(NativeNodeContractError::InvalidNodeContext);
         }
         validate_identifier("native node context node ID", &self.node_id.0)?;
-        self.handle_store.identity().validate()
+        self.handle_store.identity().validate()?;
+        for identity in self
+            .services
+            .assets
+            .as_deref()
+            .map(NativeAssetResolver::identity)
+            .into_iter()
+            .chain(
+                self.services
+                    .effects
+                    .as_deref()
+                    .map(NativePreparedEffectService::identity),
+            )
+            .chain(
+                self.services
+                    .compute
+                    .as_ref()
+                    .map(NativeNodeComputeSession::identity),
+            )
+        {
+            if !identity.matches(self.attempt_id, &self.node_id) {
+                return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+            }
+        }
+        if let Some(compute) = &self.services.compute {
+            if compute.scratch_binding != self.scratch.binding_identity() {
+                return Err(NativeNodeContractError::InvalidComputeSession);
+            }
+            compute
+                .backend
+                .validate_scratch_reservation(&self.scratch)
+                .map_err(|_| NativeNodeContractError::InvalidComputeSession)?;
+        }
+        Ok(())
+    }
+}
+
+impl NativeNodeComputeSession {
+    pub fn execution_context<'a>(
+        &self,
+        context: &'a NativeNodeContext,
+    ) -> Result<ExecutionContext<'a>, NativeNodeContractError> {
+        if !self.identity.matches(context.attempt_id, &context.node_id)
+            || self.scratch_binding != context.scratch.binding_identity()
+        {
+            return Err(NativeNodeContractError::InvalidComputeSession);
+        }
+        self.backend
+            .validate_scratch_reservation(&context.scratch)
+            .map_err(|_| NativeNodeContractError::InvalidComputeSession)?;
+        Ok(ExecutionContext {
+            stream: self.stream,
+            scratch: context.scratch.clone(),
+            rng_phase: None,
+            cancellation: &context.cancellation,
+        })
     }
 }
 
@@ -1001,13 +1531,50 @@ impl NativeCacheDependencies {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NativePreparedEffectRequest {
-    pub transaction_id: Uuid,
-    pub metadata: Vec<u8>,
+    service_id: Uuid,
+    transaction_id: Uuid,
+    kind: NativePreparedEffectKind,
+    request_digest_sha256: String,
 }
 
 impl NativePreparedEffectRequest {
+    pub fn checked(
+        service_id: Uuid,
+        transaction_id: Uuid,
+        kind: NativePreparedEffectKind,
+        request_digest_sha256: impl Into<String>,
+    ) -> Result<Self, NativeNodeContractError> {
+        let request = Self {
+            service_id,
+            transaction_id,
+            kind,
+            request_digest_sha256: request_digest_sha256.into(),
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub const fn service_id(&self) -> Uuid {
+        self.service_id
+    }
+
+    pub const fn transaction_id(&self) -> Uuid {
+        self.transaction_id
+    }
+
+    pub const fn kind(&self) -> NativePreparedEffectKind {
+        self.kind
+    }
+
+    pub fn request_digest_sha256(&self) -> &str {
+        &self.request_digest_sha256
+    }
+
     pub fn validate(&self) -> Result<(), NativeNodeContractError> {
-        if self.transaction_id.is_nil() || self.metadata.len() > MAX_EFFECT_METADATA_BYTES {
+        if self.service_id.is_nil()
+            || self.transaction_id.is_nil()
+            || !valid_sha256(&self.request_digest_sha256)
+        {
             return Err(NativeNodeContractError::InvalidEffectRequest);
         }
         Ok(())
@@ -1328,6 +1895,10 @@ pub enum NativeNodeContractError {
     BindingImplementationMismatch,
     #[error("native node context does not match its attempt-local handle store")]
     InvalidNodeContext,
+    #[error("native node service identity does not match its attempt and node")]
+    InvalidNodeServiceIdentity,
+    #[error("native node compute session does not match its backend and scratch reservation")]
+    InvalidComputeSession,
     #[error("native stored object metadata does not match its payload contract")]
     InvalidStoredObject,
     #[error("generated native node descriptors contain a duplicate")]
@@ -1372,6 +1943,38 @@ fn valid_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn output_request_digest(
+    namespace: NativeOutputNamespace,
+    filename_prefix: &str,
+    extension: &str,
+    batch_index: u32,
+    shape: NativeOutputShape,
+    content: &[u8],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sim.comfy.native-output-effect.v1");
+    hasher.update([match namespace {
+        NativeOutputNamespace::Output => 0,
+        NativeOutputNamespace::Temporary => 1,
+    }]);
+    hasher.update((filename_prefix.len() as u64).to_le_bytes());
+    hasher.update(filename_prefix.as_bytes());
+    hasher.update((extension.len() as u64).to_le_bytes());
+    hasher.update(extension.as_bytes());
+    hasher.update(batch_index.to_le_bytes());
+    match shape {
+        NativeOutputShape::File => hasher.update([0]),
+        NativeOutputShape::Image { width, height } => {
+            hasher.update([1]);
+            hasher.update(width.to_le_bytes());
+            hasher.update(height.to_le_bytes());
+        }
+    }
+    hasher.update((content.len() as u64).to_le_bytes());
+    hasher.update(content);
+    format!("{:x}", hasher.finalize())
 }
 
 #[cfg(test)]
@@ -1840,6 +2443,73 @@ mod tests {
         assert_eq!(interrupted.kind, NativeNodeFailureKind::Interrupted);
         assert_eq!(handle_store.object_count()?, 1);
         drop(backend);
+        Ok(())
+    }
+
+    #[test]
+    fn compute_session_requires_the_contexts_exact_backend_and_scratch_binding()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let (foreign_backend, foreign_authority) =
+            CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let foreign_backend = Arc::new(foreign_backend);
+        let scratch = authority.authorize_workspace(1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(0x501));
+        let attempt_id = AttemptId(Uuid::from_u128(0x502));
+        let node_id = NodeId::from("compute");
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x503),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity.clone(),
+            backend,
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        assert!(matches!(
+            NativeNodeComputeSession::checked(
+                identity,
+                foreign_backend,
+                StreamId::DEFAULT,
+                &scratch,
+            ),
+            Err(NativeNodeContractError::InvalidComputeSession)
+        ));
+        let store = Arc::new(TestHandleStore::new(
+            store_identity(0x504, 0x505)?,
+            attempt_id,
+        ));
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            store,
+            NativeNodeServices::checked(None, None, Some(compute.clone()))?,
+        )?;
+        assert_eq!(
+            compute.execution_context(&context)?.stream,
+            StreamId::DEFAULT
+        );
+        assert!(matches!(
+            NativeNodeContext::new_with_services(
+                prompt_id,
+                attempt_id,
+                NodeId::from("compute"),
+                CancellationToken::default(),
+                foreign_authority.authorize_workspace(1024)?,
+                Arc::new(TestHandleStore::new(
+                    store_identity(0x506, 0x507)?,
+                    attempt_id,
+                )),
+                NativeNodeServices::checked(None, None, Some(compute))?,
+            ),
+            Err(NativeNodeContractError::InvalidComputeSession)
+        ));
         Ok(())
     }
 

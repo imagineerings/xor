@@ -25,9 +25,9 @@ use crate::{
     DecodedScalar, DeviceId, EventFence, ExecutionContext, IndexSpec, Layout,
     LinearAlgebraOperation, NativeDeviceProperties, OperationSupport, PrimitiveOperation,
     ReductionOperation, ReductionSpec, ResizeCrop, ResizeMode, ResizeSpec, Scalar, ScalarSide,
-    Tensor, TensorBackend, TensorDescriptor, TensorError, TensorRole, TensorWrite, UnaryOperation,
-    ViewAccess, check_backend_context, normalize_narrow_range, required_storage_bytes,
-    reserve_backend_workspace, validate_inputs,
+    ScratchReservation, Tensor, TensorBackend, TensorDescriptor, TensorError, TensorRole,
+    TensorWrite, UnaryOperation, ViewAccess, check_backend_context, normalize_narrow_range,
+    required_storage_bytes, reserve_backend_workspace, validate_inputs,
 };
 use std::{
     mem::size_of,
@@ -259,6 +259,22 @@ pub struct CpuBackend {
 }
 
 impl CpuBackend {
+    pub fn validate_scratch_reservation(
+        &self,
+        scratch: &ScratchReservation,
+    ) -> Result<(), TensorError> {
+        let binding = scratch.binding_identity();
+        if binding.backend_id != self.backend_id || binding.authority_id == 0 {
+            return Err(TensorError::WorkspaceAuthorizationMismatch {
+                expected_backend: self.backend_id,
+                expected_authority: 0,
+                actual_backend: binding.backend_id,
+                actual_authority: binding.authority_id,
+            });
+        }
+        Ok(())
+    }
+
     pub fn capability_matrix() -> BackendCapabilityMatrix {
         BackendCapabilityMatrix::all_deterministic(DeviceId::CPU, Self::supported_capabilities())
     }

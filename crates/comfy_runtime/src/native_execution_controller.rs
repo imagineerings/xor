@@ -46,6 +46,11 @@ use comfy_nodes::{
     generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
     native_source_type_projection,
 };
+use comfy_nodes::{
+    NativeEffectServiceError, NativeNodeServiceIdentity, NativeOutputEffectRequest,
+    NativeOutputNamespace, NativeOutputShape, NativePreparedEffectKind,
+    NativePreparedEffectService,
+};
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
@@ -90,9 +95,13 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fmt,
     ops::Deref,
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -2927,6 +2936,7 @@ impl NativeImageExecutor {
             workspace,
             self.handle_store_generation.clone(),
         )?
+        .with_compute_backend(self.cpu_backend.clone())?
         .with_backend("cpu")?
         .with_dtype_policy("f32")?
         .with_configuration_token(configuration_token)?;
@@ -3222,21 +3232,33 @@ impl NativeNode for SaveImageNode {
                     kind: NodeFailureKind::Failure,
                     retryable: false,
                 })?;
-                let effect = NativeImageEffectRequest {
-                    namespace: self.namespace,
-                    filename_prefix: prefix.clone(),
+                let request = NativeOutputEffectRequest::checked(
+                    match self.namespace {
+                        AssetNamespace::Output => NativeOutputNamespace::Output,
+                        AssetNamespace::Temporary => NativeOutputNamespace::Temporary,
+                        _ => return Err(invalid_output_namespace()),
+                    },
+                    prefix.clone(),
+                    "png",
                     batch_index,
-                    width: u32::try_from(width).map_err(|_| dimension_failure())?,
-                    height: u32::try_from(height).map_err(|_| dimension_failure())?,
-                    encoded_png: encoded,
-                };
-                let metadata = serde_json::to_vec(&effect).map_err(encoding_failure)?;
-                let transaction_id =
-                    transaction_id(&context, self.namespace, batch_index, &metadata);
-                effects.push(PreparedEffectRequest {
-                    transaction_id,
-                    metadata,
-                });
+                    NativeOutputShape::Image {
+                        width: u32::try_from(width).map_err(|_| dimension_failure())?,
+                        height: u32::try_from(height).map_err(|_| dimension_failure())?,
+                    },
+                    Arc::from(encoded),
+                    context
+                        .prepared_effects()
+                        .map_err(effect_service_failure)?
+                        .maximum_output_bytes(),
+                )
+                .map_err(effect_service_failure)?;
+                let effect = context
+                    .prepared_effects()
+                    .map_err(effect_service_failure)?
+                    .prepare_output(request, &context.cancellation)
+                    .map_err(effect_service_failure)?;
+                let transaction_id = effect.transaction_id();
+                effects.push(effect);
                 ui_images.push(json!({
                     "transaction_id": transaction_id,
                     "batch_index": batch_index,
@@ -3262,16 +3284,6 @@ impl NativeNode for SaveImageNode {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct NativeImageEffectRequest {
-    namespace: AssetNamespace,
-    filename_prefix: String,
-    batch_index: u32,
-    width: u32,
-    height: u32,
-    encoded_png: Vec<u8>,
-}
-
 #[derive(Clone)]
 struct PreparedNativeImage {
     effect: PreparedEffect,
@@ -3284,9 +3296,9 @@ struct NativeImageEffectState {
     proposed: Vec<NativeImageOutputProposal>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct NativeImageProposalCoordinator {
-    state: Mutex<NativeImageEffectState>,
+    state: Arc<Mutex<NativeImageEffectState>>,
 }
 
 impl NativeImageProposalCoordinator {
@@ -3295,37 +3307,158 @@ impl NativeImageProposalCoordinator {
     }
 }
 
-impl EffectCoordinator for NativeImageProposalCoordinator {
-    fn prepare(&self, effect: PreparedEffect) -> Result<PreparedEffect, String> {
-        let request: NativeImageEffectRequest =
-            serde_json::from_slice(&effect.metadata).map_err(|error| error.to_string())?;
+struct NativeImagePreparedEffectService {
+    identity: NativeNodeServiceIdentity,
+    prompt_id: comfy_types::PromptId,
+    state: Arc<Mutex<NativeImageEffectState>>,
+    ordinal: AtomicU64,
+}
+
+impl fmt::Debug for NativeImagePreparedEffectService {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeImagePreparedEffectService")
+            .field("identity", &self.identity)
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativePreparedEffectService for NativeImagePreparedEffectService {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn maximum_output_bytes(&self) -> u64 {
+        2 * 1024 * 1024 * 1024
+    }
+
+    fn prepare_output(
+        &self,
+        request: NativeOutputEffectRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<PreparedEffectRequest, NativeEffectServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| NativeEffectServiceError::Cancelled)?;
+        let ordinal = self
+            .ordinal
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                value.checked_add(1)
+            })
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+        let transaction_id =
+            native_output_transaction_id(&self.identity, ordinal, request.request_digest_sha256());
+        let (width, height) = match request.shape() {
+            NativeOutputShape::File => (0, 0),
+            NativeOutputShape::Image { width, height } => (width, height),
+        };
+        let namespace = match request.namespace() {
+            NativeOutputNamespace::Output => AssetNamespace::Output,
+            NativeOutputNamespace::Temporary => AssetNamespace::Temporary,
+        };
         let output = OutputProposal::new(
-            effect.transaction_id,
-            request.namespace,
-            request.filename_prefix,
-            "png",
-            request.batch_index,
-            request.width,
-            request.height,
-            request.encoded_png,
+            transaction_id,
+            namespace,
+            request.filename_prefix(),
+            request.extension(),
+            request.batch_index(),
+            width,
+            height,
+            request.content().to_vec(),
         )
-        .map_err(|error| error.to_string())?;
-        let mut state = self.state.lock();
-        if state.prepared.contains_key(&effect.transaction_id) {
-            return Err(format!(
-                "duplicate native image transaction {}",
-                effect.transaction_id
-            ));
+        .map_err(|_| NativeEffectServiceError::InvalidRequest)?;
+        let ticket = PreparedEffectRequest::checked(
+            self.identity.service_id(),
+            transaction_id,
+            NativePreparedEffectKind::Output,
+            request.request_digest_sha256(),
+        )
+        .map_err(|_| NativeEffectServiceError::Rejected)?;
+        let effect = PreparedEffect {
+            prompt_id: self.prompt_id,
+            attempt_id: self.identity.attempt_id(),
+            node_id: self.identity.node_id().clone(),
+            service_id: self.identity.service_id(),
+            transaction_id,
+            kind: NativePreparedEffectKind::Output,
+            request_digest_sha256: request.request_digest_sha256().to_owned(),
+        };
+        let prepared = PreparedNativeImage {
+            effect: effect.clone(),
+            proposal: NativeImageOutputProposal::new(effect.node_id, output)
+                .map_err(|_| NativeEffectServiceError::Rejected)?,
+        };
+        {
+            let mut state = self.state.lock();
+            if state.prepared.insert(transaction_id, prepared).is_some() {
+                return Err(NativeEffectServiceError::InvalidTicket);
+            }
         }
-        state.prepared.insert(
-            effect.transaction_id,
-            PreparedNativeImage {
-                effect: effect.clone(),
-                proposal: NativeImageOutputProposal::new(effect.node_id.clone(), output)
-                    .map_err(|error| error.to_string())?,
-            },
-        );
-        Ok(effect)
+        if cancellation.check().is_err() {
+            self.state.lock().prepared.remove(&transaction_id);
+            return Err(NativeEffectServiceError::Cancelled);
+        }
+        Ok(ticket)
+    }
+
+    fn rollback_prepared(
+        &self,
+        request: &PreparedEffectRequest,
+    ) -> Result<(), NativeEffectServiceError> {
+        if request.service_id() != self.identity.service_id() {
+            return Err(NativeEffectServiceError::InvalidTicket);
+        }
+        let mut state = self.state.lock();
+        let Some(prepared) = state.prepared.get(&request.transaction_id()) else {
+            return Err(NativeEffectServiceError::InvalidTicket);
+        };
+        if prepared.effect.service_id != request.service_id()
+            || prepared.effect.kind != request.kind()
+            || prepared.effect.request_digest_sha256 != request.request_digest_sha256()
+        {
+            return Err(NativeEffectServiceError::InvalidTicket);
+        }
+        state.prepared.remove(&request.transaction_id());
+        Ok(())
+    }
+}
+
+impl EffectCoordinator for NativeImageProposalCoordinator {
+    fn node_service(
+        &self,
+        identity: NativeNodeServiceIdentity,
+        prompt_id: comfy_types::PromptId,
+    ) -> Result<Arc<dyn NativePreparedEffectService>, String> {
+        Ok(Arc::new(NativeImagePreparedEffectService {
+            identity,
+            prompt_id,
+            state: self.state.clone(),
+            ordinal: AtomicU64::new(0),
+        }))
+    }
+
+    fn prepared_effect(
+        &self,
+        ticket: &PreparedEffectRequest,
+        prompt_id: comfy_types::PromptId,
+        attempt_id: AttemptId,
+        node_id: &NodeId,
+    ) -> Result<PreparedEffect, String> {
+        let state = self.state.lock();
+        let prepared = state
+            .prepared
+            .get(&ticket.transaction_id())
+            .ok_or_else(|| "native output effect ticket was not prepared".to_owned())?;
+        if prepared.effect.prompt_id != prompt_id
+            || prepared.effect.attempt_id != attempt_id
+            || &prepared.effect.node_id != node_id
+            || prepared.effect.service_id != ticket.service_id()
+            || prepared.effect.kind != ticket.kind()
+            || prepared.effect.request_digest_sha256 != ticket.request_digest_sha256()
+        {
+            return Err("native output effect ticket belongs to another node session".to_owned());
+        }
+        Ok(prepared.effect.clone())
     }
 
     fn commit_batch(
@@ -3947,19 +4080,18 @@ fn png_metadata(
     Ok(metadata)
 }
 
-fn transaction_id(
-    context: &NodeContext,
-    namespace: AssetNamespace,
-    batch_index: u32,
-    metadata: &[u8],
+fn native_output_transaction_id(
+    identity: &NativeNodeServiceIdentity,
+    ordinal: u64,
+    request_digest_sha256: &str,
 ) -> Uuid {
     let mut hasher = Sha256::new();
-    hasher.update(context.prompt_id.0.as_bytes());
-    hasher.update(context.attempt_id.0.as_bytes());
-    hasher.update(context.node_id.0.as_bytes());
-    hasher.update([namespace as u8]);
-    hasher.update(batch_index.to_le_bytes());
-    hasher.update(metadata);
+    hasher.update(b"sim.comfy.native-output-transaction.v1");
+    hasher.update(identity.service_id().as_bytes());
+    hasher.update(identity.attempt_id().0.as_bytes());
+    hasher.update(identity.node_id().0.as_bytes());
+    hasher.update(ordinal.to_le_bytes());
+    hasher.update(request_digest_sha256.as_bytes());
     let digest = hasher.finalize();
     let mut bytes = [0_u8; 16];
     bytes.copy_from_slice(&digest[..16]);
@@ -4116,6 +4248,35 @@ fn dimension_failure() -> NodeFailure {
         code: "native_image_dimension_overflow".to_owned(),
         message: "image dimensions exceed the PNG contract".to_owned(),
         kind: NodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn invalid_output_namespace() -> NodeFailure {
+    NodeFailure {
+        code: "native_output_namespace_invalid".to_owned(),
+        message: "native output effects require output or temporary namespace".to_owned(),
+        kind: NodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn effect_service_failure(error: NativeEffectServiceError) -> NodeFailure {
+    NodeFailure {
+        code: match &error {
+            NativeEffectServiceError::Cancelled => "native_effect_cancelled",
+            NativeEffectServiceError::Unavailable => "native_effect_unavailable",
+            NativeEffectServiceError::InvalidRequest => "native_effect_invalid_request",
+            NativeEffectServiceError::InvalidTicket => "native_effect_invalid_ticket",
+            NativeEffectServiceError::Rejected => "native_effect_rejected",
+        }
+        .to_owned(),
+        message: error.to_string(),
+        kind: if matches!(error, NativeEffectServiceError::Cancelled) {
+            NodeFailureKind::Interrupted
+        } else {
+            NodeFailureKind::Failure
+        },
         retryable: false,
     }
 }

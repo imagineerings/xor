@@ -139,6 +139,7 @@ class ValidationGenerationTests(unittest.TestCase):
         schema_writes = set(tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]["writes"])
         value_reads = set(tasks_by_id["comfy-parity-native-node-compute-value-foundation"]["reads"])
         value_writes = set(tasks_by_id["comfy-parity-native-node-compute-value-foundation"]["writes"])
+        asset_reads = set(tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]["reads"])
         asset_writes = set(tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]["writes"])
         provider_reads = set(
             tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]["reads"]
@@ -188,6 +189,26 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_model/src/native_node_payload.rs", value_writes)
         self.assertIn("crates/comfy_model/src/clip_vision.rs", value_writes)
         self.assertIn("crates/comfy_model/src/vision_models.rs", value_writes)
+        for path in [
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/basic_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/geometry_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_io.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan3d.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_load_3d.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_gaussian_splat.py",
+        ]:
+            self.assertIn(path, asset_reads)
+        for path in [
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_nodes/src/source_type.rs",
+        ]:
+            self.assertIn(path, asset_writes)
         self.assertIn("crates/comfy_model/tests/model_families.rs", value_writes)
         self.assertIn("crates/comfy_model/src/controlnet.rs", value_writes)
         self.assertIn("crates/comfy_model/src/conditioning.rs", value_writes)
@@ -218,10 +239,13 @@ class ValidationGenerationTests(unittest.TestCase):
         ]:
             self.assertIn(validation, value_task["validations"])
         self.assertIn("crates/comfy_media/src/native_node_payload.rs", asset_writes)
+        self.assertIn("crates/comfy_media/Cargo.toml", asset_writes)
         self.assertIn("crates/comfy_media/src/gaussian_splat.rs", asset_writes)
         self.assertIn("crates/comfy_nodes/src/execution.rs", asset_writes)
         self.assertIn("crates/comfy_nodes/src/stored_payload.rs", asset_writes)
         self.assertIn("crates/comfy_runtime/src/output_committer.rs", asset_writes)
+        self.assertIn("crates/comfy_runtime/src/permissions.rs", asset_reads)
+        self.assertIn("crates/comfy_runtime/src/permissions.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/tests/component_contract.rs", asset_writes)
         self.assertNotIn("crates/comfy_runtime/src/providers.rs", provider_reads)

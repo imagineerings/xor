@@ -9,6 +9,8 @@ use thiserror::Error;
 const MAX_FRAMES: usize = 65_536;
 const MAX_ITEMS: usize = 65_536;
 const MAX_TEXT_BYTES: usize = 4_096;
+const MAX_MEDIA_BYTES: usize = 2 * 1024 * 1024 * 1024;
+const MAX_SPLAT_SH_COEFFICIENTS: u64 = 16;
 const FACE_LANDMARK_COUNT: usize = 478;
 const FACE_BLENDSHAPE_COUNT: usize = 52;
 
@@ -741,6 +743,1011 @@ impl NativeMediaResidentParts {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeArtifactKind {
+    AudioRecord,
+    Svg,
+    Webcam,
+}
+
+impl NativeArtifactKind {
+    pub const fn source_type_id(self) -> &'static str {
+        match self {
+            Self::AudioRecord => "AUDIO_RECORD",
+            Self::Svg => "SVG",
+            Self::Webcam => "WEBCAM",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeArtifactPayload {
+    kind: NativeArtifactKind,
+    media_type: Box<str>,
+    bytes: Box<[u8]>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeArtifactPayload {
+    pub fn checked(
+        kind: NativeArtifactKind,
+        media_type: String,
+        bytes: Vec<u8>,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        let media_type = checked_media_type(media_type)?.into_boxed_str();
+        check_byte_count("artifact bytes", bytes.len())?;
+        let bytes = bytes.into_boxed_slice();
+        let (semantic_digest_sha256, resident_bytes) = project_byte_asset::<Self>(
+            b"sim.comfy.media.artifact.v1",
+            &[kind_tag(kind)],
+            &media_type,
+            &bytes,
+        )?;
+        Ok(Self {
+            kind,
+            media_type,
+            bytes,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn kind(&self) -> NativeArtifactKind {
+        self.kind
+    }
+
+    pub const fn source_type_id(&self) -> &'static str {
+        self.kind.source_type_id()
+    }
+
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        checked_media_type(self.media_type.to_string())?;
+        check_byte_count("artifact bytes", self.bytes.len())?;
+        let (digest, resident_bytes) = project_byte_asset::<Self>(
+            b"sim.comfy.media.artifact.v1",
+            &[kind_tag(self.kind)],
+            &self.media_type,
+            &self.bytes,
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeFile3DFormat {
+    Fbx,
+    Gltf,
+    Glb,
+    Ksplat,
+    Obj,
+    Ply,
+    Splat,
+    Spz,
+    Stl,
+    Usdz,
+}
+
+impl NativeFile3DFormat {
+    pub const fn extension(self) -> &'static str {
+        match self {
+            Self::Fbx => "fbx",
+            Self::Gltf => "gltf",
+            Self::Glb => "glb",
+            Self::Ksplat => "ksplat",
+            Self::Obj => "obj",
+            Self::Ply => "ply",
+            Self::Splat => "splat",
+            Self::Spz => "spz",
+            Self::Stl => "stl",
+            Self::Usdz => "usdz",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeFile3DRole {
+    Any,
+    PointCloudAny,
+    SplatAny,
+    Fbx,
+    Gltf,
+    Glb,
+    Ksplat,
+    Obj,
+    Ply,
+    Splat,
+    Spz,
+    Stl,
+    Usdz,
+}
+
+impl NativeFile3DRole {
+    pub const fn source_type_id(self) -> &'static str {
+        match self {
+            Self::Any => "FILE_3D",
+            Self::PointCloudAny => "FILE_3D_POINT_CLOUD_ANY",
+            Self::SplatAny => "FILE_3D_SPLAT_ANY",
+            Self::Fbx => "FILE_3D_FBX",
+            Self::Gltf => "FILE_3D_GLTF",
+            Self::Glb => "FILE_3D_GLB",
+            Self::Ksplat => "FILE_3D_KSPLAT",
+            Self::Obj => "FILE_3D_OBJ",
+            Self::Ply => "FILE_3D_PLY",
+            Self::Splat => "FILE_3D_SPLAT",
+            Self::Spz => "FILE_3D_SPZ",
+            Self::Stl => "FILE_3D_STL",
+            Self::Usdz => "FILE_3D_USDZ",
+        }
+    }
+
+    const fn accepts(self, format: NativeFile3DFormat) -> bool {
+        match self {
+            Self::Any => true,
+            Self::PointCloudAny => matches!(format, NativeFile3DFormat::Ply),
+            Self::SplatAny => matches!(
+                format,
+                NativeFile3DFormat::Ksplat
+                    | NativeFile3DFormat::Ply
+                    | NativeFile3DFormat::Splat
+                    | NativeFile3DFormat::Spz
+            ),
+            Self::Fbx => matches!(format, NativeFile3DFormat::Fbx),
+            Self::Gltf => matches!(format, NativeFile3DFormat::Gltf),
+            Self::Glb => matches!(format, NativeFile3DFormat::Glb),
+            Self::Ksplat => matches!(format, NativeFile3DFormat::Ksplat),
+            Self::Obj => matches!(format, NativeFile3DFormat::Obj),
+            Self::Ply => matches!(format, NativeFile3DFormat::Ply),
+            Self::Splat => matches!(format, NativeFile3DFormat::Splat),
+            Self::Spz => matches!(format, NativeFile3DFormat::Spz),
+            Self::Stl => matches!(format, NativeFile3DFormat::Stl),
+            Self::Usdz => matches!(format, NativeFile3DFormat::Usdz),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeFile3DPayload {
+    role: NativeFile3DRole,
+    format: NativeFile3DFormat,
+    bytes: Box<[u8]>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeFile3DPayload {
+    pub fn checked(
+        role: NativeFile3DRole,
+        format: NativeFile3DFormat,
+        bytes: Vec<u8>,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        if !role.accepts(format) {
+            return Err(NativeMediaPayloadError::InvalidFile3DRole);
+        }
+        check_byte_count("3D file bytes", bytes.len())?;
+        if bytes.is_empty() {
+            return Err(NativeMediaPayloadError::EmptyMedia("3D file"));
+        }
+        validate_file_3d_contents(format, &bytes)?;
+        let bytes = bytes.into_boxed_slice();
+        let tags = [file_role_tag(role), file_format_tag(format)];
+        let (semantic_digest_sha256, resident_bytes) = project_byte_asset::<Self>(
+            b"sim.comfy.media.file-3d.v1",
+            &tags,
+            format.extension(),
+            &bytes,
+        )?;
+        Ok(Self {
+            role,
+            format,
+            bytes,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn role(&self) -> NativeFile3DRole {
+        self.role
+    }
+
+    pub const fn format(&self) -> NativeFile3DFormat {
+        self.format
+    }
+
+    pub const fn source_type_id(&self) -> &'static str {
+        self.role.source_type_id()
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        if !self.role.accepts(self.format) {
+            return Err(NativeMediaPayloadError::InvalidFile3DRole);
+        }
+        check_byte_count("3D file bytes", self.bytes.len())?;
+        if self.bytes.is_empty() {
+            return Err(NativeMediaPayloadError::EmptyMedia("3D file"));
+        }
+        validate_file_3d_contents(self.format, &self.bytes)?;
+        let tags = [file_role_tag(self.role), file_format_tag(self.format)];
+        let (digest, resident_bytes) = project_byte_asset::<Self>(
+            b"sim.comfy.media.file-3d.v1",
+            &tags,
+            self.format.extension(),
+            &self.bytes,
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeAudioPayload {
+    waveform: Tensor,
+    sample_rate: u32,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeAudioPayload {
+    pub const SOURCE_TYPE_ID: &'static str = "AUDIO";
+
+    pub fn checked(waveform: Tensor, sample_rate: u32) -> Result<Self, NativeMediaPayloadError> {
+        validate_audio(&waveform, sample_rate)?;
+        let (semantic_digest_sha256, resident_bytes) = project_audio(&waveform, sample_rate)?;
+        Ok(Self {
+            waveform,
+            sample_rate,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn waveform(&self) -> &Tensor {
+        &self.waveform
+    }
+
+    pub const fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        exact_tensor_parts::<Self, 1>([&self.waveform], self.resident_bytes)
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_audio(&self.waveform, self.sample_rate)?;
+        let (digest, resident_bytes) = project_audio(&self.waveform, self.sample_rate)?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeVideoPayload {
+    frames: Tensor,
+    frame_rate_numerator: u32,
+    frame_rate_denominator: u32,
+    audio: Option<NativeAudioPayload>,
+    alpha: Option<Tensor>,
+    metadata: BTreeMap<String, String>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeVideoPayload {
+    pub const SOURCE_TYPE_ID: &'static str = "VIDEO";
+
+    pub fn checked(
+        frames: Tensor,
+        frame_rate_numerator: u32,
+        frame_rate_denominator: u32,
+        audio: Option<NativeAudioPayload>,
+        alpha: Option<Tensor>,
+        metadata: BTreeMap<String, String>,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        validate_video(
+            &frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            audio.as_ref(),
+            alpha.as_ref(),
+            &metadata,
+        )?;
+        let (semantic_digest_sha256, resident_bytes) = project_video(
+            &frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            audio.as_ref(),
+            alpha.as_ref(),
+            &metadata,
+        )?;
+        Ok(Self {
+            frames,
+            frame_rate_numerator,
+            frame_rate_denominator,
+            audio,
+            alpha,
+            metadata,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn frames(&self) -> &Tensor {
+        &self.frames
+    }
+
+    pub const fn frame_rate(&self) -> (u32, u32) {
+        (self.frame_rate_numerator, self.frame_rate_denominator)
+    }
+
+    pub const fn audio(&self) -> Option<&NativeAudioPayload> {
+        self.audio.as_ref()
+    }
+
+    pub const fn alpha(&self) -> Option<&Tensor> {
+        self.alpha.as_ref()
+    }
+
+    pub const fn metadata(&self) -> &BTreeMap<String, String> {
+        &self.metadata
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let metadata_bytes = self
+            .metadata
+            .iter()
+            .try_fold(0_usize, |total, (key, value)| {
+                total
+                    .checked_add(key.capacity())
+                    .and_then(|total| total.checked_add(value.capacity()))
+                    .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)
+            })?;
+        let owned_bytes = mem::size_of::<Self>()
+            .checked_add(metadata_bytes)
+            .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
+        let mut tensors = vec![&self.frames];
+        if let Some(audio) = &self.audio {
+            tensors.push(audio.waveform());
+        }
+        if let Some(alpha) = &self.alpha {
+            tensors.push(alpha);
+        }
+        exact_tensor_parts_with_owned(owned_bytes, tensors, self.resident_bytes)
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_video(
+            &self.frames,
+            self.frame_rate_numerator,
+            self.frame_rate_denominator,
+            self.audio.as_ref(),
+            self.alpha.as_ref(),
+            &self.metadata,
+        )?;
+        let (digest, resident_bytes) = project_video(
+            &self.frames,
+            self.frame_rate_numerator,
+            self.frame_rate_denominator,
+            self.audio.as_ref(),
+            self.alpha.as_ref(),
+            &self.metadata,
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeCameraRole {
+    CameraControl,
+    Load3D,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum NativeCameraProjection {
+    Perspective {
+        fov_degrees: f32,
+        aspect_ratio: f32,
+        near: f32,
+        far: f32,
+    },
+    Orthographic {
+        left: f32,
+        right: f32,
+        bottom: f32,
+        top: f32,
+        near: f32,
+        far: f32,
+    },
+}
+
+impl NativeCameraRole {
+    pub const fn source_type_id(self) -> &'static str {
+        match self {
+            Self::CameraControl => "CAMERA_CONTROL",
+            Self::Load3D => "LOAD3D_CAMERA",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeCameraPayload {
+    role: NativeCameraRole,
+    position: [f32; 3],
+    target: [f32; 3],
+    zoom: f32,
+    orientation_wxyz: Option<[f32; 4]>,
+    projection: NativeCameraProjection,
+    width: u32,
+    height: u32,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeCameraPayload {
+    pub fn checked(
+        role: NativeCameraRole,
+        position: [f32; 3],
+        target: [f32; 3],
+        zoom: f32,
+        orientation_wxyz: Option<[f32; 4]>,
+        projection: NativeCameraProjection,
+        width: u32,
+        height: u32,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        validate_camera(
+            &position,
+            &target,
+            zoom,
+            orientation_wxyz.as_ref(),
+            projection,
+            width,
+            height,
+        )?;
+        let (semantic_digest_sha256, resident_bytes) = project_camera::<Self>(
+            role,
+            &position,
+            &target,
+            zoom,
+            orientation_wxyz.as_ref(),
+            projection,
+            width,
+            height,
+        )?;
+        Ok(Self {
+            role,
+            position,
+            target,
+            zoom,
+            orientation_wxyz,
+            projection,
+            width,
+            height,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn role(&self) -> NativeCameraRole {
+        self.role
+    }
+
+    pub const fn source_type_id(&self) -> &'static str {
+        self.role.source_type_id()
+    }
+
+    pub const fn position(&self) -> &[f32; 3] {
+        &self.position
+    }
+
+    pub const fn target(&self) -> &[f32; 3] {
+        &self.target
+    }
+
+    pub const fn zoom(&self) -> f32 {
+        self.zoom
+    }
+
+    pub const fn orientation_wxyz(&self) -> Option<&[f32; 4]> {
+        self.orientation_wxyz.as_ref()
+    }
+
+    pub const fn projection(&self) -> NativeCameraProjection {
+        self.projection
+    }
+
+    pub const fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_camera(
+            &self.position,
+            &self.target,
+            self.zoom,
+            self.orientation_wxyz.as_ref(),
+            self.projection,
+            self.width,
+            self.height,
+        )?;
+        let (digest, resident_bytes) = project_camera::<Self>(
+            self.role,
+            &self.position,
+            &self.target,
+            self.zoom,
+            self.orientation_wxyz.as_ref(),
+            self.projection,
+            self.width,
+            self.height,
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeSplatPayload {
+    positions: Tensor,
+    scales: Tensor,
+    rotations: Tensor,
+    opacity: Tensor,
+    spherical_harmonics: Tensor,
+    counts: Option<Box<[u64]>>,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeSplatPayload {
+    pub const SOURCE_TYPE_ID: &'static str = "SPLAT";
+
+    pub fn checked(
+        positions: Tensor,
+        scales: Tensor,
+        rotations: Tensor,
+        opacity: Tensor,
+        spherical_harmonics: Tensor,
+        counts: Option<Vec<u64>>,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        let counts = counts.map(Vec::into_boxed_slice);
+        validate_splat(
+            &positions,
+            &scales,
+            &rotations,
+            &opacity,
+            &spherical_harmonics,
+            counts.as_deref(),
+        )?;
+        let (semantic_digest_sha256, resident_bytes) = project_splat::<Self>(
+            &positions,
+            &scales,
+            &rotations,
+            &opacity,
+            &spherical_harmonics,
+            counts.as_deref(),
+        )?;
+        Ok(Self {
+            positions,
+            scales,
+            rotations,
+            opacity,
+            spherical_harmonics,
+            counts,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn positions(&self) -> &Tensor {
+        &self.positions
+    }
+
+    pub const fn scales(&self) -> &Tensor {
+        &self.scales
+    }
+
+    pub const fn rotations(&self) -> &Tensor {
+        &self.rotations
+    }
+
+    pub const fn opacity(&self) -> &Tensor {
+        &self.opacity
+    }
+
+    pub const fn spherical_harmonics(&self) -> &Tensor {
+        &self.spherical_harmonics
+    }
+
+    pub fn counts(&self) -> Option<&[u64]> {
+        self.counts.as_deref()
+    }
+
+    pub fn batch_count(&self) -> u64 {
+        self.positions.descriptor().shape()[0]
+    }
+
+    pub fn splat_count(&self) -> u64 {
+        self.counts.as_deref().map_or_else(
+            || self.positions.descriptor().shape()[1],
+            |counts| counts.iter().copied().sum(),
+        )
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let owned_bytes = mem::size_of::<Self>()
+            .checked_add(self.counts.as_deref().map_or(Ok(0), |counts| {
+                counts
+                    .len()
+                    .checked_mul(mem::size_of::<u64>())
+                    .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)
+            })?)
+            .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
+        exact_tensor_parts_with_owned(
+            owned_bytes,
+            [
+                &self.positions,
+                &self.scales,
+                &self.rotations,
+                &self.opacity,
+                &self.spherical_harmonics,
+            ],
+            self.resident_bytes,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_splat(
+            &self.positions,
+            &self.scales,
+            &self.rotations,
+            &self.opacity,
+            &self.spherical_harmonics,
+            self.counts.as_deref(),
+        )?;
+        let (digest, resident_bytes) = project_splat::<Self>(
+            &self.positions,
+            &self.scales,
+            &self.rotations,
+            &self.opacity,
+            &self.spherical_harmonics,
+            self.counts.as_deref(),
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeMeshBatch {
+    vertices: Tensor,
+    faces: Tensor,
+    normals: Option<Tensor>,
+    uvs: Option<Tensor>,
+    colors: Option<Tensor>,
+    texture: Option<Tensor>,
+}
+
+impl NativeMeshBatch {
+    pub fn checked(
+        vertices: Tensor,
+        faces: Tensor,
+        normals: Option<Tensor>,
+        uvs: Option<Tensor>,
+        colors: Option<Tensor>,
+        texture: Option<Tensor>,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        validate_mesh_batch(
+            &vertices,
+            &faces,
+            normals.as_ref(),
+            uvs.as_ref(),
+            colors.as_ref(),
+            texture.as_ref(),
+        )?;
+        Ok(Self {
+            vertices,
+            faces,
+            normals,
+            uvs,
+            colors,
+            texture,
+        })
+    }
+
+    pub const fn vertices(&self) -> &Tensor {
+        &self.vertices
+    }
+
+    pub const fn faces(&self) -> &Tensor {
+        &self.faces
+    }
+
+    pub const fn normals(&self) -> Option<&Tensor> {
+        self.normals.as_ref()
+    }
+
+    pub const fn colors(&self) -> Option<&Tensor> {
+        self.colors.as_ref()
+    }
+
+    pub const fn uvs(&self) -> Option<&Tensor> {
+        self.uvs.as_ref()
+    }
+
+    pub const fn texture(&self) -> Option<&Tensor> {
+        self.texture.as_ref()
+    }
+
+    fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_mesh_batch(
+            &self.vertices,
+            &self.faces,
+            self.normals.as_ref(),
+            self.uvs.as_ref(),
+            self.colors.as_ref(),
+            self.texture.as_ref(),
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeMeshPayload {
+    batches: Box<[NativeMeshBatch]>,
+    unlit: bool,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeMeshPayload {
+    pub const SOURCE_TYPE_ID: &'static str = "MESH";
+
+    pub fn checked(
+        batches: Vec<NativeMeshBatch>,
+        unlit: bool,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        if batches.is_empty() {
+            return Err(NativeMediaPayloadError::EmptyMedia("mesh batches"));
+        }
+        check_count("mesh batches", batches.len(), MAX_ITEMS)?;
+        for batch in &batches {
+            batch.validate()?;
+        }
+        let batches = batches.into_boxed_slice();
+        let (semantic_digest_sha256, resident_bytes) = project_mesh::<Self>(&batches, unlit)?;
+        Ok(Self {
+            batches,
+            unlit,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub fn batches(&self) -> &[NativeMeshBatch] {
+        &self.batches
+    }
+
+    pub const fn unlit(&self) -> bool {
+        self.unlit
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let owned_bytes = mem::size_of::<Self>()
+            .checked_add(
+                mem::size_of::<NativeMeshBatch>()
+                    .checked_mul(self.batches.len())
+                    .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?,
+            )
+            .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
+        let mut tensors = Vec::new();
+        for batch in &self.batches {
+            tensors.push(&batch.vertices);
+            tensors.push(&batch.faces);
+            if let Some(normals) = &batch.normals {
+                tensors.push(normals);
+            }
+            if let Some(uvs) = &batch.uvs {
+                tensors.push(uvs);
+            }
+            if let Some(colors) = &batch.colors {
+                tensors.push(colors);
+            }
+            if let Some(texture) = &batch.texture {
+                tensors.push(texture);
+            }
+        }
+        exact_tensor_parts_with_owned(owned_bytes, tensors, self.resident_bytes)
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        if self.batches.is_empty() {
+            return Err(NativeMediaPayloadError::EmptyMedia("mesh batches"));
+        }
+        check_count("mesh batches", self.batches.len(), MAX_ITEMS)?;
+        for batch in &self.batches {
+            batch.validate()?;
+        }
+        let (digest, resident_bytes) = project_mesh::<Self>(&self.batches, self.unlit)?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeVoxelPayload {
+    density: Tensor,
+    colors: Option<Tensor>,
+    world_from_grid: [f32; 16],
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+impl NativeVoxelPayload {
+    pub const SOURCE_TYPE_ID: &'static str = "VOXEL";
+
+    pub fn checked(
+        density: Tensor,
+        colors: Option<Tensor>,
+        world_from_grid: [f32; 16],
+    ) -> Result<Self, NativeMediaPayloadError> {
+        validate_voxel(&density, colors.as_ref(), &world_from_grid)?;
+        let (semantic_digest_sha256, resident_bytes) =
+            project_voxel::<Self>(&density, colors.as_ref(), &world_from_grid)?;
+        Ok(Self {
+            density,
+            colors,
+            world_from_grid,
+            semantic_digest_sha256,
+            resident_bytes,
+        })
+    }
+
+    pub const fn density(&self) -> &Tensor {
+        &self.density
+    }
+
+    pub const fn colors(&self) -> Option<&Tensor> {
+        self.colors.as_ref()
+    }
+
+    pub const fn world_from_grid(&self) -> &[f32; 16] {
+        &self.world_from_grid
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        let mut tensors = vec![&self.density];
+        if let Some(colors) = &self.colors {
+            tensors.push(colors);
+        }
+        exact_tensor_parts_with_owned(mem::size_of::<Self>(), tensors, self.resident_bytes)
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_voxel(&self.density, self.colors.as_ref(), &self.world_from_grid)?;
+        let (digest, resident_bytes) =
+            project_voxel::<Self>(&self.density, self.colors.as_ref(), &self.world_from_grid)?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
 impl NativeTracksPayload {
     pub const SOURCE_TYPE_ID: &'static str = "TRACKS";
 
@@ -950,6 +1957,28 @@ pub enum NativeMediaPayloadError {
     InvalidTracksShape,
     #[error("SAM3_TRACK_DATA fields do not match the source contract")]
     InvalidSam3TrackData,
+    #[error("{0} must not be empty")]
+    EmptyMedia(&'static str),
+    #[error("media byte length exceeds the portable 2 GiB boundary")]
+    MediaTooLarge,
+    #[error("media type must be a bounded lowercase type/subtype token")]
+    InvalidMediaType,
+    #[error("3D file role and concrete format are incompatible")]
+    InvalidFile3DRole,
+    #[error("3D file bytes do not match the declared concrete format")]
+    InvalidFile3DFormat,
+    #[error("AUDIO tensor and sample rate do not match the source contract")]
+    InvalidAudio,
+    #[error("VIDEO tensor and frame rate do not match the source contract")]
+    InvalidVideo,
+    #[error("camera fields or dimensions do not match the source contract")]
+    InvalidCamera,
+    #[error("SPLAT tensors do not match the canonical Gaussian layout")]
+    InvalidSplat,
+    #[error("MESH tensors do not match the canonical indexed-triangle layout")]
+    InvalidMesh,
+    #[error("VOXEL tensors do not match the canonical density/color layout")]
+    InvalidVoxel,
     #[error("payload resident-byte accounting overflowed")]
     ResidentBytesOverflow,
     #[error("resident tensor allocation changed")]
@@ -1230,6 +2259,798 @@ fn project_sam3_track_data(
         None => projection.hasher.update([0]),
     }
     Ok(projection.finish())
+}
+
+fn kind_tag(kind: NativeArtifactKind) -> u8 {
+    match kind {
+        NativeArtifactKind::AudioRecord => 0,
+        NativeArtifactKind::Svg => 1,
+        NativeArtifactKind::Webcam => 2,
+    }
+}
+
+fn validate_file_3d_contents(
+    format: NativeFile3DFormat,
+    bytes: &[u8],
+) -> Result<(), NativeMediaPayloadError> {
+    let valid = match format {
+        NativeFile3DFormat::Fbx => {
+            bytes.starts_with(b"Kaydara FBX Binary") || bytes.starts_with(b"; FBX")
+        }
+        NativeFile3DFormat::Gltf => std::str::from_utf8(bytes)
+            .ok()
+            .is_some_and(|text| text.trim_start().starts_with('{')),
+        NativeFile3DFormat::Glb => bytes.len() >= 12 && bytes.starts_with(b"glTF"),
+        NativeFile3DFormat::Ksplat => bytes.len() >= 4096 + 1024 && bytes[0] == 0 && bytes[1] >= 1,
+        NativeFile3DFormat::Obj => std::str::from_utf8(bytes).ok().is_some_and(|text| {
+            text.lines().any(|line| {
+                let line = line.trim_start();
+                line.starts_with("v ") || line.starts_with("f ")
+            })
+        }),
+        NativeFile3DFormat::Ply => bytes.starts_with(b"ply\n") || bytes.starts_with(b"ply\r\n"),
+        NativeFile3DFormat::Splat => bytes.len().is_multiple_of(32),
+        NativeFile3DFormat::Spz => bytes.starts_with(&[0x1f, 0x8b]),
+        NativeFile3DFormat::Stl => {
+            bytes.starts_with(b"solid")
+                || bytes.get(80..84).is_some_and(|count| {
+                    let count = u32::from_le_bytes([count[0], count[1], count[2], count[3]]);
+                    usize::try_from(count)
+                        .ok()
+                        .and_then(|count| count.checked_mul(50))
+                        .and_then(|body| body.checked_add(84))
+                        == Some(bytes.len())
+                })
+        }
+        NativeFile3DFormat::Usdz => bytes.starts_with(b"PK\x03\x04"),
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(NativeMediaPayloadError::InvalidFile3DFormat)
+    }
+}
+
+fn file_format_tag(format: NativeFile3DFormat) -> u8 {
+    match format {
+        NativeFile3DFormat::Fbx => 0,
+        NativeFile3DFormat::Gltf => 1,
+        NativeFile3DFormat::Glb => 2,
+        NativeFile3DFormat::Ksplat => 3,
+        NativeFile3DFormat::Obj => 4,
+        NativeFile3DFormat::Ply => 5,
+        NativeFile3DFormat::Splat => 6,
+        NativeFile3DFormat::Spz => 7,
+        NativeFile3DFormat::Stl => 8,
+        NativeFile3DFormat::Usdz => 9,
+    }
+}
+
+fn file_role_tag(role: NativeFile3DRole) -> u8 {
+    match role {
+        NativeFile3DRole::Any => 0,
+        NativeFile3DRole::PointCloudAny => 1,
+        NativeFile3DRole::SplatAny => 2,
+        NativeFile3DRole::Fbx => 3,
+        NativeFile3DRole::Gltf => 4,
+        NativeFile3DRole::Glb => 5,
+        NativeFile3DRole::Ksplat => 6,
+        NativeFile3DRole::Obj => 7,
+        NativeFile3DRole::Ply => 8,
+        NativeFile3DRole::Splat => 9,
+        NativeFile3DRole::Spz => 10,
+        NativeFile3DRole::Stl => 11,
+        NativeFile3DRole::Usdz => 12,
+    }
+}
+
+fn camera_role_tag(role: NativeCameraRole) -> u8 {
+    match role {
+        NativeCameraRole::CameraControl => 0,
+        NativeCameraRole::Load3D => 1,
+    }
+}
+
+fn check_byte_count(_field: &'static str, length: usize) -> Result<(), NativeMediaPayloadError> {
+    if length > MAX_MEDIA_BYTES {
+        return Err(NativeMediaPayloadError::MediaTooLarge);
+    }
+    Ok(())
+}
+
+fn checked_media_type(value: String) -> Result<String, NativeMediaPayloadError> {
+    if value.is_empty()
+        || value.len() > MAX_TEXT_BYTES
+        || !value.contains('/')
+        || value.bytes().any(|byte| {
+            !(byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b'/' | b'-' | b'+' | b'.'))
+        })
+    {
+        return Err(NativeMediaPayloadError::InvalidMediaType);
+    }
+    Ok(value)
+}
+
+fn project_byte_asset<Payload>(
+    domain: &[u8],
+    tags: &[u8],
+    media_type: &str,
+    bytes: &[u8],
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<Payload>(domain)?;
+    projection.hash_len(tags.len())?;
+    projection.hasher.update(tags);
+    projection.hash_text(media_type)?;
+    projection.hash_len(bytes.len())?;
+    projection.hasher.update(bytes);
+    projection.add_bytes(bytes.len())?;
+    Ok(projection.finish())
+}
+
+fn exact_tensor_parts<Payload, const COUNT: usize>(
+    tensors: [&Tensor; COUNT],
+    expected_resident_bytes: u64,
+) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+    exact_tensor_parts_with_owned(mem::size_of::<Payload>(), tensors, expected_resident_bytes)
+}
+
+fn exact_tensor_parts_with_owned<'a>(
+    owned_bytes: usize,
+    tensors: impl IntoIterator<Item = &'a Tensor>,
+    expected_resident_bytes: u64,
+) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+    let owned_bytes =
+        u64::try_from(owned_bytes).map_err(|_| NativeMediaPayloadError::ResidentBytesOverflow)?;
+    let parts = media_resident_parts(owned_bytes, tensors)?;
+    if parts.resident_bytes()? != expected_resident_bytes {
+        return Err(NativeMediaPayloadError::ProjectionChanged);
+    }
+    Ok(parts)
+}
+
+fn validate_audio(waveform: &Tensor, sample_rate: u32) -> Result<(), NativeMediaPayloadError> {
+    let descriptor = waveform.descriptor();
+    let shape = descriptor.shape();
+    if descriptor.dtype() != DType::F32
+        || shape.len() != 3
+        || shape.contains(&0)
+        || !(8_000..=384_000).contains(&sample_rate)
+    {
+        return Err(NativeMediaPayloadError::InvalidAudio);
+    }
+    validate_finite_f32(waveform, NativeMediaPayloadError::InvalidAudio)
+}
+
+fn project_audio(
+    waveform: &Tensor,
+    sample_rate: u32,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<NativeAudioPayload>(b"sim.comfy.media.audio.v1")?;
+    projection.hasher.update(sample_rate.to_le_bytes());
+    projection.hash_tensor(b"waveform", waveform)?;
+    projection.add_tensor_storages([waveform])?;
+    Ok(projection.finish())
+}
+
+fn validate_video(
+    frames: &Tensor,
+    frame_rate_numerator: u32,
+    frame_rate_denominator: u32,
+    audio: Option<&NativeAudioPayload>,
+    alpha: Option<&Tensor>,
+    metadata: &BTreeMap<String, String>,
+) -> Result<(), NativeMediaPayloadError> {
+    let descriptor = frames.descriptor();
+    let shape = descriptor.shape();
+    if !matches!(descriptor.dtype(), DType::F32 | DType::U8)
+        || shape.len() != 4
+        || shape.contains(&0)
+        || !matches!(shape[3], 1 | 3 | 4)
+        || frame_rate_numerator == 0
+        || frame_rate_denominator == 0
+        || frame_rate_numerator > 1_000_000
+        || frame_rate_denominator > 1_000_000
+        || alpha.is_some_and(|alpha| {
+            alpha.descriptor().dtype() != DType::F32
+                || alpha.descriptor().shape() != [shape[0], shape[1], shape[2], 1]
+        })
+        || metadata.len() > 128
+        || metadata.iter().any(|(key, value)| {
+            key.is_empty()
+                || key.len() > MAX_TEXT_BYTES
+                || value.len() > MAX_TEXT_BYTES
+                || key.chars().any(char::is_control)
+                || value.chars().any(char::is_control)
+        })
+    {
+        return Err(NativeMediaPayloadError::InvalidVideo);
+    }
+    if descriptor.dtype() == DType::F32 {
+        validate_finite_f32(frames, NativeMediaPayloadError::InvalidVideo)?;
+    }
+    if let Some(audio) = audio {
+        audio.validate()?;
+        if audio.waveform().descriptor().shape()[0] != 1 {
+            return Err(NativeMediaPayloadError::InvalidVideo);
+        }
+    }
+    if let Some(alpha) = alpha {
+        validate_finite_f32(alpha, NativeMediaPayloadError::InvalidVideo)?;
+        let values = tensor_f32_values(alpha).map_err(|_| NativeMediaPayloadError::InvalidVideo)?;
+        if values.iter().any(|value| !(0.0..=1.0).contains(value)) {
+            return Err(NativeMediaPayloadError::InvalidVideo);
+        }
+    }
+    Ok(())
+}
+
+fn project_video(
+    frames: &Tensor,
+    frame_rate_numerator: u32,
+    frame_rate_denominator: u32,
+    audio: Option<&NativeAudioPayload>,
+    alpha: Option<&Tensor>,
+    metadata: &BTreeMap<String, String>,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.v1")?;
+    projection.hasher.update(frame_rate_numerator.to_le_bytes());
+    projection
+        .hasher
+        .update(frame_rate_denominator.to_le_bytes());
+    projection.hash_tensor(b"frames", frames)?;
+    let mut storages = vec![frames];
+    match audio {
+        Some(audio) => {
+            projection.hasher.update([1]);
+            projection.hasher.update(audio.semantic_digest_sha256());
+            storages.push(audio.waveform());
+        }
+        None => projection.hasher.update([0]),
+    }
+    match alpha {
+        Some(alpha) => {
+            projection.hasher.update([1]);
+            projection.hash_tensor(b"alpha", alpha)?;
+            storages.push(alpha);
+        }
+        None => projection.hasher.update([0]),
+    }
+    projection.hash_len(metadata.len())?;
+    for (key, value) in metadata {
+        projection.hash_len(key.len())?;
+        projection.hasher.update(key.as_bytes());
+        projection.hash_len(value.len())?;
+        projection.hasher.update(value.as_bytes());
+        projection.add_bytes(key.capacity())?;
+        projection.add_bytes(value.capacity())?;
+    }
+    projection.add_tensor_storages(storages)?;
+    Ok(projection.finish())
+}
+
+fn validate_camera(
+    position: &[f32; 3],
+    target: &[f32; 3],
+    zoom: f32,
+    orientation_wxyz: Option<&[f32; 4]>,
+    projection: NativeCameraProjection,
+    width: u32,
+    height: u32,
+) -> Result<(), NativeMediaPayloadError> {
+    if width == 0
+        || height == 0
+        || !(0.01..=100.0).contains(&zoom)
+        || position
+            .iter()
+            .chain(target)
+            .any(|value| !value.is_finite())
+        || orientation_wxyz.is_some_and(|orientation| {
+            orientation.iter().any(|value| !value.is_finite())
+                || (orientation
+                    .iter()
+                    .fold(0.0_f32, |sum, value| value.mul_add(*value, sum))
+                    - 1.0)
+                    .abs()
+                    > 1.0e-3
+        })
+        || orientation_wxyz.is_none()
+            && position
+                .iter()
+                .zip(target)
+                .all(|(position, target)| position == target)
+        || match projection {
+            NativeCameraProjection::Perspective {
+                fov_degrees,
+                aspect_ratio,
+                near,
+                far,
+            } => {
+                !(1.0..=120.0).contains(&fov_degrees)
+                    || !aspect_ratio.is_finite()
+                    || aspect_ratio <= 0.0
+                    || !near.is_finite()
+                    || near <= 0.0
+                    || !far.is_finite()
+                    || far <= near
+            }
+            NativeCameraProjection::Orthographic {
+                left,
+                right,
+                bottom,
+                top,
+                near,
+                far,
+            } => {
+                [left, right, bottom, top, near, far]
+                    .iter()
+                    .any(|value| !value.is_finite())
+                    || left >= right
+                    || bottom >= top
+                    || near <= 0.0
+                    || far <= near
+            }
+        }
+    {
+        return Err(NativeMediaPayloadError::InvalidCamera);
+    }
+    Ok(())
+}
+
+fn project_camera<Payload>(
+    role: NativeCameraRole,
+    position: &[f32; 3],
+    target: &[f32; 3],
+    zoom: f32,
+    orientation_wxyz: Option<&[f32; 4]>,
+    camera_projection: NativeCameraProjection,
+    width: u32,
+    height: u32,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.camera.v1")?;
+    projection.hasher.update([camera_role_tag(role)]);
+    for value in position.iter().chain(target).chain(std::iter::once(&zoom)) {
+        projection.hasher.update(value.to_bits().to_le_bytes());
+    }
+    match orientation_wxyz {
+        Some(orientation) => {
+            projection.hasher.update([1]);
+            for value in orientation {
+                projection.hasher.update(value.to_bits().to_le_bytes());
+            }
+        }
+        None => projection.hasher.update([0]),
+    }
+    match camera_projection {
+        NativeCameraProjection::Perspective {
+            fov_degrees,
+            aspect_ratio,
+            near,
+            far,
+        } => {
+            projection.hasher.update([0]);
+            for value in [fov_degrees, aspect_ratio, near, far] {
+                projection.hasher.update(value.to_bits().to_le_bytes());
+            }
+        }
+        NativeCameraProjection::Orthographic {
+            left,
+            right,
+            bottom,
+            top,
+            near,
+            far,
+        } => {
+            projection.hasher.update([1]);
+            for value in [left, right, bottom, top, near, far] {
+                projection.hasher.update(value.to_bits().to_le_bytes());
+            }
+        }
+    }
+    projection.hasher.update(width.to_le_bytes());
+    projection.hasher.update(height.to_le_bytes());
+    Ok(projection.finish())
+}
+
+fn validate_splat(
+    positions: &Tensor,
+    scales: &Tensor,
+    rotations: &Tensor,
+    opacity: &Tensor,
+    spherical_harmonics: &Tensor,
+    counts: Option<&[u64]>,
+) -> Result<(), NativeMediaPayloadError> {
+    let positions_shape = positions.descriptor().shape();
+    let batch_and_count = positions_shape.get(..2);
+    if positions.descriptor().dtype() != DType::F32
+        || positions_shape.len() != 3
+        || positions_shape[2] != 3
+        || positions_shape[0] == 0
+        || positions_shape[1] == 0
+        || scales.descriptor().dtype() != DType::F32
+        || scales.descriptor().shape() != [positions_shape[0], positions_shape[1], 3]
+        || rotations.descriptor().dtype() != DType::F32
+        || rotations.descriptor().shape() != [positions_shape[0], positions_shape[1], 4]
+        || opacity.descriptor().dtype() != DType::F32
+        || opacity.descriptor().shape() != [positions_shape[0], positions_shape[1], 1]
+        || spherical_harmonics.descriptor().dtype() != DType::F32
+        || spherical_harmonics.descriptor().shape().len() != 4
+        || spherical_harmonics.descriptor().shape().get(..2) != batch_and_count
+        || spherical_harmonics.descriptor().shape()[2] == 0
+        || spherical_harmonics.descriptor().shape()[2] > MAX_SPLAT_SH_COEFFICIENTS
+        || !matches!(spherical_harmonics.descriptor().shape()[2], 1 | 4 | 9 | 16)
+        || spherical_harmonics.descriptor().shape()[3] != 3
+        || counts.is_some_and(|counts| {
+            counts.len() != usize::try_from(positions_shape[0]).unwrap_or(usize::MAX)
+                || counts.iter().any(|count| *count > positions_shape[1])
+        })
+    {
+        return Err(NativeMediaPayloadError::InvalidSplat);
+    }
+    for tensor in [positions, scales, rotations, opacity, spherical_harmonics] {
+        validate_finite_f32(tensor, NativeMediaPayloadError::InvalidSplat)?;
+    }
+    validate_splat_values(
+        positions,
+        scales,
+        rotations,
+        opacity,
+        spherical_harmonics,
+        counts,
+    )
+}
+
+fn validate_splat_values(
+    positions: &Tensor,
+    scales: &Tensor,
+    rotations: &Tensor,
+    opacity: &Tensor,
+    spherical_harmonics: &Tensor,
+    counts: Option<&[u64]>,
+) -> Result<(), NativeMediaPayloadError> {
+    let batch_count = usize::try_from(positions.descriptor().shape()[0])
+        .map_err(|_| NativeMediaPayloadError::InvalidSplat)?;
+    let padded_count = usize::try_from(positions.descriptor().shape()[1])
+        .map_err(|_| NativeMediaPayloadError::InvalidSplat)?;
+    let coefficient_count = usize::try_from(spherical_harmonics.descriptor().shape()[2])
+        .map_err(|_| NativeMediaPayloadError::InvalidSplat)?;
+    let positions = tensor_f32_values(positions)?;
+    let scales = tensor_f32_values(scales)?;
+    let rotations = tensor_f32_values(rotations)?;
+    let opacity = tensor_f32_values(opacity)?;
+    let spherical_harmonics = tensor_f32_values(spherical_harmonics)?;
+    for batch in 0..batch_count {
+        let active_count = counts
+            .and_then(|counts| counts.get(batch).copied())
+            .map_or(Ok(padded_count), |count| {
+                usize::try_from(count).map_err(|_| NativeMediaPayloadError::InvalidSplat)
+            })?;
+        for item in 0..padded_count {
+            let linear = batch
+                .checked_mul(padded_count)
+                .and_then(|value| value.checked_add(item))
+                .ok_or(NativeMediaPayloadError::InvalidSplat)?;
+            let position = tensor_item(&positions, linear, 3)?;
+            let scale = tensor_item(&scales, linear, 3)?;
+            let rotation = tensor_item(&rotations, linear, 4)?;
+            let alpha = *opacity
+                .get(linear)
+                .ok_or(NativeMediaPayloadError::InvalidSplat)?;
+            let harmonics = tensor_item(
+                &spherical_harmonics,
+                linear,
+                coefficient_count
+                    .checked_mul(3)
+                    .ok_or(NativeMediaPayloadError::InvalidSplat)?,
+            )?;
+            if item < active_count {
+                if scale.iter().any(|value| *value <= 0.0) || !(0.0..=1.0).contains(&alpha) {
+                    return Err(NativeMediaPayloadError::InvalidSplat);
+                }
+                let norm_squared = rotation
+                    .iter()
+                    .try_fold(0.0_f32, |sum, value| {
+                        let next = value.mul_add(*value, sum);
+                        next.is_finite().then_some(next)
+                    })
+                    .ok_or(NativeMediaPayloadError::InvalidSplat)?;
+                if (norm_squared - 1.0).abs() > 1.0e-3 {
+                    return Err(NativeMediaPayloadError::InvalidSplat);
+                }
+            } else if position
+                .iter()
+                .chain(scale)
+                .chain(rotation)
+                .chain(std::iter::once(&alpha))
+                .chain(harmonics)
+                .any(|value| *value != 0.0)
+            {
+                return Err(NativeMediaPayloadError::InvalidSplat);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn tensor_f32_values(tensor: &Tensor) -> Result<Vec<f32>, NativeMediaPayloadError> {
+    let bytes = tensor.contiguous_bytes()?;
+    if !bytes.len().is_multiple_of(4) {
+        return Err(NativeMediaPayloadError::InvalidSplat);
+    }
+    Ok(bytes
+        .chunks_exact(4)
+        .map(|chunk| f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect())
+}
+
+fn tensor_item(
+    values: &[f32],
+    index: usize,
+    width: usize,
+) -> Result<&[f32], NativeMediaPayloadError> {
+    let start = index
+        .checked_mul(width)
+        .ok_or(NativeMediaPayloadError::InvalidSplat)?;
+    let end = start
+        .checked_add(width)
+        .ok_or(NativeMediaPayloadError::InvalidSplat)?;
+    values
+        .get(start..end)
+        .ok_or(NativeMediaPayloadError::InvalidSplat)
+}
+
+fn project_splat<Payload>(
+    positions: &Tensor,
+    scales: &Tensor,
+    rotations: &Tensor,
+    opacity: &Tensor,
+    spherical_harmonics: &Tensor,
+    counts: Option<&[u64]>,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.splat.v1")?;
+    for (role, tensor) in [
+        (&b"positions"[..], positions),
+        (&b"scales"[..], scales),
+        (&b"rotations"[..], rotations),
+        (&b"opacity"[..], opacity),
+        (&b"spherical-harmonics"[..], spherical_harmonics),
+    ] {
+        projection.hash_tensor(role, tensor)?;
+    }
+    projection.add_tensor_storages([positions, scales, rotations, opacity, spherical_harmonics])?;
+    match counts {
+        Some(counts) => {
+            projection.hasher.update([1]);
+            projection.hash_len(counts.len())?;
+            projection.add_allocation::<u64>(counts.len())?;
+            for count in counts {
+                projection.hasher.update(count.to_le_bytes());
+            }
+        }
+        None => projection.hasher.update([0]),
+    }
+    Ok(projection.finish())
+}
+
+fn validate_mesh_batch(
+    vertices: &Tensor,
+    faces: &Tensor,
+    normals: Option<&Tensor>,
+    uvs: Option<&Tensor>,
+    colors: Option<&Tensor>,
+    texture: Option<&Tensor>,
+) -> Result<(), NativeMediaPayloadError> {
+    let vertices_shape = vertices.descriptor().shape();
+    let faces_shape = faces.descriptor().shape();
+    if vertices.descriptor().dtype() != DType::F32
+        || vertices_shape.len() != 2
+        || vertices_shape[0] == 0
+        || vertices_shape[1] != 3
+        || !matches!(faces.descriptor().dtype(), DType::I32 | DType::I64)
+        || faces_shape.len() != 2
+        || faces_shape[0] == 0
+        || faces_shape[1] != 3
+        || normals.is_some_and(|tensor| {
+            tensor.descriptor().dtype() != DType::F32
+                || tensor.descriptor().shape() != vertices_shape
+        })
+        || uvs.is_some_and(|tensor| {
+            tensor.descriptor().dtype() != DType::F32
+                || tensor.descriptor().shape() != [vertices_shape[0], 2]
+        })
+        || colors.is_some_and(|tensor| {
+            tensor.descriptor().dtype() != DType::F32
+                || tensor.descriptor().shape().len() != 2
+                || tensor.descriptor().shape()[0] != vertices_shape[0]
+                || !matches!(tensor.descriptor().shape()[1], 3 | 4)
+        })
+        || texture.is_some_and(|tensor| {
+            tensor.descriptor().dtype() != DType::F32
+                || tensor.descriptor().shape().len() != 3
+                || tensor.descriptor().shape()[0] == 0
+                || tensor.descriptor().shape()[1] == 0
+                || tensor.descriptor().shape()[2] != 3
+        })
+    {
+        return Err(NativeMediaPayloadError::InvalidMesh);
+    }
+    validate_finite_f32(vertices, NativeMediaPayloadError::InvalidMesh)?;
+    if let Some(normals) = normals {
+        validate_finite_f32(normals, NativeMediaPayloadError::InvalidMesh)?;
+    }
+    if let Some(uvs) = uvs {
+        validate_finite_f32(uvs, NativeMediaPayloadError::InvalidMesh)?;
+    }
+    if let Some(colors) = colors {
+        validate_finite_f32(colors, NativeMediaPayloadError::InvalidMesh)?;
+    }
+    if let Some(texture) = texture {
+        validate_finite_f32(texture, NativeMediaPayloadError::InvalidMesh)?;
+    }
+    validate_face_indices(faces, vertices_shape[0])
+}
+
+fn validate_face_indices(faces: &Tensor, vertex_count: u64) -> Result<(), NativeMediaPayloadError> {
+    let bytes = faces.contiguous_bytes()?;
+    match faces.descriptor().dtype() {
+        DType::I32 => {
+            for chunk in bytes.chunks_exact(4) {
+                let index = i32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                if index < 0
+                    || u64::try_from(index)
+                        .ok()
+                        .is_none_or(|index| index >= vertex_count)
+                {
+                    return Err(NativeMediaPayloadError::InvalidMesh);
+                }
+            }
+        }
+        DType::I64 => {
+            for chunk in bytes.chunks_exact(8) {
+                let index = i64::from_ne_bytes([
+                    chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
+                ]);
+                if index < 0
+                    || u64::try_from(index)
+                        .ok()
+                        .is_none_or(|index| index >= vertex_count)
+                {
+                    return Err(NativeMediaPayloadError::InvalidMesh);
+                }
+            }
+        }
+        _ => return Err(NativeMediaPayloadError::InvalidMesh),
+    }
+    Ok(())
+}
+
+fn project_mesh<Payload>(
+    batches: &[NativeMeshBatch],
+    unlit: bool,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.mesh.v1")?;
+    projection.hash_len(batches.len())?;
+    projection.hasher.update([u8::from(unlit)]);
+    projection.add_allocation::<NativeMeshBatch>(batches.len())?;
+    let mut storages = Vec::new();
+    for (index, batch) in batches.iter().enumerate() {
+        projection.hasher.update(
+            u64::try_from(index)
+                .map_err(|_| NativeMediaPayloadError::ResidentBytesOverflow)?
+                .to_le_bytes(),
+        );
+        projection.hash_tensor(b"vertices", &batch.vertices)?;
+        projection.hash_tensor(b"faces", &batch.faces)?;
+        storages.push(&batch.vertices);
+        storages.push(&batch.faces);
+        match &batch.normals {
+            Some(normals) => {
+                projection.hasher.update([1]);
+                projection.hash_tensor(b"normals", normals)?;
+                storages.push(normals);
+            }
+            None => projection.hasher.update([0]),
+        }
+        match &batch.colors {
+            Some(colors) => {
+                projection.hasher.update([1]);
+                projection.hash_tensor(b"colors", colors)?;
+                storages.push(colors);
+            }
+            None => projection.hasher.update([0]),
+        }
+        match &batch.uvs {
+            Some(uvs) => {
+                projection.hasher.update([1]);
+                projection.hash_tensor(b"uvs", uvs)?;
+                storages.push(uvs);
+            }
+            None => projection.hasher.update([0]),
+        }
+        match &batch.texture {
+            Some(texture) => {
+                projection.hasher.update([1]);
+                projection.hash_tensor(b"texture", texture)?;
+                storages.push(texture);
+            }
+            None => projection.hasher.update([0]),
+        }
+    }
+    projection.add_tensor_storages(storages)?;
+    Ok(projection.finish())
+}
+
+fn validate_voxel(
+    density: &Tensor,
+    colors: Option<&Tensor>,
+    world_from_grid: &[f32; 16],
+) -> Result<(), NativeMediaPayloadError> {
+    let density_shape = density.descriptor().shape();
+    if density.descriptor().dtype() != DType::F32
+        || density_shape.len() != 4
+        || density_shape.contains(&0)
+        || colors.is_some_and(|colors| {
+            colors.descriptor().dtype() != DType::F32
+                || colors.descriptor().shape()
+                    != [
+                        density_shape[0],
+                        density_shape[1],
+                        density_shape[2],
+                        density_shape[3],
+                        3,
+                    ]
+        })
+        || world_from_grid.iter().any(|value| !value.is_finite())
+    {
+        return Err(NativeMediaPayloadError::InvalidVoxel);
+    }
+    validate_finite_f32(density, NativeMediaPayloadError::InvalidVoxel)?;
+    if let Some(colors) = colors {
+        validate_finite_f32(colors, NativeMediaPayloadError::InvalidVoxel)?;
+    }
+    Ok(())
+}
+
+fn project_voxel<Payload>(
+    density: &Tensor,
+    colors: Option<&Tensor>,
+    world_from_grid: &[f32; 16],
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.voxel.v1")?;
+    for value in world_from_grid {
+        projection.hasher.update(value.to_bits().to_le_bytes());
+    }
+    projection.hash_tensor(b"density", density)?;
+    let mut storages = vec![density];
+    match colors {
+        Some(colors) => {
+            projection.hasher.update([1]);
+            projection.hash_tensor(b"colors", colors)?;
+            storages.push(colors);
+        }
+        None => projection.hasher.update([0]),
+    }
+    projection.add_tensor_storages(storages)?;
+    Ok(projection.finish())
+}
+
+fn validate_finite_f32(
+    tensor: &Tensor,
+    error: NativeMediaPayloadError,
+) -> Result<(), NativeMediaPayloadError> {
+    if tensor.descriptor().dtype() != DType::F32 {
+        return Err(error);
+    }
+    let bytes = tensor.contiguous_bytes()?;
+    if bytes.len() % 4 != 0
+        || bytes
+            .chunks_exact(4)
+            .any(|chunk| !f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).is_finite())
+    {
+        return Err(error);
+    }
+    Ok(())
 }
 
 struct Projection {
@@ -1915,5 +3736,208 @@ mod tests {
             digest(b"media-domain-a", b"tensor-role-a", &u32_tensor)?
         );
         Ok(())
+    }
+
+    #[test]
+    fn canonical_audio_video_and_artifact_payloads_are_bounded_and_placement_independent()
+    -> Result<(), Box<dyn Error>> {
+        let f32_bytes = |values: &[f32]| {
+            values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>()
+        };
+        let waveform_values = [0.0_f32, 0.25, -0.25, 1.0];
+        let default_waveform = tensor_on_stream(
+            vec![1, 1, 4],
+            DType::F32,
+            f32_bytes(&waveform_values),
+            StreamId::DEFAULT,
+        )?;
+        let other_waveform = tensor_on_stream(
+            vec![1, 1, 4],
+            DType::F32,
+            f32_bytes(&waveform_values),
+            StreamId::new(91),
+        )?;
+        let audio = NativeAudioPayload::checked(default_waveform, 48_000)?;
+        let other_audio = NativeAudioPayload::checked(other_waveform, 48_000)?;
+        audio.validate()?;
+        assert_eq!(
+            audio.semantic_digest_sha256(),
+            other_audio.semantic_digest_sha256()
+        );
+        assert_eq!(
+            audio.resident_parts()?.resident_bytes()?,
+            audio.resident_bytes()
+        );
+        assert!(
+            NativeAudioPayload::checked(
+                tensor(vec![1, 4], DType::F32, f32_bytes(&waveform_values))?,
+                48_000,
+            )
+            .is_err()
+        );
+
+        let video = NativeVideoPayload::checked(
+            tensor(vec![2, 2, 2, 3], DType::U8, vec![17; 24])?,
+            30_000,
+            1_001,
+            None,
+            None,
+            BTreeMap::from([("codec".to_owned(), "fixture".to_owned())]),
+        )?;
+        video.validate()?;
+        assert_eq!(video.frame_rate(), (30_000, 1_001));
+        assert_eq!(
+            video.resident_parts()?.resident_bytes()?,
+            video.resident_bytes()
+        );
+
+        let svg = NativeArtifactPayload::checked(
+            NativeArtifactKind::Svg,
+            "image/svg+xml".to_owned(),
+            b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>".to_vec(),
+        )?;
+        svg.validate()?;
+        assert_eq!(svg.source_type_id(), "SVG");
+        assert!(
+            NativeArtifactPayload::checked(
+                NativeArtifactKind::Svg,
+                "Image/SVG".to_owned(),
+                vec![1],
+            )
+            .is_err()
+        );
+
+        let ply = NativeFile3DPayload::checked(
+            NativeFile3DRole::Ply,
+            NativeFile3DFormat::Ply,
+            b"ply\nformat ascii 1.0\nend_header\n".to_vec(),
+        )?;
+        ply.validate()?;
+        assert_eq!(ply.source_type_id(), "FILE_3D_PLY");
+        assert!(
+            NativeFile3DPayload::checked(NativeFile3DRole::Spz, NativeFile3DFormat::Ply, vec![1],)
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_splat_mesh_voxel_and_camera_payloads_bind_topology_and_residency()
+    -> Result<(), Box<dyn Error>> {
+        let f32_bytes = |values: &[f32]| {
+            values
+                .iter()
+                .flat_map(|value| value.to_ne_bytes())
+                .collect::<Vec<_>>()
+        };
+        let positions = tensor(
+            vec![1, 2, 3],
+            DType::F32,
+            f32_bytes(&[0.0, 0.0, 0.0, 1.0, 2.0, 3.0]),
+        )?;
+        let scales = tensor(vec![1, 2, 3], DType::F32, f32_bytes(&[0.1; 6]))?;
+        let rotations = tensor(
+            vec![1, 2, 4],
+            DType::F32,
+            f32_bytes(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]),
+        )?;
+        let opacity = tensor(vec![1, 2, 1], DType::F32, f32_bytes(&[0.0; 2]))?;
+        let spherical_harmonics = tensor(vec![1, 2, 1, 3], DType::F32, f32_bytes(&[0.5; 6]))?;
+        let splat = NativeSplatPayload::checked(
+            positions,
+            scales,
+            rotations,
+            opacity,
+            spherical_harmonics,
+            None,
+        )?;
+        splat.validate()?;
+        assert_eq!((splat.batch_count(), splat.splat_count()), (1, 2));
+        assert_eq!(
+            splat.resident_parts()?.resident_bytes()?,
+            splat.resident_bytes()
+        );
+
+        let vertices = tensor(
+            vec![3, 3],
+            DType::F32,
+            f32_bytes(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
+        )?;
+        let faces = tensor(
+            vec![1, 3],
+            DType::I32,
+            [0_i32, 1, 2]
+                .into_iter()
+                .flat_map(i32::to_ne_bytes)
+                .collect(),
+        )?;
+        let mesh = NativeMeshPayload::checked(
+            vec![NativeMeshBatch::checked(
+                vertices, faces, None, None, None, None,
+            )?],
+            true,
+        )?;
+        mesh.validate()?;
+        assert!(mesh.unlit());
+        assert_eq!(mesh.batches().len(), 1);
+        assert_eq!(
+            mesh.resident_parts()?.resident_bytes()?,
+            mesh.resident_bytes()
+        );
+
+        let density = tensor(vec![1, 2, 2, 2], DType::F32, f32_bytes(&[0.0; 8]))?;
+        let colors = tensor(vec![1, 2, 2, 2, 3], DType::F32, f32_bytes(&[0.25; 24]))?;
+        let voxel = NativeVoxelPayload::checked(density, Some(colors), identity_matrix())?;
+        voxel.validate()?;
+        assert_eq!(
+            voxel.resident_parts()?.resident_bytes()?,
+            voxel.resident_bytes()
+        );
+
+        let camera = NativeCameraPayload::checked(
+            NativeCameraRole::Load3D,
+            [0.0, 0.0, 2.0],
+            [0.0, 0.0, 0.0],
+            1.0,
+            None,
+            NativeCameraProjection::Perspective {
+                fov_degrees: 45.0,
+                aspect_ratio: 4.0 / 3.0,
+                near: 0.01,
+                far: 100.0,
+            },
+            1_024,
+            768,
+        )?;
+        camera.validate()?;
+        assert_eq!(camera.source_type_id(), "LOAD3D_CAMERA");
+        assert!(
+            NativeCameraPayload::checked(
+                NativeCameraRole::Load3D,
+                [0.0, 0.0, 2.0],
+                [0.0, 0.0, 0.0],
+                1.0,
+                None,
+                NativeCameraProjection::Perspective {
+                    fov_degrees: 45.0,
+                    aspect_ratio: 4.0 / 3.0,
+                    near: 0.01,
+                    far: 100.0,
+                },
+                0,
+                768,
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    fn identity_matrix() -> [f32; 16] {
+        [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ]
     }
 }

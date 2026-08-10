@@ -17,14 +17,18 @@ pub use descriptor::{
 };
 pub use execution::{
     LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
-    NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION, NativeCacheDependencies, NativeCachePolicy,
-    NativeDynamicInputDescriptor, NativeEffectClass, NativeHandleKind, NativeHandleStore,
-    NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType, NativeInputDescriptor,
-    NativeNode, NativeNodeBinding, NativeNodeBindingDisposition, NativeNodeBindingsFactory,
-    NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure,
-    NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
-    NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeResolvedPayload, NativeResolvedPayloadRetention, NativeTypeUnion,
+    NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION, NativeAssetReadRequest, NativeAssetReference,
+    NativeAssetResolver, NativeAssetServiceError, NativeCacheDependencies, NativeCachePolicy,
+    NativeDynamicInputDescriptor, NativeEffectClass, NativeEffectServiceError, NativeHandleKind,
+    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
+    NativeInputDescriptor, NativeNode, NativeNodeBinding, NativeNodeBindingDisposition,
+    NativeNodeBindingsFactory, NativeNodeComputeSession, NativeNodeContext,
+    NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
+    NativeNodeOutcome, NativeNodePresentation, NativeNodeServiceIdentity, NativeNodeServices,
+    NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputEffectRequest, NativeOutputNamespace,
+    NativeOutputShape, NativePortCardinality, NativePreparedEffectKind,
+    NativePreparedEffectRequest, NativePreparedEffectService, NativePrimitive, NativePrimitiveType,
+    NativeResolvedAsset, NativeResolvedPayload, NativeResolvedPayloadRetention, NativeTypeUnion,
     NativeValue, NativeValueType, native_value_matches_input_schema,
     validate_generated_family_bindings,
 };
@@ -41,7 +45,7 @@ pub use slice_registry::{
 };
 pub use source_type::{
     NativeSourceTypeError, NativeSourceTypeOwner, NativeSourceTypeProjection,
-    NativeSourceValueClass, native_custom_source_type_projection,
+    NativeSourceValueClass, native_custom_source_type_projection, native_handle_type_accepts,
     native_plugin_source_type_projection, native_source_type_projection,
     native_value_type_for_output_schema, native_value_types_for_input_schema,
 };

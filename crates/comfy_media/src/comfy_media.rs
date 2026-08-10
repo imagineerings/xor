@@ -1,10 +1,12 @@
 use image::{DynamicImage, ImageFormat};
 use std::io::Cursor;
 
+pub mod gaussian_splat;
 pub mod metadata;
 pub mod native_node_payload;
 pub mod png;
 
+pub use gaussian_splat::*;
 pub use metadata::*;
 pub use native_node_payload::*;
 pub use png::*;

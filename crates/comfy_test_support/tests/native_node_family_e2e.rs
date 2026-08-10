@@ -1,4 +1,5 @@
 use comfy_media::{PngLimits, encode_png_frame};
+use comfy_nodes::NativePreparedEffectKind;
 use comfy_runtime::{
     AttemptState, NATIVE_IMAGE_REGISTRY_VERSION, NativeHandleKind, NativeHandleStoreError,
     NativeHandleStoreGeneration, NativeHandleType, NativeImageWorkerEvent, NativeImageWorkerPlan,
@@ -219,10 +220,12 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
         Err(NativeHandleStoreError::Cancelled)
     ));
 
-    let effect = NativePreparedEffectRequest {
-        transaction_id: Uuid::from_u128(0x3675),
-        metadata: b"prepared-only".to_vec(),
-    };
+    let effect = NativePreparedEffectRequest::checked(
+        Uuid::from_u128(0x3674),
+        Uuid::from_u128(0x3675),
+        NativePreparedEffectKind::Output,
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    )?;
     effect.validate()?;
     NativeNodeOutcome::Values {
         outputs: vec![list],

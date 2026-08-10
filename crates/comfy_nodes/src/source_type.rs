@@ -25,6 +25,36 @@ pub enum NativeSourceValueClass {
     Handle(NativeHandleKind),
 }
 
+pub fn native_handle_type_accepts(expected: &NativeHandleType, actual: &NativeHandleType) -> bool {
+    if expected == actual {
+        return true;
+    }
+    if expected.kind != NativeHandleKind::ThreeD || actual.kind != NativeHandleKind::ThreeD {
+        return false;
+    }
+    match expected.type_id.as_str() {
+        "FILE_3D" => matches!(
+            actual.type_id.as_str(),
+            "FILE_3D_FBX"
+                | "FILE_3D_GLTF"
+                | "FILE_3D_GLB"
+                | "FILE_3D_KSPLAT"
+                | "FILE_3D_OBJ"
+                | "FILE_3D_PLY"
+                | "FILE_3D_SPLAT"
+                | "FILE_3D_SPZ"
+                | "FILE_3D_STL"
+                | "FILE_3D_USDZ"
+        ),
+        "FILE_3D_POINT_CLOUD_ANY" => actual.type_id == "FILE_3D_PLY",
+        "FILE_3D_SPLAT_ANY" => matches!(
+            actual.type_id.as_str(),
+            "FILE_3D_PLY" | "FILE_3D_SPZ" | "FILE_3D_SPLAT" | "FILE_3D_KSPLAT"
+        ),
+        _ => false,
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NativeSourceTypeProjection {
     source_type: &'static str,
@@ -906,6 +936,32 @@ mod tests {
                 "CUSTOM_ELEVENLABS_VOICE",
             )?)]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn file_3d_union_sockets_admit_only_their_concrete_source_formats() -> Result<(), Box<dyn Error>>
+    {
+        fn handle(source_type: &str) -> Result<NativeHandleType, Box<dyn Error>> {
+            Ok(native_source_type_projection(source_type)?
+                .handle_type()?
+                .ok_or_else(|| format!("{source_type} is not handle-backed"))?)
+        }
+        let any = handle("FILE_3D")?;
+        let point_cloud = handle("FILE_3D_POINT_CLOUD_ANY")?;
+        let splat = handle("FILE_3D_SPLAT_ANY")?;
+        let ply = handle("FILE_3D_PLY")?;
+        let spz = handle("FILE_3D_SPZ")?;
+        let glb = handle("FILE_3D_GLB")?;
+
+        assert!(native_handle_type_accepts(&any, &ply));
+        assert!(native_handle_type_accepts(&any, &glb));
+        assert!(native_handle_type_accepts(&point_cloud, &ply));
+        assert!(!native_handle_type_accepts(&point_cloud, &spz));
+        assert!(native_handle_type_accepts(&splat, &ply));
+        assert!(native_handle_type_accepts(&splat, &spz));
+        assert!(!native_handle_type_accepts(&splat, &glb));
+        assert!(!native_handle_type_accepts(&ply, &splat));
         Ok(())
     }
 }

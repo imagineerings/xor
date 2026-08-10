@@ -12,6 +12,7 @@ path = "src/comfy_media.rs"
 comfy_tensor.workspace = true
 comfy_types.workspace = true
 flate2.workspace = true
+half.workspace = true
 image.workspace = true
 serde.workspace = true
 serde_json.workspace = true

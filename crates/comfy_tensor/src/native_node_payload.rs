@@ -1,6 +1,6 @@
 #[cfg(feature = "cpu")]
 use crate::ImageTensor;
-use crate::{DType, DeviceId, Tensor, TensorDescriptor, TensorError};
+use crate::{DType, DeviceId, Tensor, TensorDescriptor, TensorError, ViewAccess};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -42,13 +42,17 @@ impl NativeTensorRole {
     }
 
     const fn accepts_image_tensor(self) -> bool {
-        matches!(self, Self::Image | Self::Mask)
+        matches!(self, Self::Image)
     }
 
     const fn accepts_raw_tensor(self) -> bool {
         matches!(
             self,
-            Self::Conditioning | Self::Latent | Self::Sigmas | Self::WanCameraEmbedding
+            Self::Mask
+                | Self::Conditioning
+                | Self::Latent
+                | Self::Sigmas
+                | Self::WanCameraEmbedding
         )
     }
 }
@@ -186,6 +190,22 @@ impl NativeTensorPayload {
         role: NativeTensorRole,
         image: ImageTensor,
     ) -> Result<Self, NativeTensorPayloadError> {
+        if role == NativeTensorRole::Mask {
+            let (batch, height, width, channels) = image.dimensions()?;
+            if channels != 1 {
+                return Err(NativeTensorPayloadError::RoleDescriptorMismatch { role });
+            }
+            let descriptor = image
+                .tensor()
+                .descriptor()
+                .reshaped_view(vec![batch, height, width])?;
+            let tensor = image.tensor().view(descriptor, ViewAccess::ReadOnly)?;
+            let projection = project_tensor(role, &tensor)?;
+            return Ok(Self {
+                projection,
+                storage: NativeTensorStorage::Tensor(tensor),
+            });
+        }
         if !role.accepts_image_tensor() {
             return Err(NativeTensorPayloadError::RoleStorageMismatch {
                 role,
@@ -323,7 +343,7 @@ fn validate_role_descriptor(
                     .get(3)
                     .is_some_and(|channels| matches!(*channels, 1 | 3 | 4))
         }
-        NativeTensorRole::Mask => shape.len() == 4 && shape.get(3) == Some(&1),
+        NativeTensorRole::Mask => shape.len() == 3,
         NativeTensorRole::Conditioning => shape.len() == 3,
         NativeTensorRole::Latent => shape.len() == 4,
         NativeTensorRole::Sigmas => shape.len() == 1,
@@ -486,7 +506,8 @@ mod tests {
     }
 
     #[test]
-    fn image_and_mask_payloads_keep_compute_capable_image_storage() -> Result<(), Box<dyn Error>> {
+    fn image_and_mask_payloads_preserve_source_exact_bhwc_and_bhw_shapes()
+    -> Result<(), Box<dyn Error>> {
         with_context(|backend, context| {
             let image = ImageTensor::from_f32(
                 backend,
@@ -510,6 +531,8 @@ mod tests {
             let mask = ImageTensor::from_f32(backend, context, 1, 1, 2, 1, &[0.0, 1.0])?;
             let payload = NativeTensorPayload::from_image(NativeTensorRole::Mask, mask)?;
             assert_eq!(payload.handle_type_id(), "MASK");
+            assert_eq!(payload.tensor().descriptor().shape(), &[1, 1, 2]);
+            assert!(payload.image().is_none());
             payload.validate()?;
             Ok(())
         })

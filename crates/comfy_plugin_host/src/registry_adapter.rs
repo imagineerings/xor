@@ -6,9 +6,9 @@ use comfy_nodes::{
     NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleStoreIdentity,
     NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeContext, NativeNodeFailure,
     NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle,
-    NativeOutputDescriptor, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
-    native_plugin_source_type_projection,
+    NativeOutputDescriptor, NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape,
+    NativePortCardinality, NativePrimitive, NativeStoredPayload, NativeTypeUnion, NativeValue,
+    NativeValueType, native_plugin_source_type_projection,
 };
 use comfy_plugin_sdk::{
     CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
@@ -18,9 +18,9 @@ use comfy_plugin_sdk::{
 use comfy_runtime::{NativeNodeRegistry, NativeNodeRegistryError};
 use futures::future::BoxFuture;
 use serde_json::{Map, Number, Value};
-use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
+#[cfg(test)]
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
@@ -171,15 +171,51 @@ impl NativeNode for PluginNativeNode {
                     })
                 },
             );
-            let effects = if result.effects.outputs.is_empty() && result.effects.routes.is_empty() {
-                Vec::new()
-            } else {
-                let metadata = serde_json::to_vec(&result.effects).map_err(plugin_failure)?;
-                vec![NativePreparedEffectRequest {
-                    transaction_id: effect_transaction_id(&context, &metadata),
-                    metadata,
-                }]
-            };
+            if !result.effects.routes.is_empty() {
+                return Err(unmaterialized_plugin_effect("route"));
+            }
+            let effect_service = context.prepared_effects().map_err(plugin_failure)?;
+            let requests = result
+                .effects
+                .outputs
+                .iter()
+                .enumerate()
+                .map(|(index, proposal)| {
+                    let namespace = match proposal.namespace.as_str() {
+                        "output" | "outputs" => NativeOutputNamespace::Output,
+                        "temp" | "temporary" => NativeOutputNamespace::Temporary,
+                        _ => return Err(unmaterialized_plugin_effect("output namespace")),
+                    };
+                    let (filename_prefix, extension) = proposal
+                        .name
+                        .rsplit_once('.')
+                        .ok_or_else(|| unmaterialized_plugin_effect("output filename"))?;
+                    NativeOutputEffectRequest::checked(
+                        namespace,
+                        filename_prefix,
+                        extension,
+                        u32::try_from(index).map_err(plugin_failure)?,
+                        NativeOutputShape::File,
+                        Arc::from(proposal.bytes.clone()),
+                        effect_service.maximum_output_bytes(),
+                    )
+                    .map_err(plugin_failure)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut effects = Vec::with_capacity(requests.len());
+            for request in requests {
+                match effect_service.prepare_output(request, &context.cancellation) {
+                    Ok(effect) => effects.push(effect),
+                    Err(error) => {
+                        for effect in effects.iter().rev() {
+                            effect_service
+                                .rollback_prepared(effect)
+                                .map_err(plugin_failure)?;
+                        }
+                        return Err(plugin_failure(error));
+                    }
+                }
+            }
             Ok(NativeNodeOutcome::Values {
                 outputs,
                 ui,
@@ -538,7 +574,15 @@ fn plugin_value_from_stored(
         | NativeStoredPayload::AudioEncoderOutput(_)
         | NativeStoredPayload::ClipVisionOutput(_)
         | NativeStoredPayload::IcLoraParameters(_)
-        | NativeStoredPayload::LossMap(_) => Err(unmaterialized_plugin_input(&port.id)),
+        | NativeStoredPayload::LossMap(_)
+        | NativeStoredPayload::Audio(_)
+        | NativeStoredPayload::Video(_)
+        | NativeStoredPayload::Artifact(_)
+        | NativeStoredPayload::File3D(_)
+        | NativeStoredPayload::Camera(_)
+        | NativeStoredPayload::Splat(_)
+        | NativeStoredPayload::Mesh(_)
+        | NativeStoredPayload::Voxel(_) => Err(unmaterialized_plugin_input(&port.id)),
     }
 }
 
@@ -796,23 +840,19 @@ fn scalar_to_json(value: ScalarValue) -> Result<Value, NativeNodeFailure> {
     }
 }
 
-fn effect_transaction_id(context: &NativeNodeContext, metadata: &[u8]) -> Uuid {
-    let mut hasher = Sha256::new();
-    hasher.update(b"sim-comfy-plugin-effect-v1");
-    hasher.update(context.prompt_id.0.as_bytes());
-    hasher.update(context.attempt_id.0.as_bytes());
-    hasher.update(context.node_id.0.as_bytes());
-    hasher.update(metadata);
-    let digest = hasher.finalize();
-    let mut bytes = [0_u8; 16];
-    bytes.copy_from_slice(&digest[..16]);
-    Uuid::from_bytes(bytes)
-}
-
 fn invalid_value(port: &str) -> NativeNodeFailure {
     NativeNodeFailure {
         code: "invalid_plugin_value".to_owned(),
         message: format!("plugin port `{port}` has an invalid native value"),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn unmaterialized_plugin_effect(kind: &str) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "unmaterialized_plugin_effect".to_owned(),
+        message: format!("plugin {kind} effects are not materializable at the native boundary"),
         kind: NativeNodeFailureKind::Failure,
         retryable: false,
     }
