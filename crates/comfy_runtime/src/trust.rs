@@ -2484,6 +2484,22 @@ impl fmt::Debug for ProviderCostAcceptanceIssuer {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedProviderCostAcceptance {
+    nonce: ProviderCostNonce,
+    expires_at: Instant,
+}
+
+impl VerifiedProviderCostAcceptance {
+    pub fn nonce(self) -> ProviderCostNonce {
+        self.nonce
+    }
+
+    pub fn expires_at(self) -> Instant {
+        self.expires_at
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ProviderCostAcceptanceVerifier {
     public_key: [u8; ED25519_PUBLIC_KEY_BYTES],
@@ -2496,7 +2512,7 @@ impl ProviderCostAcceptanceVerifier {
         acceptance: &ProviderCostAcceptance,
         expected_scope: &ProviderCostAcceptanceScope,
         now: Instant,
-    ) -> Result<(), TrustError> {
+    ) -> Result<VerifiedProviderCostAcceptance, TrustError> {
         UnparsedPublicKey::new(&ED25519, self.public_key)
             .verify(
                 &provider_cost_acceptance_signing_payload(&acceptance.claims),
@@ -2512,7 +2528,16 @@ impl ProviderCostAcceptanceVerifier {
         {
             return Err(TrustError::ExpiredProviderCostAcceptance);
         }
-        Ok(())
+        let expires_at = self
+            .clock_origin
+            .checked_add(Duration::from_millis(
+                acceptance.claims.expires_at_milliseconds,
+            ))
+            .ok_or(TrustError::InvalidProviderCostAcceptance)?;
+        Ok(VerifiedProviderCostAcceptance {
+            nonce: acceptance.claims.nonce,
+            expires_at,
+        })
     }
 }
 

@@ -293,16 +293,22 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn(".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", provider_reads)
         self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json", provider_writes)
+        self.assertIn("crates/comfy_plugin_host/src/comfy_plugin_host.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/capabilities.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/private_worker.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_sdk/wit/comfy-plugin.wit", provider_writes)
         self.assertIn("crates/comfy_runtime/src/plugin_services.rs", provider_writes)
+        self.assertIn("crates/comfy_runtime/src/provider_materialization.rs", provider_writes)
         self.assertIn("crates/comfy_runtime/src/runtime_supervisor.rs", provider_writes)
         self.assertIn("crates/comfy_runtime/src/prompt_compiler.rs", provider_writes)
+        self.assertIn("crates/comfy_runtime/src/persistence.rs", provider_writes)
         self.assertIn("crates/comfy_worker/src/plugin_runtime.rs", provider_writes)
         self.assertIn("crates/comfy_api/src/security.rs", provider_writes)
+        self.assertIn("crates/comfy_api/src/headless.rs", provider_writes)
+        self.assertIn("crates/comfy_ui/src/execution_model.rs", provider_writes)
         self.assertIn("crates/sim/src/comfy_plugin_services.rs", provider_writes)
+        self.assertIn("crates/sim/src/sim.rs", provider_writes)
         provider_task = tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]
         self.assertEqual(
             provider_task["criterion_ids"],
