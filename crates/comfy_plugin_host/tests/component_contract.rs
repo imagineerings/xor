@@ -1879,6 +1879,7 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
     assert_eq!(generation.profile_id(), "test-profile");
     assert_eq!(generation.generation(), 1);
     assert_eq!(generation.components().len(), 1);
+    assert_eq!(generation.provider_registry_pin()?, None);
     let deployment = &generation.components()[0];
     assert_eq!(deployment.extension_id(), "test-extension");
     assert_eq!(deployment.extension_version(), "1.2.3");

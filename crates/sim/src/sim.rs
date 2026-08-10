@@ -515,21 +515,24 @@ fn register_native_comfy_execution(
         }
     };
     let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
+    let mut provider_registry = None;
     if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>()
         && component_host.profile_id == profile_id.0.to_string()
     {
         let generation = component_host.router.current()?.verified_generation()?;
+        provider_registry = generation.provider_registry_pin()?;
         worker = worker.with_registry_deployment(generation.worker_deployment_plan()?);
     }
     let presentation = comfy_ui::execution_ui_model(cx)
         .ok_or_else(|| anyhow::anyhow!("native execution UI model is not initialized"))?
         .read(cx)
         .shared_service();
-    comfy_ui::register_native_execution_services(
-        NativeExecutionControllerConfig::new(assets, presentation, worker, true)?
-            .with_memory_policy(profile.memory_policy),
-        cx,
-    )?;
+    let mut config = NativeExecutionControllerConfig::new(assets, presentation, worker, true)?
+        .with_memory_policy(profile.memory_policy);
+    if let Some(provider_registry) = provider_registry {
+        config = config.with_provider_registry(provider_registry)?;
+    }
+    comfy_ui::register_native_execution_services(config, cx)?;
     Ok(())
 }
 

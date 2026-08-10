@@ -4,8 +4,8 @@ use crate::{
 };
 use comfy_plugin_sdk::PluginManifest;
 use comfy_runtime::{
-    NativeNodeRegistry, NodeContext, PermissionPolicy, PluginAuthorization,
-    PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginTrustPolicy,
+    NativeNodeRegistry, NativeProviderRegistryPin, NodeContext, PermissionPolicy,
+    PluginAuthorization, PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginTrustPolicy,
     WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
@@ -298,6 +298,39 @@ impl VerifiedComponentGeneration {
 
     pub fn components(&self) -> &[VerifiedComponentDeployment] {
         &self.components
+    }
+
+    pub fn provider_registry_pin(
+        &self,
+    ) -> Result<Option<NativeProviderRegistryPin>, ComponentHostError> {
+        let mut binding_digests = Vec::new();
+        for component in self.components.iter() {
+            let manifest: PluginManifest = serde_json::from_slice(component.manifest_bytes())
+                .map_err(|error| ComponentHostError::InvalidManifest {
+                    extension_id: component.extension_id.clone(),
+                    message: error.to_string(),
+                })?;
+            if let Some(provider_binding) = manifest.provider_binding {
+                binding_digests.push(provider_binding.bindings_sha256);
+            }
+        }
+        if binding_digests.is_empty() {
+            return Ok(None);
+        }
+        binding_digests.sort();
+        binding_digests.dedup();
+        let deployment = self.worker_deployment_plan()?;
+        NativeProviderRegistryPin::checked(
+            deployment.begin().generation().get(),
+            deployment
+                .begin()
+                .registry_digest_sha256()
+                .as_str()
+                .to_owned(),
+            binding_digests,
+        )
+        .map(Some)
+        .map_err(worker_deployment_error)
     }
 
     pub fn prepare_worker_invocation(

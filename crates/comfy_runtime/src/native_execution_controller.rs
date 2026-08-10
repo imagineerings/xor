@@ -4411,6 +4411,7 @@ pub struct NativeExecutionControllerConfig {
     pub worker: WorkerLaunchConfig,
     pub memory_policy: MemoryPolicy,
     pub metadata_enabled: bool,
+    pub provider_registry: Option<NativeProviderRegistryPin>,
 }
 
 impl NativeExecutionControllerConfig {
@@ -4440,12 +4441,23 @@ impl NativeExecutionControllerConfig {
             worker,
             memory_policy: MemoryPolicy::default(),
             metadata_enabled,
+            provider_registry: None,
         })
     }
 
     pub fn with_memory_policy(mut self, memory_policy: MemoryPolicy) -> Self {
         self.memory_policy = memory_policy;
         self
+    }
+
+    pub fn with_provider_registry(
+        mut self,
+        provider_registry: NativeProviderRegistryPin,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        provider_registry.validate()?;
+        self.provider_registry = Some(provider_registry);
+        self.validate()?;
+        Ok(self)
     }
 
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
@@ -4467,6 +4479,22 @@ impl NativeExecutionControllerConfig {
                 "worker registry version is `{}`, expected `{NATIVE_IMAGE_REGISTRY_VERSION}`",
                 self.worker.registry_version
             )));
+        }
+        if let Some(provider_registry) = &self.provider_registry {
+            provider_registry.validate()?;
+            let deployment = self.worker.registry_deployment.as_ref().ok_or_else(|| {
+                NativeImageRuntimeError::Registry(
+                    "provider registry pin requires a worker registry deployment".to_owned(),
+                )
+            })?;
+            if deployment.begin().generation().get() != provider_registry.generation()
+                || deployment.begin().registry_digest_sha256().as_str()
+                    != provider_registry.registry_digest_sha256()
+            {
+                return Err(NativeImageRuntimeError::Registry(
+                    "provider registry pin differs from the worker registry deployment".to_owned(),
+                ));
+            }
         }
         Ok(())
     }
@@ -5013,7 +5041,7 @@ impl NativeControllerState {
             &self.input_authorization,
             &lease.cancellation,
         )?;
-        let worker_plan = NativeImageWorkerPlan::new_with_memory_policy(
+        let mut worker_plan = NativeImageWorkerPlan::new_with_memory_policy(
             lease.plan.clone(),
             input_assets,
             self.config.memory_policy,
@@ -5025,6 +5053,9 @@ impl NativeControllerState {
                 .and_then(Value::as_u64)
                 .unwrap_or(0),
         )?;
+        if let Some(provider_registry) = self.config.provider_registry.clone() {
+            worker_plan = worker_plan.with_provider_registry(provider_registry)?;
+        }
         let encoded = serde_json::to_vec(&worker_plan)
             .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
         let supervisor = self.supervisor.as_mut().ok_or_else(|| {
@@ -5758,6 +5789,87 @@ mod tests {
             serde_json::from_value::<NativeProviderRegistryPin>(unknown_field).is_err(),
             "provider registry pins reject unknown fields"
         );
+    }
+
+    fn empty_worker_registry_deployment(
+        generation: u64,
+        registry_digest_sha256: &str,
+    ) -> Result<crate::WorkerRegistryDeploymentPlan, Box<dyn std::error::Error>> {
+        let begin = comfy_types::WorkerRegistryDeploymentBegin::new(
+            comfy_types::WorkerRegistryGeneration::new(generation)?,
+            comfy_types::WorkerSha256Digest::new(registry_digest_sha256.to_owned())?,
+            Vec::new(),
+        )?;
+        let authorization_verifier = crate::PluginAuthorizationSealer::from_seed(
+            [0x71; 32],
+            crate::PermissionPolicyGeneration::new(1)?,
+        )?
+        .verifier()?;
+        Ok(crate::WorkerRegistryDeploymentPlan::new(
+            begin,
+            Vec::new(),
+            authorization_verifier,
+        )?)
+    }
+
+    #[test]
+    fn native_controller_requires_the_exact_provider_registry_deployment()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temporary, roots) = fixture_roots()?;
+        let profile_id = ProfileId(Uuid::parse_str(&roots.profile_id)?);
+        let mut presentation_service = ExecutionPresentationService::new(8)?;
+        presentation_service.initialize_profile(
+            profile_id,
+            ExecutionDataSource::Live,
+            ExecutionSnapshotStatus::Ready,
+        )?;
+        let presentation = crate::ExecutionPresentationOwner::ephemeral(presentation_service);
+        let pin = NativeProviderRegistryPin::checked(7, "a".repeat(64), vec!["b".repeat(64)])?;
+        let worker = || {
+            WorkerLaunchConfig::new(
+                PathBuf::from("unused-native-image-worker"),
+                profile_id,
+                WorkerId(Uuid::from_u128(0x1977)),
+                NATIVE_IMAGE_REGISTRY_VERSION,
+                1024,
+            )
+        };
+
+        let config = NativeExecutionControllerConfig::new(
+            fixture_asset_service(&roots)?,
+            presentation.clone(),
+            worker(),
+            true,
+        )?;
+        assert!(matches!(
+            config.with_provider_registry(pin.clone()),
+            Err(NativeImageRuntimeError::Registry(message))
+                if message.contains("requires a worker registry deployment")
+        ));
+
+        let mismatched_deployment = empty_worker_registry_deployment(8, &"a".repeat(64))?;
+        let config = NativeExecutionControllerConfig::new(
+            fixture_asset_service(&roots)?,
+            presentation.clone(),
+            worker().with_registry_deployment(mismatched_deployment),
+            true,
+        )?;
+        assert!(matches!(
+            config.with_provider_registry(pin.clone()),
+            Err(NativeImageRuntimeError::Registry(message))
+                if message.contains("differs from the worker registry deployment")
+        ));
+
+        let matching_deployment = empty_worker_registry_deployment(7, &"a".repeat(64))?;
+        let config = NativeExecutionControllerConfig::new(
+            fixture_asset_service(&roots)?,
+            presentation,
+            worker().with_registry_deployment(matching_deployment),
+            true,
+        )?
+        .with_provider_registry(pin.clone())?;
+        assert_eq!(config.provider_registry, Some(pin));
+        Ok(())
     }
 
     struct FailOnceExecutionPersistence {
