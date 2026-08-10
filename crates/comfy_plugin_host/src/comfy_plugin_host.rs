@@ -28,10 +28,11 @@ pub use private_worker::PrivateWorkerPluginExecutor;
 pub use registry_adapter::{PluginRegistryAdapterError, registry_with_installed_plugins};
 
 use comfy_plugin_sdk::{
-    COMPONENT_API_VERSION, CancelReason, CapabilityCall, CapabilityResponse,
-    ComponentManifestProjection, InputState, InvocationError, NegotiatedApi, PluginContractError,
-    PluginInvocation, PluginManifest, PluginNode, PluginValue, PluginValueRepresentation,
-    PortCardinality, PortDirection, PortPresence, PortSerialization, RustComfyPlugin, TypeRegistry,
+    COMPONENT_API_VERSION, CancelReason, CanonicalTypeId, CapabilityCall, CapabilityResponse,
+    ComponentManifestProjection, InputState, InvocationError, NegotiatedApi,
+    PROVIDER_COMPONENT_WORLD, PluginContractError, PluginInvocation, PluginManifest, PluginNode,
+    PluginValue, PluginValueRepresentation, PortCardinality, PortDirection, PortPresence,
+    PortSerialization, ProviderBindingClaim, ProviderBindingSet, RustComfyPlugin, TypeRegistry,
     ValueFamily, ValueHandle,
 };
 use comfy_runtime::{AssetIdentity, AssetNamespace, PluginAuthorization, TrustError};
@@ -41,6 +42,7 @@ use std::{
     cell::Cell,
     collections::{BTreeMap, BTreeSet},
     mem,
+    str::FromStr,
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -56,6 +58,17 @@ mod wit_contract {
     wasmtime::component::bindgen!({
         path: "../comfy_plugin_sdk/wit",
         world: "comfy-plugin",
+    });
+}
+
+mod provider_wit_contract {
+    wasmtime::component::bindgen!({
+        path: "../comfy_plugin_sdk/wit",
+        world: "comfy-provider-plugin",
+        with: {
+            "sim:comfy-plugin/types@1.0.0": super::wit_contract::sim::comfy_plugin::types,
+            "sim:comfy-plugin/host@1.0.0": super::wit_contract::sim::comfy_plugin::host,
+        },
     });
 }
 
@@ -167,6 +180,18 @@ pub enum PluginError {
     ManifestProjectionMismatch,
     #[error("compiled plugin and invocation authorization disagree")]
     InvocationBindingMismatch,
+    #[error("plugin component world disagrees with its signed manifest")]
+    ComponentWorldMismatch,
+    #[error("provider component binding set disagrees with its signed manifest")]
+    ProviderBindingMismatch,
+    #[error("provider invocation is unavailable for this component")]
+    ProviderInvocationUnavailable,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ComponentWorld {
+    Legacy,
+    Provider,
 }
 
 pub struct CompiledPlugin {
@@ -174,6 +199,8 @@ pub struct CompiledPlugin {
     identifier: String,
     digest_sha256: String,
     manifest_projection: ComponentManifestProjection,
+    provider_binding: Option<ProviderBindingSet>,
+    world: ComponentWorld,
 }
 
 impl CompiledPlugin {
@@ -197,19 +224,43 @@ pub struct WasmStoreState {
 
 pub struct WasmPluginInstance {
     store: Store<WasmStoreState>,
-    bindings: wit_contract::ComfyPlugin,
+    bindings: WasmBindings,
     expected_manifest_projection: ComponentManifestProjection,
+    provider_binding: Option<ProviderBindingSet>,
     terminal: bool,
+}
+
+enum WasmBindings {
+    Legacy(wit_contract::ComfyPlugin),
+    Provider(provider_wit_contract::ComfyProviderPlugin),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProviderInvocationResult {
+    pub outputs: BTreeMap<String, Vec<PluginValue>>,
+    pub output_presence: BTreeMap<String, bool>,
+    pub effects: CapabilityEffects,
+    receipt: Vec<u8>,
+}
+
+impl ProviderInvocationResult {
+    pub fn receipt(&self) -> &[u8] {
+        &self.receipt
+    }
 }
 
 impl WasmPluginInstance {
     pub fn manifest_bytes(&mut self) -> Result<ComponentManifestProjection, PluginError> {
         self.check_active()?;
-        match self
-            .bindings
-            .sim_comfy_plugin_plugin()
-            .call_manifest(&mut self.store)
-        {
+        let result = match &self.bindings {
+            WasmBindings::Legacy(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_manifest(&mut self.store),
+            WasmBindings::Provider(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_manifest(&mut self.store),
+        };
+        match result {
             Ok(projection) => {
                 let projection = match sdk_manifest_projection(projection) {
                     Ok(projection) => projection,
@@ -242,11 +293,15 @@ impl WasmPluginInstance {
             self.abort();
             return Err(PluginError::UndeclaredNode(node_id.to_owned()));
         }
-        match self
-            .bindings
-            .sim_comfy_plugin_plugin()
-            .call_create_node(&mut self.store, node_id)
-        {
+        let result = match &self.bindings {
+            WasmBindings::Legacy(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_create_node(&mut self.store, node_id),
+            WasmBindings::Provider(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_create_node(&mut self.store, node_id),
+        };
+        match result {
             Ok(Ok(instance)) => Ok(instance),
             Ok(Err(error)) => {
                 self.abort();
@@ -256,13 +311,44 @@ impl WasmPluginInstance {
         }
     }
 
+    pub fn provider_binding_set(&mut self) -> Result<ProviderBindingSet, PluginError> {
+        self.check_active()?;
+        let expected = self
+            .provider_binding
+            .clone()
+            .ok_or(PluginError::ProviderInvocationUnavailable)?;
+        let WasmBindings::Provider(bindings) = &self.bindings else {
+            return Err(PluginError::ProviderInvocationUnavailable);
+        };
+        let binding_set = bindings
+            .sim_comfy_plugin_provider_binding()
+            .call_binding_set(&mut self.store)
+            .map_err(|error| self.wasm_call_error(error))?;
+        let actual = match sdk_provider_binding_set(binding_set) {
+            Ok(actual) => actual,
+            Err(error) => {
+                self.abort();
+                return Err(error);
+            }
+        };
+        if actual != expected {
+            self.abort();
+            return Err(PluginError::ProviderBindingMismatch);
+        }
+        Ok(actual)
+    }
+
     pub fn invoke(&mut self, instance: u64) -> Result<(), PluginError> {
         self.check_active()?;
-        match self
-            .bindings
-            .sim_comfy_plugin_plugin()
-            .call_invoke(&mut self.store, instance)
-        {
+        let result = match &self.bindings {
+            WasmBindings::Legacy(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_invoke(&mut self.store, instance),
+            WasmBindings::Provider(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_invoke(&mut self.store, instance),
+        };
+        match result {
             Ok(Ok(())) => Ok(()),
             Ok(Err(error)) => {
                 self.abort();
@@ -274,11 +360,19 @@ impl WasmPluginInstance {
 
     pub fn cancel(&mut self, instance: u64, reason: CancelReason) -> Result<(), PluginError> {
         self.check_active()?;
-        let result = self.bindings.sim_comfy_plugin_plugin().call_cancel(
-            &mut self.store,
-            instance,
-            wit_cancel_reason(reason),
-        );
+        let reason = wit_cancel_reason(reason);
+        let result = match &self.bindings {
+            WasmBindings::Legacy(bindings) => {
+                bindings
+                    .sim_comfy_plugin_plugin()
+                    .call_cancel(&mut self.store, instance, reason)
+            }
+            WasmBindings::Provider(bindings) => {
+                bindings
+                    .sim_comfy_plugin_plugin()
+                    .call_cancel(&mut self.store, instance, reason)
+            }
+        };
         match result {
             Ok(Ok(())) => {
                 self.abort();
@@ -294,11 +388,15 @@ impl WasmPluginInstance {
 
     pub fn drop_node(&mut self, instance: u64) -> Result<(), PluginError> {
         self.check_active()?;
-        match self
-            .bindings
-            .sim_comfy_plugin_plugin()
-            .call_drop_node(&mut self.store, instance)
-        {
+        let result = match &self.bindings {
+            WasmBindings::Legacy(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_drop_node(&mut self.store, instance),
+            WasmBindings::Provider(bindings) => bindings
+                .sim_comfy_plugin_plugin()
+                .call_drop_node(&mut self.store, instance),
+        };
+        match result {
             Ok(()) => Ok(()),
             Err(error) => {
                 self.abort();
@@ -317,6 +415,67 @@ impl WasmPluginInstance {
             .take()
             .ok_or_else(|| PluginError::Invocation(InvocationError::RevokedHandle))?;
         let result = invocation.finish().map_err(PluginError::from);
+        self.terminal = true;
+        result
+    }
+
+    pub fn invoke_provider(
+        mut self,
+        class_type: &str,
+        request: &[u8],
+    ) -> Result<ProviderInvocationResult, PluginError> {
+        self.check_active()?;
+        let provider_binding = self
+            .provider_binding
+            .as_ref()
+            .ok_or(PluginError::ProviderInvocationUnavailable)?;
+        let invocation = self
+            .store
+            .data()
+            .invocation
+            .as_ref()
+            .ok_or_else(|| PluginError::Invocation(InvocationError::RevokedHandle))?;
+        if invocation.node.id != class_type
+            || !provider_binding
+                .bindings
+                .iter()
+                .any(|binding| binding.node_id == class_type)
+        {
+            self.abort();
+            return Err(PluginError::UndeclaredNode(class_type.to_owned()));
+        }
+        if request.is_empty()
+            || request.len()
+                > usize::try_from(invocation.limits.maximum_value_bytes).unwrap_or(usize::MAX)
+        {
+            self.abort();
+            return Err(PluginError::Invocation(value_quota_error()));
+        }
+        invocation.check_cancellation()?;
+        let WasmBindings::Provider(bindings) = &self.bindings else {
+            self.abort();
+            return Err(PluginError::ProviderInvocationUnavailable);
+        };
+        let response = match bindings
+            .sim_comfy_plugin_provider_binding()
+            .call_invoke_provider(&mut self.store, class_type, request)
+        {
+            Ok(Ok(response)) => response,
+            Ok(Err(error)) => {
+                self.abort();
+                return Err(PluginError::Invocation(sdk_error(error)));
+            }
+            Err(error) => return Err(self.wasm_call_error(error)),
+        };
+        let invocation = self
+            .store
+            .data_mut()
+            .invocation
+            .take()
+            .ok_or_else(|| PluginError::Invocation(InvocationError::RevokedHandle))?;
+        let result = invocation
+            .finish_provider_response(response)
+            .map_err(PluginError::from);
         self.terminal = true;
         result
     }
@@ -448,29 +607,27 @@ impl PluginHost {
         let component = self.runtime.compile_component(bytes).map_err(|error| {
             PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
         })?;
-        let mut linker = Linker::<WasmStoreState>::new(self.runtime.engine());
-        wit_contract::ComfyPlugin::add_to_linker::<
-            WasmStoreState,
-            wasmtime::component::HasSelf<WasmStoreState>,
-        >(&mut linker, |state| state)
-        .map_err(|error| {
-            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
-        })?;
-        let instance_pre = linker.instantiate_pre(&component).map_err(|error| {
-            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
-        })?;
-        wit_contract::ComfyPluginPre::new(instance_pre).map_err(|error| {
-            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
-        })?;
-        Ok(CompiledPlugin {
+        let manifest_projection = manifest.component_projection();
+        let world = if manifest.provider_binding.is_some() {
+            if manifest_projection.component_world != PROVIDER_COMPONENT_WORLD {
+                return Err(PluginError::ComponentWorldMismatch);
+            }
+            ComponentWorld::Provider
+        } else {
+            ComponentWorld::Legacy
+        };
+        let compiled = CompiledPlugin {
             component,
             identifier: manifest.identifier.clone(),
             digest_sha256: digest,
-            manifest_projection: manifest.component_projection(),
-        })
+            manifest_projection,
+            provider_binding: manifest.provider_binding.clone(),
+            world,
+        };
+        self.preflight_component(&compiled)?;
+        Ok(compiled)
     }
 
-    #[cfg(test)]
     fn new_wasm_store(&self) -> Result<Store<WasmStoreState>, PluginError> {
         self.make_wasm_store(None)
     }
@@ -495,26 +652,86 @@ impl PluginHost {
         {
             return Err(PluginError::InvocationBindingMismatch);
         }
-        let mut store = self.new_wasm_invocation_store(invocation)?;
-        let mut linker = Linker::<WasmStoreState>::new(self.runtime.engine());
-        wit_contract::ComfyPlugin::add_to_linker::<
-            WasmStoreState,
-            wasmtime::component::HasSelf<WasmStoreState>,
-        >(&mut linker, |state| state)
-        .map_err(|error| {
-            PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
-        })?;
-        let bindings =
-            wit_contract::ComfyPlugin::instantiate(&mut store, plugin.component(), &linker)
-                .map_err(|error| PluginError::WasmTrap(sanitize_diagnostic(&error.to_string())))?;
+        let store = self.new_wasm_invocation_store(invocation)?;
+        let (store, bindings) = self.instantiate_bindings(plugin, store)?;
         let mut instance = WasmPluginInstance {
             store,
             bindings,
             expected_manifest_projection: plugin.manifest_projection.clone(),
+            provider_binding: plugin.provider_binding.clone(),
             terminal: false,
         };
         instance.manifest_bytes()?;
+        if plugin.world == ComponentWorld::Provider {
+            instance.provider_binding_set()?;
+        }
         Ok(instance)
+    }
+
+    fn preflight_component(&self, plugin: &CompiledPlugin) -> Result<(), PluginError> {
+        if plugin.world == ComponentWorld::Legacy {
+            let mut linker = Linker::<WasmStoreState>::new(self.runtime.engine());
+            wit_contract::ComfyPlugin::add_to_linker::<
+                WasmStoreState,
+                wasmtime::component::HasSelf<WasmStoreState>,
+            >(&mut linker, |state| state)
+            .map_err(component_compilation_error)?;
+            let instance_pre = linker
+                .instantiate_pre(plugin.component())
+                .map_err(component_compilation_error)?;
+            wit_contract::ComfyPluginPre::new(instance_pre).map_err(component_compilation_error)?;
+            return Ok(());
+        }
+        let store = self.new_wasm_store()?;
+        let (store, bindings) = self.instantiate_bindings(plugin, store)?;
+        let mut instance = WasmPluginInstance {
+            store,
+            bindings,
+            expected_manifest_projection: plugin.manifest_projection.clone(),
+            provider_binding: plugin.provider_binding.clone(),
+            terminal: false,
+        };
+        instance.manifest_bytes()?;
+        instance.provider_binding_set()?;
+        instance.terminal = true;
+        Ok(())
+    }
+
+    fn instantiate_bindings(
+        &self,
+        plugin: &CompiledPlugin,
+        mut store: Store<WasmStoreState>,
+    ) -> Result<(Store<WasmStoreState>, WasmBindings), PluginError> {
+        let mut linker = Linker::<WasmStoreState>::new(self.runtime.engine());
+        let bindings = match plugin.world {
+            ComponentWorld::Legacy => {
+                wit_contract::ComfyPlugin::add_to_linker::<
+                    WasmStoreState,
+                    wasmtime::component::HasSelf<WasmStoreState>,
+                >(&mut linker, |state| state)
+                .map_err(component_compilation_error)?;
+                WasmBindings::Legacy(
+                    wit_contract::ComfyPlugin::instantiate(&mut store, plugin.component(), &linker)
+                        .map_err(component_instantiation_error)?,
+                )
+            }
+            ComponentWorld::Provider => {
+                provider_wit_contract::ComfyProviderPlugin::add_to_linker::<
+                    WasmStoreState,
+                    wasmtime::component::HasSelf<WasmStoreState>,
+                >(&mut linker, |state| state)
+                .map_err(component_compilation_error)?;
+                WasmBindings::Provider(
+                    provider_wit_contract::ComfyProviderPlugin::instantiate(
+                        &mut store,
+                        plugin.component(),
+                        &linker,
+                    )
+                    .map_err(component_instantiation_error)?,
+                )
+            }
+        };
+        Ok((store, bindings))
     }
 
     fn make_wasm_store(
@@ -810,6 +1027,152 @@ impl InvocationHost {
             outputs,
             output_presence,
             effects,
+        })
+    }
+
+    fn finish_provider_response(
+        mut self,
+        response: wit_contract::sim::comfy_plugin::types::ProviderInvocationResponse,
+    ) -> Result<ProviderInvocationResult, InvocationError> {
+        self.check_active()?;
+        self.check_cancellation()?;
+        if response.receipt.is_empty()
+            || u64::try_from(response.receipt.len()).unwrap_or(u64::MAX)
+                > self.limits.maximum_port_response_bytes
+        {
+            return Err(InvocationError::InvocationQuotaExceeded {
+                limit: "provider-receipt-byte".to_owned(),
+            });
+        }
+        if !self.handles.is_empty()
+            || self
+                .outputs
+                .values()
+                .any(|state| !state.values.is_empty() || state.present.is_some() || state.finished)
+        {
+            return Err(InvocationError::HostFailure(
+                "provider component mixed handle-port output with its typed response".to_owned(),
+            ));
+        }
+
+        let mut response_bytes =
+            u64::try_from(response.receipt.len()).map_err(|_| invocation_value_quota_error())?;
+        for output in response.outputs {
+            let port = self
+                .node
+                .ports
+                .iter()
+                .find(|port| port.id == output.port_id && port.direction == PortDirection::Output)
+                .ok_or_else(|| InvocationError::UnknownPort(output.port_id.clone()))?;
+            let value = PluginValue::from_abi_bytes(&output.value.abi_bytes, &self.registry)
+                .map_err(|error| {
+                    InvocationError::HostFailure(format!("invalid provider output value: {error}"))
+                })?;
+            if value.type_id().to_string() != output.value.type_id
+                || value.family() != sdk_value_family(output.value.family)
+            {
+                return Err(InvocationError::HostFailure(
+                    "encoded provider output metadata disagrees with its canonical ABI value"
+                        .to_owned(),
+                ));
+            }
+            require_exact_port_type(port, &value)?;
+            let expected_family = self.registry.family(&port.type_id).map_err(|error| {
+                InvocationError::HostFailure(format!("plugin type registry failed: {error}"))
+            })?;
+            if value.family() != expected_family {
+                return Err(InvocationError::WrongValueFamily {
+                    port: port.id.clone(),
+                    expected: expected_family,
+                    actual: value.family(),
+                });
+            }
+            let value_bytes = value_size(&value)?;
+            if value_bytes > self.limits.maximum_value_bytes {
+                return Err(value_quota_error());
+            }
+            response_bytes = response_bytes
+                .checked_add(u64::try_from(output.port_id.len()).map_err(|_| {
+                    InvocationError::HostFailure("provider response size overflow".to_owned())
+                })?)
+                .and_then(|bytes| {
+                    bytes.checked_add(u64::try_from(output.value.type_id.len()).ok()?)
+                })
+                .and_then(|bytes| {
+                    bytes.checked_add(u64::try_from(output.value.abi_bytes.len()).ok()?)
+                })
+                .ok_or_else(|| {
+                    InvocationError::HostFailure("provider response size overflow".to_owned())
+                })?;
+            if response_bytes > self.limits.maximum_port_response_bytes {
+                return Err(InvocationError::InvocationQuotaExceeded {
+                    limit: "provider-response-byte".to_owned(),
+                });
+            }
+            self.invocation_value_bytes = self
+                .invocation_value_bytes
+                .checked_add(value_bytes)
+                .ok_or_else(invocation_value_quota_error)?;
+            if self.invocation_value_bytes > self.limits.maximum_invocation_value_bytes {
+                return Err(invocation_value_quota_error());
+            }
+            let state = self.outputs.get_mut(&port.id).ok_or_else(|| {
+                InvocationError::HostFailure("provider output state is missing".to_owned())
+            })?;
+            if port.cardinality == PortCardinality::Singular && !state.values.is_empty() {
+                return Err(InvocationError::InvalidCardinality(port.id.clone()));
+            }
+            if state.values.len() >= self.limits.maximum_values_per_port {
+                return Err(InvocationError::InvalidCardinality(port.id.clone()));
+            }
+            state.value_bytes = state
+                .value_bytes
+                .checked_add(value_bytes)
+                .ok_or_else(value_quota_error)?;
+            if state.value_bytes > self.limits.maximum_value_bytes {
+                return Err(value_quota_error());
+            }
+            state.values.push(value);
+        }
+
+        let mut output_presence = BTreeMap::new();
+        for port in self
+            .node
+            .ports
+            .iter()
+            .filter(|port| port.direction == PortDirection::Output)
+        {
+            let state = self.outputs.get_mut(&port.id).ok_or_else(|| {
+                InvocationError::HostFailure("provider output state is missing".to_owned())
+            })?;
+            let present = !state.values.is_empty();
+            validate_finished_output(port, present, state.values.len())?;
+            state.present = Some(present);
+            state.finished = true;
+            output_presence.insert(port.id.clone(), present);
+        }
+        self.check_cancellation()?;
+        let mut capabilities = self.capabilities.take().ok_or_else(|| {
+            InvocationError::HostFailure("invocation capability state is missing".to_owned())
+        })?;
+        if capabilities.has_open_output_buffers() {
+            capabilities.rollback();
+            return Err(InvocationError::HostFailure(
+                "provider invocation left an output transaction open".to_owned(),
+            ));
+        }
+        let effects = capabilities.finish()?;
+        let outputs = mem::take(&mut self.outputs)
+            .into_iter()
+            .map(|(port, state)| (port, state.values))
+            .collect();
+        self.inputs.clear();
+        self.terminal = true;
+        Ok(ProviderInvocationResult {
+            outputs,
+            output_presence,
+            effects,
+            receipt: response.receipt,
         })
     }
 
@@ -1516,6 +1879,31 @@ fn sdk_manifest_projection(
                 node_version: sdk_api_version(mapping.node_version),
             })
             .collect(),
+    })
+}
+
+fn sdk_provider_binding_set(
+    binding_set: wit_contract::sim::comfy_plugin::types::ProviderBindingSet,
+) -> Result<ProviderBindingSet, PluginError> {
+    Ok(ProviderBindingSet {
+        schema_version: binding_set.schema_version,
+        implementation_namespace: binding_set.implementation_namespace,
+        bindings_sha256: binding_set.bindings_sha256,
+        bindings: binding_set
+            .bindings
+            .into_iter()
+            .map(|binding| {
+                Ok(ProviderBindingClaim {
+                    feature_id: binding.feature_id,
+                    node_id: binding.node_id,
+                    contract_sha256: binding.contract_sha256,
+                    transport_schema: CanonicalTypeId::from_str(&binding.transport_schema)
+                        .map_err(|_| PluginError::ProviderBindingMismatch)?,
+                    materializer_schema: CanonicalTypeId::from_str(&binding.materializer_schema)
+                        .map_err(|_| PluginError::ProviderBindingMismatch)?,
+                })
+            })
+            .collect::<Result<Vec<_>, PluginError>>()?,
     })
 }
 
@@ -2299,6 +2687,14 @@ fn validate_component_projection(
         return Err(PluginError::ManifestProjectionMismatch);
     }
     Ok(())
+}
+
+fn component_compilation_error(error: wasmtime::Error) -> PluginError {
+    PluginError::ComponentCompilation(sanitize_diagnostic(&error.to_string()))
+}
+
+fn component_instantiation_error(error: wasmtime::Error) -> PluginError {
+    PluginError::WasmTrap(sanitize_diagnostic(&error.to_string()))
 }
 
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {

@@ -14,10 +14,11 @@ use comfy_plugin_sdk::{
     CapabilityKind, CapabilityQuota, CapabilityRequest, CapabilityResponse, DType,
     DeterminismPolicy, DeviceId, ED25519_SIGNATURE_BYTES, EffectPolicy, InvocationError, Layout,
     ManifestProvenance, ManifestSignature, ModelValue, PLUGIN_SIGNATURE_ALGORITHM,
-    PluginContractError, PluginInvocation, PluginManifest, PluginNode, PluginPort,
-    PluginSigningKey, PluginValue, PortCardinality, PortDirection, PortPresence, PortSerialization,
-    RouteDeclaration, RustComfyPlugin, RustNodeInstance, ScalarValue, StreamId, TensorDescriptor,
-    TensorValue, TypeRegistry, UiContribution, ValueFamily,
+    PROVIDER_BINDING_API_FEATURE, PROVIDER_BINDING_SCHEMA_VERSION, PluginContractError,
+    PluginInvocation, PluginManifest, PluginNode, PluginPort, PluginSigningKey, PluginValue,
+    PortCardinality, PortDirection, PortPresence, PortSerialization, ProviderBindingClaim,
+    ProviderBindingSet, RouteDeclaration, RustComfyPlugin, RustNodeInstance, ScalarValue, StreamId,
+    TensorDescriptor, TensorValue, TypeRegistry, UiContribution, ValueFamily,
 };
 use comfy_runtime::{
     AssetError, AssetIdentity, AssetNamespace, Capability, CapabilitySet, PermissionGrant,
@@ -246,6 +247,69 @@ fn signed_host_and_manifest(
             .map(|feature| (*feature).to_owned()),
     )?;
     Ok((host, manifest, authorization))
+}
+
+fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> {
+    let registry = TypeRegistry::built_in()?;
+    let mut result_port = port(
+        &registry,
+        "result",
+        PortDirection::Output,
+        "String",
+        PortCardinality::Singular,
+        PortPresence::Required,
+    )?;
+    result_port.name = "Result".to_owned();
+    let mut provider_binding = ProviderBindingSet {
+        schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+        implementation_namespace: "test.provider-plugin".to_owned(),
+        bindings_sha256: "0".repeat(64),
+        bindings: vec![ProviderBindingClaim {
+            feature_id: "COMFY-NODE-TEST-PROVIDER".to_owned(),
+            node_id: "provider.echo".to_owned(),
+            contract_sha256: "3".repeat(64),
+            transport_schema: "sim:comfy-provider-transport@1".parse()?,
+            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+        }],
+    };
+    provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
+    Ok(PluginManifest {
+        schema_version: 1,
+        identifier: "test.provider-plugin".to_owned(),
+        plugin_version: ApiVersion::new(1, 0, 0),
+        api: ApiRequirement {
+            major: 1,
+            minimum_minor: 0,
+            maximum_minor: 0,
+            required_features: vec![PROVIDER_BINDING_API_FEATURE.to_owned()],
+        },
+        digest_sha256: component_digest,
+        signature: ManifestSignature {
+            algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+            key_id: KEY_ID.to_owned(),
+            value: "0".repeat(ED25519_SIGNATURE_BYTES * 2),
+        },
+        provenance: ManifestProvenance {
+            source: "fixture://test.provider-plugin".to_owned(),
+            publisher: "Sim provider fixture".to_owned(),
+            registry: Some("fixture://signed-registry".to_owned()),
+        },
+        provider_binding: Some(provider_binding),
+        nodes: vec![PluginNode {
+            id: "provider.echo".to_owned(),
+            version: ApiVersion::new(1, 0, 0),
+            display_name: "Provider Echo".to_owned(),
+            category: "test/provider".to_owned(),
+            ports: vec![result_port],
+            determinism: DeterminismPolicy::External,
+            cache: CachePolicy::Never,
+            effects: EffectPolicy::Provider,
+        }],
+        capabilities: Vec::new(),
+        ui: Vec::new(),
+        routes: Vec::new(),
+        legacy_mappings: Vec::new(),
+    })
 }
 
 fn trust_policy() -> Result<PluginTrustPolicy, Box<dyn Error>> {
@@ -720,6 +784,10 @@ fn component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
     decode_base64(base64.trim())
 }
 
+fn provider_component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    decode_base64(include_str!("fixtures/provider_component").trim())
+}
+
 fn decode_base64(value: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let encoded = value
         .bytes()
@@ -886,6 +954,128 @@ fn rust_and_wit_fixtures_project_the_same_ports() -> Result<(), Box<dyn Error>> 
     assert_eq!(result.effects.routes[0].route, "route.demo");
     assert_eq!(result.effects.routes[0].status, 200);
     assert_eq!(result.effects.routes[0].body, b"guest-route");
+    Ok(())
+}
+
+#[test]
+fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
+-> Result<(), Box<dyn Error>> {
+    let component = provider_component_fixture()?;
+    let digest = format!("{:x}", Sha256::digest(&component));
+    let mut manifest = provider_manifest(digest)?;
+    let authorization = sign_and_authorize(&mut manifest)?;
+    let host = PluginHost::with_configuration(
+        conformance_component_limits(),
+        comfy_plugin_host::DEFAULT_API_FEATURES
+            .iter()
+            .map(|feature| (*feature).to_owned()),
+    )?;
+    let compiled = host.compile_component(&component, &manifest, &authorization)?;
+    let invocation = host.begin_invocation(
+        &manifest,
+        &authorization,
+        "provider.echo",
+        InvocationInputs::default(),
+        empty_services(),
+        CancellationToken::default(),
+    )?;
+    let mut instance = host.instantiate_component(&compiled, invocation)?;
+    assert_eq!(
+        instance.provider_binding_set()?,
+        manifest
+            .provider_binding
+            .clone()
+            .ok_or("provider binding disappeared")?
+    );
+    let expected = scalar_value("provider-output")?;
+    let request = expected.abi_bytes()?;
+    let result = instance.invoke_provider("provider.echo", &request)?;
+    assert_eq!(result.outputs.get("result"), Some(&vec![expected]));
+    assert_eq!(result.output_presence.get("result"), Some(&true));
+    assert_eq!(result.receipt(), b"provider-fixture-receipt");
+    assert!(result.effects.outputs.is_empty());
+    assert!(result.effects.routes.is_empty());
+    Ok(())
+}
+
+#[test]
+fn provider_world_rejects_binding_mismatch_before_instantiation() -> Result<(), Box<dyn Error>> {
+    let component = provider_component_fixture()?;
+    let digest = format!("{:x}", Sha256::digest(&component));
+    let mut manifest = provider_manifest(digest)?;
+    let binding_set = manifest
+        .provider_binding
+        .as_mut()
+        .ok_or("provider binding disappeared")?;
+    binding_set
+        .bindings
+        .first_mut()
+        .ok_or("provider binding claim disappeared")?
+        .contract_sha256 = "4".repeat(64);
+    binding_set.bindings_sha256 = binding_set.canonical_bindings_sha256()?;
+    let authorization = sign_and_authorize(&mut manifest)?;
+    let host = PluginHost::new()?;
+    assert!(matches!(
+        host.compile_component(&component, &manifest, &authorization),
+        Err(PluginError::ProviderBindingMismatch)
+    ));
+    Ok(())
+}
+
+#[test]
+fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
+-> Result<(), Box<dyn Error>> {
+    let component = provider_component_fixture()?;
+    let digest = format!("{:x}", Sha256::digest(&component));
+    let mut manifest = provider_manifest(digest)?;
+    let authorization = sign_and_authorize(&mut manifest)?;
+    let host = PluginHost::new()?;
+    let compiled = host.compile_component(&component, &manifest, &authorization)?;
+
+    for (class_type, request, cancellation, expected) in [
+        (
+            "provider.echo",
+            b"not-canonical-abi".to_vec(),
+            CancellationToken::default(),
+            "invalid provider output value",
+        ),
+        (
+            "provider.unknown",
+            scalar_value("value")?.abi_bytes()?,
+            CancellationToken::default(),
+            "not declared",
+        ),
+    ] {
+        let invocation = host.begin_invocation(
+            &manifest,
+            &authorization,
+            "provider.echo",
+            InvocationInputs::default(),
+            empty_services(),
+            cancellation,
+        )?;
+        let instance = host.instantiate_component(&compiled, invocation)?;
+        let error = instance
+            .invoke_provider(class_type, &request)
+            .expect_err("invalid provider invocation unexpectedly succeeded");
+        assert!(error.to_string().contains(expected), "{error}");
+    }
+
+    let cancellation = CancellationToken::default();
+    let invocation = host.begin_invocation(
+        &manifest,
+        &authorization,
+        "provider.echo",
+        InvocationInputs::default(),
+        empty_services(),
+        cancellation.clone(),
+    )?;
+    let instance = host.instantiate_component(&compiled, invocation)?;
+    cancellation.cancel();
+    assert!(matches!(
+        instance.invoke_provider("provider.echo", &scalar_value("value")?.abi_bytes()?),
+        Err(PluginError::Invocation(InvocationError::Cancelled))
+    ));
     Ok(())
 }
 
