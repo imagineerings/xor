@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+workspace_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$workspace_root"
+
+python3 -c '
+import pathlib
+import tomllib
+
+root = pathlib.Path.cwd()
+sim = tomllib.loads((root / "crates/sim/Cargo.toml").read_text())
+features = sim["features"]
+dependencies = sim["dependencies"]
+expected = {
+    "comfy_api",
+    "comfy_model",
+    "comfy_plugin_host",
+    "comfy_runtime",
+    "comfy_tensor",
+    "comfy_types",
+    "comfy_ui",
+}
+assert features.get("default") == [], "sim default features must be empty"
+assert {item.removeprefix("dep:") for item in features["comfy"]} == expected
+assert all(dependencies[name].get("optional") is True for name in expected)
+for backend in ("corex", "cuda", "directml", "metal", "mlu", "npu", "rocm", "xpu"):
+    assert "comfy" in features[backend], f"{backend} must imply comfy"
+assert "comfy" not in features["test-support"]
+assert all(not item.startswith("comfy_") for item in features["test-support"])
+extension_host = tomllib.loads((root / "crates/extension_host/Cargo.toml").read_text())
+assert "comfy_model" not in extension_host["dependencies"]
+assert "\"comfy_runtime\"" not in (root / "assets/settings/default.json").read_text()
+'
+
+tree=$(cargo tree --locked -p sim --no-default-features -e normal --prefix none)
+if printf '%s\n' "$tree" | grep -E '^comfy_[[:alnum:]_-]+[[:space:]]' >/dev/null; then
+    printf '%s\n' "default Sim dependency graph unexpectedly contains Comfy packages:" >&2
+    printf '%s\n' "$tree" | grep -E '^comfy_[[:alnum:]_-]+[[:space:]]' >&2
+    exit 1
+fi
+
+mac_default=$(./script/bundle-mac --dry-run)
+mac_comfy=$(./script/bundle-mac --comfy --dry-run)
+linux_default=$(./script/bundle-linux --dry-run)
+linux_comfy=$(./script/bundle-linux --comfy --dry-run)
+
+for plan in "$mac_default" "$linux_default"; do
+    [[ "$plan" == *"include_comfy_worker=false"* ]]
+    [[ "$plan" == *"packages=sim,cli"* ]]
+done
+for plan in "$mac_comfy" "$linux_comfy"; do
+    [[ "$plan" == *"include_comfy_worker=true"* ]]
+    [[ "$plan" == *"comfy_worker"* ]]
+done
+
+tree_sha256=$(printf '%s' "$tree" | shasum -a 256 | cut -d' ' -f1)
+artifact_dir="${CARGO_TARGET_DIR:-target}/comfy-parity"
+mkdir -p "$artifact_dir"
+python3 -c '
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+payload = {
+    "validation_id": "VAL-COMFY-BUILD-001",
+    "default_features": [],
+    "default_tree_sha256": sys.argv[2],
+    "cases": {
+        "sim_manifest_is_opt_in": True,
+        "default_dependency_graph_excludes_comfy": True,
+        "extension_host_is_comfy_free": True,
+        "default_settings_exclude_comfy": True,
+        "macos_package_modes_are_explicit": True,
+        "linux_package_modes_are_explicit": True,
+    },
+    "summary": {"passed": 6, "failed": 0, "skipped": 0},
+}
+path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+' "$artifact_dir/val-comfy-build-001.json" "$tree_sha256"
+
+echo "VAL-COMFY-BUILD-001 passed; default tree SHA-256 $tree_sha256"

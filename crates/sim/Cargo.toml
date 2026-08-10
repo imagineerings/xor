@@ -12,19 +12,29 @@ default-run = "sim"
 workspace = true
 
 [features]
-corex = ["comfy_runtime/corex"]
-cuda = ["comfy_runtime/cuda"]
-directml = ["comfy_runtime/directml"]
-metal = ["comfy_runtime/metal"]
-mlu = ["comfy_runtime/mlu"]
-npu = ["comfy_runtime/npu"]
-rocm = ["comfy_runtime/rocm"]
-xpu = ["comfy_runtime/xpu"]
+default = []
+comfy = [
+    "dep:comfy_api",
+    "dep:comfy_model",
+    "dep:comfy_plugin_host",
+    "dep:comfy_runtime",
+    "dep:comfy_tensor",
+    "dep:comfy_types",
+    "dep:comfy_ui",
+]
+comfy-test-support = ["comfy", "test-support", "comfy_ui/test-support"]
+corex = ["comfy", "comfy_runtime/corex"]
+cuda = ["comfy", "comfy_runtime/cuda"]
+directml = ["comfy", "comfy_runtime/directml"]
+metal = ["comfy", "comfy_runtime/metal"]
+mlu = ["comfy", "comfy_runtime/mlu"]
+npu = ["comfy", "comfy_runtime/npu"]
+rocm = ["comfy", "comfy_runtime/rocm"]
+xpu = ["comfy", "comfy_runtime/xpu"]
 tracy = ["ztracing/tracy"]
 # LEAK_BACKTRACE=1 cargo run --features sim/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
-    "comfy_ui/test-support",
     "gpui/test-support",
     "gpui_platform/screen-capture",
     "dep:image",
@@ -73,13 +83,13 @@ required-features = ["visual-tests"]
 
 [dependencies]
 async-channel.workspace = true
-comfy_api.workspace = true
-comfy_model.workspace = true
-comfy_plugin_host.workspace = true
-comfy_runtime.workspace = true
-comfy_tensor.workspace = true
-comfy_types.workspace = true
-comfy_ui.workspace = true
+comfy_api = { workspace = true, optional = true }
+comfy_model = { workspace = true, optional = true }
+comfy_plugin_host = { workspace = true, optional = true }
+comfy_runtime = { workspace = true, optional = true }
+comfy_tensor = { workspace = true, optional = true }
+comfy_types = { workspace = true, optional = true }
+comfy_ui = { workspace = true, optional = true }
 acp_tools.workspace = true
 activity_indicator.workspace = true
 agent.workspace = true

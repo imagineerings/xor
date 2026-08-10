@@ -6797,7 +6797,6 @@ dependencies = [
  "client",
  "cloud_api_types",
  "collections",
- "comfy_model",
  "criterion",
  "ctor",
  "dap",

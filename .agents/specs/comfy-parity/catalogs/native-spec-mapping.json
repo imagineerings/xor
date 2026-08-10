@@ -1676,6 +1676,24 @@
       39,
       40
     ],
+    "45.1": [
+      42
+    ],
+    "45.2": [
+      42
+    ],
+    "45.3": [
+      42
+    ],
+    "45.4": [
+      42
+    ],
+    "45.5": [
+      42
+    ],
+    "45.6": [
+      42
+    ],
     "5.1": [
       9,
       18,
@@ -18736,6 +18754,24 @@
       "comfy-parity-performance",
       "comfy-parity-final-validation"
     ],
+    "45.1": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
+    "45.2": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
+    "45.3": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
+    "45.4": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
+    "45.5": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
+    "45.6": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
     "5.1": [
       "comfy-parity-native-worker",
       "comfy-parity-execution-runtime",
@@ -23961,6 +23997,24 @@
       "VAL-NATIVE-E2E-001",
       "VAL-NATIVE-E2E-002"
     ],
+    "45.1": [
+      "VAL-COMFY-BUILD-001"
+    ],
+    "45.2": [
+      "VAL-COMFY-BUILD-001"
+    ],
+    "45.3": [
+      "VAL-COMFY-BUILD-001"
+    ],
+    "45.4": [
+      "VAL-COMFY-BUILD-001"
+    ],
+    "45.5": [
+      "VAL-COMFY-BUILD-001"
+    ],
+    "45.6": [
+      "VAL-COMFY-BUILD-001"
+    ],
     "5.1": [
       "VAL-DOMAIN-004",
       "VAL-RECOVERY-003",
@@ -24207,7 +24261,8 @@
     "D38",
     "D39",
     "D40",
-    "D41"
+    "D41",
+    "D42"
   ],
   "external_release_certification_gates": {
     "cpu_signed_hardware_attestation": {
@@ -35450,6 +35505,7 @@
     "42": 6,
     "43": 6,
     "44": 6,
+    "45": 6,
     "5": 6,
     "6": 6,
     "7": 6,
@@ -35743,6 +35799,9 @@
       34,
       39,
       40
+    ],
+    "45": [
+      42
     ],
     "5": [
       9,
@@ -36597,6 +36656,9 @@
       "comfy-parity-performance",
       "comfy-parity-final-validation"
     ],
+    "45": [
+      "comfy-parity-opt-in-product-build-boundary"
+    ],
     "5": [
       "comfy-parity-native-worker",
       "comfy-parity-execution-runtime",
@@ -36994,6 +37056,9 @@
       "VAL-NODE-CLOSURE-001",
       "VAL-NATIVE-E2E-001",
       "VAL-NATIVE-E2E-002"
+    ],
+    "45": [
+      "VAL-COMFY-BUILD-001"
     ],
     "5": [
       "VAL-DOMAIN-004",
@@ -77969,6 +78034,14 @@
       "41.5",
       "41.6"
     ],
+    "comfy-parity-opt-in-product-build-boundary": [
+      "45.1",
+      "45.2",
+      "45.3",
+      "45.4",
+      "45.5",
+      "45.6"
+    ],
     "comfy-parity-patch-graph-semantic-foundation": [
       "7.1",
       "7.2",
@@ -82513,6 +82586,7 @@
     "comfy-parity-native-node-compute-value-foundation",
     "comfy-parity-native-node-asset-effect-foundation",
     "comfy-parity-native-node-provider-invocation-foundation",
+    "comfy-parity-opt-in-product-build-boundary",
     "comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757",
     "comfy-parity-native-nodes-three-d-comfy-node-0115",
     "comfy-parity-native-nodes-three-d-splat-comfy-node-0172",
@@ -82753,6 +82827,7 @@
     "VAL-METADATA-001",
     "VAL-DOCS-001",
     "VAL-CLI-001",
-    "VAL-NODE-CLOSURE-001"
+    "VAL-NODE-CLOSURE-001",
+    "VAL-COMFY-BUILD-001"
   ]
 }

@@ -12,7 +12,6 @@ use async_tar::Archive;
 use client::{Client, proto, telemetry::Telemetry};
 use cloud_api_types::{ExtensionMetadata, ExtensionProvides, GetExtensionsResponse};
 use collections::{BTreeMap, BTreeSet, FxHashSet, HashMap, HashSet, btree_map};
-use comfy_model::ArtifactKey;
 pub use extension::ExtensionManifest;
 use extension::extension_builder::{CompileExtensionOptions, ExtensionBuilder};
 use extension::{
@@ -179,11 +178,33 @@ pub fn register_component_lifecycle_adapter(
 }
 
 fn validate_component_extension_id(extension_id: &str) -> Result<()> {
-    let key = ArtifactKey::new("extension-lifecycle", extension_id).map_err(|_| {
-        anyhow!("component extension identifier `{extension_id}` is not one normal path component")
-    })?;
-    let mut components = key.relative_path.components();
-    if !matches!(components.next(), Some(path::Component::Normal(_))) || components.next().is_some()
+    const MAXIMUM_EXTENSION_ID_BYTES: usize = 64 * 1024;
+
+    let portable_name = !extension_id.is_empty()
+        && extension_id.len() <= MAXIMUM_EXTENSION_ID_BYTES
+        && !extension_id.contains(['/', '\\', ':'])
+        && !extension_id.ends_with(['.', ' '])
+        && !extension_id.chars().any(char::is_control);
+    let device_name = extension_id
+        .split_once('.')
+        .map_or(extension_id, |(name, _)| name)
+        .to_ascii_uppercase();
+    let reserved_device_name = matches!(device_name.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || device_name
+            .strip_prefix("COM")
+            .or_else(|| device_name.strip_prefix("LPT"))
+            .is_some_and(|suffix| {
+                suffix.len() == 1
+                    && suffix
+                        .as_bytes()
+                        .first()
+                        .is_some_and(|byte| matches!(byte, b'1'..=b'9'))
+            });
+    let mut components = Path::new(extension_id).components();
+    if !portable_name
+        || reserved_device_name
+        || !matches!(components.next(), Some(path::Component::Normal(_)))
+        || components.next().is_some()
     {
         bail!("component extension identifier `{extension_id}` is not one normal path component");
     }

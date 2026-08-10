@@ -97,6 +97,7 @@ DECISIONS = [
         "blindly duplicates an external mutation."
     ),
     (41, "Assign one authoritative owner to foundational behavior", "Every state transition, persistence record, security decision, path check, index mutation, queue ordering rule, cancellation signal, and final output commit has exactly one authoritative production owner recorded in the generated ownership catalog. The canonical owners are comfy_types::CancellationToken for cooperative cancellation state; comfy_types::normalize_json_non_finite for Python-token compatibility normalization; comfy_runtime::WorkflowFormatDocument for raw workflow parsing, lossless retention, validation, and migration provenance; comfy_media::MetadataDocument for generic embedded-metadata carrier parsing and writes; GraphCommandEngine for graph mutation, atomic history, and editable workspace projection; ExecutionPresentationService plus ExecutionQueue for the pure profile prompt/attempt reducer, attempt identity, queue invariants, canonical event sequencing, output recovery/removal eligibility and projection state, and attempt cancellation-token identity, with ExecutionPresentationOwner as the sole production mutation gate, durable projection coordinator, prepared-actuator commit boundary, restart hydrator, and output-operation projection transaction coordinator, while ExecutionUiModel owns only GPUI active-profile selection, diagnostics, notification batching, bounded event subscriptions, stored cancellable operation tasks, and checked operation dispatch over the same shared owner; SettingsStore for native runtime-profile configuration persistence, precedence, selection, and observation with NativeRuntimeSettings and Sim initialization as checked read-only adapters; ComfyRuntimeDb only for the atomically replaced, canonically validated execution profile-and-attempt projection and one inactive legacy-migration result per immutable identity; workspace::SerializableItem, SerializableItemRegistry, and WorkspaceDb for desktop topology, restoration dispatch, and row transactions, with GraphWorkspaceItem and ComfyWorkflowDb as focused compact-schema adapters; WorkflowSaveCoordinator for workflow/provider byte authority, journal bounds, and save/conflict/recovery transitions, while GraphWorkspaceItem only orchestrates project::Project and fs::Fs file effects and must keep its persisted engine and save journal equivalent; comfy_model::ArtifactRoot and ArtifactIndex for protected roots, canonical-path root identities, path validation, scanning, digests, availability transitions, verified/private reads, private replacement, and the base index snapshot; comfy_model::formats and restricted_pickle for model archive and executable-content validation; AssetRoots and one injected profile-scoped AssetService handle only for profile/namespace mapping, the sole bounded `sim-asset` reference conversion, authorization, mutation, verified reads, views, metadata, tags, enrichment, and access to that same index, with raw root and resolution methods crate-private or explicitly test-support-only so normal production dependencies cannot retrieve paths; ModelStore only for model parsing/mapping/cache when AssetService supplies that validated index; `AssetService::load_image_vae_with_context` is the focused production image-VAE adapter that reuses `load_model`, derives architecture selection and `VaeDescriptor` from the private canonical artifact record, and delegates admission to `comfy_model::vae_image` without exposing or cloning the index; one shared OutputCommitter for final filesystem publication, durable receipt projection metadata, prepared output-removal staging, rollback, restart reconciliation, and its journal, with shared AssetService index registration and ExecutionPresentationOwner durable projection inside the same removal/publication sagas; RecoveryJournal only for immutable attempt-scoped facts derived from OutputCommitReceipt and never for prompt phases or independent transaction validation; RuntimeSupervisor for the worker process/protocol boundary; comfy_runtime::PermissionPolicy for Comfy profile/subject authorization and the exhaustive `CapabilityKind` boundary conversion; PluginTrustPolicy for canonical plugin signing-payload verification; ProviderPolicy for profile-scoped provider request authorization while credentials_provider::CredentialsProvider alone stores secret bytes; NativeFfiRegistry for certified native-library contracts; ExternalNavigationPolicy for Comfy-originated navigation authorization, with GPUI panels acting only after a successful policy decision tied to a user gesture; comfy_plugin_sdk for versioned ABI DTOs; extension_host::ComponentRuntime for the Comfy no-WASI Wasmtime Component Model engine/cache/epoch configuration and raw component byte compilation; extension_host's existing generic WASI editor-extension engine, extension_cli's standalone development engine, and language's tree-sitter engine remain justified non-Comfy owners and are never used by Comfy invocation; extension_host::ExtensionStore plus `InstalledComponent::checked` for installed component inventory, lifecycle, identifier containment, and in-memory pair bounds; extension_host::CapabilityGranter remains the existing editor-extension manifest/grant checker for process execution, downloads, and npm installation and is never consulted by Comfy execution; ComponentHostRouter is the focused profile-switching lifecycle adapter and retains only an immutable path-free replay snapshot supplied by ExtensionStore, never a lifecycle validator or persistence owner; and comfy_plugin_host owns only typed WIT linking and preinstantiation, no-WASI invocation ceilings, handles, leasing, proposal buffers, and revocation over sealed PermissionPolicy/PluginTrustPolicy grants, with AssetPluginCapabilityServices delegating to the shared AssetService, CapabilityServiceContext as bounded call context, InstalledComponentBinding as a checked identity/provenance mapping, ComponentState as a derived revocable snapshot, and none as a second lifecycle or capability-service owner; NativeNodeRegistry for actual executable node instances and their implementation namespace/version, while NodeRegistry owns catalog metadata and API/runtime projections may only join descriptors to present executable entries; ApiSecurityGate for transport authentication/CORS/TLS/rate and preflight admission; security::IdempotencyLedger for API mutation transitions with ArtifactRoot-backed snapshot persistence and ExecutionPresentationOwner receipts for reconciliation; NativeApiServer for the native compatibility listener; NativeHttpRouter for HTTP matching/projection; NativeWebSocketEventBus for authenticated session and delivery state; http::decode_uri_component for one-pass request-target decoding; and BackendCapabilityMatrix for backend support. SafeVirtualPath, plugin root/path strings, `WorkerOutputProposal`/its private wire representation, `NativeImageOutputProposal`, other worker plan/result DTOs, and WorkerLifecycle are bounded wire/session representations with checked mappings to canonical domain types and no path, queue, persistence, security, or publication authority. NativeImageProposalCoordinator, plugin OutputProposalBuffer, and PluginOutputProposal may stage invocation-local proposals only; `NativeImageOutputProposal::from_worker_proposal` maps once to canonical OutputProposal, while PluginOutputPublicationAdapter performs one checked attempt-scoped DTO conversion into OutputCommitter; neither owns commit, security decision, or recovery state. Each native vendor adapter is a focused ABI boundary beneath NativeFfiRegistry, NativeBackendBindingStatus, and BackendCapabilityMatrix: comfy_backend_xpu and comfy_backend_cuda alone own their reviewed declarations, retained certified-image loading, unsafe calls, opaque resources, and structural packages; comfy_backend_corex owns only the verified public-source provenance record, discovery observations, typed missing-evidence state, and zero-symbol structural package until the separate `.agents/specs/comfy-corex-enablement/` specification admits and validates reviewed IXRT/IXBLAS declarations. Same-named vendor manifest, discovery, certificate-projection, and error DTOs are explicitly separate boundary representations and never second trust, binding, capability, persistence, or transaction owners. Historical duplicate tables are migration inputs or quarantine only, never active owners. Boundary DTOs and focused adapters may remain only with checked mappings to these owners. Production code may not self-grant, repeat validation or commit rules, send roots or host paths over worker IPC, accept caller-supplied verification booleans, retain an unconsumed canonical snapshot, or retain an unconsumed parallel service. <!-- impl: crates/comfy_test_support/tests/ownership_consolidation.rs#val_ownership_001 -->"),
+    (42, "Make the Comfy product boundary compile-time opt-in", "The `sim` package owns the product feature boundary. Its default feature set is empty, every direct `comfy_*` dependency is optional, and the `comfy` feature enables the complete CPU integration. Accelerator features imply `comfy` before enabling the matching runtime backend. Ordinary `test-support` remains independent; `comfy-test-support` is the explicit test-only composition for Comfy product tests. `#[cfg(feature = \"comfy\")]` removes the complete CLI, initialization, settings-observer, menu, panel, action, keymap, and worker-launch paths from non-Comfy compilation rather than replacing them with inert stubs. Comfy-neutral extension lifecycle code validates one safe path component locally or through a neutral path owner and cannot depend on a model crate. Packaging scripts share one explicit opt-in switch. Their default command lines build only Sim and ordinary companion binaries and never copy, strip, sign, install, or reference `comfy-worker` or Comfy assets. The opt-in branch adds the `sim/comfy` feature, the selected backend features, the corresponding worker features, and the existing worker packaging steps. Platform workflows remain default-Comfy-free unless they explicitly set that switch. Workspace membership and lockfile entries remain development inventory only and do not confer product inclusion. A deterministic boundary test inspects Cargo metadata/tree output, cfg-gated source surfaces, and packaging dry-run plans for both modes; it fails if the default `sim` normal graph contains a package whose name starts with `comfy_`.")
 ]
 
 _D34_STAGED_FOUNDATION_SENTENCE = (
@@ -719,6 +720,7 @@ REQ_DESIGNS = {
     39: [12, 17, 18, 24, 35, 39, 40], 40: [3, 9, 10, 17, 38, 40],
     41: [11, 17, 18, 21, 36, 39], 42: [19, 20, 37, 39],
     43: [19, 20, 24, 37, 38, 39], 44: [8, 20, 25, 29, 32, 34, 39, 40],
+    45: [42],
 }
 
 for requirement in (5, 10, 11, 12, 16, 18, 23, 28, 29, 30, 33, 35, 36, 38, 39, 40, 41):
@@ -823,6 +825,7 @@ VALIDATIONS = {
     "VAL-DOCS-001": ("Documentation evidence reconciliation", "catalog", "docs, embedded-docs, navigation, redirects, localization, node docs, OpenAPI, and tooling catalogs", "Verify file closure and deltas, require executable corroboration for stronger evidence, retain documented-only claims, and reproduce recorded link/test/translation results."),
     "VAL-CLI-001": ("comfy-cli contract reconciliation", "CLI", "Every command, flag, schema, event, error, config, format, lifecycle, test, and source row", "Compare native/migration/defer mapping, help/schema output, invalid input, offline, cancellation, interrupted operation, and source-file closure without running Python in production."),
     "VAL-NODE-CLOSURE-001": ("Native node implementation closure", "node/catalog", "All local and API-node rows plus generated native descriptors", "Reconcile implementation/provider/placeholder status and per-node schema/behavior results with zero unexplained rows; fail any representative-only equivalence claim."),
+    "VAL-COMFY-BUILD-001": ("Opt-in Comfy product boundary", "build/package", "The default and Comfy-enabled Sim feature, dependency, runtime-surface, asset, and macOS/Linux/Windows package graphs", "Build and test default Sim without Comfy, build CPU and selected accelerator Comfy modes, prove the default normal dependency tree contains no comfy_* package, verify Comfy CLI/UI/runtime/settings surfaces are cfg-absent, and compare default versus explicit-Comfy package plans with deterministic zero-failure evidence."),
 }
 
 
@@ -871,6 +874,7 @@ REQ_VALIDATIONS = {
     42: ["VAL-CATALOG-001", "VAL-NATIVE-BOUNDARY-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-FOUNDATION-001", "VAL-MODEL-DETECTION-001", "VAL-MODEL-FAMILY-ROW-001", "VAL-MODEL-FAMILY-001"],
     43: ["VAL-DOCS-001", "VAL-CLI-001", "VAL-CATALOG-001"],
     44: ["VAL-NODE-REGISTRY-001", "VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001", "VAL-NATIVE-E2E-001", "VAL-NATIVE-E2E-002"],
+    45: ["VAL-COMFY-BUILD-001"],
 }
 
 for requirement in (5, 10, 11, 12, 16, 18, 23, 28, 29, 30, 33, 35, 36, 38, 39, 40, 41):
@@ -8794,6 +8798,60 @@ def native_node_provider_invocation_foundation_task(dependency: str) -> dict[str
     )
 
 
+def comfy_opt_in_build_boundary_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-opt-in-product-build-boundary",
+        "Make the Comfy product integration compile-time opt-in",
+        [45],
+        [42],
+        ["VAL-COMFY-BUILD-001"],
+        "Exclude Comfy from Sim's default compile, link, runtime, test-support, asset, and package graphs while retaining the complete CPU and explicitly selected accelerator integration behind one compile-time feature and one explicit packaging option.",
+        [
+            "Cargo.toml",
+            "crates/sim/Cargo.toml",
+            "crates/sim/src/main.rs",
+            "crates/sim/src/sim.rs",
+            "crates/sim/src/sim/app_menus.rs",
+            "crates/extension_host/Cargo.toml",
+            "crates/extension_host/src/extension_host.rs",
+            "assets/settings/default.json",
+            "assets/keymaps/default-comfy.json",
+            "script/bundle-mac",
+            "script/bundle-linux",
+            "script/bundle-windows.ps1",
+            "crates/sim/resources/windows/sim.iss",
+        ],
+        [
+            "Cargo.lock",
+            "crates/sim/Cargo.toml",
+            "crates/sim/src/main.rs",
+            "crates/sim/src/sim.rs",
+            "crates/sim/src/sim/app_menus.rs",
+            "crates/extension_host/Cargo.toml",
+            "crates/extension_host/src/extension_host.rs",
+            "crates/extension_host/src/extension_store_test.rs",
+            "assets/settings/default.json",
+            "assets/settings/default-comfy.json",
+            "script/check-comfy-feature-boundary",
+            "script/bundle-mac",
+            "script/bundle-linux",
+            "script/bundle-windows.ps1",
+            "crates/sim/resources/windows/sim.iss",
+            ".agents/specs/comfy-parity/requirements.md",
+            ".agents/specs/comfy-parity/design.md",
+            ".agents/specs/comfy-parity/validation.md",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/tasks.md",
+            ".agents/specs/comfy-parity/traceability.md",
+        ],
+        "The sim package has an empty default feature set and zero normal comfy_* dependencies unless `comfy` is selected. CPU Comfy and accelerator features retain existing behavior, ordinary test-support remains Comfy-free, and cfg gates remove every CLI, initialization, settings observer, panel, menu, action, keymap, worker, and Comfy asset surface from the default product. ExtensionHost validates component identifiers without a Comfy dependency. Default macOS, Linux, and Windows package plans omit the worker and Comfy assets, while an explicit Comfy package option preserves the existing worker/backend plan. Both modes pass focused build, test, dependency-tree, lint, and packaging smoke validation.",
+        [dependency],
+        locked=True,
+        criterion_ids=["45.1", "45.2", "45.3", "45.4", "45.5", "45.6"],
+    )
+
+
 def node_tasks(
     schema_dependency: str,
     compute_dependency: str,
@@ -9044,7 +9102,7 @@ def requirement_criteria() -> dict[int, list[str]]:
             criterion = re.match(r"^(\d+)\.\s+\S", line)
             if criterion:
                 criteria[current].append(f"{current}.{criterion.group(1)}")
-    expected = set(range(1, 45))
+    expected = set(range(1, 46))
     if set(criteria) != expected:
         raise RuntimeError(f"requirements mismatch: expected {expected}, found {set(criteria)}")
     return dict(criteria)
@@ -9540,6 +9598,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     node_provider_foundation = native_node_provider_invocation_foundation_task(
         str(node_asset_effect_foundation["id"])
     )
+    comfy_build_boundary = comfy_opt_in_build_boundary_task(
+        str(node_provider_foundation["id"])
+    )
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
         str(node_compute_foundation["id"]),
@@ -9576,6 +9637,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_compute_foundation,
             node_asset_effect_foundation,
             node_provider_foundation,
+            comfy_build_boundary,
         ]
         + nodes
         + user_interface_tasks
@@ -12015,6 +12077,25 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
             "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
         ])
+    if identifier == "comfy-parity-opt-in-product-build-boundary":
+        commands = [
+            "cargo fmt --all -- --check",
+            "cargo check --locked -p sim --no-default-features",
+            "cargo test --locked -p sim --no-default-features",
+            "cargo check --locked -p sim --features comfy",
+            "cargo test --locked -p sim --features comfy,comfy-test-support comfy_build_boundary -- --nocapture",
+            "./script/clippy -p sim -p extension_host",
+            "./script/check-comfy-feature-boundary",
+            "./script/bundle-mac --dry-run",
+            "./script/bundle-mac --comfy --dry-run",
+            "./script/bundle-linux --dry-run",
+            "./script/bundle-linux --comfy --dry-run",
+            "pwsh -File script/bundle-windows.ps1 -DryRun",
+            "pwsh -File script/bundle-windows.ps1 -Comfy -DryRun",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ]
     if identifier == "comfy-parity-final-validation":
         commands.extend([
             "./script/clippy",

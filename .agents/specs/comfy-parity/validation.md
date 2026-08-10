@@ -752,6 +752,14 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Procedure and expected signal: Reconcile implementation/provider/placeholder status and per-node schema/behavior results with zero unexplained rows; fail any representative-only equivalence claim.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-node-closure-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
+### VAL-COMFY-BUILD-001: Opt-in Comfy product boundary
+
+- Type: build/package.
+- Fixture: The default and Comfy-enabled Sim feature, dependency, runtime-surface, asset, and macOS/Linux/Windows package graphs.
+- Command/runner: `cargo test -p comfy_test_support val_comfy_build_001`.
+- Procedure and expected signal: Build and test default Sim without Comfy, build CPU and selected accelerator Comfy modes, prove the default normal dependency tree contains no comfy_* package, verify Comfy CLI/UI/runtime/settings surfaces are cfg-absent, and compare default versus explicit-Comfy package plans with deterministic zero-failure evidence.
+- Pass artifact: exit status 0 plus `target/comfy-parity/val-comfy-build-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
+
 ## Validation execution and gates
 
 Implementation tasks run targeted crate/domain/GPUI tests and `./script/clippy`. Closure runs every generator twice, every applicable unit/protocol/GPUI/visual/E2E/persistence/failure/accessibility/platform/security/performance scenario available for the CPU/Apple Metal baseline, fail-closed compile and unavailable-path checks for optional backends, the package boundary scan, registry/source-file reconciliation, forward and reverse traceability, independent completeness and implementation-readiness audits, and:

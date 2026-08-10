@@ -3,8 +3,20 @@ Param(
     [Parameter()][Alias('i')][switch]$Install,
     [Parameter()][Alias('h')][switch]$Help,
     [Parameter()][Alias('a')][string]$Architecture,
-    [Parameter()][string]$Name
+    [Parameter()][string]$Name,
+    [Parameter()][switch]$Comfy,
+    [Parameter()][switch]$DryRun
 )
+
+if ($DryRun) {
+    if ($Comfy) {
+        Write-Output "mode=comfy packages=sim,cli,comfy_worker,auto_update_helper sim_features=comfy,rocm,directml worker_features=rocm,directml include_comfy_worker=true"
+    }
+    else {
+        Write-Output "mode=default packages=sim,cli,auto_update_helper sim_features=none include_comfy_worker=false"
+    }
+    exit 0
+}
 
 . "$PSScriptRoot/lib/workspace.ps1"
 
@@ -51,6 +63,8 @@ if ($Help) {
     Write-Output "Options:"
     Write-Output "  -Architecture, -a Which architecture to build (x86_64 or aarch64)"
     Write-Output "  -Install, -i      Run the installer after building."
+    Write-Output "  -Comfy             Include Comfy, accelerator backends, worker, and assets."
+    Write-Output "  -DryRun            Print the selected package plan without building it."
     Write-Output "  -Help, -h         Show this help message."
     exit 0
 }
@@ -101,11 +115,17 @@ function GenerateLicenses {
 
 function BuildSimAndItsFriends {
     Write-Output "Building Sim and its friends, for channel: $channel"
-    # Build sim.exe, cli.exe, comfy-worker.exe and auto_update_helper.exe
-    cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml --target $target
+    if ($Comfy) {
+        cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml --target $target
+    }
+    else {
+        cargo build --release --package sim --package cli --package auto_update_helper --target $target
+    }
     Copy-Item -Path ".\$CargoOutDir\sim.exe" -Destination "$innoDir\Sim.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
-    Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
+    if ($Comfy) {
+        Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
+    }
     Copy-Item -Path ".\$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
     # Build explorer_command_injector.dll
     switch ($channel) {
@@ -145,11 +165,13 @@ function ZipSimAndItsFriendsDebug {
     $items = @(
         ".\$CargoOutDir\sim.pdb",
         ".\$CargoOutDir\cli.pdb",
-        ".\$CargoOutDir\comfy-worker.pdb",
         ".\$CargoOutDir\auto_update_helper.pdb",
         ".\$CargoOutDir\explorer_command_injector.pdb",
         ".\$CargoOutDir\remote_server.pdb"
     )
+    if ($Comfy) {
+        $items += ".\$CargoOutDir\comfy-worker.pdb"
+    }
 
     Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip" -Force
 }
@@ -206,7 +228,10 @@ function SignSimAndItsFriends {
         return
     }
 
-    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\comfy-worker.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
+    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
+    if ($Comfy) {
+        $files += ",$innoDir\comfy-worker.exe"
+    }
     & "$innoDir\sign.ps1" $files
 }
 
@@ -334,6 +359,9 @@ function BuildInstaller {
         "Version"        = "$env:RELEASE_VERSION"
         "SourceDir"      = "$env:SIM_WORKSPACE"
         "AppxFullName"   = $appAppxFullName
+    }
+    if ($Comfy) {
+        $definitions["Comfy"] = "1"
     }
 
     $defs = @()

@@ -7425,7 +7425,25 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-REGISTRY-001, VAL-DOMAIN-004, VAL-PLUGIN-HOST-001, VAL-E2E-003, VAL-WORKER-PLUGIN-001, VAL-RUNTIME-TRUST-001, VAL-NATIVE-API-001, VAL-CANCEL-001, VAL-NATIVE-E2E-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_plugin_sdk -p comfy_plugin_host -p comfy_runtime -p comfy_worker -p comfy_api -p comfy_ui -p sim -p comfy_test_support; cargo test --locked -p comfy_plugin_sdk --all-targets; cargo test --locked -p comfy_plugin_host --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_worker --all-targets; cargo test --locked -p comfy_api --all-targets; cargo test --locked -p comfy_ui --features test-support --all-targets; cargo test --locked -p sim --features test-support --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_plugin_sdk -p comfy_plugin_host -p comfy_runtime -p comfy_worker -p comfy_api -p comfy_ui -p sim -p comfy_test_support; cargo test --locked -p comfy_nodes val_node_001 -- --nocapture; cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture; cargo test --locked -p comfy_plugin_sdk --lib type_ids -- --nocapture; cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture; cargo test --locked -p comfy_runtime val_runtime_trust_001 -- --nocapture; cargo test --locked -p comfy_runtime --lib provider_activation -- --nocapture; cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture; cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture; cargo test --locked -p comfy_test_support --test plugin_e2e val_plugin_host_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test plugin_e2e val_e2e_003 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test plugin_e2e val_worker_plugin_001 -- --exact --nocapture; cargo test --locked -p comfy_api val_native_api_001 -- --nocapture; cargo test --locked -p comfy_test_support val_cancel_001 -- --nocapture; cargo test --locked -p comfy_test_support --test native_image_e2e val_native_e2e_001 -- --exact --nocapture; cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
   - Done when: A signature-covered publisher binding set pins every canonical class, native contract digest, transport/materializer schema, and implementation namespace. A distinct host-authenticated activation envelope binds that set to the verified component snapshot and authorization generation, then activates the namespace only as one validated registry transaction. A sealed host-issued cost acceptance binds the principal, profile, prompt, provider binding, price bound, expiry, and nonce before any paid request. Native plans pin the verified provider registry generation and binding digests; app-owned capability sessions resolve invocation-scoped receipts without serializing native handles, paths, payloads, or secrets. Signed provider results are completely validated and materialized by canonical lower owners before attempt-local publication; metadata-only or forged outputs fail, and partial batches reverse every staged publication. Missing grants, secrets, cost acceptance, network, provider, cancellation, trap, timeout, malformed response, stale deployment, worker loss, restart, and partial batch perform zero unauthorized call and publish no binding, handle, cache, effect, output, or durable state; unavailable object-info and workflows remain lossless.
 
-- [x] 372. Implement native node family: (empty root category declared by source) part 1
+- [ ] 372. Make the Comfy product integration compile-time opt-in
+  - _id: comfy-parity-opt-in-product-build-boundary
+  - Outcome: Exclude Comfy from Sim's default compile, link, runtime, test-support, asset, and package graphs while retaining the complete CPU and explicitly selected accelerator integration behind one compile-time feature and one explicit packaging option.
+  - Wave: 193
+  - _Wave: 193
+  - Dependencies: comfy-parity-native-node-provider-invocation-foundation
+  - _Blocked_by: comfy-parity-native-node-provider-invocation-foundation
+  - Reads: Cargo.toml, crates/sim/Cargo.toml, crates/sim/src/main.rs, crates/sim/src/sim.rs, crates/sim/src/sim/app_menus.rs, crates/extension_host/Cargo.toml, crates/extension_host/src/extension_host.rs, assets/settings/default.json, assets/keymaps/default-comfy.json, script/bundle-mac, script/bundle-linux, script/bundle-windows.ps1, crates/sim/resources/windows/sim.iss
+  - _Reads: Cargo.toml, crates/sim/Cargo.toml, crates/sim/src/main.rs, crates/sim/src/sim.rs, crates/sim/src/sim/app_menus.rs, crates/extension_host/Cargo.toml, crates/extension_host/src/extension_host.rs, assets/settings/default.json, assets/keymaps/default-comfy.json, script/bundle-mac, script/bundle-linux, script/bundle-windows.ps1, crates/sim/resources/windows/sim.iss
+  - Writes: Cargo.lock, crates/sim/Cargo.toml, crates/sim/src/main.rs, crates/sim/src/sim.rs, crates/sim/src/sim/app_menus.rs, crates/extension_host/Cargo.toml, crates/extension_host/src/extension_host.rs, crates/extension_host/src/extension_store_test.rs, assets/settings/default.json, assets/settings/default-comfy.json, script/check-comfy-feature-boundary, script/bundle-mac, script/bundle-linux, script/bundle-windows.ps1, crates/sim/resources/windows/sim.iss, .agents/specs/comfy-parity/requirements.md, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/validation.md, .agents/specs/comfy-parity/regenerate_native_planning.py, .agents/specs/comfy-parity/test_regenerate_native_planning.py, .agents/specs/comfy-parity/tasks.md, .agents/specs/comfy-parity/traceability.md
+  - _Writes: Cargo.lock, crates/sim/Cargo.toml, crates/sim/src/main.rs, crates/sim/src/sim.rs, crates/sim/src/sim/app_menus.rs, crates/extension_host/Cargo.toml, crates/extension_host/src/extension_host.rs, crates/extension_host/src/extension_store_test.rs, assets/settings/default.json, assets/settings/default-comfy.json, script/check-comfy-feature-boundary, script/bundle-mac, script/bundle-linux, script/bundle-windows.ps1, crates/sim/resources/windows/sim.iss, .agents/specs/comfy-parity/requirements.md, .agents/specs/comfy-parity/design.md, .agents/specs/comfy-parity/validation.md, .agents/specs/comfy-parity/regenerate_native_planning.py, .agents/specs/comfy-parity/test_regenerate_native_planning.py, .agents/specs/comfy-parity/tasks.md, .agents/specs/comfy-parity/traceability.md
+  - Requirements: 45.1, 45.2, 45.3, 45.4, 45.5, 45.6
+  - _Requirements: 45.1, 45.2, 45.3, 45.4, 45.5, 45.6
+  - Design: D42
+  - Validation: VAL-COMFY-BUILD-001; commands: cargo fmt --all -- --check; cargo check --locked -p sim --no-default-features; cargo test --locked -p sim --no-default-features; cargo check --locked -p sim --features comfy; cargo test --locked -p sim --features comfy,comfy-test-support comfy_build_boundary -- --nocapture; ./script/clippy -p sim -p extension_host; ./script/check-comfy-feature-boundary; ./script/bundle-mac --dry-run; ./script/bundle-mac --comfy --dry-run; ./script/bundle-linux --dry-run; ./script/bundle-linux --comfy --dry-run; pwsh -File script/bundle-windows.ps1 -DryRun; pwsh -File script/bundle-windows.ps1 -Comfy -DryRun; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
+  - _Validation: VAL-COMFY-BUILD-001; commands: cargo fmt --all -- --check; cargo check --locked -p sim --no-default-features; cargo test --locked -p sim --no-default-features; cargo check --locked -p sim --features comfy; cargo test --locked -p sim --features comfy,comfy-test-support comfy_build_boundary -- --nocapture; ./script/clippy -p sim -p extension_host; ./script/check-comfy-feature-boundary; ./script/bundle-mac --dry-run; ./script/bundle-mac --comfy --dry-run; ./script/bundle-linux --dry-run; ./script/bundle-linux --comfy --dry-run; pwsh -File script/bundle-windows.ps1 -DryRun; pwsh -File script/bundle-windows.ps1 -Comfy -DryRun; PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py; python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
+  - Done when: The sim package has an empty default feature set and zero normal comfy_* dependencies unless `comfy` is selected. CPU Comfy and accelerator features retain existing behavior, ordinary test-support remains Comfy-free, and cfg gates remove every CLI, initialization, settings observer, panel, menu, action, keymap, worker, and Comfy asset surface from the default product. ExtensionHost validates component identifiers without a Comfy dependency. Default macOS, Linux, and Windows package plans omit the worker and Comfy assets, while an explicit Comfy package option preserves the existing worker/backend plan. Both modes pass focused build, test, dependency-tree, lint, and packaging smoke validation.
+
+- [x] 373. Implement native node family: (empty root category declared by source) part 1
   - _id: comfy-parity-native-nodes-empty-root-category-declared-by-source-comfy-node-0757
   - Outcome: The 1 rows assigned to this disjoint `(empty root category declared by source)` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7445,7 +7463,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK372 COMFY-NODE-0757 2026-08-10 commit 1f69b41c PASS. The sole declared family leaf now resolves and revalidates a checked SD15 NativeDiffusionPayload::Model through NativeStoredModelPayload and the exact MODEL handle; the previous Noise-as-Model fixture is absent. `cargo test --locked -p comfy_nodes --lib generated_empty_root_category_declared_by_source_01::tests -- --nocapture` selected 4 and passed 4/4; exact `generated_manifest_tests::generated_manifests_are_sorted_unique_and_catalog_backed` selected 1 and passed 1/1; `./script/clippy -p comfy_nodes`, `cargo fmt --all -- --check`, and diff hygiene exited 0. Observed on Darwin/aarch64 with the native CPU backend; no optional accelerator or provider certification is claimed.
 
-- [ ] 373. Implement native node family: 3d part 1
+- [ ] 374. Implement native node family: 3d part 1
   - _id: comfy-parity-native-nodes-three-d-comfy-node-0115
   - Outcome: The 10 rows assigned to this disjoint `3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared native 3D execution seams required by its rows: sealed LOAD_3D and LOAD3D_MODEL_INFO payloads, prompt-to-attempt asset sealing, safe output subfolders and logical locators, deterministic GLB encoding, and bounded basic and Surface Nets voxel-to-mesh kernels.
   - Wave: 194
@@ -7463,7 +7481,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-MEDIA-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-RECOVERY-005; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0115, COMFY-NODE-0334, COMFY-NODE-0335, COMFY-NODE-0487, COMFY-NODE-0488, COMFY-NODE-0491, COMFY-NODE-0493, COMFY-NODE-0592, COMFY-NODE-0746, COMFY-NODE-0747) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Canonical lower tests prove exact GLB chunks, voxel topology/colors/world transforms, sealed asset-selector admission, traversal/change-during-read rejection, safe subfolder staging, cancellation and restart cleanup, and one shared owner for every new payload and kernel.
 
-- [ ] 374. Implement native node family: 3d/splat part 1
+- [ ] 375. Implement native node family: 3d/splat part 1
   - _id: comfy-parity-native-nodes-three-d-splat-comfy-node-0172
   - Outcome: The 7 rows assigned to this disjoint `3d/splat` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared Gaussian-splat compute foundation: checked codec-to-payload conversion, variable-count/SH-aware merge, uniform and covariance-preserving nonuniform transforms, anisotropic EWA rendering, and density-grid Surface Nets meshing through the canonical media, tensor, scratch, and cancellation owners.
   - Wave: 195
@@ -7481,7 +7499,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEDIA-001, VAL-MEMORY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-TENSOR-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_tensor -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_media --all-targets; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_media -p comfy_tensor -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0172, COMFY-NODE-0206, COMFY-NODE-0406, COMFY-NODE-0533, COMFY-NODE-0628, COMFY-NODE-0629, COMFY-NODE-0682) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Source-derived numeric fixtures prove codec conversion, active-count padding, merge, covariance transforms, color/clay/depth/normal rendering, meshing, bounded scratch, cancellation, wrong-backend rejection, deterministic CPU execution, and zero partial publication.
 
-- [ ] 375. Implement native node family: advanced/debug part 1
+- [ ] 376. Implement native node family: advanced/debug part 1
   - _id: comfy-parity-native-nodes-advanced-debug-comfy-node-0140
   - Outcome: The 3 rows assigned to this disjoint `advanced/debug` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task also owns the missing shared immutable model-execution modifier boundary for EasyCache, LazyCache, and ModelComputeDtype: checked dtype policy, source-exact cache policy, attempt-local sampler state, canonical execution identity and residency, and runtime reset on every exit.
   - Wave: 196
@@ -7499,7 +7517,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CANCEL-001, VAL-MEMORY-001, VAL-MODEL-FAMILY-001, VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001, VAL-OWNERSHIP-001, VAL-SAMPLER-001; commands: cargo check --locked -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_sampler --all-targets; cargo test --locked -p comfy_runtime --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support -p comfy_model -p comfy_sampler -p comfy_runtime
   - Done when: Every exactly assigned feature row (COMFY-NODE-0140, COMFY-NODE-0333, COMFY-NODE-0418) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. Exact source fixtures prove real compute-dtype kernel selection, Easy/Lazy cache thresholds and sigma windows, conditioning UUID/video/audio invalidation, scope-guard restoration after success/failure/cancellation, immutable base reuse, attempt scratch convergence, cache identity invalidation, and no cross-attempt state leakage.
 
-- [ ] 376. Implement native node family: advanced/guidance part 1
+- [ ] 377. Implement native node family: advanced/guidance part 1
   - _id: comfy-parity-native-nodes-advanced-guidance-comfy-node-0049
   - Outcome: The 7 rows assigned to this disjoint `advanced/guidance` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7517,7 +7535,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0049, COMFY-NODE-0051, COMFY-NODE-0455, COMFY-NODE-0622, COMFY-NODE-0623, COMFY-NODE-0624, COMFY-NODE-0656) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 377. Implement native node family: advanced/hooks part 1
+- [ ] 378. Implement native node family: advanced/hooks part 1
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0079
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7535,7 +7553,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0079, COMFY-NODE-0080, COMFY-NODE-0081, COMFY-NODE-0096, COMFY-NODE-0098, COMFY-NODE-0099, COMFY-NODE-0102, COMFY-NODE-0116, COMFY-NODE-0117, COMFY-NODE-0118) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 378. Implement native node family: advanced/hooks part 2
+- [ ] 379. Implement native node family: advanced/hooks part 2
   - _id: comfy-parity-native-nodes-advanced-hooks-comfy-node-0119
   - Outcome: The 10 rows assigned to this disjoint `advanced/hooks` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7553,7 +7571,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0119, COMFY-NODE-0120, COMFY-NODE-0121, COMFY-NODE-0122, COMFY-NODE-0470, COMFY-NODE-0471, COMFY-NODE-0472, COMFY-NODE-0473, COMFY-NODE-0615, COMFY-NODE-0617) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 379. Implement native node family: advanced/multigpu part 1
+- [ ] 380. Implement native node family: advanced/multigpu part 1
   - _id: comfy-parity-native-nodes-advanced-multigpu-comfy-node-0454
   - Outcome: The 4 rows assigned to this disjoint `advanced/multigpu` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7571,7 +7589,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0454, COMFY-NODE-0611, COMFY-NODE-0612, COMFY-NODE-0613) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 380. Implement native node family: audio part 1
+- [ ] 381. Implement native node family: audio part 1
   - _id: comfy-parity-native-nodes-audio-comfy-node-0009
   - Outcome: The 10 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7589,7 +7607,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0009, COMFY-NODE-0010, COMFY-NODE-0013, COMFY-NODE-0014, COMFY-NODE-0152, COMFY-NODE-0274, COMFY-NODE-0336, COMFY-NODE-0490, COMFY-NODE-0508, COMFY-NODE-0588) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 381. Implement native node family: audio part 2
+- [ ] 382. Implement native node family: audio part 2
   - _id: comfy-parity-native-nodes-audio-comfy-node-0589
   - Outcome: The 5 rows assigned to this disjoint `audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7607,7 +7625,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0589, COMFY-NODE-0590, COMFY-NODE-0591, COMFY-NODE-0630, COMFY-NODE-0683) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 382. Implement native node family: experimental part 1
+- [ ] 383. Implement native node family: experimental part 1
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0133
   - Outcome: The 10 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7625,7 +7643,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0133, COMFY-NODE-0185, COMFY-NODE-0194, COMFY-NODE-0315, COMFY-NODE-0354, COMFY-NODE-0396, COMFY-NODE-0475, COMFY-NODE-0476, COMFY-NODE-0579, COMFY-NODE-0614) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 383. Implement native node family: experimental part 2
+- [ ] 384. Implement native node family: experimental part 2
   - _id: comfy-parity-native-nodes-experimental-comfy-node-0680
   - Outcome: The 1 rows assigned to this disjoint `experimental` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7643,7 +7661,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0680) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 384. Implement native node family: experimental/attention_experiments part 1
+- [ ] 385. Implement native node family: experimental/attention_experiments part 1
   - _id: comfy-parity-native-nodes-experimental-attention-experiments-comfy-node-0057
   - Outcome: The 4 rows assigned to this disjoint `experimental/attention_experiments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7661,7 +7679,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0057, COMFY-NODE-0704, COMFY-NODE-0706, COMFY-NODE-0707) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 385. Implement native node family: experimental/stable cascade part 1
+- [ ] 386. Implement native node family: experimental/stable cascade part 1
   - _id: comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638
   - Outcome: The 1 rows assigned to this disjoint `experimental/stable cascade` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7679,7 +7697,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0638) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 386. Implement native node family: image part 1
+- [ ] 387. Implement native node family: image part 1
   - _id: comfy-parity-native-nodes-image-comfy-node-0160
   - Outcome: The 10 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7697,7 +7715,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0160, COMFY-NODE-0205, COMFY-NODE-0245, COMFY-NODE-0339, COMFY-NODE-0340, COMFY-NODE-0341, COMFY-NODE-0342, COMFY-NODE-0343, COMFY-NODE-0469, COMFY-NODE-0492) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 387. Implement native node family: image part 2
+- [ ] 388. Implement native node family: image part 2
   - _id: comfy-parity-native-nodes-image-comfy-node-0586
   - Outcome: The 8 rows assigned to this disjoint `image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7715,7 +7733,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0586, COMFY-NODE-0587, COMFY-NODE-0593, COMFY-NODE-0594, COMFY-NODE-0595, COMFY-NODE-0596, COMFY-NODE-0599, COMFY-NODE-0788) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 388. Implement native node family: image/adjustments part 1
+- [ ] 389. Implement native node family: image/adjustments part 1
   - _id: comfy-parity-native-nodes-image-adjustments-comfy-node-0004
   - Outcome: The 2 rows assigned to this disjoint `image/adjustments` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7733,7 +7751,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0004, COMFY-NODE-0005) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 389. Implement native node family: image/background removal part 1
+- [ ] 390. Implement native node family: image/background removal part 1
   - _id: comfy-parity-native-nodes-image-background-removal-comfy-node-0532
   - Outcome: The 1 rows assigned to this disjoint `image/background removal` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7751,7 +7769,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0532) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 390. Implement native node family: image/batch part 1
+- [ ] 391. Implement native node family: image/batch part 1
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0017
   - Outcome: The 10 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7769,7 +7787,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0017, COMFY-NODE-0241, COMFY-NODE-0249, COMFY-NODE-0251, COMFY-NODE-0252, COMFY-NODE-0255, COMFY-NODE-0405, COMFY-NODE-0506, COMFY-NODE-0535, COMFY-NODE-0620) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 391. Implement native node family: image/batch part 2
+- [ ] 392. Implement native node family: image/batch part 2
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0621
   - Outcome: The 2 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7787,7 +7805,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0621, COMFY-NODE-0631) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 392. Implement native node family: image/color part 1
+- [ ] 393. Implement native node family: image/color part 1
   - _id: comfy-parity-native-nodes-image-color-comfy-node-0254
   - Outcome: The 4 rows assigned to this disjoint `image/color` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7805,7 +7823,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0254, COMFY-NODE-0260, COMFY-NODE-0270, COMFY-NODE-0456) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 393. Implement native node family: image/compositing part 1
+- [ ] 394. Implement native node family: image/compositing part 1
   - _id: comfy-parity-native-nodes-image-compositing-comfy-node-0246
   - Outcome: The 4 rows assigned to this disjoint `image/compositing` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7823,7 +7841,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0246, COMFY-NODE-0275, COMFY-NODE-0486, COMFY-NODE-0632) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 394. Implement native node family: image/detection part 1
+- [ ] 395. Implement native node family: image/detection part 1
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0136
   - Outcome: The 10 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7841,7 +7859,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0136, COMFY-NODE-0402, COMFY-NODE-0403, COMFY-NODE-0404, COMFY-NODE-0556, COMFY-NODE-0564, COMFY-NODE-0565, COMFY-NODE-0566, COMFY-NODE-0567, COMFY-NODE-0606) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 395. Implement native node family: image/detection part 2
+- [ ] 396. Implement native node family: image/detection part 2
   - _id: comfy-parity-native-nodes-image-detection-comfy-node-0607
   - Outcome: The 2 rows assigned to this disjoint `image/detection` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7859,7 +7877,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0607, COMFY-NODE-0608) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 396. Implement native node family: image/filters part 1
+- [ ] 397. Implement native node family: image/filters part 1
   - _id: comfy-parity-native-nodes-image-filters-comfy-node-0045
   - Outcome: The 8 rows assigned to this disjoint `image/filters` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7877,7 +7895,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0045, COMFY-NODE-0078, COMFY-NODE-0240, COMFY-NODE-0242, COMFY-NODE-0243, COMFY-NODE-0259, COMFY-NODE-0266, COMFY-NODE-0453) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 397. Implement native node family: image/geometry estimation part 1
+- [ ] 398. Implement native node family: image/geometry estimation part 1
   - _id: comfy-parity-native-nodes-image-geometry-estimation-comfy-node-0129
   - Outcome: The 7 rows assigned to this disjoint `image/geometry estimation` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7895,7 +7913,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0129, COMFY-NODE-0130, COMFY-NODE-0131, COMFY-NODE-0449, COMFY-NODE-0450, COMFY-NODE-0451, COMFY-NODE-0452) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 398. Implement native node family: image/mask part 1
+- [ ] 399. Implement native node family: image/mask part 1
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0019
   - Outcome: The 10 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7913,7 +7931,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0019, COMFY-NODE-0126, COMFY-NODE-0171, COMFY-NODE-0219, COMFY-NODE-0244, COMFY-NODE-0268, COMFY-NODE-0273, COMFY-NODE-0399, COMFY-NODE-0400, COMFY-NODE-0401) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 399. Implement native node family: image/mask part 2
+- [ ] 400. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
   - Outcome: The 3 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7931,7 +7949,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0625, COMFY-NODE-0675, COMFY-NODE-0742) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 400. Implement native node family: image/shader part 1
+- [ ] 401. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
   - Outcome: The 1 rows assigned to this disjoint `image/shader` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7949,7 +7967,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0211) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 401. Implement native node family: image/transform part 1
+- [ ] 402. Implement native node family: image/transform part 1
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0047
   - Outcome: The 10 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7967,7 +7985,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0047, COMFY-NODE-0125, COMFY-NODE-0247, COMFY-NODE-0248, COMFY-NODE-0250, COMFY-NODE-0258, COMFY-NODE-0261, COMFY-NODE-0267, COMFY-NODE-0504, COMFY-NODE-0540) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 402. Implement native node family: image/transform part 2
+- [ ] 403. Implement native node family: image/transform part 2
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0541
   - Outcome: The 3 rows assigned to this disjoint `image/transform` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -7985,7 +8003,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0541, COMFY-NODE-0542, COMFY-NODE-0543) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 403. Implement native node family: image/upscaling part 1
+- [ ] 404. Implement native node family: image/upscaling part 1
   - _id: comfy-parity-native-nodes-image-upscaling-comfy-node-0262
   - Outcome: The 5 rows assigned to this disjoint `image/upscaling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8003,7 +8021,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0262, COMFY-NODE-0263, COMFY-NODE-0264, COMFY-NODE-0265, COMFY-NODE-0269) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 404. Implement native node family: image/video part 1
+- [ ] 405. Implement native node family: image/video part 1
   - _id: comfy-parity-native-nodes-image-video-comfy-node-0762
   - Outcome: The 2 rows assigned to this disjoint `image/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8021,7 +8039,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0762, COMFY-NODE-0763) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 405. Implement native node family: model/conditioning part 1
+- [ ] 406. Implement native node family: model/conditioning part 1
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0008
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8039,7 +8057,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0008, COMFY-NODE-0011, COMFY-NODE-0022, COMFY-NODE-0063, COMFY-NODE-0064, COMFY-NODE-0065, COMFY-NODE-0066, COMFY-NODE-0067, COMFY-NODE-0068, COMFY-NODE-0069) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 406. Implement native node family: model/conditioning part 2
+- [ ] 407. Implement native node family: model/conditioning part 2
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0070
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8057,7 +8075,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0070, COMFY-NODE-0071, COMFY-NODE-0072, COMFY-NODE-0073, COMFY-NODE-0074, COMFY-NODE-0075, COMFY-NODE-0088, COMFY-NODE-0089, COMFY-NODE-0090, COMFY-NODE-0091) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 407. Implement native node family: model/conditioning part 3
+- [ ] 408. Implement native node family: model/conditioning part 3
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0092
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8075,7 +8093,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0092, COMFY-NODE-0093, COMFY-NODE-0094, COMFY-NODE-0095, COMFY-NODE-0097, COMFY-NODE-0100, COMFY-NODE-0101, COMFY-NODE-0103, COMFY-NODE-0105, COMFY-NODE-0106) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 408. Implement native node family: model/conditioning part 4
+- [ ] 409. Implement native node family: model/conditioning part 4
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0107
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8093,7 +8111,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0107, COMFY-NODE-0108, COMFY-NODE-0112, COMFY-NODE-0113, COMFY-NODE-0178, COMFY-NODE-0180, COMFY-NODE-0181, COMFY-NODE-0183, COMFY-NODE-0203, COMFY-NODE-0204) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 409. Implement native node family: model/conditioning part 5
+- [ ] 410. Implement native node family: model/conditioning part 5
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0210
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8111,7 +8129,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0210, COMFY-NODE-0225, COMFY-NODE-0228, COMFY-NODE-0229, COMFY-NODE-0230, COMFY-NODE-0231, COMFY-NODE-0232, COMFY-NODE-0234, COMFY-NODE-0271, COMFY-NODE-0272) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 410. Implement native node family: model/conditioning part 6
+- [ ] 411. Implement native node family: model/conditioning part 6
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0277
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8129,7 +8147,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0277, COMFY-NODE-0356, COMFY-NODE-0358, COMFY-NODE-0365, COMFY-NODE-0367, COMFY-NODE-0369, COMFY-NODE-0370, COMFY-NODE-0373, COMFY-NODE-0457, COMFY-NODE-0478) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 411. Implement native node family: model/conditioning part 7
+- [ ] 412. Implement native node family: model/conditioning part 7
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0480
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8147,7 +8165,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0480, COMFY-NODE-0527, COMFY-NODE-0528, COMFY-NODE-0603, COMFY-NODE-0605, COMFY-NODE-0619, COMFY-NODE-0636, COMFY-NODE-0639, COMFY-NODE-0640, COMFY-NODE-0650) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 412. Implement native node family: model/conditioning part 8
+- [ ] 413. Implement native node family: model/conditioning part 8
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0653
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8165,7 +8183,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0653, COMFY-NODE-0654, COMFY-NODE-0655, COMFY-NODE-0664, COMFY-NODE-0665, COMFY-NODE-0666, COMFY-NODE-0667, COMFY-NODE-0668, COMFY-NODE-0669, COMFY-NODE-0670) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 413. Implement native node family: model/conditioning part 9
+- [ ] 414. Implement native node family: model/conditioning part 9
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0696
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8183,7 +8201,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0696, COMFY-NODE-0697, COMFY-NODE-0703, COMFY-NODE-0741, COMFY-NODE-0749, COMFY-NODE-0750, COMFY-NODE-0756, COMFY-NODE-0758, COMFY-NODE-0759, COMFY-NODE-0761) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 414. Implement native node family: model/conditioning part 10
+- [ ] 415. Implement native node family: model/conditioning part 10
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0764
   - Outcome: The 10 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8201,7 +8219,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0764, COMFY-NODE-0765, COMFY-NODE-0766, COMFY-NODE-0767, COMFY-NODE-0768, COMFY-NODE-0770, COMFY-NODE-0772, COMFY-NODE-0773, COMFY-NODE-0774, COMFY-NODE-0775) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 415. Implement native node family: model/conditioning part 11
+- [ ] 416. Implement native node family: model/conditioning part 11
   - _id: comfy-parity-native-nodes-model-conditioning-comfy-node-0776
   - Outcome: The 7 rows assigned to this disjoint `model/conditioning` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8219,7 +8237,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0776, COMFY-NODE-0777, COMFY-NODE-0779, COMFY-NODE-0780, COMFY-NODE-0781, COMFY-NODE-0784, COMFY-NODE-0785) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 416. Implement native node family: model/latent part 1
+- [ ] 417. Implement native node family: model/latent part 1
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0018
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8237,7 +8255,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0018, COMFY-NODE-0149, COMFY-NODE-0150, COMFY-NODE-0151, COMFY-NODE-0153, COMFY-NODE-0154, COMFY-NODE-0155, COMFY-NODE-0156, COMFY-NODE-0157, COMFY-NODE-0158) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 417. Implement native node family: model/latent part 2
+- [ ] 418. Implement native node family: model/latent part 2
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0159
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8255,7 +8273,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0159, COMFY-NODE-0161, COMFY-NODE-0162, COMFY-NODE-0163, COMFY-NODE-0164, COMFY-NODE-0165, COMFY-NODE-0166, COMFY-NODE-0167, COMFY-NODE-0233, COMFY-NODE-0310) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 418. Implement native node family: model/latent part 3
+- [ ] 419. Implement native node family: model/latent part 3
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0311
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8273,7 +8291,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0311, COMFY-NODE-0312, COMFY-NODE-0313, COMFY-NODE-0314, COMFY-NODE-0316, COMFY-NODE-0317, COMFY-NODE-0318, COMFY-NODE-0319, COMFY-NODE-0320, COMFY-NODE-0321) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 419. Implement native node family: model/latent part 4
+- [ ] 420. Implement native node family: model/latent part 4
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0322
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8291,7 +8309,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0322, COMFY-NODE-0323, COMFY-NODE-0324, COMFY-NODE-0325, COMFY-NODE-0326, COMFY-NODE-0327, COMFY-NODE-0328, COMFY-NODE-0329, COMFY-NODE-0330, COMFY-NODE-0331) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 420. Implement native node family: model/latent part 5
+- [ ] 421. Implement native node family: model/latent part 5
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0344
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8309,7 +8327,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0344, COMFY-NODE-0361, COMFY-NODE-0362, COMFY-NODE-0364, COMFY-NODE-0368, COMFY-NODE-0371, COMFY-NODE-0375, COMFY-NODE-0507, COMFY-NODE-0536, COMFY-NODE-0538) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 421. Implement native node family: model/latent part 6
+- [ ] 422. Implement native node family: model/latent part 6
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0597
   - Outcome: The 10 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8327,7 +8345,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0597, COMFY-NODE-0618, COMFY-NODE-0635, COMFY-NODE-0637, COMFY-NODE-0684, COMFY-NODE-0698, COMFY-NODE-0710, COMFY-NODE-0711, COMFY-NODE-0712, COMFY-NODE-0713) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 422. Implement native node family: model/latent part 7
+- [ ] 423. Implement native node family: model/latent part 7
   - _id: comfy-parity-native-nodes-model-latent-comfy-node-0714
   - Outcome: The 8 rows assigned to this disjoint `model/latent` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8345,7 +8363,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0714, COMFY-NODE-0715, COMFY-NODE-0716, COMFY-NODE-0717, COMFY-NODE-0718, COMFY-NODE-0719, COMFY-NODE-0744, COMFY-NODE-0745) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 423. Implement native node family: model/loaders part 1
+- [ ] 424. Implement native node family: model/loaders part 1
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0012
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8363,7 +8381,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0012, COMFY-NODE-0052, COMFY-NODE-0053, COMFY-NODE-0058, COMFY-NODE-0076, COMFY-NODE-0109, COMFY-NODE-0132, COMFY-NODE-0134, COMFY-NODE-0138, COMFY-NODE-0191) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 424. Implement native node family: model/loaders part 2
+- [ ] 425. Implement native node family: model/loaders part 2
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0209
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8381,7 +8399,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0209, COMFY-NODE-0235, COMFY-NODE-0256, COMFY-NODE-0332, COMFY-NODE-0337, COMFY-NODE-0338, COMFY-NODE-0345, COMFY-NODE-0346, COMFY-NODE-0349, COMFY-NODE-0350) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 425. Implement native node family: model/loaders part 3
+- [ ] 426. Implement native node family: model/loaders part 3
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0351
   - Outcome: The 10 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8399,7 +8417,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0351, COMFY-NODE-0352, COMFY-NODE-0353, COMFY-NODE-0357, COMFY-NODE-0363, COMFY-NODE-0439, COMFY-NODE-0467, COMFY-NODE-0479, COMFY-NODE-0500, COMFY-NODE-0651) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 426. Implement native node family: model/loaders part 4
+- [ ] 427. Implement native node family: model/loaders part 4
   - _id: comfy-parity-native-nodes-model-loaders-comfy-node-0685
   - Outcome: The 5 rows assigned to this disjoint `model/loaders` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8417,7 +8435,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0685, COMFY-NODE-0702, COMFY-NODE-0705, COMFY-NODE-0708, COMFY-NODE-0720) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 427. Implement native node family: model/merging part 1
+- [ ] 428. Implement native node family: model/merging part 1
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0054
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8435,7 +8453,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0054, COMFY-NODE-0059, COMFY-NODE-0060, COMFY-NODE-0061, COMFY-NODE-0062, COMFY-NODE-0257, COMFY-NODE-0419, COMFY-NODE-0420, COMFY-NODE-0421, COMFY-NODE-0422) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 428. Implement native node family: model/merging part 2
+- [ ] 429. Implement native node family: model/merging part 2
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0423
   - Outcome: The 10 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8453,7 +8471,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0423, COMFY-NODE-0424, COMFY-NODE-0425, COMFY-NODE-0426, COMFY-NODE-0427, COMFY-NODE-0428, COMFY-NODE-0429, COMFY-NODE-0430, COMFY-NODE-0431, COMFY-NODE-0432) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 429. Implement native node family: model/merging part 3
+- [ ] 430. Implement native node family: model/merging part 3
   - _id: comfy-parity-native-nodes-model-merging-comfy-node-0433
   - Outcome: The 8 rows assigned to this disjoint `model/merging` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8471,7 +8489,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0433, COMFY-NODE-0434, COMFY-NODE-0435, COMFY-NODE-0436, COMFY-NODE-0437, COMFY-NODE-0448, COMFY-NODE-0598, COMFY-NODE-0721) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 430. Implement native node family: model/patch part 1
+- [ ] 431. Implement native node family: model/patch part 1
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0055
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8489,7 +8507,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0055, COMFY-NODE-0104, COMFY-NODE-0168, COMFY-NODE-0192, COMFY-NODE-0193, COMFY-NODE-0224, COMFY-NODE-0236, COMFY-NODE-0366, COMFY-NODE-0438, COMFY-NODE-0440) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 431. Implement native node family: model/patch part 2
+- [ ] 432. Implement native node family: model/patch part 2
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0441
   - Outcome: The 10 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8507,7 +8525,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0441, COMFY-NODE-0442, COMFY-NODE-0443, COMFY-NODE-0444, COMFY-NODE-0445, COMFY-NODE-0446, COMFY-NODE-0447, COMFY-NODE-0474, COMFY-NODE-0477, COMFY-NODE-0503) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 432. Implement native node family: model/patch part 3
+- [ ] 433. Implement native node family: model/patch part 3
   - _id: comfy-parity-native-nodes-model-patch-comfy-node-0534
   - Outcome: The 9 rows assigned to this disjoint `model/patch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8525,7 +8543,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0534, COMFY-NODE-0539, COMFY-NODE-0604, COMFY-NODE-0652, COMFY-NODE-0657, COMFY-NODE-0676, COMFY-NODE-0709, COMFY-NODE-0760, COMFY-NODE-0789) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 433. Implement native node family: model/sampling part 1
+- [ ] 434. Implement native node family: model/sampling part 1
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0001
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8543,7 +8561,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0001, COMFY-NODE-0006, COMFY-NODE-0007, COMFY-NODE-0015, COMFY-NODE-0016, COMFY-NODE-0023, COMFY-NODE-0048, COMFY-NODE-0050, COMFY-NODE-0135, COMFY-NODE-0137) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 434. Implement native node family: model/sampling part 2
+- [ ] 435. Implement native node family: model/sampling part 2
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0139
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8561,7 +8579,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0139, COMFY-NODE-0169, COMFY-NODE-0170, COMFY-NODE-0173, COMFY-NODE-0177, COMFY-NODE-0208, COMFY-NODE-0237, COMFY-NODE-0278, COMFY-NODE-0306, COMFY-NODE-0307) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 435. Implement native node family: model/sampling part 3
+- [ ] 436. Implement native node family: model/sampling part 3
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0308
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8579,7 +8597,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0308, COMFY-NODE-0309, COMFY-NODE-0374, COMFY-NODE-0398, COMFY-NODE-0468, COMFY-NODE-0485, COMFY-NODE-0505, COMFY-NODE-0568, COMFY-NODE-0569, COMFY-NODE-0570) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 436. Implement native node family: model/sampling part 4
+- [ ] 437. Implement native node family: model/sampling part 4
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0571
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8597,7 +8615,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0571, COMFY-NODE-0572, COMFY-NODE-0573, COMFY-NODE-0574, COMFY-NODE-0575, COMFY-NODE-0576, COMFY-NODE-0577, COMFY-NODE-0578, COMFY-NODE-0580, COMFY-NODE-0581) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 437. Implement native node family: model/sampling part 5
+- [ ] 438. Implement native node family: model/sampling part 5
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0582
   - Outcome: The 10 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8615,7 +8633,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0582, COMFY-NODE-0583, COMFY-NODE-0584, COMFY-NODE-0585, COMFY-NODE-0609, COMFY-NODE-0616, COMFY-NODE-0633, COMFY-NODE-0634, COMFY-NODE-0726, COMFY-NODE-0727) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 438. Implement native node family: model/sampling part 6
+- [ ] 439. Implement native node family: model/sampling part 6
   - _id: comfy-parity-native-nodes-model-sampling-comfy-node-0743
   - Outcome: The 2 rows assigned to this disjoint `model/sampling` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8633,7 +8651,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0743, COMFY-NODE-0748) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 439. Implement native node family: model/training part 1
+- [ ] 440. Implement native node family: model/training part 1
   - _id: comfy-parity-native-nodes-model-training-comfy-node-0347
   - Outcome: The 6 rows assigned to this disjoint `model/training` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -8651,7 +8669,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0347, COMFY-NODE-0355, COMFY-NODE-0397, COMFY-NODE-0544, COMFY-NODE-0600, COMFY-NODE-0681) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 440. Implement native node family: partner/3d part 1
+- [ ] 441. Implement native node family: partner/3d part 1
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0408
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8669,7 +8687,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0408, COMFY-NODE-0409, COMFY-NODE-0410, COMFY-NODE-0411, COMFY-NODE-0412, COMFY-NODE-0413, COMFY-NODE-0414, COMFY-NODE-0549, COMFY-NODE-0550, COMFY-NODE-0551) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 441. Implement native node family: partner/3d part 2
+- [ ] 442. Implement native node family: partner/3d part 2
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0552
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8687,7 +8705,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0552, COMFY-NODE-0553, COMFY-NODE-0554, COMFY-NODE-0555, COMFY-NODE-0658, COMFY-NODE-0659, COMFY-NODE-0660, COMFY-NODE-0661, COMFY-NODE-0662, COMFY-NODE-0663) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 442. Implement native node family: partner/3d part 3
+- [ ] 443. Implement native node family: partner/3d part 3
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0686
   - Outcome: The 10 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8705,7 +8723,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0686, COMFY-NODE-0687, COMFY-NODE-0688, COMFY-NODE-0689, COMFY-NODE-0690, COMFY-NODE-0691, COMFY-NODE-0692, COMFY-NODE-0693, COMFY-NODE-0694, COMFY-NODE-0695) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 443. Implement native node family: partner/3d part 4
+- [ ] 444. Implement native node family: partner/3d part 4
   - _id: comfy-parity-native-nodes-partner-three-d-comfy-node-0699
   - Outcome: The 2 rows assigned to this disjoint `partner/3d` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8723,7 +8741,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0699, COMFY-NODE-0700) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 444. Implement native node family: partner/audio part 1
+- [ ] 445. Implement native node family: partner/audio part 1
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0040
   - Outcome: The 10 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8741,7 +8759,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0040, COMFY-NODE-0141, COMFY-NODE-0142, COMFY-NODE-0143, COMFY-NODE-0144, COMFY-NODE-0145, COMFY-NODE-0146, COMFY-NODE-0147, COMFY-NODE-0148, COMFY-NODE-0626) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 445. Implement native node family: partner/audio part 2
+- [ ] 446. Implement native node family: partner/audio part 2
   - _id: comfy-parity-native-nodes-partner-audio-comfy-node-0627
   - Outcome: The 1 rows assigned to this disjoint `partner/audio` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8759,7 +8777,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0627) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 446. Implement native node family: partner/image part 1
+- [ ] 447. Implement native node family: partner/image part 1
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0020
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8777,7 +8795,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0020, COMFY-NODE-0024, COMFY-NODE-0025, COMFY-NODE-0034, COMFY-NODE-0037, COMFY-NODE-0042, COMFY-NODE-0043, COMFY-NODE-0174, COMFY-NODE-0175, COMFY-NODE-0176) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 447. Implement native node family: partner/image part 2
+- [ ] 448. Implement native node family: partner/image part 2
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0179
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8795,7 +8813,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0179, COMFY-NODE-0182, COMFY-NODE-0184, COMFY-NODE-0186, COMFY-NODE-0187, COMFY-NODE-0188, COMFY-NODE-0189, COMFY-NODE-0195, COMFY-NODE-0196, COMFY-NODE-0198) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 448. Implement native node family: partner/image part 3
+- [ ] 449. Implement native node family: partner/image part 3
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0199
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8813,7 +8831,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0199, COMFY-NODE-0212, COMFY-NODE-0213, COMFY-NODE-0214, COMFY-NODE-0226, COMFY-NODE-0238, COMFY-NODE-0239, COMFY-NODE-0286, COMFY-NODE-0293, COMFY-NODE-0303) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 449. Implement native node family: partner/image part 4
+- [ ] 450. Implement native node family: partner/image part 4
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0304
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8831,7 +8849,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0304, COMFY-NODE-0305, COMFY-NODE-0377, COMFY-NODE-0378, COMFY-NODE-0379, COMFY-NODE-0380, COMFY-NODE-0389, COMFY-NODE-0391, COMFY-NODE-0392, COMFY-NODE-0393) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 450. Implement native node family: partner/image part 5
+- [ ] 451. Implement native node family: partner/image part 5
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0394
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8849,7 +8867,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0394, COMFY-NODE-0395, COMFY-NODE-0460, COMFY-NODE-0461, COMFY-NODE-0462, COMFY-NODE-0463, COMFY-NODE-0501, COMFY-NODE-0502, COMFY-NODE-0509, COMFY-NODE-0510) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 451. Implement native node family: partner/image part 6
+- [ ] 452. Implement native node family: partner/image part 6
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0511
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8867,7 +8885,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0511, COMFY-NODE-0512, COMFY-NODE-0513, COMFY-NODE-0514, COMFY-NODE-0515, COMFY-NODE-0516, COMFY-NODE-0517, COMFY-NODE-0518, COMFY-NODE-0519, COMFY-NODE-0520) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 452. Implement native node family: partner/image part 7
+- [ ] 453. Implement native node family: partner/image part 7
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0521
   - Outcome: The 10 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8885,7 +8903,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0521, COMFY-NODE-0522, COMFY-NODE-0523, COMFY-NODE-0524, COMFY-NODE-0525, COMFY-NODE-0526, COMFY-NODE-0546, COMFY-NODE-0547, COMFY-NODE-0548, COMFY-NODE-0563) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 453. Implement native node family: partner/image part 8
+- [ ] 454. Implement native node family: partner/image part 8
   - _id: comfy-parity-native-nodes-partner-image-comfy-node-0677
   - Outcome: The 4 rows assigned to this disjoint `partner/image` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8903,7 +8921,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0677, COMFY-NODE-0769, COMFY-NODE-0782, COMFY-NODE-0787) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 454. Implement native node family: partner/text part 1
+- [ ] 455. Implement native node family: partner/text part 1
   - _id: comfy-parity-native-nodes-partner-text-comfy-node-0041
   - Outcome: The 9 rows assigned to this disjoint `partner/text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8921,7 +8939,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0041, COMFY-NODE-0056, COMFY-NODE-0197, COMFY-NODE-0200, COMFY-NODE-0201, COMFY-NODE-0458, COMFY-NODE-0459, COMFY-NODE-0464, COMFY-NODE-0466) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 455. Implement native node family: partner/video part 1
+- [ ] 456. Implement native node family: partner/video part 1
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0021
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8939,7 +8957,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0021, COMFY-NODE-0026, COMFY-NODE-0027, COMFY-NODE-0028, COMFY-NODE-0029, COMFY-NODE-0031, COMFY-NODE-0032, COMFY-NODE-0033, COMFY-NODE-0035, COMFY-NODE-0036) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 456. Implement native node family: partner/video part 2
+- [ ] 457. Implement native node family: partner/video part 2
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0038
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8957,7 +8975,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0038, COMFY-NODE-0039, COMFY-NODE-0044, COMFY-NODE-0202, COMFY-NODE-0215, COMFY-NODE-0216, COMFY-NODE-0217, COMFY-NODE-0218, COMFY-NODE-0220, COMFY-NODE-0221) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 457. Implement native node family: partner/video part 3
+- [ ] 458. Implement native node family: partner/video part 3
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0222
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8975,7 +8993,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0222, COMFY-NODE-0223, COMFY-NODE-0227, COMFY-NODE-0279, COMFY-NODE-0280, COMFY-NODE-0281, COMFY-NODE-0282, COMFY-NODE-0283, COMFY-NODE-0284, COMFY-NODE-0285) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 458. Implement native node family: partner/video part 4
+- [ ] 459. Implement native node family: partner/video part 4
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0287
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -8993,7 +9011,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0287, COMFY-NODE-0288, COMFY-NODE-0289, COMFY-NODE-0290, COMFY-NODE-0291, COMFY-NODE-0292, COMFY-NODE-0294, COMFY-NODE-0295, COMFY-NODE-0296, COMFY-NODE-0297) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 459. Implement native node family: partner/video part 5
+- [ ] 460. Implement native node family: partner/video part 5
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0298
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9011,7 +9029,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0298, COMFY-NODE-0299, COMFY-NODE-0300, COMFY-NODE-0301, COMFY-NODE-0302, COMFY-NODE-0359, COMFY-NODE-0360, COMFY-NODE-0376, COMFY-NODE-0381, COMFY-NODE-0382) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 460. Implement native node family: partner/video part 6
+- [ ] 461. Implement native node family: partner/video part 6
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0383
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9029,7 +9047,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0383, COMFY-NODE-0384, COMFY-NODE-0385, COMFY-NODE-0386, COMFY-NODE-0387, COMFY-NODE-0388, COMFY-NODE-0390, COMFY-NODE-0415, COMFY-NODE-0416, COMFY-NODE-0417) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 461. Implement native node family: partner/video part 7
+- [ ] 462. Implement native node family: partner/video part 7
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0465
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9047,7 +9065,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0465, COMFY-NODE-0481, COMFY-NODE-0482, COMFY-NODE-0483, COMFY-NODE-0484, COMFY-NODE-0557, COMFY-NODE-0558, COMFY-NODE-0559, COMFY-NODE-0560, COMFY-NODE-0561) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 462. Implement native node family: partner/video part 8
+- [ ] 463. Implement native node family: partner/video part 8
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0562
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9065,7 +9083,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0562, COMFY-NODE-0678, COMFY-NODE-0679, COMFY-NODE-0722, COMFY-NODE-0723, COMFY-NODE-0724, COMFY-NODE-0728, COMFY-NODE-0729, COMFY-NODE-0730, COMFY-NODE-0731) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 463. Implement native node family: partner/video part 9
+- [ ] 464. Implement native node family: partner/video part 9
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0732
   - Outcome: The 10 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9083,7 +9101,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0732, COMFY-NODE-0733, COMFY-NODE-0734, COMFY-NODE-0735, COMFY-NODE-0736, COMFY-NODE-0737, COMFY-NODE-0738, COMFY-NODE-0739, COMFY-NODE-0740, COMFY-NODE-0751) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 464. Implement native node family: partner/video part 10
+- [ ] 465. Implement native node family: partner/video part 10
   - _id: comfy-parity-native-nodes-partner-video-comfy-node-0752
   - Outcome: The 8 rows assigned to this disjoint `partner/video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 193
@@ -9101,7 +9119,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0752, COMFY-NODE-0753, COMFY-NODE-0754, COMFY-NODE-0755, COMFY-NODE-0771, COMFY-NODE-0778, COMFY-NODE-0783, COMFY-NODE-0786) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 465. Implement native node family: text part 1
+- [ ] 466. Implement native node family: text part 1
   - _id: comfy-parity-native-nodes-text-comfy-node-0002
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9119,7 +9137,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0002, COMFY-NODE-0003, COMFY-NODE-0030, COMFY-NODE-0046, COMFY-NODE-0110, COMFY-NODE-0111, COMFY-NODE-0276, COMFY-NODE-0407, COMFY-NODE-0529, COMFY-NODE-0530) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 466. Implement native node family: text part 2
+- [ ] 467. Implement native node family: text part 2
   - _id: comfy-parity-native-nodes-text-comfy-node-0531
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9137,7 +9155,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0531, COMFY-NODE-0537, COMFY-NODE-0641, COMFY-NODE-0642, COMFY-NODE-0643, COMFY-NODE-0644, COMFY-NODE-0645, COMFY-NODE-0646, COMFY-NODE-0647, COMFY-NODE-0648) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 467. Implement native node family: text part 3
+- [ ] 468. Implement native node family: text part 3
   - _id: comfy-parity-native-nodes-text-comfy-node-0649
   - Outcome: The 6 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9155,7 +9173,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0649, COMFY-NODE-0671, COMFY-NODE-0672, COMFY-NODE-0673, COMFY-NODE-0674, COMFY-NODE-0701) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 468. Implement native node family: utilities part 1
+- [ ] 469. Implement native node family: utilities part 1
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0077
   - Outcome: The 10 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9173,7 +9191,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0077, COMFY-NODE-0083, COMFY-NODE-0085, COMFY-NODE-0114, COMFY-NODE-0123, COMFY-NODE-0127, COMFY-NODE-0128, COMFY-NODE-0253, COMFY-NODE-0489, COMFY-NODE-0545) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 469. Implement native node family: utilities part 2
+- [ ] 470. Implement native node family: utilities part 2
   - _id: comfy-parity-native-nodes-utilities-comfy-node-0610
   - Outcome: The 1 rows assigned to this disjoint `utilities` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9191,7 +9209,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0610) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 470. Implement native node family: utilities/logic part 1
+- [ ] 471. Implement native node family: utilities/logic part 1
   - _id: comfy-parity-native-nodes-utilities-logic-comfy-node-0082
   - Outcome: The 4 rows assigned to this disjoint `utilities/logic` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9209,7 +9227,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0082, COMFY-NODE-0084, COMFY-NODE-0086, COMFY-NODE-0087) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 471. Implement native node family: utilities/primitive part 1
+- [ ] 472. Implement native node family: utilities/primitive part 1
   - _id: comfy-parity-native-nodes-utilities-primitive-comfy-node-0494
   - Outcome: The 6 rows assigned to this disjoint `utilities/primitive` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9227,7 +9245,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0494, COMFY-NODE-0495, COMFY-NODE-0496, COMFY-NODE-0497, COMFY-NODE-0498, COMFY-NODE-0499) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 472. Implement native node family: video part 1
+- [ ] 473. Implement native node family: video part 1
   - _id: comfy-parity-native-nodes-video-comfy-node-0124
   - Outcome: The 7 rows assigned to this disjoint `video` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9245,7 +9263,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0124, COMFY-NODE-0190, COMFY-NODE-0207, COMFY-NODE-0348, COMFY-NODE-0601, COMFY-NODE-0602, COMFY-NODE-0725) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 473. Implement native node family: video/preprocessors part 1
+- [ ] 474. Implement native node family: video/preprocessors part 1
   - _id: comfy-parity-native-nodes-video-preprocessors-comfy-node-0372
   - Outcome: The 1 rows assigned to this disjoint `video/preprocessors` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 192
@@ -9263,7 +9281,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0372) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 474. Generate the final native implementation registry and closure report
+- [ ] 475. Generate the final native implementation registry and closure report
   - _id: comfy-parity-native-registry-integration
   - Outcome: A serialized generator consumes disjoint node/model/provider bindings after all family tasks and emits the central implementation registry, object-info and production runtime projections, and zero-delta closure report.
   - Wave: 197
@@ -9281,7 +9299,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CATALOG-001, VAL-NODE-CLOSURE-001, VAL-MODEL-FAMILY-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002; commands: cargo check -p comfy_nodes -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_api -p sim -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_model --all-targets; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_worker --all-targets; cargo test -p comfy_api --all-targets; cargo test -p sim --features test-support --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_api -p sim -p comfy_test_support
   - Done when: Every node/model row has one collision-free executable, verified-provider, or descriptor-only unavailable status; the production desktop, API, headless, and worker projections consume that exact registry; generator output is byte-stable; both native E2E slices pass; and schema, behavior, provider, model, object-info, runtime, and recovery closure has zero unexplained rows.
 
-- [ ] 475. Implement templates, App Mode, sharing, tabs, and workflow recovery
+- [ ] 476. Implement templates, App Mode, sharing, tabs, and workflow recovery
   - _id: comfy-parity-workflow-experience
   - Outcome: Native workflow tabs, recents, autosave/drafts, local/bundled/provider/plugin templates, App Mode projections, and approved sharing preserve provenance, dirty state, permissions, and lossless documents.
   - Wave: 198
@@ -9299,7 +9317,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-007, VAL-GPUI-004, VAL-RECOVERY-002; commands: cargo check -p comfy_ui; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_ui
   - Done when: Create/open/import/save/export/close/restart/conflict/template/App Mode/share states pass with explicit missing dependencies, cancellation, provider gating, focus, and accessibility.
 
-- [ ] 476. Build node library, asset panels, missing-dependency flows, and content dispatch
+- [ ] 477. Build node library, asset panels, missing-dependency flows, and content dispatch
   - _id: comfy-parity-assets-editors-viewers
   - Outcome: Node library/search/replacement and native asset browsing dispatch typed outputs to specialized GPUI editors/viewers while preserving missing node/model/media/plugin state.
   - Wave: 199
@@ -9317,7 +9335,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-006, VAL-GPUI-007, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_ui; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_ui
   - Done when: Catalog counts reconcile and empty/loading/missing/filter/drag/drop/replace/delete/recovery plus keyboard/focus/semantic behavior pass.
 
-- [ ] 477. Implement native image, HDR, mask, crop, paint, and bounding-box content
+- [ ] 478. Implement native image, HDR, mask, crop, paint, and bounding-box content
   - _id: comfy-parity-image-mask-content
   - Outcome: Bounded native codecs and GPUI surfaces cover image/HDR/depth/mask/crop/painter/bounding-box load, view, edit, undo, metadata, output, and external changes.
   - Wave: 200
@@ -9335,7 +9353,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-MEDIA-001, VAL-RECOVERY-005; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Pixels/color/orientation/alpha/metadata and interaction/accessibility results match fixtures across malformed/oversized/cancel/crash/unsupported/external-change cases.
 
-- [ ] 478. Implement native audio and video codecs, widgets, players, and output inspection
+- [ ] 479. Implement native audio and video codecs, widgets, players, and output inspection
   - _id: comfy-parity-audio-video-content
   - Outcome: Native readers/writers and GPUI controls cover cataloged audio/video samples, frames, timing, metadata, playback, previews, edits, outputs, and platform codec availability without command subprocesses.
   - Wave: 201
@@ -9353,7 +9371,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-MEDIA-001; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Sample/frame/timing/metadata fixtures and play/pause/seek/focus/accessibility/cancel/malformed/unavailable-codec/restart paths pass; no FFmpeg command launches.
 
-- [ ] 479. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
+- [ ] 480. Implement native 3D, latent, text, JSON, file, and unknown-output inspection
   - _id: comfy-parity-three-d-latent-content
   - Outcome: Typed GPUI content covers mesh/point/splat/animation, latent channels, text/JSON/files, and preserved unknown outputs with bounded parsing and exact serialization.
   - Wave: 202
@@ -9371,7 +9389,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-GPUI-007, VAL-LATENT-001, VAL-MEDIA-001; commands: cargo check -p comfy_media -p comfy_ui; cargo test -p comfy_media --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_media -p comfy_ui
   - Done when: Format/data/view/edit/focus/accessibility/malformed/cancel/device-loss/external-change tests pass and unknown outputs remain downloadable/inspectable without reinterpretation.
 
-- [ ] 480. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
+- [ ] 481. Implement profile-scoped providers, secrets, cloud gates, telemetry, and tasks
   - _id: comfy-parity-auth-cloud-telemetry
   - Outcome: Native provider services isolate auth, secrets, entitlements, costs, uploads, polling, cancellation, tasks, feature flags, surveys, and consented telemetry by profile and plugin grants.
   - Wave: 203
@@ -9389,7 +9407,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-005, VAL-DOMAIN-008, VAL-PLUGIN-001; commands: cargo check -p comfy_runtime; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_runtime
   - Done when: Fake-provider fixtures pass expiry/offline/disabled/missing-secret/cost-confirm/ambiguous timeout/cancel/redaction/consent/restart; no unapproved real call occurs.
 
-- [ ] 481. Expose native settings, themes, localization, onboarding, help, and docs
+- [ ] 482. Expose native settings, themes, localization, onboarding, help, and docs
   - _id: comfy-parity-settings-localization-ui
   - Outcome: GPUI surfaces expose native runtime/backend/memory/plugin/API/provider/update settings plus themes, palettes, shortcuts, locales, onboarding, help, evidence-linked docs, and the exact public-help navigation commands assigned by the native menu ledger through Sim's central Settings Editor registration. This task owns the visible help command surfaces and destinations; `comfy-parity-desktop-native-ui` and `comfy-parity-security-platform` retain the platform adapter and ExternalNavigationPolicy enforcement, so the UI never owns a second URL-security decision.
   - Wave: 204
@@ -9407,7 +9425,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-005, VAL-GPUI-008, VAL-GPUI-011, VAL-DOCS-001; commands: cargo check -p comfy_ui -p settings_ui; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p settings_ui --all-targets; ./script/clippy -p comfy_ui -p settings_ui
   - Done when: All keys/defaults/flags/locales/preference layers/search/validation/restart/dismissal/contrast/focus/English fallback and documentation-only labels reconcile; the pages are visible through the existing central Settings Editor; every assigned public/help menu row has a real visible command surface and typed destination; safe navigation is delegated once to the canonical platform/security adapter with denial surfaced to the user.
 
-- [ ] 482. Map Desktop onboarding, adoption, migration, and profiles to native data
+- [ ] 483. Map Desktop onboarding, adoption, migration, and profiles to native data
   - _id: comfy-parity-desktop-installations
   - Outcome: Desktop-visible lifecycle becomes native profile/backend/model/plugin/workflow/output adoption with preview, isolation, cancellation, journals, and read-only legacy Python metadata.
   - Wave: 205
@@ -9425,7 +9443,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DESKTOP-001, VAL-GPUI-009, VAL-GPUI-010; commands: cargo check -p comfy_ui -p comfy_runtime; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_ui -p comfy_runtime
   - Done when: Every source lifecycle state has a native/migration/conflict/defer decision and platform GPUI tests cover success, invalid, busy, permission, cancel, crash, restart, and multi-profile isolation.
 
-- [ ] 483. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
+- [ ] 484. Implement native downloads, updates, snapshots, rollback, and auto-update mapping
   - _id: comfy-parity-updates-snapshots
   - Outcome: Application/backend/codec/model/registry/plugin operations use staged downloads, integrity/signature checks, pause/resume/cancel, snapshots, quiescence, verification, atomic commit, rollback, and relaunch guards.
   - Wave: 206
@@ -9443,7 +9461,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-004, VAL-RECOVERY-007, VAL-GPUI-009; commands: cargo check -p comfy_runtime -p comfy_ui; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_runtime -p comfy_ui
   - Done when: Every stage survives injected failure/crash/restart; progress and integrity are accurate; rollback retains data; Python/custom-node update paths stay inactive migration evidence.
 
-- [ ] 484. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
+- [ ] 485. Implement worker health, logs, terminal, diagnostics, feedback, and crash recovery
   - _id: comfy-parity-process-diagnostics
   - Outcome: Native worker/backend/device/model/plugin/API health and bounded sanitized logs drive diagnostic panels, terminal-like read-only streams, popouts, feedback artifacts, and recovery without arbitrary shell execution.
   - Wave: 207
@@ -9461,7 +9479,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-E2E-002, VAL-GPUI-009, VAL-RECOVERY-003, VAL-RECOVERY-009; commands: cargo check -p comfy_runtime -p comfy_ui; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_runtime -p comfy_ui
   - Done when: Health transitions, log retention/search/export/redaction, crash/orphan/restart-loop, diagnostics archive, feedback consent, focus, and platform behavior pass.
 
-- [ ] 485. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
+- [ ] 486. Map Desktop IPC, preload, menus, windows, choosers, and OS integration
   - _id: comfy-parity-desktop-native-ui
   - Outcome: Every Desktop bridge/channel/menu/window/chooser/navigation/OS contract receives a Rust service, GPUI action/event, native lifecycle mapping, inactive legacy response, or explicit defer and is registered in Sim's existing application module.
   - Wave: 208
@@ -9479,7 +9497,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DESKTOP-001, VAL-GPUI-010, VAL-GPUI-011; commands: cargo check -p comfy_ui -p sim; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p sim --features test-support --all-targets; ./script/clippy -p comfy_ui -p sim
   - Done when: The new module is compiled and initialized; all counts reconcile and platform tests cover args/results/errors, menu enablement, chooser cancel, lifecycle order, destructive guards, safe navigation, notifications, relaunch, and profile isolation.
 
-- [ ] 486. Harden native runtime security and platform packaging
+- [ ] 487. Harden native runtime security and platform packaging
   - _id: comfy-parity-security-platform
   - Outcome: Windows/macOS/Linux packages define backend/vendor/codec/plugin trust, signatures, sandbox/permissions, typed locations, remote API policy, secrets, model parser bounds, worker isolation, and native-only contents.
   - Wave: 209
@@ -9497,7 +9515,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-008, VAL-NATIVE-BOUNDARY-001, VAL-DEVICE-001, VAL-PLUGIN-001, VAL-MEDIA-001; commands: cargo check -p comfy_runtime -p comfy_worker; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_worker --all-targets; ./script/clippy -p comfy_runtime -p comfy_worker
   - Done when: Security corpus, platform paths/signing/permissions, device libraries, codec licensing, plugin sandbox, remote-host policy, binary/package/dependency scan, and isolated runtime all pass.
 
-- [ ] 487. Audit GPUI ownership, registered persistence, cancellation, and error propagation
+- [ ] 488. Audit GPUI ownership, registered persistence, cancellation, and error propagation
   - _id: comfy-parity-gpui-persistence
   - Outcome: Every entity/service/task/subscription/profile handle and persisted model has explicit ownership, lifetime, cancellation, migration, watcher, error-to-UI, and accessibility behavior.
   - Wave: 210
@@ -9515,7 +9533,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-DOMAIN-001, VAL-DOMAIN-006, VAL-RECOVERY-001, VAL-RECOVERY-008, VAL-GPUI-011; commands: cargo check -p comfy_ui -p comfy_runtime; cargo test -p comfy_ui --features test-support --all-targets; cargo test -p comfy_runtime --all-targets; ./script/clippy -p comfy_ui -p comfy_runtime
   - Done when: No nested entity update, leaked/dropped required task, stale cross-profile update, silent fallible result, unregistered persistence type, inaccessible error, or destructive watcher conflict remains.
 
-- [ ] 488. Enforce format, identifier, plugin, availability, and deprecation policy
+- [ ] 489. Enforce format, identifier, plugin, availability, and deprecation policy
   - _id: comfy-parity-backward-compatibility
   - Outcome: Legacy/current workflow and protocol versions, node/plugin IDs, Desktop/CLI state, unknown fields, deprecations, flags, docs-only claims, and inactive source behaviors preserve data and use explicit mappings or gates.
   - Wave: 211
@@ -9533,7 +9551,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-CATALOG-001, VAL-DOMAIN-002, VAL-E2E-003, VAL-DOCS-001, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_runtime -p comfy_plugin_host; cargo test -p comfy_runtime --all-targets; cargo test -p comfy_plugin_host --all-targets; ./script/clippy -p comfy_runtime -p comfy_plugin_host
   - Done when: Every cataloged version/conflict/deprecation/uncertainty maps to tested preserve/migrate/gate/defer behavior with provenance and no silent promotion, deletion, rewrite, or external fallback.
 
-- [ ] 489. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
+- [ ] 490. Meet native graph, tensor, model, sampler, media, API, and recovery budgets
   - _id: comfy-parity-performance
   - Outcome: Benchmark the numeric budgets in validation.md: image ≤2 s, tiny diffusion ≤5 s, 1,000-node input p95 ≤8 ms and frame p95 ≤16.7 ms, 10,000-node interaction p95 <50 ms, worker readiness ≤2/5 s, API events ≤50 ms, preview ≤250 ms, visible cancellation ≤100 ms, bounded terminal cancellation, and ten-second resource convergence.
   - Wave: 212
@@ -9551,7 +9569,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-RECOVERY-008, VAL-MEMORY-001, VAL-GPUI-002, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002; commands: cargo check -p comfy_test_support -p comfy_ui; cargo test -p comfy_test_support --all-targets; cargo test -p comfy_ui --features test-support --all-targets; ./script/clippy -p comfy_test_support -p comfy_ui
   - Done when: Every numeric budget passes in release profile with hardware/driver/OS/fixture/warmup/sample provenance; a miss fails the release unless the exact conditional platform row remains explicitly uncertified.
 
-- [ ] 490. Run parity, closure, platform, accessibility, security, and readiness audits
+- [ ] 491. Run parity, closure, platform, accessibility, security, and readiness audits
   - _id: comfy-parity-final-validation
   - Outcome: All deterministic source/oracle, native unit/contract/GPUI/E2E/restart/failure/accessibility/platform/security/performance tests and forward/reverse coverage gates produce an auditable implementation-closure report for the CPU and Apple Metal certified baseline plus fail-closed optional adapters.
   - Wave: 213
@@ -9565,11 +9583,11 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 27.1, 27.2, 27.3, 27.4, 27.5, 27.6, 28.1, 28.2, 28.3, 28.4, 28.5, 28.6, 30.1, 30.2, 30.3, 30.4, 30.5, 30.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 33.1, 33.2, 33.3, 33.4, 33.5, 33.6, 34.1, 34.2, 34.3, 34.4, 34.5, 34.6, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 39.1, 39.2, 39.3, 39.4, 39.5, 39.6, 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6, 42.1, 42.2, 42.3, 42.4, 42.5, 42.6, 43.1, 43.2, 43.3, 43.4, 43.5, 43.6, 44.1, 44.2, 44.3, 44.4, 44.5, 44.6
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 27.1, 27.2, 27.3, 27.4, 27.5, 27.6, 28.1, 28.2, 28.3, 28.4, 28.5, 28.6, 30.1, 30.2, 30.3, 30.4, 30.5, 30.6, 31.1, 31.2, 31.3, 31.4, 31.5, 31.6, 32.1, 32.2, 32.3, 32.4, 32.5, 32.6, 32.7, 32.8, 33.1, 33.2, 33.3, 33.4, 33.5, 33.6, 34.1, 34.2, 34.3, 34.4, 34.5, 34.6, 35.1, 35.2, 35.3, 35.4, 35.5, 35.6, 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 38.1, 38.2, 38.3, 38.4, 38.5, 38.6, 39.1, 39.2, 39.3, 39.4, 39.5, 39.6, 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 41.1, 41.2, 41.3, 41.4, 41.5, 41.6, 42.1, 42.2, 42.3, 42.4, 42.5, 42.6, 43.1, 43.2, 43.3, 43.4, 43.5, 43.6, 44.1, 44.2, 44.3, 44.4, 44.5, 44.6
   - Design: D19, D20, D22, D23, D24, D27, D28, D29, D30, D31, D32, D33, D34, D35, D36, D37, D38, D39, D40
-  - Validation: VAL-CATALOG-001, VAL-CANCEL-001, VAL-DESKTOP-001, VAL-DOMAIN-001, VAL-DOMAIN-002, VAL-WORKFLOW-OWNERSHIP-001, VAL-DOMAIN-003, VAL-DOMAIN-004, VAL-DOMAIN-005, VAL-DOMAIN-006, VAL-DOMAIN-007, VAL-DOMAIN-008, VAL-RUNTIME-PERSISTENCE-001, VAL-RUNTIME-SETTINGS-001, VAL-RUNTIME-TRUST-001, VAL-FOUNDATION-001, VAL-E2E-001, VAL-E2E-002, VAL-PROTOCOL-001, VAL-LEGACY-ENGINE-001, VAL-E2E-003, VAL-E2E-004, VAL-E2E-005, VAL-GPUI-001, VAL-GPUI-002, VAL-GPUI-003, VAL-GPUI-004, VAL-GPUI-005, VAL-GPUI-006, VAL-GPUI-007, VAL-GPUI-008, VAL-GPUI-009, VAL-GPUI-010, VAL-GPUI-011, VAL-GPUI-012, VAL-GPUI-013, VAL-GPUI-014, VAL-GPUI-015, VAL-HTTP-001, VAL-WS-001, VAL-NODE-001, VAL-NODE-002, VAL-RECOVERY-001, VAL-RECOVERY-002, VAL-RECOVERY-003, VAL-RECOVERY-004, VAL-RECOVERY-005, VAL-RECOVERY-006, VAL-RECOVERY-007, VAL-RECOVERY-008, VAL-RECOVERY-009, VAL-NATIVE-BOUNDARY-001, VAL-NODE-REGISTRY-001, VAL-TENSOR-001, VAL-NUMERIC-FORMATS-001, VAL-AUTOGRAD-001, VAL-RNG-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-CLIP-001, VAL-PATCH-001, VAL-CONTROLNET-001, VAL-CONDITIONING-001, VAL-PATCH-ADAPTER-001, VAL-VAE-001, VAL-WEIGHT-ADAPTER-001, VAL-MODEL-REGISTRY-001, VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FAMILY-001, VAL-SAMPLING-FOUNDATION-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, VAL-LATENT-001, VAL-PLUGIN-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-NATIVE-API-001, VAL-OWNERSHIP-DOMAIN-001, VAL-OWNERSHIP-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002, VAL-MEDIA-001, VAL-METADATA-001, VAL-DOCS-001, VAL-CLI-001, VAL-NODE-CLOSURE-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check; ./script/clippy; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
-  - _Validation: VAL-CATALOG-001, VAL-CANCEL-001, VAL-DESKTOP-001, VAL-DOMAIN-001, VAL-DOMAIN-002, VAL-WORKFLOW-OWNERSHIP-001, VAL-DOMAIN-003, VAL-DOMAIN-004, VAL-DOMAIN-005, VAL-DOMAIN-006, VAL-DOMAIN-007, VAL-DOMAIN-008, VAL-RUNTIME-PERSISTENCE-001, VAL-RUNTIME-SETTINGS-001, VAL-RUNTIME-TRUST-001, VAL-FOUNDATION-001, VAL-E2E-001, VAL-E2E-002, VAL-PROTOCOL-001, VAL-LEGACY-ENGINE-001, VAL-E2E-003, VAL-E2E-004, VAL-E2E-005, VAL-GPUI-001, VAL-GPUI-002, VAL-GPUI-003, VAL-GPUI-004, VAL-GPUI-005, VAL-GPUI-006, VAL-GPUI-007, VAL-GPUI-008, VAL-GPUI-009, VAL-GPUI-010, VAL-GPUI-011, VAL-GPUI-012, VAL-GPUI-013, VAL-GPUI-014, VAL-GPUI-015, VAL-HTTP-001, VAL-WS-001, VAL-NODE-001, VAL-NODE-002, VAL-RECOVERY-001, VAL-RECOVERY-002, VAL-RECOVERY-003, VAL-RECOVERY-004, VAL-RECOVERY-005, VAL-RECOVERY-006, VAL-RECOVERY-007, VAL-RECOVERY-008, VAL-RECOVERY-009, VAL-NATIVE-BOUNDARY-001, VAL-NODE-REGISTRY-001, VAL-TENSOR-001, VAL-NUMERIC-FORMATS-001, VAL-AUTOGRAD-001, VAL-RNG-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-CLIP-001, VAL-PATCH-001, VAL-CONTROLNET-001, VAL-CONDITIONING-001, VAL-PATCH-ADAPTER-001, VAL-VAE-001, VAL-WEIGHT-ADAPTER-001, VAL-MODEL-REGISTRY-001, VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FAMILY-001, VAL-SAMPLING-FOUNDATION-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, VAL-LATENT-001, VAL-PLUGIN-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-NATIVE-API-001, VAL-OWNERSHIP-DOMAIN-001, VAL-OWNERSHIP-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002, VAL-MEDIA-001, VAL-METADATA-001, VAL-DOCS-001, VAL-CLI-001, VAL-NODE-CLOSURE-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check; ./script/clippy; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
+  - Validation: VAL-CATALOG-001, VAL-CANCEL-001, VAL-DESKTOP-001, VAL-DOMAIN-001, VAL-DOMAIN-002, VAL-WORKFLOW-OWNERSHIP-001, VAL-DOMAIN-003, VAL-DOMAIN-004, VAL-DOMAIN-005, VAL-DOMAIN-006, VAL-DOMAIN-007, VAL-DOMAIN-008, VAL-RUNTIME-PERSISTENCE-001, VAL-RUNTIME-SETTINGS-001, VAL-RUNTIME-TRUST-001, VAL-FOUNDATION-001, VAL-E2E-001, VAL-E2E-002, VAL-PROTOCOL-001, VAL-LEGACY-ENGINE-001, VAL-E2E-003, VAL-E2E-004, VAL-E2E-005, VAL-GPUI-001, VAL-GPUI-002, VAL-GPUI-003, VAL-GPUI-004, VAL-GPUI-005, VAL-GPUI-006, VAL-GPUI-007, VAL-GPUI-008, VAL-GPUI-009, VAL-GPUI-010, VAL-GPUI-011, VAL-GPUI-012, VAL-GPUI-013, VAL-GPUI-014, VAL-GPUI-015, VAL-HTTP-001, VAL-WS-001, VAL-NODE-001, VAL-NODE-002, VAL-RECOVERY-001, VAL-RECOVERY-002, VAL-RECOVERY-003, VAL-RECOVERY-004, VAL-RECOVERY-005, VAL-RECOVERY-006, VAL-RECOVERY-007, VAL-RECOVERY-008, VAL-RECOVERY-009, VAL-NATIVE-BOUNDARY-001, VAL-NODE-REGISTRY-001, VAL-TENSOR-001, VAL-NUMERIC-FORMATS-001, VAL-AUTOGRAD-001, VAL-RNG-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-CLIP-001, VAL-PATCH-001, VAL-CONTROLNET-001, VAL-CONDITIONING-001, VAL-PATCH-ADAPTER-001, VAL-VAE-001, VAL-WEIGHT-ADAPTER-001, VAL-MODEL-REGISTRY-001, VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FAMILY-001, VAL-SAMPLING-FOUNDATION-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, VAL-LATENT-001, VAL-PLUGIN-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-NATIVE-API-001, VAL-OWNERSHIP-DOMAIN-001, VAL-OWNERSHIP-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002, VAL-MEDIA-001, VAL-METADATA-001, VAL-DOCS-001, VAL-CLI-001, VAL-NODE-CLOSURE-001, VAL-COMFY-BUILD-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check; ./script/clippy; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
+  - _Validation: VAL-CATALOG-001, VAL-CANCEL-001, VAL-DESKTOP-001, VAL-DOMAIN-001, VAL-DOMAIN-002, VAL-WORKFLOW-OWNERSHIP-001, VAL-DOMAIN-003, VAL-DOMAIN-004, VAL-DOMAIN-005, VAL-DOMAIN-006, VAL-DOMAIN-007, VAL-DOMAIN-008, VAL-RUNTIME-PERSISTENCE-001, VAL-RUNTIME-SETTINGS-001, VAL-RUNTIME-TRUST-001, VAL-FOUNDATION-001, VAL-E2E-001, VAL-E2E-002, VAL-PROTOCOL-001, VAL-LEGACY-ENGINE-001, VAL-E2E-003, VAL-E2E-004, VAL-E2E-005, VAL-GPUI-001, VAL-GPUI-002, VAL-GPUI-003, VAL-GPUI-004, VAL-GPUI-005, VAL-GPUI-006, VAL-GPUI-007, VAL-GPUI-008, VAL-GPUI-009, VAL-GPUI-010, VAL-GPUI-011, VAL-GPUI-012, VAL-GPUI-013, VAL-GPUI-014, VAL-GPUI-015, VAL-HTTP-001, VAL-WS-001, VAL-NODE-001, VAL-NODE-002, VAL-RECOVERY-001, VAL-RECOVERY-002, VAL-RECOVERY-003, VAL-RECOVERY-004, VAL-RECOVERY-005, VAL-RECOVERY-006, VAL-RECOVERY-007, VAL-RECOVERY-008, VAL-RECOVERY-009, VAL-NATIVE-BOUNDARY-001, VAL-NODE-REGISTRY-001, VAL-TENSOR-001, VAL-NUMERIC-FORMATS-001, VAL-AUTOGRAD-001, VAL-RNG-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-CLIP-001, VAL-PATCH-001, VAL-CONTROLNET-001, VAL-CONDITIONING-001, VAL-PATCH-ADAPTER-001, VAL-VAE-001, VAL-WEIGHT-ADAPTER-001, VAL-MODEL-REGISTRY-001, VAL-MODEL-FAMILY-FOUNDATION-001, VAL-MODEL-DETECTION-001, VAL-MODEL-FAMILY-ROW-001, VAL-MODEL-FAMILY-001, VAL-SAMPLING-FOUNDATION-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, VAL-LATENT-001, VAL-PLUGIN-001, VAL-PLUGIN-HOST-001, VAL-WORKER-PLUGIN-001, VAL-NATIVE-API-001, VAL-OWNERSHIP-DOMAIN-001, VAL-OWNERSHIP-001, VAL-NATIVE-E2E-001, VAL-NATIVE-E2E-002, VAL-MEDIA-001, VAL-METADATA-001, VAL-DOCS-001, VAL-CLI-001, VAL-NODE-CLOSURE-001, VAL-COMFY-BUILD-001; commands: python3 .agents/specs/comfy-parity/regenerate_all.py --check; ./script/clippy; python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/comfy-parity --require-complete
   - Done when: Every active/conditional feature and every native node/model/operator/device/plugin/API/media contract has implementation evidence or an explicit non-completion-blocking external release gate; deterministic CPU conformance, verification of any supplied CPU attestation, retained signed Metal baseline evidence, compiled CoreX typed-Unbound behavior, audits, `./script/clippy`, and the exact strict spec validator pass. No unavailable optional hardware work is marked complete.
 
-- [x] 491. Consolidate native model-family row validation artifacts
+- [x] 492. Consolidate native model-family row validation artifacts
   - _id: comfy-parity-model-family-row-validation-artifact-owner
   - Outcome: Make the generated model-family test harness the sole owner of deterministic per-row validation artifact schema, source/fixture/provenance digesting, environment identity, case accounting, and artifact serialization. Row tests provide only immutable identity and passed-case projections.
   - Wave: 83
@@ -9589,7 +9607,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION 2026-07-27 independent audit found one stale manually-created ACEStep15 artifact with no reproducing code and no artifacts for four sibling rows. The canonical generated model-family harness now solely owns schema, path admission, digesting, environment/case projection and serialization; row adapters provide immutable identity/cases only. The stale artifact was removed. Exact VAL-MODEL-FAMILY-ROW-001 passed twice with 13/13 tests and five byte-stable zero-failure/zero-skip artifacts: ACEStep `5f9a531ca8509859273b9accd91b9205843261306e21fc226639d046537336c9`, ACEStep15 `c19c76713b00d08a4bf6d2a1d168fdbb755037d6a2914e77908faf1d2213883e`, Anima `532127634dd303919122abb4feec8d863454b687f38a7acb3d5b039c2bf12284`, AuraFlow `392926b63fe43b032e43e3ffac0df4fd12129958d5b47b8d82d38790f9b41831`, Boogu `980982f8001f3d03de8be2f30e93b1b8d1d528f3def7b08ff1d4fcc056dcf089`. Whole-repository scans and VAL-OWNERSHIP-001 twice over 7,100 source files passed at SHA-256 `19e6538839ec325c1e83215d949b50508d70cbff33d7547b9f78d69a5ba59180`; no second row-evidence writer remains. Full locked comfy_model and comfy_test_support all-target suites, locked check, formatting and warnings-denied release clippy passed. Harness SHA-256 `ac45e33a60620cb0626f062dbe6b1b60407d53de235968f55c17d7d55dc7d9ac`. The generator now emits 469 tasks and D39/VAL-MODEL-FAMILY-ROW-001 document per-fixture ownership; strict regeneration exited 0 and Task 15 remained `[x]` with evidence intact._
 
-- [x] 492. Consolidate CogVideoX family configuration adapters
+- [x] 493. Consolidate CogVideoX family configuration adapters
   - _id: comfy-parity-cogvideox-family-adapter-consolidation
   - Outcome: Make one focused CogVideoX family adapter the authoritative consumer of canonical key-derived native/Diffusers layout identity and the owner of parsed shape/configuration normalization, 1.0/1.5 latent-profile selection, patch defaults, and typed configuration errors shared by the I2V, Inpaint, and T2V immutable row definitions.
   - Wave: 165
@@ -9609,7 +9627,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-05 independent implementation and integration validation replaced the stale caller-metadata path. The canonical detector owner now exposes bounded `AnyTensorDimensionValue` rules (at most 16 unique nonzero values and 16 keys, dimension below rank 32); the sole `cogvideox_family` adapter owns native/Diffusers marker and patch-projection keys plus spatial/temporal shape normalization, 2B/5B profiles, optional text/OFS dimensions, positional state, latent selection, and typed configuration failures. I2V, Inpaint, and T2V registrations have no metadata detector or source-configuration authority: their immutable row rules select exact 32/48/16-channel spatial projections and corresponding 256/384/128 flattened temporal projections from ModelStore keys, while profile/state-plan resolution rejects partial, mixed, cross-family, malformed, and ambiguous layouts. Focused adapter/detector tests passed 5/5, canonical VAL-MODEL-DETECTION-001 regression passed 1/1, model-family foundation passed 21/21, and all three generated rows passed 9/9. Current zero-failure/zero-skip artifacts are VAL-MODEL-DETECTION-001 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, VAL-MEMORY-001 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and VAL-OWNERSHIP-001 174/0/0 at `4ba63fca12d4fab740ccef7fb39acfa80ebe09cf9ec3fc719e4f58d3a8cec4bf`; focused ownership passed 5/5 in 174.78s. Complete locked comfy_model all-target validation passed 229 library tests, 82/82 generated-family cases, every adapter/foundation/format/patch/VAE target, 9/9 native vision forwards in 216.12s, and 17/17 weight-adapter cases. The locked compile check, cargo formatting check, and isolated release/all-target/all-feature warnings-denied clippy passed; an earlier concurrent Clippy/debug-build artifact collision produced E0463 without a source diagnostic, and the identical command passed alone. Shared detector/adapter/test and I2V/Inpaint/T2V row SHA-256 values are `582e44bcf6f60f38dec5c540e005591b3ae42d61eeade18acdd9c3d81db18b08`, `ee910caccd523472fb8b2ae22205f0d64b2686900787f8c7cfded68ea4036d8c`, `5c8b79d4d497b666b03e2151452d50d3c3e2fa891d352603bd96150a0b494989`, `24ade5380a48336a86e8cdd3a391655509b8435c6af76d0cf01d0ea99880c87e`, `d8033c99642f1e0d1773177b37676c5786bb7809712c3a388084e8c0c2fa5194`, and `67faeba953425ff0489eabfa172357ec843b8d692d0710367273dead18d6013c`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 493. Consolidate Cosmos family configuration adapters
+- [x] 494. Consolidate Cosmos family configuration adapters
   - _id: comfy-parity-cosmos-family-adapter-consolidation
   - Outcome: Make one focused Cosmos family adapter the authoritative consumer of canonical key-derived native layout admission and the owner of GeneralDIT versus Predict2 marker separation, packed-channel derivation, shared geometry and patch defaults, architecture/model-size profile selection, Predict2 positional and memory facts, and typed configuration errors shared by the Cosmos I2V/T2V and Predict2 immutable row definitions.
   - Wave: 166
@@ -9629,7 +9647,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER 2026-08-05 independent current-tree implementation and revalidation PASS. The sole `comfy_model::cosmos_family` adapter now consumes canonical key-derived layout admission and owns explicit GeneralDIT, Predict2, and Anima marker separation, packed-channel derivation, shared geometry and patch defaults, 7B/14B/Predict2 profiles, positional/RoPE facts, and typed configuration failures. COMFY-MODEL-0071 has no caller metadata or source-configuration authority: its bounded detector requires the source-exact GeneralDIT marker and projection dimension 72, ignores misleading metadata, and rejects missing/wrong-channel, Predict2, Anima, partial, mixed, malformed, and ambiguous inputs before loading. The shared adapter suite passed 4/4 and the focused row passed 3/3. Complete locked `comfy_model --all-targets --no-fail-fast` validation passed 229 library tests, all 82 generated-row cases, every adapter/foundation/format/patch/VAE target, 9/9 native vision forwards, and 17/17 weight-adapter cases. The exact locked compile check and isolated release/all-target/all-feature warnings-denied `./script/clippy -p comfy_model` passed. VAL-MODEL-DETECTION-001 records 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`; VAL-MEMORY-001 records 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`; the Cosmos row artifact records 6/0/0 at `3fa6490dcc474129b6ba0834467d596e0b05fe437b5072ad0f9c15e9921ef0bb`; and VAL-OWNERSHIP-001 passed 23/23 focused cases with 174/0/0 assertions at `4ccaa6585db950422e2b1152b39e4abaa2728ef40dfa3165566516eea0f7bbad`. Whole-repository ownership generation scanned 7,381 source files and produced catalog SHA-256 `537f0739196344056b63fdd3b2c639487c7b86e88a923c3268cc70064e2aa75f`; no second Cosmos architecture, profile, parser, tensor, transaction, patch, memory, or cancellation owner remains. Adapter/export/row/shared-test/row-test SHA-256 values are `afac5885f3fd5bbd0cded2b9f5e09aebf63dfcffabfec3e15f2de1a46c47bcdb`, `e23e3cc8a302b63927292f173bb611985437333fe6a1e3ea3eae1d6c9f30a4f9`, `4594f045f3855f590f54856b597650d46808d970c87069253ee7c63cc7a79c5f`, `e5580c78e4ef50b76355d473bc5790ee4c83b84e6c962e14d1a3c2e691d9be79`, and `3d2cddebf071411f4ee25e1491e46c61d8455befeebae7154b991d2f98d7a81e`. Validation discovered and corrected the stale metadata-era wrong-channel assertion and added the omitted row-test write to the generated task contract. A concurrent worker briefly leaked an incomplete leaf into the integration tree and interrupted the first clippy build; after isolating that worker file, the identical clippy command passed with no source diagnostic. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, unavailable hardware certification is not claimed, and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 494. Consolidate Flux and Chroma family detection adapters
+- [x] 495. Consolidate Flux and Chroma family detection adapters
   - _id: comfy-parity-flux-chroma-family-adapter-consolidation
   - Outcome: Make one focused Flux/Chroma family adapter the authoritative consumer of the canonical key-derived prefixed-native, standalone-native, and Flux-Diffusers layouts and the owner of key-norm variants, checked shape extraction, double/single block counting, Flux/Flux2/Chroma/Radiance discrimination, hidden/context/vector/guidance facts, common Flux state plans, and LongCat-versus-Flux precedence. Preserve canonical Flux and Flux2 latent owners and use model_family for layout admission and state-plan selection.
   - Wave: 167
@@ -9649,7 +9667,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER POST-FLUX-CHROMA-CONSOLIDATION 2026-08-05 independent implementation and integration revalidation replaced the stale caller-metadata path. `comfy_model::flux_chroma_family` is the sole adapter and layout/state-plan owner for key-derived prefixed-native, standalone-native, and `x_embedder` Flux-Diffusers checkpoints; misleading `model_layout`/`image_model` metadata is ignored. The adapter owns exact weight/scale key-norm admission, checked hidden/context/vector/guidance facts, consecutive double/single block counts, Flux/Flux2/Chroma/Radiance/LongCat discrimination, and LongCat (3584 context, no vector/guidance) versus Schnell (4096 context) precedence. The Diffusers plan transactionally projects canonical input/text/output keys and assembles representative double-stream QKV and single-stream QKV/MLP tensors while retaining all remaining source tensors under an explicit model route; cancellation publishes no mapped state. Chroma and Radiance retain lossless native-only signatures because the pinned generic converter does not preserve their distilled-guidance, NeRF, or sentinel state. The focused adapter suite passed 7/7, Chroma and Radiance rows passed 3/3 each, the full comfy_model matrix passed 228/228 ordinary library tests plus the exact host-only special-file test 1/1, 95/95 generated-family tests, 9/9 native vision tests in 312.57s, 17/17 weight-adapter tests, and every other all-target test. VAL-MEMORY-001 passed 1/1 and focused VAL-OWNERSHIP-001 passed 5/5 in 210.26s. `cargo check -p comfy_model`, formatting, diff hygiene, and release/all-target/all-feature warnings-denied clippy passed. Adapter/test/Chroma-row/Radiance-row/Radiance-test SHA-256: `747df646976912e8749f1abebcdc42fa99b6c6d5f1fc1977f8e269d9972a10a3`, `8682a294fa391540d076440014813a69d799c2d90035cbf8f6fd5ec093f70616`, `90b5d6ed04a19635eb70e7bc0411aea9bbb85e300bcd08ecae855262a09236ee`, `25c41775fef6713ffce73327e4b5db16afda19de7997012f16c8fa4cd2c3a4de`, `4c69c5f7323bc9a8a7ef520e04f6b4ad6b67aa1752990ff485c035d7af56f9fd`. Validated native CPU F16/BF16/F32 on macOS aarch64; Apple Metal remains typed fail-closed, with no production Python, JavaScript, or external Comfy process path._
 
-- [x] 495. Consolidate HiDreamO1 model and conditioning ownership
+- [x] 496. Consolidate HiDreamO1 model and conditioning ownership
   - _id: comfy-parity-hidream-o1-family-conditioning-adapter-consolidation
   - Outcome: Make `comfy_model::hidream_o1_family` the sole HiDreamO1 consumer of canonical key-derived layout admission and owner of detector normalization, patch and special-token constants, conditioning geometry, CLIP target definition, component schemas, and native/unprefixed transactional plans. The adapter drops visual deep-stack merger state and generates the exact pixel-space VAE and text-encoder sentinels while importing rather than restating the canonical COMFY-MODEL-0031 latent contract. Classic HiDream remains a separate row because its architecture, latent, CLIP, detector, state, and execution semantics are disjoint.
   - Wave: 168
@@ -9669,7 +9687,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-FLUX-CHROMA-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-06 independent implementation audit and current-tree revalidation PASS. The existing native Rust adapter from commit `cca500f969014dd31f2880fc20317422db21aa04` is the sole HiDreamO1 normalization owner: key-derived prefixed-native and standalone-native layouts normalize the exact `[4096, 256]` timestep and `[1024, 3072]` pixel-patch projections; misleading metadata cannot override keys; malformed, partial, and Flux-family probes fail typed. Both transactional plans discard `visual.deepstack_merger_list`, route all surviving model state, drop source VAE/text state, generate exactly `pixel_space_vae=1.0` and `_hidream_o1_te_sentinel=0.0`, and publish nothing on cancellation. The adapter imports canonical COMFY-MODEL-0031 `HiDreamO1Pixel` rather than duplicating it and binds source-exact patch size 32, vision patch/merge geometry, Qwen dimensions/token identifiers, BF16/F32 CPU dtype/device admission, memory factor 0.033, CLIP target, components, and state schemas. Focused validation passed 7/7, including detection, mapping/sentinels, cancellation, pinned latent/conditioning facts, AppleDouble-safe ownership scanning, and single-owner checks. The complete locked comfy_model all-target matrix already passed on this identical implementation (229 library tests, 111/111 generated-family cases, 9/9 native vision, 17/17 weight adapters), as did release/all-target/all-feature warnings-denied clippy and locked check. Source/test SHA-256 values are `2715dfc972715f1ef30e0ee0e52bd622091a08845128d8ee49c62e8323cf5e82` and `36a02f54420278a0554e534aec0d1d1bfe557330d8a1c0126924be4aacf2abf5`. Validated on macOS aarch64 native Rust CPU; no production Python, JavaScript, external Comfy process, or accelerator fallback is introduced._
 
-- [x] 496. Consolidate Hunyuan3D v2 family adapters
+- [x] 497. Consolidate Hunyuan3D v2 family adapters
   - _id: comfy-parity-hunyuan3d-family-adapter-consolidation
   - Outcome: Make `comfy_model::hunyuan3d_family` the sole owner of Hunyuan3D v2/v2.1/Mini layout admission, checked shape extraction, classic-versus-2.1 marker discrimination, depth and Mini specialization, guidance/QKV/context/head facts, and common source-specific immutable mapping data. Preserve the three canonical latent-format owners and reuse the canonical ModelProbe, state transaction, tensor, patch, memory, and cancellation services rather than creating parallel generic owners.
   - Wave: 169
@@ -9689,7 +9707,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HIDREAM-O1-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-06 Shard A native implementation and independent validation PASS. `comfy_model::hunyuan3d_family` is now the sole shared adapter and immutable common-map owner for Hunyuan3D v2, v2.1, and Mini. It derives prefixed `model.diffusion_model.`, saved `model.`, and standalone layouts only from parsed keys; distinguishes classic `latent_in` from the complete v2.1 timestep/QK-norm/x-embedder marker set; selects Mini before base at exact depth 8; extracts non-empty matrices and consecutive double/single/2.1 block depths; validates 16-head geometry; and binds guidance, QKV bias, context, memory factor 3.5, BF16/F16/F32 CPU admission, components, and the three canonical COMFY-MODEL-0032/0033/0034 latent owners. Three bounded transactional plans normalize every admitted layout to `native.*`, rewrite source `.scale` suffixes to `.weight`, preserve optional VAE/vision components, reject unmatched state, and publish nothing on cancellation. Genmo-only, partial 2.1, mixed variant/layout, hidden-shape, nonconsecutive-depth, and misleading-metadata fixtures fail closed. Focused validation passed 5/5; locked all-target check passed; complete comfy_model all-targets passed (229 library tests, 111/111 generated-family cases, 9/9 native vision in 238.67 s, 17/17 weight adapters, and every integration target); VAL-MEMORY-001 passed 1/1; formatting, diff hygiene, and warnings-denied release/all-target/all-feature clippy passed. Adapter/test/export SHA-256 values are `4df9577ede2512897754478e1b3db458f71b4236d89212f63ed27b3580deeb1f`, `2c71689af8c712a33a36429fc6fa814a6f9ffd2068a116573a8f2732bfd5c937`, and `8dd89d4015cec24e850f5216a205b0b066b8364313f25b342e1e6f459b83d8bf`. Validated on macOS aarch64 native Rust CPU; Apple Metal and non-CPU devices remain typed fail-closed with no production Python, JavaScript, or external Comfy process._
 
-- [x] 497. Consolidate HunyuanDiT family adapters
+- [x] 498. Consolidate HunyuanDiT family adapters
   - _id: comfy-parity-hunyuandit-family-adapter-consolidation
   - Outcome: Extend the canonical model-family tensor-fact predicates with bounded rank/dimension comparisons and make `comfy_model::hunyuandit_family` the sole owner of HunyuanDiT/DiT1 marker, depth, profile, size/style-conditioning, common CLIP/component/state/program, and source-layout facts. The adapter reuses the canonical SDXL latent, ModelStore projection, state transaction, tensor, patch, memory, and cancellation owners.
   - Wave: 171
@@ -9709,7 +9727,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HUNYUANDIT-ADAPTER-CONSOLIDATION 2026-08-06 PASS. Canonical `ModelDetectionRule::AnyTensorFact` now admits 1..=16 unique bounded rank/dimension predicates and 1..=16 keys, supports exact/inequality/ordered comparisons, validates rank and dimension indices below rank 32, inspects parsed tensor shapes only, and contributes one score per rule. The sole `hunyuandit_family` adapter derives prefixed, saved-`model.`, and standalone source layouts; 28/40-block profiles; 1,152/1,408 hidden geometry; the source 3,968-wide DiT1 size/style discriminator; SDXL latent identity; Hydit CLIP target; components; transactional state plans; named program checkpoints; memory 1.3; base Float32 attention and 0.018 sampling end versus DiT1 inherited attention and 0.03 sampling end. Focused adapter tests passed 5/5 and foundation tests 21/21; complete comfy_model all-targets passed 229 library, 152 generated-family, 9 native vision in 145.84s, and 17 weight-adapter tests; complete comfy_test_support all-targets passed with native diffusion E2E 174.09s, checkpoint foundation 4/4 in 76.86s, ownership 23/23 in 177.38s, native image/recovery/release/boundary/plugin/workflow; VAL-MEMORY-001 passed 1/1; compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Source/module/export/test SHA-256 values are `24e85a50ef26b18541378ae63109ee18433a18e816f5f25deecc13f143cc1f0c`, `ddacdc3f7043df7ee930f754bd05cf9c29a352b0c6f784c3c2c58e90448b19ad`, `201bdb5158315ecfd399c5cb78525b54b176f083eb933933ec9fd11c9741e8d4`, and `429e31f662add6f56bec3e63b89d5a4f6c5c46da36113aa5dbbbedea63c4e450`; foundation/detection/memory/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Post-regeneration focused ownership passed 5/5 in 117.84s. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy path exists._
 
-- [x] 498. Consolidate Hunyuan image and video family adapters
+- [x] 499. Consolidate Hunyuan image and video family adapters
   - _id: comfy-parity-hunyuan-video-family-adapter-consolidation
   - Outcome: Make `comfy_model::hunyuan_video_family` the sole owner of shared Hunyuan image/video marker, patch/channel/context/hidden/head/block/vector/ByT5/guidance/mean-flow/vision/condition facts, rank-dependent axes, ordered state-key rewrites, save prefix, component schemas, and architecture program. Extend the canonical key-rewrite domain with one bounded ordered optional-replacement form rather than creating a Hunyuan-specific transaction engine. Refiner stochastic conditioning reuses canonical RNG transactions and bilinear resize operations.
   - Wave: 173
@@ -9729,7 +9747,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-HUNYUAN-VIDEO-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `hunyuan_video_family` adapter now owns seven parsed-key-derived Hunyuan image/video variants across prefixed-native, saved-`model.`, and standalone-native layouts; exact rank-four/rank-five patch geometry, channels, hidden/context/head/block/vector/ByT5/guidance/mean-flow/vision facts; axes; latent identities; CLIP targets; save prefix; components; and architecture checkpoints. Canonical `ModelKeyRewrite::OrderedOptional` preserves bounded source-order optional rewrites transactionally, while refiner conditioning delegates bilinear resize and caller-addressed canonical RNG transactions with commit-on-success rollback semantics. Focused Hunyuan adapter validation passed 5/5 and model-family foundation passed 21/21. Complete locked `comfy_model` all-target validation passed 229 library tests (228 in the restricted sandbox plus the exact special-file fixture 1/1 outside it), 158 generated-family tests, 9 native-vision tests in 170.98s, 17 weight-adapter tests, and every remaining model target; VAL-MEMORY-001 passed 1/1. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Strict regeneration completed twice with snapshot-input closure over 514 tasks, 155 authoritative ownership rows, 7,548 repository source files, and 13,295 trace-complete feature rows. Source/module/export/test SHA-256 values are `e8f81022b58ce66d03c595e455f6f01d78d0a224480b59dafded615cc29cba56`, `1ca1e3c9cc826fd5f59f1fc10f5b4685f475379ddc45d04920f4486063b4a94c`, `cd4ad566b0fa06b97048b9c8bad4d0be01922f97d7a6aab5d2dbf14d87e70cf2`, and `4901a241eb48e41fa343f156f5a664b2c66c7c52264f9f7859bf82ed60773622`; foundation/detection/memory/RNG/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `25065656e091e20003a2e9a6e48cf32327b5e9c30d0eba60e578aea3e8a29041`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 499. Consolidate parsed model-layout and state-plan ownership
+- [x] 500. Consolidate parsed model-layout and state-plan ownership
   - _id: comfy-parity-model-layout-state-plan-owner-consolidation
   - Outcome: Make comfy_model::model_family the sole owner of key-derived prefixed-native, standalone-native, and Diffusers layout admission and layout-to-state-plan selection. ModelStore::family_probe remains projection-only; rows and shared adapters supply immutable bounded key signatures and consume a checked layout, while caller metadata cannot select or override layout, parsing, validation, transformation, security, or commit behavior.
   - Wave: 162
@@ -9749,7 +9767,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-LAYOUT-OWNER 2026-07-28 independent current-tree implementation and validation audit. `comfy_model::model_family` now owns the bounded typed `PrefixedNative`, `StandaloneNative`, and `Diffusers` domain, immutable key signatures, admission, ambiguity rejection, and layout-to-state-plan mapping; `ModelStore::family_probe` remains projection-only. All 19 affected row registrations and the CogVideoX, Cosmos, Flux/Chroma, and HiDreamO1 adapters consume that owner. Whole-repository scans found zero production `model_layout` metadata reads or `ModelFamilyStatePlanSelector::Metadata` uses; the only two test occurrences are explicit spoof-resistance fixtures. Real safetensors pass through ArtifactRoot, ArtifactIndex, and ModelStore and prove exact native/spoof/Diffusers plan identities plus standalone admission and typed partial, mixed, ambiguous, unsupported, and excessive-signature failures. Independent `cargo check --locked -p comfy_model --all-targets` exited 0; the focused owner suite passed 2/2; `cargo test --locked -p comfy_model --all-targets --no-fail-fast` passed 357/357 with the native vision target completing in 143.23 seconds; `cargo fmt --all -- --check` and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` exited 0. Exact VAL-CANCEL-001 passed 31/0/0 at SHA-256 `acc32d22dade74be549cb6ed014e0d188622662e2094fa606e78753e06e4040f`. VAL-OWNERSHIP-001 passed twice in 91.08 and 87.20 seconds with byte-stable 137/0/0 artifact SHA-256 `7458f7e157834185014e7f4d8cd7985e7d49432a5bfe9c14fd12b52d1f7c0f42`. Canonical owner/test/export SHA-256: `7394e6c988278d56e74e54c8ef7f4934e0ff84f4b249a4dcd6afbee7adac5853`, `9617efd4971c67a6e2ce59189d16f51ca45429c93b1c7baab25417369fc5fab9`, `4b79db1bd51bdcb529e68d8b07300744999f94ab5d4292f6d2833734f8e43c6f`. macOS arm64 native Rust CPU; unavailable accelerator execution is not claimed. POST-WEIGHT-STATISTIC-NO-REGRESSION 2026-07-28: after Task 482 extended `model_family.rs`, the focused canonical layout-owner suite independently passed 2/2 and the complete locked `comfy_model --all-targets --no-fail-fast` suite passed 360/360, including all 19 migrated rows/adapters and the long sparse vision forward. The refreshed authoritative-ownership catalog classifies key-derived `ModelStateLayout`/layout-to-plan selection as confirmed and VAL-OWNERSHIP-001 passed twice with byte-stable 137/0/0 SHA-256 `84fcab0df824424839164796edee9894d8ac0fc2e8de96bf55f581cad333ab02`; current `model_family.rs` SHA-256 is `05cd8c8882954a36539203e980b9c89bb530471c0efce4db260e405627792244`. Prior evidence remains historical detail for the same completed owner.
 
-- [x] 500. Consolidate SDXL family adapters
+- [x] 501. Consolidate SDXL family adapters
   - _id: comfy-parity-sdxl-family-adapter-consolidation
   - Outcome: Make comfy_model::sdxl_family the sole shared owner of SDXL, Refiner, KOALA, instruct-pix2pix, SSD1B, and Segmind configuration/profile discrimination, common SDXL CLIP/component/state-plan/program/memory facts, and source-supported native/Diffusers signatures while importing the canonical SDXL latent and canonical model-family layout/transaction owners.
   - Wave: 174
@@ -9769,7 +9787,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-SDXL-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `sdxl_family` adapter now owns source-order discrimination for SDXL instruct-pix2pix, Refiner, base, SSD1B, KOALA 700M/1B, and Segmind Vega across parsed prefixed-native, standalone-native, and source-supported Diffusers signatures. Exact input/model/context/ADM dimensions, residual counts, transformer input/output/middle depths, base/refiner CLIP targets, components, state plans, architecture checkpoints, supported dtype/device facts, and 0.8/1.0 memory factors are shared while the canonical COMFY-MODEL-0047 SDXL latent, model-layout selector, state transaction, tensor, patch, memory, and cancellation owners remain unique. Focused adapter validation passed 5/5 and foundation passed 21/21; VAL-MEMORY-001 passed 1/1. Complete locked `comfy_model` all-target validation passed 229 library tests (228 in the restricted sandbox plus the exact special-file fixture 1/1 outside it), 158 generated-family tests, the 5 SDXL adapter tests, 9 native-vision tests in 146.64s, 17 weight-adapter tests, and every remaining model target. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Strict regeneration completed twice with snapshot-input closure over 514 tasks, 155 authoritative ownership rows, 7,552 repository source files, and 13,295 trace-complete feature rows. Adapter/export/test SHA-256 values are `0a891f6ee1e08403089116571512ffe860753fc3b81fd8ba2d1e2a84db8727d9`, `1a15b1038ac8b651bb17a5608a13323d0773c48adc9d3463ae91279f8457412f`, and `eefc1400cd7461fca2e4a84194c64a49d65fc8ada76902422d82d087030a2809`; foundation/detection/memory/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 501. Consolidate Kandinsky5 family adapters
+- [x] 502. Consolidate Kandinsky5 family adapters
   - _id: comfy-parity-kandinsky5-family-adapter-consolidation
   - Outcome: Make comfy_model::kandinsky5_family the sole shared owner of Kandinsky5 base/image marker and model-dimension discrimination, axes/RoPE, block counts, conditioning, CLIP, component/state/program/profile facts, and source-native layouts. Image specialization wins before base; the adapter imports canonical Flux and HunyuanVideo latents and explicitly rejects unsupported Diffusers layouts.
   - Wave: 175
@@ -9789,7 +9807,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-KANDINSKY5-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole `kandinsky5_family` adapter now owns source-native prefixed/standalone detection, exact 1792/4096 video and image-specialized 2560/64 discrimination, checked 2/32 block topology, axes/head/RoPE profiles, pooled/cross-attention/mask/time-replacement/concat conditioning facts, Qwen 2.5 7B plus CLIP-L targets, component schemas, transactional state plans, dtype/device/program facts, 1.25 memory factor, and typed unsupported-Diffusers rejection. It imports the canonical COMFY-MODEL-0037 HunyuanVideo and COMFY-MODEL-0029 Flux latent owners and delegates tensor, transaction, memory, and cancellation mechanics to their canonical owners. Focused adapter validation passed 5/5 and model detection passed 1/1; foundation passed 21/21. Complete locked `comfy_model` all-target validation passed 229 library tests, 158 generated-family tests, the 5 Kandinsky5 and 5 SDXL adapter tests, 9 native-vision tests in 151.84s, 17 weight-adapter tests, and every remaining model target. Compile, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/export/test SHA-256 values are `fe46f954d41c49a0d0e29827ce61125020b51e1bae189b4f0a40689c3a127fdd`, `e6c4808518f23ae3b7f6c2b201de79ca396d8834f9f2d4f8fbd85982163f29ec`, and `307c7d34687ea4216e7b1119f1c59fbd985262aefdea666200022debb45c079a`; foundation/detection/memory/cancellation/ownership artifact SHA-256 values are `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`, `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, `81209461cf73d91830688fe949065bed6bcf3659b7a357ca12e536d1944aa4fe`, and `1eca3fab6369249624901bfdd0d2c8e3b2a71392dc2737bb690bb430f5ac9a1d`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 502. Consolidate LTXV and LTXAV family adapters
+- [x] 503. Consolidate LTXV and LTXAV family adapters
   - _id: comfy-parity-ltx-family-adapter-consolidation
   - Outcome: Make comfy_model::ltx_family the sole shared owner of LTX timestep/audio markers, PixArt collision rejection, checked layers/heads/context, bounded transformer config override, common CLIP/components/state/program/conditioning facts, and source-native layouts. Preserve LTXV dynamic memory (cross_attention_dim / 2048) * 5.5 and LTXAV final override 0.077 through the canonical estimator; import the canonical LTXV and LTXAV latents and explicitly reject unsupported Diffusers layouts.
   - Wave: 176
@@ -9809,7 +9827,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-LTX-FAMILY-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `ltx_family` adapter discriminates LTXAV before LTXV, rejects PixArt collisions and unsupported Diffusers-only layouts, admits exactly the source-prefixed, saved-`model.`, and standalone-native layouts, derives checked 32-head/layer/context/channel configurations, and permits only a bounded 16-KiB transformer metadata override consistent with detected checkpoint shapes. It preserves LTXV `(cross_attention_dim / 2048) * 5.5` memory and the final LTXAV `0.077` override, imports canonical COMFY-MODEL-0040 LTXV and COMFY-MODEL-0039 LTXAV latent owners, and records exact shared T5, component, video/audio conditioning, source-state, forward, dtype, and typed device facts. Transactional state mapping, deterministic cancellation, undersized-workspace OOM, workspace convergence, and canonical tensor ownership were exercised without partial publication. Focused adapter validation passed 5/5; the complete locked `comfy_model --all-targets` integration suite passed 229 library tests, 176 generated-family tests, 21 foundation tests, the long 9-case native-vision target in 146.27s, all remaining integration targets, and zero failures. Formatting, compile check, warnings-denied release/all-target/all-feature Clippy, and strict twice-regenerated specification consistency passed. Adapter/test/export SHA-256 values are `e655e96897672ba2875d42cb2b9f3f09333ccb42678d94819392c0617ae062b4`, `3c829771bb4d7594b46422b6c3c41c779e6526adcd5997f3547b03c67fb62111`, and `7fc89e37a20cee74254e14ac9b1cc0b7ef9fc72a7d46e132fc168212f32fc6f5`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 503. Consolidate SD2 and Lotus family adapters
+- [x] 504. Consolidate SD2 and Lotus family adapters
   - _id: comfy-parity-sd2-lotus-family-adapter-consolidation
   - Outcome: Make comfy_model::sd2_family the sole shared owner of standard-UNet SD2, LotusD, and Unclip family matching, shared SD2 CLIP transforms, native/Diffusers state plans, latent/dtype/memory facts, specialization precedence, and consumption of the canonical loaded-weight statistic used to distinguish SD2.0 EPS from V-prediction. Reuse canonical standard-UNet normalization and SD15 latent; Lotus remains an IMG_TO_IMG row and owns only its deterministic task embedding.
   - Wave: 177
@@ -9829,7 +9847,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-SD2-LOTUS-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `sd2_family` adapter reuses the canonical standard-UNet normalizer to admit exact 320-channel/1,024-context SD2 topology, applies source order LotusD before generic SD20 and exact 1,536/2,048 Unclip specializations, preserves native and pinned Diffusers layouts, and imports canonical COMFY-MODEL-0045 SD15 latent, dtype, device, memory, component, forward, and conditioning facts. The native transaction implements both source SD2 CLIP prefixes, bounded 32-layer QKV split, OpenCLIP-to-transformers key transforms, text-projection transpose, optional vision/VAE routing, and failure-atomic publication; the Diffusers plan maps all standard input/time/class/output keys and routes residual/attention namespaces without a Python conversion path. Lotus remains IMG_TO_IMG with exactly `[sin(1), sin(0), cos(1), cos(0)]` task conditioning and bypasses the inherited statistic. SD20 and Unclip consume only Task 499's real ModelStore-loaded population-standard-deviation observation at the source tensor and checked `> 0.09` threshold; spoofed metadata, wrong observations, partial/mixed layouts, unsupported topology, OOM, and cancellation fail typed without publication. Focused adapter validation passed 5/5. Complete locked `comfy_model --all-targets` validation passed 229 library tests, 176 generated-family tests, 21 foundation tests, the canonical three-case statistic target, the long 9-case native-vision target in 145.40s, all remaining integration targets, and zero failures. Formatting, compile check, warnings-denied release/all-target/all-feature Clippy, and strict twice-regenerated specification consistency passed. Adapter/test/export SHA-256 values are `5afaa4159dec31897fb1809c07f9a913b6a6fda39a334cb6df76fdc74bebc79f`, `129f71d76ca9298d15c8f97ae0785e0f6b3df48bc50cd4edc4831cd221da93f9`, and `b3bd51b2faede380bc058e5f9dff8c0e37074902ee2c3282c9b97871fa5787b9`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 504. Add the canonical model weight-statistic profile hook
+- [x] 505. Add the canonical model weight-statistic profile hook
   - _id: comfy-parity-model-weight-statistic-profile-hook
   - Outcome: Extend comfy_model::model_family with one bounded post-parse profile-observation hook over ModelStore-loaded tensor bytes so SD2.0's checked population-standard-deviation threshold is computed from canonical loaded tensors rather than invented metadata. The hook owns no parser, cache, tensor equation, allocator, device policy, or cancellation state and delegates reduction to canonical comfy_tensor operations.
   - Wave: 163
@@ -9849,7 +9867,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-MODEL-WEIGHT-STATISTIC-OWNER 2026-07-28 independent current-tree audit. Pinned ComfyUI `supported_models.py:112` establishes that the `torch.std(out, unbiased=False) > 0.09` predicate belongs to SD2.0. `comfy_model::model_family` now exclusively owns the bounded 16-request typed domain, duplicate/name/device/dtype admission, population-standard-deviation dispatch, finite observation, and checked threshold comparison; `ModelStore::observe_weight_statistics_with_context` is a focused adapter over the existing store-scoped loaded handle, ArtifactIndex-verified exact bytes, caller-authorized CpuBackend workspace/upload, and failure-atomic staged publication. It delegates the only equation/traversal to canonical `torch_std_with_context_exact_native(... correction=0 ...)`. A real SD2-shaped safetensors fixture with spoofed statistic metadata produced exact f64 bits `0.11180340498685837` and `> 0.09`; unsupported I64/Metal, 17 requests, empty/non-finite output, cancellation, 15-byte scratch OOM, and post-load artifact mutation all failed typed with no observation or leaked workspace. Focused tests passed 3/3; `cargo check --locked -p comfy_model --all-targets`, `cargo fmt --all -- --check`, and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` exited 0; complete locked `comfy_model --all-targets --no-fail-fast` passed 360/360. Exact artifacts passed: VAL-MODEL-FAMILY-FOUNDATION-001 19/0/0 SHA-256 `09f8ff0be64a23d17bbd57fa1a5530673ba332145cac1a229821c4975118bc7b`; VAL-MODEL-DETECTION-001 14/0/0 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`; VAL-TENSOR-001 27/0/0 `ab10ad94519a15cbe5d300511367d1816c7dd52ebac065fd0463ae38e5af34f2`; VAL-MEMORY-001 tensor, worker, and packaged preflight-OOM paths with 14/0/0 artifact `42fea4f07bfde5b6d05739adb617fe360fe39e27543d9672099d0087ef70a6b9`; VAL-CANCEL-001 31/0/0 `55ca6b0b59cee8410bef52608506142b86982a2c72db4ba161889bed3782ee0e`; VAL-OWNERSHIP-001 passed twice in 86.52s and 86.72s with byte-stable 137/0/0 `84fcab0df824424839164796edee9894d8ac0fc2e8de96bf55f581cad333ab02`. Whole-repository scans found one ModelStore/ModelCache, one model-layer statistic invocation, and one canonical tensor reduction owner; the new ownership concern is confirmed in the 134-row catalog (133 confirmed plus the pre-existing explicit CoreX provenance gap). Reuse/separation decision is recorded in D31 and `ownership-policy.json`; no parser, cache, index, allocator, workspace authority, device policy, cancellation token, persistence layer, or transaction manager was added. Implementation SHA-256: model family `05cd8c8882954a36539203e980b9c89bb530471c0efce4db260e405627792244`; model-store adapter `c51786c2f001779fe4c64a0657cce7593581da41276c46030861f48dca4cd745`; focused tests `e15092409b55690c6eef9cd0b1424930ea0984893bb269b9c5f754e967a841cc`; ownership catalog `43e10f62201b093a56620d7fd12b92f840e00179a4fd1ef8292921ca954ce9ee`. macOS arm64 native Rust CPU; unavailable accelerator execution is not claimed, and the dependent SD2 consumer remains Task 481.
 
-- [x] 505. Consolidate Lumina2 and ZImage family adapters
+- [x] 506. Consolidate Lumina2 and ZImage family adapters
   - _id: comfy-parity-lumina-zimage-family-adapter-consolidation
   - Outcome: Make comfy_model::lumina_zimage_family the sole shared owner of Lumina2, ZImage, and ZImagePixelSpace detector/config normalization, pixel-before-ZImage-before-Lumina precedence, conditioning schema, common plans/program/profile facts, and typed errors. Only ZImage admits the pinned Diffusers conversion; the adapter imports canonical Flux and ZImagePixelSpace latents.
   - Wave: 178
@@ -9869,7 +9887,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-LUMINA-ZIMAGE-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `lumina_zimage_family` adapter enforces pixel-space before ZImage before Lumina2 precedence, recognizes exact prefixed, saved-model, and standalone native layouts, and admits the pinned Diffusers layout only for 3,840-dimensional ZImage. Parsed shape facts distinguish Lumina2's 2,304 dimension, 24/8 attention heads, Flux latent, shift 6.0, and factor 1.4 from ZImage's 3,840 dimension, 30/30 heads, Flux latent, shift 3.0, and factor 2.8. Pixel-space checkpoints derive an exact RGB patch square, decoder input/hidden widths, consecutive residual blocks, exact frequency square, and optional `__x0__` marker before importing canonical COMFY-MODEL-0055 with factor 0.03; malformed squares, projection mismatches, block gaps, partial/mixed layouts, cross-family dimensions, and pixel Diffusers layouts fail typed. Common conditioning records mask/token behavior, cross attention, pooled text, SigLIP features, canonical reference-latent processing, reference contexts, and reference-latent memory accounting. Transactional native and Diffusers plans route all accepted state through the canonical state transaction, preserve the pinned Diffusers namespace plus canonical entry/exit tensors, and cancellation or workspace OOM publishes nothing. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 176 generated-family tests, 21 foundation tests, the 5-case Task 500 target, the long 9-case native-vision target in 152.62s, and every remaining integration target. Formatting, compile check, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `947bc2e0794a15ccb2145734c9d80b613f5ef380b85ce9408b8b7f907d5a97f0`, `c6f58aacea8632e2022e157281e6d5c2b3f3bbacdbf6a5ac37ecdbf7479fe440`, and `7baf057798490253589474f910a511d28cf36759131ed44afcab9b7178293724`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 506. Consolidate Omnigen2 and Boogu family adapters
+- [x] 507. Consolidate Omnigen2 and Boogu family adapters
   - _id: comfy-parity-omnigen2-boogu-family-adapter-consolidation
   - Outcome: Make comfy_model::omnigen2_boogu_family the sole shared owner of Omnigen2/Boogu source-native layout, configuration, CLIP, components, state plans, keys, program, profile, memory and specialization precedence. Omnigen conditionally admits F16 only through canonical extended capability; Boogu remains BF16/F32 because its source bypasses that mutation. Rename the old row-local pseudo-Diffusers plan as standalone native and make source memory factors affect the canonical estimator.
   - Wave: 179
@@ -9889,7 +9907,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-OMNIGEN2-BOOGU-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `omnigen2_boogu_family` adapter now owns Omnigen2/Boogu marker precedence, prefixed-native and standalone-native layouts, checked shape-derived configuration, canonical Flux latent admission, CLIP targets, conditioning/components, transactional state plans, executable programs, capability-gated dtype sets, and memory profiles. Boogu wins when its marker coexists with the shared timestep marker; malformed, partial, mixed, cross-family, and pseudo-Diffusers probes fail typed. Omnigen2 binds the pinned 2,520 hidden width, 32 transformer layers, two refiners, 21/7 query/KV heads, 2,048 text width, patch geometry, axes/token facts, shift 2.6, and factor 1.95. Boogu derives its widths and consecutive layer counts from keys, binds 28/7 heads, exact axes/token facts, shift 3.16, and factor 2.15. Omnigen2 admits F16 only when the canonical `BackendCapabilityMatrix` reports it; Boogu remains BF16/F32. Both variants use canonical state transactions with runtime reference-latent counts, cancellation publishes nothing, and source factors drive canonical estimator descriptors (4/8 and 4/9 bytes-per-pixel/activation factors). The reopened generated Boogu row imports this adapter, recognizes standalone native state without invented layout metadata, and rejects Diffusers. Focused adapter validation passed 5/5 and the reopened row passed 3/3. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 176 generated-family tests, 21 foundation tests, the 5-case Task 501 target, the long 9-case native-vision target in 155.14s, and all remaining integration targets. Locked check, formatting, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export/row/row-test SHA-256 values are `049b3b9066cb8e2bd7e845c0a401f859098346f48eaa900439f8a15f98a86bb2`, `2a9f25a2b24f2af9d6833369778b0da2ac39553c9a1ac9d1436353d9d8ec9e7e`, `02e5f6824280fe0bbd59c2c711d7153730efc1e765e6512e1d6ff8020259f156`, `140b8a8e5834a2113d0cf8229bcd9d421f7b2e98f953bf121d4ff20d92e2c4cc`, and `caadd34ed2de5be7a7cac7234b453c6b6cf00b4709efde2f4bb07807b792fe00`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 507. Consolidate PixelDiT and PiD family adapters
+- [x] 508. Consolidate PixelDiT and PiD family adapters
   - _id: comfy-parity-pixeldit-pid-family-adapter-consolidation
   - Outcome: Make comfy_model::pixeldit_pid_family the sole shared owner of source-native core/net layout stripping, projector/net_ema drops, exact checked adaLN reshape/split into MSA/MLP, PiD-before-base detection, down-factor/latent-channel/gate-interval configuration, and typed conditioning keys. Import canonical PixelDiTPixel latent and canonical tensor shape/index/resize operations; node consumers receive typed keys only.
   - Wave: 180
@@ -9909,7 +9927,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-PIXELDIT-PID-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `pixeldit_pid_family` adapter now owns PiD-before-PixelDiT precedence, exact `core.` and `net.` native-layout admission, checked configuration, canonical PixelDiTPixel latent import, CLIP/components/program/profile facts, and typed `attention_mask`, `lq_latent`, and `degrade_sigma` conditioning keys. PixelDiT binds the pinned 1,536 hidden width, 24 heads, 14 patch blocks, two pixel blocks, 1,152 pixel-attention width, 16 pixel heads, 2,304 text width, patch 16, 300-token limit, shift 4.0, and factor 0.04. PiD is selected first by its low-quality projection marker and additionally derives exact latent channels, hidden width, down factor, super-resolution factor 4, paired gate counts, and gate interval while binding shift 1.5. The two transactional state plans strip their source layout, drop optional `_repa_projector` and `net_ema` training state, and use canonical checked reshape/narrow transforms to split each pixel-block adaLN weight and optional bias into exact MSA and MLP tensors. Wrong rank, non-divisible dimensions, incomplete/cross-layout state, missing markers, mismatched PiD projections/gates, and cancellation fail typed without publication. The adapter references canonical tensor facilities and does not duplicate tensor shape/index/resize equations or transaction ownership. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 185 generated-family tests, 21 foundation tests, the 5-case Task 502 target, the long 9-case native-vision target in 206.24s, and every remaining integration target. Locked compile check, formatting, diff hygiene, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `0568ed4ffc21cbbfea8cf1dc5cdb008d9ca8bef483631825a0f5e15687b6823c`, `932730549676f6bc16f98a8ccd3950bf385aaaa0724c7c8c6865c61d7832a92c`, and `02749efb388bcf183d4c7abb9dca293ff2513d0ae15bebfbe2cc3ddf49d2580e`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 508. Consolidate PixArt family adapters
+- [x] 509. Consolidate PixArt family adapters
   - _id: comfy-parity-pixart-family-adapter-consolidation
   - Outcome: Make comfy_model::pixart_family the sole shared owner of PixArt detector/config, CLIP/components/state mapping/program/memory, Alpha-versus-Sigma micro-conditioning, and the pinned native/Diffusers mapping including QKV assembly. Import canonical SD15/SDXL latents and tensor transforms; node micro-conditioning consumes the adapter.
   - Wave: 181
@@ -9929,7 +9947,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-PIXART-ADAPTER-CONSOLIDATION 2026-08-06 PASS. The sole native `pixart_family` adapter now owns PixArt Alpha/Sigma selection over exact prefixed-native, standalone-native, and pinned Diffusers layouts; checked configuration; T5XXL CLIP binding; typed conditioning keys; components/program/profile facts; canonical SD15/SDXL latent imports; and transactional state conversion. Every admitted layout binds hidden width 1,152, 16 heads, four input channels, patch size two, exact consecutive depth, 4,096 caption width, bounded model length, the pinned sqrt-linear 1,000-step schedule, factor 0.5, and F16/BF16/F32 CPU admission. Alpha requires complete, exact size/aspect micro-conditioning projections and exposes typed `c_size`/`c_ar` alongside `c_crossattn`; Sigma excludes micro-conditioning and imports canonical SDXL instead of Alpha's canonical SD15. Native position tokens are rank/width/square checked before exact input-size and interpolation derivation. The bounded Diffusers plan implements every pinned basic/block mapping and canonically assembles self-attention Q/K/V and cross-attention K/V weights and biases for every checked block without duplicating tensor concatenation mechanics. Mixed/partial layouts, gapped or excessive depths, invalid projection/patch/position geometry, incomplete micro-conditioning, workspace OOM, and cancellation fail typed without publication. Focused adapter validation passed 5/5. The complete locked unrestricted `comfy_model --all-targets` suite exited 0, including 229 library tests, 185 generated-family tests, 21 foundation tests, the 5-case Task 503 target, the long 9-case native-vision target in 231.06s, and every remaining integration target. Locked compile check, formatting, diff hygiene, and warnings-denied release/all-target/all-feature Clippy passed. Adapter/test/export SHA-256 values are `59fc6260f85587a760578bd4fb513b27962920dbeada6c84c9de998cc6d2ec2b`, `1f4f2445d46e088223b296f3567dd53e273019a6e299141e1827fe00b04aa618`, and `3eac150a1d035787630705a69471f1687b183c4a0d54b9f7f4815c8f6a33b46a`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 509. Consolidate Qwen Image family ownership
+- [x] 510. Consolidate Qwen Image family ownership
   - _id: comfy-parity-qwen-image-family-adapter-consolidation
   - Outcome: Make comfy_model::qwen_image_family the sole reusable owner of Qwen Image detector/config, txt_norm, depth/channels, timestep-zero marker, optional addition-time/ref-image facts, source-native layout, block-prefix catalog, and typed conditioning keys. Import canonical Wan21 latent and PatchGraph; layered latent/edit/merge/control nodes consume the adapter without owning geometry, tensor creation, or patch commit.
   - Wave: 183
@@ -9949,7 +9967,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WORKSPACE-CONSOLIDATION POST-QWEN-IMAGE-ADAPTER-CONSOLIDATION 2026-08-05 PASS. The sole native `qwen_image_family` adapter now owns exact prefixed-native and standalone-native detection, explicit unsupported-Diffusers rejection, checked `txt_norm`/input/output/block geometry, consecutive bounded depth, timestep-zero and optional addition-time precedence, reference-image method facts, typed conditioning keys, source/mapped base and control block-prefix catalog, Qwen 2.5 text-target facts, BF16/F32 CPU admission, and the pinned 1.8 memory factor. It imports the canonical COMFY-MODEL-0053 Wan21 latent and converts the source layered-slice request into a checked canonical three-dimensional `LatentExtent`; tensor allocation remains exclusively in `empty_latent`, including fail-closed cancellation and OOM rollback. Weight-patch admission is limited to the audited Qwen block-prefix catalog and delegates ordered identity, semantic conversion, validation, and commit to canonical `PatchGraph`. Mixed layouts, gapped blocks, wrong ranks/dimensions/channels, malformed timestep markers, invalid addition-time embeddings, invalid layered extents, and out-of-catalog patch targets fail typed. Focused adapter validation passed 7/7. `cargo check -p comfy_model` exited 0. The unrestricted complete `comfy_model --all-targets` suite exited 0, including 229 library tests, 223 generated-family tests, 21 foundation tests, the 7-case Task 504 target, the long 9-case native-vision target in 155.98s, and every remaining integration target. Formatting, diff hygiene, and warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` passed. Adapter/export/test SHA-256 values are `249ca141b38e2bba6c705c92fa3e5b35bbb04d5761365dcc8fae48e8bee0e35f`, `b30f247a9a15b64c3f912fc89b3296ae158a42ccc939cdce8fb7fafbf7596134`, and `98a83c91959b7e06934e1258e019f5bfde0dab094d79ef9e03526476b4912ea3`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed, and no production Python/JavaScript or external Comfy process path exists._
 
-- [x] 510. Implement native weight-adapter runtime and bypass semantics
+- [x] 511. Implement native weight-adapter runtime and bypass semantics
   - _id: comfy-parity-weight-adapter-runtime-bypass
   - Outcome: Implement the pinned source-facing weight-adapter registry and typed trainable/bypass runtime plans as one focused comfy_model::weight_adapter owner. Static payload calculation delegates to PatchGraph, saved tensors and reverse traversal delegate to canonical comfy_tensor autograd, quantized values delegate to comfy_model::quantization, and execution uses `&dyn TensorBackend`, the caller's ExecutionContext, canonical cancellation, and external worker retry policy.
   - Wave: 128
@@ -9969,7 +9987,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-WEIGHT-ADAPTER-RUNTIME-CLOSURE 2026-07-31 independent current-tree audit PASS. The 18 exact pinned source/symbol rows execute 36 valid/invalid cases with 36 passed, 0 failed, 0 skipped in schema-v1 `VAL-WEIGHT-ADAPTER-001` (artifact SHA-256 `f4cad2a517c744aa39ced4a60df0da9dfd1edb1c50a447e0f1e7d51f950d6cdd`). Focused native runtime tests passed 16/16, covering all six families, all seven LoRA aliases, LoHa/LoKr direct/decomposed/Tucker paths, GLoRA, OFT/BOFT order, source convolution geometry, caller RNG commit, canonical first-order and analytical LoHa higher-order autograd, mutation witnesses/release, quantized materialization, static PatchGraph projection, cancellation/failure atomicity, and sole-owner scans. Fresh locked numeric, autograd, device, memory, cancellation, and ownership gates exited 0; the approved unsandboxed cancellation probe passed and VAL-OWNERSHIP-001 passed after removing declaration-shaped test needles that contaminated repository scans. Fresh all-target suites passed for comfy_model (including the unsandboxed special-file security probe and long native vision execution), comfy_tensor, comfy_worker, and comfy_test_support (including native image/diffusion E2E, no-Python/no-external-Comfy, recovery, release, and 10/10 ownership). Locked four-crate check, formatting, conditioning generation, and warnings-denied release/all-target/all-feature clippy exited 0. The normative validation runner was corrected to the executable comfy_model integration target; `regenerate_all.py --check-twice` was rerun after the expected derived-artifact refresh and exited 0 with snapshot-input closure, 517 tasks, 86 validations, 150 ownership rows, and 13,283 traced feature rows. Repository-wide ownership proves one NativeWeightAdapter, AutogradTape, GradientStore, CancellationToken, BackendWorkspaceAuthority, AttemptMemoryController, PatchGraph, and QuantizedMatrix owner; the narrow `cpu_backend` projection has one trait declaration and one canonical CPU implementation, with unsupported backends rejected typed before mutation and no private backend construction. Implementation SHA-256: weight adapter `9ce574ea9d9279370e874b57bef4df34b02df2b40abd38e922cda770785c9663`; focused tests `954faa1ee345fa929b090287e3559164d2a5bddc0505ac3fdfcfcbbe5c7915fb`; tensor boundary `5baaf2749deba9a9982c4dd279d025331ff33abb46b87555c7302f7e8f5b3160`; CPU projection `548a04dcf9b01281990f4639f6219f9bc9c467dc52b35526ec70c07bb8d81c8a`; conditioning catalog `659cc63959870fc253107e8665d6060967972b223a633f4d79f1cb1c775da179`. Validated native Rust CPU on macOS aarch64; unavailable accelerator execution is not claimed.
 
-- [x] 511. Implement patch loading, merge, and quantized replacement adapters
+- [x] 512. Implement patch loading, merge, and quantized replacement adapters
   - _id: comfy-parity-patch-loading-merge-quantized-adapter
   - Outcome: Implement comfy_model::patches as the focused adapter for checked LoRA key discovery and load diagnostics, Model/CLIP add and subtract merge mapping, and quantized-operation replacement mapping. It constructs immutable PatchGraph payloads and canonical quantized values, executes through the selected TensorBackend and caller ExecutionContext, and owns no ordering, payload equation, quantization codec/storage/materialization, allocator, retry, persistence, or commit state.
   - Wave: 129
@@ -9989,7 +10007,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-07-31 independent current-tree Task 511 audit PASS. `comfy_model::patches` is a focused source-key/load/merge/quantized-replacement adapter; `comfy_model::weight_adapter` remains the sole adapter-family registry and payload owner, `PatchGraph` remains the sole ordered payload validation/application/commit owner, and `quantization` remains the sole codec/storage/materialization owner. Whole-repository definition and call-site scans plus adapter tests found no competing family parser, patch executor, quantizer, allocator, cancellation, persistence, retry, or transaction owner. Exact source-derived validation covers all 14 catalog rows and writes schema-v1 `VAL-PATCH-ADAPTER-001` with 28 passed, 0 failed, 0 skipped on native Rust CPU/macOS aarch64; artifact SHA-256 `ee9ed10790bf8b5a4d7943c3d156190483e297baffb8219e99c1d109dae4114e`. Implementation SHA-256: patches `83ffd1a485c9a67960029772f4c72d262e58e52e02982ea2387a1e4d89ce780c`, PatchGraph `95512635a4ac81e68ce7a2a56818c0a41cdbe89feb5321e7c753d05eac07855e`, weight adapter `7d8bb136d37546bb8f202559417488f7bd01d17314db36d376ccb469404fe9c3`, focused tests `e27c6b3d5d999da269e4bdf71da0085326eabcbe489bd213e0bbac572f20c200`. Fresh declared validation exited 0: formatting; conditioning and ownership generators; locked four-crate all-target check; focused patch adapters 8/8; numeric formats 1/1; autograd 1/1; device 1/1; memory 1/1; cancellation ownership 1/1; focused ownership 1/1 over the full repository; complete comfy_model, comfy_tensor, comfy_worker, and comfy_test_support all-target suites, including deterministic native diffusion 1/1 and native image 1/1; and warnings-denied release `./script/clippy -p comfy_model -p comfy_tensor -p comfy_worker -p comfy_test_support`. Unsupported accelerator hardware was not claimed; unsupported-device paths were validated as typed failures without CPU fallback. Fresh `python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice` exited 0 with snapshot-input closure, preserving this `[x]` status and evidence across 517 tasks, 87 validations, 151 authoritative ownership rows over 7,277 source files, 264 criteria, 41 decisions, and 13,283 traced feature rows._
 
-- [x] 512. Consolidate the native SD1 tokenizer owner
+- [x] 513. Consolidate the native SD1 tokenizer owner
   - _id: comfy-parity-sd1-tokenizer-owner-consolidation
   - Outcome: Remove duplicate SD1 BPE, prompt-bound, fixed-context padding/token-sequence, textual-inversion artifact-binding, SentencePiece vocabulary, storage-dtype, and runtime tokenizer-cache identity behavior from native-diffusion and clip_tokenizer before Task 348 breadth. Keep comfy_model::clip::Sd1Tokenizer as the sole canonical SD1 vocabulary-domain, exact merge-header/cardinality, merge-rank, byte-encoding, BPE traversal, shared bound, cancellation, and fixed-77 padding/token-sequence owner. Keep NativePromptTokenizer as the sole generic configurable multi-section, special-token, padding, and word-identity packer, and formats/ModelStore as the sole bounded ModelProto, restricted fallback archive, canonical storage-dtype, verified artifact-payload, and parsed-model cache owners. Native-diffusion may provide only checked SD15 descriptor, typed-error, and fixed-77-token projections; clip_tokenizer may provide only explicitly distinct focused source-family adapters over canonical untruncated content tokens, opaque store-scoped verified artifacts, and parsed SentencePiece facts. Runtime provider, handle, resolution, and cache identities bind the exact TokenizerIdentity digest beside the model digest.
   - Wave: 126
@@ -10009,7 +10027,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-TASK348-TOKENIZER-OWNERSHIP-CLOSURE 2026-07-31 independent current-tree implementation, traceability, artifact-consistency, and ownership audit PASS. comfy_model::clip is the sole exact contiguous 49,408-token SD1 vocabulary, canonical `#version: 0.2` plus 48,894-pair merge, byte/BPE, untruncated-content, and fixed-77 owner; NativePromptTokenizer alone owns generic configurable section packing. ModelStore and formats issue opaque current-store verified SentencePiece/embedding payloads, parse the restricted stored-ZIP fallback, normalize storage dtypes, distinguish genuine nested PyTorch string_to_param from flat safetensors names, and reject raw caller rows, fabricated or stale handles, mixed stores, and mutation. Native diffusion is projection-only; runtime provider, retained handle, resolution, and cache dependencies bind the exact tokenizer digest beside the model digest. Fresh locked validation exited 0: formatting; the generator produced 151 ownership rows from 7,277 repository source files; four-crate check; clip_tokenizer 22/22; restricted format 1/1; CLIP library 9/9; runtime 283/283; native diffusion foundation 4/4 and E2E 1/1 (199.26s); tensor and worker VAL-MEMORY-001 1/1 each; packaged-worker preflight OOM 1/1; canonical cancellation 1/1; generic ownership 1/1 and focused Task 512 ownership 1/1 with four cases; comfy_model all targets (182 library tests plus every integration target); comfy_test_support all targets (28 library tests plus every integration target, ownership 12/12, native boundary and both E2Es); and `./script/clippy -p comfy_model -p comfy_runtime -p comfy_worker -p comfy_test_support` warnings-denied plus cargo-machete. VAL-CLIP task result records 12 passed, 0 failed, 0 skipped over a seven-file implementation closure in artifact SHA-256 `5db4289df455c1da3acd8e33ebda4caa44974fb1e55740452d5e1f8f79674941`; focused ownership artifact SHA-256 `17502a43aa7cc819146a0010d246214aede84f4a9be40cc2ebafe2a2fb8f64fd`. Fresh approved `python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice` exited 0 with snapshot-input closure, 517 tasks, 87 validations, 151 ownership rows, 13,283 trace rows, 264 criteria, and 41 decisions. Validated native Rust CPU on macOS aarch64 with no Python/JavaScript production engine, external Comfy process, network request, or approved Task 512 deferral._
 
-- [x] 513. Consolidate image VAE geometry and EfficientNet feature ownership
+- [x] 514. Consolidate image VAE geometry and EfficientNet feature ownership
   - _id: comfy-parity-vae-image-foundation-consolidation
   - Outcome: Before image architecture breadth, keep operation-specific encode/decode geometry and temporal batch-group tiling policy in the canonical comfy_model::vae owner, reuse vision_models::NativeEfficientNetV2S for Stable Cascade Stage C, and delegate GELU numerics to the canonical activation-normalization functional owner. Add checked x4, batch-normalized, TAESD-128, Stage A/C, Hunyuan image, pixel-space, and bounded explicit-config geometry; preserve the complete batch-as-time group when spatially tiling TemporalAutoencodingEngine decode; report constructor availability only for profiles already registered to the native image adapter, without treating constructor reachability as Task 353 execution conformance; and extend the existing vision owner with strict atomic F32/F16/BF16/I64 state projection/loading plus a checked canonical-state execution bridge rather than creating another EfficientNet or state-loader subsystem. Preserve the canonical TensorBackend interface; the generic NativeVae boundary may safely project its concrete caller to the same CpuBackend instance only for CPU-only architecture adapters and must fail typed otherwise.
   - Wave: 128
@@ -10029,7 +10047,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-07-29 independent current-tree Task 512 audit PASS after reopening four evidence gaps. One VaeSpatialGeometry/TileExecutionPlan owner covers operation-specific x4, BN, explicit-config, TAESD-128, Stage A/C, Hunyuan, pixel-space and temporal grouped decode tiling; one NativeEfficientNetV2S owner provides exact Stage C prefix projection, strict atomic feature loading, canonical feature execution, and F32/F16/BF16/I64 ModelStore materialization; vae_image delegates GELU to the canonical comfy_tensor helper. Public NativeVae encode/decode prove the exact CpuBackend instance is projected; a delegating noncanonical backend fails typed with no retained output allocation. Fresh validation: cargo check --locked -p comfy_tensor -p comfy_model exit 0; cargo test --locked -p comfy_tensor --all-targets exit 0; cargo test --locked -p comfy_model --all-targets exit 0 (177 lib tests and all integrations, vision_models 9/9); cargo fmt --all -- --check exit 0; ./script/clippy -p comfy_tensor -p comfy_model exit 0 warnings-denied. Independent repository scan found no competing geometry/tiler, EfficientNet, feature-state loader, GELU, workspace, cancellation, retry, persistence, or publication owner. Constructor availability is explicitly registration-only; Task 513 owns state/equation conformance and Task 353 owns architecture execution breadth. Strict regeneration will be rerun after finish._
 
-- [x] 514. Consolidate image VAE state admission and tensor equations
+- [x] 515. Consolidate image VAE state admission and tensor equations
   - _id: comfy-parity-vae-image-adapter-ownership-consolidation
   - Outcome: Before Task 353 architecture breadth, remove the remaining duplicate image-state schema, dtype admission, convolution geometry, softmax, normalization, padding, and pixel-rearrangement ownership from comfy_model::vae_image. Extend the existing canonical comfy_tensor and comfy_model owners only with the narrow checked adapters required by image VAE execution; replace checkpoint-derived self-comparison with immutable source-derived architecture manifests and exact legacy-prefix normalization; and connect the loader through the existing authorized AssetService/ModelStore production boundary without exposing its private ArtifactIndex or adding a second backend, workspace, cancellation, cache, retry, persistence, or publication owner.
   - Wave: 130
@@ -10049,7 +10067,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh independent Task 513 rerun PASS: locked four-crate check; locked four-crate all-target suite including 182 model, 277 runtime, 96 tensor, native image/diffusion E2E, recovery and 8 ownership tests; rustfmt; release all-feature clippy; ownership generator twice byte-identical SHA-256 563f85c31fb87d85d16428404e0a1ab5b4c37f69f9fab2ed3f113972b6fabb50 with native_model_vae_domain authoritative_owner_confirmed; validate_spec exit 0; strict regenerate_all --check-twice exit 0 after one expected stale-artifact refresh._
 
-- [x] 515. Implement the canonical CPU convolution and mixed-precision VAE execution bridge
+- [x] 516. Implement the canonical CPU convolution and mixed-precision VAE execution bridge
   - _id: comfy-parity-vae-canonical-cpu-execution-bridge
   - Outcome: Make CpuBackend::convolution a checked TensorBackend adapter to the existing generated_comfy_operator_indirection_01 convolution owner and make native image-module execution honest for every advertised CPU dtype. Preserve NativeModule as the sole parameter lifecycle and cast-generation owner, preserve the caller's ExecutionContext and backend workspace authority, and reject every unavailable device or dtype before state or output mutation. No image architecture adapter may copy convolution arithmetic, construct a private backend, or advertise an execution target that the selected backend cannot run.
   - Wave: 131
@@ -10069,7 +10087,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh four-crate check, all declared all-target suites, production F32/F16/BF16 VAE execution, ownership audit, signed CPU certification, rustfmt, release all-feature clippy, validate_spec, and exact strict regeneration rerun all passed._
 
-- [x] 516. Consolidate NativeModule backend target admission for CLIP execution
+- [x] 517. Consolidate NativeModule backend target admission for CLIP execution
   - _id: comfy-parity-native-module-backend-target-admission-consolidation
   - Outcome: Before native CLIP text or vision breadth, extend the existing NativeModule operation-selection boundary and canonical TensorBackend capability matrix with one checked backend, device, dtype, layout, and required-operation admission path. CLIP plans remain the target-identity owner, NativeModule remains the parameter and cast lifecycle owner, and TensorBackend remains the capability and execution owner; this task adds no registry, device model, dtype model, allocator, workspace authority, cancellation token, cache, retry policy, persistence layer, or publication transaction.
   - Wave: 146
@@ -10089,7 +10107,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: Fresh independent Task 506 PASS. The pre-change whole-repository ownership audit retained exactly one `BackendCapabilityMatrix` owner in `comfy_tensor::operation`, one `NativeModule` parameter/cast lifecycle owner, and one immutable `NativeExecutionRequirements` adapter in `comfy_model::native_ops`; no registry, device/dtype model, backend, allocator, workspace authority, cancellation token, cache, retry owner, persistence layer, or publication transaction was added. Production call-site scans found all loaded CLIP construction, text execution, vision preprocessing/forward, NativeModule materialization/forward, and VBAR casts using `NativeExecutionRequirements::admit_backend_target` against the actual `TensorBackend`, with no direct arbitrary-matrix admission in CLIP adapters. Locked focused admission tests passed 5/5; CLIP library, tokenizer 22/22, vision 11/11, and native-ops suites 17/17 plus 8/8 passed; locked `comfy_model --all-targets` passed including 229 library tests and every integration; locked `comfy_test_support --all-targets` passed including 28 library tests, native image and diffusion E2E, cancellation, recovery, native-boundary, plugin/workspace, and ownership 19/19. Locked two-crate check, rustfmt, and release all-feature `./script/clippy -p comfy_model -p comfy_test_support` exited 0. The ownership generator reported 151 authoritative rows across 7,300 repository source files. Standalone `validate_spec.py` exited 0 and the exact post-change `regenerate_all.py --check-twice` rerun completed twice byte-identically with exit 0. Retained artifacts: VAL-CLIP-001 SHA-256 f2e909b0928faf588a432a2ce7029434f2bc5def91fcebc61e6f51d06dbc37d6, VAL-NUMERIC-FORMATS-001 f36cadf49db79aa973358eb9f11013c9404e401984385cc50d15dcc744162fc9, VAL-OWNERSHIP-001 b549a64a55c6850c650c9db3850009a3de096e66255587df4165245e43a95dba, and the exact CLIP implementation closure digest is 789624c9b16cfb94d4c98fd30ac4d74621c7df0fb13d186c7bf6e5fa39bd52de._
 
-- [x] 517. Reconcile backend catalog cryptographic provenance after the baseline scope amendment
+- [x] 518. Reconcile backend catalog cryptographic provenance after the baseline scope amendment
   - _id: comfy-parity-backend-catalog-provenance-reconciliation
   - Outcome: After the CPU-and-Apple-Metal baseline amendment and retained fail-closed CoreX scope transfer change the normative backend-model catalog, reconcile every checked-in implementation-closure and source-provenance digest that consumes that catalog. Preserve fixture observations and execution semantics byte-for-byte apart from the catalog digest, bind the CUDA-integrated native runtime controller digest in the tokenizer closure, and keep CoreX partial only because its compiled zero-symbol adapter remains canonically Unbound pending the separate comfy-corex-enablement specification.
   - Wave: 144
@@ -10109,7 +10127,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-01 independent catalog-provenance reconciliation PASS: repository-wide search found zero stale pre-amendment backend-model digest; the registry reports exactly COMFY-MODEL-0015 Metal and COMFY-MODEL-0020 CoreX as partial while CoreX remains compiled zero-symbol typed Unbound with proprietary enablement pending only in comfy-corex-enablement. Numeric provenance passed 1/1; tokenizer closure passed 22/22; complete comfy_model all-targets passed (183 library tests and every integration target, including 9/9 vision in 165.82s); complete comfy_sampler passed 18 library, 11 ownership, 190 sampler, 12 foundation, and 30 scheduler tests; complete comfy_test_support passed 28 library tests plus every integration target, deterministic native diffusion 200.07s, checkpoint closure 90.41s, native image/recovery/release/no-Python/no-external-Comfy/plugin/workflow, and ownership 17/17 in 164.93s. Combined locked check, cargo fmt --check, warnings-denied release clippy, twice-stable regenerate_all.py --check-twice (508 tasks, 87 validations, 151 ownership rows, 13295 trace rows), and validate_spec.py all exited 0. No unavailable hardware, signing material, or proprietary CoreX work was claimed._
 
-- [x] 518. Add canonical bounded model-key and tensor-dimension detection
+- [x] 519. Add canonical bounded model-key and tensor-dimension detection
   - _id: comfy-parity-model-detection-any-of-key-selector-consolidation
   - Outcome: Before dependent model-family rows close, extend the existing comfy_model::model_family detection rule and registry with bounded disjunctive any-of-key and any-tensor-dimension selectors. model_family remains the sole detection-rule validation, scoring, evidence, precedence, and ambiguity owner, while ModelStore remains the sole parsed key/shape projection owner. This focused extension adds no family registry, parser, metadata authority, state planner, cache, persistence layer, or transaction.
   - Wave: 164
@@ -10129,7 +10147,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-ANY-KEY-OWNERSHIP-CONSOLIDATION POST-MODEL-LAYOUT-OWNER 2026-08-05 independent current-tree validation refreshed the canonical detector after its bounded tensor-dimension extension. `comfy_model::model_family` remains the sole owner of `ModelDetectionRule`, validation, scoring, evidence, precedence, and ambiguity, and ModelStore remains the sole parsed key/shape projection. `AnyKeyPresent` retains its 1..=16 unique bounded-key contract and one-match scoring; `AnyTensorDimensionValue` admits 1..=16 unique nonzero values and 1..=16 unique keys, requires a dimension below rank 32, inspects only parsed tensor shapes, contributes its score once, and fails typed for empty, duplicate, malformed, absent, out-of-rank, overflow, tied, or ambiguous probes. ACE-Step key alternatives and CogVideoX native/Diffusers patch-channel alternatives require no invented metadata. Fresh focused validation passed CogVideoX detector/adapter 5/5, canonical VAL-MODEL-DETECTION-001 1/1, model-family foundation 21/21, layout-owner 2/2, and the three generated CogVideoX rows 9/9. Complete locked comfy_model all-target validation passed 229 library tests, 82/82 generated-family cases, every integration target, 9/9 native vision forwards, and 17/17 weight-adapter cases; locked check, cargo formatting, focused/full ownership, and isolated warnings-denied release/all-target/all-feature `./script/clippy -p comfy_model` passed. Current zero-failure/zero-skip artifacts are VAL-MODEL-DETECTION-001 14/0/0 at SHA-256 `75d4354c089b016521f8e8e7e5b192113270126b439efd5568f1d623a34c490c`, VAL-MEMORY-001 14/0/0 at `cf35110c25678f2c25dbd4b15a016d3fe7d0b8a299be85309bd927148fc81bc4`, and VAL-OWNERSHIP-001 174/0/0 at `4ba63fca12d4fab740ccef7fb39acfa80ebe09cf9ec3fc719e4f58d3a8cec4bf`. Source SHA-256 values are `model_family.rs` `582e44bcf6f60f38dec5c540e005591b3ae42d61eeade18acdd9c3d81db18b08`, unchanged `model_family_foundation.rs` `fc697e67eafd0c46a9c1d2a9f10524de587ea65896e03df5a1a9f2431542523a`, and unchanged `model_layout_owner.rs` `6d1bc54a8d9823deeefc3330dd9fec552f1010dca63cfe89e0131a6fced74bda`. Validated on macOS aarch64 native Rust CPU; Apple Metal remains typed fail-closed and no Python/JavaScript or external Comfy production path exists._
 
-- [x] 519. Make generated and audited source discovery portable across macOS filesystems
+- [x] 520. Make generated and audited source discovery portable across macOS filesystems
   - _id: comfy-parity-appledouble-source-scan-portability
   - Outcome: Classify macOS AppleDouble `._*` entries as non-source filesystem metadata at every generated Rust module and repository source-audit boundary. Preserve exact discovery, UTF-8 failure, digest, collision, and ownership checks for every other path; do not delete user files, weaken registered-source closure, or make local cleanup a build prerequisite.
   - Wave: 82
@@ -10149,7 +10167,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-05 portability discovery, implementation, and independent audit. Fingerprint-verified immutable snapshots exposed macOS AppleDouble `._*` metadata entries containing invalid UTF-8 on the external filesystem. Generated model module/test discovery and every repository production-source audit now classify only basename-prefixed `._*` entries as metadata before UTF-8/source parsing; all ordinary hidden, malformed, missing, orphaned, duplicate, unregistered, collision, digest, and ownership paths remain fail-closed, and no sidecar deletion is required. Synthetic invalid-UTF-8 sidecar tests passed in the build-manifest 6/6, tokenizer 24/24, HiDream 7/7, and weight-adapter 17/17 suites; the shared helper unit target passed within 29/29 support tests. Exact cargo checks passed; the complete comfy_model all-target/all-feature suite and complete comfy_test_support all-target suite passed, including deterministic native diffusion/image, all-checkpoint comparison, release boundary, recovery, no-external-Comfy, no-Python, plugin, workflow, and 23/23 ownership targets. VAL-FOUNDATION-001 passed 22/22 at SHA-256 `004d801872d7d98e151b5989c8faf1aba16f4863c146309e2c7f0af1924ecbf2`; VAL-MODEL-FAMILY-FOUNDATION-001 passed 19/19 at `ed7406b00491c6a794c598af37ea918123ad70c618051fcaaa77c01e73a35884`; VAL-OWNERSHIP-001 passed 174/174 at `9e7efb96644b97e06dc744438e96d1413b74d2c471ca677e5025e44a85ff9cbf`. Build/helper source SHA-256 are `cc0a252b01d6762672789c10cd3399669dcb5ec402995b86013c4f3a832f0928` and `fe3f33ed0f7c917a3c65e51b4d4a50fd6b4963d51984a9751b0f699cf2aed42d`. Formatting, diff checks, strict double regeneration with 514 tasks/87 validations/155 ownership rows/13,295 traced features, standalone spec validation, and release/all-target/all-feature warnings-denied clippy passed on macOS aarch64 CPU without deleting sidecars._
 
-- [x] 520. Close CPU low-precision BMM/tanh and model-execution admission
+- [x] 521. Close CPU low-precision BMM/tanh and model-execution admission
   - _id: comfy-parity-cpu-low-precision-bmm-model-execution-closure
   - Outcome: Close the execution gaps discovered while independently validating the LTXAV, LTXV, and LotusD rows: make the canonical CPU BatchMatrixMultiply and hyperbolic-tangent primitives honestly execute F32, F16, and BF16 tensors, carry low-precision tanh through its canonical tensor facade, and make NativeModule target admission request only primitives its selected execution path actually dispatches. Preserve deterministic f32 accumulation/evaluation, canonical DType decoding/encoding, caller-owned cancellation and workspace authority, backend capacity accounting, typed fail-closed behavior, and atomic publication.
   - Wave: 182
@@ -10169,7 +10187,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: POST-CPU-LOW-PRECISION-BMM-MODEL-CLOSURE 2026-08-06 independent implementation and validation PASS. The canonical CPU capability matrix now advertises contiguous/strided BatchMatrixMultiply and hyperbolic tangent for exactly F32/F16/BF16, decodes inputs with the canonical DType codecs, performs deterministic f32 accumulation/evaluation, rounds through the requested output dtype, accounts workspace through the caller-owned authority, and publishes only after success. Focused nonzero fixtures prove exact values in all three dtypes; mixed BMM dtypes, output mismatch, malformed geometry, pre-cancellation, mid-cancellation, and OOM fail typed without output publication or capacity leaks. The canonical tanh facade preserves F16/BF16/F32, while unsupported non-float modes remain fail-closed. NativeModule SiLU admission now requests only the bounded f32-workspace path it actually dispatches. Original and patched LTXAV/LTXV BF16/F32 and LotusD F16/BF16/F32 executions pass through these real primitives. The focused BMM, tanh, and every-advertised-CPU-signature tests each passed; the complete locked tensor matrix passed 100 library cases and every integration target, the complete model matrix passed 229 library/207 generated-family/21 foundation/9 native-vision cases, and the complete support matrix passed 29 library, deterministic native diffusion in 215.69s, four checkpoints in 100.02s, native image/recovery/release/no-external-Comfy/no-Python/plugin/workflow, and ownership 23/23 in 249.08s. VAL-MEMORY-001, canonical cancellation, and focused ownership passed; locked compile, formatting, diff integrity, warnings-denied release/all-target/all-feature Clippy in 4m39s, strict double regeneration with 515 tasks/87 validations/155 ownership rows/13,295 trace rows, and standalone spec validation exited 0. CPU backend/tanh facade/NativeModule SHA-256 values are `464808a9eeb6d3d91fa1d43f44639f52c0711acbb84ca4f064f9f1fa51fc4a01`, `b01f8f43847c733cf88eee912e55cbf9d485c3ce77aea66ad66b2660b98d3abd`, and `e10870454abc5f7026466c5979e7b06b95c9e46604f10ef00b91e8cf9eeeb9d4`; LTXAV/LTXV/LotusD row artifacts are `9cd2ff4fba0cdd053e4721a3ff3f717b311c4d281d05b461e46e2f0c9b1a2bce`, `970eaec9d239c2165e9d205a0635bf447999d97d38721dd2ab7da33a2358262a`, and `1559e8b7d0aec054f79e179746a6cf635b02e805ca9af1c050ca17b51874b77c`, each with 7 passed/0 failed/0 skipped. Validated on macOS aarch64 native Rust CPU; Apple Metal remains compiled typed fail-closed and no production Python/JavaScript or external Comfy process exists._
 
-- [x] 521. Add canonical probe-derived model state-plan selection
+- [x] 522. Add canonical probe-derived model state-plan selection
   - _id: comfy-parity-probe-derived-model-state-plan-selector
   - Outcome: Close the registry reachability gap discovered while integrating PixArtAlpha: extend the sole comfy_model::model_family state-plan selector with an immutable row-owned probe selector for plans whose bounded operation sequence depends on already validated tensor facts such as consecutive transformer depth. The canonical registry must invoke the selector during resolution, revalidate every returned operation and declared component before publication, bind the resulting owned plan into ResolvedModelFamily, and remain the only state-transaction entry point; leaves may not execute an alternate mapping path.
   - Wave: 184

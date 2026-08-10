@@ -650,6 +650,19 @@ Schema recognition is not node execution parity.
 5. THE node closure report SHALL reconcile registered local and API-node totals, native implementations, explicit provider implementations, gated placeholders, per-node schema tests, per-node behavior tests, and unresolved evidence with zero unexplained rows.
 6. NO node SHALL be marked equivalent from representative family testing alone; its exact catalog row SHALL pass schema, success, boundary, validation, failure, cancellation, cache/change, persistence, and side-effect checks applicable to that node.
 
+### Requirement 45: Opt-in Comfy product build boundary
+
+Comfy is an optional Sim product capability, not part of the default editor build.
+
+#### Acceptance criteria
+
+1. THE `sim` crate SHALL define an empty default feature set and an explicit `comfy` feature; every normal `comfy_*` dependency SHALL be optional, and every Comfy accelerator feature SHALL imply `comfy`.
+2. WHEN Sim is built without `comfy` THEN its normal compile and link dependency graph SHALL contain no `comfy_*` package, and its binary SHALL expose no Comfy command, runtime/plugin initialization, panel, menu, action, keymap, settings observer, worker launch, or bundled Comfy asset.
+3. WHEN Sim is built with `comfy` THEN the existing CPU integration SHALL remain available, and selecting Metal, CUDA, ROCm, DirectML, XPU, NPU, MLU, or CoreX SHALL retain the existing backend and worker behavior while implying `comfy`.
+4. ORDINARY `test-support` SHALL remain Comfy-free; Comfy-only tests and fixtures SHALL require `comfy` or a separate `comfy-test-support` feature whose dependency closure explicitly includes `comfy`.
+5. DEFAULT macOS, Linux, and Windows packaging SHALL NOT build, copy, strip, sign, install, or reference `comfy-worker` or Comfy-only assets; an explicit packaging option SHALL build and package the Comfy-enabled Sim binary and its existing worker/backend payloads.
+6. THE build-boundary validation SHALL prove both feature modes compile, the default dependency tree contains no `comfy_*` package, default product surfaces and packages omit Comfy, Comfy-enabled behavior remains reachable, workspace Comfy crates remain independently buildable, and `Cargo.lock` membership alone is not treated as product inclusion.
+
 ## Non-blocking assumptions
 
 - The recommended production architecture is a Sim-owned native Rust control

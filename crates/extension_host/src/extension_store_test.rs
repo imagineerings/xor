@@ -346,6 +346,18 @@ fn installed_component_constructor_owns_identity_and_payload_bounds() {
     .expect("installed component must reject a non-component identifier");
     assert!(error.to_string().contains("one normal path component"));
 
+    for invalid_identifier in ["", ".", "..", "a/b", "a\\b", "a:b", "NUL", "trailing."] {
+        let error = InstalledComponent::checked(
+            invalid_identifier.into(),
+            "1.0.0".into(),
+            empty_bytes.clone(),
+            empty_bytes.clone(),
+        )
+        .err()
+        .expect("non-portable component identities must be rejected");
+        assert!(error.to_string().contains("one normal path component"));
+    }
+
     InstalledComponent::checked(
         "插件".into(),
         "1.0.0".into(),

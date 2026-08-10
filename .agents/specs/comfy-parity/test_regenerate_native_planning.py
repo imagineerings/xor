@@ -53,7 +53,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 521)
+        self.assertEqual(len(tasks), 522)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -335,6 +335,45 @@ class ValidationGenerationTests(unittest.TestCase):
             "VAL-OWNERSHIP-001",
         ]:
             self.assertIn(validation, provider_task["validations"])
+        build_boundary_task = tasks_by_id["comfy-parity-opt-in-product-build-boundary"]
+        self.assertEqual(build_boundary_task["criterion_ids"], [
+            "45.1", "45.2", "45.3", "45.4", "45.5", "45.6",
+        ])
+        self.assertEqual(build_boundary_task["validations"], ["VAL-COMFY-BUILD-001"])
+        self.assertEqual(
+            build_boundary_task["dependencies"],
+            ["comfy-parity-native-node-provider-invocation-foundation"],
+        )
+        for path in [
+            "crates/sim/Cargo.toml",
+            "crates/sim/src/main.rs",
+            "crates/sim/src/sim.rs",
+            "crates/sim/src/sim/app_menus.rs",
+            "crates/extension_host/Cargo.toml",
+            "crates/extension_host/src/extension_host.rs",
+            "script/check-comfy-feature-boundary",
+            "script/bundle-mac",
+            "script/bundle-linux",
+            "script/bundle-windows.ps1",
+            "crates/sim/resources/windows/sim.iss",
+        ]:
+            self.assertIn(path, build_boundary_task["writes"])
+        for command in [
+            "cargo check --locked -p sim --no-default-features",
+            "cargo test --locked -p sim --no-default-features",
+            "cargo check --locked -p sim --features comfy",
+            "./script/check-comfy-feature-boundary",
+            "./script/bundle-mac --dry-run",
+            "./script/bundle-mac --comfy --dry-run",
+            "./script/bundle-linux --dry-run",
+            "./script/bundle-linux --comfy --dry-run",
+            "pwsh -File script/bundle-windows.ps1 -DryRun",
+            "pwsh -File script/bundle-windows.ps1 -Comfy -DryRun",
+        ]:
+            self.assertIn(
+                command,
+                planning.task_validation_commands(build_boundary_task),
+            )
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs", registry_writes
         )
