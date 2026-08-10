@@ -206,15 +206,26 @@ mod tests {
     use super::*;
     use crate::{
         NativeHandleStore, NativeHandleStoreIdentity, NativePrimitive, NativeResolvedPayload,
-        NativeResolvedPayloadRetention, NativeStoredPayload, NodeRegistry,
+        NativeResolvedPayloadRetention, NativeStoredModelPayload, NativeStoredPayload,
+        NodeRegistry,
     };
-    use comfy_sampler::NativeNoisePayload;
-    use comfy_tensor::CpuWorkspaceAuthority;
+    use comfy_model::{
+        ArtifactIndex, ArtifactKey, ArtifactRoot, ModelStore, NativeModelPayload, ParserLimits,
+        PatchGraph,
+        generated_native_diffusion::{Sd15DetectorProjection, Sd15TinyModel},
+    };
+    use comfy_sampler::{NativeConditioningPayload, NativeDiffusionPayload};
+    use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
     use comfy_types::{AttemptId, CancellationToken, NodeId, PromptId};
     use serde_json::{Value, json};
     use std::{
         error::Error,
-        sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+        fs,
+        path::Path,
+        sync::{
+            Arc, OnceLock,
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+        },
     };
     use uuid::Uuid;
 
@@ -247,11 +258,8 @@ mod tests {
             store_id: u128,
             generation_id: u128,
             attempt_id: AttemptId,
-        ) -> Result<Arc<Self>, NativeNodeContractError> {
-            let value = Arc::new(NativeStoredPayload::Noise(Arc::new(
-                NativeNoisePayload::random(757)
-                    .map_err(|_| NativeNodeContractError::InvalidStoredObject)?,
-            )));
+        ) -> Result<Arc<Self>, Box<dyn Error>> {
+            let value = canonical_model_payload()?;
             Ok(Arc::new(Self {
                 identity: NativeHandleStoreIdentity::new(
                     Uuid::from_u128(store_id),
@@ -318,6 +326,22 @@ mod tests {
             if handle.digest_sha256() != Some(self.digest.as_str()) {
                 return Err(NativeHandleStoreError::DigestMismatch);
             }
+            self.value.validate().map_err(|error| {
+                NativeHandleStoreError::Rejected(format!(
+                    "wanBlockSwap test MODEL payload is invalid: {error}"
+                ))
+            })?;
+            let payload_type = self.value.handle_type().map_err(|error| {
+                NativeHandleStoreError::Rejected(format!(
+                    "wanBlockSwap test MODEL payload type is invalid: {error}"
+                ))
+            })?;
+            if &payload_type != expected_type {
+                return Err(NativeHandleStoreError::WrongType {
+                    expected: expected_type.type_id.clone(),
+                    actual: payload_type.type_id,
+                });
+            }
             self.resolve_count.fetch_add(1, Ordering::AcqRel);
             if self.cancel_after_resolve.load(Ordering::Acquire) {
                 cancellation.cancel();
@@ -348,6 +372,75 @@ mod tests {
             Err(NativeHandleStoreError::Rejected(
                 "wanBlockSwap must not revoke handles".to_owned(),
             ))
+        }
+    }
+
+    fn canonical_model_payload() -> Result<Arc<NativeStoredPayload>, Box<dyn Error>> {
+        static MODEL_PAYLOAD: OnceLock<Arc<NativeStoredPayload>> = OnceLock::new();
+        if let Some(payload) = MODEL_PAYLOAD.get() {
+            return Ok(payload.clone());
+        }
+
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../comfy_test_support/fixtures/models/sd15-tiny-v1");
+        let cancellation = CancellationToken::default();
+        let mut index = ArtifactIndex::default();
+        index.add_root(ArtifactRoot::canonical(
+            "wan-block-swap-model",
+            "checkpoint",
+            &fixture_root,
+            ["safetensors"],
+        )?)?;
+        index.refresh(&cancellation)?;
+        let key = ArtifactKey::new("wan-block-swap-model", "model.safetensors")?;
+        let artifact = index
+            .record(&key)
+            .cloned()
+            .ok_or("wanBlockSwap canonical MODEL fixture is absent")?;
+        let mut model_store = ModelStore::new(ParserLimits::default())?;
+        let loaded = model_store.load(&index, &artifact.key, &cancellation)?;
+        let projection: Sd15DetectorProjection = serde_json::from_slice(&fs::read(
+            fixture_root.join("sd15-detector-projection.json"),
+        )?)?;
+        let patch_graph = Arc::new(PatchGraph::checked_semantic(loaded.identity(), Vec::new())?);
+        let memory_limit = 2 * 1024 * 1024 * 1024;
+        let (backend, workspace) = CpuWorkspaceAuthority::create_backend(memory_limit)?;
+        let backend = Arc::new(backend);
+        let scratch = workspace.authorize_workspace(memory_limit)?;
+        let context = backend.execution_context(StreamId::DEFAULT, scratch, &cancellation);
+        let model = Arc::new(Sd15TinyModel::load_production_with_patch_graph(
+            &model_store,
+            &index,
+            &loaded,
+            &projection,
+            &patch_graph,
+            backend,
+            &context,
+        )?);
+        let model_owner = Arc::new(NativeModelPayload::sd15_model(model.clone())?);
+        let conditioning = Arc::new(NativeConditioningPayload::checked_sd15(
+            &artifact.sha256,
+            model.as_ref(),
+            patch_graph,
+            None,
+        )?);
+        let diffusion = Arc::new(NativeDiffusionPayload::model(model_owner, conditioning)?);
+        let payload = Arc::new(NativeStoredPayload::Model(Arc::new(
+            NativeStoredModelPayload::native_diffusion(diffusion)?,
+        )));
+        payload.validate()?;
+        if payload.handle_type()? != model_type()? {
+            return Err(
+                "wanBlockSwap canonical fixture did not produce an exact MODEL payload".into(),
+            );
+        }
+
+        match MODEL_PAYLOAD.set(payload.clone()) {
+            Ok(()) => Ok(payload),
+            Err(_) => MODEL_PAYLOAD
+                .get()
+                .cloned()
+                .ok_or_else(|| "wanBlockSwap canonical MODEL cache was not initialized".into()),
         }
     }
 
