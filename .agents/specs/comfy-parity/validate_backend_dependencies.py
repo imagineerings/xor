@@ -481,6 +481,9 @@ def validate_later_task_writes() -> None:
             "crates/comfy_plugin_host/Cargo.toml",
             "crates/comfy_plugin_sdk/Cargo.toml",
         },
+        "comfy-parity-native-node-asset-effect-foundation": {
+            "crates/comfy_media/Cargo.toml",
+        },
     }
     violations = []
     for block in blocks[owner_index + 1 :]:

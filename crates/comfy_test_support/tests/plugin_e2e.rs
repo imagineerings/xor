@@ -7,8 +7,12 @@ use comfy_api::{
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore},
 };
 use comfy_model::NativeModelPayload;
-use comfy_nodes::NativePreparedEffectKind;
 use comfy_nodes::NodeRegistry as CatalogNodeRegistry;
+use comfy_nodes::{
+    NativeEffectServiceError, NativeNodeServiceIdentity, NativeNodeServices,
+    NativeOutputEffectRequest, NativePreparedEffectKind, NativePreparedEffectRequest,
+    NativePreparedEffectService,
+};
 use comfy_plugin_host::{
     CancellationToken, ComponentExecutionBoundary, ComponentHost, ComponentHostError,
     ComponentHostRouter, ComponentLimits, InvocationInputs, LegacyInputSourceProjection,
@@ -949,6 +953,127 @@ fn registry_inputs(
     ]))
 }
 
+#[derive(Debug)]
+struct TestPreparedEffectService {
+    identity: NativeNodeServiceIdentity,
+    ordinal: AtomicUsize,
+    prepared: Mutex<BTreeMap<Uuid, NativePreparedEffectRequest>>,
+}
+
+impl NativePreparedEffectService for TestPreparedEffectService {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn maximum_output_bytes(&self) -> u64 {
+        8 * 1024 * 1024
+    }
+
+    fn prepare_output(
+        &self,
+        request: NativeOutputEffectRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativePreparedEffectRequest, NativeEffectServiceError> {
+        cancellation
+            .check()
+            .map_err(|_| NativeEffectServiceError::Cancelled)?;
+        let ordinal = self
+            .ordinal
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                value.checked_add(1)
+            })
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+        let mut digest = Sha256::new();
+        digest.update(self.identity.service_id().as_bytes());
+        digest.update(self.identity.attempt_id().0.as_bytes());
+        digest.update(self.identity.node_id().0.as_bytes());
+        digest.update(ordinal.to_le_bytes());
+        digest.update(request.request_digest_sha256().as_bytes());
+        let digest = digest.finalize();
+        let mut transaction_bytes = [0_u8; 16];
+        transaction_bytes.copy_from_slice(&digest[..16]);
+        let transaction_id = Uuid::from_bytes(transaction_bytes);
+        let ticket = NativePreparedEffectRequest::checked(
+            self.identity.service_id(),
+            transaction_id,
+            NativePreparedEffectKind::Output,
+            request.request_digest_sha256(),
+        )
+        .map_err(|_| NativeEffectServiceError::Rejected)?;
+        let mut prepared = self
+            .prepared
+            .lock()
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+        if prepared.insert(transaction_id, ticket.clone()).is_some() {
+            return Err(NativeEffectServiceError::InvalidTicket);
+        }
+        if cancellation.check().is_err() {
+            prepared.remove(&transaction_id);
+            return Err(NativeEffectServiceError::Cancelled);
+        }
+        Ok(ticket)
+    }
+
+    fn rollback_prepared(
+        &self,
+        request: &NativePreparedEffectRequest,
+    ) -> Result<(), NativeEffectServiceError> {
+        if request.service_id() != self.identity.service_id() {
+            return Err(NativeEffectServiceError::InvalidTicket);
+        }
+        let mut prepared = self
+            .prepared
+            .lock()
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+        match prepared.remove(&request.transaction_id()) {
+            Some(stored) if stored == *request => Ok(()),
+            Some(stored) => {
+                prepared.insert(stored.transaction_id(), stored);
+                Err(NativeEffectServiceError::InvalidTicket)
+            }
+            None => Err(NativeEffectServiceError::InvalidTicket),
+        }
+    }
+
+    fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError> {
+        self.prepared
+            .lock()
+            .map_err(|_| NativeEffectServiceError::Rejected)?
+            .clear();
+        Ok(())
+    }
+}
+
+fn plugin_node_context(
+    prompt_id: PromptId,
+    attempt_id: AttemptId,
+    node_id: NodeId,
+    cancellation: CancellationToken,
+    scratch: ScratchReservation,
+    store: Arc<dyn NativeHandleStore>,
+) -> Result<NodeContext, Box<dyn Error>> {
+    let identity = NativeNodeServiceIdentity::checked(
+        Uuid::from_u128(0x2100_0000_0000_0000_0000_0000_0000_0001),
+        attempt_id,
+        node_id.clone(),
+    )?;
+    let effects = Arc::new(TestPreparedEffectService {
+        identity,
+        ordinal: AtomicUsize::new(0),
+        prepared: Mutex::new(BTreeMap::new()),
+    });
+    let services = NativeNodeServices::checked(None, Some(effects), None)?;
+    Ok(NodeContext::new_with_services(
+        prompt_id,
+        attempt_id,
+        node_id,
+        cancellation,
+        scratch,
+        store,
+        services,
+    )?)
+}
+
 fn registry_invocation(
     prompt_id: PromptId,
     attempt_id: AttemptId,
@@ -966,7 +1091,7 @@ fn registry_invocation(
     let generation = NativeHandleStoreGeneration::new()?;
     let store = generation.handle_store_for_attempt(attempt_id);
     let inputs = registry_inputs(store.as_ref(), &cancellation)?;
-    let context = NodeContext::new(
+    let context = plugin_node_context(
         prompt_id,
         attempt_id,
         node_id,
@@ -1172,7 +1297,7 @@ async fn exercise_native_registry_value_boundary(
                 value: invalid_handle,
             },
         );
-        let context = NodeContext::new(
+        let context = plugin_node_context(
             PromptId(Uuid::from_u128(0x36d)),
             attempt_id,
             NodeId(format!("typed-plugin-invalid-handle-{index}")),
@@ -1199,7 +1324,7 @@ async fn exercise_native_registry_value_boundary(
         reject_at: 1,
         publication_count: AtomicUsize::new(0),
     });
-    let context = NodeContext::new(
+    let context = plugin_node_context(
         PromptId(Uuid::from_u128(0x371)),
         attempt_id,
         NodeId("typed-plugin-publication-rollback".to_owned()),

@@ -175,6 +175,18 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_runtime/src/graph.rs", schema_writes)
         self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", asset_reads)
         self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", asset_writes)
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            asset_reads,
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            asset_writes,
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            asset_writes,
+        )
         self.assertIn("crates/comfy_runtime/src/workflow_formats.rs", schema_writes)
         self.assertIn("crates/comfy_api/src/services.rs", schema_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", schema_writes)
@@ -250,6 +262,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_runtime/src/permissions.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/tests/component_contract.rs", asset_writes)
+        self.assertIn("crates/comfy_test_support/tests/plugin_e2e.rs", asset_writes)
         asset_task = tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]
         self.assertEqual(
             asset_task["validations"],
@@ -325,6 +338,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
             "cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture",
             "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+            "plugin_e2e val_plugin_host_001 -- --exact --nocapture",
+            "plugin_e2e val_e2e_003 -- --exact --nocapture",
+            "plugin_e2e val_worker_plugin_001 -- --exact --nocapture",
             "native_image_e2e val_native_e2e_001 -- --exact --nocapture",
             "cargo test --locked -p comfy_runtime val_domain_008 -- --nocapture",
             "filesystem_asset_recovery val_recovery_005 -- --nocapture",

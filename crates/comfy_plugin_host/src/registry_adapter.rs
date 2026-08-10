@@ -163,17 +163,16 @@ impl NativeNode for PluginNativeNode {
                 &context,
                 &imported_handles,
             )?;
-            let ui = (!result.effects.ui_state.is_empty() || !result.effects.logs.is_empty()).then(
-                || {
-                    serde_json::json!({
-                        "plugin_ui": &result.effects.ui_state,
-                        "plugin_logs": &result.effects.logs,
-                    })
-                },
-            );
-            if !result.effects.routes.is_empty() {
-                return Err(unmaterialized_plugin_effect("route"));
-            }
+            let ui = (!result.effects.ui_state.is_empty()
+                || !result.effects.logs.is_empty()
+                || !result.effects.routes.is_empty())
+            .then(|| {
+                serde_json::json!({
+                    "plugin_ui": &result.effects.ui_state,
+                    "plugin_logs": &result.effects.logs,
+                    "plugin_routes": &result.effects.routes,
+                })
+            });
             let effect_service = context.prepared_effects().map_err(plugin_failure)?;
             let requests = result
                 .effects
