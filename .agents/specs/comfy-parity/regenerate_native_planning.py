@@ -8877,7 +8877,103 @@ def node_tasks(
             if "COMFY-NODE-0556" in feature_ids:
                 task_dependencies.extend(["comfy-parity-native-model-family-rt-detr-v4-comfy-model-0114", "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-c5a306eb73fd"])
                 task_reads.extend(["crates/comfy_model/src/families/rt_detr_v4_comfy_model_0114.rs", "crates/comfy_tensor/src/ops/external_tensor_kernel_03.rs"])
-            result.append(task(identifier, f"Implement native node family: {category} part {part}", [6, 7, 34, 35, 36, 37, 38, 40, 41, 44], [8, 20, 25, 29, 30, 31, 32, 33, 34, 39, 40], ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"], f"The {len(assigned)} rows assigned to this disjoint `{category}` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.", task_reads, [f"crates/comfy_nodes/src/families/{module}", f"crates/comfy_test_support/fixtures/nodes/{slug(category)}-{anchor}"], f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.", task_dependencies))
+            task_outcome = f"The {len(assigned)} rows assigned to this disjoint `{category}` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated."
+            task_writes = [
+                f"crates/comfy_nodes/src/families/{module}",
+                f"crates/comfy_test_support/fixtures/nodes/{slug(category)}-{anchor}",
+            ]
+            task_done = f"Every exactly assigned feature row ({exact_assignments}) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed."
+            task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
+            task_designs = [8, 20, 25, 29, 30, 31, 32, 33, 34, 39, 40]
+            task_locked = False
+            if "COMFY-NODE-0115" in feature_ids:
+                task_dependencies.extend([
+                    provider_dependency,
+                    "comfy-parity-native-nodes-partner-three-d-comfy-node-0408",
+                ])
+                task_outcome += " This task also owns the missing shared native 3D execution seams required by its rows: sealed LOAD_3D and LOAD3D_MODEL_INFO payloads, prompt-to-attempt asset sealing, safe output subfolders and logical locators, deterministic GLB encoding, and bounded basic and Surface Nets voxel-to-mesh kernels."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_load_3d.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_save_3d.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan3d.py",
+                    "crates/comfy_runtime/src/assets.rs",
+                    "crates/comfy_runtime/src/output_committer.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_media/src/three_d.rs",
+                    "crates/comfy_media/src/native_node_payload.rs",
+                    "crates/comfy_media/src/comfy_media.rs",
+                    "crates/comfy_nodes/src/source_type.rs",
+                    "crates/comfy_nodes/src/execution.rs",
+                    "crates/comfy_nodes/src/stored_payload.rs",
+                    "crates/comfy_nodes/src/comfy_nodes.rs",
+                    "crates/comfy_runtime/src/assets.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/output_committer.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_runtime/src/comfy_runtime.rs",
+                    "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Canonical lower tests prove exact GLB chunks, voxel topology/colors/world transforms, sealed asset-selector admission, traversal/change-during-read rejection, safe subfolder staging, cancellation and restart cleanup, and one shared owner for every new payload and kernel."
+                task_validations.extend(["VAL-MEDIA-001", "VAL-DOMAIN-008", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"])
+                task_designs.extend([11, 36, 41])
+                task_locked = True
+            if "COMFY-NODE-0172" in feature_ids:
+                task_dependencies.append("comfy-parity-native-nodes-three-d-comfy-node-0115")
+                task_outcome += " This task also owns the missing shared Gaussian-splat compute foundation: checked codec-to-payload conversion, variable-count/SH-aware merge, uniform and covariance-preserving nonuniform transforms, anisotropic EWA rendering, and density-grid Surface Nets meshing through the canonical media, tensor, scratch, and cancellation owners."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_gaussian_splat.py",
+                    "crates/comfy_media/src/gaussian_splat.rs",
+                    "crates/comfy_tensor/src/operation.rs",
+                    "crates/comfy_tensor/src/image_ops.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_media/src/gaussian_splat.rs",
+                    "crates/comfy_media/src/gaussian_splat_compute.rs",
+                    "crates/comfy_media/src/native_node_payload.rs",
+                    "crates/comfy_media/src/comfy_media.rs",
+                    "crates/comfy_tensor/src/operation.rs",
+                    "crates/comfy_tensor/src/image_ops.rs",
+                    "crates/comfy_tensor/src/comfy_tensor.rs",
+                    "crates/comfy_nodes/src/stored_payload.rs",
+                    "crates/comfy_nodes/src/comfy_nodes.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Source-derived numeric fixtures prove codec conversion, active-count padding, merge, covariance transforms, color/clay/depth/normal rendering, meshing, bounded scratch, cancellation, wrong-backend rejection, deterministic CPU execution, and zero partial publication."
+                task_validations.extend(["VAL-MEDIA-001", "VAL-TENSOR-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"])
+                task_designs.extend([18, 28, 36, 41])
+                task_locked = True
+            if "COMFY-NODE-0140" in feature_ids:
+                task_dependencies.append("comfy-parity-native-nodes-three-d-splat-comfy-node-0172")
+                task_outcome += " This task also owns the missing shared immutable model-execution modifier boundary for EasyCache, LazyCache, and ModelComputeDtype: checked dtype policy, source-exact cache policy, attempt-local sampler state, canonical execution identity and residency, and runtime reset on every exit."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_easycache.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py",
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "crates/comfy_model/src/slices/native_diffusion.rs",
+                    "crates/comfy_model/src/comfy_model.rs",
+                    "crates/comfy_sampler/src/model_execution_modifiers.rs",
+                    "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                    "crates/comfy_sampler/src/comfy_sampler.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Exact source fixtures prove real compute-dtype kernel selection, Easy/Lazy cache thresholds and sigma windows, conditioning UUID/video/audio invalidation, scope-guard restoration after success/failure/cancellation, immutable base reuse, attempt scratch convergence, cache identity invalidation, and no cross-attempt state leakage."
+                task_validations.extend(["VAL-MODEL-FAMILY-001", "VAL-SAMPLER-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"])
+                task_designs.extend([18, 26, 28, 41])
+                task_locked = True
+            result.append(task(identifier, f"Implement native node family: {category} part {part}", [6, 7, 34, 35, 36, 37, 38, 40, 41, 44], sorted(set(task_designs)), sorted(set(task_validations)), task_outcome, task_reads, task_writes, task_done, task_dependencies, locked=task_locked))
             for row in assigned:
                 mapping[row["feature_id"]].append(identifier)
                 if row["node_identifier"] in image_slice:

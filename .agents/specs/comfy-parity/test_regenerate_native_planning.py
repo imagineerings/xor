@@ -86,20 +86,20 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(sum(schema_id in value for value in dependencies.values()), 102)
         self.assertEqual(sum(value_id in value for value in dependencies.values()), 84)
         self.assertEqual(sum(asset_id in value for value in dependencies.values()), 84)
-        self.assertEqual(sum(provider_id in value for value in dependencies.values()), 25)
+        self.assertEqual(sum(provider_id in value for value in dependencies.values()), 26)
         self.assertEqual(
             sum(
                 value_id in value and provider_id in value
                 for value in dependencies.values()
             ),
-            7,
+            8,
         )
         self.assertEqual(
             sum(
                 value_id in value and provider_id not in value
                 for value in dependencies.values()
             ),
-            77,
+            76,
         )
         self.assertEqual(
             sum(
@@ -119,6 +119,22 @@ class ValidationGenerationTests(unittest.TestCase):
             {schema_id: 789, value_id: 575, asset_id: 189, provider_id: 214},
         )
         self.assertEqual(sorted(tasks_by_id[registry_id]["dependencies"]), node_ids)
+
+        three_d_id = "comfy-parity-native-nodes-three-d-comfy-node-0115"
+        splat_id = "comfy-parity-native-nodes-three-d-splat-comfy-node-0172"
+        modifier_id = "comfy-parity-native-nodes-advanced-debug-comfy-node-0140"
+        self.assertIn(provider_id, dependencies[three_d_id])
+        self.assertIn(three_d_id, dependencies[splat_id])
+        self.assertIn(splat_id, dependencies[modifier_id])
+        self.assertIn("crates/comfy_media/src/three_d.rs", tasks_by_id[three_d_id]["writes"])
+        self.assertIn(
+            "crates/comfy_media/src/gaussian_splat_compute.rs",
+            tasks_by_id[splat_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_sampler/src/model_execution_modifiers.rs",
+            tasks_by_id[modifier_id]["writes"],
+        )
 
         waves = planning.task_waves(tasks)
         self.assertEqual(waves[foundation_id], waves[compute_id] + 1)
