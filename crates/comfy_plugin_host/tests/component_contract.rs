@@ -193,6 +193,7 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
             publisher: "Sim test publisher".to_owned(),
             registry: Some("fixture://signed-registry".to_owned()),
         },
+        provider_binding: None,
         nodes: vec![PluginNode {
             id: "echo".to_owned(),
             version: ApiVersion::new(1, 0, 0),

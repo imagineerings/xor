@@ -66,6 +66,7 @@ pub const DEFAULT_API_FEATURES: &[&str] = &[
     "handles.revocation",
     "legacy.non-destructive",
     "ports.list",
+    "provider.bindings.v1",
 ];
 
 static NEXT_INVOCATION_ID: AtomicU64 = AtomicU64::new(1);

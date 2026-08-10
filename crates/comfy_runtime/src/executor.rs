@@ -23,6 +23,7 @@ pub use comfy_nodes::{
 };
 #[cfg(test)]
 use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
+use comfy_plugin_sdk::{ProviderBindingClaim, ProviderBindingSet};
 use comfy_tensor::{BackendCapabilityMatrix, CpuBackend, ScratchReservation, StreamId};
 #[cfg(test)]
 use comfy_tensor::{CpuWorkspaceAuthority, DeviceId, NativeDeviceProperties};
@@ -297,10 +298,81 @@ pub struct NativeNodeRegistry {
 #[derive(Clone, Debug)]
 struct RegistryBindingState {
     disposition: NativeNodeBindingDisposition,
-    provider_activated: bool,
+    feature_id: String,
+    provider_activation_sha256: Option<String>,
     implementation_namespace: Option<String>,
     catalog_source: String,
     reason: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct NativeProviderBindingActivation {
+    claim: ProviderBindingClaim,
+    node: Arc<dyn NativeNode>,
+}
+
+impl NativeProviderBindingActivation {
+    pub fn new(claim: ProviderBindingClaim, node: Arc<dyn NativeNode>) -> Self {
+        Self { claim, node }
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeProviderBindingActivationSet {
+    binding_set: ProviderBindingSet,
+    activation_sha256: String,
+    bindings: Vec<NativeProviderBindingActivation>,
+}
+
+impl NativeProviderBindingActivationSet {
+    pub fn checked(
+        profile_id: impl Into<String>,
+        component_generation: u64,
+        component_snapshot_sha256: impl Into<String>,
+        component_digest_sha256: impl Into<String>,
+        authorization_generation_sha256: impl Into<String>,
+        binding_set: ProviderBindingSet,
+        bindings: Vec<NativeProviderBindingActivation>,
+    ) -> Result<Self, NativeNodeRegistryError> {
+        let profile_id = profile_id.into();
+        let component_snapshot_sha256 = component_snapshot_sha256.into();
+        let component_digest_sha256 = component_digest_sha256.into();
+        let authorization_generation_sha256 = authorization_generation_sha256.into();
+        if profile_id.is_empty()
+            || component_generation == 0
+            || !valid_registry_sha256(&component_snapshot_sha256)
+            || !valid_registry_sha256(&component_digest_sha256)
+            || !valid_registry_sha256(&authorization_generation_sha256)
+            || binding_set.bindings_sha256
+                != binding_set
+                    .canonical_bindings_sha256()
+                    .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?
+            || binding_set.bindings.len() != bindings.len()
+        {
+            return Err(NativeNodeRegistryError::InvalidProviderActivation);
+        }
+        let activation_sha256 = provider_activation_sha256(
+            &profile_id,
+            component_generation,
+            &component_snapshot_sha256,
+            &component_digest_sha256,
+            &authorization_generation_sha256,
+            &binding_set,
+        )?;
+        Ok(Self {
+            binding_set,
+            activation_sha256,
+            bindings,
+        })
+    }
+
+    pub fn activation_sha256(&self) -> &str {
+        &self.activation_sha256
+    }
+
+    pub fn binding_set(&self) -> &ProviderBindingSet {
+        &self.binding_set
+    }
 }
 
 impl NativeNodeRegistry {
@@ -331,7 +403,8 @@ impl NativeNodeRegistry {
             class_type,
             RegistryBindingState {
                 disposition: NativeNodeBindingDisposition::Executable,
-                provider_activated: false,
+                feature_id: "runtime-bound".to_owned(),
+                provider_activation_sha256: None,
                 implementation_namespace: Some(implementation_namespace.clone()),
                 catalog_source: implementation_namespace,
                 reason: None,
@@ -444,7 +517,7 @@ impl NativeNodeRegistry {
                 NativeNodeBindingDisposition::Executable => {
                     has_node
                         && node_matches
-                        && !binding.provider_activated
+                        && binding.provider_activation_sha256.is_none()
                         && binding.reason.is_none()
                         && binding
                             .implementation_namespace
@@ -452,7 +525,7 @@ impl NativeNodeRegistry {
                             .is_some_and(|value| !value.is_empty())
                 }
                 NativeNodeBindingDisposition::ProviderRequired => {
-                    has_node == binding.provider_activated
+                    has_node == binding.provider_activation_sha256.is_some()
                         && node_matches
                         && binding
                             .reason
@@ -465,7 +538,7 @@ impl NativeNodeRegistry {
                 }
                 NativeNodeBindingDisposition::Unavailable => {
                     !has_node
-                        && !binding.provider_activated
+                        && binding.provider_activation_sha256.is_none()
                         && binding
                             .reason
                             .as_deref()
@@ -506,7 +579,7 @@ impl NativeNodeRegistry {
 
     pub fn binding_disposition(&self, class_type: &str) -> Option<NativeNodeBindingDisposition> {
         self.bindings.get(class_type).map(|binding| {
-            if binding.provider_activated {
+            if binding.provider_activation_sha256.is_some() {
                 NativeNodeBindingDisposition::Executable
             } else {
                 binding.disposition
@@ -526,7 +599,7 @@ impl NativeNodeRegistry {
     pub fn provider_binding_is_activated(&self, class_type: &str) -> Option<bool> {
         self.bindings
             .get(class_type)
-            .map(|binding| binding.provider_activated)
+            .map(|binding| binding.provider_activation_sha256.is_some())
     }
 
     pub fn binding_source(&self, class_type: &str) -> Option<&str> {
@@ -596,6 +669,7 @@ impl NativeNodeRegistry {
         for binding in bindings {
             binding.validate()?;
             let class_type = binding.descriptor().class_type.clone();
+            let feature_id = binding.feature_id().to_owned();
             if next.descriptors.contains_key(&class_type)
                 || next.nodes.contains_key(&class_type)
                 || next.presentations.contains_key(&class_type)
@@ -619,7 +693,8 @@ impl NativeNodeRegistry {
                         class_type,
                         RegistryBindingState {
                             disposition: NativeNodeBindingDisposition::Executable,
-                            provider_activated: false,
+                            feature_id,
+                            provider_activation_sha256: None,
                             implementation_namespace: Some(source),
                             catalog_source,
                             reason: None,
@@ -635,7 +710,8 @@ impl NativeNodeRegistry {
                         class_type,
                         RegistryBindingState {
                             disposition: NativeNodeBindingDisposition::ProviderRequired,
-                            provider_activated: false,
+                            feature_id,
+                            provider_activation_sha256: None,
                             implementation_namespace: Some(provider),
                             catalog_source,
                             reason: Some(reason),
@@ -649,7 +725,8 @@ impl NativeNodeRegistry {
                         class_type,
                         RegistryBindingState {
                             disposition: NativeNodeBindingDisposition::Unavailable,
-                            provider_activated: false,
+                            feature_id,
+                            provider_activation_sha256: None,
                             implementation_namespace: None,
                             catalog_source,
                             reason: Some(reason),
@@ -662,23 +739,97 @@ impl NativeNodeRegistry {
         Ok(())
     }
 
-    pub fn activate_provider_bindings(
+    pub fn provider_binding_contract_sha256(
+        &self,
+        class_type: &str,
+        transport_schema: &str,
+        materializer_schema: &str,
+    ) -> Result<Option<String>, NativeNodeRegistryError> {
+        let Some(binding) = self.bindings.get(class_type) else {
+            return Ok(None);
+        };
+        if binding.disposition != NativeNodeBindingDisposition::ProviderRequired {
+            return Ok(None);
+        }
+        let descriptor = self
+            .descriptors
+            .get(class_type)
+            .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.to_owned()))?;
+        let presentation = self
+            .presentations
+            .get(class_type)
+            .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.to_owned()))?;
+        let implementation_namespace = binding
+            .implementation_namespace
+            .as_deref()
+            .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.to_owned()))?;
+        Ok(Some(provider_contract_sha256(
+            &binding.feature_id,
+            implementation_namespace,
+            descriptor,
+            presentation,
+            transport_schema,
+            materializer_schema,
+        )?))
+    }
+
+    pub fn activate_provider_binding_set(
         &mut self,
-        bindings: impl IntoIterator<Item = (Arc<dyn NativeNode>, RuntimeNodePresentation)>,
+        activation: NativeProviderBindingActivationSet,
     ) -> Result<(), NativeNodeRegistryError> {
+        if activation.binding_set.implementation_namespace.is_empty()
+            || activation.binding_set.bindings_sha256
+                != activation
+                    .binding_set
+                    .canonical_bindings_sha256()
+                    .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?
+        {
+            return Err(NativeNodeRegistryError::InvalidProviderActivation);
+        }
         let mut next = self.clone();
+        let expected = next
+            .bindings
+            .iter()
+            .filter_map(|(class_type, binding)| {
+                (binding.disposition == NativeNodeBindingDisposition::ProviderRequired
+                    && binding.implementation_namespace.as_deref()
+                        == Some(activation.binding_set.implementation_namespace.as_str()))
+                .then_some(class_type.clone())
+            })
+            .collect::<BTreeSet<_>>();
+        let claimed = activation
+            .binding_set
+            .bindings
+            .iter()
+            .map(|claim| claim.node_id.clone())
+            .collect::<BTreeSet<_>>();
+        if expected.is_empty()
+            || expected != claimed
+            || activation.bindings.len() != activation.binding_set.bindings.len()
+        {
+            return Err(NativeNodeRegistryError::IncompleteProviderActivation(
+                activation.binding_set.implementation_namespace.clone(),
+            ));
+        }
+        let claims = activation
+            .binding_set
+            .bindings
+            .iter()
+            .map(|claim| (claim.node_id.as_str(), claim))
+            .collect::<BTreeMap<_, _>>();
         let mut activated = BTreeSet::new();
-        for (node, presentation) in bindings {
+        for activation_binding in &activation.bindings {
+            let node = &activation_binding.node;
+            let claim = &activation_binding.claim;
             let class_type = node.class_type().to_owned();
-            if !activated.insert(class_type.clone()) || next.nodes.contains_key(&class_type) {
+            if !activated.insert(class_type.clone())
+                || next.nodes.contains_key(&class_type)
+                || claims.get(class_type.as_str()).copied() != Some(claim)
+            {
                 return Err(NativeNodeRegistryError::DuplicateBinding(class_type));
             }
             let descriptor = next
                 .descriptors
-                .get(&class_type)
-                .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
-            let expected_presentation = next
-                .presentations
                 .get(&class_type)
                 .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
             let binding = next
@@ -686,17 +837,28 @@ impl NativeNodeRegistry {
                 .get(&class_type)
                 .ok_or_else(|| NativeNodeRegistryError::BindingMismatch(class_type.clone()))?;
             if binding.disposition != NativeNodeBindingDisposition::ProviderRequired
+                || binding.feature_id != claim.feature_id
                 || descriptor.implementation_version != node.implementation_version()
                 || binding.implementation_namespace.as_deref()
                     != Some(node.implementation_namespace())
-                || expected_presentation != &presentation
+                || binding.provider_activation_sha256.is_some()
+                || self.provider_binding_contract_sha256(
+                    &class_type,
+                    &claim.transport_schema.to_string(),
+                    &claim.materializer_schema.to_string(),
+                )? != Some(claim.contract_sha256.clone())
             {
                 return Err(NativeNodeRegistryError::BindingMismatch(class_type));
             }
-            next.nodes.insert(class_type.clone(), node);
+            next.nodes.insert(class_type.clone(), node.clone());
             if let Some(binding) = next.bindings.get_mut(&class_type) {
-                binding.provider_activated = true;
+                binding.provider_activation_sha256 = Some(activation.activation_sha256.clone());
             }
+        }
+        if activated != expected {
+            return Err(NativeNodeRegistryError::IncompleteProviderActivation(
+                activation.binding_set.implementation_namespace.clone(),
+            ));
         }
         next.validate_comprehensive_bindings()?;
         *self = next;
@@ -742,6 +904,75 @@ impl NativeNodeRegistry {
     }
 }
 
+fn provider_contract_sha256(
+    feature_id: &str,
+    implementation_namespace: &str,
+    descriptor: &RuntimeNodeDescriptor,
+    presentation: &RuntimeNodePresentation,
+    transport_schema: &str,
+    materializer_schema: &str,
+) -> Result<String, NativeNodeRegistryError> {
+    let descriptor = serde_json::to_vec(descriptor)
+        .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+    let presentation = serde_json::to_vec(presentation)
+        .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+    let mut hasher = Sha256::new();
+    for field in [
+        b"sim:comfy-native-provider-contract@1".as_slice(),
+        feature_id.as_bytes(),
+        implementation_namespace.as_bytes(),
+        descriptor.as_slice(),
+        presentation.as_slice(),
+        transport_schema.as_bytes(),
+        materializer_schema.as_bytes(),
+    ] {
+        hash_registry_field(&mut hasher, field)?;
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn provider_activation_sha256(
+    profile_id: &str,
+    component_generation: u64,
+    component_snapshot_sha256: &str,
+    component_digest_sha256: &str,
+    authorization_generation_sha256: &str,
+    binding_set: &ProviderBindingSet,
+) -> Result<String, NativeNodeRegistryError> {
+    let binding_bytes = binding_set
+        .canonical_binding_bytes()
+        .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+    let mut hasher = Sha256::new();
+    for field in [
+        b"sim:comfy-provider-activation-set@1".as_slice(),
+        profile_id.as_bytes(),
+        component_snapshot_sha256.as_bytes(),
+        component_digest_sha256.as_bytes(),
+        authorization_generation_sha256.as_bytes(),
+        binding_set.bindings_sha256.as_bytes(),
+        binding_bytes.as_slice(),
+    ] {
+        hash_registry_field(&mut hasher, field)?;
+    }
+    hasher.update(component_generation.to_le_bytes());
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn hash_registry_field(hasher: &mut Sha256, value: &[u8]) -> Result<(), NativeNodeRegistryError> {
+    let length = u64::try_from(value.len())
+        .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+    hasher.update(length.to_le_bytes());
+    hasher.update(value);
+    Ok(())
+}
+
+fn valid_registry_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
 #[derive(Debug, Error)]
 pub enum NativeNodeRegistryError {
     #[error(transparent)]
@@ -758,6 +989,10 @@ pub enum NativeNodeRegistryError {
     DuplicateBinding(String),
     #[error("native node registry is incomplete at `{0}`")]
     IncompleteRegistry(String),
+    #[error("native provider binding activation is invalid")]
+    InvalidProviderActivation,
+    #[error("native provider binding activation for `{0}` is incomplete")]
+    IncompleteProviderActivation(String),
     #[error(transparent)]
     Contract(#[from] NativeNodeContractError),
     #[error(transparent)]
@@ -5333,7 +5568,7 @@ pub(crate) mod tests {
         };
         let NativeNodeBinding::ProviderRequired {
             descriptor,
-            presentation,
+            presentation: _,
             provider,
             ..
         } = binding.clone()
@@ -5349,10 +5584,50 @@ pub(crate) mod tests {
         registry.register_native_bindings([binding])?;
         registry.validate_comprehensive_bindings()?;
 
-        let mut mismatched_presentation = presentation.clone();
-        mismatched_presentation.display_name.push_str(" mismatch");
+        let transport_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "sim:comfy-provider-transport@1".parse()?;
+        let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "sim:comfy-provider-materializer@1".parse()?;
+        let contract_sha256 = registry
+            .provider_binding_contract_sha256(
+                &descriptor.class_type,
+                &transport_schema.to_string(),
+                &materializer_schema.to_string(),
+            )?
+            .ok_or("provider contract was not projected")?;
+        let claim = ProviderBindingClaim {
+            feature_id: catalog_descriptor.feature_id.clone(),
+            node_id: descriptor.class_type.clone(),
+            contract_sha256,
+            transport_schema,
+            materializer_schema,
+        };
+        let mut binding_set = ProviderBindingSet {
+            schema_version: comfy_plugin_sdk::PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: "sim.provider.test".to_owned(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![claim.clone()],
+        };
+        binding_set.bindings_sha256 = binding_set.canonical_bindings_sha256()?;
+        let mismatched_node: Arc<dyn NativeNode> = Arc::new(ConfiguredNode {
+            class_type: descriptor.class_type.clone(),
+            version: descriptor.implementation_version.clone(),
+            namespace: "sim.provider.mismatch".to_owned(),
+        });
+        let mismatched_activation = NativeProviderBindingActivationSet::checked(
+            "profile-a",
+            1,
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            binding_set.clone(),
+            vec![NativeProviderBindingActivation::new(
+                claim.clone(),
+                mismatched_node,
+            )],
+        )?;
         assert!(matches!(
-            registry.activate_provider_bindings([(node.clone(), mismatched_presentation)]),
+            registry.activate_provider_binding_set(mismatched_activation),
             Err(NativeNodeRegistryError::BindingMismatch(class_type))
                 if class_type == descriptor.class_type
         ));
@@ -5362,7 +5637,16 @@ pub(crate) mod tests {
         );
         assert!(registry.node(&descriptor.class_type).is_none());
 
-        registry.activate_provider_bindings([(node, presentation)])?;
+        let activation = NativeProviderBindingActivationSet::checked(
+            "profile-a",
+            1,
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            binding_set,
+            vec![NativeProviderBindingActivation::new(claim, node)],
+        )?;
+        registry.activate_provider_binding_set(activation)?;
         assert_eq!(
             registry.binding_declared_disposition(&descriptor.class_type),
             Some(NativeNodeBindingDisposition::ProviderRequired)
@@ -5375,6 +5659,154 @@ pub(crate) mod tests {
             registry.provider_binding_is_activated(&descriptor.class_type),
             Some(true)
         );
+        registry.validate_comprehensive_bindings()?;
+        Ok(())
+    }
+
+    #[test]
+    fn provider_activation_requires_the_complete_signed_namespace_set()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let catalog = NodeRegistry::built_in()?;
+        let catalog_descriptors = catalog
+            .registered()
+            .values()
+            .filter(|descriptor| {
+                descriptor.catalog_status == comfy_nodes::CatalogNodeStatus::ProviderRequired
+            })
+            .take(2)
+            .cloned()
+            .collect::<Vec<_>>();
+        if catalog_descriptors.len() != 2 {
+            return Err("generated catalog did not include two provider bindings".into());
+        }
+        let provider = "sim.provider.complete";
+        let bindings = catalog_descriptors
+            .iter()
+            .map(|catalog_descriptor| NativeNodeBinding::ProviderRequired {
+                feature_id: catalog_descriptor.feature_id.clone(),
+                descriptor: RuntimeNodeDescriptor {
+                    schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+                    class_type: catalog_descriptor.node_identifier.clone(),
+                    implementation_version: "provider-v1".to_owned(),
+                    source_schema: Some(comfy_nodes::NativeDescriptorSchemaMetadata::synthetic(
+                        std::iter::empty(),
+                        std::iter::empty(),
+                        ["value".to_owned()],
+                    )),
+                    inputs: Vec::new(),
+                    dynamic_inputs: Vec::new(),
+                    outputs: vec![RuntimeOutputDescriptor {
+                        name: "value".to_owned(),
+                        produced_type: NativeValueType::Any,
+                        is_list: false,
+                    }],
+                    output_node: catalog_descriptor.output_node,
+                    effect: EffectClass::Provider,
+                    cache: RuntimeCachePolicy::Never,
+                },
+                presentation: RuntimeNodePresentation {
+                    display_name: catalog_descriptor.display_name.clone(),
+                    category: match catalog_descriptor.category.as_str() {
+                        "(empty root category declared by source)" => String::new(),
+                        category => category.to_owned(),
+                    },
+                    description: String::new(),
+                    output_names: vec!["value".to_owned()],
+                    search_aliases: Vec::new(),
+                    is_deprecated: false,
+                    is_experimental: false,
+                },
+                provider: provider.to_owned(),
+                reason: "verified complete provider activation is required".to_owned(),
+            })
+            .collect::<Vec<_>>();
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_native_bindings(bindings.clone())?;
+        let transport_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "sim:comfy-provider-transport@1".parse()?;
+        let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
+            "sim:comfy-provider-materializer@1".parse()?;
+        let mut claims = Vec::new();
+        let mut activations = Vec::new();
+        for binding in bindings {
+            let class_type = binding.descriptor().class_type.clone();
+            let claim = ProviderBindingClaim {
+                feature_id: binding.feature_id().to_owned(),
+                node_id: class_type.clone(),
+                contract_sha256: registry
+                    .provider_binding_contract_sha256(
+                        &class_type,
+                        &transport_schema.to_string(),
+                        &materializer_schema.to_string(),
+                    )?
+                    .ok_or("provider contract was not projected")?,
+                transport_schema: transport_schema.clone(),
+                materializer_schema: materializer_schema.clone(),
+            };
+            let node: Arc<dyn NativeNode> = Arc::new(ConfiguredNode {
+                class_type,
+                version: binding.descriptor().implementation_version.clone(),
+                namespace: provider.to_owned(),
+            });
+            activations.push(NativeProviderBindingActivation::new(claim.clone(), node));
+            claims.push(claim);
+        }
+        claims.sort_by(|left, right| left.node_id.cmp(&right.node_id));
+        activations.sort_by(|left, right| left.claim.node_id.cmp(&right.claim.node_id));
+
+        let mut incomplete_set = ProviderBindingSet {
+            schema_version: comfy_plugin_sdk::PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: provider.to_owned(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![claims[0].clone()],
+        };
+        incomplete_set.bindings_sha256 = incomplete_set.canonical_bindings_sha256()?;
+        let incomplete = NativeProviderBindingActivationSet::checked(
+            "profile-a",
+            1,
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            incomplete_set,
+            vec![activations[0].clone()],
+        )?;
+        assert!(matches!(
+            registry.activate_provider_binding_set(incomplete),
+            Err(NativeNodeRegistryError::IncompleteProviderActivation(namespace))
+                if namespace == provider
+        ));
+        for claim in &claims {
+            assert_eq!(
+                registry.provider_binding_is_activated(&claim.node_id),
+                Some(false)
+            );
+            assert!(registry.node(&claim.node_id).is_none());
+        }
+
+        let mut complete_set = ProviderBindingSet {
+            schema_version: comfy_plugin_sdk::PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: provider.to_owned(),
+            bindings_sha256: "0".repeat(64),
+            bindings: claims.clone(),
+        };
+        complete_set.bindings_sha256 = complete_set.canonical_bindings_sha256()?;
+        let complete = NativeProviderBindingActivationSet::checked(
+            "profile-a",
+            1,
+            "1".repeat(64),
+            "2".repeat(64),
+            "3".repeat(64),
+            complete_set,
+            activations,
+        )?;
+        registry.activate_provider_binding_set(complete)?;
+        for claim in &claims {
+            assert_eq!(
+                registry.provider_binding_is_activated(&claim.node_id),
+                Some(true)
+            );
+            assert!(registry.node(&claim.node_id).is_some());
+        }
         registry.validate_comprehensive_bindings()?;
         Ok(())
     }

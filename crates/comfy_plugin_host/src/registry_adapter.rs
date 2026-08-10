@@ -11,11 +11,14 @@ use comfy_nodes::{
     NativeValueType, native_plugin_source_type_projection,
 };
 use comfy_plugin_sdk::{
-    CachePolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
-    PluginValueRepresentation, PortCardinality, PortDirection, PortPresence, ScalarValue,
-    TensorValue, TypeRegistry, ValueFamily,
+    CachePolicy, DeterminismPolicy, EffectPolicy, ModelValue, PluginNode, PluginPort, PluginValue,
+    PluginValueRepresentation, PortCardinality, PortDirection, PortPresence, ProviderBindingClaim,
+    ScalarValue, TensorValue, TypeRegistry, ValueFamily,
 };
-use comfy_runtime::{NativeNodeRegistry, NativeNodeRegistryError};
+use comfy_runtime::{
+    NativeNodeRegistry, NativeNodeRegistryError, NativeProviderBindingActivation,
+    NativeProviderBindingActivationSet,
+};
 use futures::future::BoxFuture;
 use serde_json::{Map, Number, Value};
 use std::{collections::BTreeMap, sync::Arc};
@@ -50,11 +53,31 @@ pub(crate) fn registry_with_plugins(
             node: "type-registry".to_owned(),
             message: error.to_string(),
         })?;
-    let mut bindings = Vec::new();
+    let generation = component_host.verified_generation()?;
+    let mut ordinary_bindings = Vec::new();
+    let mut provider_activation_sets = Vec::new();
     for plugin in plugins {
+        let provider_binding_set = plugin.manifest().provider_binding.as_ref();
+        let claims = provider_binding_set
+            .into_iter()
+            .flat_map(|set| &set.bindings)
+            .map(|claim| (claim.node_id.as_str(), claim))
+            .collect::<BTreeMap<_, _>>();
+        let mut used_claims = BTreeMap::new();
+        let mut provider_bindings = Vec::new();
         for node in &plugin.manifest().nodes {
             let descriptor = native_descriptor(node, &type_registry)?;
-            let implementation_version = descriptor.implementation_version.clone();
+            let declared_disposition = base.binding_declared_disposition(&node.id);
+            let implementation_version = if declared_disposition
+                == Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
+            {
+                base.descriptor(&node.id)
+                    .ok_or_else(|| provider_binding_error(&node.id, "descriptor is missing"))?
+                    .implementation_version
+                    .clone()
+            } else {
+                descriptor.implementation_version.clone()
+            };
             let implementation: Arc<dyn NativeNode> = Arc::new(PluginNativeNode {
                 component_host: component_host.clone(),
                 plugin: plugin.clone(),
@@ -62,12 +85,131 @@ pub(crate) fn registry_with_plugins(
                 type_registry: type_registry.clone(),
                 implementation_version,
             });
-            bindings.push((descriptor, implementation, native_presentation(node)));
+            match declared_disposition {
+                Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired) => {
+                    let claim = claims.get(node.id.as_str()).copied().ok_or_else(|| {
+                        provider_binding_error(&node.id, "signed provider claim is missing")
+                    })?;
+                    validate_provider_node_projection(base, node, claim)?;
+                    if used_claims.insert(node.id.as_str(), claim).is_some() {
+                        return Err(provider_binding_error(
+                            &node.id,
+                            "signed provider claim is duplicated",
+                        ));
+                    }
+                    provider_bindings.push(NativeProviderBindingActivation::new(
+                        claim.clone(),
+                        implementation,
+                    ));
+                }
+                Some(_) => {
+                    return Err(provider_binding_error(
+                        &node.id,
+                        "plugin node collides with a non-provider native binding",
+                    ));
+                }
+                None => {
+                    if claims.contains_key(node.id.as_str()) {
+                        return Err(provider_binding_error(
+                            &node.id,
+                            "provider claim targets a non-provider plugin node",
+                        ));
+                    }
+                    ordinary_bindings.push((descriptor, implementation, native_presentation(node)));
+                }
+            }
+        }
+        if used_claims.len() != claims.len() {
+            return Err(provider_binding_error(
+                plugin.binding().signed_plugin_identifier(),
+                "signed provider claim set contains an undeclared component node",
+            ));
+        }
+        if let Some(binding_set) = provider_binding_set {
+            let deployment = generation
+                .components()
+                .iter()
+                .find(|deployment| deployment.extension_id() == plugin.extension_id())
+                .ok_or_else(|| {
+                    provider_binding_error(
+                        plugin.extension_id(),
+                        "verified component deployment is missing",
+                    )
+                })?;
+            provider_activation_sets.push(NativeProviderBindingActivationSet::checked(
+                generation.profile_id(),
+                generation.generation(),
+                generation.snapshot_sha256(),
+                deployment.component_sha256(),
+                deployment.authorization_generation(),
+                binding_set.clone(),
+                provider_bindings,
+            )?);
+        } else if !provider_bindings.is_empty() {
+            return Err(provider_binding_error(
+                plugin.binding().signed_plugin_identifier(),
+                "provider bindings require a signed claim set",
+            ));
         }
     }
     let mut registry = base.clone();
-    registry.register_bound_batch_with_presentations(bindings)?;
+    registry.register_bound_batch_with_presentations(ordinary_bindings)?;
+    for activation in provider_activation_sets {
+        registry.activate_provider_binding_set(activation)?;
+    }
     Ok(registry)
+}
+
+fn provider_binding_error(
+    node: impl Into<String>,
+    message: impl Into<String>,
+) -> PluginRegistryAdapterError {
+    PluginRegistryAdapterError::InvalidPort {
+        node: node.into(),
+        message: message.into(),
+    }
+}
+
+fn validate_provider_node_projection(
+    base: &NativeNodeRegistry,
+    node: &PluginNode,
+    claim: &ProviderBindingClaim,
+) -> Result<(), PluginRegistryAdapterError> {
+    let presentation = base
+        .presentation(&node.id)
+        .ok_or_else(|| provider_binding_error(&node.id, "presentation is missing"))?;
+    let output_names = node
+        .ports
+        .iter()
+        .filter(|port| port.direction == PortDirection::Output)
+        .map(|port| port.name.as_str())
+        .collect::<Vec<_>>();
+    let expected_digest = base
+        .provider_binding_contract_sha256(
+            &node.id,
+            &claim.transport_schema.to_string(),
+            &claim.materializer_schema.to_string(),
+        )?
+        .ok_or_else(|| provider_binding_error(&node.id, "provider contract is missing"))?;
+    if node.determinism != DeterminismPolicy::External
+        || node.cache != CachePolicy::Never
+        || node.effects != EffectPolicy::Provider
+        || node.display_name != presentation.display_name
+        || node.category != presentation.category
+        || output_names
+            != presentation
+                .output_names
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        || claim.contract_sha256 != expected_digest
+    {
+        return Err(provider_binding_error(
+            &node.id,
+            "signed provider node does not match the canonical native contract",
+        ));
+    }
+    Ok(())
 }
 
 fn native_presentation(node: &PluginNode) -> NativeNodePresentation {

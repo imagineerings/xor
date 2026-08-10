@@ -11,6 +11,7 @@ pub use comfy_types::DeviceKind;
 #[cfg(any(feature = "signing-tooling", test))]
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
@@ -22,6 +23,7 @@ use zeroize::Zeroizing;
 
 pub const COMPONENT_API_VERSION: ApiVersion = ApiVersion::new(1, 0, 0);
 pub const COMPONENT_WORLD: &str = "sim:comfy-plugin@1.0.0";
+pub const PROVIDER_COMPONENT_WORLD: &str = "sim:comfy-provider-plugin@1.0.0";
 pub const MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MANIFEST_NODES: usize = 4_096;
 pub const MAX_PORTS_PER_NODE: usize = 1_024;
@@ -316,6 +318,106 @@ pub enum EffectPolicy {
     Provider,
 }
 
+pub const PROVIDER_BINDING_SCHEMA_VERSION: u16 = 1;
+pub const PROVIDER_BINDING_API_FEATURE: &str = "provider.bindings.v1";
+const PROVIDER_BINDING_CANONICAL_DOMAIN: &str = "sim:comfy-provider-binding-set@1";
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderBindingClaim {
+    pub feature_id: String,
+    pub node_id: String,
+    pub contract_sha256: String,
+    pub transport_schema: CanonicalTypeId,
+    pub materializer_schema: CanonicalTypeId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderBindingSet {
+    pub schema_version: u16,
+    pub implementation_namespace: String,
+    pub bindings_sha256: String,
+    pub bindings: Vec<ProviderBindingClaim>,
+}
+
+impl ProviderBindingSet {
+    pub fn canonical_binding_bytes(&self) -> Result<Vec<u8>, PluginContractError> {
+        let mut writer = CanonicalWriter::with_limit(MAX_MANIFEST_BYTES);
+        self.write_canonical(&mut writer);
+        if writer.overflowed() {
+            return Err(PluginContractError::ManifestTooLarge);
+        }
+        Ok(writer.finish())
+    }
+
+    pub fn canonical_bindings_sha256(&self) -> Result<String, PluginContractError> {
+        Ok(format!(
+            "{:x}",
+            Sha256::digest(self.canonical_binding_bytes()?)
+        ))
+    }
+
+    fn write_canonical(&self, writer: &mut CanonicalWriter) {
+        writer.string(PROVIDER_BINDING_CANONICAL_DOMAIN);
+        writer.u16(self.schema_version);
+        writer.string(&self.implementation_namespace);
+        writer.usize(self.bindings.len());
+        for binding in &self.bindings {
+            writer.string(&binding.feature_id);
+            writer.string(&binding.node_id);
+            writer.string(&binding.contract_sha256);
+            writer.string(&binding.transport_schema.to_string());
+            writer.string(&binding.materializer_schema.to_string());
+        }
+    }
+
+    fn validate(
+        &self,
+        implementation_namespace: &str,
+        required_features: &[String],
+        nodes: &[PluginNode],
+    ) -> Result<(), PluginContractError> {
+        if self.schema_version != PROVIDER_BINDING_SCHEMA_VERSION
+            || self.implementation_namespace != implementation_namespace
+            || !required_features
+                .iter()
+                .any(|feature| feature == PROVIDER_BINDING_API_FEATURE)
+            || self.bindings.is_empty()
+            || self.bindings.len() > MAX_MANIFEST_NODES
+        {
+            return Err(PluginContractError::InvalidProviderBindingSet);
+        }
+        validate_sha256(&self.bindings_sha256)?;
+        let mut feature_ids = BTreeSet::new();
+        let mut previous_node_id: Option<&str> = None;
+        for binding in &self.bindings {
+            if !valid_feature_id(&binding.feature_id)
+                || !valid_dotted_identifier(&binding.node_id)
+                || !feature_ids.insert(binding.feature_id.as_str())
+                || previous_node_id.is_some_and(|previous| previous >= binding.node_id.as_str())
+            {
+                return Err(PluginContractError::InvalidProviderBindingSet);
+            }
+            validate_sha256(&binding.contract_sha256)?;
+            let Some(node) = nodes.iter().find(|node| node.id == binding.node_id) else {
+                return Err(PluginContractError::InvalidProviderBindingSet);
+            };
+            if node.determinism != DeterminismPolicy::External
+                || node.effects != EffectPolicy::Provider
+                || node.cache != CachePolicy::Never
+            {
+                return Err(PluginContractError::InvalidProviderBindingSet);
+            }
+            previous_node_id = Some(binding.node_id.as_str());
+        }
+        if self.bindings_sha256 != self.canonical_bindings_sha256()? {
+            return Err(PluginContractError::InvalidProviderBindingSet);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginNode {
@@ -549,6 +651,8 @@ pub struct PluginManifest {
     pub signature: ManifestSignature,
     pub provenance: ManifestProvenance,
     pub nodes: Vec<PluginNode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_binding: Option<ProviderBindingSet>,
     pub capabilities: Vec<CapabilityRequest>,
     pub ui: Vec<UiContribution>,
     pub routes: Vec<RouteDeclaration>,
@@ -742,6 +846,14 @@ impl PluginManifest {
             }
         }
 
+        if let Some(provider_binding) = &self.provider_binding {
+            provider_binding.validate(
+                &self.identifier,
+                &self.api.required_features,
+                &self.nodes,
+            )?;
+        }
+
         if self.capabilities.len() > 1_024 {
             return Err(PluginContractError::DuplicateOrInvalidCapability);
         }
@@ -861,6 +973,11 @@ impl PluginManifest {
         writer.string(&self.provenance.publisher);
         writer.optional_string(self.provenance.registry.as_deref());
         self.write_declarations(writer);
+        if let Some(provider_binding) = &self.provider_binding {
+            writer.string(PROVIDER_BINDING_CANONICAL_DOMAIN);
+            writer.string(&provider_binding.bindings_sha256);
+            provider_binding.write_canonical(writer);
+        }
     }
 
     fn write_declarations(&self, writer: &mut CanonicalWriter) {
@@ -950,7 +1067,11 @@ impl PluginManifest {
 
     pub fn component_projection(&self) -> ComponentManifestProjection {
         ComponentManifestProjection {
-            component_world: COMPONENT_WORLD.to_owned(),
+            component_world: if self.provider_binding.is_some() {
+                PROVIDER_COMPONENT_WORLD.to_owned()
+            } else {
+                COMPONENT_WORLD.to_owned()
+            },
             schema_version: self.schema_version,
             identifier: self.identifier.clone(),
             plugin_version: self.plugin_version,
@@ -1549,6 +1670,7 @@ pub enum PluginContractError {
     #[cfg(any(feature = "signing-tooling", test))]
     InvalidSigningKey,
     InvalidProvenance,
+    InvalidProviderBindingSet,
     InvalidNodeCount(usize),
     DuplicateOrInvalidNode(String),
     InvalidNodeMetadata(String),
@@ -1611,6 +1733,9 @@ impl fmt::Display for PluginContractError {
             #[cfg(any(feature = "signing-tooling", test))]
             Self::InvalidSigningKey => formatter.write_str("invalid Ed25519 signing key"),
             Self::InvalidProvenance => formatter.write_str("invalid manifest provenance"),
+            Self::InvalidProviderBindingSet => {
+                formatter.write_str("invalid signed provider binding set")
+            }
             Self::InvalidNodeCount(count) => write!(formatter, "invalid plugin node count {count}"),
             Self::DuplicateOrInvalidNode(node) => {
                 write!(formatter, "duplicate or invalid node `{node}`")
@@ -1693,6 +1818,14 @@ fn validate_sha256(digest: &str) -> Result<(), PluginContractError> {
         return Err(PluginContractError::InvalidDigest);
     }
     Ok(())
+}
+
+fn valid_feature_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 #[cfg(any(feature = "signing-tooling", test))]
@@ -2179,6 +2312,7 @@ mod tests {
                 publisher: "Sim tests".to_owned(),
                 registry: None,
             },
+            provider_binding: None,
             nodes: vec![PluginNode {
                 id: "echo".to_owned(),
                 version: ApiVersion::new(1, 0, 0),
@@ -2588,6 +2722,155 @@ mod tests {
     }
 
     #[test]
+    fn signed_provider_binding_sets_are_ordered_bounded_and_node_exact()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let mut manifest = manifest_fixture(&registry)?;
+        let legacy_signing_payload = manifest.signing_payload();
+        let mut legacy_writer = CanonicalWriter::default();
+        legacy_writer.u16(manifest.schema_version);
+        legacy_writer.string(&manifest.identifier);
+        legacy_writer.version(manifest.plugin_version);
+        legacy_writer.u16(manifest.api.major);
+        legacy_writer.u16(manifest.api.minimum_minor);
+        legacy_writer.u16(manifest.api.maximum_minor);
+        legacy_writer.strings(&manifest.api.required_features);
+        legacy_writer.string(&manifest.digest_sha256);
+        legacy_writer.string(&manifest.signature.algorithm);
+        legacy_writer.string(&manifest.signature.key_id);
+        legacy_writer.string(&manifest.provenance.source);
+        legacy_writer.string(&manifest.provenance.publisher);
+        legacy_writer.optional_string(manifest.provenance.registry.as_deref());
+        manifest.write_declarations(&mut legacy_writer);
+        assert_eq!(legacy_signing_payload, legacy_writer.finish());
+        manifest
+            .api
+            .required_features
+            .push(PROVIDER_BINDING_API_FEATURE.to_owned());
+        manifest.nodes[0].determinism = DeterminismPolicy::External;
+        manifest.nodes[0].cache = CachePolicy::Never;
+        manifest.nodes[0].effects = EffectPolicy::Provider;
+        let binding = ProviderBindingClaim {
+            feature_id: "COMFY-NODE-0001".to_owned(),
+            node_id: manifest.nodes[0].id.clone(),
+            contract_sha256: "3".repeat(64),
+            transport_schema: "sim:comfy-provider-transport@1".parse()?,
+            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+        };
+        let mut provider_binding = ProviderBindingSet {
+            schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+            implementation_namespace: manifest.identifier.clone(),
+            bindings_sha256: "0".repeat(64),
+            bindings: vec![binding],
+        };
+        provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
+        manifest.provider_binding = Some(provider_binding);
+        manifest.validate(&registry)?;
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../schema/plugin-manifest-v1.schema.json"))?;
+        let validator = jsonschema::validator_for(&schema)?;
+        assert!(validator.is_valid(&serde_json::to_value(&manifest)?));
+        assert_eq!(
+            manifest.component_projection().component_world,
+            PROVIDER_COMPONENT_WORLD
+        );
+        let canonical = manifest
+            .provider_binding
+            .as_ref()
+            .ok_or("provider binding disappeared")?
+            .canonical_binding_bytes()?;
+        assert_eq!(
+            canonical,
+            manifest
+                .provider_binding
+                .as_ref()
+                .ok_or("provider binding disappeared")?
+                .canonical_binding_bytes()?
+        );
+        let signed = manifest.signing_payload();
+        let mut changed = manifest.clone();
+        changed
+            .provider_binding
+            .as_mut()
+            .ok_or("provider binding disappeared")?
+            .bindings[0]
+            .contract_sha256 = "5".repeat(64);
+        assert_ne!(signed, changed.signing_payload());
+
+        let mut forged_set_digest = manifest.clone();
+        forged_set_digest
+            .provider_binding
+            .as_mut()
+            .ok_or("provider binding disappeared")?
+            .bindings_sha256 = "4".repeat(64);
+        assert_eq!(
+            forged_set_digest.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+
+        let mut wrong_policy = manifest.clone();
+        wrong_policy.nodes[0].cache = CachePolicy::InputIdentity;
+        assert_eq!(
+            wrong_policy.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        let mut unknown_node = manifest.clone();
+        unknown_node
+            .provider_binding
+            .as_mut()
+            .ok_or("provider binding disappeared")?
+            .bindings[0]
+            .node_id = "missing".to_owned();
+        assert_eq!(
+            unknown_node.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        let mut duplicate = manifest.clone();
+        let binding = duplicate
+            .provider_binding
+            .as_ref()
+            .and_then(|set| set.bindings.first())
+            .cloned()
+            .ok_or("provider binding disappeared")?;
+        duplicate
+            .provider_binding
+            .as_mut()
+            .ok_or("provider binding disappeared")?
+            .bindings
+            .push(binding);
+        assert_eq!(
+            duplicate.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        let mut wrong_namespace = manifest.clone();
+        wrong_namespace
+            .provider_binding
+            .as_mut()
+            .ok_or("provider binding disappeared")?
+            .implementation_namespace = "provider.other".to_owned();
+        assert_eq!(
+            wrong_namespace.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        let mut missing_feature = manifest.clone();
+        missing_feature
+            .api
+            .required_features
+            .retain(|feature| feature != PROVIDER_BINDING_API_FEATURE);
+        assert_eq!(
+            missing_feature.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        let mut wrong_determinism = manifest.clone();
+        wrong_determinism.nodes[0].determinism = DeterminismPolicy::Deterministic;
+        assert_eq!(
+            wrong_determinism.validate(&registry),
+            Err(PluginContractError::InvalidProviderBindingSet)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn wit_exposes_typed_manifest_values_and_presence() {
         let wit = include_str!("../wit/comfy-plugin.wit");
         for contract in [
@@ -2597,6 +2880,12 @@ mod tests {
             "record scalar-value",
             "default: option<scalar-value>",
             "record encoded-value",
+            "record provider-binding-claim",
+            "record provider-binding-set",
+            "record provider-materialized-output",
+            "record provider-invocation-response",
+            "interface provider-binding",
+            "world comfy-provider-plugin",
             "read-scalar-input",
             "read-handle: func(handle: value-handle) -> result<encoded-value, invocation-error>",
             "create-output-value",

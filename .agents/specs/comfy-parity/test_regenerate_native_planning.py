@@ -274,9 +274,45 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_runtime/src/trust.rs", provider_reads)
         self.assertIn("crates/comfy_runtime/src/permissions.rs", provider_reads)
         self.assertIn("crates/comfy_runtime/src/plugin_services.rs", provider_reads)
+        self.assertIn(".agents/specs/comfy-parity/catalogs/backend-node-contracts.json", provider_reads)
+        self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", provider_writes)
+        self.assertIn("crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_host/src/capabilities.rs", provider_writes)
+        self.assertIn("crates/comfy_plugin_host/src/private_worker.rs", provider_writes)
         self.assertIn("crates/comfy_plugin_sdk/wit/comfy-plugin.wit", provider_writes)
+        self.assertIn("crates/comfy_runtime/src/plugin_services.rs", provider_writes)
+        self.assertIn("crates/comfy_runtime/src/runtime_supervisor.rs", provider_writes)
+        self.assertIn("crates/comfy_runtime/src/prompt_compiler.rs", provider_writes)
+        self.assertIn("crates/comfy_worker/src/plugin_runtime.rs", provider_writes)
+        self.assertIn("crates/comfy_api/src/security.rs", provider_writes)
+        self.assertIn("crates/sim/src/comfy_plugin_services.rs", provider_writes)
+        provider_task = tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]
+        self.assertEqual(
+            provider_task["criterion_ids"],
+            [
+                "4.3", "4.4", "4.5", "6.4", "6.5", "6.6", "12.5", "12.6",
+                "28.3", "28.6", "32.1", "32.2", "32.5", "32.7", "32.8",
+                "34.2", "34.6", "39.2", "39.3", "39.5", "39.6", "40.1",
+                "40.4", "40.6", "41.5", "44.1", "44.2", "44.3",
+            ],
+        )
+        self.assertNotIn("VAL-NODE-002", provider_task["validations"])
+        self.assertNotIn("VAL-NATIVE-E2E-002", provider_task["validations"])
+        for validation in [
+            "VAL-NODE-001",
+            "VAL-NODE-REGISTRY-001",
+            "VAL-DOMAIN-004",
+            "VAL-PLUGIN-HOST-001",
+            "VAL-E2E-003",
+            "VAL-WORKER-PLUGIN-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-API-001",
+            "VAL-CANCEL-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-OWNERSHIP-001",
+        ]:
+            self.assertIn(validation, provider_task["validations"])
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs", registry_writes
         )
@@ -349,6 +385,30 @@ class ValidationGenerationTests(unittest.TestCase):
             "validate_spec.py .agents/specs/comfy-parity --require-complete",
         ]:
             self.assertIn(command, asset_commands)
+        provider_commands = planning.task_validation_commands(
+            tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]
+        )
+        for command in [
+            "cargo test --locked -p comfy_nodes val_node_001 -- --nocapture",
+            "cargo test --locked -p comfy_nodes val_node_registry_001 -- --nocapture",
+            "cargo test --locked -p comfy_plugin_sdk --lib type_ids -- --nocapture",
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
+            "cargo test --locked -p comfy_runtime val_runtime_trust_001 -- --nocapture",
+            "cargo test --locked -p comfy_runtime --lib provider_activation -- --nocapture",
+            "cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture",
+            "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+            "val_plugin_host_001 -- --exact --nocapture",
+            "val_e2e_003 -- --exact --nocapture",
+            "val_worker_plugin_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_api val_native_api_001 -- --nocapture",
+            "cargo test --locked -p comfy_test_support val_cancel_001 -- --nocapture",
+            "native_image_e2e val_native_e2e_001 -- --exact --nocapture",
+            "ownership_consolidation val_ownership_001 -- --exact --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "validate_spec.py .agents/specs/comfy-parity --require-complete",
+        ]:
+            self.assertIn(command, provider_commands)
 
     def test_catalog_pass_signal_is_command_only_and_other_artifact_classes_remain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

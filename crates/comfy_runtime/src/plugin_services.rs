@@ -1362,6 +1362,7 @@ mod tests {
                 publisher: "fixture publisher".to_owned(),
                 registry: Some("fixture://registry".to_owned()),
             },
+            provider_binding: None,
             nodes: vec![PluginNode {
                 id: "node.fixture".to_owned(),
                 version: ApiVersion::new(1, 0, 0),

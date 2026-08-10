@@ -18,10 +18,10 @@ comfy_types.workspace = true
 ring = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 zeroize = { workspace = true, optional = true }
 
 [dev-dependencies]
 jsonschema.workspace = true
 ring.workspace = true
-sha2.workspace = true
 zeroize.workspace = true

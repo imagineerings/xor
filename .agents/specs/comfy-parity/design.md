@@ -373,7 +373,7 @@ Implementation closure and release certification are distinct gates. This pack c
 
 ### D40: Keep API nodes in native provider sandboxes
 
-API nodes are native provider implementations or Rust/WASM plugins with explicit network, secret, upload, cost, polling, and cancellation grants. Offline and disabled states make no request and retain workflow data.
+API nodes are native provider implementations or versioned Rust/WASM components with explicit network, secret, upload, cost, polling, and cancellation grants. A signature-covered publisher binding set names the canonical node class, source feature, native contract digest, transport/materializer schema, and exact implementation namespace. A distinct host-authenticated activation envelope binds that publisher set to the verified component snapshot and authorization generation. The host activates only the complete validated set for one namespace in a cloned NativeNodeRegistry; missing, extra, duplicate, stale, mixed-namespace, or mismatched claims leave the declared provider-required descriptors intact and executable dispatch unavailable. Paid dispatch requires a host-issued cost acceptance bound to the principal, profile, prompt digest, provider binding digest, evaluated maximum, expiry, and nonce. ProviderPolicy remains the sole endpoint, profile, subject, and credential authorization owner, and the plugin receives neither the acceptance authority nor ambient credentials. Native plans pin the verified provider registry generation and sorted binding digests. RuntimeSupervisor multiplexes attempt- and node-scoped capability sessions to the committed worker deployment; a deployment change or restart invalidates the executor, cache identity, sessions, and stale handles before another call. Provider components exchange invocation-scoped receipts rather than serialized native handles, paths, payload objects, or secrets. App-side services resolve those receipts against the exact attempt store, encode canonical inputs through their lower-domain owners, and materialize completely validated responses through the same owners before attempt-local publication. Metadata-only tensor, model, media, or artifact descriptions cannot allocate native state. A model result must reuse an exact sealed imported model unless a canonical model-family owner explicitly materializes the response. A ProviderTask result is a signed-namespace NativeProviderPayload with bounded ABI bytes and owner-derived digests. The complete output batch is validated before publication, and cancellation or a later failure reverses every staged publication and proposal. Offline, disabled, absent, ungranted, secretless, unaccepted, expired, stale, cancelled, malformed, oversized, trapped, timed-out, or worker-lost states retain workflow and object-info data. Any condition known before authorization makes zero actuator calls; any failure after an authorized request publishes no handle, cache entry, effect, output, or durable success. Paid-request idempotency binds profile, prompt, attempt, node, request ordinal, provider binding, and request digest so recovery never blindly duplicates an external mutation.
 
 ### D41: Assign one authoritative owner to foundational behavior
 
@@ -857,6 +857,31 @@ interface types {
         abi-bytes: list<u8>,
     }
 
+    record provider-binding-claim {
+        feature-id: string,
+        node-id: string,
+        contract-sha256: string,
+        transport-schema: string,
+        materializer-schema: string,
+    }
+
+    record provider-binding-set {
+        schema-version: u16,
+        implementation-namespace: string,
+        bindings-sha256: string,
+        bindings: list<provider-binding-claim>,
+    }
+
+    record provider-materialized-output {
+        port-id: string,
+        value: encoded-value,
+    }
+
+    record provider-invocation-response {
+        outputs: list<provider-materialized-output>,
+        receipt: list<u8>,
+    }
+
     record capability-quota {
         maximum-operations: u64,
         maximum-request-bytes: u64,
@@ -992,9 +1017,22 @@ interface plugin {
     drop-node: func(instance: u64);
 }
 
+interface provider-binding {
+    use types.{invocation-error, provider-binding-set, provider-invocation-response};
+
+    binding-set: func() -> provider-binding-set;
+    invoke-provider: func(class-type: string, request: list<u8>) -> result<provider-invocation-response, invocation-error>;
+}
+
 world comfy-plugin {
     import host;
     export plugin;
+}
+
+world comfy-provider-plugin {
+    import host;
+    export plugin;
+    export provider-binding;
 }
 ```
 
