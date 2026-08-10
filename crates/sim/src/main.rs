@@ -1,6 +1,7 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(feature = "comfy")]
 mod comfy_cli;
 mod reliability;
 mod sim;
@@ -209,7 +210,7 @@ fn main() {
     #[cfg(unix)]
     util::prevent_root_execution();
 
-    #[cfg(all(not(debug_assertions), target_os = "windows"))]
+    #[cfg(all(not(debug_assertions), target_os = "windows", feature = "comfy"))]
     unsafe {
         use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
 
@@ -276,6 +277,7 @@ fn main() {
         paths::set_custom_data_dir(dir);
     }
 
+    #[cfg(feature = "comfy")]
     if let Some(SimCommand::Comfy(comfy_args)) = args.command.clone() {
         let exit_code = comfy_cli::run(comfy_args);
         if exit_code != 0 {
@@ -1683,6 +1685,7 @@ fn stdout_is_a_pty() -> bool {
     subcommand_precedence_over_arg = true
 )]
 struct Args {
+    #[cfg(feature = "comfy")]
     #[command(subcommand)]
     command: Option<SimCommand>,
 
@@ -1747,7 +1750,7 @@ struct Args {
 
     /// Run sim in the foreground, only used on Windows, to match the behavior on macOS.
     #[arg(long)]
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", feature = "comfy"))]
     #[arg(hide = true)]
     foreground: bool,
 
@@ -1792,6 +1795,7 @@ struct Args {
     etw_socket: Option<String>,
 }
 
+#[cfg(feature = "comfy")]
 #[derive(clap::Subcommand, Clone, Debug)]
 enum SimCommand {
     /// Run native Comfy lifecycle, automation, and compatibility-host commands.

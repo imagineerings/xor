@@ -271,6 +271,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Clear All Breakpoints", debugger_ui::ClearAllBreakpoints),
             ],
         },
+        #[cfg(feature = "comfy")]
         comfy_ui::comfy_menu(),
         Menu {
             name: "Window".into(),

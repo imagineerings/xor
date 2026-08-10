@@ -1,5 +1,5 @@
 mod app_menus;
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 #[path = "comfy_plugin_services.rs"]
 pub mod comfy_plugin_services;
 pub mod edit_prediction_registry;
@@ -118,6 +118,7 @@ pub struct CrashHandler(pub Arc<crashes::Client>);
 
 impl gpui::Global for CrashHandler {}
 
+#[cfg(feature = "comfy")]
 struct ComfyComponentHostGlobal {
     profile_id: String,
     component_generation: u64,
@@ -126,8 +127,10 @@ struct ComfyComponentHostGlobal {
     router: comfy_plugin_host::ComponentHostRouter,
 }
 
+#[cfg(feature = "comfy")]
 impl gpui::Global for ComfyComponentHostGlobal {}
 
+#[cfg(feature = "comfy")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct NativeComfyRuntimeBinding {
     profile_id: Uuid,
@@ -148,6 +151,7 @@ struct NativeComfyRuntimeBinding {
     plugin_security: comfy_runtime::NativePluginSecurityPolicy,
 }
 
+#[cfg(feature = "comfy")]
 impl NativeComfyRuntimeBinding {
     fn new(
         profile: &comfy_runtime::NativeRuntimeProfile,
@@ -174,13 +178,16 @@ impl NativeComfyRuntimeBinding {
     }
 }
 
+#[cfg(feature = "comfy")]
 impl gpui::Global for NativeComfyRuntimeBinding {}
 
+#[cfg(feature = "comfy")]
 #[derive(Clone)]
 struct SimComfyPluginContributionSource {
     router: comfy_plugin_host::ComponentHostRouter,
 }
 
+#[cfg(feature = "comfy")]
 impl comfy_ui::PluginContributionSource for SimComfyPluginContributionSource {
     fn verified_contributions(&self) -> anyhow::Result<Vec<comfy_ui::PluginContributionInput>> {
         let plugins = self.router.current()?.installed_plugins()?;
@@ -201,6 +208,7 @@ impl comfy_ui::PluginContributionSource for SimComfyPluginContributionSource {
     }
 }
 
+#[cfg(feature = "comfy")]
 fn register_comfy_plugin_contribution_source(
     router: comfy_plugin_host::ComponentHostRouter,
     cx: &mut App,
@@ -211,6 +219,7 @@ fn register_comfy_plugin_contribution_source(
     );
 }
 
+#[cfg(feature = "comfy")]
 fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     #[cfg(not(test))]
     let (profile, plugin_security) = active_native_comfy_configuration(cx)?;
@@ -314,6 +323,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "comfy")]
 pub(crate) fn init_comfy_ui(cx: &mut App) {
     #[cfg(test)]
     comfy_ui::init(cx);
@@ -347,6 +357,7 @@ pub(crate) fn init_comfy_ui(cx: &mut App) {
 }
 
 #[cfg(not(test))]
+#[cfg(feature = "comfy")]
 fn sync_active_native_comfy_profile(cx: &mut App) {
     match active_native_comfy_configuration(cx) {
         Ok((profile, plugin_security)) => {
@@ -407,7 +418,7 @@ fn sync_active_native_comfy_profile(cx: &mut App) {
     }
 }
 
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 fn active_native_comfy_profile(cx: &App) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
     let settings_store = cx
         .try_global::<SettingsStore>()
@@ -415,7 +426,7 @@ fn active_native_comfy_profile(cx: &App) -> anyhow::Result<comfy_runtime::Native
     active_native_comfy_profile_from_settings(settings_store.merged_settings())
 }
 
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 fn active_native_comfy_configuration(
     cx: &App,
 ) -> anyhow::Result<(
@@ -428,31 +439,48 @@ fn active_native_comfy_configuration(
     active_native_comfy_configuration_from_settings(settings_store.merged_settings())
 }
 
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 fn configured_native_comfy_profile_id(cx: &App) -> Option<comfy_types::ProfileId> {
     cx.try_global::<SettingsStore>()
         .and_then(|store| native_comfy_profile_id_from_settings(store.merged_settings()))
 }
 
+#[cfg(feature = "comfy")]
 fn native_comfy_profile_id_from_settings(
     settings: &settings::SettingsContent,
 ) -> Option<comfy_types::ProfileId> {
-    let active_profile = settings.comfy_runtime.as_ref()?.active_profile.as_deref()?;
+    let fallback = default_native_comfy_settings_content().ok();
+    let runtime = settings
+        .comfy_runtime
+        .as_ref()
+        .or_else(|| fallback.as_ref()?.comfy_runtime.as_ref())?;
+    let active_profile = runtime.active_profile.as_deref()?;
     Uuid::parse_str(active_profile)
         .ok()
         .map(comfy_types::ProfileId)
 }
 
+#[cfg(feature = "comfy")]
+fn default_native_comfy_settings_content() -> anyhow::Result<settings::SettingsContent> {
+    <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
+        include_str!("../../../assets/settings/default-comfy.json"),
+    )
+    .map_err(Into::into)
+}
+
+#[cfg(feature = "comfy")]
 fn active_native_comfy_configuration_from_settings(
     settings: &settings::SettingsContent,
 ) -> anyhow::Result<(
     comfy_runtime::NativeRuntimeProfile,
     comfy_runtime::NativePluginSecurityPolicy,
 )> {
+    let fallback = default_native_comfy_settings_content()?;
     let content = settings
         .comfy_runtime
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("native Comfy settings are missing"))?;
+        .or(fallback.comfy_runtime.as_ref())
+        .ok_or_else(|| anyhow::anyhow!("native Comfy default settings are missing"))?;
     let settings = comfy_runtime::parse_runtime_settings(content)?;
     let profile = settings
         .active_profile()
@@ -465,13 +493,14 @@ fn active_native_comfy_configuration_from_settings(
     Ok((profile, plugin_security))
 }
 
+#[cfg(feature = "comfy")]
 fn active_native_comfy_profile_from_settings(
     settings: &settings::SettingsContent,
 ) -> anyhow::Result<comfy_runtime::NativeRuntimeProfile> {
     active_native_comfy_configuration_from_settings(settings).map(|(profile, _)| profile)
 }
 
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 fn native_comfy_worker_launch(
     profile: &comfy_runtime::NativeRuntimeProfile,
     worker_id: comfy_types::WorkerId,
@@ -486,7 +515,7 @@ fn native_comfy_worker_launch(
     )
 }
 
-#[cfg(not(test))]
+#[cfg(all(feature = "comfy", not(test)))]
 fn register_native_comfy_execution(
     profile: &comfy_runtime::NativeRuntimeProfile,
     replace_assets: bool,
@@ -592,28 +621,32 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
-    init_comfy_ui(cx);
-    match init_comfy_component_host(cx) {
-        Err(error) => {
-            let message = format!("native Comfy component host initialization failed: {error}");
-            log::error!("{message}");
-            comfy_ui::set_initialization_error(message, cx);
-        }
-        #[cfg(not(test))]
-        Ok(()) => {
-            if let Ok(profile) = active_native_comfy_profile(cx)
-                && let Err(error) = register_native_comfy_execution(&profile, false, cx)
-            {
-                let message =
-                    format!("native Comfy worker registry initialization failed: {error}");
+    #[cfg(feature = "comfy")]
+    {
+        init_comfy_ui(cx);
+        match init_comfy_component_host(cx) {
+            Err(error) => {
+                let message = format!("native Comfy component host initialization failed: {error}");
                 log::error!("{message}");
                 comfy_ui::set_initialization_error(message, cx);
-            } else if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx) {
-                cx.set_global(NativeComfyRuntimeBinding::new(&profile, &plugin_security));
             }
+            #[cfg(not(test))]
+            Ok(()) => {
+                if let Ok(profile) = active_native_comfy_profile(cx)
+                    && let Err(error) = register_native_comfy_execution(&profile, false, cx)
+                {
+                    let message =
+                        format!("native Comfy worker registry initialization failed: {error}");
+                    log::error!("{message}");
+                    comfy_ui::set_initialization_error(message, cx);
+                } else if let Ok((profile, plugin_security)) = active_native_comfy_configuration(cx)
+                {
+                    cx.set_global(NativeComfyRuntimeBinding::new(&profile, &plugin_security));
+                }
+            }
+            #[cfg(test)]
+            Ok(()) => {}
         }
-        #[cfg(test)]
-        Ok(()) => {}
     }
 
     #[cfg(target_os = "macos")]
@@ -1204,14 +1237,6 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
         let channels_panel =
             collab_ui::collab_panel::CollabPanel::load(workspace_handle.clone(), cx.clone());
         let debug_panel = DebugPanel::load(workspace_handle.clone(), cx);
-        let mut execution_context = cx.clone();
-        let execution_panel =
-            comfy_ui::ExecutionPanel::load(workspace_handle.clone(), &mut execution_context);
-        let mut properties_context = cx.clone();
-        let graph_properties_panel = comfy_ui::GraphPropertiesPanel::load(
-            workspace_handle.clone(),
-            &mut properties_context,
-        );
 
         async fn add_panel_when_ready(
             panel_task: impl Future<Output = anyhow::Result<Entity<impl workspace::Panel>>> + 'static,
@@ -1228,6 +1253,36 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             }
         }
 
+        #[cfg(feature = "comfy")]
+        let comfy_workspace_handle = workspace_handle.clone();
+        let comfy_panels = async {
+            #[cfg(feature = "comfy")]
+            {
+                let mut execution_context = cx.clone();
+                let execution_panel = comfy_ui::ExecutionPanel::load(
+                    comfy_workspace_handle.clone(),
+                    &mut execution_context,
+                );
+                let mut properties_context = cx.clone();
+                let graph_properties_panel = comfy_ui::GraphPropertiesPanel::load(
+                    comfy_workspace_handle.clone(),
+                    &mut properties_context,
+                );
+                futures::join!(
+                    add_panel_when_ready(
+                        execution_panel,
+                        comfy_workspace_handle.clone(),
+                        cx.clone()
+                    ),
+                    add_panel_when_ready(
+                        graph_properties_panel,
+                        comfy_workspace_handle.clone(),
+                        cx.clone()
+                    ),
+                );
+            }
+        };
+
         futures::join!(
             add_panel_when_ready(project_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(outline_panel, workspace_handle.clone(), cx.clone()),
@@ -1235,12 +1290,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
-            add_panel_when_ready(execution_panel, workspace_handle.clone(), cx.clone()),
-            add_panel_when_ready(
-                graph_properties_panel,
-                workspace_handle.clone(),
-                cx.clone()
-            ),
+            comfy_panels,
             initialize_agent_panel(workspace_handle, cx.clone()).map(|r| r.log_err()),
         );
 
@@ -2757,6 +2807,7 @@ fn builtin_keymap_assets(
     if vim_enabled {
         assets.push((VIM_KEYMAP_PATH, KeybindSource::Vim));
     }
+    #[cfg(feature = "comfy")]
     assets.push((comfy_ui::DEFAULT_COMFY_KEYMAP_PATH, KeybindSource::Default));
     assets.push((SPECIFIC_OVERRIDES_KEYMAP_PATH, KeybindSource::Default));
     assets
@@ -3142,10 +3193,11 @@ mod tests {
         DisplayPoint, Editor, MultiBufferOffset, SelectionEffects, display_map::DisplayRow,
     };
     use gpui::{
-        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, KeyContext, Keystroke, Menu,
-        MenuItem, Modifiers, TestAppContext, UpdateGlobal, VisualTestContext, WindowHandle,
-        actions, point, px,
+        Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
+        UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
     };
+    #[cfg(feature = "comfy")]
+    use gpui::{KeyContext, Keystroke, Menu, MenuItem};
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
     use pretty_assertions::{assert_eq, assert_ne};
@@ -3173,21 +3225,24 @@ mod tests {
         open_new, open_paths, pane,
     };
 
+    #[cfg(feature = "comfy")]
     #[test]
-    fn native_comfy_profile_adapter_uses_canonical_merged_settings() {
+    fn comfy_build_boundary_loads_split_native_defaults() {
         let content =
             <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
                 include_str!("../../../assets/settings/default.json"),
             )
             .expect("parse registered Sim defaults");
+        assert!(content.comfy_runtime.is_none());
         let profile = active_native_comfy_profile_from_settings(&content)
-            .expect("map merged settings to a native runtime profile");
+            .expect("fall back to the Comfy-only native runtime defaults");
         assert_eq!(profile.id, comfy_runtime::DEFAULT_NATIVE_PROFILE_ID);
         assert_eq!(profile.device, comfy_types::DeviceKind::Cpu);
         assert_eq!(profile.provider_scope, "local");
         assert!(!profile.api_host.enabled);
     }
 
+    #[cfg(feature = "comfy")]
     #[gpui::test(seed = 367)]
     fn native_comfy_component_host_starts_from_the_comprehensive_generated_registry(
         cx: &mut TestAppContext,
@@ -3215,6 +3270,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "comfy")]
     #[test]
     fn native_comfy_runtime_binding_rebinds_same_profile_policy_changes() {
         fn binding(settings: &str) -> NativeComfyRuntimeBinding {
@@ -3499,6 +3555,7 @@ mod tests {
         assert_ne!(directml_baseline, directml_rotated_key);
     }
 
+    #[cfg(feature = "comfy")]
     #[test]
     fn invalid_native_comfy_settings_preserve_the_selected_error_scope() {
         let selected_profile_id = Uuid::from_u128(0x4_101);
@@ -3553,6 +3610,7 @@ mod tests {
         futures::future::join_all(all_tasks).await;
     }
 
+    #[cfg(feature = "comfy")]
     fn validation_digest(parts: impl IntoIterator<Item = impl AsRef<[u8]>>) -> String {
         const OFFSETS: [u64; 4] = [
             0xcbf29ce484222325,
@@ -3575,6 +3633,7 @@ mod tests {
             .collect()
     }
 
+    #[cfg(feature = "comfy")]
     fn collect_menu_action_names(items: &[MenuItem], names: &mut Vec<String>) {
         for item in items {
             match item {
@@ -3585,6 +3644,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "comfy")]
     #[test]
     fn comfy_keymap_loads_between_vim_and_specific_overrides() {
         let keymap_order = builtin_keymap_assets(BaseKeymap::JetBrains, true);
@@ -3605,6 +3665,7 @@ mod tests {
         assert!(builtin_keymap_assets(BaseKeymap::None, true).is_empty());
     }
 
+    #[cfg(feature = "comfy")]
     #[gpui::test(seed = 16013)]
     fn comfy_static_menu_has_registered_action_targets(cx: &mut TestAppContext) {
         cx.update(|cx| {
@@ -3636,6 +3697,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "comfy")]
     #[gpui::test(seed = 16013)]
     fn val_gpui_013(cx: &mut TestAppContext) {
         const MAIN_SOURCE: &str = include_str!("main.rs");
@@ -4509,16 +4571,19 @@ mod tests {
         let editor = multi_workspace
             .update(cx, |multi_workspace, _, cx| {
                 multi_workspace.workspace().update(cx, |workspace, cx| {
-                    assert!(
-                        workspace.panel::<comfy_ui::ExecutionPanel>(cx).is_some(),
-                        "the production workspace must register the native execution dock panel"
-                    );
-                    assert!(
-                        workspace
-                            .panel::<comfy_ui::GraphPropertiesPanel>(cx)
-                            .is_some(),
-                        "the production workspace must register the native graph properties dock panel"
-                    );
+                    #[cfg(feature = "comfy")]
+                    {
+                        assert!(
+                            workspace.panel::<comfy_ui::ExecutionPanel>(cx).is_some(),
+                            "the production workspace must register the native execution dock panel"
+                        );
+                        assert!(
+                            workspace
+                                .panel::<comfy_ui::GraphPropertiesPanel>(cx)
+                                .is_some(),
+                            "the production workspace must register the native graph properties dock panel"
+                        );
+                    }
                     let editor = workspace
                         .active_item(cx)
                         .unwrap()
@@ -6501,7 +6566,9 @@ mod tests {
                 "client",
                 "collab",
                 "collab_panel",
+                #[cfg(feature = "comfy")]
                 "comfy_graph",
+                #[cfg(feature = "comfy")]
                 "comfy_shell",
                 "command_palette",
                 "console",
@@ -6758,6 +6825,7 @@ mod tests {
             release_channel::init(Version::new(0, 0, 0), cx);
             command_palette::init(cx);
             editor::init(cx);
+            #[cfg(feature = "comfy")]
             init_comfy_ui(cx);
             collab_ui::init(&app_state, cx);
             git_ui::init(cx);
