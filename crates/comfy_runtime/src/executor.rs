@@ -1,8 +1,17 @@
+use crate::assets::{AssetIdentity, NativeAssetResolverRegistry};
 use crate::{
     AttemptEvent, AttemptEventKind, AttemptState, CacheEntry, CacheKey, CompiledNode, CompiledPlan,
     EventBusError, ExecutionEventBus, InputBinding, NativeCache, PromptCompileError,
 };
 use chrono::Utc;
+use comfy_nodes::{
+    NativeAssetReference, NativeAssetServiceError, NativeHandleStore, NativeHandleStoreError,
+    NativeHandleStoreIdentity, NativeHandleType, NativeNodeBindingDisposition,
+    NativeNodeComputeSession, NativeNodeContractError, NativeNodeServiceIdentity,
+    NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency, NativePreparedEffectKind,
+    NativePreparedEffectService, NativeResidentAllocationId, NativeResolvedPayload,
+    NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue, NodeRegistry,
+};
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
     NativeEffectClass as EffectClass, NativeNode, NativeNodeBinding,
@@ -11,14 +20,6 @@ pub use comfy_nodes::{
     NativeNodeOutcome as NodeOutcome, NativeNodePresentation as RuntimeNodePresentation,
     NativeOutputDescriptor as RuntimeOutputDescriptor, NativePortCardinality as InputMode,
     NativePreparedEffectRequest as PreparedEffectRequest,
-};
-use comfy_nodes::{
-    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeNodeBindingDisposition, NativeNodeComputeSession, NativeNodeContractError,
-    NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency,
-    NativePreparedEffectKind, NativePreparedEffectService, NativeResidentAllocationId,
-    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue,
-    NodeRegistry,
 };
 #[cfg(test)]
 use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
@@ -1624,6 +1625,18 @@ fn node_effect_service_id(prompt_id: PromptId, attempt_id: AttemptId, node_id: &
     Uuid::from_bytes(bytes)
 }
 
+fn rollback_node_prepared_effects(
+    service: &dyn NativePreparedEffectService,
+    primary: ExecutionError,
+) -> ExecutionError {
+    match service.rollback_all_prepared() {
+        Ok(()) => primary,
+        Err(rollback) => ExecutionError::Effect(format!(
+            "{primary}; rolling back the node's prepared effects failed: {rollback}"
+        )),
+    }
+}
+
 #[cfg(test)]
 #[derive(Debug, Default)]
 struct EffectCoordinatorCalls {
@@ -1720,6 +1733,15 @@ impl NativePreparedEffectService for RecordingPreparedEffectService {
             return Err(comfy_nodes::NativeEffectServiceError::InvalidTicket);
         };
         calls.prepared.remove(index);
+        Ok(())
+    }
+
+    fn rollback_all_prepared(&self) -> Result<(), comfy_nodes::NativeEffectServiceError> {
+        self.calls.lock().prepared.retain(|prepared| {
+            prepared.service_id != self.identity.service_id()
+                || prepared.attempt_id != self.identity.attempt_id()
+                || prepared.node_id != *self.identity.node_id()
+        });
         Ok(())
     }
 }
@@ -1932,6 +1954,7 @@ pub struct ExecutionEngine {
     configuration_token: String,
     scratch: ScratchReservation,
     compute_backend: Option<Arc<CpuBackend>>,
+    asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
 
@@ -1983,6 +2006,7 @@ impl ExecutionEngine {
             configuration_token: "default".to_owned(),
             scratch,
             compute_backend: None,
+            asset_resolvers: None,
             handle_store_generation,
         })
     }
@@ -2005,6 +2029,34 @@ impl ExecutionEngine {
             .map_err(|error| ExecutionError::Cache(error.to_string()))?;
         self.compute_backend = Some(backend);
         Ok(self)
+    }
+
+    pub fn with_asset_resolvers(
+        mut self,
+        asset_resolvers: Arc<NativeAssetResolverRegistry>,
+    ) -> Self {
+        self.asset_resolvers = Some(asset_resolvers);
+        self
+    }
+
+    pub fn seal_asset_for_node(
+        &self,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: NodeId,
+        identity: AssetIdentity,
+        source_type_id: impl Into<String>,
+    ) -> Result<NativeAssetReference, NativeAssetServiceError> {
+        let service_identity = NativeNodeServiceIdentity::checked(
+            node_effect_service_id(prompt_id, attempt_id, &node_id),
+            attempt_id,
+            node_id,
+        )
+        .map_err(|_| NativeAssetServiceError::InvalidReference)?;
+        self.asset_resolvers
+            .as_ref()
+            .ok_or(NativeAssetServiceError::Unavailable)?
+            .seal_for_node(&service_identity, identity, source_type_id)
     }
 
     pub fn with_backend(mut self, backend: impl Into<String>) -> Result<Self, ExecutionError> {
@@ -2319,6 +2371,10 @@ impl ExecutionEngine {
             node_id.clone(),
         )
         .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        let asset_resolver = self
+            .asset_resolvers
+            .as_ref()
+            .map(|registry| registry.node_service(service_identity.clone()));
         let effect_service = self
             .effects
             .node_service(service_identity.clone(), plan.prompt_id)
@@ -2336,8 +2392,9 @@ impl ExecutionEngine {
             })
             .transpose()
             .map_err(|error| ExecutionError::Effect(error.to_string()))?;
-        let services = NativeNodeServices::checked(None, Some(effect_service), compute)
-            .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        let services =
+            NativeNodeServices::checked(asset_resolver, Some(effect_service.clone()), compute)
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         let context = NodeContext::new_with_services(
             plan.prompt_id,
             state.attempt_id,
@@ -2467,7 +2524,7 @@ impl ExecutionEngine {
             }
         }
 
-        let (outputs, ui, effects) = self
+        let execution = self
             .execute_mapped(
                 &node,
                 implementation.as_ref(),
@@ -2476,45 +2533,70 @@ impl ExecutionEngine {
                 state,
                 expansion_depth,
             )
-            .await?;
-        if outputs.len() != node.descriptor.outputs.len() {
-            return Err(ExecutionError::OutputArity {
-                node: node_id.clone(),
-                expected: node.descriptor.outputs.len(),
-                actual: outputs.len(),
-            });
-        }
-        if !effects.is_empty()
-            && matches!(
-                node.descriptor.effect,
-                EffectClass::Pure | EffectClass::ReadsArtifact
-            )
-        {
-            return Err(ExecutionError::UnexpectedEffect {
-                node: node_id.clone(),
-                effect: node.descriptor.effect,
-            });
-        }
-        if effects.len() > MAX_EFFECTS_PER_NODE {
-            return Err(ExecutionError::TooManyEffects {
-                node: node_id.clone(),
-            });
-        }
-        let mut effect_transactions = BTreeSet::new();
-        for effect in effects {
-            effect
-                .validate()
-                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
-            if !effect_transactions.insert(effect.transaction_id()) {
-                return Err(ExecutionError::Effect(format!(
-                    "duplicate prepared effect ticket {}",
-                    effect.transaction_id()
-                )));
+            .await;
+        let (outputs, ui, effects) = match execution {
+            Ok(execution) => execution,
+            Err(error) => {
+                return Err(rollback_node_prepared_effects(
+                    effect_service.as_ref(),
+                    error,
+                ));
             }
-            let prepared = self
-                .effects
-                .prepared_effect(&effect, plan.prompt_id, state.attempt_id, node_id)
-                .map_err(ExecutionError::Effect)?;
+        };
+        let validated_effects = (|| {
+            if outputs.len() != node.descriptor.outputs.len() {
+                return Err(ExecutionError::OutputArity {
+                    node: node_id.clone(),
+                    expected: node.descriptor.outputs.len(),
+                    actual: outputs.len(),
+                });
+            }
+            if !effects.is_empty()
+                && matches!(
+                    node.descriptor.effect,
+                    EffectClass::Pure | EffectClass::ReadsArtifact
+                )
+            {
+                return Err(ExecutionError::UnexpectedEffect {
+                    node: node_id.clone(),
+                    effect: node.descriptor.effect,
+                });
+            }
+            if effects.len() > MAX_EFFECTS_PER_NODE {
+                return Err(ExecutionError::TooManyEffects {
+                    node: node_id.clone(),
+                });
+            }
+            let mut effect_transactions = BTreeSet::new();
+            let mut prepared_effects = Vec::new();
+            for effect in effects {
+                effect
+                    .validate()
+                    .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+                if !effect_transactions.insert(effect.transaction_id()) {
+                    return Err(ExecutionError::Effect(format!(
+                        "duplicate prepared effect ticket {}",
+                        effect.transaction_id()
+                    )));
+                }
+                prepared_effects.push(
+                    self.effects
+                        .prepared_effect(&effect, plan.prompt_id, state.attempt_id, node_id)
+                        .map_err(ExecutionError::Effect)?,
+                );
+            }
+            Ok(prepared_effects)
+        })();
+        let validated_effects = match validated_effects {
+            Ok(effects) => effects,
+            Err(error) => {
+                return Err(rollback_node_prepared_effects(
+                    effect_service.as_ref(),
+                    error,
+                ));
+            }
+        };
+        for prepared in validated_effects {
             state.prepared_effects.push(prepared.clone());
             state.emit(
                 self.event_bus.as_ref(),

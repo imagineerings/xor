@@ -1276,6 +1276,8 @@ pub trait NativePreparedEffectService: Send + Sync + fmt::Debug {
         &self,
         request: &NativePreparedEffectRequest,
     ) -> Result<(), NativeEffectServiceError>;
+
+    fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError>;
 }
 
 #[derive(Clone, Debug)]

@@ -3421,6 +3421,15 @@ impl NativePreparedEffectService for NativeImagePreparedEffectService {
         state.prepared.remove(&request.transaction_id());
         Ok(())
     }
+
+    fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError> {
+        self.state.lock().prepared.retain(|_, prepared| {
+            prepared.effect.service_id != self.identity.service_id()
+                || prepared.effect.attempt_id != self.identity.attempt_id()
+                || prepared.effect.node_id != *self.identity.node_id()
+        });
+        Ok(())
+    }
 }
 
 impl EffectCoordinator for NativeImageProposalCoordinator {

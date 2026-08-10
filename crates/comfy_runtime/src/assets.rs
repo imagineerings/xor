@@ -15,6 +15,10 @@ use comfy_model::{
     VaeStructuredDecodeRequest, VaeStructuredResult, VideoVaeError,
     validate_native_vae_backend_target,
 };
+use comfy_nodes::{
+    NativeAssetReadRequest, NativeAssetReference, NativeAssetResolver, NativeAssetServiceError,
+    NativeNodeServiceIdentity, NativeResolvedAsset,
+};
 use comfy_tensor::{CancellationToken, CpuBackend, ExecutionContext, Tensor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -26,6 +30,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
+use uuid::Uuid;
 
 pub const DEFAULT_MAX_ASSET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 pub const DEFAULT_MAX_RANGE_BYTES: u64 = 64 * 1024 * 1024;
@@ -674,6 +679,195 @@ pub struct AssetService {
 }
 
 pub type SharedAssetService = Arc<Mutex<AssetService>>;
+
+#[derive(Clone, Debug)]
+struct NativeAssetResolutionRecord {
+    service_id: Uuid,
+    identity: AssetIdentity,
+    source_type_id: String,
+    byte_length: u64,
+    sha256: String,
+}
+
+pub struct NativeAssetResolverRegistry {
+    assets: SharedAssetService,
+    authorization: AuthorizedCapabilities,
+    references: Mutex<BTreeMap<Uuid, NativeAssetResolutionRecord>>,
+}
+
+impl std::fmt::Debug for NativeAssetResolverRegistry {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NativeAssetResolverRegistry")
+            .field(
+                "reference_count",
+                &self.references.lock().map(|rows| rows.len()).ok(),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl NativeAssetResolverRegistry {
+    pub fn new(assets: SharedAssetService, authorization: AuthorizedCapabilities) -> Arc<Self> {
+        Arc::new(Self {
+            assets,
+            authorization,
+            references: Mutex::new(BTreeMap::new()),
+        })
+    }
+
+    pub fn seal_for_node(
+        &self,
+        service_identity: &NativeNodeServiceIdentity,
+        identity: AssetIdentity,
+        source_type_id: impl Into<String>,
+    ) -> Result<NativeAssetReference, NativeAssetServiceError> {
+        let source_type_id = source_type_id.into();
+        let record = self
+            .assets
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .record(&identity)
+            .ok_or(NativeAssetServiceError::Missing)?;
+        if record.availability == AssetAvailability::Missing || record.byte_size == 0 {
+            return Err(NativeAssetServiceError::Missing);
+        }
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.native-asset-reference.v1");
+        hasher.update(service_identity.service_id().as_bytes());
+        hasher.update(identity.profile_id.as_bytes());
+        hasher.update(identity.namespace.locator_type().as_bytes());
+        if let Some(root_id) = &identity.root_id {
+            hasher.update(root_id.as_bytes());
+        }
+        hasher.update(identity.relative_path.as_os_str().as_encoded_bytes());
+        hasher.update(source_type_id.as_bytes());
+        hasher.update(record.byte_size.to_le_bytes());
+        hasher.update(record.sha256.as_bytes());
+        let digest = hasher.finalize();
+        let mut reference_bytes = [0_u8; 16];
+        reference_bytes.copy_from_slice(&digest[..16]);
+        let reference_id = Uuid::from_bytes(reference_bytes);
+        let reference = NativeAssetReference::checked(
+            service_identity.service_id(),
+            reference_id,
+            source_type_id.clone(),
+            record.byte_size,
+            record.sha256.clone(),
+        )?;
+        let resolution = NativeAssetResolutionRecord {
+            service_id: service_identity.service_id(),
+            identity,
+            source_type_id,
+            byte_length: record.byte_size,
+            sha256: record.sha256,
+        };
+        let mut references = self
+            .references
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?;
+        if let Some(existing) = references.get(&reference_id)
+            && existing != &resolution
+        {
+            return Err(NativeAssetServiceError::InvalidReference);
+        }
+        references.insert(reference_id, resolution);
+        Ok(reference)
+    }
+
+    pub fn node_service(
+        self: &Arc<Self>,
+        identity: NativeNodeServiceIdentity,
+    ) -> Arc<dyn NativeAssetResolver> {
+        Arc::new(RuntimeNativeAssetResolver {
+            identity,
+            registry: self.clone(),
+        })
+    }
+}
+
+impl PartialEq for NativeAssetResolutionRecord {
+    fn eq(&self, other: &Self) -> bool {
+        self.service_id == other.service_id
+            && self.identity == other.identity
+            && self.source_type_id == other.source_type_id
+            && self.byte_length == other.byte_length
+            && self.sha256 == other.sha256
+    }
+}
+
+#[derive(Debug)]
+struct RuntimeNativeAssetResolver {
+    identity: NativeNodeServiceIdentity,
+    registry: Arc<NativeAssetResolverRegistry>,
+}
+
+impl NativeAssetResolver for RuntimeNativeAssetResolver {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn read_verified(
+        &self,
+        request: &NativeAssetReadRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeResolvedAsset, NativeAssetServiceError> {
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+        let reference = request.reference();
+        if reference.service_id() != self.identity.service_id() {
+            return Err(NativeAssetServiceError::InvalidReference);
+        }
+        let record = self
+            .registry
+            .references
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .get(&reference.reference_id())
+            .cloned()
+            .ok_or(NativeAssetServiceError::InvalidReference)?;
+        if record.service_id != self.identity.service_id()
+            || record.source_type_id != reference.source_type_id()
+            || record.byte_length != reference.byte_length()
+            || record.sha256 != reference.sha256()
+            || record.byte_length > request.maximum_bytes()
+        {
+            return Err(NativeAssetServiceError::InvalidReference);
+        }
+        let bytes = self
+            .registry
+            .assets
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .read_verified(
+                &record.identity,
+                &self.registry.authorization,
+                cancellation,
+                request.maximum_bytes(),
+            )
+            .map_err(map_native_asset_error)?;
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+        NativeResolvedAsset::checked(reference.clone(), Arc::from(bytes), record.sha256)
+    }
+}
+
+fn map_native_asset_error(error: AssetError) -> NativeAssetServiceError {
+    match error {
+        AssetError::Cancelled => NativeAssetServiceError::Cancelled,
+        AssetError::PermissionDenied { .. } | AssetError::ProfileMismatch { .. } => {
+            NativeAssetServiceError::PermissionDenied
+        }
+        AssetError::Missing(_) | AssetError::UnknownAsset(_) => NativeAssetServiceError::Missing,
+        AssetError::TooLarge { .. } | AssetError::AllocationFailed => {
+            NativeAssetServiceError::TooLarge
+        }
+        AssetError::ChangedDuringRead(_) => NativeAssetServiceError::ChangedDuringRead,
+        _ => NativeAssetServiceError::Rejected,
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AssetStateRecovery {
@@ -2641,6 +2835,7 @@ mod tests {
     use super::*;
     use crate::{CapabilitySet, PermissionGrant, PermissionPolicy};
     use comfy_tensor::DType;
+    use comfy_types::{AttemptId, NodeId};
     use serde_json::{Value, json};
     use std::fs;
 
@@ -2714,6 +2909,56 @@ mod tests {
             overwrite: false,
             tags: BTreeSet::from(["input".to_owned()]),
         }
+    }
+
+    #[test]
+    fn native_asset_resolver_seals_paths_and_rejects_foreign_or_cancelled_reads()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, mut service, authorization) = service()?;
+        let cancellation = CancellationToken::default();
+        let uploaded = service.upload(
+            upload("sealed.bin", b"canonical-asset"),
+            &authorization,
+            &cancellation,
+        )?;
+        let registry =
+            NativeAssetResolverRegistry::new(Arc::new(Mutex::new(service)), authorization);
+        let attempt_id = AttemptId(Uuid::from_u128(0xa551));
+        let node_identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0xa552),
+            attempt_id,
+            NodeId::from("asset-node"),
+        )?;
+        let reference =
+            registry.seal_for_node(&node_identity, uploaded.record.identity, "FILE_3D_PLY")?;
+        assert!(!format!("{reference:?}").contains("sealed.bin"));
+        let request = NativeAssetReadRequest::checked(reference.clone(), 1024)?;
+        let resolved = registry
+            .node_service(node_identity.clone())
+            .read_verified(&request, &cancellation)?;
+        assert_eq!(resolved.bytes().as_ref(), b"canonical-asset");
+        assert_eq!(resolved.reference(), &reference);
+
+        let foreign_identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0xa553),
+            attempt_id,
+            NodeId::from("foreign-node"),
+        )?;
+        assert!(matches!(
+            registry
+                .node_service(foreign_identity)
+                .read_verified(&request, &cancellation),
+            Err(NativeAssetServiceError::InvalidReference)
+        ));
+        let cancelled = CancellationToken::default();
+        assert!(cancelled.cancel());
+        assert!(matches!(
+            registry
+                .node_service(node_identity)
+                .read_verified(&request, &cancelled),
+            Err(NativeAssetServiceError::Cancelled)
+        ));
+        Ok(())
     }
 
     fn taesd_flux2_safetensors(dtype: DType) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
