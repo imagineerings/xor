@@ -66,6 +66,17 @@ struct CommittedPluginRegistry {
     compiled: Arc<plugin_runtime::WorkerPluginRegistry>,
 }
 
+fn provider_registry_pin_is_available(
+    plugin_registry: Option<&CommittedPluginRegistry>,
+    provider_registry: &comfy_runtime::NativeProviderRegistryPin,
+) -> bool {
+    plugin_registry.is_some_and(|registry| {
+        registry
+            .compiled
+            .matches_provider_registry_pin(provider_registry)
+    })
+}
+
 fn apply_compiled_registry_commit(
     current: &mut Option<CommittedPluginRegistry>,
     responses: &[WorkerEnvelope],
@@ -701,6 +712,21 @@ async fn run_worker_process_with_configuration(
                                     })?;
                                 worker_plan.validate()?;
                                 validate_worker_plan_has_no_serialized_handles(&worker_plan)?;
+                                if let Some(provider_registry) = &worker_plan.provider_registry
+                                    && !provider_registry_pin_is_available(
+                                        plugin_registry.as_ref(),
+                                        provider_registry,
+                                    )
+                                {
+                                    let event = NativeImageWorkerEvent::Failed {
+                                        message: "native provider registry pin is unavailable or stale; execution was not dispatched".to_owned(),
+                                        cancelled: false,
+                                    };
+                                    let encoded = postcard::to_stdvec(&event)?;
+                                    let response = session.complete_execution(encoded)?;
+                                    write_frame(&mut stdout, &response)?;
+                                    continue 'worker;
+                                }
                                 if let Some(unavailable) =
                                     backend_neutral_executor_unavailable(session.backend_device())
                                 {
@@ -1629,5 +1655,30 @@ mod tests {
             result,
             Err(plugin_runtime::WorkerPluginRuntimeError::MissingComponent)
         ));
+    }
+
+    #[test]
+    fn provider_registry_pin_requires_a_matching_committed_registry() {
+        let profile_id = ProfileId(Default::default());
+        let generation = WorkerRegistryGeneration::new(3).expect("nonzero generation");
+        let digest = WorkerSha256Digest::new("a".repeat(64)).expect("valid digest");
+        let source = Arc::new(AssembledWorkerRegistry::empty_for_test(
+            generation,
+            digest.clone(),
+        ));
+        let compiled = Arc::new(
+            plugin_runtime::WorkerPluginRegistry::empty_for_test(profile_id, generation, digest)
+                .expect("empty compiled registry"),
+        );
+        let registry = CommittedPluginRegistry { source, compiled };
+        let pin = comfy_runtime::NativeProviderRegistryPin::checked(
+            generation.get(),
+            "a".repeat(64),
+            vec!["b".repeat(64)],
+        )
+        .expect("valid provider registry pin");
+
+        assert!(!provider_registry_pin_is_available(None, &pin));
+        assert!(!provider_registry_pin_is_available(Some(&registry), &pin));
     }
 }

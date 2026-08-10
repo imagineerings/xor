@@ -13,8 +13,8 @@ use comfy_plugin_host::{
 };
 use comfy_plugin_sdk::{CapabilityKind, InvocationError, ModelValue, PluginManifest};
 use comfy_runtime::{
-    AssetIdentity, PluginAuthorization, PluginAuthorizationVerifier, PluginServiceWireFailure,
-    PluginServiceWireRequest, PluginServiceWireResponse, SecretId,
+    AssetIdentity, NativeProviderRegistryPin, PluginAuthorization, PluginAuthorizationVerifier,
+    PluginServiceWireFailure, PluginServiceWireRequest, PluginServiceWireResponse, SecretId,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::{
@@ -428,6 +428,25 @@ impl WorkerPluginRegistry {
         &self.component_limits == component_limits
     }
 
+    pub fn matches_provider_registry_pin(&self, pin: &NativeProviderRegistryPin) -> bool {
+        let mut binding_digests = self
+            .components
+            .values()
+            .filter_map(|component| {
+                component
+                    .manifest
+                    .provider_binding
+                    .as_ref()
+                    .map(|binding| binding.bindings_sha256.clone())
+            })
+            .collect::<Vec<_>>();
+        binding_digests.sort();
+        binding_digests.dedup();
+        self.generation.get() == pin.generation()
+            && self.registry_digest_sha256.as_str() == pin.registry_digest_sha256()
+            && binding_digests == pin.binding_digests_sha256()
+    }
+
     #[cfg(test)]
     pub(crate) fn empty_for_test(
         profile_id: ProfileId,
@@ -612,6 +631,23 @@ fn context_required(service: &str) -> InvocationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_registry_pin_requires_the_exact_committed_generation() {
+        let registry = WorkerPluginRegistry::empty_for_test(
+            ProfileId(uuid::Uuid::nil()),
+            comfy_types::WorkerRegistryGeneration::new(2).expect("generation is non-zero"),
+            comfy_types::WorkerSha256Digest::new("a".repeat(64)).expect("registry digest is valid"),
+        )
+        .expect("empty worker registry is valid");
+        let pin = NativeProviderRegistryPin::checked(2, "a".repeat(64), vec!["b".repeat(64)])
+            .expect("provider registry pin is valid");
+
+        assert!(
+            !registry.matches_provider_registry_pin(&pin),
+            "an empty committed registry cannot satisfy a provider binding pin"
+        );
+    }
 
     #[test]
     fn stale_worker_generation_fails_before_component_or_capability_access() {

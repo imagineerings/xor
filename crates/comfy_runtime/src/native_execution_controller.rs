@@ -853,6 +853,62 @@ pub trait NativeDiffusionProvider: Send + Sync {
     ) -> Result<NativeDiffusionBundle, NativeImageRuntimeError>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeProviderRegistryPin {
+    generation: u64,
+    registry_digest_sha256: String,
+    binding_digests_sha256: Vec<String>,
+}
+
+impl NativeProviderRegistryPin {
+    pub fn checked(
+        generation: u64,
+        registry_digest_sha256: impl Into<String>,
+        binding_digests_sha256: Vec<String>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        let pin = Self {
+            generation,
+            registry_digest_sha256: registry_digest_sha256.into(),
+            binding_digests_sha256,
+        };
+        pin.validate()?;
+        Ok(pin)
+    }
+
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn registry_digest_sha256(&self) -> &str {
+        &self.registry_digest_sha256
+    }
+
+    pub fn binding_digests_sha256(&self) -> &[String] {
+        &self.binding_digests_sha256
+    }
+
+    pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
+        if self.generation == 0
+            || !valid_provider_registry_digest(&self.registry_digest_sha256)
+            || self.binding_digests_sha256.is_empty()
+            || self
+                .binding_digests_sha256
+                .iter()
+                .any(|digest| !valid_provider_registry_digest(digest))
+            || self
+                .binding_digests_sha256
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(NativeImageRuntimeError::Encoding(
+                "native provider registry pin is invalid".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NativeImageWorkerPlan {
     pub plan: CompiledPlan,
@@ -863,6 +919,8 @@ pub struct NativeImageWorkerPlan {
     pub metadata_enabled: bool,
     #[serde(default)]
     pub injected_delay_millis: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_registry: Option<NativeProviderRegistryPin>,
 }
 
 impl NativeImageWorkerPlan {
@@ -906,12 +964,16 @@ impl NativeImageWorkerPlan {
             memory_policy,
             metadata_enabled,
             injected_delay_millis,
+            provider_registry: None,
         };
         value.validate()?;
         Ok(value)
     }
 
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
+        if let Some(provider_registry) = &self.provider_registry {
+            provider_registry.validate()?;
+        }
         validate_worker_input_assets(&self.input_assets)?;
         let expected = required_worker_input_ids(&self.plan)?;
         let actual = self.input_assets.keys().cloned().collect();
@@ -922,6 +984,23 @@ impl NativeImageWorkerPlan {
         }
         Ok(())
     }
+
+    pub fn with_provider_registry(
+        mut self,
+        provider_registry: NativeProviderRegistryPin,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        provider_registry.validate()?;
+        self.provider_registry = Some(provider_registry);
+        self.validate()?;
+        Ok(self)
+    }
+}
+
+fn valid_provider_registry_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 const fn metadata_enabled_by_default() -> bool {
@@ -5636,6 +5715,49 @@ mod tests {
                 value,
             },
         }
+    }
+
+    #[test]
+    fn provider_registry_pin_is_canonical_and_tamper_evident() {
+        let pin = NativeProviderRegistryPin::checked(
+            7,
+            "a".repeat(64),
+            vec!["b".repeat(64), "c".repeat(64)],
+        )
+        .expect("sorted provider registry pin is valid");
+        let encoded = serde_json::to_vec(&pin).expect("provider registry pin serializes");
+        let decoded: NativeProviderRegistryPin =
+            serde_json::from_slice(&encoded).expect("provider registry pin deserializes");
+        assert_eq!(decoded, pin);
+
+        for invalid in [
+            NativeProviderRegistryPin::checked(0, "a".repeat(64), vec!["b".repeat(64)]),
+            NativeProviderRegistryPin::checked(1, "A".repeat(64), vec!["b".repeat(64)]),
+            NativeProviderRegistryPin::checked(1, "a".repeat(64), Vec::new()),
+            NativeProviderRegistryPin::checked(
+                1,
+                "a".repeat(64),
+                vec!["c".repeat(64), "b".repeat(64)],
+            ),
+            NativeProviderRegistryPin::checked(
+                1,
+                "a".repeat(64),
+                vec!["b".repeat(64), "b".repeat(64)],
+            ),
+        ] {
+            assert!(matches!(invalid, Err(NativeImageRuntimeError::Encoding(_))));
+        }
+
+        let unknown_field = serde_json::json!({
+            "generation": 7,
+            "registry_digest_sha256": "a".repeat(64),
+            "binding_digests_sha256": ["b".repeat(64)],
+            "store_generation": 99,
+        });
+        assert!(
+            serde_json::from_value::<NativeProviderRegistryPin>(unknown_field).is_err(),
+            "provider registry pins reject unknown fields"
+        );
     }
 
     struct FailOnceExecutionPersistence {
