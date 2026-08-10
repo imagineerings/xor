@@ -23,12 +23,15 @@ use thiserror::Error;
 
 use crate::{
     AssetError, AssetNamespace, AssetOperation, AuthorizedProviderRequest, Capability,
-    PluginAuthorization, ProviderPolicy, SecretId, SecretValue, SharedAssetService,
+    PluginAuthorization, ProviderCostAcceptance, ProviderCostAcceptanceScope,
+    ProviderCostAcceptanceVerifier, ProviderCostNonce, ProviderPolicy, ProviderPriceBound,
+    SecretId, SecretValue, SharedAssetService,
 };
 
 pub const MAX_PLUGIN_SERVICE_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
 pub const MAX_PLUGIN_SERVICE_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PLUGIN_SERVICE_IDENTITY_BYTES: usize = 1_024;
+const MAX_CONSUMED_PROVIDER_COST_NONCES: usize = 65_536;
 const RNG_DEADLINE_CHECK_CHUNK_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -162,6 +165,7 @@ pub struct PluginServiceInvocationContext {
     prompt_id: PromptId,
     attempt_id: AttemptId,
     node_id: NodeId,
+    principal_id: Option<String>,
     authorization: PluginAuthorization,
     cancellation: CancellationToken,
     deadline: Instant,
@@ -175,6 +179,64 @@ impl PluginServiceInvocationContext {
         prompt_id: PromptId,
         attempt_id: AttemptId,
         node_id: NodeId,
+        authorization: PluginAuthorization,
+        cancellation: CancellationToken,
+        deadline: Instant,
+        maximum_response_bytes: u64,
+    ) -> Result<Self, PluginServiceError> {
+        Self::checked(
+            profile_id,
+            prompt_id,
+            attempt_id,
+            node_id,
+            None,
+            authorization,
+            cancellation,
+            deadline,
+            maximum_response_bytes,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_principal(
+        profile_id: ProfileId,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: NodeId,
+        principal_id: impl Into<String>,
+        authorization: PluginAuthorization,
+        cancellation: CancellationToken,
+        deadline: Instant,
+        maximum_response_bytes: u64,
+    ) -> Result<Self, PluginServiceError> {
+        let principal_id = principal_id.into();
+        if principal_id.is_empty()
+            || principal_id.len() > MAX_PLUGIN_SERVICE_IDENTITY_BYTES
+            || principal_id != principal_id.trim()
+            || principal_id.chars().any(char::is_control)
+        {
+            return Err(PluginServiceError::InvalidIdentity { kind: "principal" });
+        }
+        Self::checked(
+            profile_id,
+            prompt_id,
+            attempt_id,
+            node_id,
+            Some(principal_id),
+            authorization,
+            cancellation,
+            deadline,
+            maximum_response_bytes,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn checked(
+        profile_id: ProfileId,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        node_id: NodeId,
+        principal_id: Option<String>,
         authorization: PluginAuthorization,
         cancellation: CancellationToken,
         deadline: Instant,
@@ -199,6 +261,7 @@ impl PluginServiceInvocationContext {
             prompt_id,
             attempt_id,
             node_id,
+            principal_id,
             authorization,
             cancellation,
             deadline,
@@ -220,6 +283,10 @@ impl PluginServiceInvocationContext {
 
     pub fn node_id(&self) -> &NodeId {
         &self.node_id
+    }
+
+    pub fn principal_id(&self) -> Option<&str> {
+        self.principal_id.as_deref()
     }
 
     pub fn plugin_id(&self) -> &str {
@@ -411,6 +478,8 @@ struct PluginCapabilityBrokerInner {
     assets: SharedAssetService,
     model_store: Mutex<ModelStore>,
     provider_policy: ProviderPolicy,
+    provider_cost_acceptance_verifier: Option<ProviderCostAcceptanceVerifier>,
+    consumed_provider_cost_nonces: Mutex<BTreeSet<ProviderCostNonce>>,
     provider_actuator: Arc<dyn ProviderRequestActuator>,
     credential_presence_actuator: Arc<dyn CredentialPresenceActuator>,
     clock: Arc<dyn SystemClock>,
@@ -446,12 +515,60 @@ impl PluginCapabilityBroker {
         clock: Arc<dyn SystemClock>,
         rng_policy: PluginRngPolicy,
     ) -> Self {
+        Self::new_internal(
+            assets,
+            model_store,
+            provider_policy,
+            None,
+            provider_actuator,
+            credential_presence_actuator,
+            clock,
+            rng_policy,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_provider_cost_acceptance(
+        assets: SharedAssetService,
+        model_store: ModelStore,
+        provider_policy: ProviderPolicy,
+        provider_cost_acceptance_verifier: ProviderCostAcceptanceVerifier,
+        provider_actuator: Arc<dyn ProviderRequestActuator>,
+        credential_presence_actuator: Arc<dyn CredentialPresenceActuator>,
+        clock: Arc<dyn SystemClock>,
+        rng_policy: PluginRngPolicy,
+    ) -> Self {
+        Self::new_internal(
+            assets,
+            model_store,
+            provider_policy,
+            Some(provider_cost_acceptance_verifier),
+            provider_actuator,
+            credential_presence_actuator,
+            clock,
+            rng_policy,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_internal(
+        assets: SharedAssetService,
+        model_store: ModelStore,
+        provider_policy: ProviderPolicy,
+        provider_cost_acceptance_verifier: Option<ProviderCostAcceptanceVerifier>,
+        provider_actuator: Arc<dyn ProviderRequestActuator>,
+        credential_presence_actuator: Arc<dyn CredentialPresenceActuator>,
+        clock: Arc<dyn SystemClock>,
+        rng_policy: PluginRngPolicy,
+    ) -> Self {
         let clock_origin = clock.utc_now();
         Self {
             inner: Arc::new(PluginCapabilityBrokerInner {
                 assets,
                 model_store: Mutex::new(model_store),
                 provider_policy,
+                provider_cost_acceptance_verifier,
+                consumed_provider_cost_nonces: Mutex::new(BTreeSet::new()),
                 provider_actuator,
                 credential_presence_actuator,
                 clock,
@@ -643,6 +760,131 @@ impl PluginCapabilityInvocation {
                 }
             })
             .transpose()?;
+        let response = match self.broker.inner.provider_actuator.execute(
+            &authorized_request,
+            secret.as_ref(),
+            body,
+            &operation_context,
+        ) {
+            Ok(response) => response,
+            Err(error) => {
+                operation_context.check_active()?;
+                return Err(PluginServiceError::ActuatorFailed {
+                    service: "provider",
+                    message: error.message,
+                });
+            }
+        };
+        check_response_size(response.len(), self.context.maximum_response_bytes)?;
+        operation_context.check_active()?;
+        Ok(outcome.succeed(response))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_priced_provider_request(
+        &self,
+        provider_binding_sha256: &str,
+        provider: &str,
+        endpoint: &str,
+        secret_id: Option<&SecretId>,
+        price_bound: &ProviderPriceBound,
+        nonce: ProviderCostNonce,
+        acceptance: Option<&ProviderCostAcceptance>,
+        body: &[u8],
+    ) -> Result<Vec<u8>, PluginServiceError> {
+        self.check_terminal()?;
+        let outcome = OperationOutcomeGuard::new(self.operation_failed.clone());
+        check_request_size(body.len())?;
+        self.require_capability(&Capability::ProviderNetwork {
+            provider: provider.to_owned(),
+            endpoint: endpoint.to_owned(),
+        })?;
+        if let Some(secret_id) = secret_id {
+            self.require_capability(&Capability::Secret {
+                secret_id: secret_id.as_str().to_owned(),
+            })?;
+        }
+        let operation_context = self.operation_context();
+        operation_context.check_active()?;
+        let acceptance = acceptance.ok_or(PluginServiceError::ProviderCostAcceptanceRequired)?;
+        let verifier = self
+            .broker
+            .inner
+            .provider_cost_acceptance_verifier
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderCostAcceptanceRequired)?;
+        let principal_id = self
+            .context
+            .principal_id()
+            .ok_or(PluginServiceError::ProviderCostPrincipalRequired)?;
+        let expected_scope = ProviderCostAcceptanceScope::new(
+            principal_id,
+            self.context.profile_id().0.to_string(),
+            self.context.prompt_id().0.to_string(),
+            self.context.plugin_id(),
+            self.context.plugin_digest_sha256(),
+            provider_binding_sha256,
+            provider,
+            endpoint,
+            price_bound.clone(),
+        )
+        .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        verifier
+            .verify(
+                acceptance,
+                &expected_scope,
+                self.broker.inner.clock.utc_now(),
+            )
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        if acceptance.nonce() != nonce {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let authorized_request = self
+            .broker
+            .inner
+            .provider_policy
+            .authorize(
+                &self.context.profile_id.0.to_string(),
+                self.context.plugin_id(),
+                provider,
+                endpoint,
+                secret_id,
+            )
+            .map_err(|_| PluginServiceError::ProviderPolicyDenied)?;
+        let secret = secret_id
+            .map(|secret_id| {
+                let request = AuthorizedCredentialPresenceRequest {
+                    profile_id: self.context.profile_id,
+                    plugin_id: self.context.plugin_id().to_owned(),
+                    secret_id: secret_id.clone(),
+                };
+                match self
+                    .broker
+                    .inner
+                    .credential_presence_actuator
+                    .read_for_provider(&request, &operation_context)
+                {
+                    Ok(secret) => secret.ok_or(PluginServiceError::CredentialUnavailable),
+                    Err(error) => {
+                        operation_context.check_active()?;
+                        Err(PluginServiceError::ActuatorFailed {
+                            service: "credential_read",
+                            message: error.message,
+                        })
+                    }
+                }
+            })
+            .transpose()?;
+        operation_context.check_active()?;
+        let mut consumed_nonces = self.broker.inner.consumed_provider_cost_nonces.lock();
+        if consumed_nonces.contains(&nonce) {
+            return Err(PluginServiceError::ProviderCostAcceptanceReused);
+        }
+        if consumed_nonces.len() >= MAX_CONSUMED_PROVIDER_COST_NONCES {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        consumed_nonces.insert(nonce);
+        drop(consumed_nonces);
         let response = match self.broker.inner.provider_actuator.execute(
             &authorized_request,
             secret.as_ref(),
@@ -1030,6 +1272,14 @@ pub enum PluginServiceError {
     AssetOperationFailed { operation: &'static str },
     #[error("provider policy denied the request")]
     ProviderPolicyDenied,
+    #[error("priced provider request requires a host-issued cost acceptance")]
+    ProviderCostAcceptanceRequired,
+    #[error("priced provider request requires a host-bound principal")]
+    ProviderCostPrincipalRequired,
+    #[error("provider cost acceptance is invalid, expired, or bound to another request")]
+    ProviderCostAcceptanceDenied,
+    #[error("provider cost acceptance nonce was already consumed")]
+    ProviderCostAcceptanceReused,
     #[error("the authorized provider credential is unavailable")]
     CredentialUnavailable,
     #[error("{service} actuator failed: {message}")]
@@ -1057,7 +1307,11 @@ impl From<PluginServiceError> for PluginServiceWireFailure {
             PluginServiceError::DeadlineExceeded => Self::DeadlineExceeded,
             PluginServiceError::ResponseTooLarge { .. }
             | PluginServiceError::ResponseAllocationFailed => Self::ResponseTooLarge,
-            PluginServiceError::ProviderPolicyDenied => Self::ProviderDenied,
+            PluginServiceError::ProviderPolicyDenied
+            | PluginServiceError::ProviderCostAcceptanceRequired
+            | PluginServiceError::ProviderCostPrincipalRequired
+            | PluginServiceError::ProviderCostAcceptanceDenied
+            | PluginServiceError::ProviderCostAcceptanceReused => Self::ProviderDenied,
             PluginServiceError::ActuatorFailed { .. } => Self::ActuatorFailed,
             PluginServiceError::RandomnessStreamBusy | PluginServiceError::RandomnessFailed => {
                 Self::RandomnessFailed
@@ -1194,7 +1448,8 @@ mod tests {
 
     use crate::{
         AssetRoots, AssetService, CapabilitySet, PermissionGrant, PermissionPolicy,
-        PluginTrustPolicy, PluginVerificationKey, ProviderEndpoint, ProviderMode,
+        PluginTrustPolicy, PluginVerificationKey, ProviderCostAcceptanceIssuer, ProviderEndpoint,
+        ProviderMode, TrustError,
     };
 
     use super::*;
@@ -1468,6 +1723,14 @@ mod tests {
         authorization: &PluginAuthorization,
         clock: Arc<TestClock>,
     ) -> Result<BrokerFixture, Box<dyn Error>> {
+        broker_with_cost_acceptance(authorization, clock, None)
+    }
+
+    fn broker_with_cost_acceptance(
+        authorization: &PluginAuthorization,
+        clock: Arc<TestClock>,
+        verifier: Option<ProviderCostAcceptanceVerifier>,
+    ) -> Result<BrokerFixture, Box<dyn Error>> {
         assert_eq!(
             authorization.capabilities().profile_id(),
             PROFILE_UUID.to_string()
@@ -1487,15 +1750,30 @@ mod tests {
             )?],
         )?;
         let model_store = ModelStore::new(ParserLimits::default())?;
-        let broker = PluginCapabilityBroker::new(
-            assets,
-            model_store,
-            provider_policy,
-            provider.clone(),
-            credential.clone(),
-            clock,
-            PluginRngPolicy::new(RngProfileVersion::V2, RngAlgorithm::Philox4x32_10, 7),
-        );
+        let rng_policy =
+            PluginRngPolicy::new(RngProfileVersion::V2, RngAlgorithm::Philox4x32_10, 7);
+        let broker = if let Some(verifier) = verifier {
+            PluginCapabilityBroker::new_with_provider_cost_acceptance(
+                assets,
+                model_store,
+                provider_policy,
+                verifier,
+                provider.clone(),
+                credential.clone(),
+                clock,
+                rng_policy,
+            )
+        } else {
+            PluginCapabilityBroker::new(
+                assets,
+                model_store,
+                provider_policy,
+                provider.clone(),
+                credential.clone(),
+                clock,
+                rng_policy,
+            )
+        };
         Ok((directory, broker, provider, credential))
     }
 
@@ -1514,6 +1792,42 @@ mod tests {
             cancellation,
             clock.now() + Duration::from_secs(30),
             maximum_response_bytes,
+        )
+    }
+
+    fn priced_context(
+        authorization: PluginAuthorization,
+        clock: &TestClock,
+    ) -> Result<PluginServiceInvocationContext, PluginServiceError> {
+        PluginServiceInvocationContext::new_with_principal(
+            ProfileId(PROFILE_UUID),
+            PromptId(PROMPT_UUID),
+            AttemptId(ATTEMPT_UUID),
+            NodeId("node.fixture".to_owned()),
+            "principal-a",
+            authorization,
+            CancellationToken::default(),
+            clock.now() + Duration::from_secs(30),
+            1_024,
+        )
+    }
+
+    fn provider_cost_scope(
+        provider_binding_sha256: &str,
+        provider: &str,
+        endpoint: &str,
+        price_bound: ProviderPriceBound,
+    ) -> Result<ProviderCostAcceptanceScope, TrustError> {
+        ProviderCostAcceptanceScope::new(
+            "principal-a",
+            PROFILE_UUID.to_string(),
+            PROMPT_UUID.to_string(),
+            "plugin.fixture",
+            DIGEST,
+            provider_binding_sha256,
+            provider,
+            endpoint,
+            price_bound,
         )
     }
 
@@ -1545,6 +1859,191 @@ mod tests {
         ));
         assert_eq!(provider.calls.load(Ordering::Acquire), 0);
         assert_eq!(credential.calls.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn provider_cost_acceptance_denials_make_zero_priced_actuator_calls()
+    -> Result<(), Box<dyn Error>> {
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("{PROVIDER}|{ENDPOINT}"),
+        )])?;
+        let clock = Arc::new(TestClock::new(Instant::now()));
+        let issuer = ProviderCostAcceptanceIssuer::from_seed([11; 32], clock.now())?;
+        let (_directory, broker, provider, credential) =
+            broker_with_cost_acceptance(&authorization, clock.clone(), Some(issuer.verifier()?))?;
+        let binding = "a".repeat(64);
+        let other_binding = "b".repeat(64);
+        let price = ProviderPriceBound::new("USD", 25_000)?;
+        let nonce = ProviderCostNonce::new([21; 32])?;
+        let acceptance = issuer.issue(
+            provider_cost_scope(&binding, PROVIDER, ENDPOINT, price.clone())?,
+            clock.now(),
+            clock.now() + Duration::from_secs(10),
+            nonce,
+        )?;
+
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding, PROVIDER, ENDPOINT, None, &price, nonce, None, b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceRequired)
+        );
+
+        let foreign_issuer = ProviderCostAcceptanceIssuer::from_seed([12; 32], clock.now())?;
+        let forged = foreign_issuer.issue(
+            provider_cost_scope(&binding, PROVIDER, ENDPOINT, price.clone())?,
+            clock.now(),
+            clock.now() + Duration::from_secs(10),
+            ProviderCostNonce::new([22; 32])?,
+        )?;
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                forged.nonce(),
+                Some(&forged),
+                b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceDenied)
+        );
+
+        let expired_nonce = ProviderCostNonce::new([23; 32])?;
+        let expired = issuer.issue(
+            provider_cost_scope(&binding, PROVIDER, ENDPOINT, price.clone())?,
+            clock.now(),
+            clock.now() + Duration::from_millis(1),
+            expired_nonce,
+        )?;
+        clock.advance(Duration::from_millis(1));
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                expired_nonce,
+                Some(&expired),
+                b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceDenied)
+        );
+
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &other_binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                nonce,
+                Some(&acceptance),
+                b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceDenied)
+        );
+        let invocation = broker.begin_invocation(priced_context(authorization, &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                ProviderCostNonce::new([24; 32])?,
+                Some(&acceptance),
+                b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceDenied)
+        );
+
+        assert_eq!(provider.calls.load(Ordering::Acquire), 0);
+        assert_eq!(credential.calls.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn provider_cost_acceptance_is_single_use_and_legacy_requests_stay_unpriced()
+    -> Result<(), Box<dyn Error>> {
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("{PROVIDER}|{ENDPOINT}"),
+        )])?;
+        let clock = Arc::new(TestClock::new(Instant::now()));
+        let issuer = ProviderCostAcceptanceIssuer::from_seed([31; 32], clock.now())?;
+        let (_directory, broker, provider, _credential) =
+            broker_with_cost_acceptance(&authorization, clock.clone(), Some(issuer.verifier()?))?;
+        provider.set_response(b"provider-response".to_vec());
+        let binding = "c".repeat(64);
+        let price = ProviderPriceBound::new("USD", 30_000)?;
+        let nonce = ProviderCostNonce::new([32; 32])?;
+        let acceptance = issuer.issue(
+            provider_cost_scope(&binding, PROVIDER, ENDPOINT, price.clone())?,
+            clock.now(),
+            clock.now() + Duration::from_secs(10),
+            nonce,
+        )?;
+
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                nonce,
+                Some(&acceptance),
+                b"request",
+            )?,
+            b"provider-response"
+        );
+        let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+        assert_eq!(
+            invocation.execute_priced_provider_request(
+                &binding,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                nonce,
+                Some(&acceptance),
+                b"request",
+            ),
+            Err(PluginServiceError::ProviderCostAcceptanceReused)
+        );
+
+        let legacy = broker.begin_invocation(context(
+            authorization,
+            &clock,
+            CancellationToken::default(),
+            1_024,
+        )?)?;
+        assert_eq!(
+            legacy.execute_provider_request(PROVIDER, ENDPOINT, None, b"request")?,
+            b"provider-response"
+        );
+        assert_eq!(provider.calls.load(Ordering::Acquire), 2);
+
+        let wire = serde_json::to_value(PluginServiceWireRequest::ExecuteProvider {
+            provider: PROVIDER.to_owned(),
+            endpoint: ENDPOINT.to_owned(),
+            secret_id: None,
+            body: b"request".to_vec(),
+        })?;
+        let wire_text = serde_json::to_string(&wire)?;
+        assert!(!wire_text.contains("acceptance"));
+        assert!(!wire_text.contains("nonce"));
+        assert!(!wire_text.contains("price"));
         Ok(())
     }
 

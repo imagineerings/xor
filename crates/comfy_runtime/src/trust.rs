@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
     net::IpAddr,
+    time::{Duration, Instant},
 };
 
 #[cfg(any(
@@ -65,6 +66,8 @@ pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
 pub const MAX_SEALED_PLUGIN_AUTHORIZATION_BYTES: usize = 2 * 1024 * 1024;
 pub const CUDART_LIBRARY_ID: &str = "nvidia-cudart";
 const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-plugin-authorization-v2\0";
+const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-cost-acceptance-v1\0";
+const MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 const ROCM_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-rocm-package-v1\0";
 const METAL_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-metal-package-v1\0";
 const MLU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-mlu-package-v1\0";
@@ -2239,6 +2242,280 @@ impl AuthorizedProviderRequest {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderPriceBound {
+    currency_code: String,
+    maximum_microunits: u64,
+}
+
+impl ProviderPriceBound {
+    pub fn new(
+        currency_code: impl Into<String>,
+        maximum_microunits: u64,
+    ) -> Result<Self, TrustError> {
+        let currency_code = currency_code.into();
+        if currency_code.len() != 3
+            || !currency_code.bytes().all(|byte| byte.is_ascii_uppercase())
+            || maximum_microunits == 0
+        {
+            return Err(TrustError::InvalidProviderPriceBound);
+        }
+        Ok(Self {
+            currency_code,
+            maximum_microunits,
+        })
+    }
+
+    pub fn currency_code(&self) -> &str {
+        &self.currency_code
+    }
+
+    pub fn maximum_microunits(&self) -> u64 {
+        self.maximum_microunits
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ProviderCostNonce([u8; 32]);
+
+impl ProviderCostNonce {
+    pub fn new(bytes: [u8; 32]) -> Result<Self, TrustError> {
+        if bytes.iter().all(|byte| *byte == 0) {
+            return Err(TrustError::InvalidProviderCostAcceptance);
+        }
+        Ok(Self(bytes))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderCostAcceptanceScope {
+    principal_id: String,
+    profile_id: String,
+    prompt_id: String,
+    plugin_id: String,
+    plugin_digest_sha256: String,
+    provider_binding_sha256: String,
+    endpoint: ProviderEndpoint,
+    price_bound: ProviderPriceBound,
+}
+
+impl ProviderCostAcceptanceScope {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        principal_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        prompt_id: impl Into<String>,
+        plugin_id: impl Into<String>,
+        plugin_digest_sha256: impl Into<String>,
+        provider_binding_sha256: impl Into<String>,
+        provider: impl Into<String>,
+        endpoint: impl Into<String>,
+        price_bound: ProviderPriceBound,
+    ) -> Result<Self, TrustError> {
+        let principal_id = principal_id.into();
+        let profile_id = profile_id.into();
+        let prompt_id = prompt_id.into();
+        let plugin_id = plugin_id.into();
+        let plugin_digest_sha256 = plugin_digest_sha256.into();
+        let provider_binding_sha256 = provider_binding_sha256.into();
+        if principal_id.is_empty()
+            || principal_id.len() > 1_024
+            || principal_id != principal_id.trim()
+            || principal_id.chars().any(char::is_control)
+            || !valid_ascii_identifier(&profile_id, 1_024)
+            || !valid_ascii_identifier(&prompt_id, 1_024)
+            || !valid_ascii_identifier(&plugin_id, 1_024)
+            || validate_sha256(&plugin_digest_sha256).is_err()
+            || validate_sha256(&provider_binding_sha256).is_err()
+        {
+            return Err(TrustError::InvalidProviderCostAcceptance);
+        }
+        Ok(Self {
+            principal_id,
+            profile_id,
+            prompt_id,
+            plugin_id,
+            plugin_digest_sha256,
+            provider_binding_sha256,
+            endpoint: ProviderEndpoint::new(provider, endpoint)?,
+            price_bound,
+        })
+    }
+
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
+
+    pub fn profile_id(&self) -> &str {
+        &self.profile_id
+    }
+
+    pub fn prompt_id(&self) -> &str {
+        &self.prompt_id
+    }
+
+    pub fn plugin_id(&self) -> &str {
+        &self.plugin_id
+    }
+
+    pub fn plugin_digest_sha256(&self) -> &str {
+        &self.plugin_digest_sha256
+    }
+
+    pub fn provider_binding_sha256(&self) -> &str {
+        &self.provider_binding_sha256
+    }
+
+    pub fn provider(&self) -> &str {
+        self.endpoint.provider().as_str()
+    }
+
+    pub fn endpoint(&self) -> &str {
+        self.endpoint.endpoint()
+    }
+
+    pub fn price_bound(&self) -> &ProviderPriceBound {
+        &self.price_bound
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProviderCostAcceptanceClaims {
+    scope: ProviderCostAcceptanceScope,
+    issued_at_milliseconds: u64,
+    expires_at_milliseconds: u64,
+    nonce: ProviderCostNonce,
+}
+
+pub struct ProviderCostAcceptance {
+    claims: ProviderCostAcceptanceClaims,
+    signature: [u8; ED25519_SIGNATURE_BYTES],
+}
+
+impl ProviderCostAcceptance {
+    pub fn nonce(&self) -> ProviderCostNonce {
+        self.claims.nonce
+    }
+}
+
+impl fmt::Debug for ProviderCostAcceptance {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderCostAcceptance([SEALED])")
+    }
+}
+
+pub struct ProviderCostAcceptanceIssuer {
+    seed: Zeroizing<[u8; 32]>,
+    clock_origin: Instant,
+}
+
+impl ProviderCostAcceptanceIssuer {
+    pub fn generate(clock_origin: Instant) -> Result<Self, TrustError> {
+        let mut seed = [0_u8; 32];
+        SystemRandom::new()
+            .fill(&mut seed)
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        Self::from_seed(seed, clock_origin)
+    }
+
+    pub fn from_seed(seed: [u8; 32], clock_origin: Instant) -> Result<Self, TrustError> {
+        Ed25519KeyPair::from_seed_unchecked(&seed)
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        Ok(Self {
+            seed: Zeroizing::new(seed),
+            clock_origin,
+        })
+    }
+
+    pub fn verifier(&self) -> Result<ProviderCostAcceptanceVerifier, TrustError> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        let public_key = key_pair
+            .public_key()
+            .as_ref()
+            .try_into()
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        Ok(ProviderCostAcceptanceVerifier {
+            public_key,
+            clock_origin: self.clock_origin,
+        })
+    }
+
+    pub fn issue(
+        &self,
+        scope: ProviderCostAcceptanceScope,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: ProviderCostNonce,
+    ) -> Result<ProviderCostAcceptance, TrustError> {
+        let issued_at_milliseconds = provider_cost_milliseconds(self.clock_origin, issued_at)?;
+        let expires_at_milliseconds = provider_cost_milliseconds(self.clock_origin, expires_at)?;
+        if expires_at <= issued_at
+            || expires_at
+                .checked_duration_since(issued_at)
+                .is_none_or(|duration| duration > MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME)
+        {
+            return Err(TrustError::InvalidProviderCostAcceptance);
+        }
+        let claims = ProviderCostAcceptanceClaims {
+            scope,
+            issued_at_milliseconds,
+            expires_at_milliseconds,
+            nonce,
+        };
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        let signature = key_pair
+            .sign(&provider_cost_acceptance_signing_payload(&claims))
+            .as_ref()
+            .try_into()
+            .map_err(|_| TrustError::ProviderCostAcceptanceSealingUnavailable)?;
+        Ok(ProviderCostAcceptance { claims, signature })
+    }
+}
+
+impl fmt::Debug for ProviderCostAcceptanceIssuer {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderCostAcceptanceIssuer([REDACTED])")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ProviderCostAcceptanceVerifier {
+    public_key: [u8; ED25519_PUBLIC_KEY_BYTES],
+    clock_origin: Instant,
+}
+
+impl ProviderCostAcceptanceVerifier {
+    pub fn verify(
+        &self,
+        acceptance: &ProviderCostAcceptance,
+        expected_scope: &ProviderCostAcceptanceScope,
+        now: Instant,
+    ) -> Result<(), TrustError> {
+        UnparsedPublicKey::new(&ED25519, self.public_key)
+            .verify(
+                &provider_cost_acceptance_signing_payload(&acceptance.claims),
+                &acceptance.signature,
+            )
+            .map_err(|_| TrustError::InvalidProviderCostAcceptance)?;
+        if acceptance.claims.scope != *expected_scope {
+            return Err(TrustError::InvalidProviderCostAcceptance);
+        }
+        let now_milliseconds = provider_cost_milliseconds(self.clock_origin, now)?;
+        if now_milliseconds < acceptance.claims.issued_at_milliseconds
+            || now_milliseconds >= acceptance.claims.expires_at_milliseconds
+        {
+            return Err(TrustError::ExpiredProviderCostAcceptance);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RemoteExposureApproval {
     LoopbackOnly,
@@ -2681,6 +2958,14 @@ pub enum TrustError {
     ProviderEndpointDenied,
     #[error("provider secret grant is missing")]
     MissingSecretGrant,
+    #[error("provider price bound is invalid")]
+    InvalidProviderPriceBound,
+    #[error("provider cost acceptance is invalid or does not match the request")]
+    InvalidProviderCostAcceptance,
+    #[error("provider cost acceptance has expired")]
+    ExpiredProviderCostAcceptance,
+    #[error("provider cost acceptance sealing key generation failed")]
+    ProviderCostAcceptanceSealingUnavailable,
     #[error("native API remote exposure is unsafe")]
     UnsafeApiExposure,
     #[error("external navigation policy is invalid")]
@@ -2898,6 +3183,47 @@ fn authorization_signing_payload(payload: &[u8]) -> [u8; 32] {
             .to_le_bytes(),
     );
     digest.update(payload);
+    digest.finalize().into()
+}
+
+fn provider_cost_milliseconds(origin: Instant, value: Instant) -> Result<u64, TrustError> {
+    let duration = value
+        .checked_duration_since(origin)
+        .ok_or(TrustError::InvalidProviderCostAcceptance)?;
+    u64::try_from(duration.as_millis()).map_err(|_| TrustError::InvalidProviderCostAcceptance)
+}
+
+fn provider_cost_acceptance_signing_payload(claims: &ProviderCostAcceptanceClaims) -> [u8; 32] {
+    fn update_field(digest: &mut Sha256, value: &[u8]) {
+        digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+        digest.update(value);
+    }
+
+    let mut digest = Sha256::new();
+    digest.update(PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN);
+    for field in [
+        claims.scope.principal_id().as_bytes(),
+        claims.scope.profile_id().as_bytes(),
+        claims.scope.prompt_id().as_bytes(),
+        claims.scope.plugin_id().as_bytes(),
+        claims.scope.plugin_digest_sha256().as_bytes(),
+        claims.scope.provider_binding_sha256().as_bytes(),
+        claims.scope.provider().as_bytes(),
+        claims.scope.endpoint().as_bytes(),
+        claims.scope.price_bound().currency_code().as_bytes(),
+    ] {
+        update_field(&mut digest, field);
+    }
+    digest.update(
+        claims
+            .scope
+            .price_bound()
+            .maximum_microunits()
+            .to_le_bytes(),
+    );
+    digest.update(claims.issued_at_milliseconds.to_le_bytes());
+    digest.update(claims.expires_at_milliseconds.to_le_bytes());
+    digest.update(claims.nonce.as_bytes());
     digest.finalize().into()
 }
 
@@ -4134,6 +4460,84 @@ mod tests {
                 Err(TrustError::InvalidProviderProfile)
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_cost_acceptance_is_sealed_exact_bounded_and_expiring()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let origin = Instant::now();
+        let issuer = ProviderCostAcceptanceIssuer::from_seed([7; 32], origin)?;
+        let verifier = issuer.verifier()?;
+        let price = ProviderPriceBound::new("USD", 25_000)?;
+        let scope = ProviderCostAcceptanceScope::new(
+            "principal-a",
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "plugin.fixture",
+            DIGEST,
+            &"a".repeat(64),
+            "fixture",
+            "https://fixture.invalid/v1/generate",
+            price.clone(),
+        )?;
+        let nonce = ProviderCostNonce::new([9; 32])?;
+        let acceptance = issuer.issue(
+            scope.clone(),
+            origin + Duration::from_secs(1),
+            origin + Duration::from_secs(31),
+            nonce,
+        )?;
+
+        verifier.verify(&acceptance, &scope, origin + Duration::from_secs(1))?;
+        assert_eq!(acceptance.nonce(), nonce);
+        assert_eq!(
+            format!("{acceptance:?}"),
+            "ProviderCostAcceptance([SEALED])"
+        );
+        assert_eq!(
+            verifier.verify(&acceptance, &scope, origin + Duration::from_secs(31)),
+            Err(TrustError::ExpiredProviderCostAcceptance)
+        );
+        let wrong_binding = ProviderCostAcceptanceScope::new(
+            "principal-a",
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "plugin.fixture",
+            DIGEST,
+            &"b".repeat(64),
+            "fixture",
+            "https://fixture.invalid/v1/generate",
+            price,
+        )?;
+        assert_eq!(
+            verifier.verify(&acceptance, &wrong_binding, origin + Duration::from_secs(2)),
+            Err(TrustError::InvalidProviderCostAcceptance)
+        );
+
+        let mut forged = acceptance;
+        forged.signature[0] ^= 1;
+        assert_eq!(
+            verifier.verify(&forged, &scope, origin + Duration::from_secs(2)),
+            Err(TrustError::InvalidProviderCostAcceptance)
+        );
+        assert_eq!(
+            ProviderCostNonce::new([0; 32]),
+            Err(TrustError::InvalidProviderCostAcceptance)
+        );
+        assert_eq!(
+            ProviderPriceBound::new("usd", 25_000),
+            Err(TrustError::InvalidProviderPriceBound)
+        );
+        assert!(matches!(
+            issuer.issue(
+                scope,
+                origin,
+                origin + MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME + Duration::from_millis(1),
+                nonce,
+            ),
+            Err(TrustError::InvalidProviderCostAcceptance)
+        ));
         Ok(())
     }
 
