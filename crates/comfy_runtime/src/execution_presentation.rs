@@ -3092,6 +3092,7 @@ mod tests {
             topological_order: vec![node_id.clone()],
             static_required_nodes: BTreeSet::from([node_id.clone()]),
             output_nodes: vec![node_id],
+            provider_execution: None,
             persistence_unknown_fields: BTreeMap::new(),
         }
     }

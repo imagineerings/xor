@@ -888,6 +888,18 @@ impl NativeProviderRegistryPin {
         &self.binding_digests_sha256
     }
 
+    pub fn identity_sha256(&self) -> String {
+        let mut digest = Sha256::new();
+        digest.update(b"sim-native-provider-registry-pin-v1\0");
+        digest.update(self.generation.to_le_bytes());
+        digest.update(self.registry_digest_sha256.as_bytes());
+        for binding_digest in &self.binding_digests_sha256 {
+            digest.update([0]);
+            digest.update(binding_digest.as_bytes());
+        }
+        format!("{:x}", digest.finalize())
+    }
+
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
         if self.generation == 0
             || !valid_provider_registry_digest(&self.registry_digest_sha256)
@@ -958,21 +970,29 @@ impl NativeImageWorkerPlan {
         metadata_enabled: bool,
         injected_delay_millis: u64,
     ) -> Result<Self, NativeImageRuntimeError> {
+        plan.validate_provider_execution_identity()?;
+        let provider_registry = plan.provider_registry_pin().cloned();
         let value = Self {
             plan,
             input_assets,
             memory_policy,
             metadata_enabled,
             injected_delay_millis,
-            provider_registry: None,
+            provider_registry,
         };
         value.validate()?;
         Ok(value)
     }
 
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
+        self.plan.validate_provider_execution_identity()?;
         if let Some(provider_registry) = &self.provider_registry {
             provider_registry.validate()?;
+        }
+        if self.provider_registry.as_ref() != self.plan.provider_registry_pin() {
+            return Err(NativeImageRuntimeError::Encoding(
+                "native worker provider registry must be derived from the compiled plan".to_owned(),
+            ));
         }
         validate_worker_input_assets(&self.input_assets)?;
         let expected = required_worker_input_ids(&self.plan)?;
@@ -983,16 +1003,6 @@ impl NativeImageWorkerPlan {
             ));
         }
         Ok(())
-    }
-
-    pub fn with_provider_registry(
-        mut self,
-        provider_registry: NativeProviderRegistryPin,
-    ) -> Result<Self, NativeImageRuntimeError> {
-        provider_registry.validate()?;
-        self.provider_registry = Some(provider_registry);
-        self.validate()?;
-        Ok(self)
     }
 }
 
@@ -3028,6 +3038,7 @@ impl NativeImageExecutor {
                 "native memory configuration token is empty".to_owned(),
             ));
         }
+        plan.validate_provider_execution_identity()?;
         cancellable_delay(injected_delay_millis, &cancellation)?;
         let effects = Arc::new(NativeImageProposalCoordinator::default());
         let registry_version = if self.diffusion_enabled {
@@ -3040,6 +3051,11 @@ impl NativeImageExecutor {
         } else {
             format!("native-image-v1:{memory_configuration}")
         };
+        let provider_identity = plan
+            .provider_registry_pin()
+            .map(NativeProviderRegistryPin::identity_sha256)
+            .unwrap_or_else(|| "local".to_owned());
+        let configuration_token = format!("{configuration_token}:provider={provider_identity}");
         let mut engine = ExecutionEngine::new_with_handle_store_generation(
             self.profile_id,
             self.nodes.clone(),
@@ -4513,6 +4529,7 @@ impl NativeExecutionControllerConfig {
 
 pub struct NativeExecutionController {
     profile_id: ProfileId,
+    provider_registry: Option<NativeProviderRegistryPin>,
     commands: async_channel::Sender<PreparedNativeCommand>,
     runner: Mutex<Option<thread::JoinHandle<()>>>,
 }
@@ -4552,6 +4569,7 @@ impl NativeExecutionController {
         event_bus: ExecutionEventBus,
     ) -> Result<Arc<Self>, NativeImageRuntimeError> {
         config.validate()?;
+        let provider_registry = config.provider_registry.clone();
         let supervisor = smol::block_on(RuntimeSupervisor::start(config.worker.clone()))
             .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
         let (commands, receiver) = async_channel::bounded(NATIVE_CONTROLLER_CAPACITY);
@@ -4568,6 +4586,7 @@ impl NativeExecutionController {
             .map_err(|error| NativeImageRuntimeError::Execution(error.to_string()))?;
         Ok(Arc::new(Self {
             profile_id,
+            provider_registry,
             commands,
             runner: Mutex::new(Some(runner)),
         }))
@@ -4601,6 +4620,18 @@ impl ExecutionController for NativeExecutionController {
             )
             .with_origin(ExecutionFailureOrigin::Transport));
         }
+        match &command.kind {
+            ExecutionControlCommandKind::Queue { plan, .. } => {
+                validate_plan_provider_registry(plan, self.provider_registry.as_ref())?;
+            }
+            ExecutionControlCommandKind::Retry {
+                replacement_plan: Some(plan),
+                ..
+            } => {
+                validate_plan_provider_registry(plan, self.provider_registry.as_ref())?;
+            }
+            _ => {}
+        }
         let (activation, receiver) = async_channel::bounded(1);
         self.commands
             .try_send(PreparedNativeCommand {
@@ -4633,6 +4664,27 @@ impl ExecutionController for NativeExecutionController {
     fn shutdown(&self) -> Result<(), ExecutionFailure> {
         self.shutdown_and_join()
     }
+}
+
+fn validate_plan_provider_registry(
+    plan: &CompiledPlan,
+    current: Option<&NativeProviderRegistryPin>,
+) -> Result<(), ExecutionFailure> {
+    plan.validate_provider_execution_identity()
+        .map_err(|error| {
+            ExecutionFailure::new("native_provider_plan_invalid", error.to_string())
+                .with_origin(ExecutionFailureOrigin::Validation)
+        })?;
+    if let Some(planned) = plan.provider_registry_pin()
+        && current != Some(planned)
+    {
+        return Err(ExecutionFailure::new(
+            "native_provider_registry_stale",
+            "the compiled plan provider registry is unavailable or has changed",
+        )
+        .with_origin(ExecutionFailureOrigin::Validation));
+    }
+    Ok(())
 }
 
 impl Drop for NativeExecutionController {
@@ -4981,6 +5033,27 @@ impl NativeControllerState {
         let Some(lease) = lease else {
             return Ok(());
         };
+        if let Err(failure) =
+            validate_plan_provider_registry(&lease.plan, self.config.provider_registry.as_ref())
+        {
+            self.publish_kind(
+                lease.profile_id,
+                lease.prompt_id,
+                lease.attempt_id,
+                None,
+                AttemptEventKind::Started,
+                None,
+            )?;
+            self.publish_kind(
+                lease.profile_id,
+                lease.prompt_id,
+                lease.attempt_id,
+                None,
+                AttemptEventKind::Failed { failure },
+                None,
+            )?;
+            return Ok(());
+        }
         self.active = Some(ActiveNativeExecution {
             profile_id: lease.profile_id,
             prompt_id: lease.prompt_id,
@@ -5041,7 +5114,7 @@ impl NativeControllerState {
             &self.input_authorization,
             &lease.cancellation,
         )?;
-        let mut worker_plan = NativeImageWorkerPlan::new_with_memory_policy(
+        let worker_plan = NativeImageWorkerPlan::new_with_memory_policy(
             lease.plan.clone(),
             input_assets,
             self.config.memory_policy,
@@ -5053,9 +5126,6 @@ impl NativeControllerState {
                 .and_then(Value::as_u64)
                 .unwrap_or(0),
         )?;
-        if let Some(provider_registry) = self.config.provider_registry.clone() {
-            worker_plan = worker_plan.with_provider_registry(provider_registry)?;
-        }
         let encoded = serde_json::to_vec(&worker_plan)
             .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
         let supervisor = self.supervisor.as_mut().ok_or_else(|| {
@@ -5789,6 +5859,81 @@ mod tests {
             serde_json::from_value::<NativeProviderRegistryPin>(unknown_field).is_err(),
             "provider registry pins reject unknown fields"
         );
+        let changed = NativeProviderRegistryPin::checked(
+            8,
+            "a".repeat(64),
+            vec!["b".repeat(64), "c".repeat(64)],
+        )
+        .expect("changed provider registry pin is valid");
+        assert_ne!(pin.identity_sha256(), changed.identity_sha256());
+        assert!(valid_provider_registry_digest(&pin.identity_sha256()));
+    }
+
+    fn compiled_provider_plan(
+        pin: NativeProviderRegistryPin,
+    ) -> Result<CompiledPlan, Box<dyn std::error::Error>> {
+        let descriptor = comfy_nodes::NativeNodeDescriptor {
+            schema_version: comfy_nodes::LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "ControllerProvider".to_owned(),
+            implementation_version: "1".to_owned(),
+            source_schema: None,
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![comfy_nodes::NativeOutputDescriptor {
+                name: "value".to_owned(),
+                produced_type: NativeValueType::Primitive(NativePrimitiveType::Number),
+                is_list: false,
+            }],
+            output_node: true,
+            effect: comfy_nodes::NativeEffectClass::Provider,
+            cache: comfy_nodes::NativeCachePolicy::Never,
+        };
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(descriptor)?;
+        Ok(PromptCompiler::new(&registry)
+            .with_provider_registry_pin(pin)?
+            .compile(PromptSubmission {
+                prompt: ApiPrompt(BTreeMap::from([(
+                    NodeId::from("provider"),
+                    PromptNode {
+                        class_type: "ControllerProvider".to_owned(),
+                        inputs: BTreeMap::new(),
+                        unknown: BTreeMap::new(),
+                    },
+                )])),
+                prompt_id: Some(PromptId(Uuid::from_u128(0x3710))),
+                client_id: None,
+                number: None,
+                extra_data: BTreeMap::new(),
+                unknown: BTreeMap::new(),
+            })?)
+    }
+
+    #[test]
+    fn controller_rejects_stale_provider_plan_before_dispatch()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let planned = NativeProviderRegistryPin::checked(7, "a".repeat(64), vec!["b".repeat(64)])?;
+        let plan = compiled_provider_plan(planned.clone())?;
+        assert!(validate_plan_provider_registry(&plan, Some(&planned)).is_ok());
+        let current = NativeProviderRegistryPin::checked(8, "c".repeat(64), vec!["d".repeat(64)])?;
+        let stale = validate_plan_provider_registry(&plan, Some(&current))
+            .expect_err("changed provider deployment rejects queued plan");
+        assert_eq!(stale.code, "native_provider_registry_stale");
+        assert_eq!(
+            validate_plan_provider_registry(&plan, None)
+                .expect_err("missing provider deployment rejects queued plan")
+                .code,
+            "native_provider_registry_stale"
+        );
+        let mut worker_plan = NativeImageWorkerPlan::new(plan, BTreeMap::new(), true, 0)?;
+        assert_eq!(worker_plan.provider_registry.as_ref(), Some(&planned));
+        worker_plan.provider_registry = None;
+        assert!(matches!(
+            worker_plan.validate(),
+            Err(NativeImageRuntimeError::Encoding(message))
+                if message.contains("derived from the compiled plan")
+        ));
+        Ok(())
     }
 
     fn empty_worker_registry_deployment(

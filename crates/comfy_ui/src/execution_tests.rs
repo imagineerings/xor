@@ -613,6 +613,7 @@ fn plan(prompt_id: PromptId) -> CompiledPlan {
         topological_order: Vec::new(),
         static_required_nodes: BTreeSet::new(),
         output_nodes: vec![NodeId("error-node".to_owned())],
+        provider_execution: None,
         persistence_unknown_fields: BTreeMap::new(),
     }
 }

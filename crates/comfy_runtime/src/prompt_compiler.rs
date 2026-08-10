@@ -1,11 +1,12 @@
-use crate::executor::NativeNodeRegistry;
+use crate::{NativeProviderRegistryPin, cache::canonical_json, executor::NativeNodeRegistry};
 use comfy_nodes::{
-    NativeNodeDescriptor, NativePortCardinality, NativePrimitive, NativePrimitiveType,
-    NativeTypeUnion, NativeValue, NativeValueType,
+    NativeEffectClass, NativeNodeBindingDisposition, NativeNodeDescriptor, NativePortCardinality,
+    NativePrimitive, NativePrimitiveType, NativeTypeUnion, NativeValue, NativeValueType,
 };
 use comfy_types::{ApiPrompt, NodeId, PromptId, PromptNode, PromptSubmission};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 use uuid::Uuid;
@@ -47,8 +48,94 @@ pub struct CompiledPlan {
     pub topological_order: Vec<NodeId>,
     pub static_required_nodes: BTreeSet<NodeId>,
     pub output_nodes: Vec<NodeId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_execution: Option<NativeProviderPlanIdentity>,
     #[serde(default, flatten)]
     pub persistence_unknown_fields: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeProviderPlanIdentity {
+    registry: NativeProviderRegistryPin,
+    compiled_plan_sha256: String,
+}
+
+impl NativeProviderPlanIdentity {
+    pub fn registry(&self) -> &NativeProviderRegistryPin {
+        &self.registry
+    }
+
+    pub fn compiled_plan_sha256(&self) -> &str {
+        &self.compiled_plan_sha256
+    }
+}
+
+impl CompiledPlan {
+    pub fn provider_registry_pin(&self) -> Option<&NativeProviderRegistryPin> {
+        self.provider_execution
+            .as_ref()
+            .map(|identity| identity.registry())
+    }
+
+    pub fn requires_provider_registry(&self) -> bool {
+        self.nodes
+            .values()
+            .any(|node| node.descriptor.effect == NativeEffectClass::Provider)
+    }
+
+    pub fn validate_provider_execution_identity(&self) -> Result<(), PromptCompileError> {
+        match (self.requires_provider_registry(), &self.provider_execution) {
+            (false, None) => Ok(()),
+            (false, Some(_)) => Err(PromptCompileError::UnexpectedProviderRegistryPin),
+            (true, None) => Err(PromptCompileError::ProviderRegistryPinRequired),
+            (true, Some(identity)) => {
+                identity
+                    .registry
+                    .validate()
+                    .map_err(|_| PromptCompileError::InvalidProviderRegistryPin)?;
+                let expected = provider_plan_digest(self, &identity.registry)?;
+                if expected != identity.compiled_plan_sha256 {
+                    return Err(PromptCompileError::ProviderPlanIdentityMismatch);
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn seal_provider_registry(
+        &mut self,
+        registry: NativeProviderRegistryPin,
+    ) -> Result<(), PromptCompileError> {
+        registry
+            .validate()
+            .map_err(|_| PromptCompileError::InvalidProviderRegistryPin)?;
+        self.provider_execution = Some(NativeProviderPlanIdentity {
+            compiled_plan_sha256: provider_plan_digest(self, &registry)?,
+            registry,
+        });
+        self.validate_provider_execution_identity()
+    }
+}
+
+fn provider_plan_digest(
+    plan: &CompiledPlan,
+    registry: &NativeProviderRegistryPin,
+) -> Result<String, PromptCompileError> {
+    let mut value = serde_json::to_value(plan)
+        .map_err(|_| PromptCompileError::ProviderPlanSerializationFailed)?;
+    let Value::Object(fields) = &mut value else {
+        return Err(PromptCompileError::ProviderPlanSerializationFailed);
+    };
+    fields.remove("provider_execution");
+    let canonical =
+        canonical_json(&value).map_err(|_| PromptCompileError::ProviderPlanSerializationFailed)?;
+    let mut digest = Sha256::new();
+    digest.update(b"sim-native-provider-plan-v1\0");
+    digest.update(registry.identity_sha256().as_bytes());
+    digest.update([0]);
+    digest.update(canonical.as_bytes());
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -105,15 +192,40 @@ pub enum PromptCompileError {
     NoOutputNode,
     #[error("prompt graph contains a cycle involving {0:?}")]
     Cycle(Vec<NodeId>),
+    #[error("provider-backed prompt compilation requires a selected provider registry pin")]
+    ProviderRegistryPinRequired,
+    #[error("provider registry pin is invalid")]
+    InvalidProviderRegistryPin,
+    #[error("local-only prompt unexpectedly carries a provider registry pin")]
+    UnexpectedProviderRegistryPin,
+    #[error("provider plan identity does not match the compiled plan")]
+    ProviderPlanIdentityMismatch,
+    #[error("provider plan identity could not be serialized canonically")]
+    ProviderPlanSerializationFailed,
 }
 
 pub struct PromptCompiler<'a> {
     registry: &'a NativeNodeRegistry,
+    provider_registry_pin: Option<NativeProviderRegistryPin>,
 }
 
 impl<'a> PromptCompiler<'a> {
     pub fn new(registry: &'a NativeNodeRegistry) -> Self {
-        Self { registry }
+        Self {
+            registry,
+            provider_registry_pin: None,
+        }
+    }
+
+    pub fn with_provider_registry_pin(
+        mut self,
+        provider_registry_pin: NativeProviderRegistryPin,
+    ) -> Result<Self, PromptCompileError> {
+        provider_registry_pin
+            .validate()
+            .map_err(|_| PromptCompileError::InvalidProviderRegistryPin)?;
+        self.provider_registry_pin = Some(provider_registry_pin);
+        Ok(self)
     }
 
     pub fn compile(
@@ -180,7 +292,12 @@ impl<'a> PromptCompiler<'a> {
         }
         let topological_order = topological_order(&nodes)?;
         let static_required_nodes = static_required_nodes(&nodes, &output_nodes);
-        Ok(CompiledPlan {
+        let provider_required = nodes.values().any(|node| {
+            node.descriptor.effect == NativeEffectClass::Provider
+                || self.registry.binding_declared_disposition(&node.class_type)
+                    == Some(NativeNodeBindingDisposition::ProviderRequired)
+        });
+        let mut plan = CompiledPlan {
             prompt_id: submission
                 .prompt_id
                 .unwrap_or_else(|| PromptId(Uuid::new_v4())),
@@ -192,8 +309,17 @@ impl<'a> PromptCompiler<'a> {
             topological_order,
             static_required_nodes,
             output_nodes,
+            provider_execution: None,
             persistence_unknown_fields: BTreeMap::new(),
-        })
+        };
+        if provider_required {
+            let pin = self
+                .provider_registry_pin
+                .clone()
+                .ok_or(PromptCompileError::ProviderRegistryPinRequired)?;
+            plan.seal_provider_registry(pin)?;
+        }
+        Ok(plan)
     }
 
     fn resolve_descriptors<'b>(
@@ -1126,6 +1252,69 @@ pub(crate) mod tests {
             Some("right".to_owned())
         );
         assert!(resolve_input_descriptor(&dynamic, "unknown").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_plans_require_and_seal_the_selected_registry_pin()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut provider = descriptor("ProviderOutput", true)?;
+        provider.effect = NativeEffectClass::Provider;
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(provider)?;
+        let provider_submission = || {
+            submission(BTreeMap::from([(
+                NodeId::from("provider"),
+                PromptNode {
+                    class_type: "ProviderOutput".to_owned(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            )]))
+        };
+        assert_eq!(
+            PromptCompiler::new(&registry)
+                .compile(provider_submission())
+                .expect_err("provider plans require a host-selected registry"),
+            PromptCompileError::ProviderRegistryPinRequired
+        );
+
+        let pin = NativeProviderRegistryPin::checked(
+            9,
+            "a".repeat(64),
+            vec!["b".repeat(64), "c".repeat(64)],
+        )?;
+        let plan = PromptCompiler::new(&registry)
+            .with_provider_registry_pin(pin.clone())?
+            .compile(provider_submission())?;
+        assert_eq!(plan.provider_registry_pin(), Some(&pin));
+        plan.validate_provider_execution_identity()?;
+
+        let mut tampered = plan.clone();
+        tampered
+            .extra_data
+            .insert("tampered".to_owned(), json!(true));
+        assert_eq!(
+            tampered
+                .validate_provider_execution_identity()
+                .expect_err("execution-relevant plan drift invalidates the seal"),
+            PromptCompileError::ProviderPlanIdentityMismatch
+        );
+
+        let local = descriptor("LocalOutput", true)?;
+        let mut local_registry = NativeNodeRegistry::default();
+        local_registry.register_descriptor(local)?;
+        let local_plan = PromptCompiler::new(&local_registry)
+            .with_provider_registry_pin(pin)?
+            .compile(submission(BTreeMap::from([(
+                NodeId::from("local"),
+                PromptNode {
+                    class_type: "LocalOutput".to_owned(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            )])))?;
+        assert!(local_plan.provider_execution.is_none());
         Ok(())
     }
 

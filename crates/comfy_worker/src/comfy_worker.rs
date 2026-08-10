@@ -82,7 +82,7 @@ fn apply_compiled_registry_commit(
     responses: &[WorkerEnvelope],
     source: Option<Arc<AssembledWorkerRegistry>>,
     compiled: Option<Arc<plugin_runtime::WorkerPluginRegistry>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let acknowledged = matches!(
         responses,
         [WorkerEnvelope {
@@ -91,16 +91,21 @@ fn apply_compiled_registry_commit(
         }]
     );
     if acknowledged {
+        let source = source
+            .ok_or_else(|| anyhow::anyhow!("worker registry commit produced no source registry"))?;
+        let changed = current.as_ref().is_none_or(|registry| {
+            registry.source.generation() != source.generation()
+                || registry.source.registry_digest_sha256() != source.registry_digest_sha256()
+        });
         *current = Some(CommittedPluginRegistry {
-            source: source.ok_or_else(|| {
-                anyhow::anyhow!("worker registry commit produced no source registry")
-            })?,
+            source,
             compiled: compiled.ok_or_else(|| {
                 anyhow::anyhow!("worker registry commit produced no compiled registry")
             })?,
         });
+        return Ok(changed);
     }
-    Ok(())
+    Ok(false)
 }
 
 #[derive(Debug, Error)]
@@ -592,6 +597,7 @@ async fn run_worker_process_with_configuration(
     let mut next_heartbeat = Instant::now() + HEARTBEAT_INTERVAL;
     let mut active_execution: Option<ActiveExecution> = None;
     let mut native_image_executor: Option<NativeImageExecutor> = None;
+    let mut native_image_executor_provider_registry = None;
     let mut plugin_registry: Option<CommittedPluginRegistry> = None;
     let mut pending_plugin_capabilities: BTreeMap<u64, async_channel::Sender<Vec<u8>>> =
         BTreeMap::new();
@@ -688,12 +694,15 @@ async fn run_worker_process_with_configuration(
                             Ok(())
                         });
                     if let Ok(responses) = &responses {
-                        apply_compiled_registry_commit(
+                        if apply_compiled_registry_commit(
                             &mut plugin_registry,
                             responses,
                             session.registry().cloned().map(Arc::new),
                             compiled_candidate,
-                        )?;
+                        )? {
+                            native_image_executor = None;
+                            native_image_executor_provider_registry = None;
+                        }
                     }
                     responses
                 } else {
@@ -760,6 +769,8 @@ async fn run_worker_process_with_configuration(
                                             && executor.metadata_enabled()
                                                 == worker_plan.metadata_enabled
                                             && executor.diffusion_enabled() == diffusion_enabled
+                                            && native_image_executor_provider_registry.as_ref()
+                                                == worker_plan.provider_registry.as_ref()
                                     });
                                 let executor_update = if reuse_executor {
                                     native_image_executor
@@ -804,6 +815,8 @@ async fn run_worker_process_with_configuration(
                                     };
                                     created.map(|executor| {
                                         native_image_executor = Some(executor);
+                                        native_image_executor_provider_registry =
+                                            worker_plan.provider_registry.clone();
                                     })
                                 };
                                 if let Err(error) = executor_update {
@@ -1273,8 +1286,8 @@ mod tests {
 
     use comfy_types::{
         ProfileId, RequestId, WORKER_PROTOCOL_VERSION, WorkerId, WorkerMessage,
-        WorkerRegistryDeploymentRejection, WorkerRegistryDeploymentRejectionReason,
-        WorkerRegistryGeneration, WorkerSha256Digest,
+        WorkerRegistryDeploymentAck, WorkerRegistryDeploymentRejection,
+        WorkerRegistryDeploymentRejectionReason, WorkerRegistryGeneration, WorkerSha256Digest,
     };
 
     use super::*;
@@ -1412,6 +1425,7 @@ mod tests {
             topological_order: vec![node_id.clone()],
             static_required_nodes: std::collections::BTreeSet::from([node_id.clone()]),
             output_nodes: vec![node_id],
+            provider_execution: None,
             persistence_unknown_fields: BTreeMap::new(),
         };
         let worker_plan = NativeImageWorkerPlan::new(plan, BTreeMap::new(), true, 0)
@@ -1622,8 +1636,15 @@ mod tests {
                 WorkerRegistryDeploymentRejectionReason::ComponentCompilationFailed,
             ),
         });
-        apply_compiled_registry_commit(&mut current, &[rejection], Some(replacement_source), None)
-            .expect("rejection is a non-mutating process transition");
+        assert!(
+            !apply_compiled_registry_commit(
+                &mut current,
+                &[rejection],
+                Some(replacement_source),
+                None,
+            )
+            .expect("rejection is a non-mutating process transition")
+        );
 
         let current = current.expect("previous registry remains committed");
         assert_eq!(current.source.generation(), initial_generation);
@@ -1659,6 +1680,66 @@ mod tests {
             result,
             Err(plugin_runtime::WorkerPluginRuntimeError::MissingComponent)
         ));
+    }
+
+    #[test]
+    fn accepted_registry_change_requires_native_executor_recreation() {
+        let profile_id = ProfileId(Default::default());
+        let first_generation = WorkerRegistryGeneration::new(1).expect("nonzero generation");
+        let first_digest = WorkerSha256Digest::new("a".repeat(64)).expect("valid digest");
+        let mut current = Some(CommittedPluginRegistry {
+            source: Arc::new(AssembledWorkerRegistry::empty_for_test(
+                first_generation,
+                first_digest.clone(),
+            )),
+            compiled: Arc::new(
+                plugin_runtime::WorkerPluginRegistry::empty_for_test(
+                    profile_id,
+                    first_generation,
+                    first_digest,
+                )
+                .expect("empty compiled registry"),
+            ),
+        });
+        let next_generation = WorkerRegistryGeneration::new(2).expect("nonzero generation");
+        let next_digest = WorkerSha256Digest::new("b".repeat(64)).expect("valid digest");
+        let acknowledgement = envelope(WorkerMessage::RegistryDeploymentAck {
+            acknowledgement: WorkerRegistryDeploymentAck::new(
+                next_generation,
+                next_digest.clone(),
+                0,
+            )
+            .expect("bounded acknowledgement"),
+        });
+        let next_source = Arc::new(AssembledWorkerRegistry::empty_for_test(
+            next_generation,
+            next_digest.clone(),
+        ));
+        let next_compiled = Arc::new(
+            plugin_runtime::WorkerPluginRegistry::empty_for_test(
+                profile_id,
+                next_generation,
+                next_digest,
+            )
+            .expect("empty compiled registry"),
+        );
+        assert!(
+            apply_compiled_registry_commit(
+                &mut current,
+                &[acknowledgement],
+                Some(next_source),
+                Some(next_compiled),
+            )
+            .expect("accepted replacement commits atomically")
+        );
+        assert_eq!(
+            current
+                .as_ref()
+                .expect("replacement is committed")
+                .source
+                .generation(),
+            next_generation
+        );
     }
 
     #[test]

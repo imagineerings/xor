@@ -3326,6 +3326,7 @@ fn namespace_expansion(
             topological_order: plan.topological_order.iter().map(translate).collect(),
             static_required_nodes: plan.static_required_nodes.iter().map(translate).collect(),
             output_nodes: plan.output_nodes.iter().map(translate).collect(),
+            provider_execution: plan.provider_execution.clone(),
             persistence_unknown_fields: plan.persistence_unknown_fields.clone(),
         },
         translate(output_node),

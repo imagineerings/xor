@@ -172,6 +172,8 @@ impl PersistedExecutionAttempt {
                 plan.prompt_id == self.record.prompt_id,
                 "persisted execution plan does not match its attempt prompt"
             );
+            plan.validate_provider_execution_identity()
+                .map_err(|error| anyhow::anyhow!("persisted provider plan is invalid: {error}"))?;
             ensure_unknown_fields_do_not_shadow(
                 &plan.persistence_unknown_fields,
                 &[
@@ -184,6 +186,7 @@ impl PersistedExecutionAttempt {
                     "topological_order",
                     "static_required_nodes",
                     "output_nodes",
+                    "provider_execution",
                 ],
             )?;
         }
@@ -1264,6 +1267,69 @@ mod tests {
     }
 
     #[test]
+    fn persisted_provider_plan_rejects_execution_fact_tampering() -> Result<(), Box<dyn Error>> {
+        let descriptor = crate::NativeNodeDescriptor {
+            schema_version: comfy_nodes::LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: "PersistedProvider".to_owned(),
+            implementation_version: "1".to_owned(),
+            source_schema: None,
+            inputs: Vec::new(),
+            dynamic_inputs: Vec::new(),
+            outputs: vec![crate::NativeOutputDescriptor {
+                name: "value".to_owned(),
+                produced_type: crate::NativeValueType::Primitive(
+                    crate::NativePrimitiveType::Number,
+                ),
+                is_list: false,
+            }],
+            output_node: true,
+            effect: crate::NativeEffectClass::Provider,
+            cache: crate::NativeCachePolicy::Never,
+        };
+        let mut registry = crate::NativeNodeRegistry::default();
+        registry.register_descriptor(descriptor)?;
+        let prompt_id = crate::PromptId(Uuid::from_u128(0x371));
+        let submission = comfy_types::PromptSubmission {
+            prompt: comfy_types::ApiPrompt(BTreeMap::from([(
+                comfy_types::NodeId::from("provider"),
+                comfy_types::PromptNode {
+                    class_type: "PersistedProvider".to_owned(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            )])),
+            prompt_id: Some(prompt_id),
+            client_id: None,
+            number: None,
+            extra_data: BTreeMap::new(),
+            unknown: BTreeMap::new(),
+        };
+        let pin =
+            crate::NativeProviderRegistryPin::checked(4, "a".repeat(64), vec!["b".repeat(64)])?;
+        let plan = crate::PromptCompiler::new(&registry)
+            .with_provider_registry_pin(pin)?
+            .compile(submission)?;
+        let record = AttemptRecord::queued(
+            crate::ProfileId(Uuid::from_u128(0x372)),
+            prompt_id,
+            crate::AttemptId(Uuid::from_u128(0x373)),
+        );
+        PersistedExecutionAttempt::new(
+            record.clone(),
+            Some(plan.clone()),
+            ExecutionDataSource::Persisted,
+        )?;
+
+        let mut tampered = plan;
+        tampered.unknown.insert("tampered".to_owned(), json!(true));
+        assert!(
+            PersistedExecutionAttempt::new(record, Some(tampered), ExecutionDataSource::Persisted,)
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn invalid_attempt_update_preserves_the_last_valid_record() {
         smol::block_on(async {
             let database = ComfyRuntimeDb::open_test_db("comfy_runtime_atomic_attempt").await;
@@ -1488,6 +1554,7 @@ mod tests {
                 topological_order: Vec::new(),
                 static_required_nodes: Default::default(),
                 output_nodes: Vec::new(),
+                provider_execution: None,
                 persistence_unknown_fields: BTreeMap::from([(
                     "future_plan_state".into(),
                     json!({"preserved": true}),
