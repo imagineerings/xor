@@ -709,7 +709,11 @@ fn map_broker_error(
         | PluginServiceError::ModelNamespaceRequired => InvocationError::InvalidCapabilityRequest(
             "canonical capability identifier is invalid".to_owned(),
         ),
-        PluginServiceError::ProviderPolicyDenied => InvocationError::CapabilityDenied {
+        PluginServiceError::ProviderPolicyDenied
+        | PluginServiceError::ProviderCostAcceptanceRequired
+        | PluginServiceError::ProviderCostPrincipalRequired
+        | PluginServiceError::ProviderCostAcceptanceDenied
+        | PluginServiceError::ProviderCostAcceptanceReused => InvocationError::CapabilityDenied {
             kind: CapabilityKind::NetworkProvider,
             scope: scope.to_owned(),
         },
