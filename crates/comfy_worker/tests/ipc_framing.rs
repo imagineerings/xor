@@ -942,6 +942,13 @@ fn ipc_schema_contains_no_tensor_pointer_path_or_plugin_handle()
         "PrepareOutput",
         "CommitOutput",
         "OutputCommitter",
+        "NativeAssetReference",
+        "NativeAssetReadRequest",
+        "NativeNodeComputeSession",
+        "NativeNodeServices",
+        "NativePreparedEffectRequest",
+        "ScratchReservation",
+        "CpuBackend",
     ] {
         assert!(
             !production_source.contains(forbidden),
@@ -1073,6 +1080,12 @@ fn assert_path_free_json(value: &serde_json::Value) -> Result<(), Box<dyn std::e
                     "pointer",
                     "plugin_handle",
                     "commit_operation",
+                    "service_id",
+                    "reference_id",
+                    "request_digest_sha256",
+                    "scratch_binding",
+                    "backend_id",
+                    "authority_id",
                 ] {
                     if key.eq_ignore_ascii_case(prohibited) {
                         return Err(format!("worker payload contains prohibited key {key}").into());

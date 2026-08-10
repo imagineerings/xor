@@ -1098,6 +1098,10 @@ fn hex_sha256(value: &[u8; 32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_media::{
+        NativeArtifactKind, NativeCameraProjection, NativeCameraRole, NativeFile3DFormat,
+        NativeFile3DRole,
+    };
     use comfy_model::{
         ClipVisionActivation, ClipVisionConfiguration, ClipVisionLayerWeights, ClipVisionModelType,
         ClipVisionWeights, NativeClipVision, NativeRaftLarge, raft_large_exact_native,
@@ -1482,6 +1486,57 @@ mod tests {
             NativeDiffusionPayload::vae(optical_flow),
             Err(NativeDiffusionPayloadError::RoleMismatch)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn byte_backed_media_payloads_derive_exact_handles_and_residency() -> Result<(), Box<dyn Error>>
+    {
+        let payloads = [
+            NativeStoredPayload::Artifact(Arc::new(NativeArtifactPayload::checked(
+                NativeArtifactKind::Svg,
+                "image/svg+xml".to_owned(),
+                b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>".to_vec(),
+            )?)),
+            NativeStoredPayload::File3D(Arc::new(NativeFile3DPayload::checked(
+                NativeFile3DRole::Ply,
+                NativeFile3DFormat::Ply,
+                b"ply\nformat ascii 1.0\nend_header\n".to_vec(),
+            )?)),
+            NativeStoredPayload::Camera(Arc::new(NativeCameraPayload::checked(
+                NativeCameraRole::Load3D,
+                [0.0, 0.0, 2.0],
+                [0.0, 0.0, 0.0],
+                1.0,
+                None,
+                NativeCameraProjection::Perspective {
+                    fov_degrees: 45.0,
+                    aspect_ratio: 4.0 / 3.0,
+                    near: 0.01,
+                    far: 100.0,
+                },
+                1_024,
+                768,
+            )?)),
+        ];
+        let expected = [
+            (NativeHandleKind::Artifact, "SVG"),
+            (NativeHandleKind::ThreeD, "FILE_3D_PLY"),
+            (NativeHandleKind::ThreeD, "LOAD3D_CAMERA"),
+        ];
+
+        for (payload, (kind, type_id)) in payloads.into_iter().zip(expected) {
+            payload.validate()?;
+            assert_eq!(
+                payload.handle_type()?,
+                NativeHandleType::new(kind, type_id)?
+            );
+            assert!(valid_sha256(&payload.digest_sha256()));
+            assert_eq!(
+                payload.residency()?.resident_bytes()?,
+                payload.resident_bytes()?
+            );
+        }
         Ok(())
     }
 

@@ -1530,8 +1530,7 @@ impl NativeCacheDependencies {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativePreparedEffectRequest {
     service_id: Uuid,
     transaction_id: Uuid,
@@ -1583,8 +1582,7 @@ impl NativePreparedEffectRequest {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NativeNodeOutcome {
     Values {
         outputs: Vec<NativeValue>,

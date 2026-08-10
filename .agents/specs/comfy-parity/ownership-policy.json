@@ -717,10 +717,16 @@
       "concern": "asset_domain_adapter",
       "canonical_owner": "comfy_runtime::AssetService",
       "owner_files": [
-        "crates/comfy_runtime/src/assets.rs"
+        "crates/comfy_runtime/src/assets.rs",
+        "crates/comfy_nodes/src/execution.rs"
       ],
       "owner_symbols": [
-        "AssetService"
+        "AssetService",
+        "NativeAssetReference",
+        "NativeAssetReadRequest",
+        "NativeAssetResolver",
+        "NativeAssetResolverRegistry",
+        "RuntimeNativeAssetResolver"
       ],
       "allowed_adapters": [
         "AssetRoots maps profile namespaces and stable canonical-path configured-root identities to canonical ArtifactRoot values",
@@ -728,6 +734,7 @@
         "AssetIdentity::to_reference and AssetRoots::identity_from_reference are the sole bounded sim-asset wire mapping; controller and GPUI code consume that mapping without parsing or formatting the scheme",
         "API and GPUI views consume the same SharedAssetService with sealed AuthorizedCapabilities and never grant themselves capabilities",
         "AssetPluginCapabilityServices is a least-privilege broker over that shared service and delegates authorization and verified reads to AssetService",
+        "NativeAssetResolverRegistry seals authorized AssetIdentity values behind attempt-scoped NativeAssetReference tokens; native nodes receive only the opaque reference and bounded NativeAssetResolver interface, never paths or grants",
         "SubgraphBlueprintLibrary is a focused graph-to-asset adapter that delegates authorization, exact transactional writes, verified reads, enumeration, containment, rollback, indexing, and persistence to AssetService; its GPUI catalog is a refreshed bounded derived projection, not a second index",
         "the legacy model-list wire projection intentionally de-duplicates relative names for Comfy compatibility while the experimental model-list DTO carries stable opaque root IDs and never host paths"
       ],
@@ -737,6 +744,36 @@
           "qualified": "comfy_runtime::AssetService",
           "role": "canonical",
           "symbol": "AssetService"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetReference",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetReference"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetReadRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetReadRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetResolver",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetResolver"
+        },
+        {
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "qualified": "comfy_runtime::NativeAssetResolverRegistry",
+          "role": "allowed_adapter",
+          "symbol": "NativeAssetResolverRegistry"
+        },
+        {
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "qualified": "comfy_runtime::RuntimeNativeAssetResolver",
+          "role": "allowed_adapter",
+          "symbol": "RuntimeNativeAssetResolver"
         },
         {
           "path": "crates/comfy_model/src/artifact_index.rs",
@@ -772,6 +809,11 @@
       "call_symbols": [
         "ArtifactIndex",
         "AssetIdentity",
+        "NativeAssetReference",
+        "NativeAssetReadRequest",
+        "NativeAssetResolver",
+        "NativeAssetResolverRegistry",
+        "RuntimeNativeAssetResolver",
         "AssetRoot",
         "AssetRoots",
         "AssetService",
@@ -802,6 +844,11 @@
           "pattern": "ArtifactIndex"
         },
         {
+          "name": "native-asset-reference-delegates-verified-read",
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "pattern": "NativeAssetResolverRegistry[\\s\\S]*NativeAssetReference::checked[\\s\\S]*RuntimeNativeAssetResolver[\\s\\S]*impl NativeAssetResolver for RuntimeNativeAssetResolver[\\s\\S]*read_verified"
+        },
+        {
           "name": "native-output-reference-to-asset-identity",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "\\.to_reference\\(\\)"
@@ -818,7 +865,8 @@
         "comfy-parity-execution-ui",
         "comfy-parity-artifact-owner-consolidation",
         "comfy-parity-authoritative-domain-ownership",
-        "comfy-parity-pre-breadth-ownership-closure"
+        "comfy-parity-pre-breadth-ownership-closure",
+        "comfy-parity-native-node-asset-effect-foundation"
       ],
       "production_consumers": [
         "comfy_ui output and asset surfaces",
@@ -838,11 +886,13 @@
         "D41"
       ],
       "validation": [
-        "VAL-ASSET-001",
+        "VAL-DOMAIN-008",
+        "VAL-NATIVE-E2E-001",
+        "VAL-RECOVERY-005",
         "VAL-OWNERSHIP-DOMAIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "AssetService alone owns asset authorization, mutation, metadata, tags, and asset-specific persistence; it delegates byte identity, secure roots, and filesystem indexing to ArtifactRoot and ArtifactIndex. Profile startup creates one shared handle consumed by desktop, CLI, API, controller, plugin, output, and model adapters."
+      "decision_reason": "AssetService alone owns asset authorization, mutation, metadata, tags, and asset-specific persistence; it delegates byte identity, secure roots, and filesystem indexing to ArtifactRoot and ArtifactIndex. NativeAssetResolverRegistry is the sole attempt-scoped adapter that seals AssetIdentity and authority behind opaque NativeAssetReference values, delegates bounded reads back to AssetService, and retires all references when an attempt ends. Profile startup creates one shared handle consumed by desktop, CLI, API, controller, plugin, output, and model adapters."
     },
     {
       "concern": "attention_kernel_mechanics",
@@ -3160,16 +3210,24 @@
       "concern": "final_output_commit",
       "canonical_owner": "comfy_runtime::OutputCommitter",
       "owner_files": [
-        "crates/comfy_runtime/src/output_committer.rs"
+        "crates/comfy_runtime/src/output_committer.rs",
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_runtime/src/executor.rs"
       ],
       "owner_symbols": [
-        "OutputCommitter"
+        "OutputCommitter",
+        "NativeOutputEffectRequest",
+        "NativePreparedEffectKind",
+        "NativePreparedEffectRequest",
+        "NativePreparedEffectService",
+        "EffectCoordinator"
       ],
       "allowed_adapters": [
         "workers and plugins propose opaque output chunks and metadata without filesystem roots",
         "RuntimeSupervisor wire DTOs carry bounded proposal identities only",
         "RecoveryJournal records commit receipts but never performs a second commit",
         "PluginOutputPublicationAdapter maps checked invocation-local PluginOutputProposal DTOs once into attempt-scoped OutputProposal values and delegates one batch to OutputCommitter",
+        "NativePreparedEffectService creates sealed attempt-and-node-scoped tickets from typed NativeOutputEffectRequest values; ExecutionEngine validates and rolls back those tickets before EffectCoordinator may delegate a final batch to OutputCommitter",
         "AssetService registration runs as the final rollback-safe hook inside OutputCommitter's publication transaction",
         "OutputCommitter receipts retain bounded opaque projection metadata so the native controller can durably reconstruct a missing canonical output event without a second receipt journal",
         "NativeExecutionController holds ExecutionPresentationOwner's mutation lease across precommit validation, publication, asset registration, and durable output projection, then reconciles committed-but-unprojected receipts exactly once at startup",
@@ -3184,6 +3242,36 @@
           "qualified": "comfy_runtime::OutputCommitter",
           "role": "canonical",
           "symbol": "OutputCommitter"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeOutputEffectRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeOutputEffectRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativePreparedEffectKind",
+          "role": "boundary_dto",
+          "symbol": "NativePreparedEffectKind"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativePreparedEffectRequest",
+          "role": "boundary_dto",
+          "symbol": "NativePreparedEffectRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativePreparedEffectService",
+          "role": "boundary_dto",
+          "symbol": "NativePreparedEffectService"
+        },
+        {
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "qualified": "comfy_runtime::EffectCoordinator",
+          "role": "allowed_adapter",
+          "symbol": "EffectCoordinator"
         },
         {
           "path": "crates/comfy_plugin_host/src/capabilities.rs",
@@ -3264,6 +3352,11 @@
         "CapabilityEffects",
         "NativeImageWorkerPlan",
         "NativeImageWorkerResult",
+        "NativeOutputEffectRequest",
+        "NativePreparedEffectKind",
+        "NativePreparedEffectRequest",
+        "NativePreparedEffectService",
+        "EffectCoordinator",
         "OutputCommitter",
         "OutputProposalBuffer",
         "PluginOutputProposal",
@@ -3307,6 +3400,11 @@
           "pattern": "OutputCommitter"
         },
         {
+          "name": "native-prepared-effects-are-sealed-and-transactional",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "(?s)(?=.*NativePreparedEffectService)(?=.*rollback_node_prepared_effects)(?=.*prepared_effect\\(&effect)(?=.*commit_batch\\(&state\\.prepared_effects)(?=.*rollback_batch\\(&state\\.prepared_effects)"
+        },
+        {
           "name": "worker-output-wire-round-trip-is-bounded",
           "path": "crates/comfy_types/src/worker_protocol.rs",
           "pattern": "impl TryFrom<WorkerOutputProposalWire> for WorkerOutputProposal[\\s\\S]*WorkerOutputProposal::new"
@@ -3342,6 +3440,7 @@
         "comfy-parity-execution-output-owner-consolidation",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
+        ,"comfy-parity-native-node-asset-effect-foundation"
       ],
       "production_consumers": [
         "native image execution controller",
@@ -3365,10 +3464,12 @@
       ],
       "validation": [
         "VAL-OUTPUT-001",
+        "VAL-DOMAIN-004",
+        "VAL-NATIVE-E2E-001",
         "VAL-RECOVERY-004",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "Only OutputCommitter may validate an output destination and make staged bytes visible. AssetService index registration is an in-transaction rollback hook, while worker, plugin, runtime, and recovery layers exchange proposals and durable receipts around that single commit boundary."
+      "decision_reason": "Only OutputCommitter may validate an output destination and make staged bytes visible. Native nodes may prepare only typed, sealed, attempt-scoped effect tickets; ExecutionEngine owns their validation and exact rollback until EffectCoordinator delegates the final batch to OutputCommitter. AssetService index registration is an in-transaction rollback hook, while worker, plugin, runtime, and recovery layers exchange proposals and durable receipts around that single commit boundary."
     },
     {
       "concern": "frontend_plugin_contribution_declaration",
@@ -9432,6 +9533,8 @@
         "NativeNodeBinding",
         "NativeNodePresentation",
         "NativeNodeContext",
+        "NativeNodeComputeSession",
+        "NativeNodeServices",
         "NativeValue",
         "NativeHandleType",
         "NativeHandleStoreIdentity",
@@ -9492,6 +9595,14 @@
         "NativePoseKeypointPayload",
         "NativeSam3TrackDataPayload",
         "NativeTracksPayload",
+        "NativeAudioPayload",
+        "NativeVideoPayload",
+        "NativeArtifactPayload",
+        "NativeFile3DPayload",
+        "NativeCameraPayload",
+        "NativeSplatPayload",
+        "NativeMeshPayload",
+        "NativeVoxelPayload",
         "NativeMediaResidentParts",
         "NativeMediaTensorResidentAllocation",
         "AudioEncoderOutput",
@@ -9549,6 +9660,18 @@
           "qualified": "comfy_nodes::NativeNodeContext",
           "role": "boundary_dto",
           "symbol": "NativeNodeContext"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeNodeComputeSession",
+          "role": "boundary_dto",
+          "symbol": "NativeNodeComputeSession"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeNodeServices",
+          "role": "boundary_dto",
+          "symbol": "NativeNodeServices"
         },
         {
           "path": "crates/comfy_nodes/src/execution.rs",
@@ -9888,6 +10011,54 @@
         },
         {
           "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeAudioPayload",
+          "role": "canonical",
+          "symbol": "NativeAudioPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVideoPayload",
+          "role": "canonical",
+          "symbol": "NativeVideoPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeArtifactPayload",
+          "role": "canonical",
+          "symbol": "NativeArtifactPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeFile3DPayload",
+          "role": "canonical",
+          "symbol": "NativeFile3DPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeCameraPayload",
+          "role": "canonical",
+          "symbol": "NativeCameraPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeSplatPayload",
+          "role": "canonical",
+          "symbol": "NativeSplatPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeMeshPayload",
+          "role": "canonical",
+          "symbol": "NativeMeshPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVoxelPayload",
+          "role": "canonical",
+          "symbol": "NativeVoxelPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
           "qualified": "comfy_media::NativeMediaResidentParts",
           "role": "boundary_dto",
           "symbol": "NativeMediaResidentParts"
@@ -10008,6 +10179,8 @@
         "NativeNodeBinding",
         "NativeNodePresentation",
         "NativeNodeContext",
+        "NativeNodeComputeSession",
+        "NativeNodeServices",
         "NativeNodeRegistry",
         "NativeHandleType",
         "NativeHandleStoreIdentity",
@@ -10055,6 +10228,14 @@
         "NativePoseKeypointPayload",
         "NativeSam3TrackDataPayload",
         "NativeTracksPayload",
+        "NativeAudioPayload",
+        "NativeVideoPayload",
+        "NativeArtifactPayload",
+        "NativeFile3DPayload",
+        "NativeCameraPayload",
+        "NativeSplatPayload",
+        "NativeMeshPayload",
+        "NativeVoxelPayload",
         "NativeMediaResidentParts",
         "NativeMediaTensorResidentAllocation",
         "AudioEncoderOutput",
@@ -10181,7 +10362,7 @@
         "VAL-WORKER-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, media-annotation, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
+      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, explicit audio/video/artifact/File3D/camera/splat/mesh/voxel media values, media annotations, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. NativeNodeComputeSession and NativeNodeServices bind the attempt's exact backend and scratch reservation below the runtime dependency boundary. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
     },
     {
       "concern": "native_rgb8_tensor_conversion",

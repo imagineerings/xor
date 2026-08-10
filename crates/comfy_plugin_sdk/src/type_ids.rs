@@ -267,7 +267,7 @@ struct RegisteredType {
 
 impl TypeRegistry {
     pub fn built_in() -> Result<Self, TypeRegistryError> {
-        let registry = Self::from_registrations(BUILT_IN_TYPES)?;
+        let registry = TypeRegistry::from_registrations(BUILT_IN_TYPES)?;
         validate_native_source_projections(BUILT_IN_TYPES)?;
         Ok(registry)
     }

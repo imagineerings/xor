@@ -9887,6 +9887,48 @@ fn validate_native_stored_payload_boundary(
             );
         }
     }
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    let prepared_effect_declaration = execution
+        .split_once("pub struct NativePreparedEffectRequest {")
+        .and_then(|(prefix, declaration)| {
+            prefix.rsplit_once("#[derive(").map(|(_, derive)| {
+                format!("#[derive({derive}pub struct NativePreparedEffectRequest {{{declaration}")
+            })
+        })
+        .and_then(|declaration| {
+            declaration
+                .split_once("impl NativePreparedEffectRequest")
+                .map(|(declaration, _)| declaration.to_owned())
+        })
+        .ok_or("native prepared-effect ticket declaration is missing")?;
+    assert!(!prepared_effect_declaration.contains("Serialize"));
+    assert!(!prepared_effect_declaration.contains("Deserialize"));
+    for (path, source) in sources {
+        let path = path.to_string_lossy();
+        if path.contains("crates/comfy_worker/")
+            || path.contains("crates/comfy_api/")
+            || path.ends_with("crates/comfy_types/src/worker_protocol.rs")
+        {
+            if path.contains("/tests/") {
+                continue;
+            }
+            let production = source
+                .split_once("#[cfg(test)]")
+                .map_or(source.as_str(), |(production, _)| production);
+            for capability in [
+                "NativeAssetReference",
+                "NativeAssetReadRequest",
+                "NativeNodeComputeSession",
+                "NativeNodeServices",
+                "NativePreparedEffectRequest",
+            ] {
+                assert!(
+                    !production.contains(capability),
+                    "process-local native capability {capability} leaked into {path}"
+                );
+            }
+        }
+    }
     assert!(
         production_source_occurrences(&sources, "impl<T> NativeResolvedPayloadRetention")
             .is_empty()
@@ -9897,6 +9939,34 @@ fn validate_native_stored_payload_boundary(
     assert!(resolved_payload_constructors[0].contains("crates/comfy_runtime/src/executor.rs"));
 
     let owner_definitions = [
+        (
+            "pub struct NativeAssetReference {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub trait NativeAssetResolver:",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub trait NativePreparedEffectService:",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativeNodeComputeSession {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativeNodeServices {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativePreparedEffectRequest {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativeAssetResolverRegistry {",
+            "crates/comfy_runtime/src/assets.rs",
+        ),
         (
             "pub enum NativeStoredPayload {",
             "crates/comfy_nodes/src/stored_payload.rs",
@@ -10038,6 +10108,38 @@ fn validate_native_stored_payload_boundary(
             "crates/comfy_media/src/native_node_payload.rs",
         ),
         (
+            "pub struct NativeAudioPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeVideoPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeArtifactPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeFile3DPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeCameraPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeSplatPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeMeshPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
+            "pub struct NativeVoxelPayload {",
+            "crates/comfy_media/src/native_node_payload.rs",
+        ),
+        (
             "pub struct NativeMediaTensorResidentAllocation {",
             "crates/comfy_media/src/native_node_payload.rs",
         ),
@@ -10105,6 +10207,14 @@ fn validate_native_stored_payload_boundary(
         "ClipVisionOutput(Arc<ClipVisionOutput>)",
         "IcLoraParameters(Arc<IcLoraParameters>)",
         "LossMap(Arc<LossMap>)",
+        "Audio(Arc<NativeAudioPayload>)",
+        "Video(Arc<NativeVideoPayload>)",
+        "Artifact(Arc<NativeArtifactPayload>)",
+        "File3D(Arc<NativeFile3DPayload>)",
+        "Camera(Arc<NativeCameraPayload>)",
+        "Splat(Arc<NativeSplatPayload>)",
+        "Mesh(Arc<NativeMeshPayload>)",
+        "Voxel(Arc<NativeVoxelPayload>)",
         "Provider(Arc<NativeProviderPayload>)",
     ] {
         assert!(
@@ -10163,6 +10273,11 @@ fn validate_native_stored_payload_boundary(
         "Self::Tracks(payload) => media_residency(",
         "Self::AudioEncoderOutput(payload) => structured_model_residency(",
         "Self::LossMap(payload) => structured_model_residency(",
+        "Self::Audio(payload) => media_residency(",
+        "Self::Video(payload) => media_residency(",
+        "Self::Splat(payload) => media_residency(",
+        "Self::Mesh(payload) => media_residency(",
+        "Self::Voxel(payload) => media_residency(",
     ] {
         assert!(
             residency_projection.contains(required_projection),
@@ -10176,6 +10291,11 @@ fn validate_native_stored_payload_boundary(
         "Self::Tracks(payload) => single_arc_residency",
         "Self::AudioEncoderOutput(payload) => single_arc_residency",
         "Self::LossMap(payload) => single_arc_residency",
+        "Self::Audio(payload) => single_arc_residency",
+        "Self::Video(payload) => single_arc_residency",
+        "Self::Splat(payload) => single_arc_residency",
+        "Self::Mesh(payload) => single_arc_residency",
+        "Self::Voxel(payload) => single_arc_residency",
         "NativeStoredModelResource::Diffusion(diffusion) => single_arc_residency",
     ] {
         assert!(

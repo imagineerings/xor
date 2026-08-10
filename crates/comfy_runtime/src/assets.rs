@@ -683,6 +683,7 @@ pub type SharedAssetService = Arc<Mutex<AssetService>>;
 #[derive(Clone, Debug)]
 struct NativeAssetResolutionRecord {
     service_id: Uuid,
+    attempt_id: comfy_types::AttemptId,
     identity: AssetIdentity,
     source_type_id: String,
     byte_length: u64,
@@ -757,6 +758,7 @@ impl NativeAssetResolverRegistry {
         )?;
         let resolution = NativeAssetResolutionRecord {
             service_id: service_identity.service_id(),
+            attempt_id: service_identity.attempt_id(),
             identity,
             source_type_id,
             byte_length: record.byte_size,
@@ -775,6 +777,12 @@ impl NativeAssetResolverRegistry {
         Ok(reference)
     }
 
+    pub fn retire_attempt(&self, attempt_id: comfy_types::AttemptId) {
+        if let Ok(mut references) = self.references.lock() {
+            references.retain(|_, record| record.attempt_id != attempt_id);
+        }
+    }
+
     pub fn node_service(
         self: &Arc<Self>,
         identity: NativeNodeServiceIdentity,
@@ -789,6 +797,7 @@ impl NativeAssetResolverRegistry {
 impl PartialEq for NativeAssetResolutionRecord {
     fn eq(&self, other: &Self) -> bool {
         self.service_id == other.service_id
+            && self.attempt_id == other.attempt_id
             && self.identity == other.identity
             && self.source_type_id == other.source_type_id
             && self.byte_length == other.byte_length
@@ -2929,8 +2938,11 @@ mod tests {
             attempt_id,
             NodeId::from("asset-node"),
         )?;
-        let reference =
-            registry.seal_for_node(&node_identity, uploaded.record.identity, "FILE_3D_PLY")?;
+        let reference = registry.seal_for_node(
+            &node_identity,
+            uploaded.record.identity.clone(),
+            "FILE_3D_PLY",
+        )?;
         assert!(!format!("{reference:?}").contains("sealed.bin"));
         let request = NativeAssetReadRequest::checked(reference.clone(), 1024)?;
         let resolved = registry
@@ -2938,6 +2950,17 @@ mod tests {
             .read_verified(&request, &cancellation)?;
         assert_eq!(resolved.bytes().as_ref(), b"canonical-asset");
         assert_eq!(resolved.reference(), &reference);
+
+        registry.retire_attempt(attempt_id);
+        assert!(matches!(
+            registry
+                .node_service(node_identity.clone())
+                .read_verified(&request, &cancellation),
+            Err(NativeAssetServiceError::InvalidReference)
+        ));
+        let reference =
+            registry.seal_for_node(&node_identity, uploaded.record.identity, "FILE_3D_PLY")?;
+        let request = NativeAssetReadRequest::checked(reference, 1024)?;
 
         let foreign_identity = NativeNodeServiceIdentity::checked(
             Uuid::from_u128(0xa553),

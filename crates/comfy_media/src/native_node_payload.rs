@@ -1385,7 +1385,6 @@ impl NativeSplatPayload {
         spherical_harmonics: Tensor,
         counts: Option<Vec<u64>>,
     ) -> Result<Self, NativeMediaPayloadError> {
-        let counts = counts.map(Vec::into_boxed_slice);
         validate_splat(
             &positions,
             &scales,
@@ -1394,6 +1393,10 @@ impl NativeSplatPayload {
             &spherical_harmonics,
             counts.as_deref(),
         )?;
+        let padded_count = positions.descriptor().shape()[1];
+        let counts = counts
+            .filter(|counts| counts.iter().any(|count| *count != padded_count))
+            .map(Vec::into_boxed_slice);
         let (semantic_digest_sha256, resident_bytes) = project_splat::<Self>(
             &positions,
             &scales,
@@ -3846,6 +3849,14 @@ mod tests {
         )?;
         let opacity = tensor(vec![1, 2, 1], DType::F32, f32_bytes(&[0.0; 2]))?;
         let spherical_harmonics = tensor(vec![1, 2, 1, 3], DType::F32, f32_bytes(&[0.5; 6]))?;
+        let uniform_counts = NativeSplatPayload::checked(
+            positions.clone(),
+            scales.clone(),
+            rotations.clone(),
+            opacity.clone(),
+            spherical_harmonics.clone(),
+            Some(vec![2]),
+        )?;
         let splat = NativeSplatPayload::checked(
             positions,
             scales,
@@ -3855,11 +3866,59 @@ mod tests {
             None,
         )?;
         splat.validate()?;
+        assert!(uniform_counts.counts().is_none());
+        assert_eq!(
+            uniform_counts.semantic_digest_sha256(),
+            splat.semantic_digest_sha256()
+        );
+        assert_eq!(uniform_counts.resident_bytes(), splat.resident_bytes());
         assert_eq!((splat.batch_count(), splat.splat_count()), (1, 2));
         assert_eq!(
             splat.resident_parts()?.resident_bytes()?,
             splat.resident_bytes()
         );
+
+        let padded_splat = NativeSplatPayload::checked(
+            tensor(
+                vec![1, 2, 3],
+                DType::F32,
+                f32_bytes(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            )?,
+            tensor(
+                vec![1, 2, 3],
+                DType::F32,
+                f32_bytes(&[0.1, 0.1, 0.1, 0.0, 0.0, 0.0]),
+            )?,
+            tensor(
+                vec![1, 2, 4],
+                DType::F32,
+                f32_bytes(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
+            )?,
+            tensor(vec![1, 2, 1], DType::F32, f32_bytes(&[0.5, 0.0]))?,
+            tensor(
+                vec![1, 2, 1, 3],
+                DType::F32,
+                f32_bytes(&[0.5, 0.5, 0.5, 0.0, 0.0, 0.0]),
+            )?,
+            Some(vec![1]),
+        )?;
+        assert_eq!(padded_splat.counts(), Some(&[1][..]));
+        assert_eq!(padded_splat.splat_count(), 1);
+        assert!(matches!(
+            NativeSplatPayload::checked(
+                tensor(
+                    vec![1, 2, 3],
+                    DType::F32,
+                    f32_bytes(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+                )?,
+                padded_splat.scales().clone(),
+                padded_splat.rotations().clone(),
+                padded_splat.opacity().clone(),
+                padded_splat.spherical_harmonics().clone(),
+                Some(vec![1]),
+            ),
+            Err(NativeMediaPayloadError::InvalidSplat)
+        ));
 
         let vertices = tensor(
             vec![3, 3],
@@ -3874,6 +3933,50 @@ mod tests {
                 .flat_map(i32::to_ne_bytes)
                 .collect(),
         )?;
+        let full_mesh = NativeMeshPayload::checked(
+            vec![NativeMeshBatch::checked(
+                vertices.clone(),
+                faces.clone(),
+                Some(vertices.clone()),
+                Some(tensor(
+                    vec![3, 2],
+                    DType::F32,
+                    f32_bytes(&[0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                )?),
+                Some(tensor(vec![3, 4], DType::F32, f32_bytes(&[1.0; 12]))?),
+                Some(tensor(vec![1, 1, 3], DType::F32, f32_bytes(&[0.25; 3]))?),
+            )?],
+            false,
+        )?;
+        full_mesh.validate()?;
+        assert!(!full_mesh.unlit());
+        assert!(full_mesh.batches()[0].normals().is_some());
+        assert!(full_mesh.batches()[0].uvs().is_some());
+        assert!(full_mesh.batches()[0].colors().is_some());
+        assert!(full_mesh.batches()[0].texture().is_some());
+        assert_eq!(
+            full_mesh.resident_parts()?.tensor_allocations().len(),
+            5,
+            "vertices and aliased normals must charge one storage"
+        );
+        assert!(matches!(
+            NativeMeshBatch::checked(
+                vertices.clone(),
+                tensor(
+                    vec![1, 3],
+                    DType::I32,
+                    [0_i32, 1, 3]
+                        .into_iter()
+                        .flat_map(i32::to_ne_bytes)
+                        .collect(),
+                )?,
+                None,
+                None,
+                None,
+                None,
+            ),
+            Err(NativeMediaPayloadError::InvalidMesh)
+        ));
         let mesh = NativeMeshPayload::checked(
             vec![NativeMeshBatch::checked(
                 vertices, faces, None, None, None, None,

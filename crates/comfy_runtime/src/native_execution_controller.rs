@@ -1049,6 +1049,37 @@ struct NativeImageWorkerUiOutput {
     encoded_json: Vec<u8>,
 }
 
+fn validate_native_worker_ui_value(value: &Value) -> Result<(), String> {
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        match value {
+            Value::Array(values) => pending.extend(values),
+            Value::Object(values) => {
+                for (key, value) in values {
+                    if [
+                        "service_id",
+                        "reference_id",
+                        "request_digest_sha256",
+                        "scratch_binding",
+                        "backend_id",
+                        "authority_id",
+                    ]
+                    .iter()
+                    .any(|reserved| key.eq_ignore_ascii_case(reserved))
+                    {
+                        return Err(format!(
+                            "native worker UI output contains private capability key `{key}`"
+                        ));
+                    }
+                    pending.push(value);
+                }
+            }
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+        }
+    }
+    Ok(())
+}
+
 impl NativeImageWorkerResult {
     pub fn from_execution_report(
         mut report: ExecutionReport,
@@ -1063,6 +1094,7 @@ impl NativeImageWorkerResult {
         let mut encoded_byte_count = 0_usize;
         let mut encoded_ui_outputs = Vec::with_capacity(report.ui_outputs.len());
         for (node_id, value) in std::mem::take(&mut report.ui_outputs) {
+            validate_native_worker_ui_value(&value).map_err(NativeImageRuntimeError::Encoding)?;
             let encoded_json = serde_json::to_vec(&value)
                 .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
             encoded_byte_count = encoded_byte_count
@@ -1121,6 +1153,8 @@ impl NativeImageWorkerResult {
             }
             let value = serde_json::from_slice(&output.encoded_json)
                 .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+            validate_native_worker_ui_value(&value)
+                .map_err(NativeImageRuntimeError::WorkerEvent)?;
             if ui_outputs.insert(output.node_id.clone(), value).is_some() {
                 return Err(NativeImageRuntimeError::WorkerEvent(format!(
                     "native worker repeated UI output for node {:?}",
@@ -6873,6 +6907,36 @@ mod tests {
             Err(NativeImageRuntimeError::WorkerEvent(message))
                 if message.contains("process-local outputs or events")
         ));
+
+        for key in [
+            "service_id",
+            "reference_id",
+            "request_digest_sha256",
+            "scratch_binding",
+            "backend_id",
+            "authority_id",
+        ] {
+            let report = ExecutionReport {
+                profile_id,
+                prompt_id,
+                attempt_id,
+                state: AttemptState::Succeeded,
+                outputs: BTreeMap::new(),
+                ui_outputs: BTreeMap::from([(
+                    NodeId("worker".to_owned()),
+                    json!({"nested": [{(key): "private"}]}),
+                )]),
+                events: Vec::new(),
+                cache_hits: 0,
+                error: None,
+                handle_lease: None,
+            };
+            assert!(matches!(
+                NativeImageWorkerResult::from_execution_report(report, Vec::new(), 1),
+                Err(NativeImageRuntimeError::Encoding(message))
+                    if message.contains("private capability key")
+            ));
+        }
         Ok(())
     }
 

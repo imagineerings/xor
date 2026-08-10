@@ -3625,6 +3625,29 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn native_prompt_literals_reject_nested_process_local_handles() -> Result<(), Box<dyn Error>> {
+        let identity: comfy_runtime::NativeHandleStoreIdentity = serde_json::from_value(json!({
+            "store_id": "00000000-0000-0000-0000-000000000001",
+            "generation_id": "00000000-0000-0000-0000-000000000002",
+        }))?;
+        let handle = comfy_runtime::NativeOpaqueHandle::new(
+            comfy_runtime::NativeHandleType::new(comfy_runtime::NativeHandleKind::Artifact, "SVG")?,
+            identity,
+            "artifact-1",
+            1,
+            Some("a".repeat(64)),
+        )?;
+        let literal = NativeValue::List {
+            values: vec![NativeValue::List {
+                values: vec![NativeValue::Handle { value: handle }],
+            }],
+        };
+        let error = native_literal_json(&literal).expect_err("handles must remain process-local");
+        assert_eq!(error.code, "native_prompt_handle_not_serializable");
+        Ok(())
+    }
+
+    #[test]
     fn authority_is_profile_bound_and_later_owned_routes_fail_explicitly()
     -> Result<(), NativeServiceError> {
         let profile_id = profile("00000000-0000-0000-0000-000000000001")?;

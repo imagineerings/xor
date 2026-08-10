@@ -1641,6 +1641,8 @@ fn rollback_node_prepared_effects(
 #[derive(Debug, Default)]
 struct EffectCoordinatorCalls {
     prepared: Vec<PreparedEffect>,
+    prepared_history: Vec<Uuid>,
+    node_rolled_back: Vec<Uuid>,
     committed_batches: Vec<Vec<PreparedEffect>>,
     rolled_back_batches: Vec<Vec<PreparedEffect>>,
 }
@@ -1705,7 +1707,10 @@ impl NativePreparedEffectService for RecordingPreparedEffectService {
             kind: NativePreparedEffectKind::Output,
             request_digest_sha256: request.request_digest_sha256().to_owned(),
         };
-        self.calls.lock().prepared.push(prepared.clone());
+        let mut calls = self.calls.lock();
+        calls.prepared_history.push(transaction_id);
+        calls.prepared.push(prepared.clone());
+        drop(calls);
         if cancellation.check().is_err() {
             self.calls
                 .lock()
@@ -1732,22 +1737,41 @@ impl NativePreparedEffectService for RecordingPreparedEffectService {
         }) else {
             return Err(comfy_nodes::NativeEffectServiceError::InvalidTicket);
         };
-        calls.prepared.remove(index);
+        let prepared = calls.prepared.remove(index);
+        calls.node_rolled_back.push(prepared.transaction_id);
         Ok(())
     }
 
     fn rollback_all_prepared(&self) -> Result<(), comfy_nodes::NativeEffectServiceError> {
-        self.calls.lock().prepared.retain(|prepared| {
-            prepared.service_id != self.identity.service_id()
-                || prepared.attempt_id != self.identity.attempt_id()
-                || prepared.node_id != *self.identity.node_id()
-        });
+        let mut calls = self.calls.lock();
+        let mut retained = Vec::with_capacity(calls.prepared.len());
+        let mut rolled_back = Vec::new();
+        for prepared in calls.prepared.drain(..) {
+            if prepared.service_id == self.identity.service_id()
+                && prepared.attempt_id == self.identity.attempt_id()
+                && prepared.node_id == *self.identity.node_id()
+            {
+                rolled_back.push(prepared.transaction_id);
+            } else {
+                retained.push(prepared);
+            }
+        }
+        calls.prepared = retained;
+        calls.node_rolled_back.extend(rolled_back);
         Ok(())
     }
 }
 
 #[cfg(test)]
 impl RecordingEffectCoordinator {
+    pub fn prepared_history(&self) -> BTreeSet<Uuid> {
+        self.calls.lock().prepared_history.iter().copied().collect()
+    }
+
+    pub fn node_rolled_back(&self) -> BTreeSet<Uuid> {
+        self.calls.lock().node_rolled_back.iter().copied().collect()
+    }
+
     pub fn prepared(&self) -> BTreeSet<Uuid> {
         self.calls
             .lock()
@@ -2234,6 +2258,10 @@ impl ExecutionEngine {
             Ok(())
         }
         .await;
+
+        if let Some(asset_resolvers) = &self.asset_resolvers {
+            asset_resolvers.retire_attempt(attempt_id);
+        }
 
         match result {
             Ok(()) => ExecutionReport {
@@ -3545,6 +3573,22 @@ pub(crate) mod tests {
                             outputs: vec![native_string("prepared")],
                             ui: None,
                             effects: vec![prepare_test_effect(&context, b"output")?],
+                        });
+                    }
+                    "PrepareThenFail" => {
+                        let _prepared_effect = prepare_test_effect(&context, b"failure")?;
+                        return Err(NodeFailure {
+                            code: "fixture_failure".to_owned(),
+                            message: "fixture failed after preparing an effect".to_owned(),
+                            kind: NodeFailureKind::Failure,
+                            retryable: false,
+                        });
+                    }
+                    "PrepareThenInvalidOutput" => {
+                        return Ok(NodeOutcome::Values {
+                            outputs: vec![native_string("invalid")],
+                            ui: None,
+                            effects: vec![prepare_test_effect(&context, b"invalid-output")?],
                         });
                     }
                     "Block" => {
@@ -5387,6 +5431,66 @@ pub(crate) mod tests {
             assert!(generation.is_empty());
             assert!(cache.lock().is_empty());
             assert!(effects.committed().is_empty());
+            Ok::<(), Box<dyn std::error::Error>>(())
+        })
+    }
+
+    #[test]
+    fn native_prepared_effects_roll_back_before_node_failure_publication()
+    -> Result<(), Box<dyn std::error::Error>> {
+        smol::block_on(async {
+            let (_backend, workspace_authority) =
+                CpuWorkspaceAuthority::create_backend(TEST_WORKSPACE_BYTES)?;
+            for (ordinal, class_type) in ["PrepareThenFail", "PrepareThenInvalidOutput"]
+                .into_iter()
+                .enumerate()
+            {
+                let descriptor = runtime_descriptor(
+                    class_type,
+                    true,
+                    BTreeMap::new(),
+                    EffectClass::WritesArtifact,
+                )?;
+                let plan = compile_plan(
+                    vec![descriptor],
+                    BTreeMap::from([(
+                        NodeId::from("effect"),
+                        PromptNode {
+                            class_type: class_type.to_owned(),
+                            inputs: BTreeMap::new(),
+                            unknown: BTreeMap::new(),
+                        },
+                    )]),
+                )?;
+                let mut registry = NativeNodeRegistry::default();
+                registry.register(Arc::new(FixtureNode {
+                    class_type: class_type.to_owned(),
+                    calls: Arc::new(AtomicUsize::new(0)),
+                }))?;
+                let effects = Arc::new(RecordingEffectCoordinator::default());
+                let engine = ExecutionEngine::new_with_workspace_authorization(
+                    ProfileId(Uuid::from_u128(71)),
+                    Arc::new(registry),
+                    Arc::new(Mutex::new(NativeCache::new(4)?)),
+                    effects.clone(),
+                    "registry-v1",
+                    workspace_authority.authorize_workspace(TEST_WORKSPACE_BYTES)?,
+                )?;
+                let report = engine
+                    .execute(
+                        &plan,
+                        AttemptId(Uuid::from_u128(72 + u128::try_from(ordinal)?)),
+                        CancellationToken::default(),
+                    )
+                    .await;
+                assert_eq!(report.state, AttemptState::Failed);
+                assert!(report.outputs.is_empty());
+                assert!(effects.prepared().is_empty());
+                assert!(effects.committed().is_empty());
+                assert!(effects.rolled_back().is_empty());
+                assert_eq!(effects.prepared_history(), effects.node_rolled_back());
+                assert_eq!(effects.node_rolled_back().len(), 1);
+            }
             Ok::<(), Box<dyn std::error::Error>>(())
         })
     }

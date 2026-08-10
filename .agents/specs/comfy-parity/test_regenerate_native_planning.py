@@ -173,6 +173,8 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_nodes/src/slices/native_image.descriptors.json", schema_writes)
         self.assertIn("crates/comfy_runtime/src/executor.rs", schema_writes)
         self.assertIn("crates/comfy_runtime/src/graph.rs", schema_writes)
+        self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", asset_reads)
+        self.assertIn("crates/comfy_plugin_sdk/src/type_ids.rs", asset_writes)
         self.assertIn("crates/comfy_runtime/src/workflow_formats.rs", schema_writes)
         self.assertIn("crates/comfy_api/src/services.rs", schema_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", schema_writes)
@@ -248,6 +250,13 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_runtime/src/permissions.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", asset_writes)
         self.assertIn("crates/comfy_plugin_host/tests/component_contract.rs", asset_writes)
+        asset_task = tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]
+        self.assertEqual(
+            asset_task["validations"],
+            ["VAL-DOMAIN-008", "VAL-NATIVE-E2E-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
+        )
+        self.assertNotIn("VAL-NODE-002", asset_task["validations"])
+        self.assertIn("41.6", asset_task["criterion_ids"])
         self.assertNotIn("crates/comfy_runtime/src/providers.rs", provider_reads)
         self.assertIn("crates/comfy_runtime/src/trust.rs", provider_reads)
         self.assertIn("crates/comfy_runtime/src/permissions.rs", provider_reads)
@@ -303,8 +312,25 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id["comfy-parity-native-node-asset-effect-foundation"]
         )
         for command in [
+            "cargo test --locked -p comfy_media --lib native_node_payload -- --nocapture",
+            "cargo test --locked -p comfy_media --lib gaussian_splat -- --nocapture",
+            "cargo test --locked -p comfy_nodes --lib stored_payload::tests -- --nocapture",
+            "cargo test --locked -p comfy_plugin_sdk --lib type_ids -- --nocapture",
+            "compute_session_requires_the_contexts_exact_backend_and_scratch_binding -- --exact --nocapture",
+            "native_asset_resolver_seals_paths_and_rejects_foreign_or_cancelled_reads -- --exact --nocapture",
+            "native_prepared_effects_roll_back_before_node_failure_publication -- --exact --nocapture",
+            "native_worker_result_maps_ui_outputs_through_a_bounded_wire_dto -- --exact --nocapture",
+            "ipc_schema_contains_no_tensor_pointer_path_or_plugin_handle -- --exact --nocapture",
+            "native_prompt_literals_reject_nested_process_local_handles -- --exact --nocapture",
+            "cargo test --locked -p comfy_runtime val_domain_004 -- --nocapture",
             "cargo test --locked -p comfy_plugin_host --lib registry_adapter -- --nocapture",
             "cargo test --locked -p comfy_plugin_host --test component_contract -- --nocapture",
+            "native_image_e2e val_native_e2e_001 -- --exact --nocapture",
+            "cargo test --locked -p comfy_runtime val_domain_008 -- --nocapture",
+            "filesystem_asset_recovery val_recovery_005 -- --nocapture",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice",
+            "validate_spec.py .agents/specs/comfy-parity --require-complete",
         ]:
             self.assertIn(command, asset_commands)
 
