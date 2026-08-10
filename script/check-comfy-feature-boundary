@@ -32,6 +32,12 @@ assert all(not item.startswith("comfy_") for item in features["test-support"])
 extension_host = tomllib.loads((root / "crates/extension_host/Cargo.toml").read_text())
 assert "comfy_model" not in extension_host["dependencies"]
 assert "\"comfy_runtime\"" not in (root / "assets/settings/default.json").read_text()
+windows_bundle = (root / "script/bundle-windows.ps1").read_text()
+windows_installer = (root / "crates/sim/resources/windows/sim.iss").read_text()
+assert "[Parameter()][switch]$Comfy" in windows_bundle
+assert "[Parameter()][switch]$DryRun" in windows_bundle
+assert "if ($Comfy)" in windows_bundle
+assert "#ifdef Comfy\nSource: \"{#ResourcesDir}\\comfy-worker.exe\"" in windows_installer
 '
 
 tree=$(cargo tree --locked -p sim --no-default-features -e normal --prefix none)
@@ -75,8 +81,9 @@ payload = {
         "default_settings_exclude_comfy": True,
         "macos_package_modes_are_explicit": True,
         "linux_package_modes_are_explicit": True,
+        "windows_package_modes_are_explicit": True,
     },
-    "summary": {"passed": 6, "failed": 0, "skipped": 0},
+    "summary": {"passed": 7, "failed": 0, "skipped": 0},
 }
 path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 ' "$artifact_dir/val-comfy-build-001.json" "$tree_sha256"

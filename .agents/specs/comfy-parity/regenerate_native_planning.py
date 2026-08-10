@@ -9599,7 +9599,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(node_asset_effect_foundation["id"])
     )
     comfy_build_boundary = comfy_opt_in_build_boundary_task(
-        str(node_provider_foundation["id"])
+        str(node_asset_effect_foundation["id"])
+    )
+    node_provider_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(node_provider_foundation["dependencies"])
+            + [str(comfy_build_boundary["id"])]
+        )
     )
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
@@ -13647,6 +13653,17 @@ def write_mapping(
         raise RuntimeError(
             "graph context menu validation override must cover exactly 63 features"
         )
+    comfy_build_boundary_feature_id = "COMFY-DESKTOP-206"
+    feature_criterion_overrides[comfy_build_boundary_feature_id] = list(criteria[45])
+    feature_validation_overrides[comfy_build_boundary_feature_id] = [
+        "VAL-COMFY-BUILD-001"
+    ]
+    special.setdefault(comfy_build_boundary_feature_id, []).append(
+        "comfy-parity-opt-in-product-build-boundary"
+    )
+    special[comfy_build_boundary_feature_id] = sorted(
+        set(special[comfy_build_boundary_feature_id])
+    )
     criterion_designs = {
         criterion: CRITERION_DESIGN_OVERRIDES.get(criterion, REQ_DESIGNS[int(criterion.split(".", 1)[0])])
         for values in criteria.values()

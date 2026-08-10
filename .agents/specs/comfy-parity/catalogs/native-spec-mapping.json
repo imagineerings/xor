@@ -27249,6 +27249,14 @@
       "15.1",
       "20.1"
     ],
+    "COMFY-DESKTOP-206": [
+      "45.1",
+      "45.2",
+      "45.3",
+      "45.4",
+      "45.5",
+      "45.6"
+    ],
     "COMFY-FRONTEND-SURFACE-001F5D1AC076": [
       "20.1"
     ],
@@ -31929,6 +31937,9 @@
     ],
     "COMFY-CLOUD-234": [
       "VAL-GPUI-012"
+    ],
+    "COMFY-DESKTOP-206": [
+      "VAL-COMFY-BUILD-001"
     ],
     "COMFY-FRONTEND-SURFACE-001F5D1AC076": [
       "VAL-GPUI-012"
@@ -37750,6 +37761,9 @@
     ],
     "COMFY-CLOUD-234": [
       "comfy-parity-graph-shell-accessibility"
+    ],
+    "COMFY-DESKTOP-206": [
+      "comfy-parity-opt-in-product-build-boundary"
     ],
     "COMFY-FRONTEND-SURFACE-001F5D1AC076": [
       "comfy-parity-graph-shell-accessibility"

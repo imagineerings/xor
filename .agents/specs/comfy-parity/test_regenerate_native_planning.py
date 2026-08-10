@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -77,7 +78,11 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             tasks_by_id[provider_id]["dependencies"],
-            [asset_id, "comfy-parity-extension-host-plugin-adapter"],
+            [
+                asset_id,
+                "comfy-parity-extension-host-plugin-adapter",
+                "comfy-parity-opt-in-product-build-boundary",
+            ],
         )
         dependencies = {
             identifier: set(tasks_by_id[identifier]["dependencies"])
@@ -141,7 +146,10 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[schema_id], waves[foundation_id] + 1)
         self.assertEqual(waves[value_id], waves[schema_id] + 1)
         self.assertEqual(waves[asset_id], waves[value_id] + 1)
-        self.assertEqual(waves[provider_id], waves[asset_id] + 1)
+        self.assertEqual(
+            waves[provider_id],
+            waves["comfy-parity-opt-in-product-build-boundary"] + 1,
+        )
         self.assertEqual(
             waves[registry_id], max(waves[identifier] for identifier in node_ids) + 1
         )
@@ -342,7 +350,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(build_boundary_task["validations"], ["VAL-COMFY-BUILD-001"])
         self.assertEqual(
             build_boundary_task["dependencies"],
-            ["comfy-parity-native-node-provider-invocation-foundation"],
+            ["comfy-parity-native-node-asset-effect-foundation"],
         )
         for path in [
             "crates/sim/Cargo.toml",
@@ -374,6 +382,21 @@ class ValidationGenerationTests(unittest.TestCase):
                 command,
                 planning.task_validation_commands(build_boundary_task),
             )
+        generated_mapping = json.loads(
+            (planning.CATALOGS / "native-spec-mapping.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            generated_mapping["feature_criterion_overrides"]["COMFY-DESKTOP-206"],
+            ["45.1", "45.2", "45.3", "45.4", "45.5", "45.6"],
+        )
+        self.assertEqual(
+            generated_mapping["feature_validation_overrides"]["COMFY-DESKTOP-206"],
+            ["VAL-COMFY-BUILD-001"],
+        )
+        self.assertIn(
+            "comfy-parity-opt-in-product-build-boundary",
+            generated_mapping["special_feature_tasks"]["COMFY-DESKTOP-206"],
+        )
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs", registry_writes
         )
