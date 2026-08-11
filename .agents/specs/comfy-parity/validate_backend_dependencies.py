@@ -502,6 +502,16 @@ def validate_later_task_writes() -> None:
             "Cargo.lock",
             "crates/comfy_media/Cargo.toml",
         },
+        "comfy-parity-native-media-text-rendering-foundation": {
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+        },
+        "comfy-parity-native-shader-execution-foundation": {
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_tensor/Cargo.toml",
+        },
     }
     violations = []
     for block in blocks[owner_index + 1 :]:

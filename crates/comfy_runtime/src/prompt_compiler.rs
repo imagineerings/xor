@@ -1415,7 +1415,7 @@ pub(crate) mod tests {
         let image_type = comfy_nodes::native_source_type_projection("IMAGE")?.value_type()?;
         let mut source = descriptor("ImageSource", false)?;
         source.schema_version = comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
-        source.outputs[0].produced_type = image_type.clone();
+        source.outputs[0].produced_type = image_type;
         source.source_schema = Some(comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
             comfy_nodes::NativeSchemaProvenance::SourceV3,
             std::iter::empty(),
@@ -1526,7 +1526,7 @@ pub(crate) mod tests {
         assert_eq!(restored, plan);
         restored.validate_integrity()?;
 
-        let mut tampered_plan = plan.clone();
+        let mut tampered_plan = plan;
         tampered_plan
             .nodes
             .get_mut(&NodeId::from("output"))

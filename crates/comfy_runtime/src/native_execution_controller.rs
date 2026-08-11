@@ -66,8 +66,9 @@ use comfy_sampler::{
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType,
-    ExecutionContext, ImageTensor, NativeTensorPayload, NativeTensorRole, ResizeCrop, ResizeMode,
-    RngCompatibilityError, RngError, ScratchReservation, StreamId, TensorError,
+    ExecutionContext, ImageTensor, NativeShaderExecutor, NativeTensorPayload, NativeTensorRole,
+    ResizeCrop, ResizeMode, RngCompatibilityError, RngError, ScratchReservation, StreamId,
+    TensorError, WgpuNativeShaderExecutor,
 };
 #[cfg(test)]
 use comfy_tensor::{DeviceId, TensorDescriptor};
@@ -2823,6 +2824,7 @@ pub struct NativeImageExecutor {
     cache: Arc<Mutex<NativeCache>>,
     handle_store_generation: crate::NativeHandleStoreGeneration,
     cpu_backend: Arc<CpuBackend>,
+    shader_executor: Arc<dyn NativeShaderExecutor>,
     metadata_enabled: bool,
     diffusion_enabled: bool,
 }
@@ -2868,6 +2870,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
+            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -2897,6 +2900,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
+            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -2925,6 +2929,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
+            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -2955,6 +2960,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
+            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -2983,6 +2989,29 @@ impl NativeImageExecutor {
 
     pub fn cpu_backend(&self) -> &Arc<CpuBackend> {
         &self.cpu_backend
+    }
+
+    pub fn with_shader_executor(mut self, shader_executor: Arc<dyn NativeShaderExecutor>) -> Self {
+        self.shader_executor = shader_executor;
+        self
+    }
+
+    fn execution_configuration_token(
+        &self,
+        plan: &CompiledPlan,
+        memory_configuration: &str,
+    ) -> String {
+        let configuration_token = if self.diffusion_enabled {
+            format!("native-diffusion-v1:{memory_configuration}")
+        } else {
+            format!("native-image-v1:{memory_configuration}")
+        };
+        let provider_identity = plan
+            .provider_registry_pin()
+            .map(NativeProviderRegistryPin::identity_sha256)
+            .unwrap_or_else(|| "local".to_owned());
+        let shader_identity = self.shader_executor.configuration_identity();
+        format!("{configuration_token}:provider={provider_identity}:shader={shader_identity}")
     }
 
     pub fn execute_blocking(
@@ -3046,16 +3075,7 @@ impl NativeImageExecutor {
         } else {
             NATIVE_IMAGE_REGISTRY_VERSION
         };
-        let configuration_token = if self.diffusion_enabled {
-            format!("native-diffusion-v1:{memory_configuration}")
-        } else {
-            format!("native-image-v1:{memory_configuration}")
-        };
-        let provider_identity = plan
-            .provider_registry_pin()
-            .map(NativeProviderRegistryPin::identity_sha256)
-            .unwrap_or_else(|| "local".to_owned());
-        let configuration_token = format!("{configuration_token}:provider={provider_identity}");
+        let configuration_token = self.execution_configuration_token(plan, memory_configuration);
         let mut engine = ExecutionEngine::new_with_handle_store_generation(
             self.profile_id,
             self.nodes.clone(),
@@ -3066,6 +3086,7 @@ impl NativeImageExecutor {
             self.handle_store_generation.clone(),
         )?
         .with_compute_backend(self.cpu_backend.clone())?
+        .with_shader_executor(self.shader_executor.clone())
         .with_backend("cpu")?
         .with_dtype_policy("f32")?
         .with_configuration_token(configuration_token)?;
@@ -5793,10 +5814,31 @@ mod tests {
         ExecutionSnapshotStatus, NativeHandleStoreGeneration, PersistedExecutionAttempt,
         PersistedExecutionProfile, PromptCompiler,
     };
+    use comfy_tensor::{NativeShaderError, NativeShaderRequest, NativeShaderResult};
     use comfy_types::{ApiPrompt, PromptId, PromptNode, PromptSubmission, RequestId, WorkerId};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    #[derive(Debug)]
+    struct IdentityShaderExecutor(&'static str);
+
+    impl NativeShaderExecutor for IdentityShaderExecutor {
+        fn configuration_identity(&self) -> String {
+            self.0.to_owned()
+        }
+
+        fn execute(
+            &self,
+            _request: &NativeShaderRequest,
+            _backend: &CpuBackend,
+            _context: &ExecutionContext<'_>,
+        ) -> Result<NativeShaderResult, NativeShaderError> {
+            Err(NativeShaderError::BackendUnavailable(
+                "identity-only test executor".to_owned(),
+            ))
+        }
+    }
 
     fn native(value: Value) -> NativeValue {
         match value {
@@ -5834,6 +5876,54 @@ mod tests {
                 value,
             },
         }
+    }
+
+    #[test]
+    fn shader_identity_is_stable_across_restart_and_partitions_cache_configuration()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let registry = native_image_registry_projection()?;
+        let plan = PromptCompiler::new(&registry).compile(fixture_prompt())?;
+        let profile_id = ProfileId(Uuid::from_u128(0x5349_4d00_0000_0000_0000_0000_0000_377));
+        let (first_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let first = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(first_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")));
+        let first_identity = first.execution_configuration_token(&plan, "balanced");
+        assert!(first_identity.ends_with(":shader=shader-a"));
+
+        let (restarted_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let restarted = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(restarted_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")));
+        assert_eq!(
+            restarted.execution_configuration_token(&plan, "balanced"),
+            first_identity
+        );
+
+        let (changed_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let changed = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(changed_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-b")));
+        assert_ne!(
+            changed.execution_configuration_token(&plan, "balanced"),
+            first_identity
+        );
+        Ok(())
     }
 
     #[test]

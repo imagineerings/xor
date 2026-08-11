@@ -9509,7 +9509,7 @@
     },
     {
       "concern": "native_node_registry",
-      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for canonical attempt sessions, staged objects, active-execution claims, handle leases, resolved-payload retention, generations, and unique resident allocation accounting; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
+      "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for canonical attempt sessions, staged objects, active-execution claims, handle leases, resolved-payload retention, generations, and unique resident allocation accounting; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads and the injected bounded shader executor; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
       "owner_files": [
         "crates/comfy_runtime/src/executor.rs",
         "crates/comfy_runtime/src/prompt_compiler.rs",
@@ -9522,6 +9522,7 @@
         "crates/comfy_nodes/src/text_regex.rs",
         "crates/comfy_nodes/src/registry_generator.rs",
         "crates/comfy_tensor/src/native_node_payload.rs",
+        "crates/comfy_tensor/src/shader.rs",
         "crates/comfy_model/src/native_node_payload.rs",
         "crates/comfy_model/src/conditioning.rs",
         "crates/comfy_model/src/clip_vision.rs",
@@ -9568,6 +9569,14 @@
         "NativeResidentPayloadKind",
         "NativeResidentAllocation",
         "NativeTensorPayload",
+        "NativeShaderRequest",
+        "NativeShaderResult",
+        "NativeShaderError",
+        "NativeShaderExecutor",
+        "WgpuNativeShaderExecutor",
+        "NativeShaderServiceError",
+        "NativeShaderPreviewError",
+        "NativePreparedShaderResult",
         "NativeModelPayload",
         "NativeModelResourceRole",
         "NativeModelResourceIdentity",
@@ -9638,6 +9647,7 @@
         "comfy_nodes::NativeTextFormatter is the sole bounded source-compatible keyword formatter; generated leaves may consume its checked named-field, conversion, item/attribute, nested-spec, and cancellation boundary but may not embed a second format parser or interpreter",
         "comfy_nodes::NativeTextRegex is the sole native text-regex owner; generated text leaves may consume its bounded checked capture rows but may not embed a second parser, regex engine, interpreter, or unbounded backtracking path",
         "comfy_nodes::NativeInputSchemaMetadata is the sole source-declared DynamicCombo and MultiType structure owner; PromptCompiler resolves only active schema-declared dotted prompt fields into ordinary typed bindings, and the executor assembles those resolved values through NativeStructuredValue without interpreting handle-shaped JSON",
+        "comfy_tensor::WgpuNativeShaderExecutor is the sole production GLSL ES admission, lowering, compilation, resource, execution, and readback owner; NativeNodeServices injects it through the attempt's checked compute session and node leaves cannot construct a device or substitute another shader interpreter",
         "the signed plugin adapter may project canonical payloads into neutral SDK values or return an exact imported handle; metadata-only tensor, model, and artifact values cannot mint canonical executable payloads",
         "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into NativeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor; comfy_runtime may alias NativeNodePresentation as RuntimeNodePresentation",
         "NativeRuntimeHttpServices serializes checked NativeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
@@ -9792,6 +9802,54 @@
           "qualified": "comfy_tensor::NativeTensorPayload",
           "role": "canonical",
           "symbol": "NativeTensorPayload"
+        },
+        {
+          "path": "crates/comfy_tensor/src/shader.rs",
+          "qualified": "comfy_tensor::NativeShaderRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeShaderRequest"
+        },
+        {
+          "path": "crates/comfy_tensor/src/shader.rs",
+          "qualified": "comfy_tensor::NativeShaderResult",
+          "role": "boundary_dto",
+          "symbol": "NativeShaderResult"
+        },
+        {
+          "path": "crates/comfy_tensor/src/shader.rs",
+          "qualified": "comfy_tensor::NativeShaderError",
+          "role": "boundary_dto",
+          "symbol": "NativeShaderError"
+        },
+        {
+          "path": "crates/comfy_tensor/src/shader.rs",
+          "qualified": "comfy_tensor::NativeShaderExecutor",
+          "role": "canonical",
+          "symbol": "NativeShaderExecutor"
+        },
+        {
+          "path": "crates/comfy_tensor/src/shader.rs",
+          "qualified": "comfy_tensor::WgpuNativeShaderExecutor",
+          "role": "canonical",
+          "symbol": "WgpuNativeShaderExecutor"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeShaderServiceError",
+          "role": "boundary_dto",
+          "symbol": "NativeShaderServiceError"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeShaderPreviewError",
+          "role": "boundary_dto",
+          "symbol": "NativeShaderPreviewError"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativePreparedShaderResult",
+          "role": "boundary_dto",
+          "symbol": "NativePreparedShaderResult"
         },
         {
           "path": "crates/comfy_model/src/native_node_payload.rs",
@@ -10265,6 +10323,14 @@
         "NativeResidentPayloadKind",
         "NativeResidentAllocation",
         "NativeTensorPayload",
+        "NativeShaderRequest",
+        "NativeShaderResult",
+        "NativeShaderError",
+        "NativeShaderExecutor",
+        "WgpuNativeShaderExecutor",
+        "NativeShaderServiceError",
+        "NativeShaderPreviewError",
+        "NativePreparedShaderResult",
         "NativeModelPayload",
         "NativeModelResourceRole",
         "NativeModelResourceIdentity",
@@ -10333,6 +10399,14 @@
       ],
       "call_patterns": [
         {
+          "symbol": "bounded injected native shader execution",
+          "pattern": "WgpuNativeShaderExecutor::new_or_unavailable\\(\\)|with_shader_executor\\(|\\.execute_shader\\(",
+          "path_prefixes": [
+            "crates/comfy_nodes/src",
+            "crates/comfy_runtime/src"
+          ]
+        },
+        {
           "symbol": "checked native structured input assembly",
           "pattern": "structured_options\\(\\)|NativeStructuredValue::checked\\(|NativeStructuredValue::from_native_value\\(",
           "path_prefixes": [
@@ -10388,6 +10462,16 @@
       ],
       "required_mappings": [
         {
+          "name": "native-shader-owner-to-attempt-compute-service",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "with_shader_executor[\\s\\S]*NativeNodeServices::checked[\\s\\S]*services = services\\.with_shader"
+        },
+        {
+          "name": "native-shader-result-to-transactional-preview",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "execute_shader_with_previews[\\s\\S]*prepare_image_preview[\\s\\S]*rollback_prepared[\\s\\S]*input_images"
+        },
+        {
           "name": "canonical-text-transforms-to-generated-text-leaves",
           "path": "crates/comfy_nodes/src/families/text_02.rs",
           "pattern": "NativeTextRegex::checked[\\s\\S]*regex[\\s\\S]*\\.replace\\([\\s\\S]*NativeTextFormatter::format"
@@ -10439,6 +10523,7 @@
         "comfy-parity-native-node-schema-metadata-foundation",
         "comfy-parity-native-node-compute-value-foundation",
         "comfy-parity-native-structured-input-link-foundation",
+        "comfy-parity-native-shader-execution-foundation",
         "comfy-parity-native-text-value-regex-foundation",
         "comfy-parity-native-text-transform-foundation",
         "comfy-parity-extension-host-plugin-adapter",

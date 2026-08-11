@@ -860,7 +860,7 @@ fn group_digits(value: &str, separator: char, group_size: usize) -> String {
     for (index, character) in characters.into_iter().enumerate() {
         if index != 0
             && (index == first_group
-                || (index > first_group && (index - first_group) % group_size == 0))
+                || (index > first_group && (index - first_group).is_multiple_of(group_size)))
         {
             output.push(separator);
         }

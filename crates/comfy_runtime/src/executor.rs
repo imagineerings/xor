@@ -25,7 +25,9 @@ pub use comfy_nodes::{
 #[cfg(test)]
 use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
 use comfy_plugin_sdk::{ProviderBindingClaim, ProviderBindingSet};
-use comfy_tensor::{BackendCapabilityMatrix, CpuBackend, ScratchReservation, StreamId};
+use comfy_tensor::{
+    BackendCapabilityMatrix, CpuBackend, NativeShaderExecutor, ScratchReservation, StreamId,
+};
 #[cfg(test)]
 use comfy_tensor::{CpuWorkspaceAuthority, DeviceId, NativeDeviceProperties};
 use comfy_types::{
@@ -2214,6 +2216,7 @@ pub struct ExecutionEngine {
     configuration_token: String,
     scratch: ScratchReservation,
     compute_backend: Option<Arc<CpuBackend>>,
+    shader_executor: Option<Arc<dyn NativeShaderExecutor>>,
     asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
@@ -2266,6 +2269,7 @@ impl ExecutionEngine {
             configuration_token: "default".to_owned(),
             scratch,
             compute_backend: None,
+            shader_executor: None,
             asset_resolvers: None,
             handle_store_generation,
         })
@@ -2289,6 +2293,11 @@ impl ExecutionEngine {
             .map_err(|error| ExecutionError::Cache(error.to_string()))?;
         self.compute_backend = Some(backend);
         Ok(self)
+    }
+
+    pub fn with_shader_executor(mut self, shader: Arc<dyn NativeShaderExecutor>) -> Self {
+        self.shader_executor = Some(shader);
+        self
     }
 
     pub fn with_asset_resolvers(
@@ -2656,9 +2665,12 @@ impl ExecutionEngine {
             })
             .transpose()
             .map_err(|error| ExecutionError::Effect(error.to_string()))?;
-        let services =
+        let mut services =
             NativeNodeServices::checked(asset_resolver, Some(effect_service.clone()), compute)
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        if let Some(shader) = &self.shader_executor {
+            services = services.with_shader(shader.clone());
+        }
         let context = NodeContext::new_with_services(
             plan.prompt_id,
             state.attempt_id,

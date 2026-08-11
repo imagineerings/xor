@@ -385,7 +385,7 @@ fn collect_structured_input_fields(
     let lazy = call_keyword_boolean(object, "lazy").unwrap_or(false);
     let field = NativeStructuredInputField {
         path: path.clone(),
-        schema: schema.clone(),
+        schema,
         required,
         lazy,
     };

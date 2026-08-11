@@ -184,11 +184,20 @@ pub fn encode_png_frame_with_policy(
         batch_index,
         limits,
     )?;
-    let mut rgb = Vec::new();
-    rgb.try_reserve_exact(values_per_frame)
+    let mut pixels = Vec::new();
+    pixels
+        .try_reserve_exact(values_per_frame)
         .map_err(|error| PngError::Allocation(error.to_string()))?;
-    rgb.extend(frame.iter().map(|value| quantize_channel(*value)));
-    encode_rgb_with_metadata(&rgb, width, height, metadata, metadata_policy, limits)
+    pixels.extend(frame.iter().map(|value| quantize_channel(*value)));
+    encode_pixels_with_metadata(
+        &pixels,
+        width,
+        height,
+        channels,
+        metadata,
+        metadata_policy,
+        limits,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -215,14 +224,22 @@ pub fn encode_png_frame_with_policy_and_context(
         batch_index,
         limits,
     )?;
-    let mut rgb = backend.workspace_vec::<u8>(context, values_per_frame)?;
+    let mut pixels = backend.workspace_vec::<u8>(context, values_per_frame)?;
     for (index, value) in frame.iter().copied().enumerate() {
         if index.is_multiple_of(4_096) {
             context.check()?;
         }
-        rgb.try_push(quantize_channel(value))?;
+        pixels.try_push(quantize_channel(value))?;
     }
-    encode_rgb_with_metadata(&rgb, width, height, metadata, metadata_policy, limits)
+    encode_pixels_with_metadata(
+        &pixels,
+        width,
+        height,
+        channels,
+        metadata,
+        metadata_policy,
+        limits,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -235,7 +252,7 @@ fn checked_png_frame(
     batch_index: u64,
     limits: PngLimits,
 ) -> Result<(&[f32], u32, u32, usize), PngError> {
-    if channels != 3 {
+    if !matches!(channels, 3 | 4) {
         return Err(PngError::Dimensions {
             width: u32::try_from(width).unwrap_or(u32::MAX),
             height: u32::try_from(height).unwrap_or(u32::MAX),
@@ -251,7 +268,7 @@ fn checked_png_frame(
     let height = u32::try_from(height).map_err(|_| PngError::SizeOverflow)?;
     validate_dimensions(width, height, limits)?;
     let values_per_frame = checked_pixel_count(width, height)?
-        .checked_mul(3)
+        .checked_mul(usize::try_from(channels).map_err(|_| PngError::SizeOverflow)?)
         .ok_or(PngError::SizeOverflow)?;
     let expected = values_per_frame
         .checked_mul(usize::try_from(batch).map_err(|_| PngError::SizeOverflow)?)
@@ -279,16 +296,22 @@ fn quantize_channel(value: f32) -> u8 {
     scaled as u8
 }
 
-fn encode_rgb_with_metadata(
-    rgb: &[u8],
+fn encode_pixels_with_metadata(
+    pixels: &[u8],
     width: u32,
     height: u32,
+    channels: u64,
     metadata: &BTreeMap<String, String>,
     metadata_policy: MetadataWritePolicy,
     limits: PngLimits,
 ) -> Result<Vec<u8>, PngError> {
     let mut encoded = Vec::new();
-    PngEncoder::new(&mut encoded).write_image(rgb, width, height, ExtendedColorType::Rgb8)?;
+    let color_type = match channels {
+        3 => ExtendedColorType::Rgb8,
+        4 => ExtendedColorType::Rgba8,
+        _ => return Err(PngError::Dimensions { width, height }),
+    };
+    PngEncoder::new(&mut encoded).write_image(pixels, width, height, color_type)?;
     if encoded.len() > limits.max_input_bytes {
         return Err(PngError::InputTooLarge {
             actual: encoded.len(),
@@ -346,6 +369,26 @@ mod tests {
     use super::*;
     use comfy_tensor::{CancellationToken, CpuWorkspaceAuthority, StreamId};
     use image::RgbaImage;
+
+    #[test]
+    fn native_png_encoding_preserves_rgba_preview_alpha() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let encoded = encode_png_frame(
+            &[1.0, 0.0, 0.5, 0.25],
+            1,
+            1,
+            1,
+            4,
+            0,
+            &BTreeMap::new(),
+            PngLimits::default(),
+        )?;
+        let decoded = decode_png(&encoded, PngLimits::default())?;
+        assert!(decoded.has_alpha);
+        assert_eq!(decoded.pixels_bhwc, vec![1.0, 0.0, 127.0 / 255.0]);
+        assert_eq!(decoded.mask_bhw, vec![1.0 - 63.0 / 255.0]);
+        Ok(())
+    }
 
     #[test]
     fn native_png_encoding_uses_exact_caller_workspace() -> Result<(), Box<dyn std::error::Error>> {

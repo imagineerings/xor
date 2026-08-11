@@ -22,6 +22,7 @@ pub mod operation;
 pub mod operation_contracts;
 pub mod promotion;
 pub mod rng;
+pub mod shader;
 
 pub use autograd::*;
 #[cfg(feature = "cpu")]
@@ -34,6 +35,7 @@ pub use operation::*;
 pub use operation_contracts::*;
 pub use promotion::*;
 pub use rng::*;
+pub use shader::*;
 
 include!(concat!(env!("OUT_DIR"), "/generated_modules.rs"));
 

@@ -8239,6 +8239,10 @@ fn run_ownership_validation(
             "native_structured_input_links_have_one_checked_boundary",
             validate_native_structured_input_boundary(&root, &sources)?,
         );
+        cases.insert(
+            "native_shader_execution_has_one_injected_owner",
+            validate_native_shader_execution_boundary(&root, &sources)?,
+        );
     }
     let cases = cases
         .into_iter()
@@ -8338,6 +8342,7 @@ fn run_ownership_validation(
         "crates/comfy_runtime/src/subgraph_blueprints.rs",
         "crates/comfy_tensor/src/cpu_backend.rs",
         "crates/comfy_tensor/src/operation.rs",
+        "crates/comfy_tensor/src/shader.rs",
         "crates/comfy_tensor/src/image_ops.rs",
         "crates/comfy_tensor/src/autograd.rs",
         "crates/comfy_tensor/src/autograd/breadth.rs",
@@ -10552,6 +10557,191 @@ fn validate_native_stored_payload_boundary(
         assert!(!runtime_root.contains(forbidden));
     }
     Ok(true)
+}
+
+fn validate_native_shader_execution_boundary(
+    root: &Path,
+    sources: &[(PathBuf, String)],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    for (definition, owner) in [
+        (
+            "pub struct NativeShaderRequest {",
+            "crates/comfy_tensor/src/shader.rs",
+        ),
+        (
+            "pub struct NativeShaderResult {",
+            "crates/comfy_tensor/src/shader.rs",
+        ),
+        (
+            "pub enum NativeShaderError {",
+            "crates/comfy_tensor/src/shader.rs",
+        ),
+        (
+            "pub trait NativeShaderExecutor:",
+            "crates/comfy_tensor/src/shader.rs",
+        ),
+        (
+            "pub struct WgpuNativeShaderExecutor {",
+            "crates/comfy_tensor/src/shader.rs",
+        ),
+        (
+            "pub enum NativeShaderServiceError {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub enum NativeShaderPreviewError {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativePreparedShaderResult {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+    ] {
+        let occurrences = production_source_occurrences(sources, definition);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "native shader boundary {definition} must have one production definition"
+        );
+        assert!(
+            occurrences[0].contains(owner),
+            "native shader boundary {definition} must be owned by {owner}: {occurrences:?}"
+        );
+    }
+
+    for (path, source) in sources {
+        let path = path.to_string_lossy();
+        if path.contains("/crates/comfy_nodes/src/families/")
+            || path.contains("/crates/comfy_runtime/src/")
+        {
+            let production = source
+                .split_once("#[cfg(test)]")
+                .map_or(source.as_str(), |(production, _)| production);
+            assert!(
+                !production.contains("create_shader_module(")
+                    && !production.contains("wgpu::Device")
+                    && !production.contains("naga::front"),
+                "native shader backend ownership leaked into {path}"
+            );
+        }
+    }
+
+    let workspace_manifest = fs::read_to_string(root.join("Cargo.toml"))?;
+    let tensor_manifest = fs::read_to_string(root.join("crates/comfy_tensor/Cargo.toml"))?;
+    let tensor_root = fs::read_to_string(root.join("crates/comfy_tensor/src/comfy_tensor.rs"))?;
+    let shader = fs::read_to_string(root.join("crates/comfy_tensor/src/shader.rs"))?;
+    let png = fs::read_to_string(root.join("crates/comfy_media/src/png.rs"))?;
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    let executor = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
+    let controller =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    let policy = fs::read_to_string(root.join(".agents/specs/comfy-parity/ownership-policy.json"))?;
+    let tasks = fs::read_to_string(root.join(".agents/specs/comfy-parity/tasks.md"))?;
+
+    for required in [
+        "naga = { git = \"https://github.com/simtropolis/wgpu.git\"",
+        "wgpu = { git = \"https://github.com/simtropolis/wgpu.git\"",
+    ] {
+        assert!(
+            workspace_manifest.contains(required),
+            "workspace shader dependency is not pinned: {required}"
+        );
+    }
+    for required in [
+        "if !matches!(channels, 3 | 4)",
+        "ExtendedColorType::Rgba8",
+        "native_png_encoding_preserves_rgba_preview_alpha",
+    ] {
+        assert!(
+            png.contains(required),
+            "native shader preview PNG projection lacks {required}"
+        );
+    }
+    for required in [
+        "naga.workspace = true",
+        "pollster.workspace = true",
+        "wgpu = { workspace = true, features = [\"glsl\"] }",
+    ] {
+        assert!(
+            tensor_manifest.contains(required),
+            "comfy_tensor shader dependency is missing: {required}"
+        );
+    }
+    for required in ["pub mod shader;", "pub use shader::*;"] {
+        assert!(
+            tensor_root.contains(required),
+            "comfy_tensor shader export is missing: {required}"
+        );
+    }
+    for required in [
+        "pub const MAX_SHADER_IMAGES: usize = 5;",
+        "pub const MAX_SHADER_OUTPUTS: usize = 4;",
+        "fn lower_es_300_source(",
+        "glsl::Frontend::default()",
+        "wgpu::TextureFormat::Rgba32Float",
+        "#pragma passes ",
+        "wait_for_submission(",
+        "NativeShaderError::BackendUnavailable",
+    ] {
+        assert!(
+            shader.contains(required),
+            "canonical native shader owner lacks {required}"
+        );
+    }
+    for required in [
+        "shader: Option<Arc<dyn NativeShaderExecutor>>",
+        "pub fn with_shader(",
+        "pub fn execute_shader(",
+        "pub fn execute_shader_with_previews(",
+        "let compute = self.compute_session()?;",
+        "let execution_context = compute.execution_context(self)?;",
+        "json!({\"input_images\": input_images, \"images\": output_images})",
+    ] {
+        assert!(
+            execution.contains(required),
+            "portable shader service boundary lacks {required}"
+        );
+    }
+    for required in [
+        "shader_executor: Option<Arc<dyn NativeShaderExecutor>>",
+        "pub fn with_shader_executor(",
+        "services = services.with_shader(shader.clone())",
+    ] {
+        assert!(
+            executor.contains(required),
+            "runtime shader injection lacks {required}"
+        );
+    }
+    for required in [
+        "WgpuNativeShaderExecutor::new_or_unavailable()",
+        "self.shader_executor.configuration_identity()",
+        ".with_shader_executor(self.shader_executor.clone())",
+    ] {
+        assert!(
+            controller.contains(required),
+            "native controller shader lifecycle lacks {required}"
+        );
+    }
+    assert!(policy.contains("comfy-parity-native-shader-execution-foundation"));
+    assert!(policy.contains("native-shader-owner-to-attempt-compute-service"));
+    assert!(policy.contains("native-shader-result-to-transactional-preview"));
+    assert!(tasks.contains("comfy-parity-native-shader-execution-foundation"));
+    Ok(true)
+}
+
+#[test]
+fn val_ownership_001_native_shader_execution_has_one_injected_owner()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    assert!(validate_native_shader_execution_boundary(&root, &sources)?);
+    Ok(())
 }
 
 fn validate_native_structured_input_boundary(

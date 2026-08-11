@@ -758,6 +758,7 @@ prost = "0.9"
 prost-build = "0.9"
 prost-types = "0.9"
 pollster = "0.4.0"
+naga = { git = "https://github.com/simtropolis/wgpu.git", rev = "357a0c56e0070480ad9daea5d2eaa83150b79e88", features = ["glsl-in"] }
 pulldown-cmark = { version = "0.13.0", default-features = false }
 quick-xml = "0.38"
 quote = "1.0.9"

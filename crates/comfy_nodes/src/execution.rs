@@ -6,8 +6,9 @@ use comfy_media::{
     MetadataWritePolicy, PngError, PngLimits, encode_png_frame_with_policy_and_context,
 };
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, ImageTensor, ScratchBindingIdentity, ScratchReservation,
-    StreamId, TensorError,
+    CpuBackend, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS, MAX_SHADER_PASSES,
+    NativeShaderError, NativeShaderExecutor, NativeShaderRequest, NativeShaderResult,
+    ScratchBindingIdentity, ScratchReservation, StreamId, TensorError,
 };
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
@@ -1512,6 +1513,53 @@ pub trait NativePreparedEffectService: Send + Sync + fmt::Debug {
     fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError>;
 }
 
+#[derive(Debug, Error)]
+pub enum NativeShaderServiceError {
+    #[error("native shader execution service is unavailable")]
+    Unavailable,
+    #[error("native shader compute session is invalid: {0}")]
+    Contract(#[from] NativeNodeContractError),
+    #[error("native shader execution failed: {0}")]
+    Shader(#[from] NativeShaderError),
+    #[error("native shader executor returned an invalid result projection")]
+    InvalidProjection,
+}
+
+#[derive(Debug, Error)]
+pub enum NativeShaderPreviewError {
+    #[error("native shader execution failed: {0}")]
+    Shader(#[from] NativeShaderServiceError),
+    #[error("native shader preview preparation failed: {0}")]
+    Preview(#[from] NativeImagePreviewError),
+    #[error("native shader preview effect rollback failed: {0}")]
+    Effect(#[from] NativeEffectServiceError),
+}
+
+#[derive(Clone, Debug)]
+pub struct NativePreparedShaderResult {
+    shader: NativeShaderResult,
+    effects: Vec<NativePreparedEffectRequest>,
+    ui: Value,
+}
+
+impl NativePreparedShaderResult {
+    pub fn shader(&self) -> &NativeShaderResult {
+        &self.shader
+    }
+
+    pub fn effects(&self) -> &[NativePreparedEffectRequest] {
+        &self.effects
+    }
+
+    pub fn ui(&self) -> &Value {
+        &self.ui
+    }
+
+    pub fn into_parts(self) -> (NativeShaderResult, Vec<NativePreparedEffectRequest>, Value) {
+        (self.shader, self.effects, self.ui)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeNodeComputeSession {
     identity: NativeNodeServiceIdentity,
@@ -1556,6 +1604,7 @@ pub struct NativeNodeServices {
     assets: Option<Arc<dyn NativeAssetResolver>>,
     effects: Option<Arc<dyn NativePreparedEffectService>>,
     compute: Option<NativeNodeComputeSession>,
+    shader: Option<Arc<dyn NativeShaderExecutor>>,
 }
 
 impl NativeNodeServices {
@@ -1583,7 +1632,13 @@ impl NativeNodeServices {
             assets,
             effects,
             compute,
+            shader: None,
         })
+    }
+
+    pub fn with_shader(mut self, shader: Arc<dyn NativeShaderExecutor>) -> Self {
+        self.shader = Some(shader);
+        self
     }
 }
 
@@ -1665,6 +1720,114 @@ impl NativeNodeContext {
             .compute
             .as_ref()
             .ok_or(NativeNodeContractError::InvalidComputeSession)
+    }
+
+    pub fn execute_shader(
+        &self,
+        request: &NativeShaderRequest,
+    ) -> Result<NativeShaderResult, NativeShaderServiceError> {
+        self.cancellation
+            .check()
+            .map_err(|_| NativeShaderError::Cancelled)?;
+        let compute = self.compute_session()?;
+        let execution_context = compute.execution_context(self)?;
+        let shader = self
+            .services
+            .shader
+            .as_deref()
+            .ok_or(NativeShaderServiceError::Unavailable)?;
+        let result = shader
+            .execute(request, compute.backend(), &execution_context)
+            .map_err(NativeShaderServiceError::from)?;
+        let (batch, _, _, _) = request
+            .images
+            .first()
+            .ok_or(NativeShaderServiceError::InvalidProjection)?
+            .dimensions()
+            .map_err(|_| NativeShaderServiceError::InvalidProjection)?;
+        if result.outputs.len() != MAX_SHADER_OUTPUTS
+            || result.pass_count == 0
+            || result.pass_count > MAX_SHADER_PASSES
+        {
+            return Err(NativeShaderServiceError::InvalidProjection);
+        }
+        for output in &result.outputs {
+            let dimensions = output
+                .dimensions()
+                .map_err(|_| NativeShaderServiceError::InvalidProjection)?;
+            if dimensions
+                != (
+                    batch,
+                    u64::from(request.height),
+                    u64::from(request.width),
+                    4,
+                )
+            {
+                return Err(NativeShaderServiceError::InvalidProjection);
+            }
+        }
+        Ok(result)
+    }
+
+    pub fn execute_shader_with_previews(
+        &self,
+        request: &NativeShaderRequest,
+    ) -> Result<NativePreparedShaderResult, NativeShaderPreviewError> {
+        let shader = self.execute_shader(request)?;
+        let effects_service = self.prepared_effects()?;
+        let mut effects = Vec::new();
+        let mut input_images = Vec::new();
+
+        for (image_index, image) in request.images.iter().enumerate() {
+            let prefix = format!("GLSLShader_input_{image_index}");
+            let preview = match self.prepare_image_preview(image, &prefix) {
+                Ok(preview) => preview,
+                Err(error) => {
+                    for effect in effects.iter().rev() {
+                        effects_service.rollback_prepared(effect)?;
+                    }
+                    return Err(error.into());
+                }
+            };
+            let (preview_effects, ui) = preview.into_parts();
+            if let Some(images) = ui.get("images").and_then(Value::as_array) {
+                input_images.extend(images.iter().cloned());
+            }
+            effects.extend(preview_effects);
+        }
+
+        let output = shader
+            .outputs
+            .first()
+            .ok_or(NativeShaderServiceError::InvalidProjection)?;
+        let preview = match self.prepare_image_preview(output, "GLSLShader_output") {
+            Ok(preview) => preview,
+            Err(error) => {
+                for effect in effects.iter().rev() {
+                    effects_service.rollback_prepared(effect)?;
+                }
+                return Err(error.into());
+            }
+        };
+        let (preview_effects, ui) = preview.into_parts();
+        let output_images = ui
+            .get("images")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        effects.extend(preview_effects);
+
+        if self.cancellation.is_cancelled() {
+            for effect in effects.iter().rev() {
+                effects_service.rollback_prepared(effect)?;
+            }
+            return Err(NativeShaderServiceError::Shader(NativeShaderError::Cancelled).into());
+        }
+        Ok(NativePreparedShaderResult {
+            shader,
+            effects,
+            ui: json!({"input_images": input_images, "images": output_images}),
+        })
     }
 
     pub fn prepare_image_preview(
@@ -2337,6 +2500,65 @@ mod tests {
         next_ordinal: AtomicU64,
         prepared: Mutex<Vec<NativePreparedEffectRequest>>,
         rolled_back: Mutex<Vec<Uuid>>,
+    }
+
+    #[derive(Debug)]
+    struct TestShaderExecutor;
+
+    impl NativeShaderExecutor for TestShaderExecutor {
+        fn configuration_identity(&self) -> String {
+            "test-shader-v1".to_owned()
+        }
+
+        fn execute(
+            &self,
+            request: &NativeShaderRequest,
+            backend: &CpuBackend,
+            context: &ExecutionContext<'_>,
+        ) -> Result<NativeShaderResult, NativeShaderError> {
+            context
+                .cancellation
+                .check()
+                .map_err(|_| NativeShaderError::Cancelled)?;
+            let batch = request
+                .images
+                .first()
+                .ok_or_else(|| NativeShaderError::Bounds("missing test image".to_owned()))?
+                .dimensions()?
+                .0;
+            let pixel_count = usize::try_from(
+                batch
+                    .checked_mul(u64::from(request.width))
+                    .and_then(|value| value.checked_mul(u64::from(request.height)))
+                    .ok_or_else(|| {
+                        NativeShaderError::Bounds("test output overflowed".to_owned())
+                    })?,
+            )
+            .map_err(|_| NativeShaderError::Bounds("test output is too large".to_owned()))?;
+            let output_values = pixel_count
+                .checked_mul(4)
+                .ok_or_else(|| NativeShaderError::Bounds("test output overflowed".to_owned()))?;
+            let mut values = Vec::new();
+            values.try_reserve_exact(output_values).map_err(|error| {
+                NativeShaderError::Bounds(format!("test output allocation failed: {error}"))
+            })?;
+            for _ in 0..pixel_count {
+                values.extend_from_slice(&[0.25, 0.5, 0.75, 1.0]);
+            }
+            let output = ImageTensor::from_f32(
+                backend,
+                context,
+                batch,
+                u64::from(request.height),
+                u64::from(request.width),
+                4,
+                &values,
+            )?;
+            Ok(NativeShaderResult {
+                outputs: vec![output.clone(), output.clone(), output.clone(), output],
+                pass_count: 1,
+            })
+        }
     }
 
     impl fmt::Debug for TestPreviewEffectService {
@@ -3037,6 +3259,160 @@ mod tests {
             ),
             Err(NativeNodeContractError::InvalidComputeSession)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn shader_service_uses_the_attempts_exact_compute_session()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(0x551));
+        let attempt_id = AttemptId(Uuid::from_u128(0x552));
+        let node_id = NodeId::from("shader");
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x553),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity.clone(),
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let effects = Arc::new(TestPreviewEffectService::new(identity, None));
+        let services = NativeNodeServices::checked(None, Some(effects), Some(compute))?
+            .with_shader(Arc::new(TestShaderExecutor));
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x554, 0x555)?,
+                attempt_id,
+            )),
+            services,
+        )?;
+        let request = NativeShaderRequest {
+            fragment_source: "#version 300 es\nvoid main() {}".to_owned(),
+            images: vec![ImageTensor::from_f32(
+                &backend,
+                &context.compute_session()?.execution_context(&context)?,
+                1,
+                2,
+                2,
+                3,
+                &[0.0; 12],
+            )?],
+            floats: Vec::new(),
+            ints: Vec::new(),
+            bools: Vec::new(),
+            curves: Vec::new(),
+            width: 2,
+            height: 2,
+        };
+        let result = context.execute_shader(&request)?;
+        assert!(
+            result.outputs[0]
+                .as_f32_slice()?
+                .chunks_exact(4)
+                .all(|pixel| pixel == [0.25, 0.5, 0.75, 1.0])
+        );
+        let prepared = context.execute_shader_with_previews(&request)?;
+        assert_eq!(prepared.effects().len(), 2);
+        assert_eq!(
+            prepared.ui()["input_images"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(prepared.ui()["images"].as_array().map(Vec::len), Some(1));
+        assert_eq!(prepared.shader().outputs.len(), MAX_SHADER_OUTPUTS);
+
+        let cancellation = CancellationToken::default();
+        assert!(cancellation.cancel());
+        let scratch = authority.authorize_workspace(1024)?;
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x556),
+            attempt_id,
+            NodeId::from("shader"),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity,
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let cancelled = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            NodeId::from("shader"),
+            cancellation,
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x557, 0x558)?,
+                attempt_id,
+            )),
+            NativeNodeServices::checked(None, None, Some(compute))?
+                .with_shader(Arc::new(TestShaderExecutor)),
+        )?;
+        assert!(matches!(
+            cancelled.execute_shader(&request),
+            Err(NativeShaderServiceError::Shader(
+                NativeShaderError::Cancelled
+            ))
+        ));
+
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let node_id = NodeId::from("shader-preview-failure");
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x559),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity.clone(),
+            backend,
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let failing_effects = Arc::new(TestPreviewEffectService::new(identity, Some(1)));
+        let failed = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x55a, 0x55b)?,
+                attempt_id,
+            )),
+            NativeNodeServices::checked(None, Some(failing_effects.clone()), Some(compute))?
+                .with_shader(Arc::new(TestShaderExecutor)),
+        )?;
+        assert!(matches!(
+            failed.execute_shader_with_previews(&request),
+            Err(NativeShaderPreviewError::Preview(
+                NativeImagePreviewError::Effect(NativeEffectServiceError::Rejected)
+            ))
+        ));
+        assert!(
+            failing_effects
+                .prepared
+                .lock()
+                .map_err(|_| "shader preview prepared state is poisoned")?
+                .is_empty()
+        );
+        assert_eq!(
+            failing_effects
+                .rolled_back
+                .lock()
+                .map_err(|_| "shader preview rollback state is poisoned")?
+                .len(),
+            1
+        );
         Ok(())
     }
 

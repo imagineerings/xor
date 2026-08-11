@@ -32,11 +32,14 @@ comfy_backend_rocm = { workspace = true, optional = true }
 comfy_backend_xpu = { workspace = true, optional = true }
 comfy_types.workspace = true
 half.workspace = true
+naga.workspace = true
+pollster.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+wgpu = { workspace = true, features = ["glsl"] }
 [dev-dependencies]
 comfy_backend_cuda = { workspace = true, features = ["test-support"] }
 comfy_backend_directml = { workspace = true, features = ["test-support"] }
