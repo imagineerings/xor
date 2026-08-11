@@ -32,8 +32,8 @@ use comfy_plugin_sdk::{
     ComponentManifestProjection, InputState, InvocationError, NegotiatedApi,
     PROVIDER_COMPONENT_WORLD, PluginContractError, PluginInvocation, PluginManifest, PluginNode,
     PluginValue, PluginValueRepresentation, PortCardinality, PortDirection, PortPresence,
-    PortSerialization, ProviderBindingClaim, ProviderBindingSet, RustComfyPlugin, TypeRegistry,
-    ValueFamily, ValueHandle,
+    PortSerialization, ProviderBindingClaim, ProviderBindingSet, ProviderResultReceiptSet,
+    RustComfyPlugin, TypeRegistry, ValueFamily, ValueHandle,
 };
 use comfy_runtime::{AssetIdentity, AssetNamespace, PluginAuthorization, TrustError};
 use extension_host::ComponentRuntime;
@@ -241,12 +241,12 @@ pub struct ProviderInvocationResult {
     pub outputs: BTreeMap<String, Vec<PluginValue>>,
     pub output_presence: BTreeMap<String, bool>,
     pub effects: CapabilityEffects,
-    receipt: Vec<u8>,
+    receipts: Vec<Vec<u8>>,
 }
 
 impl ProviderInvocationResult {
-    pub fn receipt(&self) -> &[u8] {
-        &self.receipt
+    pub fn receipts(&self) -> &[Vec<u8>] {
+        &self.receipts
     }
 }
 
@@ -1036,6 +1036,13 @@ impl InvocationHost {
                 limit: "provider-receipt-byte".to_owned(),
             });
         }
+        let receipts = ProviderResultReceiptSet::from_bytes(&response.receipt)
+            .map_err(|_| {
+                InvocationError::HostFailure(
+                    "provider component returned an invalid result receipt set".to_owned(),
+                )
+            })?
+            .into_receipts();
         if !self.handles.is_empty()
             || self
                 .outputs
@@ -1164,7 +1171,7 @@ impl InvocationHost {
             outputs,
             output_presence,
             effects,
-            receipt: response.receipt,
+            receipts,
         })
     }
 

@@ -99,6 +99,11 @@ impl provider_binding::Guest for ProviderComponent {
                 "invalid provider request".to_owned(),
             ));
         }
+        let receipt = if request == b"invalid-provider-receipt" {
+            b"guest-controlled-receipt".to_vec()
+        } else {
+            receipt_set(&[b"provider-fixture-receipt"])
+        };
         Ok(types::ProviderInvocationResponse {
             outputs: vec![types::ProviderMaterializedOutput {
                 port_id: "result".to_owned(),
@@ -108,9 +113,20 @@ impl provider_binding::Guest for ProviderComponent {
                     abi_bytes: request,
                 },
             }],
-            receipt: b"provider-fixture-receipt".to_vec(),
+            receipt,
         })
     }
+}
+
+fn receipt_set(receipts: &[&[u8]]) -> Vec<u8> {
+    let mut encoded = b"sim.comfy.provider-result-receipt-set\0".to_vec();
+    encoded.extend_from_slice(&1_u16.to_le_bytes());
+    encoded.extend_from_slice(&(receipts.len() as u32).to_le_bytes());
+    for receipt in receipts {
+        encoded.extend_from_slice(&(receipt.len() as u32).to_le_bytes());
+        encoded.extend_from_slice(receipt);
+    }
+    encoded
 }
 
 fn version(major: u16, minor: u16, patch: u16) -> types::ApiVersion {

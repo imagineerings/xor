@@ -30,11 +30,142 @@ pub const MAX_PORTS_PER_NODE: usize = 1_024;
 pub const MAX_LEGACY_IDENTIFIERS: usize = 16_384;
 pub const MAX_LEGACY_TRANSLATIONS_PER_MAPPING: usize = 1_024;
 pub const MAX_MANIFEST_BYTES: usize = 16 * 1024 * 1024;
+pub const MAX_PROVIDER_RESULT_RECEIPTS: usize = 1_024;
+pub const MAX_PROVIDER_RESULT_RECEIPT_BYTES: usize = 32 * 1024;
+pub const MAX_PROVIDER_RESULT_RECEIPT_SET_BYTES: usize = 16 * 1024 * 1024;
 pub const PLUGIN_SIGNATURE_ALGORITHM: &str = "ed25519-v1";
 #[cfg(any(feature = "signing-tooling", test))]
 pub const ED25519_PRIVATE_KEY_SEED_BYTES: usize = 32;
 pub const ED25519_PUBLIC_KEY_BYTES: usize = 32;
 pub const ED25519_SIGNATURE_BYTES: usize = 64;
+
+const PROVIDER_RESULT_RECEIPT_SET_DOMAIN: &[u8] = b"sim.comfy.provider-result-receipt-set\0";
+const PROVIDER_RESULT_RECEIPT_SET_VERSION: u16 = 1;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderResultReceiptSet {
+    receipts: Vec<Vec<u8>>,
+}
+
+impl ProviderResultReceiptSet {
+    pub fn new(receipts: Vec<Vec<u8>>) -> Result<Self, PluginContractError> {
+        if receipts.is_empty() || receipts.len() > MAX_PROVIDER_RESULT_RECEIPTS {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        let mut unique = BTreeSet::new();
+        let mut encoded_length = PROVIDER_RESULT_RECEIPT_SET_DOMAIN
+            .len()
+            .checked_add(size_of::<u16>() + size_of::<u32>())
+            .ok_or(PluginContractError::InvalidProviderReceiptSet)?;
+        for receipt in &receipts {
+            if receipt.is_empty()
+                || receipt.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES
+                || !unique.insert(receipt.as_slice())
+            {
+                return Err(PluginContractError::InvalidProviderReceiptSet);
+            }
+            encoded_length = encoded_length
+                .checked_add(size_of::<u32>())
+                .and_then(|length| length.checked_add(receipt.len()))
+                .ok_or(PluginContractError::InvalidProviderReceiptSet)?;
+        }
+        if encoded_length > MAX_PROVIDER_RESULT_RECEIPT_SET_BYTES {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        Ok(Self { receipts })
+    }
+
+    pub fn receipts(&self) -> &[Vec<u8>] {
+        &self.receipts
+    }
+
+    pub fn into_receipts(self) -> Vec<Vec<u8>> {
+        self.receipts
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PluginContractError> {
+        let receipt_count = u32::try_from(self.receipts.len())
+            .map_err(|_| PluginContractError::InvalidProviderReceiptSet)?;
+        let mut bytes = Vec::with_capacity(
+            PROVIDER_RESULT_RECEIPT_SET_DOMAIN.len()
+                + size_of::<u16>()
+                + size_of::<u32>()
+                + self
+                    .receipts
+                    .iter()
+                    .map(|receipt| size_of::<u32>() + receipt.len())
+                    .sum::<usize>(),
+        );
+        bytes.extend_from_slice(PROVIDER_RESULT_RECEIPT_SET_DOMAIN);
+        bytes.extend_from_slice(&PROVIDER_RESULT_RECEIPT_SET_VERSION.to_le_bytes());
+        bytes.extend_from_slice(&receipt_count.to_le_bytes());
+        for receipt in &self.receipts {
+            let receipt_length = u32::try_from(receipt.len())
+                .map_err(|_| PluginContractError::InvalidProviderReceiptSet)?;
+            bytes.extend_from_slice(&receipt_length.to_le_bytes());
+            bytes.extend_from_slice(receipt);
+        }
+        if bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_SET_BYTES {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        Ok(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PluginContractError> {
+        if bytes.is_empty() || bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_SET_BYTES {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        let mut remaining = bytes;
+        take_exact(&mut remaining, PROVIDER_RESULT_RECEIPT_SET_DOMAIN.len())
+            .filter(|domain| *domain == PROVIDER_RESULT_RECEIPT_SET_DOMAIN)
+            .ok_or(PluginContractError::InvalidProviderReceiptSet)?;
+        let version = u16::from_le_bytes(
+            take_exact(&mut remaining, size_of::<u16>())
+                .and_then(|value| value.try_into().ok())
+                .ok_or(PluginContractError::InvalidProviderReceiptSet)?,
+        );
+        if version != PROVIDER_RESULT_RECEIPT_SET_VERSION {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        let receipt_count = u32::from_le_bytes(
+            take_exact(&mut remaining, size_of::<u32>())
+                .and_then(|value| value.try_into().ok())
+                .ok_or(PluginContractError::InvalidProviderReceiptSet)?,
+        );
+        let receipt_count = usize::try_from(receipt_count)
+            .map_err(|_| PluginContractError::InvalidProviderReceiptSet)?;
+        if receipt_count == 0 || receipt_count > MAX_PROVIDER_RESULT_RECEIPTS {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        let mut receipts = Vec::with_capacity(receipt_count);
+        for _ in 0..receipt_count {
+            let receipt_length = u32::from_le_bytes(
+                take_exact(&mut remaining, size_of::<u32>())
+                    .and_then(|value| value.try_into().ok())
+                    .ok_or(PluginContractError::InvalidProviderReceiptSet)?,
+            );
+            let receipt_length = usize::try_from(receipt_length)
+                .map_err(|_| PluginContractError::InvalidProviderReceiptSet)?;
+            let receipt = take_exact(&mut remaining, receipt_length)
+                .ok_or(PluginContractError::InvalidProviderReceiptSet)?
+                .to_vec();
+            receipts.push(receipt);
+        }
+        if !remaining.is_empty() {
+            return Err(PluginContractError::InvalidProviderReceiptSet);
+        }
+        Self::new(receipts)
+    }
+}
+
+fn take_exact<'a>(bytes: &mut &'a [u8], length: usize) -> Option<&'a [u8]> {
+    if bytes.len() < length {
+        return None;
+    }
+    let (value, remaining) = bytes.split_at(length);
+    *bytes = remaining;
+    Some(value)
+}
 
 #[cfg(any(feature = "signing-tooling", test))]
 pub struct PluginSigningKey {
@@ -1671,6 +1802,7 @@ pub enum PluginContractError {
     InvalidSigningKey,
     InvalidProvenance,
     InvalidProviderBindingSet,
+    InvalidProviderReceiptSet,
     InvalidNodeCount(usize),
     DuplicateOrInvalidNode(String),
     InvalidNodeMetadata(String),
@@ -1735,6 +1867,9 @@ impl fmt::Display for PluginContractError {
             Self::InvalidProvenance => formatter.write_str("invalid manifest provenance"),
             Self::InvalidProviderBindingSet => {
                 formatter.write_str("invalid signed provider binding set")
+            }
+            Self::InvalidProviderReceiptSet => {
+                formatter.write_str("invalid provider result receipt set")
             }
             Self::InvalidNodeCount(count) => write!(formatter, "invalid plugin node count {count}"),
             Self::DuplicateOrInvalidNode(node) => {
@@ -2454,6 +2589,43 @@ mod tests {
         writer.raw(&[5]);
         assert!(writer.overflowed());
         assert_eq!(writer.finish(), [1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn provider_result_receipt_sets_are_canonical_ordered_and_bounded() -> Result<(), Box<dyn Error>>
+    {
+        let receipts = ProviderResultReceiptSet::new(vec![
+            b"first-sealed-receipt".to_vec(),
+            b"second-sealed-receipt".to_vec(),
+        ])?;
+        let encoded = receipts.to_bytes()?;
+        assert_eq!(ProviderResultReceiptSet::from_bytes(&encoded)?, receipts);
+
+        let mut trailing = encoded.clone();
+        trailing.push(0);
+        assert_eq!(
+            ProviderResultReceiptSet::from_bytes(&trailing),
+            Err(PluginContractError::InvalidProviderReceiptSet)
+        );
+        let mut wrong_version = encoded;
+        wrong_version[PROVIDER_RESULT_RECEIPT_SET_DOMAIN.len()] = 2;
+        assert_eq!(
+            ProviderResultReceiptSet::from_bytes(&wrong_version),
+            Err(PluginContractError::InvalidProviderReceiptSet)
+        );
+        assert_eq!(
+            ProviderResultReceiptSet::new(Vec::new()),
+            Err(PluginContractError::InvalidProviderReceiptSet)
+        );
+        assert_eq!(
+            ProviderResultReceiptSet::new(vec![b"duplicate".to_vec(), b"duplicate".to_vec()]),
+            Err(PluginContractError::InvalidProviderReceiptSet)
+        );
+        assert_eq!(
+            ProviderResultReceiptSet::new(vec![vec![b'x'; MAX_PROVIDER_RESULT_RECEIPT_BYTES + 1]]),
+            Err(PluginContractError::InvalidProviderReceiptSet)
+        );
+        Ok(())
     }
 
     #[test]

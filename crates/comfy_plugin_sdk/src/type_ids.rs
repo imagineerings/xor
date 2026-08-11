@@ -962,7 +962,7 @@ mod tests {
             (
                 include_bytes!("../../../.agents/specs/comfy-parity/catalogs/backend-nodes.csv")
                     .as_slice(),
-                "3fe43e8978f55500dcebd7faf91a376f0c9606d66ebcda6f5be791c20474bc6e",
+                "6aed8b3f991b3c08d8361dff1d89d5064c5784bfac0e2fc6cd0d02f8122ff8cd",
                 b"schema_api".as_slice(),
             ),
             (

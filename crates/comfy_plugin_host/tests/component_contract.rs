@@ -992,7 +992,7 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     let result = instance.invoke_provider("provider.echo", &request)?;
     assert_eq!(result.outputs.get("result"), Some(&vec![expected]));
     assert_eq!(result.output_presence.get("result"), Some(&true));
-    assert_eq!(result.receipt(), b"provider-fixture-receipt");
+    assert_eq!(result.receipts(), &[b"provider-fixture-receipt".to_vec()]);
     assert!(result.effects.outputs.is_empty());
     assert!(result.effects.routes.is_empty());
     let encoded = serde_json::to_vec(&result)?;
@@ -1062,6 +1062,12 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
             b"not-canonical-abi".to_vec(),
             CancellationToken::default(),
             "invalid provider output value",
+        ),
+        (
+            "provider.echo",
+            b"invalid-provider-receipt".to_vec(),
+            CancellationToken::default(),
+            "invalid result receipt set",
         ),
         (
             "provider.unknown",

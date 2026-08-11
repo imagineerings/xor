@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use comfy_plugin_sdk::CanonicalTypeId;
+use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -56,6 +56,26 @@ struct IssuedProviderResult {
     identity: ProviderInvocationIdentity,
     result_sha256: String,
     response: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedProviderResult {
+    identity: ProviderInvocationIdentity,
+    response: Vec<u8>,
+}
+
+impl ResolvedProviderResult {
+    pub fn identity(&self) -> &ProviderInvocationIdentity {
+        &self.identity
+    }
+
+    pub fn response(&self) -> &[u8] {
+        &self.response
+    }
+
+    pub fn into_response(self) -> Vec<u8> {
+        self.response
+    }
 }
 
 pub struct ProviderResultReceiptSession {
@@ -173,6 +193,57 @@ impl ProviderResultReceiptSession {
             .ok_or(ProviderMaterializationError::UnknownReceipt)?;
         self.issued_order.pop_front();
         Ok(issued.response)
+    }
+
+    pub fn resolve_receipt_set(
+        &mut self,
+        receipt_set: &ProviderResultReceiptSet,
+        now: Instant,
+    ) -> Result<Vec<ResolvedProviderResult>, ProviderMaterializationError> {
+        self.check_active()?;
+        if receipt_set.receipts().len() != self.issued_order.len() {
+            return Err(ProviderMaterializationError::UnresolvedReceipts);
+        }
+        let mut validated_nonces = Vec::with_capacity(receipt_set.receipts().len());
+        for (receipt_bytes, expected_nonce) in receipt_set
+            .receipts()
+            .iter()
+            .zip(self.issued_order.iter().copied())
+        {
+            let receipt = ProviderResultReceipt::from_bytes(receipt_bytes)
+                .map_err(|_| ProviderMaterializationError::ReceiptRejected)?;
+            if receipt.nonce() != expected_nonce {
+                return if self.issued.contains_key(&receipt.nonce()) {
+                    Err(ProviderMaterializationError::ReceiptOutOfOrder)
+                } else {
+                    Err(ProviderMaterializationError::UnknownReceipt)
+                };
+            }
+            let issued = self
+                .issued
+                .get(&expected_nonce)
+                .ok_or(ProviderMaterializationError::UnknownReceipt)?;
+            self.verifier
+                .verify(&receipt, &issued.identity, &issued.result_sha256, now)
+                .map_err(|_| ProviderMaterializationError::ReceiptRejected)?;
+            validated_nonces.push(expected_nonce);
+        }
+
+        let mut resolved = Vec::with_capacity(validated_nonces.len());
+        for nonce in validated_nonces {
+            if self.issued_order.pop_front() != Some(nonce) {
+                return Err(ProviderMaterializationError::ReceiptOutOfOrder);
+            }
+            let issued = self
+                .issued
+                .remove(&nonce)
+                .ok_or(ProviderMaterializationError::UnknownReceipt)?;
+            resolved.push(ResolvedProviderResult {
+                identity: issued.identity,
+                response: issued.response,
+            });
+        }
+        Ok(resolved)
     }
 
     pub fn finish(mut self) -> Result<(), ProviderMaterializationError> {
@@ -336,6 +407,45 @@ mod tests {
             unresolved.finish(),
             Err(ProviderMaterializationError::UnresolvedReceipts)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_result_session_resolves_a_complete_receipt_set_atomically()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let origin = Instant::now();
+        let issuer = Arc::new(ProviderResultReceiptIssuer::from_seed([29; 32], origin)?);
+        let mut session = ProviderResultReceiptSession::new(issuer, 1_024, 7)?;
+        let first_identity = invocation_identity("node.fixture", 7, 'a')?;
+        let second_identity = invocation_identity("node.fixture", 8, 'b')?;
+        let first_receipt = session.issue(
+            first_identity.clone(),
+            b"first".to_vec(),
+            origin + Duration::from_secs(1),
+            origin + Duration::from_secs(31),
+        )?;
+        let second_receipt = session.issue(
+            second_identity.clone(),
+            b"second".to_vec(),
+            origin + Duration::from_secs(2),
+            origin + Duration::from_secs(32),
+        )?;
+        let reversed =
+            ProviderResultReceiptSet::new(vec![second_receipt.clone(), first_receipt.clone()])?;
+        assert_eq!(
+            session.resolve_receipt_set(&reversed, origin + Duration::from_secs(3)),
+            Err(ProviderMaterializationError::ReceiptOutOfOrder)
+        );
+
+        let receipt_set = ProviderResultReceiptSet::new(vec![first_receipt, second_receipt])?;
+        let resolved =
+            session.resolve_receipt_set(&receipt_set, origin + Duration::from_secs(3))?;
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(resolved[0].identity(), &first_identity);
+        assert_eq!(resolved[0].response(), b"first");
+        assert_eq!(resolved[1].identity(), &second_identity);
+        assert_eq!(resolved[1].response(), b"second");
+        session.finish()?;
         Ok(())
     }
 }
