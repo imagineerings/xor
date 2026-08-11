@@ -13137,6 +13137,84 @@
       "decision_reason": "ProviderPolicy alone turns checked immutable profile configuration into an exact provider/endpoint/secret/credential-scope authorization bound to authenticated plugin identity and native measurement; execution adapters cannot infer ambient network or credential authority."
     },
     {
+      "concern": "provider_result_receipts",
+      "canonical_owner": "comfy_runtime::ProviderResultReceiptVerifier",
+      "owner_files": [
+        "crates/comfy_runtime/src/trust.rs"
+      ],
+      "owner_symbols": [
+        "ProviderResultReceiptVerifier"
+      ],
+      "allowed_adapters": [
+        "Plugin capability sessions assign request ordinals and retain bounded provider response bytes app-side",
+        "provider WIT and worker boundaries carry only the bounded opaque receipt encoding and never native handles, paths, payloads, or secrets",
+        "provider materialization verifies the exact invocation identity and result digest before delegating payload construction to canonical lower-domain owners"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderInvocationIdentity",
+          "role": "canonical_identity",
+          "symbol": "ProviderInvocationIdentity"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderResultReceipt",
+          "role": "sealed_authorization",
+          "symbol": "ProviderResultReceipt"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderResultReceiptIssuer",
+          "role": "related_owner",
+          "symbol": "ProviderResultReceiptIssuer"
+        },
+        {
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "qualified": "comfy_runtime::ProviderResultReceiptVerifier",
+          "role": "canonical",
+          "symbol": "ProviderResultReceiptVerifier"
+        }
+      ],
+      "call_symbols": [
+        "ProviderInvocationIdentity",
+        "ProviderResultReceipt",
+        "ProviderResultReceiptIssuer",
+        "ProviderResultReceiptVerifier"
+      ],
+      "required_mappings": [],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-node-provider-invocation-foundation",
+        "comfy-parity-authoritative-domain-ownership"
+      ],
+      "production_consumers": [
+        "app-owned provider capability sessions",
+        "provider result materialization",
+        "native provider worker execution"
+      ],
+      "requirements": [
+        "Requirement 40",
+        "Requirement 41"
+      ],
+      "design": [
+        "D12",
+        "D13",
+        "D18",
+        "D21",
+        "D40",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-E2E-003",
+        "VAL-WORKER-PLUGIN-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "ProviderResultReceiptVerifier alone admits a domain-separated host-issued provider result receipt bound to the exact principal, profile, prompt, attempt, node, request ordinal and digest, signed provider binding, endpoint, and result digest; worker, plugin, and materialization adapters cannot mint or reinterpret that authority."
+    },
+    {
       "concern": "recovery_receipts",
       "canonical_owner": "comfy_runtime::RecoveryJournal",
       "owner_files": [

@@ -67,7 +67,10 @@ pub const MAX_SEALED_PLUGIN_AUTHORIZATION_BYTES: usize = 2 * 1024 * 1024;
 pub const CUDART_LIBRARY_ID: &str = "nvidia-cudart";
 const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-plugin-authorization-v2\0";
 const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-cost-acceptance-v2\0";
+const PROVIDER_RESULT_RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-result-receipt-v1\0";
 const MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
+const MAX_PROVIDER_RESULT_RECEIPT_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
+pub const MAX_PROVIDER_RESULT_RECEIPT_BYTES: usize = 32 * 1024;
 const ROCM_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-rocm-package-v1\0";
 const METAL_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-metal-package-v1\0";
 const MLU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-mlu-package-v1\0";
@@ -2292,7 +2295,7 @@ impl ProviderCostNonce {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProviderCostAcceptanceScope {
+pub struct ProviderInvocationIdentity {
     principal_id: String,
     profile_id: String,
     prompt_id: String,
@@ -2305,10 +2308,9 @@ pub struct ProviderCostAcceptanceScope {
     plugin_digest_sha256: String,
     provider_binding_sha256: String,
     endpoint: ProviderEndpoint,
-    price_bound: ProviderPriceBound,
 }
 
-impl ProviderCostAcceptanceScope {
+impl ProviderInvocationIdentity {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         principal_id: impl Into<String>,
@@ -2324,7 +2326,6 @@ impl ProviderCostAcceptanceScope {
         provider_binding_sha256: impl Into<String>,
         provider: impl Into<String>,
         endpoint: impl Into<String>,
-        price_bound: ProviderPriceBound,
     ) -> Result<Self, TrustError> {
         let principal_id = principal_id.into();
         let profile_id = profile_id.into();
@@ -2350,7 +2351,7 @@ impl ProviderCostAcceptanceScope {
             || validate_sha256(&plugin_digest_sha256).is_err()
             || validate_sha256(&provider_binding_sha256).is_err()
         {
-            return Err(TrustError::InvalidProviderCostAcceptance);
+            return Err(TrustError::InvalidProviderInvocationIdentity);
         }
         Ok(Self {
             principal_id,
@@ -2365,7 +2366,6 @@ impl ProviderCostAcceptanceScope {
             plugin_digest_sha256,
             provider_binding_sha256,
             endpoint: ProviderEndpoint::new(provider, endpoint)?,
-            price_bound,
         })
     }
 
@@ -2419,6 +2419,114 @@ impl ProviderCostAcceptanceScope {
 
     pub fn endpoint(&self) -> &str {
         self.endpoint.endpoint()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderCostAcceptanceScope {
+    identity: ProviderInvocationIdentity,
+    price_bound: ProviderPriceBound,
+}
+
+impl ProviderCostAcceptanceScope {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        principal_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        prompt_id: impl Into<String>,
+        prompt_sha256: impl Into<String>,
+        attempt_id: impl Into<String>,
+        node_id: impl Into<String>,
+        request_ordinal: u32,
+        request_sha256: impl Into<String>,
+        plugin_id: impl Into<String>,
+        plugin_digest_sha256: impl Into<String>,
+        provider_binding_sha256: impl Into<String>,
+        provider: impl Into<String>,
+        endpoint: impl Into<String>,
+        price_bound: ProviderPriceBound,
+    ) -> Result<Self, TrustError> {
+        let identity = ProviderInvocationIdentity::new(
+            principal_id,
+            profile_id,
+            prompt_id,
+            prompt_sha256,
+            attempt_id,
+            node_id,
+            request_ordinal,
+            request_sha256,
+            plugin_id,
+            plugin_digest_sha256,
+            provider_binding_sha256,
+            provider,
+            endpoint,
+        )
+        .map_err(|error| match error {
+            TrustError::InvalidProviderInvocationIdentity => {
+                TrustError::InvalidProviderCostAcceptance
+            }
+            other => other,
+        })?;
+        Ok(Self {
+            identity,
+            price_bound,
+        })
+    }
+
+    pub fn identity(&self) -> &ProviderInvocationIdentity {
+        &self.identity
+    }
+
+    pub fn principal_id(&self) -> &str {
+        self.identity.principal_id()
+    }
+
+    pub fn profile_id(&self) -> &str {
+        self.identity.profile_id()
+    }
+
+    pub fn prompt_id(&self) -> &str {
+        self.identity.prompt_id()
+    }
+
+    pub fn prompt_sha256(&self) -> &str {
+        self.identity.prompt_sha256()
+    }
+
+    pub fn attempt_id(&self) -> &str {
+        self.identity.attempt_id()
+    }
+
+    pub fn node_id(&self) -> &str {
+        self.identity.node_id()
+    }
+
+    pub fn request_ordinal(&self) -> u32 {
+        self.identity.request_ordinal()
+    }
+
+    pub fn request_sha256(&self) -> &str {
+        self.identity.request_sha256()
+    }
+
+    pub fn plugin_id(&self) -> &str {
+        self.identity.plugin_id()
+    }
+
+    pub fn plugin_digest_sha256(&self) -> &str {
+        self.identity.plugin_digest_sha256()
+    }
+
+    pub fn provider_binding_sha256(&self) -> &str {
+        self.identity.provider_binding_sha256()
+    }
+
+    pub fn provider(&self) -> &str {
+        self.identity.provider()
+    }
+
+    pub fn endpoint(&self) -> &str {
+        self.identity.endpoint()
     }
 
     pub fn price_bound(&self) -> &ProviderPriceBound {
@@ -2579,6 +2687,298 @@ impl ProviderCostAcceptanceVerifier {
             .ok_or(TrustError::InvalidProviderCostAcceptance)?;
         Ok(VerifiedProviderCostAcceptance {
             nonce: acceptance.claims.nonce,
+            expires_at,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ProviderResultNonce([u8; 32]);
+
+impl ProviderResultNonce {
+    pub fn new(bytes: [u8; 32]) -> Result<Self, TrustError> {
+        if bytes.iter().all(|byte| *byte == 0) {
+            return Err(TrustError::InvalidProviderResultReceipt);
+        }
+        Ok(Self(bytes))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProviderResultReceiptClaims {
+    identity: ProviderInvocationIdentity,
+    result_sha256: String,
+    issued_at_milliseconds: u64,
+    expires_at_milliseconds: u64,
+    nonce: ProviderResultNonce,
+}
+
+pub struct ProviderResultReceipt {
+    claims: ProviderResultReceiptClaims,
+    signature: [u8; ED25519_SIGNATURE_BYTES],
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderResultReceiptWire {
+    principal_id: String,
+    profile_id: String,
+    prompt_id: String,
+    prompt_sha256: String,
+    attempt_id: String,
+    node_id: String,
+    request_ordinal: u32,
+    request_sha256: String,
+    plugin_id: String,
+    plugin_digest_sha256: String,
+    provider_binding_sha256: String,
+    provider: String,
+    endpoint: String,
+    result_sha256: String,
+    issued_at_milliseconds: u64,
+    expires_at_milliseconds: u64,
+    nonce: String,
+    signature: String,
+}
+
+impl ProviderResultReceipt {
+    pub fn identity(&self) -> &ProviderInvocationIdentity {
+        &self.claims.identity
+    }
+
+    pub fn result_sha256(&self) -> &str {
+        &self.claims.result_sha256
+    }
+
+    pub fn nonce(&self) -> ProviderResultNonce {
+        self.claims.nonce
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, TrustError> {
+        let identity = &self.claims.identity;
+        let wire = ProviderResultReceiptWire {
+            principal_id: identity.principal_id().to_owned(),
+            profile_id: identity.profile_id().to_owned(),
+            prompt_id: identity.prompt_id().to_owned(),
+            prompt_sha256: identity.prompt_sha256().to_owned(),
+            attempt_id: identity.attempt_id().to_owned(),
+            node_id: identity.node_id().to_owned(),
+            request_ordinal: identity.request_ordinal(),
+            request_sha256: identity.request_sha256().to_owned(),
+            plugin_id: identity.plugin_id().to_owned(),
+            plugin_digest_sha256: identity.plugin_digest_sha256().to_owned(),
+            provider_binding_sha256: identity.provider_binding_sha256().to_owned(),
+            provider: identity.provider().to_owned(),
+            endpoint: identity.endpoint().to_owned(),
+            result_sha256: self.claims.result_sha256.clone(),
+            issued_at_milliseconds: self.claims.issued_at_milliseconds,
+            expires_at_milliseconds: self.claims.expires_at_milliseconds,
+            nonce: encode_hex(self.claims.nonce.as_bytes()),
+            signature: encode_hex(&self.signature),
+        };
+        let bytes =
+            serde_json::to_vec(&wire).map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        if bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES {
+            return Err(TrustError::ProviderResultReceiptTooLarge);
+        }
+        Ok(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, TrustError> {
+        if bytes.is_empty() || bytes.len() > MAX_PROVIDER_RESULT_RECEIPT_BYTES {
+            return Err(TrustError::ProviderResultReceiptTooLarge);
+        }
+        let wire: ProviderResultReceiptWire =
+            serde_json::from_slice(bytes).map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        let identity = ProviderInvocationIdentity::new(
+            wire.principal_id,
+            wire.profile_id,
+            wire.prompt_id,
+            wire.prompt_sha256,
+            wire.attempt_id,
+            wire.node_id,
+            wire.request_ordinal,
+            wire.request_sha256,
+            wire.plugin_id,
+            wire.plugin_digest_sha256,
+            wire.provider_binding_sha256,
+            wire.provider,
+            wire.endpoint,
+        )
+        .map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        validate_sha256(&wire.result_sha256)
+            .map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        let nonce = decode_hex_exact::<32>(&wire.nonce)
+            .and_then(|bytes| ProviderResultNonce::new(bytes).ok())
+            .ok_or(TrustError::InvalidProviderResultReceipt)?;
+        let signature = decode_hex_exact::<ED25519_SIGNATURE_BYTES>(&wire.signature)
+            .ok_or(TrustError::InvalidProviderResultReceipt)?;
+        Ok(Self {
+            claims: ProviderResultReceiptClaims {
+                identity,
+                result_sha256: wire.result_sha256,
+                issued_at_milliseconds: wire.issued_at_milliseconds,
+                expires_at_milliseconds: wire.expires_at_milliseconds,
+                nonce,
+            },
+            signature,
+        })
+    }
+}
+
+impl fmt::Debug for ProviderResultReceipt {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderResultReceipt([SEALED])")
+    }
+}
+
+pub struct ProviderResultReceiptIssuer {
+    seed: Zeroizing<[u8; 32]>,
+    clock_origin: Instant,
+}
+
+impl ProviderResultReceiptIssuer {
+    pub fn generate(clock_origin: Instant) -> Result<Self, TrustError> {
+        let mut seed = [0_u8; 32];
+        SystemRandom::new()
+            .fill(&mut seed)
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Self::from_seed(seed, clock_origin)
+    }
+
+    pub fn from_seed(seed: [u8; 32], clock_origin: Instant) -> Result<Self, TrustError> {
+        Ed25519KeyPair::from_seed_unchecked(&seed)
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(Self {
+            seed: Zeroizing::new(seed),
+            clock_origin,
+        })
+    }
+
+    pub fn verifier(&self) -> Result<ProviderResultReceiptVerifier, TrustError> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        let public_key = key_pair
+            .public_key()
+            .as_ref()
+            .try_into()
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(ProviderResultReceiptVerifier {
+            public_key,
+            clock_origin: self.clock_origin,
+        })
+    }
+
+    pub fn issue(
+        &self,
+        identity: ProviderInvocationIdentity,
+        result_sha256: impl Into<String>,
+        issued_at: Instant,
+        expires_at: Instant,
+        nonce: ProviderResultNonce,
+    ) -> Result<ProviderResultReceipt, TrustError> {
+        let result_sha256 = result_sha256.into();
+        validate_sha256(&result_sha256).map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        let issued_at_milliseconds = provider_result_milliseconds(self.clock_origin, issued_at)?;
+        let expires_at_milliseconds = provider_result_milliseconds(self.clock_origin, expires_at)?;
+        if expires_at <= issued_at
+            || expires_at
+                .checked_duration_since(issued_at)
+                .is_none_or(|duration| duration > MAX_PROVIDER_RESULT_RECEIPT_LIFETIME)
+        {
+            return Err(TrustError::InvalidProviderResultReceipt);
+        }
+        let claims = ProviderResultReceiptClaims {
+            identity,
+            result_sha256,
+            issued_at_milliseconds,
+            expires_at_milliseconds,
+            nonce,
+        };
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(self.seed.as_ref())
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        let signature = key_pair
+            .sign(&provider_result_receipt_signing_payload(&claims))
+            .as_ref()
+            .try_into()
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Ok(ProviderResultReceipt { claims, signature })
+    }
+}
+
+impl fmt::Debug for ProviderResultReceiptIssuer {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderResultReceiptIssuer([REDACTED])")
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedProviderResultReceipt {
+    result_sha256: String,
+    nonce: ProviderResultNonce,
+    expires_at: Instant,
+}
+
+impl VerifiedProviderResultReceipt {
+    pub fn result_sha256(&self) -> &str {
+        &self.result_sha256
+    }
+
+    pub fn nonce(&self) -> ProviderResultNonce {
+        self.nonce
+    }
+
+    pub fn expires_at(&self) -> Instant {
+        self.expires_at
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ProviderResultReceiptVerifier {
+    public_key: [u8; ED25519_PUBLIC_KEY_BYTES],
+    clock_origin: Instant,
+}
+
+impl ProviderResultReceiptVerifier {
+    pub fn verify(
+        &self,
+        receipt: &ProviderResultReceipt,
+        expected_identity: &ProviderInvocationIdentity,
+        expected_result_sha256: &str,
+        now: Instant,
+    ) -> Result<VerifiedProviderResultReceipt, TrustError> {
+        validate_sha256(expected_result_sha256)
+            .map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        UnparsedPublicKey::new(&ED25519, self.public_key)
+            .verify(
+                &provider_result_receipt_signing_payload(&receipt.claims),
+                &receipt.signature,
+            )
+            .map_err(|_| TrustError::InvalidProviderResultReceipt)?;
+        if receipt.claims.identity != *expected_identity
+            || receipt.claims.result_sha256 != expected_result_sha256
+        {
+            return Err(TrustError::InvalidProviderResultReceipt);
+        }
+        let now_milliseconds = provider_result_milliseconds(self.clock_origin, now)?;
+        if now_milliseconds < receipt.claims.issued_at_milliseconds
+            || now_milliseconds >= receipt.claims.expires_at_milliseconds
+        {
+            return Err(TrustError::ExpiredProviderResultReceipt);
+        }
+        let expires_at = self
+            .clock_origin
+            .checked_add(Duration::from_millis(
+                receipt.claims.expires_at_milliseconds,
+            ))
+            .ok_or(TrustError::InvalidProviderResultReceipt)?;
+        Ok(VerifiedProviderResultReceipt {
+            result_sha256: receipt.claims.result_sha256.clone(),
+            nonce: receipt.claims.nonce,
             expires_at,
         })
     }
@@ -3034,6 +3434,16 @@ pub enum TrustError {
     ExpiredProviderCostAcceptance,
     #[error("provider cost acceptance sealing key generation failed")]
     ProviderCostAcceptanceSealingUnavailable,
+    #[error("provider invocation identity is invalid")]
+    InvalidProviderInvocationIdentity,
+    #[error("provider result receipt is invalid or does not match the invocation")]
+    InvalidProviderResultReceipt,
+    #[error("provider result receipt has expired")]
+    ExpiredProviderResultReceipt,
+    #[error("provider result receipt exceeds its bounded wire size")]
+    ProviderResultReceiptTooLarge,
+    #[error("provider result receipt sealing key generation failed")]
+    ProviderResultReceiptSealingUnavailable,
     #[error("native API remote exposure is unsafe")]
     UnsafeApiExposure,
     #[error("external navigation policy is invalid")]
@@ -3294,6 +3704,46 @@ fn provider_cost_acceptance_signing_payload(claims: &ProviderCostAcceptanceClaim
             .maximum_microunits()
             .to_le_bytes(),
     );
+    digest.update(claims.issued_at_milliseconds.to_le_bytes());
+    digest.update(claims.expires_at_milliseconds.to_le_bytes());
+    digest.update(claims.nonce.as_bytes());
+    digest.finalize().into()
+}
+
+fn provider_result_milliseconds(origin: Instant, value: Instant) -> Result<u64, TrustError> {
+    let duration = value
+        .checked_duration_since(origin)
+        .ok_or(TrustError::InvalidProviderResultReceipt)?;
+    u64::try_from(duration.as_millis()).map_err(|_| TrustError::InvalidProviderResultReceipt)
+}
+
+fn provider_result_receipt_signing_payload(claims: &ProviderResultReceiptClaims) -> [u8; 32] {
+    fn update_field(digest: &mut Sha256, value: &[u8]) {
+        digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_le_bytes());
+        digest.update(value);
+    }
+
+    let identity = &claims.identity;
+    let mut digest = Sha256::new();
+    digest.update(PROVIDER_RESULT_RECEIPT_SIGNATURE_DOMAIN);
+    for field in [
+        identity.principal_id().as_bytes(),
+        identity.profile_id().as_bytes(),
+        identity.prompt_id().as_bytes(),
+        identity.prompt_sha256().as_bytes(),
+        identity.attempt_id().as_bytes(),
+        identity.node_id().as_bytes(),
+        identity.request_sha256().as_bytes(),
+        identity.plugin_id().as_bytes(),
+        identity.plugin_digest_sha256().as_bytes(),
+        identity.provider_binding_sha256().as_bytes(),
+        identity.provider().as_bytes(),
+        identity.endpoint().as_bytes(),
+        claims.result_sha256.as_bytes(),
+    ] {
+        update_field(&mut digest, field);
+    }
+    digest.update(identity.request_ordinal().to_le_bytes());
     digest.update(claims.issued_at_milliseconds.to_le_bytes());
     digest.update(claims.expires_at_milliseconds.to_le_bytes());
     digest.update(claims.nonce.as_bytes());
@@ -4673,6 +5123,157 @@ mod tests {
                 nonce,
             ),
             Err(TrustError::InvalidProviderCostAcceptance)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_result_receipt_is_sealed_scoped_bounded_and_domain_separated()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let origin = Instant::now();
+        let issuer = ProviderResultReceiptIssuer::from_seed([17; 32], origin)?;
+        let verifier = issuer.verifier()?;
+        let identity_for = |node_id: &str, request_ordinal: u32, request_sha256: &str| {
+            ProviderInvocationIdentity::new(
+                "principal-a",
+                "00000000-0000-0000-0000-000000000001",
+                "00000000-0000-0000-0000-000000000002",
+                "c".repeat(64),
+                "00000000-0000-0000-0000-000000000003",
+                node_id,
+                request_ordinal,
+                request_sha256,
+                "plugin.fixture",
+                DIGEST,
+                "a".repeat(64),
+                "fixture",
+                "https://fixture.invalid/v1/generate",
+            )
+        };
+        let identity = identity_for("node.fixture", 7, &"d".repeat(64))?;
+        let result_sha256 = "e".repeat(64);
+        let nonce = ProviderResultNonce::new([19; 32])?;
+        let receipt = issuer.issue(
+            identity.clone(),
+            result_sha256.clone(),
+            origin + Duration::from_secs(1),
+            origin + Duration::from_secs(31),
+            nonce,
+        )?;
+        let encoded = receipt.to_bytes()?;
+        assert!(encoded.len() <= MAX_PROVIDER_RESULT_RECEIPT_BYTES);
+        let decoded = ProviderResultReceipt::from_bytes(&encoded)?;
+        let verified = verifier.verify(
+            &decoded,
+            &identity,
+            &result_sha256,
+            origin + Duration::from_secs(2),
+        )?;
+        assert_eq!(verified.result_sha256(), result_sha256);
+        assert_eq!(verified.nonce(), nonce);
+        assert_eq!(decoded.identity(), &identity);
+        assert_eq!(decoded.result_sha256(), result_sha256);
+        assert_eq!(format!("{decoded:?}"), "ProviderResultReceipt([SEALED])");
+        assert_eq!(
+            verifier.verify(
+                &decoded,
+                &identity,
+                &result_sha256,
+                origin + Duration::from_secs(31),
+            ),
+            Err(TrustError::ExpiredProviderResultReceipt)
+        );
+
+        let wrong_identity = identity_for("node.other", 7, &"d".repeat(64))?;
+        assert_eq!(
+            verifier.verify(
+                &decoded,
+                &wrong_identity,
+                &result_sha256,
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        let wrong_ordinal = identity_for("node.fixture", 8, &"d".repeat(64))?;
+        assert_eq!(
+            verifier.verify(
+                &decoded,
+                &wrong_ordinal,
+                &result_sha256,
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        let wrong_request = identity_for("node.fixture", 7, &"f".repeat(64))?;
+        assert_eq!(
+            verifier.verify(
+                &decoded,
+                &wrong_request,
+                &result_sha256,
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        assert_eq!(
+            verifier.verify(
+                &decoded,
+                &identity,
+                &"b".repeat(64),
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        let foreign_verifier =
+            ProviderResultReceiptIssuer::from_seed([18; 32], origin)?.verifier()?;
+        assert_eq!(
+            foreign_verifier.verify(
+                &decoded,
+                &identity,
+                &result_sha256,
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+
+        let cost_issuer = ProviderCostAcceptanceIssuer::from_seed([17; 32], origin)?;
+        let cost_scope = ProviderCostAcceptanceScope {
+            identity: identity.clone(),
+            price_bound: ProviderPriceBound::new("USD", 25_000)?,
+        };
+        let cost_acceptance = cost_issuer.issue(
+            cost_scope,
+            origin + Duration::from_secs(1),
+            origin + Duration::from_secs(31),
+            ProviderCostNonce::new([19; 32])?,
+        )?;
+        let mut wrong_domain = ProviderResultReceipt::from_bytes(&encoded)?;
+        wrong_domain.signature = cost_acceptance.signature;
+        assert_eq!(
+            verifier.verify(
+                &wrong_domain,
+                &identity,
+                &result_sha256,
+                origin + Duration::from_secs(2),
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        assert_eq!(
+            ProviderResultNonce::new([0; 32]),
+            Err(TrustError::InvalidProviderResultReceipt)
+        );
+        assert!(matches!(
+            ProviderResultReceipt::from_bytes(&vec![b'x'; MAX_PROVIDER_RESULT_RECEIPT_BYTES + 1]),
+            Err(TrustError::ProviderResultReceiptTooLarge)
+        ));
+        assert!(matches!(
+            issuer.issue(
+                identity,
+                result_sha256,
+                origin,
+                origin + MAX_PROVIDER_RESULT_RECEIPT_LIFETIME + Duration::from_millis(1),
+                nonce,
+            ),
+            Err(TrustError::InvalidProviderResultReceipt)
         ));
         Ok(())
     }
