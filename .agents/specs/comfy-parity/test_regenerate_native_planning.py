@@ -54,7 +54,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 530)
+        self.assertEqual(len(tasks), 532)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -135,6 +135,8 @@ class ValidationGenerationTests(unittest.TestCase):
         text_regex_id = "comfy-parity-native-nodes-text-comfy-node-0002"
         text_regex_foundation_id = "comfy-parity-native-text-value-regex-foundation"
         text_transform_foundation_id = "comfy-parity-native-text-transform-foundation"
+        text_generation_foundation_id = "comfy-parity-native-text-generation-foundation"
+        media_text_foundation_id = "comfy-parity-native-media-text-rendering-foundation"
         sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
@@ -148,6 +150,8 @@ class ValidationGenerationTests(unittest.TestCase):
         structured_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0541"
         shader_id = "comfy-parity-native-nodes-image-shader-comfy-node-0211"
         text_transform_id = "comfy-parity-native-nodes-text-comfy-node-0531"
+        text_generation_id = "comfy-parity-native-nodes-text-comfy-node-0649"
+        media_text_id = "comfy-parity-native-nodes-utilities-comfy-node-0077"
         primitive_id = "comfy-parity-native-nodes-utilities-primitive-comfy-node-0494"
         video_id = "comfy-parity-native-nodes-video-comfy-node-0124"
         video_preprocessor_id = "comfy-parity-native-nodes-video-preprocessors-comfy-node-0372"
@@ -220,6 +224,16 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[text_transform_foundation_id]["writes"],
         )
         self.assertTrue(tasks_by_id[text_transform_foundation_id]["locked"])
+        self.assertIn(text_generation_foundation_id, dependencies[text_generation_id])
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            tasks_by_id[text_generation_foundation_id]["writes"],
+        )
+        self.assertIn(media_text_foundation_id, dependencies[media_text_id])
+        self.assertIn(
+            "crates/comfy_media/src/text_rendering.rs",
+            tasks_by_id[media_text_foundation_id]["writes"],
+        )
         self.assertIn(
             "crates/comfy_model/src/sdpose.rs",
             tasks_by_id[sdpose_foundation_id]["writes"],
@@ -271,6 +285,8 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         for identifier in (
             image_source_foundation_id,
+            text_generation_foundation_id,
+            media_text_foundation_id,
             structured_link_foundation_id,
             shader_foundation_id,
             detection_foundation_id,
@@ -296,12 +312,20 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             waves[text_transform_foundation_id], waves[text_regex_foundation_id] + 1
         )
-        self.assertEqual(waves[sdpose_foundation_id], waves[provider_id] + 1)
+        self.assertEqual(
+            waves[text_generation_foundation_id], waves[provider_id] + 1
+        )
+        self.assertEqual(
+            waves[sdpose_foundation_id], waves[text_generation_foundation_id] + 1
+        )
         self.assertEqual(
             waves[video_foundation_id], waves[hook_consumers_id] + 1
         )
         self.assertEqual(
             waves[image_source_foundation_id], waves[text_transform_foundation_id] + 1
+        )
+        self.assertEqual(
+            waves[media_text_foundation_id], waves[detection_id] + 1
         )
         self.assertEqual(
             waves[structured_link_foundation_id],

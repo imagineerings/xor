@@ -1677,6 +1677,7 @@ mod tests {
         let mut fixture_digests = BTreeMap::new();
         for relative_path in [
             "assets/settings/default.json",
+            "assets/settings/default-comfy.json",
             "crates/settings_content/src/settings_content.rs",
             "crates/comfy_runtime/src/settings.rs",
             "crates/sim/src/sim.rs",
@@ -1737,11 +1738,21 @@ mod tests {
     }
 
     #[test]
-    fn default_settings_register_a_valid_native_profile() {
+    fn default_settings_do_not_register_a_native_comfy_profile() {
         let defaults = include_str!("../../../assets/settings/default.json");
         let settings = <SettingsContent as RootUserSettings>::parse_json_with_comments(defaults)
             .expect("default settings parse");
-        let comfy = settings.comfy_runtime.expect("native Comfy defaults");
+        assert!(settings.comfy_runtime.is_none());
+    }
+
+    #[test]
+    fn opt_in_comfy_settings_register_a_valid_native_profile() {
+        let defaults = include_str!("../../../assets/settings/default-comfy.json");
+        let settings = <SettingsContent as RootUserSettings>::parse_json_with_comments(defaults)
+            .expect("opt-in Comfy settings parse");
+        let comfy = settings
+            .comfy_runtime
+            .expect("opt-in native Comfy defaults");
         let runtime = parse_runtime_settings(&comfy).expect("valid native settings");
         assert_eq!(runtime.active_profile_id, DEFAULT_NATIVE_PROFILE_ID);
         assert_eq!(runtime.profiles.len(), 1);
@@ -2596,14 +2607,22 @@ mod tests {
         let workspace_root = workspace_root()?;
         let mut cases = BTreeMap::new();
 
-        let defaults = include_str!("../../../assets/settings/default.json");
+        let ordinary_defaults = include_str!("../../../assets/settings/default.json");
+        let ordinary_content =
+            <SettingsContent as RootUserSettings>::parse_json_with_comments(ordinary_defaults)?;
+        cases.insert(
+            "ordinary_default_settings_are_comfy_free",
+            ordinary_content.comfy_runtime.is_none(),
+        );
+
+        let defaults = include_str!("../../../assets/settings/default-comfy.json");
         let default_content =
             <SettingsContent as RootUserSettings>::parse_json_with_comments(defaults)?;
         let default_runtime = parse_runtime_settings(
             default_content
                 .comfy_runtime
                 .as_ref()
-                .ok_or("native Comfy defaults are absent")?,
+                .ok_or("opt-in native Comfy defaults are absent")?,
         )?;
         let default_profile = default_runtime
             .active_profile()

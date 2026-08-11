@@ -91,6 +91,46 @@ impl Mt19937 {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NumpyRandomState {
+    generator: Mt19937,
+}
+
+impl NumpyRandomState {
+    pub fn from_seed(seed: u64) -> Self {
+        Self {
+            generator: Mt19937::from_seed(seed % u64::from(u32::MAX)),
+        }
+    }
+
+    pub fn randint(
+        &mut self,
+        low: u32,
+        high_exclusive: u32,
+        cancellation: &CancellationToken,
+    ) -> Result<u32, RngError> {
+        let interval = high_exclusive
+            .checked_sub(low)
+            .ok_or(RngError::InvalidBound)?;
+        let maximum = interval.checked_sub(1).ok_or(RngError::InvalidBound)?;
+        let mut mask = maximum;
+        mask |= mask >> 1;
+        mask |= mask >> 2;
+        mask |= mask >> 4;
+        mask |= mask >> 8;
+        mask |= mask >> 16;
+        loop {
+            if cancellation.is_cancelled() {
+                return Err(RngError::Cancelled);
+            }
+            let value = self.generator.next_u32() & mask;
+            if value <= maximum {
+                return low.checked_add(value).ok_or(RngError::InvalidBound);
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Mt19937Snapshot {
     state: Vec<u32>,
@@ -1273,6 +1313,33 @@ mod tests {
                 545_404_204,
             ]
         );
+    }
+
+    #[test]
+    fn numpy_random_state_randint_matches_legacy_interval_sampling() {
+        let cancellation = CancellationToken::default();
+        let mut state = NumpyRandomState::from_seed(0);
+        let values = (0..10)
+            .map(|_| state.randint(0, 10, &cancellation))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("legacy NumPy bounded draws should succeed");
+        assert_eq!(values, vec![5, 0, 3, 3, 7, 9, 3, 5, 2, 4]);
+
+        let mut wrapped_seed = NumpyRandomState::from_seed(u64::from(u32::MAX) + 7);
+        let mut canonical_seed = NumpyRandomState::from_seed(7);
+        assert_eq!(
+            wrapped_seed.randint(2, 9, &cancellation),
+            canonical_seed.randint(2, 9, &cancellation)
+        );
+        assert!(matches!(
+            state.randint(4, 4, &cancellation),
+            Err(RngError::InvalidBound)
+        ));
+        cancellation.cancel();
+        assert!(matches!(
+            state.randint(0, 2, &cancellation),
+            Err(RngError::Cancelled)
+        ));
     }
 
     #[test]

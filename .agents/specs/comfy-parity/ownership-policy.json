@@ -10514,6 +10514,138 @@
       "decision_reason": "Rgb8ImageTensor is a checked layout adapter over canonical Tensor storage, not a second raster store. It alone validates HWC U8 RGB and performs the observed logical CHW conversion; media consumers own codec or drawing behavior without taking tensor-storage authority."
     },
     {
+      "concern": "native_rgb8_workflow_source_compatibility",
+      "canonical_owner": "comfy_tensor::NumpyRandomState, comfy_media::quantize_image_tensor, and comfy_nodes::NativePreparedImagePreview",
+      "owner_files": [
+        "crates/comfy_tensor/src/image_ops.rs",
+        "crates/comfy_tensor/src/rng.rs",
+        "crates/comfy_media/src/image_quantization.rs",
+        "crates/comfy_nodes/src/execution.rs"
+      ],
+      "owner_symbols": [
+        "NumpyRandomState",
+        "NativeImageDither",
+        "NativeImageQuantizationError",
+        "NativePreparedImagePreview",
+        "NativeImagePreviewError"
+      ],
+      "allowed_adapters": [
+        "generated image leaves call ImageTensor::source_compatible_u8_crop instead of repeating source byte-quantized crop loops",
+        "generated image leaves call quantize_image_tensor with a checked NativeImageDither instead of owning an adaptive palette or dither engine",
+        "generated data-order leaves create NumpyRandomState for exact legacy bounded-integer sampling without taking compatibility RNG ownership",
+        "PreviewImage calls NativeNodeContext::prepare_image_preview and returns its prepared effect tickets and bounded UI projection without encoding or staging a second time"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_tensor/src/rng.rs",
+          "qualified": "comfy_tensor::NumpyRandomState",
+          "role": "canonical",
+          "symbol": "NumpyRandomState"
+        },
+        {
+          "path": "crates/comfy_media/src/image_quantization.rs",
+          "qualified": "comfy_media::NativeImageDither",
+          "role": "canonical",
+          "symbol": "NativeImageDither"
+        },
+        {
+          "path": "crates/comfy_media/src/image_quantization.rs",
+          "qualified": "comfy_media::NativeImageQuantizationError",
+          "role": "canonical",
+          "symbol": "NativeImageQuantizationError"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativePreparedImagePreview",
+          "role": "boundary_dto",
+          "symbol": "NativePreparedImagePreview"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeImagePreviewError",
+          "role": "boundary_dto",
+          "symbol": "NativeImagePreviewError"
+        }
+      ],
+      "call_symbols": [
+        "NumpyRandomState",
+        "NativeImageDither",
+        "NativeImageQuantizationError",
+        "quantize_image_tensor",
+        "quantize_rgb8",
+        "NativePreparedImagePreview",
+        "NativeImagePreviewError",
+        "prepare_image_preview",
+        "source_compatible_u8_crop"
+      ],
+      "required_mappings": [
+        {
+          "name": "source-compatible-crop-owns-byte-roundtrip",
+          "path": "crates/comfy_tensor/src/image_ops.rs",
+          "pattern": "pub fn source_compatible_u8_crop[\\s\\S]*value \\* 255\\.0[\\s\\S]*trunc\\(\\) as i64 as u8[\\s\\S]*f32::from\\(quantized\\) / 255\\.0"
+        },
+        {
+          "name": "numpy-random-state-owns-legacy-interval-sampling",
+          "path": "crates/comfy_tensor/src/rng.rs",
+          "pattern": "pub struct NumpyRandomState[\\s\\S]*seed % u64::from\\(u32::MAX\\)[\\s\\S]*pub fn randint[\\s\\S]*let mut mask = maximum"
+        },
+        {
+          "name": "media-quantization-owns-adaptive-palette-and-dither",
+          "path": "crates/comfy_media/src/image_quantization.rs",
+          "pattern": "pub fn quantize_image_tensor[\\s\\S]*adaptive_palette[\\s\\S]*NativeImageDither::FloydSteinberg[\\s\\S]*NativeImageDither::Bayer16"
+        },
+        {
+          "name": "portable-preview-prepares-native-png-effects",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "pub fn prepare_image_preview[\\s\\S]*encode_png_frame_with_policy_and_context[\\s\\S]*NativeOutputNamespace::Temporary[\\s\\S]*prepare_output[\\s\\S]*rollback_prepared"
+        },
+        {
+          "name": "runtime-preview-delegates-portable-preparation",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "AssetNamespace::Temporary[\\s\\S]*prepare_image_preview\\(&image, \"ComfyUI_temp\"\\)[\\s\\S]*preview\\.into_parts\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-image-source-compatibility-foundation"
+      ],
+      "production_consumers": [
+        "native image crop and filter leaves",
+        "native dataset ordering leaves",
+        "native PreviewImage runtime adapter"
+      ],
+      "requirements": [
+        "Requirement 11",
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D11",
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "ImageTensor owns canonical storage while its source-compatible crop method owns the exact temporary u8 roundtrip. NumpyRandomState owns legacy MT19937 bounded-integer sampling. comfy_media alone owns adaptive palette construction and the NONE, Floyd-Steinberg, and Bayer mapping algorithms. NativeNodeContext alone prepares bounded temporary PNG effects and their UI projection; the runtime PreviewImage node only delegates and returns those checked results. Generated leaves cannot repeat these algorithms or stage output effects directly."
+    },
+    {
       "concern": "native_rmsprop_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_23::NativeRmsprop",
       "owner_files": [

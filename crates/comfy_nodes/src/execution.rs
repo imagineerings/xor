@@ -2,13 +2,17 @@ use crate::{
     NativeDescriptorSchemaMetadata, NativeInputSchemaMetadata, NativeSchemaValue,
     NativeStoredPayload, NativeStoredPayloadError,
 };
+use comfy_media::{
+    MetadataWritePolicy, PngError, PngLimits, encode_png_frame_with_policy_and_context,
+};
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, ScratchBindingIdentity, ScratchReservation, StreamId,
+    CpuBackend, ExecutionContext, ImageTensor, ScratchBindingIdentity, ScratchReservation,
+    StreamId, TensorError,
 };
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1262,6 +1266,40 @@ pub enum NativeEffectServiceError {
     InvalidTicket,
 }
 
+#[derive(Debug, Error)]
+pub enum NativeImagePreviewError {
+    #[error("native image preview compute session is invalid: {0}")]
+    Contract(#[from] NativeNodeContractError),
+    #[error("native image preview tensor is invalid: {0}")]
+    Tensor(#[from] TensorError),
+    #[error("native image preview PNG encoding failed: {0}")]
+    Png(#[from] PngError),
+    #[error("native image preview effect preparation failed: {0}")]
+    Effect(#[from] NativeEffectServiceError),
+    #[error("native image preview dimensions or batch index exceeded the output contract")]
+    DimensionOverflow,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativePreparedImagePreview {
+    effects: Vec<NativePreparedEffectRequest>,
+    ui: Value,
+}
+
+impl NativePreparedImagePreview {
+    pub fn effects(&self) -> &[NativePreparedEffectRequest] {
+        &self.effects
+    }
+
+    pub fn ui(&self) -> &Value {
+        &self.ui
+    }
+
+    pub fn into_parts(self) -> (Vec<NativePreparedEffectRequest>, Value) {
+        (self.effects, self.ui)
+    }
+}
+
 pub trait NativePreparedEffectService: Send + Sync + fmt::Debug {
     fn identity(&self) -> &NativeNodeServiceIdentity;
     fn maximum_output_bytes(&self) -> u64;
@@ -1433,6 +1471,92 @@ impl NativeNodeContext {
             .compute
             .as_ref()
             .ok_or(NativeNodeContractError::InvalidComputeSession)
+    }
+
+    pub fn prepare_image_preview(
+        &self,
+        image: &ImageTensor,
+        filename_prefix: &str,
+    ) -> Result<NativePreparedImagePreview, NativeImagePreviewError> {
+        self.cancellation
+            .check()
+            .map_err(|_| NativeImagePreviewError::Effect(NativeEffectServiceError::Cancelled))?;
+        let compute = self.compute_session()?;
+        let execution_context = compute.execution_context(self)?;
+        let effects_service = self.prepared_effects()?;
+        let (batch, height, width, channels) = image.dimensions()?;
+        let pixels = image.as_f32_slice()?;
+        let metadata = BTreeMap::new();
+        let mut effects = Vec::new();
+        let mut ui_images = Vec::new();
+        for batch_index in 0..batch {
+            let prepared = (|| {
+                self.cancellation.check().map_err(|_| {
+                    NativeImagePreviewError::Effect(NativeEffectServiceError::Cancelled)
+                })?;
+                let encoded = encode_png_frame_with_policy_and_context(
+                    compute.backend(),
+                    &execution_context,
+                    pixels,
+                    batch,
+                    height,
+                    width,
+                    channels,
+                    batch_index,
+                    &metadata,
+                    MetadataWritePolicy {
+                        metadata_enabled: false,
+                    },
+                    PngLimits::default(),
+                )?;
+                let output_index = u32::try_from(batch_index)
+                    .map_err(|_| NativeImagePreviewError::DimensionOverflow)?;
+                let request = NativeOutputEffectRequest::checked(
+                    NativeOutputNamespace::Temporary,
+                    filename_prefix,
+                    "png",
+                    output_index,
+                    NativeOutputShape::Image {
+                        width: u32::try_from(width)
+                            .map_err(|_| NativeImagePreviewError::DimensionOverflow)?,
+                        height: u32::try_from(height)
+                            .map_err(|_| NativeImagePreviewError::DimensionOverflow)?,
+                    },
+                    Arc::from(encoded),
+                    effects_service.maximum_output_bytes(),
+                )?;
+                effects_service
+                    .prepare_output(request, &self.cancellation)
+                    .map_err(NativeImagePreviewError::from)
+            })();
+            let effect = match prepared {
+                Ok(effect) => effect,
+                Err(error) => {
+                    for effect in effects.iter().rev() {
+                        effects_service.rollback_prepared(effect)?;
+                    }
+                    return Err(error);
+                }
+            };
+            ui_images.push(json!({
+                "transaction_id": effect.transaction_id(),
+                "batch_index": batch_index,
+                "type": "temp",
+            }));
+            effects.push(effect);
+        }
+        if self.cancellation.is_cancelled() {
+            for effect in effects.iter().rev() {
+                effects_service.rollback_prepared(effect)?;
+            }
+            return Err(NativeImagePreviewError::Effect(
+                NativeEffectServiceError::Cancelled,
+            ));
+        }
+        Ok(NativePreparedImagePreview {
+            effects,
+            ui: json!({"images": ui_images, "animated": [false]}),
+        })
     }
 
     pub fn validate(&self) -> Result<(), NativeNodeContractError> {
@@ -2011,6 +2135,104 @@ mod tests {
         values: Mutex<BTreeMap<String, Arc<NativeStoredPayload>>>,
     }
 
+    struct TestPreviewEffectService {
+        identity: NativeNodeServiceIdentity,
+        fail_on_ordinal: Option<u64>,
+        next_ordinal: AtomicU64,
+        prepared: Mutex<Vec<NativePreparedEffectRequest>>,
+        rolled_back: Mutex<Vec<Uuid>>,
+    }
+
+    impl fmt::Debug for TestPreviewEffectService {
+        fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter
+                .debug_struct("TestPreviewEffectService")
+                .field("identity", &self.identity)
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl TestPreviewEffectService {
+        fn new(identity: NativeNodeServiceIdentity, fail_on_ordinal: Option<u64>) -> Self {
+            Self {
+                identity,
+                fail_on_ordinal,
+                next_ordinal: AtomicU64::new(0),
+                prepared: Mutex::new(Vec::new()),
+                rolled_back: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl NativePreparedEffectService for TestPreviewEffectService {
+        fn identity(&self) -> &NativeNodeServiceIdentity {
+            &self.identity
+        }
+
+        fn maximum_output_bytes(&self) -> u64 {
+            1024 * 1024
+        }
+
+        fn prepare_output(
+            &self,
+            request: NativeOutputEffectRequest,
+            cancellation: &CancellationToken,
+        ) -> Result<NativePreparedEffectRequest, NativeEffectServiceError> {
+            cancellation
+                .check()
+                .map_err(|_| NativeEffectServiceError::Cancelled)?;
+            let ordinal = self.next_ordinal.fetch_add(1, Ordering::AcqRel);
+            if self.fail_on_ordinal == Some(ordinal) {
+                return Err(NativeEffectServiceError::Rejected);
+            }
+            let ticket = NativePreparedEffectRequest::checked(
+                self.identity.service_id(),
+                Uuid::from_u128(0x600 + u128::from(ordinal)),
+                NativePreparedEffectKind::Output,
+                request.request_digest_sha256(),
+            )
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+            self.prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?
+                .push(ticket.clone());
+            Ok(ticket)
+        }
+
+        fn rollback_prepared(
+            &self,
+            request: &NativePreparedEffectRequest,
+        ) -> Result<(), NativeEffectServiceError> {
+            let mut prepared = self
+                .prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            let index = prepared
+                .iter()
+                .position(|ticket| ticket == request)
+                .ok_or(NativeEffectServiceError::InvalidTicket)?;
+            prepared.remove(index);
+            self.rolled_back
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?
+                .push(request.transaction_id());
+            Ok(())
+        }
+
+        fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError> {
+            let mut prepared = self
+                .prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            let mut rolled_back = self
+                .rolled_back
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            rolled_back.extend(prepared.drain(..).map(|ticket| ticket.transaction_id()));
+            Ok(())
+        }
+    }
+
     impl fmt::Debug for TestHandleStore {
         fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
             formatter
@@ -2562,6 +2784,103 @@ mod tests {
             ),
             Err(NativeNodeContractError::InvalidComputeSession)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn image_preview_prepares_batched_pngs_and_rolls_back_partial_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let prompt_id = PromptId(Uuid::from_u128(0x581));
+        let attempt_id = AttemptId(Uuid::from_u128(0x582));
+        let node_id = NodeId::from("preview");
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x583),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity.clone(),
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let effects = Arc::new(TestPreviewEffectService::new(identity, None));
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id.clone(),
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x584, 0x585)?,
+                attempt_id,
+            )),
+            NativeNodeServices::checked(None, Some(effects), Some(compute))?,
+        )?;
+        let execution_context = context.compute_session()?.execution_context(&context)?;
+        let image = ImageTensor::from_f32(
+            &backend,
+            &execution_context,
+            2,
+            1,
+            1,
+            3,
+            &[0.0, 0.5, 1.0, 1.0, 0.5, 0.0],
+        )?;
+        let preview = context.prepare_image_preview(&image, "preview")?;
+        assert_eq!(preview.effects().len(), 2);
+        assert_eq!(preview.ui()["images"].as_array().map(Vec::len), Some(2));
+        assert_eq!(preview.ui()["animated"], json!([false]));
+
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x586),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity.clone(),
+            backend,
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let failing_effects = Arc::new(TestPreviewEffectService::new(identity, Some(1)));
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x587, 0x588)?,
+                attempt_id,
+            )),
+            NativeNodeServices::checked(None, Some(failing_effects.clone()), Some(compute))?,
+        )?;
+        assert!(matches!(
+            context.prepare_image_preview(&image, "preview"),
+            Err(NativeImagePreviewError::Effect(
+                NativeEffectServiceError::Rejected
+            ))
+        ));
+        assert!(
+            failing_effects
+                .prepared
+                .lock()
+                .map_err(|_| "preview prepared state is poisoned")?
+                .is_empty()
+        );
+        assert_eq!(
+            failing_effects
+                .rolled_back
+                .lock()
+                .map_err(|_| "preview rollback state is poisoned")?
+                .len(),
+            1
+        );
         Ok(())
     }
 

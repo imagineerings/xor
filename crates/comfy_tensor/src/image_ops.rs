@@ -245,6 +245,70 @@ impl ImageTensor {
         })
     }
 
+    pub fn source_compatible_u8_crop(
+        &self,
+        left: u64,
+        top: u64,
+        width: u64,
+        height: u64,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, TensorError> {
+        context.check()?;
+        let (batch, input_height, input_width, channels) = self.dimensions()?;
+        if left >= input_width || top >= input_height || width == 0 || height == 0 {
+            return Err(TensorError::Faulted {
+                reason: "source-compatible image crop is outside the input bounds".to_owned(),
+            });
+        }
+        let output_width = width.min(input_width - left);
+        let output_height = height.min(input_height - top);
+        let element_count = batch
+            .checked_mul(output_height)
+            .and_then(|value| value.checked_mul(output_width))
+            .and_then(|value| value.checked_mul(channels))
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(TensorError::ShapeOverflow)?;
+        let input = self.as_f32_slice()?;
+        let mut output = backend.workspace_vec(context, element_count)?;
+        for batch_index in 0..batch {
+            for output_y in 0..output_height {
+                context.check()?;
+                for output_x in 0..output_width {
+                    for channel in 0..channels {
+                        let input_index = image_offset(
+                            batch_index,
+                            top + output_y,
+                            left + output_x,
+                            channel,
+                            input_height,
+                            input_width,
+                            channels,
+                        )?;
+                        let value = input.get(input_index).copied().ok_or_else(|| {
+                            TensorError::Faulted {
+                                reason: "source-compatible crop index exceeded IMAGE storage"
+                                    .to_owned(),
+                            }
+                        })?;
+                        let quantized = (value * 255.0).trunc() as i64 as u8;
+                        output.try_push(f32::from(quantized) / 255.0)?;
+                    }
+                }
+            }
+        }
+        context.check()?;
+        Self::from_f32(
+            backend,
+            context,
+            batch,
+            output_height,
+            output_width,
+            channels,
+            &output,
+        )
+    }
+
     pub fn invert(
         &self,
         backend: &CpuBackend,
@@ -323,6 +387,26 @@ impl ImageTensor {
         )?;
         Self::from_tensor(bhwc_output)
     }
+}
+
+fn image_offset(
+    batch: u64,
+    y: u64,
+    x: u64,
+    channel: u64,
+    height: u64,
+    width: u64,
+    channels: u64,
+) -> Result<usize, TensorError> {
+    batch
+        .checked_mul(height)
+        .and_then(|value| value.checked_add(y))
+        .and_then(|value| value.checked_mul(width))
+        .and_then(|value| value.checked_add(x))
+        .and_then(|value| value.checked_mul(channels))
+        .and_then(|value| value.checked_add(channel))
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(TensorError::ShapeOverflow)
 }
 
 fn image_descriptor(
@@ -759,6 +843,36 @@ pub(crate) mod tests {
         let image = Rgb8ImageTensor::from_logical_chw(&backend, &context, &source)?;
 
         assert_eq!(image.as_u8_slice()?, &[10, 30, 50, 20, 40, 60]);
+        Ok(())
+    }
+
+    #[test]
+    fn source_compatible_crop_quantizes_like_the_pillow_adapter() -> Result<(), TensorError> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(TEST_MEMORY_LIMIT_BYTES)?;
+        let scratch = authority.authorize_workspace(TEST_MEMORY_LIMIT_BYTES)?;
+        let context = backend.execution_context(StreamId::DEFAULT, scratch, &cancellation);
+        let image = ImageTensor::from_f32(
+            &backend,
+            &context,
+            1,
+            2,
+            3,
+            1,
+            &[0.0, 0.1, 0.5, 0.9, 1.0, 1.1],
+        )?;
+        let cropped = image.source_compatible_u8_crop(1, 0, 2, 2, &backend, &context)?;
+        assert_eq!(cropped.dimensions()?, (1, 2, 2, 1));
+        assert_eq!(
+            cropped.to_f32_vec()?,
+            vec![25.0 / 255.0, 127.0 / 255.0, 1.0, 24.0 / 255.0]
+        );
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        assert!(
+            image
+                .source_compatible_u8_crop(3, 0, 1, 1, &backend, &context)
+                .is_err()
+        );
         Ok(())
     }
 

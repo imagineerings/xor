@@ -47,8 +47,8 @@ use comfy_nodes::{
     native_source_type_projection,
 };
 use comfy_nodes::{
-    NativeEffectServiceError, NativeNodeServiceIdentity, NativeOutputEffectRequest,
-    NativeOutputNamespace, NativeOutputShape, NativePreparedEffectKind,
+    NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
+    NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape, NativePreparedEffectKind,
     NativePreparedEffectService,
 };
 use comfy_sampler::{
@@ -3324,15 +3324,22 @@ impl NativeNode for SaveImageNode {
     ) -> BoxFuture<'a, Result<NodeOutcome, NodeFailure>> {
         Box::pin(async move {
             let image = resolve_image(&context, &inputs, "images", NativeTensorKind::Image)?;
+            if self.namespace == AssetNamespace::Temporary {
+                let preview = context
+                    .prepare_image_preview(&image, "ComfyUI_temp")
+                    .map_err(image_preview_failure)?;
+                let (effects, ui) = preview.into_parts();
+                return Ok(NodeOutcome::Values {
+                    outputs: Vec::new(),
+                    ui: Some(ui),
+                    effects,
+                });
+            }
             let (batch, height, width, channels) = image.dimensions().map_err(tensor_failure)?;
             let pixels = image.as_f32_slice().map_err(tensor_failure)?;
-            let prefix = if self.namespace == AssetNamespace::Temporary {
-                "ComfyUI_temp".to_owned()
-            } else {
-                optional_string(&inputs, "filename_prefix")
-                    .unwrap_or("ComfyUI")
-                    .to_owned()
-            };
+            let prefix = optional_string(&inputs, "filename_prefix")
+                .unwrap_or("ComfyUI")
+                .to_owned();
             let metadata = png_metadata(&inputs)?;
             let tensor_context = native_image_tensor_context(&self.cpu_backend, &context);
             let mut effects = Vec::new();
@@ -3394,16 +3401,12 @@ impl NativeNode for SaveImageNode {
                     "type": self.namespace.locator_type(),
                 }));
             }
-            let outputs = if self.namespace == AssetNamespace::Temporary {
-                Vec::new()
-            } else {
-                vec![
-                    inputs
-                        .get("images")
-                        .cloned()
-                        .ok_or_else(|| invalid_diffusion_input("`images` is missing"))?,
-                ]
-            };
+            let outputs = vec![
+                inputs
+                    .get("images")
+                    .cloned()
+                    .ok_or_else(|| invalid_diffusion_input("`images` is missing"))?,
+            ];
             Ok(NodeOutcome::Values {
                 outputs,
                 ui: Some(json!({"images": ui_images})),
@@ -4356,6 +4359,21 @@ fn media_failure(error: PngError) -> NodeFailure {
             kind: NodeFailureKind::Failure,
             retryable: false,
         },
+    }
+}
+
+fn image_preview_failure(error: NativeImagePreviewError) -> NodeFailure {
+    match error {
+        NativeImagePreviewError::Tensor(error) => tensor_failure(error),
+        NativeImagePreviewError::Png(error) => media_failure(error),
+        NativeImagePreviewError::Effect(error) => effect_service_failure(error),
+        NativeImagePreviewError::Contract(error) => NodeFailure {
+            code: "native_image_preview_context_invalid".to_owned(),
+            message: error.to_string(),
+            kind: NodeFailureKind::Failure,
+            retryable: false,
+        },
+        NativeImagePreviewError::DimensionOverflow => dimension_failure(),
     }
 }
 
@@ -7924,12 +7942,38 @@ mod tests {
         assert_eq!(first.report.state, AttemptState::Succeeded);
         assert_eq!(first.report.cache_hits, 0);
         assert_eq!(first.output_proposals.len(), 2);
+        assert_eq!(
+            first.report.ui_outputs.get(&NodeId("4".to_owned())),
+            Some(&json!({
+                "images": [{
+                    "transaction_id": first
+                        .output_proposals
+                        .iter()
+                        .find(|proposal| {
+                            proposal.output.namespace() == AssetNamespace::Temporary
+                        })
+                        .ok_or("preview output")?
+                        .proposal_id(),
+                    "batch_index": 0,
+                    "type": "temp",
+                }],
+                "animated": [false],
+            }))
+        );
         assert!(
             fs::read_dir(roots.test_root_path(AssetNamespace::Output)?)?
                 .next()
                 .is_none(),
             "worker-side execution must not publish a final file"
         );
+        let preview = first
+            .output_proposals
+            .iter()
+            .find(|proposal| proposal.output.namespace() == AssetNamespace::Temporary)
+            .ok_or("preview output")?;
+        let preview_png = decode_png(preview.output.content(), PngLimits::default())?;
+        assert_eq!((preview_png.width, preview_png.height), (4, 2));
+        assert_eq!(preview_png.metadata.comfy_metadata(), Default::default());
         let saved = first
             .output_proposals
             .iter()

@@ -9064,6 +9064,7 @@ def native_image_source_compatibility_foundation_task(dependency: str) -> dict[s
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
         ],
         "Source-derived fixtures prove exact u8 quantize/dequantize cropping, adaptive palette identity, NONE/Floyd-Steinberg/Bayer dithering, NumPy RandomState seed and randint behavior, batched preview PNG preparation and UI projection, cancellation at bounded phases, scratch convergence, effect rollback and restart cleanup, and one production owner for each algorithm and effect.",
         [dependency],
@@ -9108,6 +9109,96 @@ def native_structured_input_link_foundation_task(dependency: str) -> dict[str, o
         [dependency],
         locked=True,
         criterion_ids=["6.4", "7.4", "29.3", "32.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_text_generation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-text-generation-foundation",
+        "Implement native multimodal text generation",
+        [6, 7, 18, 26, 28, 31, 37, 41, 44],
+        [8, 18, 25, 26, 28, 31, 32, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-RNG-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical native text-generation boundary admits retained decoder text encoders as exact MODEL resources, tokenizes source template text with optional image, video, and audio inputs, executes bounded seeded generation, and decodes generated tokens. Generated text leaves receive only checked model handles and an attempt-scoped RNG transaction; they cannot introduce a metadata-only model, template facade, global generator, or second tokenizer.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_tensor/src/rng.rs",
+            "crates/comfy_runtime/src/executor.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+        ],
+        "Source-derived fixtures prove exact prompt/template/media tokenization, skip-template and thinking behavior, min/max length, seeded sampling and replay, generated-token decoding, retained decoder model identity and alias-aware residency, wrong-model and stale-handle rejection, cancellation at every bounded phase, scratch/RNG rollback, restart behavior, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["6.4", "7.4", "18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_media_text_rendering_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-media-text-rendering-foundation",
+        "Implement source-compatible native media text rendering",
+        [11, 18, 26, 36, 37, 41, 44],
+        [11, 18, 25, 26, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One shared worker-safe media owner provides the exact pinned scalable default font, text measurement and wrapping, glyph rasterization, and RGBA alpha composition used by source image-preview nodes. Generated leaves supply checked text, layout, colors, and canonical image tensors but cannot embed a second font, bitmap alphabet, rasterizer, or host UI text path.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_nodes/src/execution.rs",
+        ],
+        [
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/text_rendering.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_media/assets/pillow-default-font.ttf",
+            "crates/comfy_media/assets/pillow-default-font.LICENSE",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_test_support/fixtures/media/text-rendering",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+        ],
+        "Source-derived fixtures prove pinned font identity, scalable glyph metrics, zero-padded numeric tags, multiline and Unicode body text, source wrapping boundaries, foreground/background opacity, exact RGBA composition, bounds and allocation limits, cancellation and scratch convergence, deterministic pixels across restart, and one production font/raster owner.",
+        [dependency],
+        locked=True,
+        criterion_ids=["11.4", "18.1", "26.2", "36.4", "37.5", "41.2", "44.1", "44.3"],
     )
 
 
@@ -9199,6 +9290,8 @@ def node_tasks(
     provider_dependency: str,
     text_regex_dependency: str,
     text_transform_dependency: str,
+    text_generation_dependency: str,
+    media_text_dependency: str,
     sdpose_dependency: str,
     video_dependency: str,
     image_source_dependency: str,
@@ -9309,6 +9402,22 @@ def node_tasks(
                     "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
                 ])
                 task_done += " RegexReplace delegates Python-compatible substitution spans and replacement templates to the canonical regex owner, and StringFormat delegates exact named autogrow field parsing and formatting to the canonical text-format owner; neither node embeds a second parser or engine."
+            if "COMFY-NODE-0671" in feature_ids:
+                task_dependencies.append(text_generation_dependency)
+                task_reads.extend([
+                    "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+                    "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
+                ])
+                task_done += " TextGenerate and TextGenerateLTX2Prompt delegate template-aware multimodal tokenization, seeded bounded generation, and decoding to the canonical retained decoder-text model owner with attempt-scoped RNG and zero partial publication."
+            if "COMFY-NODE-0114" in feature_ids:
+                task_dependencies.append(media_text_dependency)
+                task_reads.extend([
+                    "crates/comfy_media/src/text_rendering.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_bounding_boxes.py",
+                ])
+                task_done += " CreateBoundingBoxes delegates scalable default-font measurement, wrapping, glyph rasterization, and RGBA composition to the canonical media text-rendering owner; no leaf-local bitmap font or text approximation is permitted."
             if "COMFY-NODE-0494" in feature_ids:
                 task_dependencies.append(text_regex_dependency)
                 task_reads.extend([
@@ -10146,8 +10255,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             + [str(comfy_build_boundary["id"]), str(shader_foundation["id"])]
         )
     )
-    sdpose_foundation = native_sdpose_execution_foundation_task(
+    text_generation_foundation = native_text_generation_foundation_task(
         str(node_provider_foundation["id"])
+    )
+    sdpose_foundation = native_sdpose_execution_foundation_task(
+        str(text_generation_foundation["id"])
+    )
+    media_text_foundation = native_media_text_rendering_foundation_task(
+        "comfy-parity-native-nodes-image-detection-comfy-node-0136"
     )
     video_foundation = native_video_execution_foundation_task(
         "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
@@ -10168,6 +10283,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(node_provider_foundation["id"]),
         str(text_regex_foundation["id"]),
         str(text_transform_foundation["id"]),
+        str(text_generation_foundation["id"]),
+        str(media_text_foundation["id"]),
         str(sdpose_foundation["id"]),
         str(video_foundation["id"]),
         str(image_source_foundation["id"]),
@@ -10208,9 +10325,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             text_regex_foundation,
             text_transform_foundation,
             image_source_foundation,
+            media_text_foundation,
             structured_link_foundation,
             shader_foundation,
             node_provider_foundation,
+            text_generation_foundation,
             sdpose_foundation,
             video_foundation,
             detection_foundation,

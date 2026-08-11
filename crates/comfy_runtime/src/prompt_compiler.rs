@@ -1290,7 +1290,7 @@ pub(crate) mod tests {
         assert_eq!(plan.provider_registry_pin(), Some(&pin));
         plan.validate_provider_execution_identity()?;
 
-        let mut tampered = plan.clone();
+        let mut tampered = plan;
         tampered
             .extra_data
             .insert("tampered".to_owned(), json!(true));

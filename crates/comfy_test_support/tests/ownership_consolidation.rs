@@ -10666,6 +10666,135 @@ fn validate_native_text_regex_boundary(
     Ok(true)
 }
 
+fn validate_native_image_source_compatibility_boundary(
+    root: &Path,
+    sources: &[(PathBuf, String)],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    for (definition, owner) in [
+        (
+            "pub struct NumpyRandomState {",
+            "crates/comfy_tensor/src/rng.rs",
+        ),
+        (
+            "pub enum NativeImageDither {",
+            "crates/comfy_media/src/image_quantization.rs",
+        ),
+        (
+            "pub enum NativeImageQuantizationError {",
+            "crates/comfy_media/src/image_quantization.rs",
+        ),
+        (
+            "pub struct NativePreparedImagePreview {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub enum NativeImagePreviewError {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+    ] {
+        let occurrences = production_source_occurrences(sources, definition);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "{definition} must have exactly one production owner: {occurrences:?}"
+        );
+        assert!(
+            occurrences[0].contains(owner),
+            "{definition} must be owned by {owner}: {occurrences:?}"
+        );
+    }
+    let image_ops = fs::read_to_string(root.join("crates/comfy_tensor/src/image_ops.rs"))?;
+    for required in [
+        "pub fn source_compatible_u8_crop(",
+        "(value * 255.0).trunc() as i64 as u8",
+        "f32::from(quantized) / 255.0",
+    ] {
+        assert!(
+            image_ops.contains(required),
+            "source-compatible crop lacks {required}"
+        );
+    }
+    let rng = fs::read_to_string(root.join("crates/comfy_tensor/src/rng.rs"))?;
+    for required in [
+        "pub struct NumpyRandomState {",
+        "seed % u64::from(u32::MAX)",
+        "pub fn randint(",
+        "let mut mask = maximum;",
+        "self.generator.next_u32() & mask",
+    ] {
+        assert!(rng.contains(required), "NumPy RandomState lacks {required}");
+    }
+    let quantization =
+        fs::read_to_string(root.join("crates/comfy_media/src/image_quantization.rs"))?;
+    for required in [
+        "pub fn quantize_image_tensor(",
+        "pub fn quantize_rgb8(",
+        "fn adaptive_palette(",
+        "NativeImageDither::FloydSteinberg",
+        "NativeImageDither::Bayer16",
+        "check_cancel(cancellation)?",
+    ] {
+        assert!(
+            quantization.contains(required),
+            "native image quantization lacks {required}"
+        );
+    }
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    for required in [
+        "pub fn prepare_image_preview(",
+        "encode_png_frame_with_policy_and_context(",
+        "NativeOutputNamespace::Temporary",
+        ".prepare_output(request, &self.cancellation)",
+        "effects_service.rollback_prepared(effect)?",
+        "json!({\"images\": ui_images, \"animated\": [false]})",
+    ] {
+        assert!(
+            execution.contains(required),
+            "portable image preview lacks {required}"
+        );
+    }
+    let runtime =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    assert!(runtime.contains(".prepare_image_preview(&image, \"ComfyUI_temp\")"));
+    assert!(runtime.contains("let (effects, ui) = preview.into_parts();"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rgb8_workflow_source_compatibility")
+            })
+        })
+        .ok_or("missing native image source compatibility ownership concern")?;
+    let mappings = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing native image compatibility mappings")?;
+    assert_eq!(mappings.len(), 5);
+    Ok(true)
+}
+
+#[test]
+fn val_ownership_001_native_image_source_compatibility_has_one_owner()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    assert!(validate_native_image_source_compatibility_boundary(
+        &root, &sources
+    )?);
+    Ok(())
+}
+
 #[test]
 fn val_ownership_001_native_text_regex_has_one_bounded_owner()
 -> Result<(), Box<dyn std::error::Error>> {
