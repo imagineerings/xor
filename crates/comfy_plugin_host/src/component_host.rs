@@ -662,6 +662,14 @@ impl PreparedPluginInvocation {
     pub fn context(&self) -> &NodeContext {
         &self.context
     }
+
+    pub fn provider_binding_sha256(&self) -> Option<&str> {
+        self.plugin
+            .manifest()
+            .provider_binding
+            .as_ref()
+            .map(|binding| binding.bindings_sha256.as_str())
+    }
 }
 
 struct ComponentState {

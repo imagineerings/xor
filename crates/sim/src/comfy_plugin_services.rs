@@ -5,15 +5,18 @@ use comfy_plugin_host::{
 use comfy_runtime::{
     AuthorizedCredentialPresenceRequest, AuthorizedProviderRequest, CredentialPresenceActuator,
     PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
-    PluginServiceOperationContext, ProviderPolicy, ProviderRequestActuator, SecretValue,
-    SharedAssetService, WorkerLaunchConfig,
+    PluginServiceOperationContext, ProviderPolicy, ProviderRequestActuator,
+    ProviderResultReceiptIssuer, SecretValue, SharedAssetService, WorkerLaunchConfig,
 };
 use comfy_tensor::{RngAlgorithm, RngProfileVersion};
 use futures::AsyncReadExt as _;
 use gpui::{App, BackgroundExecutor};
 use http_client::{AsyncBody, HttpClient, Request, http};
 use std::sync::Arc;
-use std::{future::Future, time::Duration};
+use std::{
+    future::Future,
+    time::{Duration, Instant},
+};
 
 pub fn private_worker_boundary(
     launch: WorkerLaunchConfig,
@@ -39,8 +42,17 @@ pub fn private_worker_boundary(
             profile_seed,
         ),
     );
+    let receipt_issuer = Arc::new(
+        ProviderResultReceiptIssuer::generate(Instant::now()).map_err(component_boundary_error)?,
+    );
     Ok(ComponentExecutionBoundary::private_worker(
-        PrivateWorkerPluginExecutor::new(launch, broker)?,
+        PrivateWorkerPluginExecutor::new_with_provider_result_receipts(
+            launch.clone(),
+            broker,
+            launch.profile_id.0.to_string(),
+            receipt_issuer,
+            Duration::from_secs(5 * 60),
+        )?,
     ))
 }
 

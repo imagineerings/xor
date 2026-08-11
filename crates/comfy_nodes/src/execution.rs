@@ -1605,6 +1605,30 @@ pub struct NativeNodeServices {
     effects: Option<Arc<dyn NativePreparedEffectService>>,
     compute: Option<NativeNodeComputeSession>,
     shader: Option<Arc<dyn NativeShaderExecutor>>,
+    provider_execution: Option<NativeProviderExecutionIdentity>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeProviderExecutionIdentity {
+    compiled_plan_sha256: String,
+}
+
+impl NativeProviderExecutionIdentity {
+    pub fn checked(
+        compiled_plan_sha256: impl Into<String>,
+    ) -> Result<Self, NativeNodeContractError> {
+        let compiled_plan_sha256 = compiled_plan_sha256.into();
+        if !valid_sha256(&compiled_plan_sha256) {
+            return Err(NativeNodeContractError::InvalidNodeContext);
+        }
+        Ok(Self {
+            compiled_plan_sha256,
+        })
+    }
+
+    pub fn compiled_plan_sha256(&self) -> &str {
+        &self.compiled_plan_sha256
+    }
 }
 
 impl NativeNodeServices {
@@ -1633,11 +1657,20 @@ impl NativeNodeServices {
             effects,
             compute,
             shader: None,
+            provider_execution: None,
         })
     }
 
     pub fn with_shader(mut self, shader: Arc<dyn NativeShaderExecutor>) -> Self {
         self.shader = Some(shader);
+        self
+    }
+
+    pub fn with_provider_execution(
+        mut self,
+        provider_execution: NativeProviderExecutionIdentity,
+    ) -> Self {
+        self.provider_execution = Some(provider_execution);
         self
     }
 }
@@ -1720,6 +1753,15 @@ impl NativeNodeContext {
             .compute
             .as_ref()
             .ok_or(NativeNodeContractError::InvalidComputeSession)
+    }
+
+    pub fn provider_execution(
+        &self,
+    ) -> Result<&NativeProviderExecutionIdentity, NativeNodeContractError> {
+        self.services
+            .provider_execution
+            .as_ref()
+            .ok_or(NativeNodeContractError::InvalidNodeContext)
     }
 
     pub fn execute_shader(

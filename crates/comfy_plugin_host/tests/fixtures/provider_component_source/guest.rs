@@ -4,7 +4,7 @@ wit_bindgen::generate!({
 });
 
 use exports::sim::comfy_plugin::{plugin, provider_binding};
-use sim::comfy_plugin::types;
+use sim::comfy_plugin::{host, types};
 
 struct ProviderComponent;
 
@@ -43,7 +43,18 @@ impl plugin::Guest for ProviderComponent {
                 cache: types::CachePolicy::Never,
                 effects: types::EffectPolicy::Provider,
             }],
-            capabilities: Vec::new(),
+            capabilities: vec![types::CapabilityRequest {
+                kind: types::CapabilityKind::NetworkProvider,
+                scope: "fixture|https://fixture.invalid/v1/generate".to_owned(),
+                quota: types::CapabilityQuota {
+                    maximum_operations: 16,
+                    maximum_request_bytes: 16 * 1024 * 1024,
+                    maximum_response_bytes: 64 * 1024 * 1024,
+                    maximum_total_bytes: 80 * 1024 * 1024,
+                    maximum_handles: 8,
+                    timeout_milliseconds: 5_000,
+                },
+            }],
             ui: Vec::new(),
             routes: Vec::new(),
             legacy_mappings: Vec::new(),
@@ -99,20 +110,33 @@ impl provider_binding::Guest for ProviderComponent {
                 "invalid provider request".to_owned(),
             ));
         }
-        let receipt = if request == b"invalid-provider-receipt" {
+        let receipt = if request.starts_with(b"sim.comfy.provider-transport-request\0") {
+            let receipt = host::provider_request(
+                "fixture",
+                "https://fixture.invalid/v1/generate",
+                &request,
+                None,
+            )?;
+            receipt_set(&[receipt.as_slice()])
+        } else if request == b"invalid-provider-receipt" {
             b"guest-controlled-receipt".to_vec()
         } else {
             receipt_set(&[b"provider-fixture-receipt"])
         };
-        Ok(types::ProviderInvocationResponse {
-            outputs: vec![types::ProviderMaterializedOutput {
+        let outputs = if request == b"guest-authored-output" {
+            vec![types::ProviderMaterializedOutput {
                 port_id: "result".to_owned(),
                 value: types::EncodedValue {
                     type_id: "comfy:string@1".to_owned(),
                     family: types::ValueFamily::Scalar,
                     abi_bytes: request,
                 },
-            }],
+            }]
+        } else {
+            Vec::new()
+        };
+        Ok(types::ProviderInvocationResponse {
+            outputs,
             receipt,
         })
     }

@@ -10,9 +10,9 @@ use comfy_nodes::{
     NativeHandleStoreIdentity, NativeHandleType, NativeNodeBindingDisposition,
     NativeNodeComputeSession, NativeNodeContractError, NativeNodeServiceIdentity,
     NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency, NativePreparedEffectKind,
-    NativePreparedEffectService, NativeResidentAllocationId, NativeResolvedPayload,
-    NativeResolvedPayloadRetention, NativeStoredPayload, NativeStructuredValue, NativeValue,
-    NodeRegistry,
+    NativePreparedEffectService, NativeProviderExecutionIdentity, NativeResidentAllocationId,
+    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeStoredPayload,
+    NativeStructuredValue, NativeValue, NodeRegistry,
 };
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
@@ -2679,6 +2679,14 @@ impl ExecutionEngine {
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         if let Some(shader) = &self.shader_executor {
             services = services.with_shader(shader.clone());
+        }
+        if let Some(provider_execution) = &plan.provider_execution {
+            services = services.with_provider_execution(
+                NativeProviderExecutionIdentity::checked(
+                    provider_execution.compiled_plan_sha256().to_owned(),
+                )
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?,
+            );
         }
         let context = NodeContext::new_with_services(
             plan.prompt_id,

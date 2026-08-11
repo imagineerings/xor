@@ -1601,6 +1601,7 @@ fn map_provider_materialization_error(error: ProviderMaterializationError) -> Pl
         | ProviderMaterializationError::ReceiptOutOfOrder
         | ProviderMaterializationError::UnresolvedReceipts
         | ProviderMaterializationError::InvalidReceiptAuthority
+        | ProviderMaterializationError::InvalidTransportProjection
         | ProviderMaterializationError::UnsupportedTransportSchema
         | ProviderMaterializationError::UnsupportedMaterializerSchema => {
             PluginServiceError::ProviderResultReceiptAuthorityDenied

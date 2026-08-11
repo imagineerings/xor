@@ -713,10 +713,14 @@ fn map_broker_error(
         | PluginServiceError::ProviderCostAcceptanceRequired
         | PluginServiceError::ProviderCostPrincipalRequired
         | PluginServiceError::ProviderCostAcceptanceDenied
-        | PluginServiceError::ProviderCostAcceptanceReused => InvocationError::CapabilityDenied {
-            kind: CapabilityKind::NetworkProvider,
-            scope: scope.to_owned(),
-        },
+        | PluginServiceError::ProviderCostAcceptanceReused
+        | PluginServiceError::ProviderResultReceiptAuthorityRequired
+        | PluginServiceError::ProviderResultReceiptAuthorityDenied => {
+            InvocationError::CapabilityDenied {
+                kind: CapabilityKind::NetworkProvider,
+                scope: scope.to_owned(),
+            }
+        }
         PluginServiceError::InvocationFinished | PluginServiceError::InvocationFailed => {
             InvocationError::RevokedHandle
         }

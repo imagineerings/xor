@@ -22,9 +22,9 @@ use comfy_plugin_sdk::{
 };
 use comfy_runtime::{
     AssetError, AssetIdentity, AssetNamespace, Capability, CapabilitySet, PermissionGrant,
-    PermissionPolicy, PluginAuthorization, PluginTrustPolicy, PluginVerificationKey, SecretId,
-    authorize_native_input_reader, authorize_native_plugin_asset_broker,
-    open_native_profile_asset_service,
+    PermissionPolicy, PluginAuthorization, PluginTrustPolicy, PluginVerificationKey,
+    ProviderTransportRequest, SecretId, authorize_native_input_reader,
+    authorize_native_plugin_asset_broker, open_native_profile_asset_service,
 };
 use extension_host::{ComponentLifecycleAdapter, ComponentRuntime, InstalledComponent};
 use sha2::{Digest, Sha256};
@@ -305,7 +305,18 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
             cache: CachePolicy::Never,
             effects: EffectPolicy::Provider,
         }],
-        capabilities: Vec::new(),
+        capabilities: vec![CapabilityRequest {
+            kind: CapabilityKind::NetworkProvider,
+            scope: "fixture|https://fixture.invalid/v1/generate".to_owned(),
+            quota: CapabilityQuota {
+                maximum_operations: 16,
+                maximum_request_bytes: 16 * 1024 * 1024,
+                maximum_response_bytes: 64 * 1024 * 1024,
+                maximum_total_bytes: 80 * 1024 * 1024,
+                maximum_handles: 8,
+                timeout_milliseconds: 5_000,
+            },
+        }],
         ui: Vec::new(),
         routes: Vec::new(),
         legacy_mappings: Vec::new(),
@@ -731,6 +742,13 @@ fn resources_with_log_blocker(
         ),
         b"provider".to_vec(),
     );
+    resources.provider_responses.insert(
+        (
+            "fixture".to_owned(),
+            "https://fixture.invalid/v1/generate".to_owned(),
+        ),
+        b"host-owned-provider-receipt".to_vec(),
+    );
     resources
         .secret_identifiers
         .insert("secret.demo".to_owned());
@@ -987,17 +1005,33 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
             .clone()
             .ok_or("provider binding disappeared")?
     );
-    let expected = scalar_value("provider-output")?;
-    let request = expected.abi_bytes()?;
+    let request = scalar_value("provider-output")?.abi_bytes()?;
     let result = instance.invoke_provider("provider.echo", &request)?;
-    assert_eq!(result.outputs.get("result"), Some(&vec![expected]));
-    assert_eq!(result.output_presence.get("result"), Some(&true));
+    assert!(result.outputs.is_empty());
+    assert!(result.output_presence.is_empty());
     assert_eq!(result.receipts(), &[b"provider-fixture-receipt".to_vec()]);
     assert!(result.effects.outputs.is_empty());
     assert!(result.effects.routes.is_empty());
     let encoded = serde_json::to_vec(&result)?;
     let decoded: comfy_plugin_host::ProviderInvocationResult = serde_json::from_slice(&encoded)?;
     assert_eq!(decoded, result);
+
+    let invocation = host.begin_invocation(
+        &manifest,
+        &authorization,
+        "provider.echo",
+        InvocationInputs::default(),
+        resources()?,
+        CancellationToken::default(),
+    )?;
+    let instance = host.instantiate_component(&compiled, invocation)?;
+    let request = ProviderTransportRequest::checked("provider.echo", Vec::new())?.to_bytes()?;
+    let result = instance.invoke_provider("provider.echo", &request)?;
+    assert_eq!(
+        result.receipts(),
+        &[b"host-owned-provider-receipt".to_vec()]
+    );
+    assert!(result.outputs.is_empty());
     Ok(())
 }
 
@@ -1059,15 +1093,15 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
     for (class_type, request, cancellation, expected) in [
         (
             "provider.echo",
-            b"not-canonical-abi".to_vec(),
-            CancellationToken::default(),
-            "invalid provider output value",
-        ),
-        (
-            "provider.echo",
             b"invalid-provider-receipt".to_vec(),
             CancellationToken::default(),
             "invalid result receipt set",
+        ),
+        (
+            "provider.echo",
+            b"guest-authored-output".to_vec(),
+            CancellationToken::default(),
+            "attempted to author materialized output metadata",
         ),
         (
             "provider.unknown",

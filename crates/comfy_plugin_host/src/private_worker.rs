@@ -3,21 +3,36 @@ use crate::{
     PreparedPluginInvocation, ProviderInvocationResult,
 };
 use comfy_plugin_sdk::InvocationError;
+use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_runtime::{
     PluginAuthorizationVerifier, PluginCapabilityBroker, PluginCapabilityInvocation,
-    PluginServiceInvocationContext, RetainedPluginExecution, RuntimeSupervisor,
-    RuntimeSupervisorError, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
+    PluginServiceInvocationContext, ProviderResultReceiptAuthority, ProviderResultReceiptIssuer,
+    RetainedPluginExecution, RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig,
+    WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     AttemptId, ProfileId, PromptId, WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome,
     WorkerRegistryGeneration,
 };
-use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub struct PrivateWorkerPluginExecutor {
     launch: WorkerLaunchConfig,
     broker: PluginCapabilityBroker,
+    provider_result_receipts: Option<PrivateWorkerProviderResultReceipts>,
     commands: async_channel::Sender<PrivateWorkerCommand>,
+}
+
+#[derive(Clone)]
+struct PrivateWorkerProviderResultReceipts {
+    principal_id: Arc<str>,
+    issuer: Arc<ProviderResultReceiptIssuer>,
+    lifetime: Duration,
 }
 
 struct PrivateWorkerCommand {
@@ -40,6 +55,38 @@ impl PrivateWorkerPluginExecutor {
         launch: WorkerLaunchConfig,
         broker: PluginCapabilityBroker,
     ) -> Result<Arc<Self>, ComponentHostError> {
+        Self::new_internal(launch, broker, None)
+    }
+
+    pub fn new_with_provider_result_receipts(
+        launch: WorkerLaunchConfig,
+        broker: PluginCapabilityBroker,
+        principal_id: impl Into<Arc<str>>,
+        issuer: Arc<ProviderResultReceiptIssuer>,
+        lifetime: Duration,
+    ) -> Result<Arc<Self>, ComponentHostError> {
+        let principal_id = principal_id.into();
+        if principal_id.is_empty() || lifetime.is_zero() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider result receipt authority is invalid".to_owned(),
+            ));
+        }
+        Self::new_internal(
+            launch,
+            broker,
+            Some(PrivateWorkerProviderResultReceipts {
+                principal_id,
+                issuer,
+                lifetime,
+            }),
+        )
+    }
+
+    fn new_internal(
+        launch: WorkerLaunchConfig,
+        broker: PluginCapabilityBroker,
+        provider_result_receipts: Option<PrivateWorkerProviderResultReceipts>,
+    ) -> Result<Arc<Self>, ComponentHostError> {
         let (commands, receiver) = async_channel::bounded(64);
         let actor_launch = launch.clone();
         std::thread::Builder::new()
@@ -49,6 +96,7 @@ impl PrivateWorkerPluginExecutor {
         Ok(Arc::new(Self {
             launch,
             broker,
+            provider_result_receipts,
             commands,
         }))
     }
@@ -72,17 +120,57 @@ impl PrivateWorkerPluginExecutor {
                 "plugin invocation deadline overflowed".to_owned(),
             )
         })?;
-        let service_context = PluginServiceInvocationContext::new(
-            self.launch.profile_id,
-            context.prompt_id,
-            context.attempt_id,
-            context.node_id.clone(),
-            invocation.authorization().clone(),
-            context.cancellation.clone(),
-            deadline,
-            invocation.worker_invocation().maximum_response_bytes(),
-        )
-        .map_err(worker_boundary_error)?;
+        let service_context = if invocation.worker_invocation().provider_request().is_some() {
+            let receipt_configuration =
+                self.provider_result_receipts.as_ref().ok_or_else(|| {
+                    ComponentHostError::ExecutionBoundary(
+                        "provider invocation requires app-owned result receipt authority"
+                            .to_owned(),
+                    )
+                })?;
+            let provider_execution = context
+                .provider_execution()
+                .map_err(worker_boundary_error)?;
+            let provider_binding_sha256 =
+                invocation.provider_binding_sha256().ok_or_else(|| {
+                    ComponentHostError::ExecutionBoundary(
+                        "provider invocation is missing its signed binding identity".to_owned(),
+                    )
+                })?;
+            let authority = ProviderResultReceiptAuthority::new(
+                receipt_configuration.principal_id.as_ref(),
+                provider_execution.compiled_plan_sha256(),
+                provider_binding_sha256,
+                receipt_configuration.issuer.clone(),
+                receipt_configuration.lifetime,
+            )
+            .map_err(worker_boundary_error)?;
+            PluginServiceInvocationContext::new_with_principal(
+                self.launch.profile_id,
+                context.prompt_id,
+                context.attempt_id,
+                context.node_id.clone(),
+                receipt_configuration.principal_id.as_ref(),
+                invocation.authorization().clone(),
+                context.cancellation.clone(),
+                deadline,
+                invocation.worker_invocation().maximum_response_bytes(),
+            )
+            .and_then(|context| context.with_provider_result_authority(authority))
+            .map_err(worker_boundary_error)?
+        } else {
+            PluginServiceInvocationContext::new(
+                self.launch.profile_id,
+                context.prompt_id,
+                context.attempt_id,
+                context.node_id.clone(),
+                invocation.authorization().clone(),
+                context.cancellation.clone(),
+                deadline,
+                invocation.worker_invocation().maximum_response_bytes(),
+            )
+            .map_err(worker_boundary_error)?
+        };
         let capability_invocation = self
             .broker
             .begin_invocation(service_context)
@@ -141,9 +229,15 @@ impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
         Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
     > {
         Box::pin(async move {
-            let retained = self.execute_prepared(invocation).await?;
+            let mut retained = self.execute_prepared(invocation).await?;
             match decode_worker_provider_result(retained.outcome()) {
-                Ok(result) => {
+                Ok(mut result) => {
+                    let receipt_set = ProviderResultReceiptSet::new(result.receipts().to_vec())
+                        .map_err(worker_boundary_error)?;
+                    let resolved = retained
+                        .resolve_provider_result_receipt_set(&receipt_set)
+                        .map_err(worker_boundary_error)?;
+                    result.set_resolved_provider_results(resolved);
                     retained.finish().map_err(worker_boundary_error)?;
                     Ok(result)
                 }

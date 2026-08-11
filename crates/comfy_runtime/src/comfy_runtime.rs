@@ -9,13 +9,14 @@ pub use comfy_nodes::{
     NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
     NativeNodeSchemaMetadata, NativeOpaqueHandle, NativeOutputDescriptor,
     NativeOutputSchemaMetadata, NativePortCardinality, NativePreparedEffectRequest,
-    NativePrimitive, NativePrimitiveType, NativeProviderPayload, NativeResolvedPayload,
-    NativeResolvedPayloadRetention, NativeSchemaError, NativeSchemaField, NativeSchemaProvenance,
-    NativeSchemaValue, NativeSourcePresentationMetadata, NativeStoredModelPayload,
-    NativeStoredPayload, NativeStoredPayloadError, NativeStructuredInputField,
-    NativeStructuredInputOption, NativeStructuredValue, NativeTypeUnion, NativeUploadKind,
-    NativeValue, NativeValueType, NodeRegistry, NodeRegistryError, ObjectInfoInputSchema,
-    ObjectInfoNode, ObjectInfoOutputSchema, ObjectInfoRegistry,
+    NativePrimitive, NativePrimitiveType, NativeProviderExecutionIdentity, NativeProviderPayload,
+    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeSchemaError, NativeSchemaField,
+    NativeSchemaProvenance, NativeSchemaValue, NativeSourcePresentationMetadata,
+    NativeStoredModelPayload, NativeStoredPayload, NativeStoredPayloadError,
+    NativeStructuredInputField, NativeStructuredInputOption, NativeStructuredValue,
+    NativeTypeUnion, NativeUploadKind, NativeValue, NativeValueType, NodeRegistry,
+    NodeRegistryError, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,
+    ObjectInfoRegistry,
 };
 pub use comfy_types::{AttemptId, ExecutionId, ProfileId, PromptId, RequestId};
 

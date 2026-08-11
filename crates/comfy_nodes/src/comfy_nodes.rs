@@ -31,10 +31,10 @@ pub use execution::{
     NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativeOutputDescriptor,
     NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape, NativePortCardinality,
     NativePreparedEffectKind, NativePreparedEffectRequest, NativePreparedEffectService,
-    NativePreparedImagePreview, NativePrimitive, NativePrimitiveType, NativeResolvedAsset,
-    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeStructuredValue, NativeTypeUnion,
-    NativeValue, NativeValueType, native_value_matches_input_schema,
-    validate_generated_family_bindings,
+    NativePreparedImagePreview, NativePrimitive, NativePrimitiveType,
+    NativeProviderExecutionIdentity, NativeResolvedAsset, NativeResolvedPayload,
+    NativeResolvedPayloadRetention, NativeStructuredValue, NativeTypeUnion, NativeValue,
+    NativeValueType, native_value_matches_input_schema, validate_generated_family_bindings,
 };
 pub use object_info::{
     OBJECT_INFO_SCHEMA_VERSION, ObjectInfoInputSchema, ObjectInfoNode, ObjectInfoOutputSchema,

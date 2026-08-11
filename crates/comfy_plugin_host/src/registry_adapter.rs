@@ -1,6 +1,6 @@
 use crate::{
     ComponentHost, ComponentHostError, InstalledVerifiedPlugin, InvocationInputs,
-    capabilities::artifact_value_identity,
+    capabilities::artifact_value_identity, require_exact_port_type,
 };
 use comfy_nodes::{
     NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind, NativeHandleStoreIdentity,
@@ -17,7 +17,8 @@ use comfy_plugin_sdk::{
 };
 use comfy_runtime::{
     NativeNodeRegistry, NativeNodeRegistryError, NativeProviderBindingActivation,
-    NativeProviderBindingActivationSet,
+    NativeProviderBindingActivationSet, ProviderTransportPort, ProviderTransportRequest,
+    ProviderTransportResponse, ProviderTransportValue,
 };
 use futures::future::BoxFuture;
 use serde_json::{Map, Number, Value};
@@ -83,12 +84,28 @@ pub(crate) fn registry_with_plugins(
             } else {
                 descriptor.implementation_version.clone()
             };
+            let provider_binding = if declared_disposition
+                == Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
+            {
+                Some(
+                    claims
+                        .get(node.id.as_str())
+                        .copied()
+                        .ok_or_else(|| {
+                            provider_binding_error(&node.id, "signed provider claim is missing")
+                        })?
+                        .clone(),
+                )
+            } else {
+                None
+            };
             let implementation: Arc<dyn NativeNode> = Arc::new(PluginNativeNode {
                 component_host: component_host.clone(),
                 plugin: plugin.clone(),
                 node: node.clone(),
                 type_registry: type_registry.clone(),
                 implementation_version,
+                provider_binding,
             });
             match declared_disposition {
                 Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired) => {
@@ -240,6 +257,7 @@ struct PluginNativeNode {
     node: PluginNode,
     type_registry: TypeRegistry,
     implementation_version: String,
+    provider_binding: Option<ProviderBindingClaim>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -291,38 +309,75 @@ impl NativeNode for PluginNativeNode {
                 profile_id,
                 &context,
             )?;
-            let result = self
-                .component_host
-                .execute_plugin(
-                    &self.plugin,
-                    &self.node.id,
-                    invocation_inputs,
-                    context.clone(),
-                )
-                .await
-                .map_err(plugin_failure)?;
+            let (result_outputs, result_presence, result_effects) =
+                if let Some(provider_binding) = &self.provider_binding {
+                    comfy_runtime::validate_native_provider_schemas(
+                        &provider_binding.transport_schema,
+                        &provider_binding.materializer_schema,
+                    )
+                    .map_err(plugin_failure)?;
+                    context.provider_execution().map_err(plugin_failure)?;
+                    let request = provider_transport_request(&self.node, &invocation_inputs)?;
+                    let mut result = self
+                        .component_host
+                        .execute_provider(
+                            &self.plugin,
+                            &self.node.id,
+                            invocation_inputs,
+                            request.to_bytes().map_err(plugin_failure)?,
+                            context.clone(),
+                        )
+                        .await
+                        .map_err(plugin_failure)?;
+                    if !result.outputs.is_empty() || !result.output_presence.is_empty() {
+                        return Err(unmaterialized_plugin_output("provider response"));
+                    }
+                    let mut resolved = result.take_resolved_provider_results().into_iter();
+                    let response = resolved
+                        .next()
+                        .ok_or_else(|| unmaterialized_plugin_output("provider receipt"))?;
+                    if resolved.next().is_some() {
+                        return Err(unmaterialized_plugin_output("provider receipt count"));
+                    }
+                    let response = ProviderTransportResponse::from_bytes(response.response())
+                        .map_err(plugin_failure)?;
+                    let (outputs, presence) =
+                        provider_transport_outputs(&self.node, &response, &self.type_registry)?;
+                    (outputs, presence, result.effects)
+                } else {
+                    let result = self
+                        .component_host
+                        .execute_plugin(
+                            &self.plugin,
+                            &self.node.id,
+                            invocation_inputs,
+                            context.clone(),
+                        )
+                        .await
+                        .map_err(plugin_failure)?;
+                    (result.outputs, result.output_presence, result.effects)
+                };
             let outputs = invocation_outputs(
                 &self.node,
-                &result.outputs,
-                &result.output_presence,
+                &result_outputs,
+                &result_presence,
                 &self.type_registry,
                 profile_id,
                 &context,
                 &imported_handles,
             )?;
-            let ui = (!result.effects.ui_state.is_empty()
-                || !result.effects.logs.is_empty()
-                || !result.effects.routes.is_empty())
+            let ui = (!result_effects.ui_state.is_empty()
+                || !result_effects.logs.is_empty()
+                || !result_effects.routes.is_empty())
             .then(|| {
                 serde_json::json!({
-                    "plugin_ui": &result.effects.ui_state,
-                    "plugin_logs": &result.effects.logs,
-                    "plugin_routes": &result.effects.routes,
+                    "plugin_ui": &result_effects.ui_state,
+                    "plugin_logs": &result_effects.logs,
+                    "plugin_routes": &result_effects.routes,
                 })
             });
             let effect_service = context.prepared_effects().map_err(plugin_failure)?;
-            let requests = result
-                .effects
+            let requests = result_effects
                 .outputs
                 .iter()
                 .enumerate()
@@ -788,6 +843,100 @@ fn scalar_from_json(value: Value) -> Result<ScalarValue, NativeNodeFailure> {
     }
 }
 
+fn provider_transport_request(
+    node: &PluginNode,
+    inputs: &InvocationInputs,
+) -> Result<ProviderTransportRequest, NativeNodeFailure> {
+    let mut ports = Vec::with_capacity(inputs.values().len());
+    for (port_id, values) in inputs.values() {
+        let present = values.is_some();
+        let values = values.as_deref().unwrap_or_default();
+        let transport_values = values
+            .iter()
+            .map(|value| {
+                ProviderTransportValue::checked(
+                    value.type_id().to_string(),
+                    value.family(),
+                    value.abi_bytes().map_err(plugin_failure)?,
+                )
+                .map_err(plugin_failure)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        ports.push(
+            ProviderTransportPort::checked(port_id, present, transport_values)
+                .map_err(plugin_failure)?,
+        );
+    }
+    ProviderTransportRequest::checked(&node.id, ports).map_err(plugin_failure)
+}
+
+fn provider_transport_outputs(
+    node: &PluginNode,
+    response: &ProviderTransportResponse,
+    registry: &TypeRegistry,
+) -> Result<(BTreeMap<String, Vec<PluginValue>>, BTreeMap<String, bool>), NativeNodeFailure> {
+    if response.class_type() != node.id {
+        return Err(unmaterialized_plugin_output("provider class"));
+    }
+    let expected_ports = node
+        .ports
+        .iter()
+        .filter(|port| port.direction == PortDirection::Output)
+        .collect::<Vec<_>>();
+    if response.ports().len() != expected_ports.len() {
+        return Err(unmaterialized_plugin_output("provider output count"));
+    }
+    let mut outputs = BTreeMap::new();
+    let mut presence = BTreeMap::new();
+    for transport_port in response.ports() {
+        let port = expected_ports
+            .iter()
+            .copied()
+            .find(|port| port.id == transport_port.port_id())
+            .ok_or_else(|| unmaterialized_plugin_output("provider output port"))?;
+        let values = transport_port
+            .values()
+            .iter()
+            .map(|transport_value| {
+                let value = PluginValue::from_abi_bytes(transport_value.abi_bytes(), registry)
+                    .map_err(plugin_failure)?;
+                if value.type_id().to_string() != transport_value.type_id()
+                    || value.family() != transport_value.family()
+                {
+                    return Err(unmaterialized_plugin_output("provider output metadata"));
+                }
+                require_exact_port_type(port, &value).map_err(plugin_failure)?;
+                Ok(value)
+            })
+            .collect::<Result<Vec<_>, NativeNodeFailure>>()?;
+        validate_provider_output_cardinality(port, transport_port.present(), values.len())?;
+        presence.insert(port.id.clone(), transport_port.present());
+        outputs.insert(port.id.clone(), values);
+    }
+    if expected_ports
+        .iter()
+        .any(|port| !presence.contains_key(&port.id))
+    {
+        return Err(unmaterialized_plugin_output("provider output port"));
+    }
+    Ok((outputs, presence))
+}
+
+fn validate_provider_output_cardinality(
+    port: &PluginPort,
+    present: bool,
+    value_count: usize,
+) -> Result<(), NativeNodeFailure> {
+    if (!present && value_count != 0)
+        || (port.presence == PortPresence::Required && !present)
+        || (port.cardinality == PortCardinality::Singular
+            && ((present && value_count != 1) || value_count > 1))
+    {
+        return Err(unmaterialized_plugin_output(&port.id));
+    }
+    Ok(())
+}
+
 fn invocation_outputs(
     node: &PluginNode,
     outputs: &BTreeMap<String, Vec<PluginValue>>,
@@ -1041,7 +1190,7 @@ mod tests {
     use comfy_model::ClipVisionOutput;
     use comfy_nodes::NativePrimitiveType;
     use comfy_plugin_sdk::{
-        ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
+        ApiVersion, ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
     };
     use comfy_runtime::{AttemptId, NativeHandleStoreGeneration, PromptId};
     use comfy_tensor::{CancellationToken, CpuBackend, CpuWorkspaceAuthority, Tensor};
@@ -1055,6 +1204,64 @@ mod tests {
             ArtifactValue::new("input", identifier, 3, "2".repeat(64))?,
             &registry,
         )?)
+    }
+
+    #[test]
+    fn provider_transport_outputs_are_exactly_typed_and_guest_independent()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let output = PluginPort {
+            id: "result".to_owned(),
+            name: "Result".to_owned(),
+            direction: PortDirection::Output,
+            type_id: registry.resolve("STRING")?.clone(),
+            cardinality: PortCardinality::Singular,
+            presence: PortPresence::Required,
+            hidden: false,
+            lazy: false,
+            default: None,
+            serialization: PortSerialization::Inline,
+            accepted_legacy_names: Vec::new(),
+        };
+        let node = PluginNode {
+            id: "provider.echo".to_owned(),
+            version: ApiVersion {
+                major: 1,
+                minor: 0,
+                patch: 0,
+            },
+            display_name: "Provider Echo".to_owned(),
+            category: "test/provider".to_owned(),
+            ports: vec![output],
+            determinism: DeterminismPolicy::External,
+            cache: CachePolicy::Never,
+            effects: EffectPolicy::Provider,
+        };
+        let value = PluginValue::scalar(
+            registry.resolve("STRING")?.clone(),
+            ScalarValue::String("provider-output".to_owned()),
+            &registry,
+        )?;
+        let response = ProviderTransportResponse::checked(
+            "provider.echo",
+            vec![ProviderTransportPort::checked(
+                "result",
+                true,
+                vec![ProviderTransportValue::checked(
+                    value.type_id().to_string(),
+                    value.family(),
+                    value.abi_bytes()?,
+                )?],
+            )?],
+        )?;
+        let (outputs, presence) = provider_transport_outputs(&node, &response, &registry)?;
+        assert_eq!(outputs.get("result"), Some(&vec![value]));
+        assert_eq!(presence.get("result"), Some(&true));
+
+        let wrong_class =
+            ProviderTransportResponse::checked("provider.other", response.ports().to_vec())?;
+        assert!(provider_transport_outputs(&node, &wrong_class, &registry).is_err());
+        Ok(())
     }
 
     fn input_port(

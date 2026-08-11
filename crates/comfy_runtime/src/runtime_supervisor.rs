@@ -29,8 +29,9 @@ use crate::{
     NativeMluPackageSettings, NativeNpuPackageSettings, NativeRocmPackageSettings,
     NativeRuntimeProfile, NativeXpuPackageSettings, PluginAuthorizationVerifier,
     PluginCapabilityInvocation, PluginServiceWireFailure, PluginServiceWireRequest,
-    PluginServiceWireResponse,
+    PluginServiceWireResponse, ResolvedProviderResult,
 };
+use comfy_plugin_sdk::ProviderResultReceiptSet;
 
 pub const WORKER_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(2);
 pub const WORKER_MISSED_HEARTBEAT_LIMIT: u8 = 3;
@@ -52,6 +53,21 @@ pub struct RetainedPluginExecution {
 impl RetainedPluginExecution {
     pub fn outcome(&self) -> &WorkerPluginExecutionOutcome {
         &self.outcome
+    }
+
+    pub fn resolve_provider_result_receipt_set(
+        &mut self,
+        receipt_set: &ProviderResultReceiptSet,
+    ) -> Result<Vec<ResolvedProviderResult>, RuntimeSupervisorError> {
+        self.capability_invocation
+            .as_mut()
+            .ok_or_else(|| {
+                RuntimeSupervisorError::PluginCapabilityBroker(
+                    "provider capability invocation is already terminal".to_owned(),
+                )
+            })?
+            .resolve_provider_result_receipt_set(receipt_set)
+            .map_err(|error| RuntimeSupervisorError::PluginCapabilityBroker(error.to_string()))
     }
 
     pub fn finish(mut self) -> Result<WorkerPluginExecutionOutcome, RuntimeSupervisorError> {

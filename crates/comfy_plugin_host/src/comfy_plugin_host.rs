@@ -35,6 +35,7 @@ use comfy_plugin_sdk::{
     PortSerialization, ProviderBindingClaim, ProviderBindingSet, ProviderResultReceiptSet,
     RustComfyPlugin, TypeRegistry, ValueFamily, ValueHandle,
 };
+use comfy_runtime::ResolvedProviderResult;
 use comfy_runtime::{AssetIdentity, AssetNamespace, PluginAuthorization, TrustError};
 use extension_host::ComponentRuntime;
 use sha2::{Digest, Sha256};
@@ -242,11 +243,28 @@ pub struct ProviderInvocationResult {
     pub output_presence: BTreeMap<String, bool>,
     pub effects: CapabilityEffects,
     receipts: Vec<Vec<u8>>,
+    #[serde(skip)]
+    resolved_provider_results: Vec<ResolvedProviderResult>,
 }
 
 impl ProviderInvocationResult {
     pub fn receipts(&self) -> &[Vec<u8>] {
         &self.receipts
+    }
+
+    pub fn resolved_provider_results(&self) -> &[ResolvedProviderResult] {
+        &self.resolved_provider_results
+    }
+
+    pub(crate) fn set_resolved_provider_results(
+        &mut self,
+        resolved_provider_results: Vec<ResolvedProviderResult>,
+    ) {
+        self.resolved_provider_results = resolved_provider_results;
+    }
+
+    pub(crate) fn take_resolved_provider_results(&mut self) -> Vec<ResolvedProviderResult> {
+        mem::take(&mut self.resolved_provider_results)
     }
 }
 
@@ -837,6 +855,10 @@ impl InvocationInputs {
     pub fn set_present(&mut self, port_id: impl Into<String>, values: Vec<PluginValue>) {
         self.values.insert(port_id.into(), Some(values));
     }
+
+    pub(crate) fn values(&self) -> &BTreeMap<String, Option<Vec<PluginValue>>> {
+        &self.values
+    }
 }
 
 struct InputPortState {
@@ -1053,102 +1075,10 @@ impl InvocationHost {
                 "provider component mixed handle-port output with its typed response".to_owned(),
             ));
         }
-
-        let mut response_bytes =
-            u64::try_from(response.receipt.len()).map_err(|_| invocation_value_quota_error())?;
-        for output in response.outputs {
-            let port = self
-                .node
-                .ports
-                .iter()
-                .find(|port| port.id == output.port_id && port.direction == PortDirection::Output)
-                .ok_or_else(|| InvocationError::UnknownPort(output.port_id.clone()))?;
-            let value = PluginValue::from_abi_bytes(&output.value.abi_bytes, &self.registry)
-                .map_err(|error| {
-                    InvocationError::HostFailure(format!("invalid provider output value: {error}"))
-                })?;
-            if value.type_id().to_string() != output.value.type_id
-                || value.family() != sdk_value_family(output.value.family)
-            {
-                return Err(InvocationError::HostFailure(
-                    "encoded provider output metadata disagrees with its canonical ABI value"
-                        .to_owned(),
-                ));
-            }
-            require_exact_port_type(port, &value)?;
-            let expected_family = self.registry.family(&port.type_id).map_err(|error| {
-                InvocationError::HostFailure(format!("plugin type registry failed: {error}"))
-            })?;
-            if value.family() != expected_family {
-                return Err(InvocationError::WrongValueFamily {
-                    port: port.id.clone(),
-                    expected: expected_family,
-                    actual: value.family(),
-                });
-            }
-            let value_bytes = value_size(&value)?;
-            if value_bytes > self.limits.maximum_value_bytes {
-                return Err(value_quota_error());
-            }
-            response_bytes = response_bytes
-                .checked_add(u64::try_from(output.port_id.len()).map_err(|_| {
-                    InvocationError::HostFailure("provider response size overflow".to_owned())
-                })?)
-                .and_then(|bytes| {
-                    bytes.checked_add(u64::try_from(output.value.type_id.len()).ok()?)
-                })
-                .and_then(|bytes| {
-                    bytes.checked_add(u64::try_from(output.value.abi_bytes.len()).ok()?)
-                })
-                .ok_or_else(|| {
-                    InvocationError::HostFailure("provider response size overflow".to_owned())
-                })?;
-            if response_bytes > self.limits.maximum_port_response_bytes {
-                return Err(InvocationError::InvocationQuotaExceeded {
-                    limit: "provider-response-byte".to_owned(),
-                });
-            }
-            self.invocation_value_bytes = self
-                .invocation_value_bytes
-                .checked_add(value_bytes)
-                .ok_or_else(invocation_value_quota_error)?;
-            if self.invocation_value_bytes > self.limits.maximum_invocation_value_bytes {
-                return Err(invocation_value_quota_error());
-            }
-            let state = self.outputs.get_mut(&port.id).ok_or_else(|| {
-                InvocationError::HostFailure("provider output state is missing".to_owned())
-            })?;
-            if port.cardinality == PortCardinality::Singular && !state.values.is_empty() {
-                return Err(InvocationError::InvalidCardinality(port.id.clone()));
-            }
-            if state.values.len() >= self.limits.maximum_values_per_port {
-                return Err(InvocationError::InvalidCardinality(port.id.clone()));
-            }
-            state.value_bytes = state
-                .value_bytes
-                .checked_add(value_bytes)
-                .ok_or_else(value_quota_error)?;
-            if state.value_bytes > self.limits.maximum_value_bytes {
-                return Err(value_quota_error());
-            }
-            state.values.push(value);
-        }
-
-        let mut output_presence = BTreeMap::new();
-        for port in self
-            .node
-            .ports
-            .iter()
-            .filter(|port| port.direction == PortDirection::Output)
-        {
-            let state = self.outputs.get_mut(&port.id).ok_or_else(|| {
-                InvocationError::HostFailure("provider output state is missing".to_owned())
-            })?;
-            let present = !state.values.is_empty();
-            validate_finished_output(port, present, state.values.len())?;
-            state.present = Some(present);
-            state.finished = true;
-            output_presence.insert(port.id.clone(), present);
+        if !response.outputs.is_empty() {
+            return Err(InvocationError::HostFailure(
+                "provider component attempted to author materialized output metadata".to_owned(),
+            ));
         }
         self.check_cancellation()?;
         let mut capabilities = self.capabilities.take().ok_or_else(|| {
@@ -1161,17 +1091,15 @@ impl InvocationHost {
             ));
         }
         let effects = capabilities.finish()?;
-        let outputs = mem::take(&mut self.outputs)
-            .into_iter()
-            .map(|(port, state)| (port, state.values))
-            .collect();
+        self.outputs.clear();
         self.inputs.clear();
         self.terminal = true;
         Ok(ProviderInvocationResult {
-            outputs,
-            output_presence,
+            outputs: BTreeMap::new(),
+            output_presence: BTreeMap::new(),
             effects,
             receipts,
+            resolved_provider_results: Vec::new(),
         })
     }
 
@@ -2566,7 +2494,7 @@ fn encoded_value_response_size(value: &PluginValue) -> Result<u64, InvocationErr
         .ok_or_else(|| InvocationError::HostFailure("plugin value ABI size overflow".to_owned()))
 }
 
-fn require_exact_port_type(
+pub(crate) fn require_exact_port_type(
     port: &comfy_plugin_sdk::PluginPort,
     value: &PluginValue,
 ) -> Result<(), InvocationError> {

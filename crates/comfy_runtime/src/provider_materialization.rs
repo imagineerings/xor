@@ -4,7 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet};
+use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet, ValueFamily};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -16,6 +17,13 @@ use crate::{
 pub const NATIVE_PROVIDER_TRANSPORT_SCHEMA: &str = "sim:comfy-provider-transport@1";
 pub const NATIVE_PROVIDER_MATERIALIZER_SCHEMA: &str = "sim:comfy-provider-materializer@1";
 pub const MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
+pub const MAX_PROVIDER_TRANSPORT_REQUEST_BYTES: usize = 16 * 1024 * 1024;
+const PROVIDER_TRANSPORT_REQUEST_DOMAIN: &[u8] = b"sim.comfy.provider-transport-request\0";
+const PROVIDER_TRANSPORT_RESPONSE_DOMAIN: &[u8] = b"sim.comfy.provider-transport-response\0";
+const PROVIDER_TRANSPORT_VERSION: u16 = 1;
+const MAX_PROVIDER_TRANSPORT_PORTS: usize = 1_024;
+const MAX_PROVIDER_TRANSPORT_VALUES_PER_PORT: usize = 4_096;
+const MAX_PROVIDER_TRANSPORT_IDENTITY_BYTES: usize = 1_024;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ProviderMaterializationError {
@@ -39,6 +47,275 @@ pub enum ProviderMaterializationError {
     UnresolvedReceipts,
     #[error("provider result receipt authority is invalid")]
     InvalidReceiptAuthority,
+    #[error("provider transport projection is invalid or exceeds its bound")]
+    InvalidTransportProjection,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderTransportValue {
+    type_id: String,
+    family: ValueFamily,
+    abi_bytes: Vec<u8>,
+}
+
+impl ProviderTransportValue {
+    pub fn checked(
+        type_id: impl Into<String>,
+        family: ValueFamily,
+        abi_bytes: Vec<u8>,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let value = Self {
+            type_id: type_id.into(),
+            family,
+            abi_bytes,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn type_id(&self) -> &str {
+        &self.type_id
+    }
+
+    pub const fn family(&self) -> ValueFamily {
+        self.family
+    }
+
+    pub fn abi_bytes(&self) -> &[u8] {
+        &self.abi_bytes
+    }
+
+    fn validate(&self) -> Result<(), ProviderMaterializationError> {
+        if !valid_transport_identity(&self.type_id)
+            || self.abi_bytes.is_empty()
+            || self.abi_bytes.len() > MAX_PROVIDER_TRANSPORT_REQUEST_BYTES
+        {
+            return Err(ProviderMaterializationError::InvalidTransportProjection);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProviderTransportPort {
+    port_id: String,
+    present: bool,
+    values: Vec<ProviderTransportValue>,
+}
+
+impl ProviderTransportPort {
+    pub fn checked(
+        port_id: impl Into<String>,
+        present: bool,
+        values: Vec<ProviderTransportValue>,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let port = Self {
+            port_id: port_id.into(),
+            present,
+            values,
+        };
+        port.validate()?;
+        Ok(port)
+    }
+
+    pub fn port_id(&self) -> &str {
+        &self.port_id
+    }
+
+    pub const fn present(&self) -> bool {
+        self.present
+    }
+
+    pub fn values(&self) -> &[ProviderTransportValue] {
+        &self.values
+    }
+
+    fn validate(&self) -> Result<(), ProviderMaterializationError> {
+        if !valid_transport_identity(&self.port_id)
+            || self.values.len() > MAX_PROVIDER_TRANSPORT_VALUES_PER_PORT
+            || (!self.present && !self.values.is_empty())
+        {
+            return Err(ProviderMaterializationError::InvalidTransportProjection);
+        }
+        self.values
+            .iter()
+            .try_for_each(ProviderTransportValue::validate)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderTransportProjection {
+    class_type: String,
+    ports: Vec<ProviderTransportPort>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderTransportRequest(ProviderTransportProjection);
+
+impl ProviderTransportRequest {
+    pub fn checked(
+        class_type: impl Into<String>,
+        ports: Vec<ProviderTransportPort>,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let projection = ProviderTransportProjection {
+            class_type: class_type.into(),
+            ports,
+        };
+        validate_transport_projection(&projection)?;
+        Ok(Self(projection))
+    }
+
+    pub fn class_type(&self) -> &str {
+        &self.0.class_type
+    }
+
+    pub fn ports(&self) -> &[ProviderTransportPort] {
+        &self.0.ports
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, ProviderMaterializationError> {
+        encode_transport_projection(
+            PROVIDER_TRANSPORT_REQUEST_DOMAIN,
+            &self.0,
+            MAX_PROVIDER_TRANSPORT_REQUEST_BYTES,
+        )
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProviderMaterializationError> {
+        decode_transport_projection(
+            PROVIDER_TRANSPORT_REQUEST_DOMAIN,
+            bytes,
+            MAX_PROVIDER_TRANSPORT_REQUEST_BYTES,
+        )
+        .map(Self)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderTransportResponse(ProviderTransportProjection);
+
+impl ProviderTransportResponse {
+    pub fn checked(
+        class_type: impl Into<String>,
+        ports: Vec<ProviderTransportPort>,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let projection = ProviderTransportProjection {
+            class_type: class_type.into(),
+            ports,
+        };
+        validate_transport_projection(&projection)?;
+        Ok(Self(projection))
+    }
+
+    pub fn class_type(&self) -> &str {
+        &self.0.class_type
+    }
+
+    pub fn ports(&self) -> &[ProviderTransportPort] {
+        &self.0.ports
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, ProviderMaterializationError> {
+        encode_transport_projection(
+            PROVIDER_TRANSPORT_RESPONSE_DOMAIN,
+            &self.0,
+            MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES,
+        )
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ProviderMaterializationError> {
+        decode_transport_projection(
+            PROVIDER_TRANSPORT_RESPONSE_DOMAIN,
+            bytes,
+            MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES,
+        )
+        .map(Self)
+    }
+}
+
+fn validate_transport_projection(
+    projection: &ProviderTransportProjection,
+) -> Result<(), ProviderMaterializationError> {
+    if !valid_transport_identity(&projection.class_type)
+        || projection.ports.len() > MAX_PROVIDER_TRANSPORT_PORTS
+    {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    let mut previous_port = None;
+    for port in &projection.ports {
+        port.validate()?;
+        if previous_port.is_some_and(|previous| previous >= port.port_id()) {
+            return Err(ProviderMaterializationError::InvalidTransportProjection);
+        }
+        previous_port = Some(port.port_id());
+    }
+    Ok(())
+}
+
+fn encode_transport_projection(
+    domain: &[u8],
+    projection: &ProviderTransportProjection,
+    maximum_bytes: usize,
+) -> Result<Vec<u8>, ProviderMaterializationError> {
+    validate_transport_projection(projection)?;
+    let payload = postcard::to_stdvec(projection)
+        .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+    let total = domain
+        .len()
+        .checked_add(2)
+        .and_then(|length| length.checked_add(payload.len()))
+        .ok_or(ProviderMaterializationError::InvalidTransportProjection)?;
+    if total > maximum_bytes {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    let mut bytes = Vec::with_capacity(total);
+    bytes.extend_from_slice(domain);
+    bytes.extend_from_slice(&PROVIDER_TRANSPORT_VERSION.to_le_bytes());
+    bytes.extend_from_slice(&payload);
+    Ok(bytes)
+}
+
+fn decode_transport_projection(
+    domain: &[u8],
+    bytes: &[u8],
+    maximum_bytes: usize,
+) -> Result<ProviderTransportProjection, ProviderMaterializationError> {
+    if bytes.len() > maximum_bytes || !bytes.starts_with(domain) {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    let version_start = domain.len();
+    let version_end = version_start
+        .checked_add(2)
+        .ok_or(ProviderMaterializationError::InvalidTransportProjection)?;
+    let version_bytes = bytes
+        .get(version_start..version_end)
+        .ok_or(ProviderMaterializationError::InvalidTransportProjection)?;
+    let version = u16::from_le_bytes(
+        version_bytes
+            .try_into()
+            .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?,
+    );
+    if version != PROVIDER_TRANSPORT_VERSION {
+        return Err(ProviderMaterializationError::InvalidTransportProjection);
+    }
+    let projection: ProviderTransportProjection = postcard::from_bytes(
+        bytes
+            .get(version_end..)
+            .ok_or(ProviderMaterializationError::InvalidTransportProjection)?,
+    )
+    .map_err(|_| ProviderMaterializationError::InvalidTransportProjection)?;
+    validate_transport_projection(&projection)?;
+    Ok(projection)
+}
+
+fn valid_transport_identity(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_PROVIDER_TRANSPORT_IDENTITY_BYTES
+        && value == value.trim()
+        && !value.chars().any(char::is_control)
 }
 
 #[derive(Clone)]
@@ -357,6 +634,7 @@ impl ProviderResultReceiptSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_plugin_sdk::{PluginValue, ScalarValue, TypeRegistry};
     use std::time::Duration;
 
     fn invocation_identity(
@@ -379,6 +657,66 @@ mod tests {
             "fixture",
             "https://fixture.invalid/v1/generate",
         )?)
+    }
+
+    #[test]
+    fn provider_transport_is_domain_separated_bounded_and_canonical()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let type_id: CanonicalTypeId = "comfy:string@1".parse()?;
+        let value = PluginValue::scalar(
+            type_id.clone(),
+            ScalarValue::String("result".to_owned()),
+            &registry,
+        )?;
+        let port = ProviderTransportPort::checked(
+            "result",
+            true,
+            vec![ProviderTransportValue::checked(
+                type_id.to_string(),
+                value.family(),
+                value.abi_bytes()?,
+            )?],
+        )?;
+        let request = ProviderTransportRequest::checked("provider.echo", vec![port.clone()])?;
+        let response = ProviderTransportResponse::checked("provider.echo", vec![port])?;
+        let request_bytes = request.to_bytes()?;
+        let response_bytes = response.to_bytes()?;
+        assert_ne!(request_bytes, response_bytes);
+        assert_eq!(
+            ProviderTransportRequest::from_bytes(&request_bytes)?,
+            request
+        );
+        assert_eq!(
+            ProviderTransportResponse::from_bytes(&response_bytes)?,
+            response
+        );
+        assert!(ProviderTransportRequest::from_bytes(&response_bytes).is_err());
+        assert!(ProviderTransportResponse::from_bytes(&request_bytes).is_err());
+
+        assert!(
+            ProviderTransportRequest::checked(
+                "provider.echo",
+                vec![
+                    ProviderTransportPort::checked("z", false, Vec::new())?,
+                    ProviderTransportPort::checked("a", false, Vec::new())?,
+                ],
+            )
+            .is_err()
+        );
+        assert!(
+            ProviderTransportPort::checked(
+                "result",
+                false,
+                vec![ProviderTransportValue::checked(
+                    type_id.to_string(),
+                    ValueFamily::Scalar,
+                    value.abi_bytes()?,
+                )?,]
+            )
+            .is_err()
+        );
+        Ok(())
     }
 
     #[test]
