@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet};
@@ -9,8 +9,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
-    ProviderInvocationIdentity, ProviderResultNonce, ProviderResultReceipt,
-    ProviderResultReceiptIssuer, ProviderResultReceiptVerifier,
+    MAX_PROVIDER_RESULT_RECEIPT_LIFETIME, ProviderInvocationIdentity, ProviderResultNonce,
+    ProviderResultReceipt, ProviderResultReceiptIssuer, ProviderResultReceiptVerifier,
 };
 
 pub const NATIVE_PROVIDER_TRANSPORT_SCHEMA: &str = "sim:comfy-provider-transport@1";
@@ -37,6 +37,85 @@ pub enum ProviderMaterializationError {
     ReceiptOutOfOrder,
     #[error("provider result receipt session still has unresolved responses")]
     UnresolvedReceipts,
+    #[error("provider result receipt authority is invalid")]
+    InvalidReceiptAuthority,
+}
+
+#[derive(Clone)]
+pub struct ProviderResultReceiptAuthority {
+    principal_id: String,
+    prompt_sha256: String,
+    provider_binding_sha256: String,
+    issuer: Arc<ProviderResultReceiptIssuer>,
+    receipt_lifetime: Duration,
+}
+
+impl ProviderResultReceiptAuthority {
+    pub fn new(
+        principal_id: impl Into<String>,
+        prompt_sha256: impl Into<String>,
+        provider_binding_sha256: impl Into<String>,
+        issuer: Arc<ProviderResultReceiptIssuer>,
+        receipt_lifetime: Duration,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let principal_id = principal_id.into();
+        let prompt_sha256 = prompt_sha256.into();
+        let provider_binding_sha256 = provider_binding_sha256.into();
+        if principal_id.is_empty()
+            || principal_id.len() > 1_024
+            || principal_id != principal_id.trim()
+            || principal_id.chars().any(char::is_control)
+            || !is_sha256(&prompt_sha256)
+            || !is_sha256(&provider_binding_sha256)
+            || receipt_lifetime.is_zero()
+            || receipt_lifetime > MAX_PROVIDER_RESULT_RECEIPT_LIFETIME
+        {
+            return Err(ProviderMaterializationError::InvalidReceiptAuthority);
+        }
+        Ok(Self {
+            principal_id,
+            prompt_sha256,
+            provider_binding_sha256,
+            issuer,
+            receipt_lifetime,
+        })
+    }
+
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
+
+    pub fn prompt_sha256(&self) -> &str {
+        &self.prompt_sha256
+    }
+
+    pub fn provider_binding_sha256(&self) -> &str {
+        &self.provider_binding_sha256
+    }
+
+    pub fn receipt_lifetime(&self) -> Duration {
+        self.receipt_lifetime
+    }
+
+    pub fn begin_session(
+        &self,
+        maximum_response_bytes: usize,
+    ) -> Result<ProviderResultReceiptSession, ProviderMaterializationError> {
+        ProviderResultReceiptSession::new(self.issuer.clone(), maximum_response_bytes, 0)
+    }
+}
+
+impl std::fmt::Debug for ProviderResultReceiptAuthority {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ProviderResultReceiptAuthority([REDACTED])")
+    }
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
 }
 
 pub fn validate_native_provider_schemas(
@@ -158,6 +237,11 @@ impl ProviderResultReceiptSession {
         self.issued_order.push_back(nonce);
         self.next_request_ordinal = next_request_ordinal;
         Ok(receipt_bytes)
+    }
+
+    pub fn next_request_ordinal(&self) -> Result<u32, ProviderMaterializationError> {
+        self.check_active()?;
+        Ok(self.next_request_ordinal)
     }
 
     pub fn resolve(

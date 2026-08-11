@@ -12,6 +12,7 @@ use clock::SystemClock;
 use comfy_model::{
     LoadedModel, ModelFormat, ModelFormatError, ModelLoadAccounting, ModelStore, ModelStoreError,
 };
+use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_tensor::{
     CancellationToken, RetryRngPolicy, RngAlgorithm, RngCheckpoint, RngProfileVersion, RngStream,
     RngStreamAddress, RngTransaction,
@@ -25,8 +26,10 @@ use thiserror::Error;
 use crate::{
     AssetError, AssetNamespace, AssetOperation, AuthorizedProviderRequest, Capability,
     PluginAuthorization, ProviderCostAcceptance, ProviderCostAcceptanceScope,
-    ProviderCostAcceptanceVerifier, ProviderCostNonce, ProviderPolicy, ProviderPriceBound,
-    SecretId, SecretValue, SharedAssetService,
+    ProviderCostAcceptanceVerifier, ProviderCostNonce, ProviderInvocationIdentity,
+    ProviderMaterializationError, ProviderPolicy, ProviderPriceBound,
+    ProviderResultReceiptAuthority, ProviderResultReceiptSession, ResolvedProviderResult, SecretId,
+    SecretValue, SharedAssetService,
 };
 
 pub const MAX_PLUGIN_SERVICE_REQUEST_BYTES: u64 = 16 * 1024 * 1024;
@@ -171,6 +174,7 @@ pub struct PluginServiceInvocationContext {
     cancellation: CancellationToken,
     deadline: Instant,
     maximum_response_bytes: u64,
+    provider_result_authority: Option<ProviderResultReceiptAuthority>,
 }
 
 impl PluginServiceInvocationContext {
@@ -267,7 +271,19 @@ impl PluginServiceInvocationContext {
             cancellation,
             deadline,
             maximum_response_bytes,
+            provider_result_authority: None,
         })
+    }
+
+    pub fn with_provider_result_authority(
+        mut self,
+        authority: ProviderResultReceiptAuthority,
+    ) -> Result<Self, PluginServiceError> {
+        if self.principal_id() != Some(authority.principal_id()) {
+            return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
+        }
+        self.provider_result_authority = Some(authority);
+        Ok(self)
     }
 
     pub fn profile_id(&self) -> ProfileId {
@@ -312,6 +328,10 @@ impl PluginServiceInvocationContext {
 
     pub fn maximum_response_bytes(&self) -> u64 {
         self.maximum_response_bytes
+    }
+
+    pub fn provider_result_authority(&self) -> Option<&ProviderResultReceiptAuthority> {
+        self.provider_result_authority.as_ref()
     }
 }
 
@@ -590,10 +610,23 @@ impl PluginCapabilityBroker {
             clock_origin: self.inner.clock_origin,
         };
         operation_context.check_active()?;
+        let provider_result_receipts = context
+            .provider_result_authority()
+            .map(|authority| {
+                usize::try_from(context.maximum_response_bytes())
+                    .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)
+                    .and_then(|maximum| {
+                        authority
+                            .begin_session(maximum)
+                            .map_err(map_provider_materialization_error)
+                    })
+            })
+            .transpose()?;
         Ok(PluginCapabilityInvocation {
             broker: self.clone(),
             context,
             rng_transactions: BTreeMap::new(),
+            provider_result_receipts,
             operation_failed: Arc::new(AtomicBool::new(false)),
             terminal: false,
         })
@@ -604,6 +637,7 @@ pub struct PluginCapabilityInvocation {
     broker: PluginCapabilityBroker,
     context: PluginServiceInvocationContext,
     rng_transactions: BTreeMap<PluginRngKey, RngTransaction>,
+    provider_result_receipts: Option<ProviderResultReceiptSession>,
     operation_failed: Arc<AtomicBool>,
     terminal: bool,
 }
@@ -832,6 +866,79 @@ impl PluginCapabilityInvocation {
         check_response_size(response.len(), self.context.maximum_response_bytes)?;
         operation_context.check_active()?;
         Ok(outcome.succeed(response))
+    }
+
+    pub fn execute_provider_request_with_receipt(
+        &mut self,
+        provider: &str,
+        endpoint: &str,
+        secret_id: Option<&SecretId>,
+        body: &[u8],
+    ) -> Result<Vec<u8>, PluginServiceError> {
+        self.check_terminal()?;
+        let outcome = OperationOutcomeGuard::new(self.operation_failed.clone());
+        let authority = self
+            .context
+            .provider_result_authority()
+            .cloned()
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityRequired)?;
+        let response = self.execute_provider_request(provider, endpoint, secret_id, body)?;
+        let request_ordinal = self
+            .provider_result_receipts
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityRequired)?
+            .next_request_ordinal()
+            .map_err(map_provider_materialization_error)?;
+        let identity = ProviderInvocationIdentity::new(
+            authority.principal_id(),
+            self.context.profile_id().0.to_string(),
+            self.context.prompt_id().0.to_string(),
+            authority.prompt_sha256(),
+            self.context.attempt_id().0.to_string(),
+            self.context.node_id().0.clone(),
+            request_ordinal,
+            format!("{:x}", Sha256::digest(body)),
+            self.context.plugin_id(),
+            self.context.plugin_digest_sha256(),
+            authority.provider_binding_sha256(),
+            provider,
+            endpoint,
+        )
+        .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let issued_at = self.broker.inner.clock.utc_now();
+        let lifetime_expiration = issued_at
+            .checked_add(authority.receipt_lifetime())
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let expires_at = lifetime_expiration.min(self.context.deadline());
+        if expires_at <= issued_at {
+            return Err(PluginServiceError::DeadlineExceeded);
+        }
+        let receipt = self
+            .provider_result_receipts
+            .as_mut()
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityRequired)?
+            .issue(identity, response, issued_at, expires_at)
+            .map_err(map_provider_materialization_error)?;
+        check_response_size(receipt.len(), self.context.maximum_response_bytes())?;
+        Ok(outcome.succeed(receipt))
+    }
+
+    pub fn resolve_provider_result_receipt_set(
+        &mut self,
+        receipt_set: &ProviderResultReceiptSet,
+    ) -> Result<Vec<ResolvedProviderResult>, PluginServiceError> {
+        self.check_terminal()?;
+        let outcome = OperationOutcomeGuard::new(self.operation_failed.clone());
+        self.operation_context().check_active()?;
+        let now = self.broker.inner.clock.utc_now();
+        let resolved = self
+            .provider_result_receipts
+            .as_mut()
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityRequired)?
+            .resolve_receipt_set(receipt_set, now)
+            .map_err(map_provider_materialization_error)?;
+        self.operation_context().check_active()?;
+        Ok(outcome.succeed(resolved))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1130,14 +1237,31 @@ impl PluginCapabilityInvocation {
                 endpoint,
                 secret_id,
                 body,
-            } => secret_id
-                .map(SecretId::new)
-                .transpose()
-                .map_err(|_| PluginServiceError::InvalidWirePayload)
-                .and_then(|secret_id| {
-                    self.execute_provider_request(&provider, &endpoint, secret_id.as_ref(), &body)
-                })
-                .map(PluginServiceWireResponse::Bytes),
+            } => {
+                let provider_result_receipts = self.provider_result_receipts.is_some();
+                secret_id
+                    .map(SecretId::new)
+                    .transpose()
+                    .map_err(|_| PluginServiceError::InvalidWirePayload)
+                    .and_then(|secret_id| {
+                        if provider_result_receipts {
+                            self.execute_provider_request_with_receipt(
+                                &provider,
+                                &endpoint,
+                                secret_id.as_ref(),
+                                &body,
+                            )
+                        } else {
+                            self.execute_provider_request(
+                                &provider,
+                                &endpoint,
+                                secret_id.as_ref(),
+                                &body,
+                            )
+                        }
+                    })
+                    .map(PluginServiceWireResponse::Bytes)
+            }
             PluginServiceWireRequest::CredentialIsPresent { secret_id } => SecretId::new(secret_id)
                 .map_err(|_| PluginServiceError::InvalidWirePayload)
                 .and_then(|secret_id| self.credential_is_present(&secret_id))
@@ -1173,6 +1297,11 @@ impl PluginCapabilityInvocation {
             return Err(PluginServiceError::InvocationFailed);
         }
         self.operation_context().check_active()?;
+        if let Some(receipt_session) = self.provider_result_receipts.take() {
+            receipt_session
+                .finish()
+                .map_err(map_provider_materialization_error)?;
+        }
         let committed = std::mem::take(&mut self.rng_transactions)
             .into_iter()
             .map(|(key, transaction)| (key, transaction.commit()))
@@ -1249,6 +1378,9 @@ impl PluginCapabilityInvocation {
     }
 
     fn abort_internal(&mut self) {
+        if let Some(receipt_session) = self.provider_result_receipts.take() {
+            receipt_session.abort();
+        }
         let transactions = std::mem::take(&mut self.rng_transactions);
         let mut state = self.broker.inner.rng_state.lock();
         for (key, transaction) in transactions {
@@ -1339,6 +1471,10 @@ pub enum PluginServiceError {
     ProviderCostAcceptanceDenied,
     #[error("provider cost acceptance nonce was already consumed")]
     ProviderCostAcceptanceReused,
+    #[error("provider result receipts require host-owned invocation authority")]
+    ProviderResultReceiptAuthorityRequired,
+    #[error("provider result receipt authority is invalid or belongs to another invocation")]
+    ProviderResultReceiptAuthorityDenied,
     #[error("the authorized provider credential is unavailable")]
     CredentialUnavailable,
     #[error("{service} actuator failed: {message}")]
@@ -1370,7 +1506,9 @@ impl From<PluginServiceError> for PluginServiceWireFailure {
             | PluginServiceError::ProviderCostAcceptanceRequired
             | PluginServiceError::ProviderCostPrincipalRequired
             | PluginServiceError::ProviderCostAcceptanceDenied
-            | PluginServiceError::ProviderCostAcceptanceReused => Self::ProviderDenied,
+            | PluginServiceError::ProviderCostAcceptanceReused
+            | PluginServiceError::ProviderResultReceiptAuthorityRequired
+            | PluginServiceError::ProviderResultReceiptAuthorityDenied => Self::ProviderDenied,
             PluginServiceError::ActuatorFailed { .. } => Self::ActuatorFailed,
             PluginServiceError::RandomnessStreamBusy | PluginServiceError::RandomnessFailed => {
                 Self::RandomnessFailed
@@ -1451,6 +1589,25 @@ fn map_asset_error(error: AssetError) -> PluginServiceError {
     }
 }
 
+fn map_provider_materialization_error(error: ProviderMaterializationError) -> PluginServiceError {
+    match error {
+        ProviderMaterializationError::ResponseTooLarge => PluginServiceError::ResponseTooLarge {
+            maximum: MAX_PLUGIN_SERVICE_RESPONSE_BYTES,
+        },
+        ProviderMaterializationError::ReceiptSessionFinished
+        | ProviderMaterializationError::RequestOrdinalOutOfOrder
+        | ProviderMaterializationError::ReceiptRejected
+        | ProviderMaterializationError::UnknownReceipt
+        | ProviderMaterializationError::ReceiptOutOfOrder
+        | ProviderMaterializationError::UnresolvedReceipts
+        | ProviderMaterializationError::InvalidReceiptAuthority
+        | ProviderMaterializationError::UnsupportedTransportSchema
+        | ProviderMaterializationError::UnsupportedMaterializerSchema => {
+            PluginServiceError::ProviderResultReceiptAuthorityDenied
+        }
+    }
+}
+
 fn sanitize_actuator_message(message: &str) -> String {
     let mut sanitized = String::new();
     for character in message.chars() {
@@ -1508,7 +1665,7 @@ mod tests {
     use crate::{
         AssetRoots, AssetService, CapabilitySet, PermissionGrant, PermissionPolicy,
         PluginTrustPolicy, PluginVerificationKey, ProviderCostAcceptanceIssuer, ProviderEndpoint,
-        ProviderMode, TrustError,
+        ProviderMode, ProviderResultReceiptIssuer, TrustError,
     };
 
     use super::*;
@@ -1882,6 +2039,23 @@ mod tests {
         )
     }
 
+    fn provider_receipt_context(
+        authorization: PluginAuthorization,
+        clock: &TestClock,
+    ) -> Result<PluginServiceInvocationContext, PluginServiceError> {
+        PluginServiceInvocationContext::new_with_principal(
+            ProfileId(PROFILE_UUID),
+            PromptId(PROMPT_UUID),
+            AttemptId(ATTEMPT_UUID),
+            NodeId("node.fixture".to_owned()),
+            "principal-a",
+            authorization,
+            CancellationToken::default(),
+            clock.now() + Duration::from_secs(30),
+            4 * 1_024,
+        )
+    }
+
     fn provider_cost_scope(
         provider_binding_sha256: &str,
         provider: &str,
@@ -1934,6 +2108,81 @@ mod tests {
         ));
         assert_eq!(provider.calls.load(Ordering::Acquire), 0);
         assert_eq!(credential.calls.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn provider_wire_requests_return_app_owned_receipts_until_exact_settlement()
+    -> Result<(), Box<dyn Error>> {
+        let authorization = authorization(vec![capability(
+            CapabilityKind::NetworkProvider,
+            &format!("{PROVIDER}|{ENDPOINT}"),
+        )])?;
+        let origin = Instant::now();
+        let clock = Arc::new(TestClock::new(origin));
+        let (_directory, broker, provider, _credential) = broker(&authorization, clock.clone())?;
+        let response_body = b"app-side-provider-response".to_vec();
+        *provider.response.lock() = response_body.clone();
+        let authority = ProviderResultReceiptAuthority::new(
+            "principal-a",
+            PROMPT_SHA256,
+            "f".repeat(64),
+            Arc::new(ProviderResultReceiptIssuer::from_seed([31; 32], origin)?),
+            Duration::from_secs(20),
+        )?;
+        let context = provider_receipt_context(authorization.clone(), &clock)?
+            .with_provider_result_authority(authority)?;
+        let mut invocation = broker.begin_invocation(context)?;
+        let response = invocation.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+            provider: PROVIDER.to_owned(),
+            endpoint: ENDPOINT.to_owned(),
+            secret_id: None,
+            body: REQUEST_BODY.to_vec(),
+        });
+        let PluginServiceWireResponse::Bytes(receipt) = response else {
+            return Err(format!("provider receipt response was not returned: {response:?}").into());
+        };
+        assert_eq!(provider.calls.load(Ordering::Acquire), 1);
+        assert!(
+            !receipt
+                .windows(response_body.len())
+                .any(|window| window == response_body)
+        );
+        let receipt_set = ProviderResultReceiptSet::new(vec![receipt])?;
+        let resolved = invocation.resolve_provider_result_receipt_set(&receipt_set)?;
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].response(), response_body);
+        assert_eq!(resolved[0].identity().principal_id(), "principal-a");
+        assert_eq!(resolved[0].identity().prompt_sha256(), PROMPT_SHA256);
+        assert_eq!(resolved[0].identity().request_ordinal(), 0);
+        assert_eq!(
+            resolved[0].identity().request_sha256(),
+            format!("{:x}", Sha256::digest(REQUEST_BODY))
+        );
+        invocation.finish()?;
+
+        let mut unresolved = broker.begin_invocation(
+            provider_receipt_context(authorization, &clock)?.with_provider_result_authority(
+                ProviderResultReceiptAuthority::new(
+                    "principal-a",
+                    PROMPT_SHA256,
+                    "f".repeat(64),
+                    Arc::new(ProviderResultReceiptIssuer::from_seed([32; 32], origin)?),
+                    Duration::from_secs(20),
+                )?,
+            )?,
+        )?;
+        let response = unresolved.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+            provider: PROVIDER.to_owned(),
+            endpoint: ENDPOINT.to_owned(),
+            secret_id: None,
+            body: REQUEST_BODY.to_vec(),
+        });
+        assert!(matches!(response, PluginServiceWireResponse::Bytes(_)));
+        assert_eq!(
+            unresolved.finish(),
+            Err(PluginServiceError::ProviderResultReceiptAuthorityDenied)
+        );
         Ok(())
     }
 
