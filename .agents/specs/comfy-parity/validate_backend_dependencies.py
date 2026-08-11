@@ -269,7 +269,7 @@ def validate_production_feature_manifests() -> None:
             if adapter == "metal"
             else [f"comfy_tensor/{adapter}"]
         ),
-        "crates/sim/Cargo.toml": lambda adapter: [f"comfy_runtime/{adapter}"],
+        "crates/sim/Cargo.toml": lambda adapter: ["comfy", f"comfy_runtime/{adapter}"],
     }
     for relative_path, expected_feature in manifests.items():
         path = REPOSITORY_ROOT / relative_path
@@ -409,7 +409,7 @@ def expected_ledger(workspace: dict, lock: dict) -> dict:
                 if adapter == "metal"
                 else [f"comfy_tensor/{adapter}"]
             ),
-            "sim": [f"comfy_runtime/{adapter}"],
+            "sim": ["comfy", f"comfy_runtime/{adapter}"],
             "reason": (
                 "CoreX forwarding compiles the zero-symbol structural adapter through each layer "
                 "only so all production surfaces report the same canonical typed Unbound state; "
@@ -483,6 +483,15 @@ def validate_later_task_writes() -> None:
         },
         "comfy-parity-native-node-asset-effect-foundation": {
             "crates/comfy_media/Cargo.toml",
+        },
+        "comfy-parity-native-node-provider-invocation-foundation": {
+            "Cargo.lock",
+            "crates/comfy_plugin_host/Cargo.toml",
+        },
+        "comfy-parity-opt-in-product-build-boundary": {
+            "Cargo.lock",
+            "crates/extension_host/Cargo.toml",
+            "crates/sim/Cargo.toml",
         },
     }
     violations = []

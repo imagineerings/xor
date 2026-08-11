@@ -547,9 +547,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Add Text Prefix (DEPRECATED)"
               }
             },
             {
@@ -718,7 +717,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Add Text Prefix (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -992,9 +991,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Add Text Suffix (DEPRECATED)"
               }
             },
             {
@@ -1163,7 +1161,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Add Text Suffix (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -1501,9 +1499,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Adjust Brightness"
               }
             },
             {
@@ -1688,7 +1685,7 @@
           ],
           "presentation": {
             "description": "Adjust the brightness of an image.",
-            "display_name": null,
+            "display_name": "Adjust Brightness",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -2026,9 +2023,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Adjust Contrast"
               }
             },
             {
@@ -2213,7 +2209,7 @@
           ],
           "presentation": {
             "description": "Adjust the contrast of an image.",
-            "display_name": null,
+            "display_name": "Adjust Contrast",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -30671,9 +30667,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Crop Image (Center)"
               }
             },
             {
@@ -30889,7 +30884,7 @@
           ],
           "presentation": {
             "description": "Center crop an image to the specified dimensions.",
-            "display_name": null,
+            "display_name": "Crop Image (Center)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -143315,9 +143310,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Deduplicate Images"
               }
             },
             {
@@ -143502,7 +143496,7 @@
           ],
           "presentation": {
             "description": "Remove duplicate or very similar images from a list.",
-            "display_name": null,
+            "display_name": "Deduplicate Images",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -144811,9 +144805,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Make Image Grid"
               }
             },
             {
@@ -145091,7 +145084,7 @@
           ],
           "presentation": {
             "description": "Arrange multiple images into a grid layout.",
-            "display_name": null,
+            "display_name": "Make Image Grid",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -228266,9 +228259,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Merge Image Lists (DEPRECATED)"
               }
             },
             {
@@ -228422,7 +228414,7 @@
           ],
           "presentation": {
             "description": "Concatenate multiple image lists into one.",
-            "display_name": null,
+            "display_name": "Merge Image Lists (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -228958,9 +228950,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Merge Text Lists (DEPRECATED)"
               }
             },
             {
@@ -229104,7 +229095,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Merge Text Lists (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -253353,9 +253344,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Normalize Image Colors"
               }
             },
             {
@@ -253571,7 +253561,7 @@
           ],
           "presentation": {
             "description": "Normalize images using mean and standard deviation.",
-            "display_name": null,
+            "display_name": "Normalize Image Colors",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -278573,9 +278563,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Crop Image (Random)"
               }
             },
             {
@@ -278822,7 +278811,7 @@
           ],
           "presentation": {
             "description": "Randomly crop an image to the specified dimensions.",
-            "display_name": null,
+            "display_name": "Crop Image (Random)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -292933,9 +292922,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Replace Text (DEPRECATED)"
               }
             },
             {
@@ -293129,7 +293117,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Replace Text (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -296080,9 +296068,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Resize Images by Longer Edge (DEPRECATED)"
               }
             },
             {
@@ -296267,7 +296254,7 @@
           ],
           "presentation": {
             "description": "Resize images so that the longer edge matches the specified dimension while preserving aspect ratio.",
-            "display_name": null,
+            "display_name": "Resize Images by Longer Edge (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -296595,9 +296582,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Resize Images by Shorter Edge (DEPRECATED)"
               }
             },
             {
@@ -296782,7 +296768,7 @@
           ],
           "presentation": {
             "description": "Resize images so that the shorter edge matches the specified dimension while preserving aspect ratio.",
-            "display_name": null,
+            "display_name": "Resize Images by Shorter Edge (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -335730,9 +335716,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Shuffle Images List"
               }
             },
             {
@@ -335917,7 +335902,7 @@
           ],
           "presentation": {
             "description": "Randomly shuffle the order of images in a list.",
-            "display_name": null,
+            "display_name": "Shuffle Images List",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -347787,9 +347772,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Strip Whitespace (DEPRECATED)"
               }
             },
             {
@@ -347933,7 +347917,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Strip Whitespace (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -363676,9 +363660,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Convert Text to Lowercase (DEPRECATED)"
               }
             },
             {
@@ -363822,7 +363805,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Convert Text to Lowercase (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -364039,9 +364022,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Convert Text to Uppercase (DEPRECATED)"
               }
             },
             {
@@ -364185,7 +364167,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Convert Text to Uppercase (DEPRECATED)",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -385671,9 +385653,8 @@
             {
               "name": "display_name",
               "value": {
-                "kind": "boolop",
-                "sha256": "47d5006fcadd04ca0e5a766a89458adfc8969f0eba30a6c6eb67de627f7a8a0d",
-                "source": "cls.display_name or cls.node_id"
+                "kind": "literal",
+                "value": "Truncate Text"
               }
             },
             {
@@ -385848,7 +385829,7 @@
           ],
           "presentation": {
             "description": null,
-            "display_name": null,
+            "display_name": "Truncate Text",
             "is_deprecated": false,
             "is_experimental": true
           },
@@ -447453,7 +447434,7 @@
   ],
   "input": {
     "path": "catalogs/backend-nodes.csv",
-    "sha256": "3fe43e8978f55500dcebd7faf91a376f0c9606d66ebcda6f5be791c20474bc6e"
+    "sha256": "0af470d05d3d23dd67bb019f329956f1cb0411100b78c837fe865a45377f1f43"
   },
   "schema_version": 2,
   "source_snapshot": {

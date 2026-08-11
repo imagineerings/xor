@@ -2823,7 +2823,8 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
                         .contains("crates/comfy_runtime/src/executor.rs")
                     && source_occurrences(&sources, "struct ExecutionRegistry").is_empty()
                     && registry_adapter_source
-                        .contains("register_bound_batch_with_presentations(bindings)"),
+                        .contains("register_bound_batch_with_presentations(ordinary_bindings)")
+                    && registry_adapter_source.contains("activate_provider_binding_set("),
             ),
             (
                 "capability_services_are_injected_without_parallel_resources",

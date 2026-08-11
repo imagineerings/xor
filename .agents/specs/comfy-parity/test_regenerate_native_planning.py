@@ -128,9 +128,15 @@ class ValidationGenerationTests(unittest.TestCase):
         three_d_id = "comfy-parity-native-nodes-three-d-comfy-node-0115"
         splat_id = "comfy-parity-native-nodes-three-d-splat-comfy-node-0172"
         modifier_id = "comfy-parity-native-nodes-advanced-debug-comfy-node-0140"
+        guidance_id = "comfy-parity-native-nodes-advanced-guidance-comfy-node-0049"
+        hooks_id = "comfy-parity-native-nodes-advanced-hooks-comfy-node-0079"
+        hook_consumers_id = "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
         self.assertIn(provider_id, dependencies[three_d_id])
         self.assertIn(three_d_id, dependencies[splat_id])
         self.assertIn(splat_id, dependencies[modifier_id])
+        self.assertIn(modifier_id, dependencies[guidance_id])
+        self.assertIn(guidance_id, dependencies[hooks_id])
+        self.assertIn(hooks_id, dependencies[hook_consumers_id])
         self.assertIn("crates/comfy_media/src/three_d.rs", tasks_by_id[three_d_id]["writes"])
         self.assertIn(
             "crates/comfy_media/src/gaussian_splat_compute.rs",
@@ -140,6 +146,25 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_sampler/src/model_execution_modifiers.rs",
             tasks_by_id[modifier_id]["writes"],
         )
+        self.assertIn(
+            "crates/comfy_sampler/src/guidance.rs",
+            tasks_by_id[guidance_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/hooks.rs",
+            tasks_by_id[hooks_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/assets.rs",
+            tasks_by_id[hook_consumers_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/clip.rs",
+            tasks_by_id[hook_consumers_id]["writes"],
+        )
+        self.assertTrue(tasks_by_id[guidance_id]["locked"])
+        self.assertTrue(tasks_by_id[hooks_id]["locked"])
+        self.assertTrue(tasks_by_id[hook_consumers_id]["locked"])
 
         waves = planning.task_waves(tasks)
         self.assertEqual(waves[foundation_id], waves[compute_id] + 1)
@@ -347,7 +372,10 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(build_boundary_task["criterion_ids"], [
             "45.1", "45.2", "45.3", "45.4", "45.5", "45.6",
         ])
-        self.assertEqual(build_boundary_task["validations"], ["VAL-COMFY-BUILD-001"])
+        self.assertEqual(
+            build_boundary_task["validations"],
+            ["VAL-COMFY-BUILD-001", "VAL-NATIVE-BOUNDARY-001", "VAL-OWNERSHIP-001"],
+        )
         self.assertEqual(
             build_boundary_task["dependencies"],
             ["comfy-parity-native-node-asset-effect-foundation"],
@@ -364,12 +392,19 @@ class ValidationGenerationTests(unittest.TestCase):
             "script/bundle-linux",
             "script/bundle-windows.ps1",
             "crates/sim/resources/windows/sim.iss",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
         ]:
             self.assertIn(path, build_boundary_task["writes"])
         for command in [
             "cargo check --locked -p sim --no-default-features",
             "cargo test --locked -p sim --no-default-features",
             "cargo check --locked -p sim --features comfy",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "cargo test --locked -p comfy_test_support --test native_release_boundary val_native_boundary_001_packaged_release -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "./script/check-comfy-feature-boundary",
             "./script/bundle-mac --dry-run",
             "./script/bundle-mac --comfy --dry-run",

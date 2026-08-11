@@ -7056,10 +7056,13 @@ fn run_ownership_validation(
                 && model_formats.contains("ModelFormatError::DuplicateArchivePath")
                 && extension_host.contains("Archive::new(decompressed_bytes)")
                 && extension_host.contains("archive.unpack(temp_dir.path()).await?")
-                && extension_host.contains("use comfy_model::ArtifactKey;")
-                && extension_host
-                    .contains("ArtifactKey::new(\"extension-lifecycle\", extension_id)")
+                && extension_host.contains("fn validate_component_extension_id(")
+                && extension_host.contains("const MAXIMUM_EXTENSION_ID_BYTES: usize = 64 * 1024")
+                && extension_host.contains("!extension_id.contains(['/', '\\\\', ':'])")
+                && extension_host.contains("Some(path::Component::Normal(_))")
+                && extension_host.contains("validate_component_extension_id(extension_id)?")
                 && extension_host.matches("checked_extension_dir(").count() == 5
+                && !extension_host.contains("comfy_model::ArtifactKey")
                 && !extension_host.contains("comfy_model::formats")
                 && !extension_host.contains("ArchiveEntry"),
         ),
@@ -7928,7 +7931,9 @@ fn run_ownership_validation(
                 && plugin_registry_adapter.contains("category: node.category.clone()")
                 && plugin_registry_adapter.contains(".map(|port| port.name.clone())")
                 && plugin_registry_adapter
-                    .contains("register_bound_batch_with_presentations(bindings)")
+                    .contains("register_bound_batch_with_presentations(ordinary_bindings)")
+                && plugin_registry_adapter.contains("let presentation = base")
+                && plugin_registry_adapter.contains(".presentation(&node.id)")
                 && api_services.contains("self.registry.presentation(class_type)")
                 && api_services.contains("native_node_presentation_missing")
                 && api_services.contains(

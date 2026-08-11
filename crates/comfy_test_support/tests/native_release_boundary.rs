@@ -25,6 +25,7 @@ const WORKFLOW_FIXTURE: &[u8] = include_bytes!("../fixtures/native_image/workflo
 const INPUT_FIXTURE: &[u8] = include_bytes!("../fixtures/native_image/input.json");
 const RELEASE_POLICY: &[u8] = include_bytes!("../fixtures/release-boundary.json");
 const DEFAULT_SETTINGS: &str = include_str!("../../../assets/settings/default.json");
+const DEFAULT_COMFY_SETTINGS: &str = include_str!("../../../assets/settings/default-comfy.json");
 const SIM_SOURCE: &str = include_str!("../../sim/src/sim.rs");
 const COMFY_CLI_SOURCE: &str = include_str!("../../sim/src/comfy_cli.rs");
 const COMFY_MENU_SOURCE: &str = include_str!("../../comfy_ui/src/shell.rs");
@@ -248,7 +249,8 @@ fn dependency_boundary_cases(
             && worker_values.contains(runtime_feature.as_str())
             && worker_values.contains(tensor_feature.as_str())
             && test_support_is_exact
-            && sim_values.len() == 1
+            && sim_values.len() == 2
+            && sim_values.contains("comfy")
             && sim_values.contains(runtime_feature.as_str())
     });
     let worker_has_binary =
@@ -295,30 +297,51 @@ fn dependency_boundary_cases(
 fn packaging_cases() -> BTreeMap<&'static str, bool> {
     BTreeMap::from([
         (
+            "mac_default_bundle_omits_native_worker",
+            MAC_BUNDLE.contains("mode=default packages=sim,cli sim_features=none include_comfy_worker=false")
+                && MAC_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
+                && MAC_BUNDLE.contains("--comfy  Include the Comfy integration, Metal backend, worker, and assets."),
+        ),
+        (
             "mac_bundle_builds_places_and_signs_native_worker",
             MAC_BUNDLE.contains("--package comfy_worker")
-                && MAC_BUNDLE.contains("--features sim/metal,comfy_worker/metal")
+                && MAC_BUNDLE.contains("--features sim/comfy,sim/metal,comfy_worker/metal")
                 && MAC_BUNDLE.contains("Contents/MacOS/comfy-worker")
                 && MAC_BUNDLE.contains("codesign --deep --force --timestamp --options runtime --sign \"$IDENTITY\" \"${app_path}/Contents/MacOS/comfy-worker\""),
+        ),
+        (
+            "linux_default_bundle_omits_native_worker",
+            LINUX_BUNDLE.contains("mode=default packages=sim,cli sim_features=none include_comfy_worker=false")
+                && LINUX_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
+                && LINUX_BUNDLE.contains("--comfy        Include the Comfy integration, accelerator backends, worker, and assets."),
         ),
         (
             "linux_bundle_builds_strips_and_places_native_worker",
             LINUX_BUNDLE.contains("--package comfy_worker")
                 && LINUX_BUNDLE.contains(
-                    "--features sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu",
+                    "--features sim/comfy,sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu",
                 )
                 && LINUX_BUNDLE.contains("release/comfy-worker\"")
                 && LINUX_BUNDLE.contains("libexec/comfy-worker"),
         ),
         (
+            "windows_default_bundle_omits_native_worker",
+            WINDOWS_BUNDLE.contains("mode=default packages=sim,cli,auto_update_helper sim_features=none include_comfy_worker=false")
+                && WINDOWS_BUNDLE.contains("if ($Comfy)")
+                && WINDOWS_INSTALLER.contains("#ifdef Comfy")
+                && WINDOWS_INSTALLER.contains("#endif"),
+        ),
+        (
             "windows_bundle_builds_places_signs_and_installs_native_worker",
             WINDOWS_BUNDLE.contains("--package comfy_worker")
                 && WINDOWS_BUNDLE.contains(
-                    "--features sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml",
+                    "--features sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml",
                 )
                 && WINDOWS_BUNDLE.contains("comfy-worker.exe\" -Destination \"$innoDir\\comfy-worker.exe")
-                && WINDOWS_BUNDLE.contains("$innoDir\\comfy-worker.exe,$innoDir\\auto_update_helper.exe")
-                && WINDOWS_INSTALLER.contains("Source: \"{#ResourcesDir}\\comfy-worker.exe\"; DestDir: \"{code:GetInstallDir}\""),
+                && WINDOWS_BUNDLE.contains("$files += \",$innoDir\\comfy-worker.exe\"")
+                && WINDOWS_INSTALLER.contains("#ifdef Comfy")
+                && WINDOWS_INSTALLER.contains("Source: \"{#ResourcesDir}\\comfy-worker.exe\"; DestDir: \"{code:GetInstallDir}\"")
+                && WINDOWS_INSTALLER.contains("#endif"),
         ),
         (
             "runtime_owns_one_sibling_worker_resolver_for_desktop_and_cli",
@@ -663,17 +686,21 @@ fn application_surface_cases() -> BTreeMap<&'static str, bool> {
         .map(|(source, _)| source)
         .unwrap_or_default();
     let default_settings_lowercase = DEFAULT_SETTINGS.to_ascii_lowercase();
+    let default_comfy_settings_lowercase = DEFAULT_COMFY_SETTINGS.to_ascii_lowercase();
     let worker_source = String::from_utf8_lossy(WORKER_SOURCE);
     BTreeMap::from([
         (
-            "default_settings_select_native_cpu_without_external_authority",
-            DEFAULT_SETTINGS.contains("\"name\": \"Native Local\"")
-                && DEFAULT_SETTINGS.contains("\"device\": \"cpu\"")
-                && DEFAULT_SETTINGS.contains("\"api_host_enabled\": false")
-                && DEFAULT_SETTINGS.contains("\"plugin_policy\": \"approved_only\"")
+            "default_settings_exclude_comfy_while_opt_in_defaults_select_native_cpu",
+            !default_settings_lowercase.contains("comfy_runtime")
                 && !default_settings_lowercase.contains("comfyui")
                 && !default_settings_lowercase.contains("python_runtime")
-                && !default_settings_lowercase.contains("external_comfy"),
+                && !default_settings_lowercase.contains("external_comfy")
+                && DEFAULT_COMFY_SETTINGS.contains("\"name\": \"Native Local\"")
+                && DEFAULT_COMFY_SETTINGS.contains("\"device\": \"cpu\"")
+                && DEFAULT_COMFY_SETTINGS.contains("\"api_host_enabled\": false")
+                && DEFAULT_COMFY_SETTINGS.contains("\"plugin_policy\": \"approved_only\"")
+                && !default_comfy_settings_lowercase.contains("python_runtime")
+                && !default_comfy_settings_lowercase.contains("external_comfy"),
         ),
         (
             "comfy_menu_has_no_browser_or_external_server_action",
@@ -1075,6 +1102,7 @@ fn write_artifact(
             "workflow_sha256": format!("{:x}", Sha256::digest(WORKFLOW_FIXTURE)),
             "input_sha256": format!("{:x}", Sha256::digest(INPUT_FIXTURE)),
             "default_settings_sha256": format!("{:x}", Sha256::digest(DEFAULT_SETTINGS.as_bytes())),
+            "default_comfy_settings_sha256": format!("{:x}", Sha256::digest(DEFAULT_COMFY_SETTINGS.as_bytes())),
             "sim_source_sha256": format!("{:x}", Sha256::digest(SIM_SOURCE.as_bytes())),
             "comfy_cli_source_sha256": format!("{:x}", Sha256::digest(COMFY_CLI_SOURCE.as_bytes())),
             "comfy_menu_source_sha256": format!("{:x}", Sha256::digest(COMFY_MENU_SOURCE.as_bytes())),

@@ -8804,7 +8804,7 @@ def comfy_opt_in_build_boundary_task(dependency: str) -> dict[str, object]:
         "Make the Comfy product integration compile-time opt-in",
         [45],
         [42],
-        ["VAL-COMFY-BUILD-001"],
+        ["VAL-COMFY-BUILD-001", "VAL-NATIVE-BOUNDARY-001", "VAL-OWNERSHIP-001"],
         "Exclude Comfy from Sim's default compile, link, runtime, test-support, asset, and package graphs while retaining the complete CPU and explicitly selected accelerator integration behind one compile-time feature and one explicit packaging option.",
         [
             "Cargo.toml",
@@ -8820,6 +8820,8 @@ def comfy_opt_in_build_boundary_task(dependency: str) -> dict[str, object]:
             "script/bundle-linux",
             "script/bundle-windows.ps1",
             "crates/sim/resources/windows/sim.iss",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "Cargo.lock",
@@ -8837,6 +8839,10 @@ def comfy_opt_in_build_boundary_task(dependency: str) -> dict[str, object]:
             "script/bundle-linux",
             "script/bundle-windows.ps1",
             "crates/sim/resources/windows/sim.iss",
+            "crates/comfy_test_support/tests/native_release_boundary.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
             ".agents/specs/comfy-parity/requirements.md",
             ".agents/specs/comfy-parity/design.md",
             ".agents/specs/comfy-parity/validation.md",
@@ -9030,6 +9036,114 @@ def node_tasks(
                 task_done += " Exact source fixtures prove real compute-dtype kernel selection, Easy/Lazy cache thresholds and sigma windows, conditioning UUID/video/audio invalidation, scope-guard restoration after success/failure/cancellation, immutable base reuse, attempt scratch convergence, cache identity invalidation, and no cross-attempt state leakage."
                 task_validations.extend(["VAL-MODEL-FAMILY-001", "VAL-SAMPLER-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"])
                 task_designs.extend([18, 26, 28, 41])
+                task_locked = True
+            if "COMFY-NODE-0049" in feature_ids:
+                task_dependencies.append(
+                    "comfy-parity-native-nodes-advanced-debug-comfy-node-0140"
+                )
+                task_outcome += " This task also owns the guidance extension of the shared immutable model-execution modifier boundary: CFG normalization and zero-star transforms, normalized-attention guidance, per-layer DiT/SD3 skip guidance, and TCFG are checked immutable MODEL modifiers consumed by the canonical sampler and model-forward paths."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_cfg.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_nag.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_slg.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_tcfg.py",
+                    "crates/comfy_sampler/src/guidance.rs",
+                    "crates/comfy_sampler/src/model_execution_modifiers.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "crates/comfy_model/src/slices/native_diffusion.rs",
+                    "crates/comfy_model/src/comfy_model.rs",
+                    "crates/comfy_sampler/src/guidance.rs",
+                    "crates/comfy_sampler/src/model_execution_modifiers.rs",
+                    "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                    "crates/comfy_sampler/src/comfy_sampler.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Source-derived execution fixtures prove that every modifier changes real denoiser/model execution at the exact source boundary, binds semantic and cache identity, preserves immutable base payloads and alias-aware residency, rejects unsupported architectures and layers, restores attempt-local state on success/failure/cancellation, and never leaks modifiers across attempts, retries, lists, or restarts."
+                task_validations.extend([
+                    "VAL-MODEL-FAMILY-001",
+                    "VAL-SAMPLER-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_designs.extend([18, 26, 28, 41])
+                task_locked = True
+            if "COMFY-NODE-0079" in feature_ids:
+                task_dependencies.append(
+                    "comfy-parity-native-nodes-advanced-guidance-comfy-node-0049"
+                )
+                task_outcome += " This task also owns the missing shared canonical HOOKS and HOOK_KEYFRAMES payload boundary, including ordered immutable hook composition, checked keyframe schedules, conditioning hook-property application, exact handle identity, semantic digest, alias-aware residency, and attempt-store admission."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py",
+                    "crates/comfy_model/src/conditioning.rs",
+                    "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_model/src/hooks.rs",
+                    "crates/comfy_model/src/conditioning.rs",
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "crates/comfy_model/src/comfy_model.rs",
+                    "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                    "crates/comfy_sampler/src/comfy_sampler.rs",
+                    "crates/comfy_nodes/src/stored_payload.rs",
+                    "crates/comfy_nodes/src/comfy_nodes.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Source-derived fixtures prove exact 2/4/8 hook order, keyframe construction/interpolation and bounds, conditioning default/property/timestep behavior, immutable input reuse, canonical hook/keyframe publication and resolution, shared-allocation deduplication, cancellation rollback, persistence rejection, recovery, and no generic record or provider fallback."
+                task_validations.extend([
+                    "VAL-DOMAIN-004",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_designs.extend([18, 28, 34, 41])
+                task_locked = True
+            if "COMFY-NODE-0119" in feature_ids:
+                task_dependencies.append(
+                    "comfy-parity-native-nodes-advanced-hooks-comfy-node-0079"
+                )
+                task_outcome += " This task also owns the asset-backed and CLIP-consuming extension of the canonical hook boundary: attempt-scoped selectors seal verified LoRA/checkpoint inputs, hook creation clones immutable model facts, SetHookKeyframes applies canonical schedules, and SetClipHooks publishes a checked modified CLIP payload without exposing paths or inventing a second model owner."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_hooks.py",
+                    "crates/comfy_model/src/clip.rs",
+                    "crates/comfy_runtime/src/assets.rs",
+                    "crates/comfy_runtime/src/prompt_compiler.rs",
+                ])
+                task_writes.extend([
+                    "crates/comfy_model/src/hooks.rs",
+                    "crates/comfy_model/src/clip.rs",
+                    "crates/comfy_model/src/native_node_payload.rs",
+                    "crates/comfy_model/src/comfy_model.rs",
+                    "crates/comfy_nodes/src/execution.rs",
+                    "crates/comfy_nodes/src/stored_payload.rs",
+                    "crates/comfy_nodes/src/comfy_nodes.rs",
+                    "crates/comfy_runtime/src/assets.rs",
+                    "crates/comfy_runtime/src/prompt_compiler.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                    "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+                    "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
+                    "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ])
+                task_done += " Exact fixtures prove verified selector sealing, LoRA/checkpoint type and digest admission, immutable model/CLIP cloning, schedule attachment, paired-conditioning behavior, wrong profile/attempt/path/type/digest rejection, cancellation and partial-publication rollback, cache invalidation, restart staleness, and one canonical owner for hook, keyframe, CLIP, asset, and stored-payload state."
+                task_validations.extend([
+                    "VAL-DOMAIN-004",
+                    "VAL-NATIVE-E2E-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-OWNERSHIP-001",
+                ])
+                task_designs.extend([11, 18, 28, 34, 41])
                 task_locked = True
             result.append(task(identifier, f"Implement native node family: {category} part {part}", [6, 7, 34, 35, 36, 37, 38, 40, 41, 44], sorted(set(task_designs)), sorted(set(task_validations)), task_outcome, task_reads, task_writes, task_done, task_dependencies, locked=task_locked))
             for row in assigned:
@@ -12091,6 +12205,9 @@ def task_validation_commands(item: dict[str, object]) -> str:
             "cargo check --locked -p sim --features comfy",
             "cargo test --locked -p sim --features comfy,comfy-test-support comfy_build_boundary -- --nocapture",
             "./script/clippy -p sim -p extension_host",
+            "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
+            "cargo test --locked -p comfy_test_support --test native_release_boundary val_native_boundary_001_packaged_release -- --exact --nocapture",
+            "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
             "./script/check-comfy-feature-boundary",
             "./script/bundle-mac --dry-run",
             "./script/bundle-mac --comfy --dry-run",

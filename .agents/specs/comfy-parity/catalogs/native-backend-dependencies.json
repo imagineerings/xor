@@ -12,7 +12,7 @@
   },
   "lockfile": {
     "path": "Cargo.lock",
-    "sha256": "b0f57cabd59d073f235764796ee5f4570104cc9ae97c605ed95122545b5fd706"
+    "sha256": "be1fa94eacd33ccc9407df0d92b425ba59f355ca788e8ac97e58d8aa23b0e0a6"
   },
   "packages": {
     "anyhow": {
@@ -554,6 +554,7 @@
         "comfy_tensor/corex"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/corex"
       ],
       "reason": "CoreX forwarding compiles the zero-symbol structural adapter through each layer only so all production surfaces report the same canonical typed Unbound state; no layer may construct a runtime session, loader, capability row, certificate, availability claim, or CPU fallback."
@@ -568,6 +569,7 @@
         "comfy_tensor/cuda"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/cuda"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -582,6 +584,7 @@
         "comfy_tensor/directml"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/directml"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -597,6 +600,7 @@
         "comfy_tensor/metal"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/metal"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -611,6 +615,7 @@
         "comfy_tensor/mlu"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/mlu"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -625,6 +630,7 @@
         "comfy_tensor/npu"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/npu"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -639,6 +645,7 @@
         "comfy_tensor/rocm"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/rocm"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
@@ -653,6 +660,7 @@
         "comfy_tensor/xpu"
       ],
       "sim": [
+        "comfy",
         "comfy_runtime/xpu"
       ],
       "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."

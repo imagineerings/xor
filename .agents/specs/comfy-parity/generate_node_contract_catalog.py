@@ -270,6 +270,41 @@ def literal_string(node: ast.AST | None) -> str | None:
     return None
 
 
+def literal_truthiness(node: ast.AST) -> bool | None:
+    if isinstance(node, ast.Constant):
+        return bool(node.value)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return bool(node.elts)
+    if isinstance(node, ast.Dict):
+        return bool(node.keys)
+    return None
+
+
+def fold_literal_boolean_operation(node: ast.AST) -> ast.AST:
+    if not isinstance(node, ast.BoolOp):
+        return node
+    values = [fold_literal_boolean_operation(value) for value in node.values]
+    remaining: list[ast.AST] = []
+    for value in values:
+        truthiness = literal_truthiness(value)
+        if isinstance(node.op, ast.Or):
+            if truthiness is True:
+                return value
+            if truthiness is False:
+                continue
+        else:
+            if truthiness is False:
+                return value
+            if truthiness is True:
+                continue
+        remaining.append(value)
+    if not remaining:
+        return ast.Constant(value=isinstance(node.op, ast.And))
+    if len(remaining) == 1:
+        return remaining[0]
+    return ast.BoolOp(op=node.op, values=remaining)
+
+
 def dict_entries(node: ast.AST | None) -> list[tuple[ast.AST, ast.AST]]:
     if not isinstance(node, ast.Dict):
         return []
@@ -1056,6 +1091,15 @@ class StaticPortResolver:
             if isinstance(node, ast.Tuple):
                 return ast.Tuple(elts=values, ctx=ast.Load())
             return ast.Set(elts=values)
+        if isinstance(node, ast.BoolOp):
+            return fold_literal_boolean_operation(
+                ast.BoolOp(
+                    op=node.op,
+                    values=[
+                        self._resolve(value, environment, stack) for value in node.values
+                    ],
+                )
+            )
         if isinstance(node, ast.Call):
             function_name = dotted_name(node.func)
             if function_name in self.functions and function_name not in stack:
@@ -1297,7 +1341,11 @@ def v3_schema_contract(
             "status": "preserved_source_definition",
             "expression": expression_projection(expression, source),
         }
-    keywords = {keyword.arg: keyword.value for keyword in expression.keywords if keyword.arg}
+    keywords = {
+        keyword.arg: fold_literal_boolean_operation(keyword.value)
+        for keyword in expression.keywords
+        if keyword.arg
+    }
     inputs = keywords.get("inputs")
     outputs = keywords.get("outputs")
     hidden = keywords.get("hidden")
@@ -1326,9 +1374,9 @@ def v3_schema_contract(
         "outputs": [v3_port_projection(value, source) for value in expanded(outputs)],
         "hidden": [expression_projection(value, source) for value in expanded(hidden)],
         "node_options": [
-            {"name": keyword.arg, "value": expression_projection(keyword.value, source)}
-            for keyword in expression.keywords
-            if keyword.arg not in {"inputs", "outputs", "hidden"}
+            {"name": name, "value": expression_projection(value, source)}
+            for name, value in keywords.items()
+            if name not in {"inputs", "outputs", "hidden"}
         ],
     }
 

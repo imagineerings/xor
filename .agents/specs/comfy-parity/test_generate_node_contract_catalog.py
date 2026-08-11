@@ -36,6 +36,17 @@ class NodeContractCatalogTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_schema_calls_preserve_exact_literals_and_unsupported_expressions(self) -> None:
+        brightness = self.contracts["COMFY-NODE-0004"]
+        contrast = self.contracts["COMFY-NODE-0005"]
+        self.assertEqual(
+            brightness["schema"]["portable"]["presentation"]["display_name"],
+            "Adjust Brightness",
+        )
+        self.assertEqual(
+            contrast["schema"]["portable"]["presentation"]["display_name"],
+            "Adjust Contrast",
+        )
+
         boolean = self.contracts["COMFY-NODE-0494"]
         self.assertEqual(boolean["binding_disposition"], "executable")
         self.assertEqual(boolean["schema"]["status"], "normalized_v3")

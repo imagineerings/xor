@@ -10312,7 +10312,7 @@
         {
           "name": "verified-plugin-registry-adapter",
           "path": "crates/comfy_plugin_host/src/registry_adapter.rs",
-          "pattern": "register_bound_batch_with_presentations\\(bindings\\)[\\s\\S]*fn native_presentation\\(node: &PluginNode\\) -> NativeNodePresentation[\\s\\S]*display_name: node\\.display_name\\.clone\\(\\)[\\s\\S]*category: node\\.category\\.clone\\(\\)[\\s\\S]*port\\.name\\.clone\\(\\)"
+          "pattern": "register_bound_batch_with_presentations\\(ordinary_bindings\\)[\\s\\S]*fn validate_provider_node[\\s\\S]*base[\\s\\S]*\\.presentation\\(&node\\.id\\)[\\s\\S]*fn native_presentation\\(node: &PluginNode\\) -> NativeNodePresentation[\\s\\S]*display_name: node\\.display_name\\.clone\\(\\)[\\s\\S]*category: node\\.category\\.clone\\(\\)[\\s\\S]*port\\.name\\.clone\\(\\)"
         },
         {
           "name": "component-api-uses-checked-presentation",
