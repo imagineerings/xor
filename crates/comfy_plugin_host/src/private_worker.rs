@@ -5,11 +5,12 @@ use crate::{
 use comfy_plugin_sdk::InvocationError;
 use comfy_runtime::{
     PluginAuthorizationVerifier, PluginCapabilityBroker, PluginCapabilityInvocation,
-    PluginServiceInvocationContext, RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig,
-    WorkerRegistryDeploymentPlan,
+    PluginServiceInvocationContext, RetainedPluginExecution, RuntimeSupervisor,
+    RuntimeSupervisorError, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     AttemptId, ProfileId, PromptId, WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome,
+    WorkerRegistryGeneration,
 };
 use std::{future::Future, pin::Pin, sync::Arc, time::Instant};
 
@@ -25,12 +26,12 @@ struct PrivateWorkerCommand {
     prompt_id: PromptId,
     attempt_id: AttemptId,
     capability_invocation: PluginCapabilityInvocation,
-    response: async_channel::Sender<Result<WorkerPluginExecutionOutcome, RuntimeSupervisorError>>,
+    response: async_channel::Sender<Result<RetainedPluginExecution, RuntimeSupervisorError>>,
 }
 
 struct PrivateWorkerState {
     supervisor: Option<RuntimeSupervisor>,
-    deployed_registry_digest: Option<String>,
+    deployed_registry_identity: Option<(WorkerRegistryGeneration, String)>,
     authorization_verifier: Option<PluginAuthorizationVerifier>,
 }
 
@@ -55,7 +56,7 @@ impl PrivateWorkerPluginExecutor {
     async fn execute_prepared(
         &self,
         invocation: PreparedPluginInvocation,
-    ) -> Result<WorkerPluginExecutionOutcome, ComponentHostError> {
+    ) -> Result<RetainedPluginExecution, ComponentHostError> {
         let context = invocation.context();
         context.cancellation.check().map_err(|_| {
             ComponentHostError::Plugin(PluginError::Invocation(InvocationError::Cancelled))
@@ -119,8 +120,17 @@ impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
     ) -> Pin<Box<dyn Future<Output = Result<InvocationResult, ComponentHostError>> + Send + 'a>>
     {
         Box::pin(async move {
-            let outcome = self.execute_prepared(invocation).await?;
-            decode_worker_result(outcome)
+            let retained = self.execute_prepared(invocation).await?;
+            match decode_worker_result(retained.outcome()) {
+                Ok(result) => {
+                    retained.finish().map_err(worker_boundary_error)?;
+                    Ok(result)
+                }
+                Err(error) => {
+                    retained.abort();
+                    Err(error)
+                }
+            }
         })
     }
 
@@ -131,8 +141,17 @@ impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
         Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
     > {
         Box::pin(async move {
-            let outcome = self.execute_prepared(invocation).await?;
-            decode_worker_provider_result(outcome)
+            let retained = self.execute_prepared(invocation).await?;
+            match decode_worker_provider_result(retained.outcome()) {
+                Ok(result) => {
+                    retained.finish().map_err(worker_boundary_error)?;
+                    Ok(result)
+                }
+                Err(error) => {
+                    retained.abort();
+                    Err(error)
+                }
+            }
         })
     }
 }
@@ -144,7 +163,7 @@ fn run_private_worker_actor(
     smol::block_on(async move {
         let mut state = PrivateWorkerState {
             supervisor: None,
-            deployed_registry_digest: None,
+            deployed_registry_identity: None,
             authorization_verifier: None,
         };
         while let Ok(command) = commands.recv().await {
@@ -155,12 +174,12 @@ fn run_private_worker_actor(
                 .is_err_and(worker_failure_requires_supervisor_reset)
             {
                 state.supervisor = None;
-                state.deployed_registry_digest = None;
+                state.deployed_registry_identity = None;
                 state.authorization_verifier = None;
             }
             if response.send(result).await.is_err() {
                 state.supervisor = None;
-                state.deployed_registry_digest = None;
+                state.deployed_registry_identity = None;
                 state.authorization_verifier = None;
             }
         }
@@ -171,16 +190,19 @@ async fn execute_private_worker_command(
     launch: &WorkerLaunchConfig,
     state: &mut PrivateWorkerState,
     command: PrivateWorkerCommand,
-) -> Result<WorkerPluginExecutionOutcome, RuntimeSupervisorError> {
-    let registry_digest = command
-        .deployment
-        .begin()
-        .registry_digest_sha256()
-        .as_str()
-        .to_owned();
+) -> Result<RetainedPluginExecution, RuntimeSupervisorError> {
+    let registry_identity = (
+        command.deployment.begin().generation(),
+        command
+            .deployment
+            .begin()
+            .registry_digest_sha256()
+            .as_str()
+            .to_owned(),
+    );
     if state.authorization_verifier.as_ref() != Some(command.deployment.authorization_verifier()) {
         state.supervisor = None;
-        state.deployed_registry_digest = None;
+        state.deployed_registry_identity = None;
         state.authorization_verifier = None;
     }
     if state.supervisor.is_none() {
@@ -192,9 +214,9 @@ async fn execute_private_worker_command(
             return Err(worker_failure_with_logs(error, &supervisor));
         }
         state.supervisor = Some(supervisor);
-        state.deployed_registry_digest = Some(registry_digest.clone());
+        state.deployed_registry_identity = Some(registry_identity.clone());
         state.authorization_verifier = Some(command.deployment.authorization_verifier().clone());
-    } else if state.deployed_registry_digest.as_deref() != Some(&registry_digest) {
+    } else if state.deployed_registry_identity.as_ref() != Some(&registry_identity) {
         let supervisor = state
             .supervisor
             .as_mut()
@@ -202,14 +224,14 @@ async fn execute_private_worker_command(
         if let Err(error) = supervisor.deploy_registry(&command.deployment).await {
             return Err(worker_failure_with_logs(error, supervisor));
         }
-        state.deployed_registry_digest = Some(registry_digest);
+        state.deployed_registry_identity = Some(registry_identity);
     }
     let supervisor = state
         .supervisor
         .as_mut()
         .ok_or(RuntimeSupervisorError::NotRunning)?;
     match supervisor
-        .execute_plugin(
+        .execute_plugin_retaining_capabilities(
             command.prompt_id,
             command.attempt_id,
             command.invocation,
@@ -257,7 +279,7 @@ fn verify_profile(
 }
 
 fn decode_worker_result(
-    outcome: WorkerPluginExecutionOutcome,
+    outcome: &WorkerPluginExecutionOutcome,
 ) -> Result<InvocationResult, ComponentHostError> {
     match outcome {
         WorkerPluginExecutionOutcome::Succeeded(bytes) => {
@@ -275,7 +297,7 @@ fn decode_worker_result(
                 ComponentHostError::Plugin(PluginError::Invocation(InvocationError::TimedOut))
             }
             WorkerPluginExecutionFailure::Trap { diagnostic } => {
-                ComponentHostError::Plugin(PluginError::WasmTrap(diagnostic))
+                ComponentHostError::Plugin(PluginError::WasmTrap(diagnostic.clone()))
             }
             WorkerPluginExecutionFailure::InvalidInvocation => {
                 ComponentHostError::ExecutionBoundary(
@@ -295,7 +317,7 @@ fn decode_worker_result(
 }
 
 fn decode_worker_provider_result(
-    outcome: WorkerPluginExecutionOutcome,
+    outcome: &WorkerPluginExecutionOutcome,
 ) -> Result<ProviderInvocationResult, ComponentHostError> {
     match outcome {
         WorkerPluginExecutionOutcome::Succeeded(bytes) => {
@@ -310,7 +332,7 @@ fn decode_worker_provider_result(
 }
 
 fn decode_worker_failure<T>(
-    failure: WorkerPluginExecutionFailure,
+    failure: &WorkerPluginExecutionFailure,
 ) -> Result<T, ComponentHostError> {
     Err(match failure {
         WorkerPluginExecutionFailure::Cancelled => {
@@ -320,7 +342,7 @@ fn decode_worker_failure<T>(
             ComponentHostError::Plugin(PluginError::Invocation(InvocationError::TimedOut))
         }
         WorkerPluginExecutionFailure::Trap { diagnostic } => {
-            ComponentHostError::Plugin(PluginError::WasmTrap(diagnostic))
+            ComponentHostError::Plugin(PluginError::WasmTrap(diagnostic.clone()))
         }
         WorkerPluginExecutionFailure::InvalidInvocation => ComponentHostError::ExecutionBoundary(
             "private worker rejected the plugin invocation".to_owned(),

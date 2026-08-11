@@ -2272,16 +2272,17 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             &component_router,
         )
         .await;
-        if !errors.is_empty() {
-            return Err(format!("private worker component update failed: {errors:?}").into());
-        }
-        let trapped = invoke_registry_binding(&component_host.registry_snapshot()?)
-            .await
-            .expect_err("fuel-bounded private component must trap");
+        let trapped = errors
+            .get("sim.comfy.component-host.v1")
+            .ok_or("fuel-bounded component update unexpectedly succeeded")?;
         assert!(
-            trapped.to_string().contains("trap"),
-            "unexpected private component trap: {trapped}"
+            trapped.contains("fuel") || trapped.contains("trap"),
+            "unexpected private component preflight failure: {trapped}"
         );
+        assert!(matches!(
+            invoke_registry_binding_at(&registry, "retained component after rejected update").await?,
+            NodeOutcome::Values { .. }
+        ));
 
         write_component_pair(
             &fake_filesystem,

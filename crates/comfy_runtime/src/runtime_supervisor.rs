@@ -44,6 +44,33 @@ pub const MAX_TRACKED_WORKER_REQUESTS: usize = 8;
 
 type WorkerInput = Box<dyn AsyncWrite + Send + Unpin>;
 
+pub struct RetainedPluginExecution {
+    outcome: WorkerPluginExecutionOutcome,
+    capability_invocation: Option<PluginCapabilityInvocation>,
+}
+
+impl RetainedPluginExecution {
+    pub fn outcome(&self) -> &WorkerPluginExecutionOutcome {
+        &self.outcome
+    }
+
+    pub fn finish(mut self) -> Result<WorkerPluginExecutionOutcome, RuntimeSupervisorError> {
+        if let Some(invocation) = self.capability_invocation.take() {
+            invocation.finish().map_err(|error| {
+                RuntimeSupervisorError::PluginCapabilityBroker(error.to_string())
+            })?;
+        }
+        Ok(self.outcome)
+    }
+
+    pub fn abort(mut self) -> WorkerPluginExecutionOutcome {
+        if let Some(invocation) = self.capability_invocation.take() {
+            invocation.abort();
+        }
+        self.outcome
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SupervisorPolicy {
     pub heartbeat_interval: Duration,
@@ -1652,6 +1679,23 @@ impl RuntimeSupervisor {
         invocation: Vec<u8>,
         capability_invocation: PluginCapabilityInvocation,
     ) -> Result<WorkerPluginExecutionOutcome, RuntimeSupervisorError> {
+        self.execute_plugin_retaining_capabilities(
+            prompt_id,
+            attempt_id,
+            invocation,
+            capability_invocation,
+        )
+        .await?
+        .finish()
+    }
+
+    pub async fn execute_plugin_retaining_capabilities(
+        &mut self,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        invocation: Vec<u8>,
+        capability_invocation: PluginCapabilityInvocation,
+    ) -> Result<RetainedPluginExecution, RuntimeSupervisorError> {
         if invocation.is_empty() {
             return Err(RuntimeSupervisorError::InvalidConfiguration(
                 "worker plugin invocation is empty".to_owned(),
@@ -1752,15 +1796,19 @@ impl RuntimeSupervisor {
                             "invocation completed more than once".to_owned(),
                         )
                     })?;
-                    match &outcome {
-                        WorkerPluginExecutionOutcome::Succeeded(_) => {
-                            invocation.finish().map_err(|error| {
-                                RuntimeSupervisorError::PluginCapabilityBroker(error.to_string())
-                            })?
+                    return Ok(match outcome {
+                        WorkerPluginExecutionOutcome::Succeeded(bytes) => RetainedPluginExecution {
+                            outcome: WorkerPluginExecutionOutcome::Succeeded(bytes),
+                            capability_invocation: Some(invocation),
+                        },
+                        WorkerPluginExecutionOutcome::Failed(failure) => {
+                            invocation.abort();
+                            RetainedPluginExecution {
+                                outcome: WorkerPluginExecutionOutcome::Failed(failure),
+                                capability_invocation: None,
+                            }
                         }
-                        WorkerPluginExecutionOutcome::Failed(_) => invocation.abort(),
-                    }
-                    return Ok(outcome);
+                    });
                 }
                 WorkerMessage::Fatal { code, message } => {
                     if let Some(invocation) = capability_invocation.take() {
