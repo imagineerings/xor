@@ -2696,6 +2696,14 @@ impl ProviderCostAcceptanceVerifier {
 pub struct ProviderResultNonce([u8; 32]);
 
 impl ProviderResultNonce {
+    pub fn generate() -> Result<Self, TrustError> {
+        let mut bytes = [0_u8; 32];
+        SystemRandom::new()
+            .fill(&mut bytes)
+            .map_err(|_| TrustError::ProviderResultReceiptSealingUnavailable)?;
+        Self::new(bytes)
+    }
+
     pub fn new(bytes: [u8; 32]) -> Result<Self, TrustError> {
         if bytes.iter().all(|byte| *byte == 0) {
             return Err(TrustError::InvalidProviderResultReceipt);
