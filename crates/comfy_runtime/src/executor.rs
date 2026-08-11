@@ -2,6 +2,7 @@ use crate::assets::{AssetIdentity, NativeAssetResolverRegistry};
 use crate::{
     AttemptEvent, AttemptEventKind, AttemptState, CacheEntry, CacheKey, CompiledNode, CompiledPlan,
     EventBusError, ExecutionEventBus, InputBinding, NativeCache, PromptCompileError,
+    validate_native_provider_schemas,
 };
 use chrono::Utc;
 use comfy_nodes::{
@@ -24,7 +25,7 @@ pub use comfy_nodes::{
 };
 #[cfg(test)]
 use comfy_nodes::{NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape};
-use comfy_plugin_sdk::{ProviderBindingClaim, ProviderBindingSet};
+use comfy_plugin_sdk::{CanonicalTypeId, ProviderBindingClaim, ProviderBindingSet};
 use comfy_tensor::{
     BackendCapabilityMatrix, CpuBackend, NativeShaderExecutor, ScratchReservation, StreamId,
 };
@@ -748,6 +749,14 @@ impl NativeNodeRegistry {
         transport_schema: &str,
         materializer_schema: &str,
     ) -> Result<Option<String>, NativeNodeRegistryError> {
+        let transport_schema: CanonicalTypeId = transport_schema
+            .parse()
+            .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+        let materializer_schema: CanonicalTypeId = materializer_schema
+            .parse()
+            .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
+        validate_native_provider_schemas(&transport_schema, &materializer_schema)
+            .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
         let Some(binding) = self.bindings.get(class_type) else {
             return Ok(None);
         };
@@ -771,8 +780,8 @@ impl NativeNodeRegistry {
             implementation_namespace,
             descriptor,
             presentation,
-            transport_schema,
-            materializer_schema,
+            &transport_schema.to_string(),
+            &materializer_schema.to_string(),
         )?))
     }
 
@@ -5848,6 +5857,22 @@ pub(crate) mod tests {
             "sim:comfy-provider-transport@1".parse()?;
         let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
             "sim:comfy-provider-materializer@1".parse()?;
+        assert!(matches!(
+            registry.provider_binding_contract_sha256(
+                &descriptor.class_type,
+                "sim:unsupported-provider-transport@1",
+                &materializer_schema.to_string(),
+            ),
+            Err(NativeNodeRegistryError::InvalidProviderActivation)
+        ));
+        assert!(matches!(
+            registry.provider_binding_contract_sha256(
+                &descriptor.class_type,
+                &transport_schema.to_string(),
+                "sim:unsupported-provider-materializer@1",
+            ),
+            Err(NativeNodeRegistryError::InvalidProviderActivation)
+        ));
         let contract_sha256 = registry
             .provider_binding_contract_sha256(
                 &descriptor.class_type,
