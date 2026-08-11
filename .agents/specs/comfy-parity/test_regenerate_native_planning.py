@@ -223,7 +223,19 @@ class ValidationGenerationTests(unittest.TestCase):
             ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
             tasks_by_id[text_transform_foundation_id]["writes"],
         )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validation.md",
+            tasks_by_id[text_transform_foundation_id]["writes"],
+        )
         self.assertTrue(tasks_by_id[text_transform_foundation_id]["locked"])
+        self.assertIn(
+            "octal escapes",
+            tasks_by_id[text_transform_foundation_id]["done"],
+        )
+        self.assertIn(
+            "pre-allocation bounded output",
+            tasks_by_id[text_transform_foundation_id]["done"],
+        )
         self.assertIn(text_generation_foundation_id, dependencies[text_generation_id])
         self.assertIn(
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
@@ -272,6 +284,14 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn(
             "crates/comfy_runtime/src/prompt_compiler.rs",
             tasks_by_id[structured_link_foundation_id]["writes"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            tasks_by_id[structured_link_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "flat dotted prompt keys",
+            tasks_by_id[structured_link_foundation_id]["outcome"],
         )
         self.assertIn(shader_foundation_id, dependencies[shader_id])
         self.assertIn(

@@ -1,5 +1,5 @@
 use comfy_media::{PngLimits, encode_png_frame};
-use comfy_nodes::NativePreparedEffectKind;
+use comfy_nodes::{NativePreparedEffectKind, NativeStructuredValue, built_in_source_schema};
 use comfy_runtime::{
     AttemptState, NATIVE_IMAGE_REGISTRY_VERSION, NativeHandleKind, NativeHandleStoreError,
     NativeHandleStoreGeneration, NativeHandleType, NativeImageWorkerEvent, NativeImageWorkerPlan,
@@ -256,6 +256,97 @@ fn portable_values_dynamic_ports_and_attempt_handles_fail_closed() -> Result<(),
         serde_json::from_slice::<NativeNodeFailure>(&serde_json::to_vec(&failure)?)?,
         failure
     );
+    Ok(())
+}
+
+#[test]
+fn source_structured_values_keep_resolved_handles_typed_across_recovery()
+-> Result<(), Box<dyn Error>> {
+    let schema = built_in_source_schema("ResizeImageMaskNode")?;
+    let resize_type = schema
+        .inputs
+        .iter()
+        .find(|input| input.schema.name == "resize_type")
+        .ok_or("ResizeImageMaskNode has no resize_type input")?;
+    let match_size = resize_type
+        .schema
+        .structured_options()?
+        .into_iter()
+        .find(|option| option.selector == "match size")
+        .ok_or("ResizeImageMaskNode has no match size option")?;
+    assert!(match_size.fields.iter().any(|field| {
+        field.path.as_slice() == ["match"]
+            && field.schema.source_type_names.as_slice() == ["IMAGE", "MASK"]
+    }));
+
+    let generation = NativeHandleStoreGeneration::with_capacities(4, 1024)?;
+    let attempt_id = AttemptId(Uuid::from_u128(0x3760));
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        workspace_authority.authorize_workspace(1024 * 1024)?,
+        &cancellation,
+    );
+    let image = ImageTensor::from_f32(&backend, &context, 1, 1, 1, 3, &[0.1, 0.2, 0.3])?;
+    let payload = NativeStoredPayload::Tensor(Arc::new(NativeTensorPayload::from_image(
+        NativeTensorRole::Image,
+        image,
+    )?));
+    let handle = store.publish(payload, &cancellation)?;
+    let structured = NativeStructuredValue::checked(
+        "COMFY_DYNAMICCOMBO_V3",
+        BTreeMap::from([
+            (
+                "resize_type".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::String("match size".to_owned()),
+                },
+            ),
+            (
+                "crop".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::String("center".to_owned()),
+                },
+            ),
+            (
+                "match".to_owned(),
+                NativeValue::Handle {
+                    value: handle.clone(),
+                },
+            ),
+        ]),
+    )?;
+    let value = structured.into_native_value();
+    let expected = NativeTypeUnion::new([NativeValueType::NamedPreservedUnknown(
+        "COMFY_DYNAMICCOMBO_V3".to_owned(),
+    )])?;
+    assert!(expected.accepts(&value));
+    let restored: NativeValue = serde_json::from_slice(&serde_json::to_vec(&value)?)?;
+    let restored = NativeStructuredValue::from_native_value(&restored)?
+        .ok_or("structured value lost its typed representation")?;
+    assert_eq!(
+        restored.get("match"),
+        Some(&NativeValue::Handle {
+            value: handle.clone(),
+        })
+    );
+    let image_type = NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?;
+    store.resolve(&handle, &image_type, &cancellation)?;
+
+    let recovered =
+        NativeHandleStoreGeneration::with_capacities(4, 1024)?.handle_store_for_attempt(attempt_id);
+    assert!(matches!(
+        recovered.resolve(&handle, &image_type, &cancellation),
+        Err(NativeHandleStoreError::WrongStore | NativeHandleStoreError::WrongGeneration)
+    ));
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        store.resolve(&handle, &image_type, &cancelled),
+        Err(NativeHandleStoreError::Cancelled)
+    ));
     Ok(())
 }
 

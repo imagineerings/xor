@@ -103,6 +103,105 @@ impl CompiledPlan {
         }
     }
 
+    pub fn validate_integrity(&self) -> Result<(), PromptCompileError> {
+        self.validate_provider_execution_identity()?;
+        for (node_id, node) in &self.nodes {
+            if node.id != *node_id
+                || node.class_type != node.descriptor.class_type
+                || node.descriptor.validate().is_err()
+            {
+                return Err(PromptCompileError::InvalidCompiledPlan);
+            }
+            for input in &node.descriptor.inputs {
+                if input.required && !input.hidden && !node.inputs.contains_key(&input.name) {
+                    return Err(PromptCompileError::InvalidCompiledPlan);
+                }
+            }
+            validate_compiled_structured_inputs(node)?;
+            for (name, binding) in &node.inputs {
+                let (input, source_schema) = if name.contains('.') {
+                    resolve_compiled_structured_input(node, name)
+                        .ok_or(PromptCompileError::InvalidCompiledPlan)?
+                } else {
+                    (
+                        resolve_input_descriptor(&node.descriptor, name)
+                            .ok_or(PromptCompileError::InvalidCompiledPlan)?,
+                        resolve_input_schema(&node.descriptor, name),
+                    )
+                };
+                match binding {
+                    InputBinding::Literal { value } => {
+                        value
+                            .validate()
+                            .map_err(|_| PromptCompileError::InvalidCompiledPlan)?;
+                        let cardinality_matches = match input.cardinality {
+                            NativePortCardinality::List => {
+                                matches!(value, NativeValue::List { values } if values.iter().all(|value| input.accepted_types.accepts(value)))
+                            }
+                            NativePortCardinality::Mapped => match value {
+                                NativeValue::List { values } => values
+                                    .iter()
+                                    .all(|value| input.accepted_types.accepts(value)),
+                                value => input.accepted_types.accepts(value),
+                            },
+                            NativePortCardinality::Scalar => {
+                                !matches!(value, NativeValue::List { .. })
+                                    && input.accepted_types.accepts(value)
+                            }
+                        };
+                        let schema_matches = source_schema.as_ref().is_none_or(|schema| {
+                            structured_selector_matches(schema, value)
+                                || comfy_nodes::native_value_matches_input_schema(value, schema)
+                        });
+                        if !cardinality_matches || !schema_matches {
+                            return Err(PromptCompileError::InvalidCompiledPlan);
+                        }
+                    }
+                    InputBinding::Link {
+                        source,
+                        output_index,
+                        lazy,
+                        mode,
+                    } => {
+                        let source_node = self
+                            .nodes
+                            .get(source)
+                            .ok_or(PromptCompileError::InvalidCompiledPlan)?;
+                        let output = source_node
+                            .descriptor
+                            .outputs
+                            .get(*output_index)
+                            .ok_or(PromptCompileError::InvalidCompiledPlan)?;
+                        if *lazy != input.lazy
+                            || *mode != input.cardinality
+                            || !type_union_accepts_output(
+                                &input.accepted_types,
+                                &output.produced_type,
+                            )
+                            || (output.is_list
+                                && input.cardinality == NativePortCardinality::Scalar)
+                        {
+                            return Err(PromptCompileError::InvalidCompiledPlan);
+                        }
+                    }
+                }
+            }
+        }
+        let output_nodes = self
+            .nodes
+            .values()
+            .filter(|node| node.descriptor.output_node)
+            .map(|node| node.id.clone())
+            .collect::<Vec<_>>();
+        if output_nodes != self.output_nodes
+            || topological_order(&self.nodes)? != self.topological_order
+            || static_required_nodes(&self.nodes, &self.output_nodes) != self.static_required_nodes
+        {
+            return Err(PromptCompileError::InvalidCompiledPlan);
+        }
+        Ok(())
+    }
+
     fn seal_provider_registry(
         &mut self,
         registry: NativeProviderRegistryPin,
@@ -202,6 +301,8 @@ pub enum PromptCompileError {
     ProviderPlanIdentityMismatch,
     #[error("provider plan identity could not be serialized canonically")]
     ProviderPlanSerializationFailed,
+    #[error("compiled prompt plan integrity validation failed")]
+    InvalidCompiledPlan,
 }
 
 pub struct PromptCompiler<'a> {
@@ -319,6 +420,7 @@ impl<'a> PromptCompiler<'a> {
                 .ok_or(PromptCompileError::ProviderRegistryPinRequired)?;
             plan.seal_provider_registry(pin)?;
         }
+        plan.validate_integrity()?;
         Ok(plan)
     }
 
@@ -375,18 +477,29 @@ fn compile_inputs(
             }
         }
     }
+    validate_required_structured_inputs(node_id, prompt_node, descriptor)?;
     let mut compiled = BTreeMap::new();
     for (name, value) in &prompt_node.inputs {
-        let input = resolve_input_descriptor(descriptor, name).ok_or_else(|| {
-            PromptCompileError::UnknownInput {
-                node: node_id.clone(),
-                input: name.clone(),
-            }
-        })?;
+        let (input, source_schema) = if name.contains('.') {
+            resolve_active_structured_input(node_id, descriptor, prompt_node, name)?.ok_or_else(
+                || PromptCompileError::UnknownInput {
+                    node: node_id.clone(),
+                    input: name.clone(),
+                },
+            )?
+        } else {
+            let input = resolve_input_descriptor(descriptor, name).ok_or_else(|| {
+                PromptCompileError::UnknownInput {
+                    node: node_id.clone(),
+                    input: name.clone(),
+                }
+            })?;
+            let source_schema = resolve_input_schema(descriptor, name);
+            (input, source_schema)
+        };
         if input.hidden {
             continue;
         }
-        let source_schema = resolve_input_schema(descriptor, name);
         let binding = if let Some((source, output_index)) = decode_link(value) {
             if !prompt.0.contains_key(&source) {
                 return Err(PromptCompileError::UnknownLink {
@@ -440,9 +553,11 @@ fn compile_inputs(
                 node: node_id.clone(),
                 input: name.clone(),
             })?;
-            if source_schema.as_ref().is_some_and(|schema| {
-                !comfy_nodes::native_value_matches_input_schema(&value, schema)
-            }) {
+            let schema_matches = source_schema.as_ref().is_none_or(|schema| {
+                structured_selector_matches(schema, &value)
+                    || comfy_nodes::native_value_matches_input_schema(&value, schema)
+            });
+            if !schema_matches {
                 return Err(PromptCompileError::InvalidLiteral {
                     node: node_id.clone(),
                     input: name.clone(),
@@ -453,6 +568,308 @@ fn compile_inputs(
         compiled.insert(name.clone(), binding);
     }
     Ok(compiled)
+}
+
+fn validate_required_structured_inputs(
+    node_id: &NodeId,
+    prompt_node: &PromptNode,
+    descriptor: &NativeNodeDescriptor,
+) -> Result<(), PromptCompileError> {
+    let Some(source_schema) = &descriptor.source_schema else {
+        return Ok(());
+    };
+    for schema in &source_schema.inputs {
+        if schema
+            .structured_options()
+            .map_err(|_| {
+                PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+            })?
+            .is_empty()
+        {
+            continue;
+        }
+        validate_required_structured_fields(
+            node_id,
+            prompt_node,
+            descriptor,
+            &schema.name,
+            schema,
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_compiled_structured_inputs(node: &CompiledNode) -> Result<(), PromptCompileError> {
+    let Some(source_schema) = &node.descriptor.source_schema else {
+        return Ok(());
+    };
+    for schema in &source_schema.inputs {
+        let options = schema
+            .structured_options()
+            .map_err(|_| PromptCompileError::InvalidCompiledPlan)?;
+        if options.is_empty() {
+            continue;
+        }
+        let mut active_fields = BTreeSet::new();
+        validate_compiled_structured_fields(node, &schema.name, schema, &mut active_fields)?;
+        let prefix = format!("{}.", schema.name);
+        if node
+            .inputs
+            .keys()
+            .any(|name| name.starts_with(&prefix) && !active_fields.contains(name))
+        {
+            return Err(PromptCompileError::InvalidCompiledPlan);
+        }
+    }
+    Ok(())
+}
+
+fn validate_compiled_structured_fields(
+    node: &CompiledNode,
+    prefix: &str,
+    schema: &comfy_nodes::NativeInputSchemaMetadata,
+    active_fields: &mut BTreeSet<String>,
+) -> Result<(), PromptCompileError> {
+    let selector = match node.inputs.get(prefix) {
+        Some(InputBinding::Literal {
+            value:
+                NativeValue::PreservedUnknown {
+                    type_name,
+                    value: Value::String(selector),
+                },
+        }) if type_name == "COMFY_DYNAMICCOMBO_V3" => selector,
+        _ => return Err(PromptCompileError::InvalidCompiledPlan),
+    };
+    let options = schema
+        .structured_options()
+        .map_err(|_| PromptCompileError::InvalidCompiledPlan)?;
+    let option = options
+        .iter()
+        .find(|option| option.selector == *selector)
+        .ok_or(PromptCompileError::InvalidCompiledPlan)?;
+    for field in &option.fields {
+        if field.path.is_empty() {
+            return Err(PromptCompileError::InvalidCompiledPlan);
+        }
+        let name = format!("{prefix}.{}", field.path.join("."));
+        active_fields.insert(name.clone());
+        if field.required && !node.inputs.contains_key(&name) {
+            return Err(PromptCompileError::InvalidCompiledPlan);
+        }
+        if node.inputs.contains_key(&name)
+            && !field
+                .schema
+                .structured_options()
+                .map_err(|_| PromptCompileError::InvalidCompiledPlan)?
+                .is_empty()
+        {
+            validate_compiled_structured_fields(node, &name, &field.schema, active_fields)?;
+        }
+    }
+    Ok(())
+}
+
+fn resolve_compiled_structured_input(
+    node: &CompiledNode,
+    name: &str,
+) -> Option<(
+    comfy_nodes::NativeInputDescriptor,
+    Option<comfy_nodes::NativeInputSchemaMetadata>,
+)> {
+    let mut parts = name.split('.');
+    let root = parts.next()?;
+    let mut schema = resolve_input_schema(&node.descriptor, root)?;
+    let mut prefix = root.to_owned();
+    let mut selected_field = None;
+    for part in parts {
+        let selector = match node.inputs.get(&prefix)? {
+            InputBinding::Literal {
+                value:
+                    NativeValue::PreservedUnknown {
+                        type_name,
+                        value: Value::String(selector),
+                    },
+            } if type_name == "COMFY_DYNAMICCOMBO_V3" => selector,
+            _ => return None,
+        };
+        let option = schema
+            .structured_options()
+            .ok()?
+            .into_iter()
+            .find(|option| option.selector == *selector)?;
+        let field = option
+            .fields
+            .into_iter()
+            .find(|field| field.path.as_slice() == [part])?;
+        schema = field.schema.clone();
+        selected_field = Some(field);
+        prefix.push('.');
+        prefix.push_str(part);
+    }
+    let field = selected_field?;
+    let accepted_types = comfy_nodes::native_value_types_for_input_schema(&schema).ok()?;
+    let allows_literal = accepted_types
+        .members()
+        .iter()
+        .any(|member| !matches!(member, NativeValueType::Handle(_)));
+    Some((
+        comfy_nodes::NativeInputDescriptor {
+            name: name.to_owned(),
+            accepted_types,
+            required: field.required,
+            hidden: false,
+            lazy: field.lazy,
+            cardinality: NativePortCardinality::Scalar,
+            allows_literal,
+        },
+        Some(schema),
+    ))
+}
+
+fn validate_required_structured_fields(
+    node_id: &NodeId,
+    prompt_node: &PromptNode,
+    descriptor: &NativeNodeDescriptor,
+    prefix: &str,
+    schema: &comfy_nodes::NativeInputSchemaMetadata,
+) -> Result<(), PromptCompileError> {
+    let selector = prompt_node
+        .inputs
+        .get(prefix)
+        .and_then(Value::as_str)
+        .ok_or_else(|| PromptCompileError::InvalidLiteral {
+            node: node_id.clone(),
+            input: prefix.to_owned(),
+        })?;
+    let options = schema
+        .structured_options()
+        .map_err(|_| PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone()))?;
+    let option = options
+        .iter()
+        .find(|option| option.selector == selector)
+        .ok_or_else(|| PromptCompileError::InvalidLiteral {
+            node: node_id.clone(),
+            input: prefix.to_owned(),
+        })?;
+    for field in &option.fields {
+        let Some(field_name) = field.path.first() else {
+            return Err(PromptCompileError::InvalidRuntimeDescriptor(
+                descriptor.class_type.clone(),
+            ));
+        };
+        let name = format!("{prefix}.{field_name}");
+        if field.required && !prompt_node.inputs.contains_key(&name) {
+            return Err(PromptCompileError::MissingInput {
+                node: node_id.clone(),
+                input: name,
+            });
+        }
+        if prompt_node.inputs.contains_key(&name)
+            && !field
+                .schema
+                .structured_options()
+                .map_err(|_| {
+                    PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+                })?
+                .is_empty()
+        {
+            validate_required_structured_fields(
+                node_id,
+                prompt_node,
+                descriptor,
+                &name,
+                &field.schema,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn resolve_active_structured_input(
+    node_id: &NodeId,
+    descriptor: &NativeNodeDescriptor,
+    prompt_node: &PromptNode,
+    name: &str,
+) -> Result<
+    Option<(
+        comfy_nodes::NativeInputDescriptor,
+        Option<comfy_nodes::NativeInputSchemaMetadata>,
+    )>,
+    PromptCompileError,
+> {
+    let mut parts = name.split('.');
+    let Some(root) = parts.next() else {
+        return Ok(None);
+    };
+    let Some(mut schema) = resolve_input_schema(descriptor, root) else {
+        return Ok(None);
+    };
+    let mut prefix = root.to_owned();
+    let mut field = None;
+    for part in parts {
+        let selector = prompt_node
+            .inputs
+            .get(&prefix)
+            .and_then(Value::as_str)
+            .ok_or_else(|| PromptCompileError::InvalidLiteral {
+                node: node_id.clone(),
+                input: prefix.clone(),
+            })?;
+        let options = schema.structured_options().map_err(|_| {
+            PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone())
+        })?;
+        let option = options.iter().find(|option| option.selector == selector);
+        let Some(next) = option.and_then(|option| {
+            option
+                .fields
+                .iter()
+                .find(|field| field.path.as_slice() == [part])
+        }) else {
+            return Ok(None);
+        };
+        schema = next.schema.clone();
+        field = Some(next.clone());
+        prefix.push('.');
+        prefix.push_str(part);
+    }
+    let Some(field) = field else {
+        return Ok(None);
+    };
+    let accepted_types = comfy_nodes::native_value_types_for_input_schema(&schema)
+        .map_err(|_| PromptCompileError::InvalidRuntimeDescriptor(descriptor.class_type.clone()))?;
+    let allows_literal = accepted_types
+        .members()
+        .iter()
+        .any(|member| !matches!(member, NativeValueType::Handle(_)));
+    Ok(Some((
+        comfy_nodes::NativeInputDescriptor {
+            name: name.to_owned(),
+            accepted_types,
+            required: field.required,
+            hidden: false,
+            lazy: field.lazy,
+            cardinality: NativePortCardinality::Scalar,
+            allows_literal,
+        },
+        Some(schema),
+    )))
+}
+
+fn structured_selector_matches(
+    schema: &comfy_nodes::NativeInputSchemaMetadata,
+    value: &NativeValue,
+) -> bool {
+    let NativeValue::PreservedUnknown {
+        type_name,
+        value: Value::String(selector),
+    } = value
+    else {
+        return false;
+    };
+    type_name == "COMFY_DYNAMICCOMBO_V3"
+        && schema
+            .structured_options()
+            .is_ok_and(|options| options.iter().any(|option| option.selector == *selector))
 }
 
 fn inject_hidden_inputs(
@@ -508,6 +925,24 @@ pub(crate) fn resolve_input_descriptor(
     descriptor: &NativeNodeDescriptor,
     name: &str,
 ) -> Option<comfy_nodes::NativeInputDescriptor> {
+    if name.contains('.') {
+        let field = resolve_structured_input_field_any(descriptor, name)?;
+        let accepted_types =
+            comfy_nodes::native_value_types_for_input_schema(&field.schema).ok()?;
+        let allows_literal = accepted_types
+            .members()
+            .iter()
+            .any(|member| !matches!(member, NativeValueType::Handle(_)));
+        return Some(comfy_nodes::NativeInputDescriptor {
+            name: name.to_owned(),
+            accepted_types,
+            required: field.required,
+            hidden: false,
+            lazy: field.lazy,
+            cardinality: NativePortCardinality::Scalar,
+            allows_literal,
+        });
+    }
     if let Some(input) = descriptor.inputs.iter().find(|input| input.name == name) {
         return Some(input.clone());
     }
@@ -549,6 +984,9 @@ fn resolve_input_schema(
     descriptor: &NativeNodeDescriptor,
     name: &str,
 ) -> Option<comfy_nodes::NativeInputSchemaMetadata> {
+    if name.contains('.') {
+        return resolve_structured_input_field_any(descriptor, name).map(|field| field.schema);
+    }
     let source_schema = descriptor.source_schema.as_ref()?;
     if let Some((index, _)) = descriptor
         .inputs
@@ -590,6 +1028,40 @@ fn resolve_input_schema(
         }
     }
     None
+}
+
+fn resolve_structured_input_field_any(
+    descriptor: &NativeNodeDescriptor,
+    name: &str,
+) -> Option<comfy_nodes::NativeStructuredInputField> {
+    let mut parts = name.split('.');
+    let root = parts.next()?;
+    let mut schemas = vec![resolve_input_schema(descriptor, root)?];
+    let mut selected_field = None;
+    for part in parts {
+        let mut matches = Vec::new();
+        for schema in schemas {
+            for option in schema.structured_options().ok()? {
+                matches.extend(
+                    option
+                        .fields
+                        .into_iter()
+                        .filter(|field| field.path.as_slice() == [part]),
+                );
+            }
+        }
+        let first = matches.first()?.clone();
+        if matches.iter().any(|field| {
+            field.schema != first.schema
+                || field.required != first.required
+                || field.lazy != first.lazy
+        }) {
+            return None;
+        }
+        schemas = vec![first.schema.clone()];
+        selected_field = Some(first);
+    }
+    selected_field
 }
 
 fn required_dynamic_input_names(
@@ -934,6 +1406,179 @@ pub(crate) mod tests {
             plan.nodes[&NodeId::from("output")].unknown["future_node_field"],
             9
         );
+        Ok(())
+    }
+
+    #[test]
+    fn source_declared_dotted_multitype_links_compile_as_real_dependencies()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let image_type = comfy_nodes::native_source_type_projection("IMAGE")?.value_type()?;
+        let mut source = descriptor("ImageSource", false)?;
+        source.schema_version = comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
+        source.outputs[0].produced_type = image_type.clone();
+        source.source_schema = Some(comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+            comfy_nodes::NativeSchemaProvenance::SourceV3,
+            std::iter::empty(),
+            std::iter::empty(),
+            [("value".to_owned(), "IMAGE".to_owned())],
+        ));
+
+        let expression = json!({
+            "arguments": [
+                {"kind": "attribute", "name": "ResizeType.MATCH_SIZE"},
+                {"kind": "list", "items": [
+                    {
+                        "arguments": [
+                            {"kind": "literal", "value": "match"},
+                            {"kind": "list", "items": [
+                                {"kind": "attribute", "name": "io.Image"},
+                                {"kind": "attribute", "name": "io.Mask"}
+                            ]}
+                        ],
+                        "keywords": [
+                            {"name": "lazy", "value": {"kind": "literal", "value": true}}
+                        ],
+                        "kind": "call",
+                        "name": "io.MultiType.Input"
+                    },
+                    {
+                        "arguments": [{"kind": "literal", "value": "crop"}],
+                        "keywords": [
+                            {"name": "options", "value": {"kind": "list", "items": [
+                                {"kind": "literal", "value": "disabled"},
+                                {"kind": "literal", "value": "center"}
+                            ]}}
+                        ],
+                        "kind": "call",
+                        "name": "io.Combo.Input"
+                    }
+                ]}
+            ],
+            "keywords": [],
+            "kind": "call",
+            "name": "io.DynamicCombo.Option"
+        });
+        let expression = serde_json::to_string(&expression)?;
+        let mut sink = descriptor("StructuredSink", true)?;
+        sink.schema_version = comfy_nodes::NATIVE_NODE_CONTRACT_SCHEMA_VERSION;
+        sink.inputs.push(input(
+            "resize_type",
+            NativeValueType::NamedPreservedUnknown("COMFY_DYNAMICCOMBO_V3".to_owned()),
+            false,
+            NativePortCardinality::Scalar,
+            true,
+        )?);
+        sink.outputs[0].produced_type = NativeValueType::Primitive(NativePrimitiveType::Boolean);
+        let mut sink_schema = comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+            comfy_nodes::NativeSchemaProvenance::SourceV3,
+            [("resize_type".to_owned(), "COMFY_DYNAMICCOMBO_V3".to_owned())],
+            std::iter::empty(),
+            [("value".to_owned(), "BOOLEAN".to_owned())],
+        );
+        sink_schema.inputs[0].choices = vec![comfy_nodes::NativeSchemaValue::PreservedExpression {
+            sha256: format!("{:x}", Sha256::digest(expression.as_bytes())),
+            source: expression,
+        }];
+        sink.source_schema = Some(sink_schema);
+
+        let mut registry = NativeNodeRegistry::default();
+        registry.register_descriptor(source)?;
+        registry.register_descriptor(sink)?;
+        let nodes = BTreeMap::from([
+            (
+                NodeId::from("image"),
+                PromptNode {
+                    class_type: "ImageSource".to_owned(),
+                    inputs: BTreeMap::new(),
+                    unknown: BTreeMap::new(),
+                },
+            ),
+            (
+                NodeId::from("output"),
+                PromptNode {
+                    class_type: "StructuredSink".to_owned(),
+                    inputs: BTreeMap::from([
+                        ("resize_type".to_owned(), json!("match size")),
+                        ("resize_type.crop".to_owned(), json!("center")),
+                        ("resize_type.match".to_owned(), json!(["image", 0])),
+                    ]),
+                    unknown: BTreeMap::new(),
+                },
+            ),
+        ]);
+        let plan = PromptCompiler::new(&registry).compile(submission(nodes.clone()))?;
+        assert_eq!(
+            plan.nodes[&NodeId::from("output")].inputs["resize_type.match"],
+            InputBinding::Link {
+                source: NodeId::from("image"),
+                output_index: 0,
+                lazy: true,
+                mode: NativePortCardinality::Scalar,
+            }
+        );
+        assert_eq!(
+            plan.topological_order,
+            [NodeId::from("image"), NodeId::from("output")]
+        );
+        assert!(!plan.static_required_nodes.contains(&NodeId::from("image")));
+        plan.validate_integrity()?;
+        let restored: CompiledPlan = serde_json::from_slice(&serde_json::to_vec(&plan)?)?;
+        assert_eq!(restored, plan);
+        restored.validate_integrity()?;
+
+        let mut tampered_plan = plan.clone();
+        tampered_plan
+            .nodes
+            .get_mut(&NodeId::from("output"))
+            .ok_or("missing compiled sink")?
+            .inputs
+            .remove("resize_type.crop");
+        assert_eq!(
+            tampered_plan.validate_integrity(),
+            Err(PromptCompileError::InvalidCompiledPlan)
+        );
+
+        let mut missing = nodes.clone();
+        missing
+            .get_mut(&NodeId::from("output"))
+            .ok_or("missing sink")?
+            .inputs
+            .remove("resize_type.crop");
+        assert!(matches!(
+            PromptCompiler::new(&registry).compile(submission(missing)),
+            Err(PromptCompileError::MissingInput { input, .. })
+                if input == "resize_type.crop"
+        ));
+
+        let mut inactive = nodes.clone();
+        inactive
+            .get_mut(&NodeId::from("output"))
+            .ok_or("missing sink")?
+            .inputs
+            .insert("resize_type.width".to_owned(), json!(512));
+        assert!(matches!(
+            PromptCompiler::new(&registry).compile(submission(inactive)),
+            Err(PromptCompileError::UnknownInput { input, .. })
+                if input == "resize_type.width"
+        ));
+
+        let mut handle_shaped_json = nodes;
+        handle_shaped_json
+            .get_mut(&NodeId::from("output"))
+            .ok_or("missing sink")?
+            .inputs = BTreeMap::from([(
+            "resize_type".to_owned(),
+            json!({
+                "resize_type": "match size",
+                "match": ["image", 0],
+                "crop": "center"
+            }),
+        )]);
+        assert!(matches!(
+            PromptCompiler::new(&registry).compile(submission(handle_shaped_json)),
+            Err(PromptCompileError::InvalidLiteral { input, .. })
+                if input == "resize_type"
+        ));
         Ok(())
     }
 

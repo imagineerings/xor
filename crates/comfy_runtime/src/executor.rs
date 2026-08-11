@@ -10,7 +10,8 @@ use comfy_nodes::{
     NativeNodeComputeSession, NativeNodeContractError, NativeNodeServiceIdentity,
     NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency, NativePreparedEffectKind,
     NativePreparedEffectService, NativeResidentAllocationId, NativeResolvedPayload,
-    NativeResolvedPayloadRetention, NativeStoredPayload, NativeValue, NodeRegistry,
+    NativeResolvedPayloadRetention, NativeStoredPayload, NativeStructuredValue, NativeValue,
+    NodeRegistry,
 };
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
@@ -2689,8 +2690,9 @@ impl ExecutionEngine {
                 InputBinding::Link { lazy: true, .. } => {}
             }
         }
+        let node_inputs = assemble_structured_inputs(&node.descriptor, &inputs)?;
         let demanded = implementation
-            .demanded_lazy_inputs(&context, &inputs)
+            .demanded_lazy_inputs(&context, &node_inputs)
             .map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
         for name in demanded {
             let binding =
@@ -2716,14 +2718,16 @@ impl ExecutionEngine {
             inputs.insert(name, linked_value(source, *output_index, *mode, &outputs)?);
         }
 
+        let node_inputs = assemble_structured_inputs(&node.descriptor, &inputs)?;
+
         if context.cancellation.is_cancelled() {
             return Err(ExecutionError::Cancelled);
         }
         let change_token = implementation
-            .cache_change_token(&inputs)
+            .cache_change_token(&node_inputs)
             .map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
         let cache_dependencies = implementation
-            .cache_dependencies(&context, &inputs)
+            .cache_dependencies(&context, &node_inputs)
             .map_err(|failure| execution_node_failure(node_id.clone(), failure))?;
         let demanded_dependencies = demanded_dependency_identities(&node, &inputs, state)?;
         let cache_key = CacheKey::from_inputs_with_dependencies(
@@ -2914,6 +2918,7 @@ impl ExecutionEngine {
             })
             .collect::<Vec<_>>();
         if mapped.is_empty() {
+            let inputs = assemble_structured_inputs(&node.descriptor, &inputs)?;
             return self
                 .execute_once(
                     implementation,
@@ -2971,7 +2976,7 @@ impl ExecutionEngine {
                     implementation,
                     &node.descriptor.outputs,
                     context.clone(),
-                    iteration_inputs,
+                    assemble_structured_inputs(&node.descriptor, &iteration_inputs)?,
                     state,
                     expansion_depth,
                 )
@@ -3251,6 +3256,153 @@ fn native_list_values(value: &NativeValue) -> Option<&[NativeValue]> {
     match value {
         NativeValue::List { values } => Some(values),
         _ => None,
+    }
+}
+
+#[derive(Default)]
+struct StructuredInputTree {
+    value: Option<NativeValue>,
+    children: BTreeMap<String, StructuredInputTree>,
+}
+
+fn assemble_structured_inputs(
+    descriptor: &RuntimeNodeDescriptor,
+    inputs: &BTreeMap<String, NativeValue>,
+) -> Result<BTreeMap<String, NativeValue>, ExecutionError> {
+    let Some(source_schema) = &descriptor.source_schema else {
+        return Ok(inputs.clone());
+    };
+    let mut result = inputs.clone();
+    for schema in &source_schema.inputs {
+        let structured = schema
+            .structured_options()
+            .map_err(|error| ExecutionError::HandleStore(error.to_string()))?;
+        if structured.is_empty() || !inputs.contains_key(&schema.name) {
+            continue;
+        }
+        let mut tree = StructuredInputTree::default();
+        tree.value = result.remove(&schema.name).map(normalize_structured_field);
+        let prefix = format!("{}.", schema.name);
+        let nested_names = result
+            .keys()
+            .filter(|name| name.starts_with(&prefix))
+            .cloned()
+            .collect::<Vec<_>>();
+        for name in nested_names {
+            let value = result.remove(&name).ok_or_else(|| {
+                ExecutionError::HandleStore("structured input disappeared".to_owned())
+            })?;
+            let path = name.strip_prefix(&prefix).ok_or_else(|| {
+                ExecutionError::HandleStore("structured input path is invalid".to_owned())
+            })?;
+            insert_structured_input_path(&mut tree, path, normalize_structured_field(value))?;
+        }
+        let type_name = schema.source_type_names.first().ok_or_else(|| {
+            ExecutionError::HandleStore("structured input type is missing".to_owned())
+        })?;
+        let value = structured_tree_value(&schema.name, type_name, tree)?;
+        result.insert(schema.name.clone(), value);
+    }
+    Ok(result)
+}
+
+fn insert_structured_input_path(
+    tree: &mut StructuredInputTree,
+    path: &str,
+    value: NativeValue,
+) -> Result<(), ExecutionError> {
+    let mut parts = path.split('.').peekable();
+    let mut current = tree;
+    while let Some(part) = parts.next() {
+        if part.is_empty() {
+            return Err(ExecutionError::HandleStore(
+                "structured input path contains an empty field".to_owned(),
+            ));
+        }
+        current = current.children.entry(part.to_owned()).or_default();
+        if parts.peek().is_none() {
+            if current.value.replace(value).is_some() {
+                return Err(ExecutionError::HandleStore(
+                    "structured input path is duplicated".to_owned(),
+                ));
+            }
+            return Ok(());
+        }
+    }
+    Err(ExecutionError::HandleStore(
+        "structured input path is empty".to_owned(),
+    ))
+}
+
+fn structured_tree_value(
+    field_name: &str,
+    type_name: &str,
+    tree: StructuredInputTree,
+) -> Result<NativeValue, ExecutionError> {
+    let mut fields = BTreeMap::new();
+    if let Some(value) = tree.value {
+        fields.insert(field_name.to_owned(), value);
+    }
+    for (name, child) in tree.children {
+        let value = if child.children.is_empty() {
+            child.value.ok_or_else(|| {
+                ExecutionError::HandleStore("structured input field has no value".to_owned())
+            })?
+        } else {
+            structured_tree_value(&name, "sim.structured@1", child)?
+        };
+        if fields.insert(name, value).is_some() {
+            return Err(ExecutionError::HandleStore(
+                "structured input field is duplicated".to_owned(),
+            ));
+        }
+    }
+    NativeStructuredValue::checked(type_name, fields)
+        .and_then(NativeStructuredValue::into_runtime_value)
+        .map_err(|error| ExecutionError::HandleStore(error.to_string()))
+}
+
+fn normalize_structured_field(value: NativeValue) -> NativeValue {
+    let NativeValue::PreservedUnknown { value, .. } = value else {
+        return value;
+    };
+    match value {
+        Value::Null => NativeValue::Primitive {
+            value: comfy_nodes::NativePrimitive::Null,
+        },
+        Value::Bool(value) => NativeValue::Primitive {
+            value: comfy_nodes::NativePrimitive::Boolean(value),
+        },
+        Value::Number(value) => {
+            let primitive = value
+                .as_i64()
+                .map(comfy_nodes::NativePrimitive::Integer)
+                .or_else(|| {
+                    value
+                        .as_u64()
+                        .map(comfy_nodes::NativePrimitive::UnsignedInteger)
+                })
+                .or_else(|| {
+                    value
+                        .as_f64()
+                        .filter(|value| value.is_finite())
+                        .map(comfy_nodes::NativePrimitive::Number)
+                });
+            match primitive {
+                Some(value) => NativeValue::Primitive { value },
+                None => NativeValue::PreservedUnknown {
+                    type_name: "sim.json@1".to_owned(),
+                    value: Value::Number(value),
+                },
+            }
+        }
+        Value::String(value) => NativeValue::Primitive {
+            value: comfy_nodes::NativePrimitive::String(value),
+        },
+        value @ (Value::Array(_) | Value::Object(_)) => NativeValue::PreservedUnknown {
+            type_name: "sim.json@1".to_owned(),
+            value,
+        },
     }
 }
 
@@ -4292,6 +4444,101 @@ pub(crate) mod tests {
             is_list: false,
         }];
         Ok(descriptor)
+    }
+
+    #[test]
+    fn resolved_dotted_fields_assemble_without_serializing_handles()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut descriptor = runtime_descriptor(
+            "Structured",
+            true,
+            BTreeMap::from([(
+                "resize_type".to_owned(),
+                RuntimeInputDescriptor {
+                    value_type: ValueType::Any,
+                    required: true,
+                    hidden: false,
+                    lazy: false,
+                    mode: InputMode::Scalar,
+                    allows_literal: true,
+                },
+            )]),
+            EffectClass::Pure,
+        )?;
+        descriptor.inputs[0].accepted_types =
+            NativeTypeUnion::new([NativeValueType::NamedPreservedUnknown(
+                "COMFY_DYNAMICCOMBO_V3".to_owned(),
+            )])?;
+        let expression = json!({
+            "arguments": [
+                {"kind": "literal", "value": "match size"},
+                {"kind": "list", "items": [{
+                    "arguments": [
+                        {"kind": "literal", "value": "match"},
+                        {"kind": "list", "items": [
+                            {"kind": "attribute", "name": "io.Image"},
+                            {"kind": "attribute", "name": "io.Mask"}
+                        ]}
+                    ],
+                    "keywords": [],
+                    "kind": "call",
+                    "name": "io.MultiType.Input"
+                }]}
+            ],
+            "keywords": [],
+            "kind": "call",
+            "name": "io.DynamicCombo.Option"
+        });
+        let expression = serde_json::to_string(&expression)?;
+        let mut source_schema = comfy_nodes::NativeDescriptorSchemaMetadata::compatibility(
+            comfy_nodes::NativeSchemaProvenance::SourceV3,
+            [("resize_type".to_owned(), "COMFY_DYNAMICCOMBO_V3".to_owned())],
+            std::iter::empty(),
+            [("value".to_owned(), "FLOAT".to_owned())],
+        );
+        source_schema.inputs[0].choices =
+            vec![comfy_nodes::NativeSchemaValue::PreservedExpression {
+                sha256: format!("{:x}", Sha256::digest(expression.as_bytes())),
+                source: expression,
+            }];
+        descriptor.source_schema = Some(source_schema);
+
+        let store = NativeHandleStoreGeneration::new()?;
+        let session = store.session(AttemptId(Uuid::from_u128(400)));
+        let payload = stored_test_payload(b"structured".to_vec())?;
+        let handle = session.publish(payload, &CancellationToken::default())?;
+        let inputs = BTreeMap::from([
+            (
+                "resize_type".to_owned(),
+                NativeValue::PreservedUnknown {
+                    type_name: "COMFY_DYNAMICCOMBO_V3".to_owned(),
+                    value: json!("match size"),
+                },
+            ),
+            (
+                "resize_type.match".to_owned(),
+                NativeValue::Handle {
+                    value: handle.clone(),
+                },
+            ),
+        ]);
+        let assembled = assemble_structured_inputs(&descriptor, &inputs)?;
+        assert_eq!(assembled.len(), 1);
+        let structured = NativeStructuredValue::from_native_value(
+            assembled
+                .get("resize_type")
+                .ok_or("missing structured input")?,
+        )?
+        .ok_or("structured input did not retain its typed representation")?;
+        assert_eq!(
+            structured.get("resize_type"),
+            Some(&native_string("match size"))
+        );
+        assert_eq!(
+            structured.get("match"),
+            Some(&NativeValue::Handle { value: handle })
+        );
+        Ok(())
     }
 
     fn report_handle(report: &ExecutionReport) -> Option<NativeOpaqueHandle> {

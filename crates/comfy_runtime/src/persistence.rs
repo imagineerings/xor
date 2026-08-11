@@ -172,8 +172,8 @@ impl PersistedExecutionAttempt {
                 plan.prompt_id == self.record.prompt_id,
                 "persisted execution plan does not match its attempt prompt"
             );
-            plan.validate_provider_execution_identity()
-                .map_err(|error| anyhow::anyhow!("persisted provider plan is invalid: {error}"))?;
+            plan.validate_integrity()
+                .map_err(|error| anyhow::anyhow!("persisted compiled plan is invalid: {error}"))?;
             ensure_unknown_fields_do_not_shadow(
                 &plan.persistence_unknown_fields,
                 &[

@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, error::Error, fmt};
+use serde_json::Value as JsonValue;
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+    fmt,
+};
 
 pub const NODE_DESCRIPTOR_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_SCHEMA_METADATA_VERSION: u16 = 2;
@@ -186,6 +192,20 @@ pub struct NativeInputSchemaMetadata {
     pub extra: Vec<NativeSchemaField>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeStructuredInputField {
+    pub path: Vec<String>,
+    pub schema: NativeInputSchemaMetadata,
+    pub required: bool,
+    pub lazy: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeStructuredInputOption {
+    pub selector: String,
+    pub fields: Vec<NativeStructuredInputField>,
+}
+
 impl NativeInputSchemaMetadata {
     pub fn compatibility(name: impl Into<String>, source_type_name: impl Into<String>) -> Self {
         Self {
@@ -228,6 +248,296 @@ impl NativeInputSchemaMetadata {
         }
         Ok(())
     }
+
+    pub fn structured_options(
+        &self,
+    ) -> Result<Vec<NativeStructuredInputOption>, NativeSchemaError> {
+        if !self
+            .source_type_names
+            .iter()
+            .any(|source_type| source_type == "COMFY_DYNAMICCOMBO_V3")
+        {
+            return Ok(Vec::new());
+        }
+        let mut options = Vec::with_capacity(self.choices.len());
+        let mut selectors = BTreeSet::new();
+        for choice in &self.choices {
+            let NativeSchemaValue::PreservedExpression { source, .. } = choice else {
+                return Err(NativeSchemaError::InvalidMetadata(
+                    "structured_input_option",
+                ));
+            };
+            let expression: JsonValue = serde_json::from_str(source)
+                .map_err(|_| NativeSchemaError::InvalidMetadata("structured_input_option"))?;
+            let option = structured_option_from_expression(&expression)?;
+            if !selectors.insert(option.selector.clone()) {
+                return Err(NativeSchemaError::DuplicateField(option.selector));
+            }
+            options.push(option);
+        }
+        Ok(options)
+    }
+}
+
+fn structured_option_from_expression(
+    expression: &JsonValue,
+) -> Result<NativeStructuredInputOption, NativeSchemaError> {
+    let object = expression
+        .as_object()
+        .ok_or(NativeSchemaError::InvalidMetadata(
+            "structured_input_option",
+        ))?;
+    if object.get("kind").and_then(JsonValue::as_str) != Some("call")
+        || !object
+            .get("name")
+            .and_then(JsonValue::as_str)
+            .is_some_and(|name| name.ends_with("DynamicCombo.Option"))
+    {
+        return Err(NativeSchemaError::InvalidMetadata(
+            "structured_input_option",
+        ));
+    }
+    let arguments = object
+        .get("arguments")
+        .and_then(JsonValue::as_array)
+        .ok_or(NativeSchemaError::InvalidMetadata(
+            "structured_input_option",
+        ))?;
+    let selector = structured_option_selector(arguments.first().ok_or(
+        NativeSchemaError::InvalidMetadata("structured_input_option"),
+    )?)?;
+    let items = arguments
+        .get(1)
+        .and_then(|value| value.get("items"))
+        .and_then(JsonValue::as_array)
+        .ok_or(NativeSchemaError::InvalidMetadata(
+            "structured_input_option",
+        ))?;
+    let mut fields = BTreeMap::<Vec<String>, NativeStructuredInputField>::new();
+    for item in items {
+        collect_structured_input_fields(item, &[], &mut fields)?;
+    }
+    Ok(NativeStructuredInputOption {
+        selector,
+        fields: fields.into_values().collect(),
+    })
+}
+
+fn structured_option_selector(value: &JsonValue) -> Result<String, NativeSchemaError> {
+    match value.get("kind").and_then(JsonValue::as_str) {
+        Some("literal") => value
+            .get("value")
+            .and_then(JsonValue::as_str)
+            .map(ToOwned::to_owned)
+            .ok_or(NativeSchemaError::InvalidMetadata(
+                "structured_input_selector",
+            )),
+        Some("attribute") | Some("name") => {
+            let name = value.get("name").and_then(JsonValue::as_str).ok_or(
+                NativeSchemaError::InvalidMetadata("structured_input_selector"),
+            )?;
+            let member = name
+                .rsplit('.')
+                .next()
+                .ok_or(NativeSchemaError::InvalidMetadata(
+                    "structured_input_selector",
+                ))?;
+            let selector = member.to_ascii_lowercase().replace('_', " ");
+            if selector.is_empty() {
+                Err(NativeSchemaError::InvalidMetadata(
+                    "structured_input_selector",
+                ))
+            } else {
+                Ok(selector)
+            }
+        }
+        _ => Err(NativeSchemaError::InvalidMetadata(
+            "structured_input_selector",
+        )),
+    }
+}
+
+fn collect_structured_input_fields(
+    expression: &JsonValue,
+    prefix: &[String],
+    fields: &mut BTreeMap<Vec<String>, NativeStructuredInputField>,
+) -> Result<(), NativeSchemaError> {
+    let object = expression
+        .as_object()
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_field"))?;
+    if object.get("kind").and_then(JsonValue::as_str) != Some("call") {
+        return Err(NativeSchemaError::InvalidMetadata("structured_input_field"));
+    }
+    let arguments = object
+        .get("arguments")
+        .and_then(JsonValue::as_array)
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_field"))?;
+    let name = arguments
+        .first()
+        .and_then(|value| value.get("value"))
+        .and_then(JsonValue::as_str)
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_field"))?;
+    validate_name(name)?;
+    let mut path = prefix.to_vec();
+    path.push(name.to_owned());
+    let schema = structured_field_schema(object, name)?;
+    let required = !call_keyword_boolean(object, "optional").unwrap_or(false);
+    let lazy = call_keyword_boolean(object, "lazy").unwrap_or(false);
+    let field = NativeStructuredInputField {
+        path: path.clone(),
+        schema: schema.clone(),
+        required,
+        lazy,
+    };
+    if let Some(existing) = fields.get(&path) {
+        if existing != &field {
+            return Err(NativeSchemaError::InvalidMetadata("structured_input_field"));
+        }
+    } else {
+        fields.insert(path.clone(), field);
+    }
+    Ok(())
+}
+
+fn structured_field_schema(
+    call: &serde_json::Map<String, JsonValue>,
+    name: &str,
+) -> Result<NativeInputSchemaMetadata, NativeSchemaError> {
+    let constructor = call
+        .get("name")
+        .and_then(JsonValue::as_str)
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_field"))?;
+    let arguments = call
+        .get("arguments")
+        .and_then(JsonValue::as_array)
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_field"))?;
+    let source_type_names = if constructor.ends_with("MultiType.Input") {
+        arguments
+            .get(1)
+            .and_then(|value| value.get("items"))
+            .and_then(JsonValue::as_array)
+            .ok_or(NativeSchemaError::InvalidMetadata("structured_input_type"))?
+            .iter()
+            .map(structured_source_type)
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        vec![structured_constructor_source_type(constructor)?]
+    };
+    let mut schema = NativeInputSchemaMetadata::compatibility(name, "STRING");
+    schema.source_type_names = source_type_names;
+    schema.default = call_keyword_value(call, "default").map(ast_schema_value);
+    schema.minimum = call_keyword_value(call, "min").map(ast_schema_value);
+    schema.maximum = call_keyword_value(call, "max").map(ast_schema_value);
+    schema.step = call_keyword_value(call, "step").map(ast_schema_value);
+    schema.choices = call_keyword_value(call, "options")
+        .and_then(|value| value.get("items"))
+        .and_then(JsonValue::as_array)
+        .map(|values| values.iter().map(ast_schema_value).collect())
+        .unwrap_or_default();
+    schema.display_name = call_keyword_string(call, "display_name");
+    schema.tooltip = call_keyword_string(call, "tooltip");
+    schema.multiline = call_keyword_boolean(call, "multiline").unwrap_or(false);
+    schema.socketless = call_keyword_boolean(call, "socketless").unwrap_or(false);
+    schema.force_input = call_keyword_boolean(call, "force_input")
+        .or_else(|| call_keyword_boolean(call, "forceInput"))
+        .unwrap_or(false);
+    schema.raw_link = call_keyword_boolean(call, "raw_link")
+        .or_else(|| call_keyword_boolean(call, "rawLink"))
+        .unwrap_or(false);
+    schema.advanced = call_keyword_boolean(call, "advanced").unwrap_or(false);
+    schema.validate()?;
+    Ok(schema)
+}
+
+fn structured_constructor_source_type(constructor: &str) -> Result<String, NativeSchemaError> {
+    let type_name = constructor
+        .strip_suffix(".Input")
+        .and_then(|value| value.rsplit('.').next())
+        .ok_or(NativeSchemaError::InvalidMetadata("structured_input_type"))?;
+    let source_type = match type_name {
+        "Boolean" => "BOOLEAN",
+        "Combo" => "COMBO",
+        "DynamicCombo" => "COMFY_DYNAMICCOMBO_V3",
+        "Float" => "FLOAT",
+        "Int" => "INT",
+        "MatchType" => "COMFY_MATCHTYPE_V3",
+        "String" => "STRING",
+        value => return Ok(value.to_ascii_uppercase()),
+    };
+    Ok(source_type.to_owned())
+}
+
+fn structured_source_type(value: &JsonValue) -> Result<String, NativeSchemaError> {
+    match value.get("kind").and_then(JsonValue::as_str) {
+        Some("attribute") | Some("name") => value
+            .get("name")
+            .and_then(JsonValue::as_str)
+            .and_then(|name| name.rsplit('.').next())
+            .map(|name| name.to_ascii_uppercase())
+            .ok_or(NativeSchemaError::InvalidMetadata("structured_input_type")),
+        _ => Err(NativeSchemaError::InvalidMetadata("structured_input_type")),
+    }
+}
+
+fn call_keyword_value<'a>(
+    call: &'a serde_json::Map<String, JsonValue>,
+    name: &str,
+) -> Option<&'a JsonValue> {
+    call.get("keywords")
+        .and_then(JsonValue::as_array)?
+        .iter()
+        .find(|keyword| keyword.get("name").and_then(JsonValue::as_str) == Some(name))?
+        .get("value")
+}
+
+fn call_keyword_boolean(call: &serde_json::Map<String, JsonValue>, name: &str) -> Option<bool> {
+    call_keyword_value(call, name)?.get("value")?.as_bool()
+}
+
+fn call_keyword_string(call: &serde_json::Map<String, JsonValue>, name: &str) -> Option<String> {
+    call_keyword_value(call, name)?
+        .get("value")?
+        .as_str()
+        .map(ToOwned::to_owned)
+}
+
+fn ast_schema_value(expression: &JsonValue) -> NativeSchemaValue {
+    if expression.get("kind").and_then(JsonValue::as_str) == Some("literal")
+        && let Some(value) = expression.get("value")
+    {
+        if value.is_null() {
+            return NativeSchemaValue::Null;
+        }
+        if let Some(value) = value.as_bool() {
+            return NativeSchemaValue::Boolean { value };
+        }
+        if let Some(value) = value.as_i64() {
+            return NativeSchemaValue::SignedInteger { value };
+        }
+        if let Some(value) = value.as_u64() {
+            return NativeSchemaValue::UnsignedInteger { value };
+        }
+        if let Some(value) = value.as_f64().filter(|value| value.is_finite()) {
+            return NativeSchemaValue::FiniteDecimal {
+                value: value.to_string(),
+            };
+        }
+        if let Some(value) = value.as_str() {
+            return NativeSchemaValue::String {
+                value: value.to_owned(),
+            };
+        }
+    }
+    if expression.get("kind").and_then(JsonValue::as_str) == Some("list")
+        && let Some(values) = expression.get("items").and_then(JsonValue::as_array)
+    {
+        return NativeSchemaValue::List {
+            values: values.iter().map(ast_schema_value).collect(),
+        };
+    }
+    let source = expression.to_string();
+    let sha256 = format!("{:x}", Sha256::digest(source.as_bytes()));
+    NativeSchemaValue::PreservedExpression { source, sha256 }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -1114,5 +1424,90 @@ mod tests {
             preserved_expressions.validate(),
             Err(NativeSchemaError::TotalBytesExceeded)
         );
+    }
+
+    #[test]
+    fn dynamic_combo_options_recover_source_declared_multitype_fields() -> Result<(), Box<dyn Error>>
+    {
+        let expression = serde_json::json!({
+            "arguments": [
+                {"kind": "attribute", "name": "ResizeType.MATCH_SIZE"},
+                {"kind": "list", "items": [
+                    {
+                        "arguments": [
+                            {"kind": "literal", "value": "match"},
+                            {"kind": "list", "items": [
+                                {"kind": "attribute", "name": "io.Image"},
+                                {"kind": "attribute", "name": "io.Mask"}
+                            ]}
+                        ],
+                        "keywords": [
+                            {"name": "tooltip", "value": {"kind": "literal", "value": "reference"}}
+                        ],
+                        "kind": "call",
+                        "name": "io.MultiType.Input"
+                    },
+                    {
+                        "arguments": [{"kind": "literal", "value": "crop"}],
+                        "keywords": [
+                            {"name": "options", "value": {"kind": "list", "items": [
+                                {"kind": "literal", "value": "disabled"},
+                                {"kind": "literal", "value": "center"}
+                            ]}},
+                            {"name": "default", "value": {"kind": "literal", "value": "center"}}
+                        ],
+                        "kind": "call",
+                        "name": "io.Combo.Input"
+                    }
+                ]}
+            ],
+            "keywords": [],
+            "kind": "call",
+            "name": "io.DynamicCombo.Option"
+        });
+        let source = serde_json::to_string(&expression)?;
+        let mut schema =
+            NativeInputSchemaMetadata::compatibility("resize_type", "COMFY_DYNAMICCOMBO_V3");
+        schema.choices.push(NativeSchemaValue::PreservedExpression {
+            sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
+            source,
+        });
+        let options = schema.structured_options()?;
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].selector, "match size");
+        assert_eq!(options[0].fields.len(), 2);
+        assert_eq!(options[0].fields[0].path, ["crop"]);
+        assert_eq!(options[0].fields[1].path, ["match"]);
+        assert_eq!(
+            options[0].fields[1].schema.source_type_names,
+            ["IMAGE", "MASK"]
+        );
+        assert!(options[0].fields.iter().all(|field| field.required));
+        Ok(())
+    }
+
+    #[test]
+    fn resize_image_mask_catalog_retains_the_source_declared_match_union()
+    -> Result<(), Box<dyn Error>> {
+        let schema = crate::built_in_source_schema("ResizeImageMaskNode")?;
+        let resize_type = schema
+            .inputs
+            .iter()
+            .find(|input| input.schema.name == "resize_type")
+            .ok_or("ResizeImageMaskNode has no resize_type input")?;
+        let match_size = resize_type
+            .schema
+            .structured_options()?
+            .into_iter()
+            .find(|option| option.selector == "match size")
+            .ok_or("ResizeImageMaskNode has no match size option")?;
+        let match_input = match_size
+            .fields
+            .iter()
+            .find(|field| field.path.as_slice() == ["match"])
+            .ok_or("match size has no match input")?;
+        assert_eq!(match_input.schema.source_type_names, ["IMAGE", "MASK"]);
+        assert!(match_input.required);
+        Ok(())
     }
 }

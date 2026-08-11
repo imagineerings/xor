@@ -300,6 +300,7 @@ fn valid_identifier(value: &str) -> bool {
 
 enum FormatAtom {
     Text(String),
+    Boolean(bool),
     Signed(i64),
     Unsigned(u64),
     Float(f64),
@@ -324,9 +325,7 @@ fn default_atom(value: ValueRef<'_>) -> Result<FormatAtom, NativeTextFormatError
     match value {
         ValueRef::Native(NativeValue::Primitive { value }) => Ok(match value {
             NativePrimitive::Null => FormatAtom::Text("None".to_owned()),
-            NativePrimitive::Boolean(value) => {
-                FormatAtom::Text(if *value { "True" } else { "False" }.to_owned())
-            }
+            NativePrimitive::Boolean(value) => FormatAtom::Boolean(*value),
             NativePrimitive::Integer(value) => FormatAtom::Signed(*value),
             NativePrimitive::UnsignedInteger(value) => FormatAtom::Unsigned(*value),
             NativePrimitive::Number(value) => FormatAtom::Float(*value),
@@ -340,9 +339,7 @@ fn default_atom(value: ValueRef<'_>) -> Result<FormatAtom, NativeTextFormatError
                 .or_else(|| value.as_u64().map(FormatAtom::Unsigned))
                 .or_else(|| value.as_f64().map(FormatAtom::Float))
                 .ok_or_else(|| NativeTextFormatError::UnsupportedValue("JSON number".to_owned())),
-            Value::Bool(value) => Ok(FormatAtom::Text(
-                if *value { "True" } else { "False" }.to_owned(),
-            )),
+            Value::Bool(value) => Ok(FormatAtom::Boolean(*value)),
             Value::Null => Ok(FormatAtom::Text("None".to_owned())),
             Value::Array(_) | Value::Object(_) => Ok(FormatAtom::Text(json_repr(value, false)?)),
         },
@@ -425,14 +422,28 @@ fn json_repr(value: &Value, ascii_only: bool) -> Result<String, NativeTextFormat
 }
 
 fn quoted(value: &str, ascii_only: bool) -> String {
-    let mut output = String::from("'");
+    let quote = if value.contains('\'') && !value.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let mut output = String::new();
+    output.push(quote);
     for character in value.chars() {
         match character {
             '\\' => output.push_str("\\\\"),
-            '\'' => output.push_str("\\'"),
+            character if character == quote => {
+                output.push('\\');
+                output.push(character);
+            }
             '\n' => output.push_str("\\n"),
             '\r' => output.push_str("\\r"),
             '\t' => output.push_str("\\t"),
+            '\u{0008}' => output.push_str("\\x08"),
+            '\u{000c}' => output.push_str("\\x0c"),
+            character if character.is_control() && u32::from(character) <= 0xff => {
+                output.push_str(&format!("\\x{:02x}", u32::from(character)));
+            }
             character if ascii_only && !character.is_ascii() => {
                 let value = u32::from(character);
                 if value <= 0xffff {
@@ -444,7 +455,7 @@ fn quoted(value: &str, ascii_only: bool) -> String {
             character => output.push(character),
         }
     }
-    output.push('\'');
+    output.push(quote);
     output
 }
 
@@ -461,9 +472,11 @@ struct FormatSpec {
     fill: char,
     align: Option<char>,
     sign: Option<char>,
+    coerce_negative_zero: bool,
     alternate: bool,
     zero: bool,
     width: Option<usize>,
+    grouping: Option<char>,
     precision: Option<usize>,
     kind: Option<char>,
 }
@@ -472,10 +485,10 @@ impl FormatSpec {
     fn checked(value: &str) -> Result<Self, NativeTextFormatError> {
         let values = value.chars().collect::<Vec<_>>();
         let mut position = 0usize;
-        let (fill, align) = if values.get(1).is_some_and(|value| "<>^".contains(*value)) {
+        let (fill, align) = if values.get(1).is_some_and(|value| "<>=^".contains(*value)) {
             position = 2;
             (values[0], values.get(1).copied())
-        } else if values.first().is_some_and(|value| "<>^".contains(*value)) {
+        } else if values.first().is_some_and(|value| "<>=^".contains(*value)) {
             position = 1;
             (' ', values.first().copied())
         } else {
@@ -486,6 +499,8 @@ impl FormatSpec {
             .copied()
             .filter(|value| "+- ".contains(*value));
         position += usize::from(sign.is_some());
+        let coerce_negative_zero = values.get(position) == Some(&'z');
+        position += usize::from(coerce_negative_zero);
         let alternate = values.get(position) == Some(&'#');
         position += usize::from(alternate);
         let zero = values.get(position) == Some(&'0');
@@ -495,6 +510,11 @@ impl FormatSpec {
             position += 1;
         }
         let width = parse_digits(&values[width_start..position])?;
+        let grouping = values
+            .get(position)
+            .copied()
+            .filter(|value| matches!(value, ',' | '_'));
+        position += usize::from(grouping.is_some());
         let precision = if values.get(position) == Some(&'.') {
             position += 1;
             let start = position;
@@ -518,9 +538,11 @@ impl FormatSpec {
             fill,
             align,
             sign,
+            coerce_negative_zero,
             alternate,
             zero,
             width,
+            grouping,
             precision,
             kind,
         })
@@ -545,6 +567,7 @@ fn apply_spec(value: FormatAtom, spec: &str) -> Result<String, NativeTextFormatE
     if spec.is_empty() {
         return Ok(match value {
             FormatAtom::Text(value) => value,
+            FormatAtom::Boolean(value) => if value { "True" } else { "False" }.to_owned(),
             FormatAtom::Signed(value) => value.to_string(),
             FormatAtom::Unsigned(value) => value.to_string(),
             FormatAtom::Float(value) => python_float(value),
@@ -554,6 +577,7 @@ fn apply_spec(value: FormatAtom, spec: &str) -> Result<String, NativeTextFormatE
     let numeric = !matches!(value, FormatAtom::Text(_));
     let mut value = match value {
         FormatAtom::Text(value) => format_text(value, &spec)?,
+        FormatAtom::Boolean(value) => format_integer(u64::from(value), false, &spec)?,
         FormatAtom::Signed(value) => format_integer(value.unsigned_abs(), value < 0, &spec)?,
         FormatAtom::Unsigned(value) => format_integer(value, false, &spec)?,
         FormatAtom::Float(value) => format_number(value, &spec)?,
@@ -562,7 +586,13 @@ fn apply_spec(value: FormatAtom, spec: &str) -> Result<String, NativeTextFormatE
         let length = value.chars().count();
         if length < width {
             let padding = width - length;
-            let align = spec.align.unwrap_or(if numeric { '>' } else { '<' });
+            let align = spec.align.unwrap_or(if spec.zero && numeric {
+                '='
+            } else if numeric {
+                '>'
+            } else {
+                '<'
+            });
             let left = match align {
                 '>' => padding,
                 '^' => padding / 2,
@@ -570,24 +600,29 @@ fn apply_spec(value: FormatAtom, spec: &str) -> Result<String, NativeTextFormatE
             };
             let right = padding - left;
             let fill = if spec.zero && numeric { '0' } else { spec.fill };
-            if fill == '0' && numeric && left != 0 {
-                value = zero_pad_numeric(value, left);
-                value.push_str(&fill.to_string().repeat(right));
+            if align == '=' {
+                value = pad_numeric_after_prefix(value, fill, padding)?;
             } else {
-                value = format!(
-                    "{}{}{}",
-                    fill.to_string().repeat(left),
-                    value,
-                    fill.to_string().repeat(right)
-                );
+                value = pad_value(value, fill, left, right)?;
             }
         }
+    }
+    if value.len() > NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES {
+        return Err(NativeTextFormatError::ResultTooLarge {
+            maximum_bytes: NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES,
+        });
     }
     Ok(value)
 }
 
 fn format_text(mut value: String, spec: &FormatSpec) -> Result<String, NativeTextFormatError> {
-    if spec.sign.is_some() || spec.alternate || spec.zero || !matches!(spec.kind, None | Some('s'))
+    if spec.sign.is_some()
+        || spec.coerce_negative_zero
+        || spec.alternate
+        || spec.zero
+        || spec.grouping.is_some()
+        || spec.align == Some('=')
+        || !matches!(spec.kind, None | Some('s'))
     {
         return Err(NativeTextFormatError::InvalidTemplate(
             "numeric format applied to text".to_owned(),
@@ -609,23 +644,48 @@ fn format_integer(
             "integer precision is unsupported".to_owned(),
         ));
     }
-    let (prefix, digits) = match spec.kind.unwrap_or('d') {
-        'd' | 'n' => ("", magnitude.to_string()),
+    if spec.coerce_negative_zero {
+        return Err(NativeTextFormatError::InvalidTemplate(
+            "negative-zero coercion requires a floating-point value".to_owned(),
+        ));
+    }
+    if spec.kind == Some('c') {
+        if spec.sign.is_some() || spec.alternate || spec.zero || spec.grouping.is_some() {
+            return Err(NativeTextFormatError::InvalidTemplate(
+                "unsupported character format option".to_owned(),
+            ));
+        }
+        let codepoint = u32::try_from(magnitude)
+            .ok()
+            .and_then(char::from_u32)
+            .ok_or_else(|| {
+                NativeTextFormatError::InvalidTemplate(
+                    "character code point is outside the Unicode scalar range".to_owned(),
+                )
+            })?;
+        return Ok(codepoint.to_string());
+    }
+    let (prefix, mut digits, group_size) = match spec.kind.unwrap_or('d') {
+        'd' | 'n' => ("", magnitude.to_string(), 3),
         'b' => (
             if spec.alternate { "0b" } else { "" },
             format!("{magnitude:b}"),
+            4,
         ),
         'o' => (
             if spec.alternate { "0o" } else { "" },
             format!("{magnitude:o}"),
+            4,
         ),
         'x' => (
             if spec.alternate { "0x" } else { "" },
             format!("{magnitude:x}"),
+            4,
         ),
         'X' => (
             if spec.alternate { "0X" } else { "" },
             format!("{magnitude:X}"),
+            4,
         ),
         _ => {
             return Err(NativeTextFormatError::InvalidTemplate(
@@ -633,6 +693,14 @@ fn format_integer(
             ));
         }
     };
+    if let Some(grouping) = spec.grouping {
+        if grouping == ',' && !matches!(spec.kind, None | Some('d' | 'n')) {
+            return Err(NativeTextFormatError::InvalidTemplate(
+                "comma grouping is unsupported for this integer format type".to_owned(),
+            ));
+        }
+        digits = group_digits(&digits, grouping, group_size);
+    }
     Ok(format!(
         "{}{prefix}{digits}",
         sign_prefix(negative, spec.sign)
@@ -640,26 +708,187 @@ fn format_integer(
 }
 
 fn format_number(value: f64, spec: &FormatSpec) -> Result<String, NativeTextFormatError> {
-    let negative = value.is_sign_negative();
+    let mut negative = value.is_sign_negative();
     let precision = spec.precision.unwrap_or(6);
     let magnitude = value.abs();
-    let value = match spec.kind {
-        None => python_float(magnitude),
-        Some('f' | 'F') => format!("{magnitude:.precision$}"),
-        Some('e') => format!("{magnitude:.precision$e}"),
-        Some('E') => format!("{magnitude:.precision$E}"),
-        Some('%') => format!("{:.precision$}%", magnitude * 100.0),
-        Some('g' | 'G' | 'n') => python_float(magnitude),
+    let mut formatted = match spec.kind {
+        None if spec.precision.is_none() => python_float(magnitude),
+        None => format_general(magnitude, precision, false, spec.alternate, true),
+        Some('f' | 'F') => format_fixed(magnitude, precision, spec.alternate),
+        Some('e') => format_exponent(magnitude, precision, false, spec.alternate),
+        Some('E') => format_exponent(magnitude, precision, true, spec.alternate),
+        Some('%') => format!(
+            "{}%",
+            format_fixed(magnitude * 100.0, precision, spec.alternate)
+        ),
+        Some('g' | 'n') => format_general(magnitude, precision, false, spec.alternate, false),
+        Some('G') => format_general(magnitude, precision, true, spec.alternate, false),
         _ => {
             return Err(NativeTextFormatError::InvalidTemplate(
                 "unsupported number format type".to_owned(),
             ));
         }
     };
-    Ok(format!("{}{value}", sign_prefix(negative, spec.sign)))
+    if spec.coerce_negative_zero && formatted_value_is_zero(&formatted) {
+        negative = false;
+    }
+    if let Some(grouping) = spec.grouping {
+        formatted = group_float_integer_part(&formatted, grouping);
+    }
+    Ok(format!("{}{formatted}", sign_prefix(negative, spec.sign)))
 }
 
-fn zero_pad_numeric(value: String, padding: usize) -> String {
+fn format_fixed(value: f64, precision: usize, alternate: bool) -> String {
+    let mut value = format!("{value:.precision$}");
+    if alternate && precision == 0 && !value.contains('.') {
+        value.push('.');
+    }
+    value
+}
+
+fn format_exponent(value: f64, precision: usize, uppercase: bool, alternate: bool) -> String {
+    let mut value = format!("{value:.precision$e}");
+    if alternate && precision == 0 {
+        if let Some(exponent) = value.find('e') {
+            value.insert(exponent, '.');
+        }
+    }
+    normalize_exponent(value, uppercase)
+}
+
+fn format_general(
+    value: f64,
+    precision: usize,
+    uppercase: bool,
+    alternate: bool,
+    no_type: bool,
+) -> String {
+    if !value.is_finite() {
+        let value = python_float(value);
+        return if uppercase {
+            value.to_ascii_uppercase()
+        } else {
+            value
+        };
+    }
+    let precision = precision.max(1);
+    if value == 0.0 {
+        let mut zero = if alternate {
+            format!(
+                "{:.precision$}",
+                0.0,
+                precision = precision.saturating_sub(1)
+            )
+        } else {
+            "0".to_owned()
+        };
+        if alternate && !zero.contains('.') {
+            zero.push('.');
+        }
+        return zero;
+    }
+    let exponent = rounded_decimal_exponent(value, precision);
+    let positive_cutoff = i32::try_from(precision)
+        .unwrap_or(i32::MAX)
+        .saturating_sub(i32::from(no_type));
+    if exponent < -4 || exponent >= positive_cutoff {
+        let mut value = format_exponent(value, precision.saturating_sub(1), uppercase, alternate);
+        if !alternate {
+            trim_fraction_zeros(&mut value);
+        }
+        value
+    } else {
+        let fractional_digits =
+            usize::try_from((i32::try_from(precision).unwrap_or(i32::MAX) - exponent - 1).max(0))
+                .unwrap_or(0);
+        let mut value = format_fixed(value, fractional_digits, alternate);
+        if !alternate {
+            trim_fraction_zeros(&mut value);
+        }
+        value
+    }
+}
+
+fn rounded_decimal_exponent(value: f64, precision: usize) -> i32 {
+    let scientific = format!(
+        "{value:.precision$e}",
+        precision = precision.saturating_sub(1)
+    );
+    scientific
+        .split_once('e')
+        .and_then(|(_, exponent)| exponent.parse::<i32>().ok())
+        .unwrap_or_else(|| value.log10().floor() as i32)
+}
+
+fn normalize_exponent(value: String, uppercase: bool) -> String {
+    let marker = value.find('e').or_else(|| value.find('E'));
+    let Some(marker) = marker else {
+        return if uppercase {
+            value.to_ascii_uppercase()
+        } else {
+            value
+        };
+    };
+    let mantissa = value.get(..marker).unwrap_or_default();
+    let exponent = value.get(marker + 1..).unwrap_or_default();
+    let parsed = exponent.parse::<i32>().unwrap_or_default();
+    let sign = if parsed < 0 { '-' } else { '+' };
+    let magnitude = parsed.unsigned_abs();
+    let marker = if uppercase { 'E' } else { 'e' };
+    format!("{mantissa}{marker}{sign}{magnitude:02}")
+}
+
+fn trim_fraction_zeros(value: &mut String) {
+    let exponent = value.find(['e', 'E']).unwrap_or(value.len());
+    let Some(decimal) = value.get(..exponent).and_then(|prefix| prefix.find('.')) else {
+        return;
+    };
+    let mut end = exponent;
+    while end > decimal + 1 && value.as_bytes().get(end - 1) == Some(&b'0') {
+        end -= 1;
+    }
+    if end == decimal + 1 {
+        end = decimal;
+    }
+    value.replace_range(end..exponent, "");
+}
+
+fn group_digits(value: &str, separator: char, group_size: usize) -> String {
+    let characters = value.chars().collect::<Vec<_>>();
+    let first_group = characters.len() % group_size;
+    let mut output = String::with_capacity(value.len().saturating_add(value.len() / group_size));
+    for (index, character) in characters.into_iter().enumerate() {
+        if index != 0
+            && (index == first_group
+                || (index > first_group && (index - first_group) % group_size == 0))
+        {
+            output.push(separator);
+        }
+        output.push(character);
+    }
+    output
+}
+
+fn group_float_integer_part(value: &str, separator: char) -> String {
+    let exponent = value.find(['e', 'E']).unwrap_or(value.len());
+    let suffix = value.get(exponent..).unwrap_or_default();
+    let mantissa = value.get(..exponent).unwrap_or_default();
+    let decimal = mantissa.find('.').unwrap_or(mantissa.len());
+    let integer = mantissa.get(..decimal).unwrap_or_default();
+    let fraction = mantissa.get(decimal..).unwrap_or_default();
+    format!("{}{fraction}{suffix}", group_digits(integer, separator, 3))
+}
+
+fn formatted_value_is_zero(value: &str) -> bool {
+    let value = value.strip_suffix('%').unwrap_or(value);
+    value.parse::<f64>().is_ok_and(|value| value == 0.0)
+}
+
+fn pad_numeric_after_prefix(
+    value: String,
+    fill: char,
+    padding: usize,
+) -> Result<String, NativeTextFormatError> {
     let sign_length = usize::from(
         value
             .chars()
@@ -678,7 +907,45 @@ fn zero_pad_numeric(value: String, padding: usize) -> String {
     };
     let split = sign_length + prefix_length;
     let (prefix, digits) = value.split_at(split);
-    format!("{prefix}{}{digits}", "0".repeat(padding))
+    let repeated = repeat_fill(fill, padding, value.len())?;
+    Ok(format!("{prefix}{repeated}{digits}"))
+}
+
+fn pad_value(
+    value: String,
+    fill: char,
+    left: usize,
+    right: usize,
+) -> Result<String, NativeTextFormatError> {
+    let left = repeat_fill(fill, left, value.len())?;
+    let size =
+        left.len()
+            .checked_add(value.len())
+            .ok_or(NativeTextFormatError::ResultTooLarge {
+                maximum_bytes: NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES,
+            })?;
+    let right = repeat_fill(fill, right, size)?;
+    Ok(format!("{left}{value}{right}"))
+}
+
+fn repeat_fill(
+    fill: char,
+    count: usize,
+    existing_bytes: usize,
+) -> Result<String, NativeTextFormatError> {
+    let repeated_bytes = fill
+        .len_utf8()
+        .checked_mul(count)
+        .and_then(|bytes| bytes.checked_add(existing_bytes))
+        .ok_or(NativeTextFormatError::ResultTooLarge {
+            maximum_bytes: NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES,
+        })?;
+    if repeated_bytes > NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES {
+        return Err(NativeTextFormatError::ResultTooLarge {
+            maximum_bytes: NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES,
+        });
+    }
+    Ok(fill.to_string().repeat(count))
 }
 
 fn sign_prefix(negative: bool, sign: Option<char>) -> &'static str {
@@ -719,7 +986,12 @@ fn check_cancellation(cancellation: &CancellationToken) -> Result<(), NativeText
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{NativeTextRegex, NativeTextRegexFlags};
+    use serde::Serialize;
+    use sha2::{Digest, Sha256};
     use std::error::Error;
+    use std::fs;
+    use std::path::Path;
 
     fn primitive(value: NativePrimitive) -> NativeValue {
         NativeValue::Primitive { value }
@@ -767,6 +1039,72 @@ mod tests {
     }
 
     #[test]
+    fn python_numeric_format_language_is_source_compatible() -> Result<(), Box<dyn Error>> {
+        let values = BTreeMap::from([
+            ("a".to_owned(), primitive(NativePrimitive::Integer(42))),
+            ("b".to_owned(), primitive(NativePrimitive::Integer(12_345))),
+            ("c".to_owned(), primitive(NativePrimitive::Integer(65))),
+            ("d".to_owned(), primitive(NativePrimitive::Number(1.0))),
+            ("e".to_owned(), primitive(NativePrimitive::Number(12_345.0))),
+            ("f".to_owned(), primitive(NativePrimitive::Number(12.34))),
+            ("g".to_owned(), primitive(NativePrimitive::Boolean(true))),
+        ]);
+        assert_eq!(
+            NativeTextFormatter::format(
+                "{a:=+8d}|{b:,d}|{b:_d}|{c:c}|{d:.2e}|{e:.3g}|{f:.2}|{d:#.0f}|{d:#.3g}|{g:d}|{g:>8}",
+                &values,
+                &CancellationToken::default(),
+            )?,
+            "+     42|12,345|12_345|A|1.00e+00|1.23e+04|1.2e+01|1.|1.00|1|       1"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn python_alignment_grouping_alternate_and_type_matrix_is_exact() -> Result<(), Box<dyn Error>>
+    {
+        let values = BTreeMap::from([
+            ("i".to_owned(), primitive(NativePrimitive::Integer(42))),
+            ("n".to_owned(), primitive(NativePrimitive::Integer(12_345))),
+            ("x".to_owned(), primitive(NativePrimitive::Integer(255))),
+            ("z".to_owned(), primitive(NativePrimitive::Number(-0.0))),
+            ("v".to_owned(), primitive(NativePrimitive::Number(1_234.5))),
+        ]);
+        assert_eq!(
+            NativeTextFormatter::format(
+                "{i:<8d}|{i:^8d}|{i:*>8d}|{i:+d}|{i: d}|{x:#b}|{x:#o}|{x:#x}|{x:#X}|{i:08d}|{x:_b}|{n:,d}|{v:.0f}|{v:.2f}|{v:.1%}|{v:.3E}|{v:.4G}|{v:,.2f}|{z:z.1f}",
+                &values,
+                &CancellationToken::default(),
+            )?,
+            "42      |   42   |******42|+42| 42|0b11111111|0o377|0xff|0XFF|00000042|1111_1111|12,345|1234|1234.50|123450.0%|1.234E+03|1234|1,234.50|0.0"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn python_repr_and_result_allocation_bounds_fail_closed_before_repeating()
+    -> Result<(), Box<dyn Error>> {
+        let values = BTreeMap::from([
+            (
+                "a".to_owned(),
+                primitive(NativePrimitive::String("can't \u{0007} café".to_owned())),
+            ),
+            ("b".to_owned(), primitive(NativePrimitive::Integer(1))),
+        ]);
+        assert_eq!(
+            NativeTextFormatter::format("{a!r}|{a!a}", &values, &CancellationToken::default(),)?,
+            "\"can't \\x07 café\"|\"can't \\x07 caf\\u00e9\""
+        );
+        assert_eq!(
+            NativeTextFormatter::format("{b:😀>999999999}", &values, &CancellationToken::default(),),
+            Err(NativeTextFormatError::ResultTooLarge {
+                maximum_bytes: NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES,
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
     fn invalid_missing_and_cancelled_formats_fail_closed() {
         let values = BTreeMap::new();
         assert!(matches!(
@@ -783,5 +1121,131 @@ mod tests {
             NativeTextFormatter::format("text", &values, &cancellation),
             Err(NativeTextFormatError::Cancelled)
         );
+    }
+
+    #[derive(Serialize)]
+    struct TextTransformValidationArtifact {
+        validation_id: &'static str,
+        scope: &'static str,
+        source_path: &'static str,
+        source_sha256: &'static str,
+        fixture_sha256: String,
+        environment: TextTransformValidationEnvironment,
+        cases: Vec<serde_json::Value>,
+        passed: usize,
+        failed: usize,
+        skipped: usize,
+    }
+
+    #[derive(Serialize)]
+    struct TextTransformValidationEnvironment {
+        operating_system: &'static str,
+        architecture: &'static str,
+        backend_identity: &'static str,
+    }
+
+    #[test]
+    fn val_node_002_text_transform_source_oracle() -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let regex = NativeTextRegex::checked(r"(?P<word>a)(b)?", NativeTextRegexFlags::default())?;
+        let cases = vec![
+            serde_json::json!({
+                "case_id": "regex-python-octal-and-unmatched-group",
+                "actual": regex.replace("a", "\\0-\\123-\\08-\\g<0>-\\g<word>-\\2", 0, &cancellation)?,
+                "expected": "\u{0000}-S-\u{0000}8-a-a-",
+                "passed": true,
+            }),
+            serde_json::json!({
+                "case_id": "regex-python-zero-width-duplicate-order",
+                "actual": NativeTextRegex::checked(r"x*", NativeTextRegexFlags::default())?
+                    .replace("abxd", "-", 0, &cancellation)?,
+                "expected": "-a-b--d-",
+                "passed": true,
+            }),
+            serde_json::json!({
+                "case_id": "regex-invalid-reference-fails-closed",
+                "passed": matches!(
+                    regex.replace("a", r"\3", 0, &cancellation),
+                    Err(crate::NativeTextRegexError::InvalidReplacement(_))
+                ),
+            }),
+            serde_json::json!({
+                "case_id": "format-python-numeric-mini-language",
+                "actual": NativeTextFormatter::format(
+                    "{a:=+8d}|{b:,d}|{c:c}|{d:.2e}|{e:.3g}|{f:.2}|{g:d}",
+                    &BTreeMap::from([
+                        ("a".to_owned(), primitive(NativePrimitive::Integer(42))),
+                        ("b".to_owned(), primitive(NativePrimitive::Integer(12_345))),
+                        ("c".to_owned(), primitive(NativePrimitive::Integer(65))),
+                        ("d".to_owned(), primitive(NativePrimitive::Number(1.0))),
+                        ("e".to_owned(), primitive(NativePrimitive::Number(12_345.0))),
+                        ("f".to_owned(), primitive(NativePrimitive::Number(12.34))),
+                        ("g".to_owned(), primitive(NativePrimitive::Boolean(true))),
+                    ]),
+                    &cancellation,
+                )?,
+                "expected": "+     42|12,345|A|1.00e+00|1.23e+04|1.2e+01|1",
+                "passed": true,
+            }),
+            serde_json::json!({
+                "case_id": "format-preallocation-bound",
+                "passed": matches!(
+                    NativeTextFormatter::format(
+                        "{a:😀>999999999}",
+                        &BTreeMap::from([("a".to_owned(), primitive(NativePrimitive::Integer(1)))]),
+                        &cancellation,
+                    ),
+                    Err(NativeTextFormatError::ResultTooLarge { .. })
+                ),
+            }),
+        ];
+        assert!(
+            cases.iter().all(|case| {
+                case.get("passed") == Some(&serde_json::Value::Bool(true))
+                    && case
+                        .get("actual")
+                        .zip(case.get("expected"))
+                        .is_none_or(|(actual, expected)| actual == expected)
+            }),
+            "source-oracle mismatch: {cases:#?}"
+        );
+        let fixture_bytes = serde_json::to_vec(&cases)?;
+        let fixture_sha256 = format!("{:x}", Sha256::digest(&fixture_bytes));
+        let artifact = TextTransformValidationArtifact {
+            validation_id: "VAL-NODE-002",
+            scope: "native text transform source oracle",
+            source_path: "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+            source_sha256: "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1",
+            fixture_sha256,
+            environment: TextTransformValidationEnvironment {
+                operating_system: std::env::consts::OS,
+                architecture: std::env::consts::ARCH,
+                backend_identity: "native-rust-cpu-source-oracle",
+            },
+            passed: cases.len(),
+            failed: 0,
+            skipped: 0,
+            cases,
+        };
+        let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .ok_or("workspace root is unavailable")?;
+        let target = std::env::var_os("CARGO_TARGET_DIR")
+            .map(std::path::PathBuf::from)
+            .map(|target| {
+                if target.is_absolute() {
+                    target
+                } else {
+                    workspace_root.join(target)
+                }
+            })
+            .unwrap_or_else(|| workspace_root.join("target"));
+        let artifact_directory = target.join("comfy-parity");
+        fs::create_dir_all(&artifact_directory)?;
+        let mut artifact_bytes = serde_json::to_vec_pretty(&artifact)?;
+        artifact_bytes.push(b'\n');
+        fs::write(artifact_directory.join("val-node-002.json"), artifact_bytes)?;
+        Ok(())
     }
 }

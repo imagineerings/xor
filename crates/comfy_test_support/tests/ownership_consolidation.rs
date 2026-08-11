@@ -8235,6 +8235,10 @@ fn run_ownership_validation(
             "native_text_regex_has_one_bounded_owner",
             validate_native_text_regex_boundary(&root, &sources)?,
         );
+        cases.insert(
+            "native_structured_input_links_have_one_checked_boundary",
+            validate_native_structured_input_boundary(&root, &sources)?,
+        );
     }
     let cases = cases
         .into_iter()
@@ -10550,6 +10554,90 @@ fn validate_native_stored_payload_boundary(
     Ok(true)
 }
 
+fn validate_native_structured_input_boundary(
+    root: &Path,
+    sources: &[(PathBuf, String)],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let definitions = [
+        (
+            "pub struct NativeStructuredValue {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "fn structured_option_from_expression(",
+            "crates/comfy_nodes/src/descriptor.rs",
+        ),
+        (
+            "fn resolve_active_structured_input(",
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+        ),
+        (
+            "fn assemble_structured_inputs(",
+            "crates/comfy_runtime/src/executor.rs",
+        ),
+    ];
+    for (needle, expected_path) in definitions {
+        let occurrences = production_source_occurrences(sources, needle);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "structured-input owner {needle} must have one production definition"
+        );
+        assert!(
+            occurrences[0].contains(expected_path),
+            "structured-input owner {needle} is declared at {}",
+            occurrences[0]
+        );
+    }
+
+    for (path, source) in sources {
+        let path = path.to_string_lossy();
+        if path.contains("crates/comfy_nodes/src/families/") {
+            let production = source
+                .split_once("#[cfg(test)]")
+                .map_or(source.as_str(), |(production, _)| production);
+            assert!(
+                !production.contains("decode_link")
+                    && !production.contains("[source_node, output_index]")
+                    && !production.contains("value.as_array()"),
+                "native family {path} implements a private structured-link decoder"
+            );
+        }
+    }
+
+    let descriptor = fs::read_to_string(root.join("crates/comfy_nodes/src/descriptor.rs"))?;
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    let compiler = fs::read_to_string(root.join("crates/comfy_runtime/src/prompt_compiler.rs"))?;
+    let executor = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
+    let persistence = fs::read_to_string(root.join("crates/comfy_runtime/src/persistence.rs"))?;
+    Ok(descriptor.contains("pub fn structured_options(")
+        && descriptor.contains("DynamicCombo.Option")
+        && descriptor.contains("MultiType.Input")
+        && execution.contains("sim.native-structured-value@1")
+        && execution.contains("NativeStructuredValue::from_native_value(value)")
+        && compiler.contains("resolve_active_structured_input(")
+        && compiler.contains("decode_link(value)")
+        && compiler.contains("validate_compiled_structured_inputs(node)?")
+        && executor.contains("assemble_structured_inputs(&node.descriptor, &inputs)?")
+        && executor.contains("collect_native_value_handles(value, handles)")
+        && persistence.contains("plan.validate_integrity()"))
+}
+
+#[test]
+fn val_ownership_001_native_structured_input_links_have_one_checked_boundary()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    assert!(validate_native_structured_input_boundary(&root, &sources)?);
+    Ok(())
+}
+
 #[test]
 fn val_ownership_001_native_stored_payload_boundary_is_closed()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -10624,7 +10712,7 @@ fn validate_native_text_regex_boundary(
         "maximum_input_bytes",
         "maximum_matches",
         "maximum_capture_bytes",
-        "NativeTextRegexReplacement::checked(replacement)?",
+        "NativeTextRegexReplacement::checked(replacement, &self.regex)?",
         "append_bounded(",
         "self.check_cancellation(cancellation)?",
     ] {
@@ -10663,6 +10751,10 @@ fn validate_native_text_regex_boundary(
     assert!(execution.contains("fn validate_workflow_text("));
     assert!(execution.contains("'\\n' | '\\r' | '\\t'"));
     assert!(execution.contains("fn validate_identifier("));
+    let policy = fs::read_to_string(root.join(".agents/specs/comfy-parity/ownership-policy.json"))?;
+    assert!(policy.contains("comfy-parity-native-text-transform-foundation"));
+    assert!(policy.contains("canonical-text-transforms-to-generated-text-leaves"));
+    assert!(policy.contains(r"regex\\s*\\.replace\\("));
     Ok(true)
 }
 

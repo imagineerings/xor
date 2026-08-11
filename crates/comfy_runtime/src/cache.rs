@@ -960,6 +960,40 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[test]
+    fn structured_dotted_dependency_identity_is_part_of_the_cache_key()
+    -> Result<(), NativeCacheError> {
+        let inputs = BTreeMap::from([
+            ("resize_type".to_owned(), native(json!("match size"))),
+            ("resize_type.crop".to_owned(), native(json!("center"))),
+            (
+                "resize_type.match".to_owned(),
+                native(json!("resolved-image")),
+            ),
+        ]);
+        let key = |dependency: &str| {
+            CacheKey::from_inputs_with_dependencies(
+                "ResizeImageMaskNode",
+                "1",
+                &inputs,
+                BTreeMap::from([("resize_type.match".to_owned(), dependency.to_owned())]),
+                BTreeMap::new(),
+                "cpu",
+                "f32",
+                None,
+                None,
+                "config-v1",
+                "registry-v1",
+                "stable",
+            )
+        };
+        let first = key("image-source-v1")?;
+        let second = key("image-source-v2")?;
+        assert_ne!(first, second);
+        assert_ne!(first.identity()?, second.identity()?);
+        Ok(())
+    }
+
     pub(crate) fn val_domain_004_cache_case_results()
     -> Result<Vec<(&'static str, bool)>, NativeCacheError> {
         val_domain_004_canonical_inputs_ignore_object_insertion_order()?;

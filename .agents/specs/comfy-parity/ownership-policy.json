@@ -9512,6 +9512,9 @@
       "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for canonical attempt sessions, staged objects, active-execution claims, handle leases, resolved-payload retention, generations, and unique resident allocation accounting; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
       "owner_files": [
         "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_runtime/src/prompt_compiler.rs",
+        "crates/comfy_runtime/src/persistence.rs",
+        "crates/comfy_nodes/src/descriptor.rs",
         "crates/comfy_nodes/src/execution.rs",
         "crates/comfy_nodes/src/source_type.rs",
         "crates/comfy_nodes/src/stored_payload.rs",
@@ -9538,6 +9541,9 @@
         "NativeNodeComputeSession",
         "NativeNodeServices",
         "NativeValue",
+        "NativeStructuredValue",
+        "NativeStructuredInputField",
+        "NativeStructuredInputOption",
         "NativeHandleType",
         "NativeHandleStoreIdentity",
         "NativeOpaqueHandle",
@@ -9631,6 +9637,7 @@
         "comfy_nodes::NativePrimitive::String uses the canonical bounded workflow-text admission seam, which preserves tab, CR, LF, Unicode, and empty values while identifier and path-like fields retain strict control-character rejection",
         "comfy_nodes::NativeTextFormatter is the sole bounded source-compatible keyword formatter; generated leaves may consume its checked named-field, conversion, item/attribute, nested-spec, and cancellation boundary but may not embed a second format parser or interpreter",
         "comfy_nodes::NativeTextRegex is the sole native text-regex owner; generated text leaves may consume its bounded checked capture rows but may not embed a second parser, regex engine, interpreter, or unbounded backtracking path",
+        "comfy_nodes::NativeInputSchemaMetadata is the sole source-declared DynamicCombo and MultiType structure owner; PromptCompiler resolves only active schema-declared dotted prompt fields into ordinary typed bindings, and the executor assembles those resolved values through NativeStructuredValue without interpreting handle-shaped JSON",
         "the signed plugin adapter may project canonical payloads into neutral SDK values or return an exact imported handle; metadata-only tensor, model, and artifact values cannot mint canonical executable payloads",
         "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into NativeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor; comfy_runtime may alias NativeNodePresentation as RuntimeNodePresentation",
         "NativeRuntimeHttpServices serializes checked NativeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
@@ -10081,6 +10088,24 @@
           "symbol": "NativeMediaTensorResidentAllocation"
         },
         {
+          "path": "crates/comfy_nodes/src/descriptor.rs",
+          "qualified": "comfy_nodes::NativeStructuredInputField",
+          "role": "boundary_dto",
+          "symbol": "NativeStructuredInputField"
+        },
+        {
+          "path": "crates/comfy_nodes/src/descriptor.rs",
+          "qualified": "comfy_nodes::NativeStructuredInputOption",
+          "role": "boundary_dto",
+          "symbol": "NativeStructuredInputOption"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeStructuredValue",
+          "role": "boundary_dto",
+          "symbol": "NativeStructuredValue"
+        },
+        {
           "path": "crates/comfy_nodes/src/text_format.rs",
           "qualified": "comfy_nodes::NativeTextFormatter",
           "role": "canonical",
@@ -10296,6 +10321,9 @@
         "NativeTextRegexCaptureRows",
         "NativeTextRegexError",
         "NativeTextRegexFlags",
+        "NativeStructuredValue",
+        "NativeStructuredInputField",
+        "NativeStructuredInputOption",
         "NativeValue",
         "NodeRegistry",
         "TypeRegistry",
@@ -10305,6 +10333,14 @@
       ],
       "call_patterns": [
         {
+          "symbol": "checked native structured input assembly",
+          "pattern": "structured_options\\(\\)|NativeStructuredValue::checked\\(|NativeStructuredValue::from_native_value\\(",
+          "path_prefixes": [
+            "crates/comfy_nodes/src",
+            "crates/comfy_runtime/src"
+          ]
+        },
+        {
           "symbol": "bounded native text formatting",
           "pattern": "NativeTextFormatter::format\\(",
           "path_prefixes": [
@@ -10313,7 +10349,7 @@
         },
         {
           "symbol": "bounded native text regex",
-          "pattern": "NativeTextRegex::checked\\(|\\.capture_rows\\(|\\.is_match\\(",
+          "pattern": "NativeTextRegex::checked\\(|\\.capture_rows\\(|\\.is_match\\(|regex\\s*\\.replace\\(",
           "path_prefixes": [
             "crates/comfy_nodes/src"
           ]
@@ -10351,6 +10387,16 @@
         }
       ],
       "required_mappings": [
+        {
+          "name": "canonical-text-transforms-to-generated-text-leaves",
+          "path": "crates/comfy_nodes/src/families/text_02.rs",
+          "pattern": "NativeTextRegex::checked[\\s\\S]*regex[\\s\\S]*\\.replace\\([\\s\\S]*NativeTextFormatter::format"
+        },
+        {
+          "name": "source-structured-inputs-to-typed-runtime-values",
+          "path": "crates/comfy_runtime/src/prompt_compiler.rs",
+          "pattern": "resolve_active_structured_input[\\s\\S]*decode_link\\(value\\)[\\s\\S]*validate_compiled_structured_inputs"
+        },
         {
           "name": "catalog-source-types-to-sealed-payload-identities",
           "path": "crates/comfy_nodes/src/source_type.rs",
@@ -10392,7 +10438,9 @@
         "comfy-parity-native-node-runtime-foundation",
         "comfy-parity-native-node-schema-metadata-foundation",
         "comfy-parity-native-node-compute-value-foundation",
+        "comfy-parity-native-structured-input-link-foundation",
         "comfy-parity-native-text-value-regex-foundation",
+        "comfy-parity-native-text-transform-foundation",
         "comfy-parity-extension-host-plugin-adapter",
         "comfy-parity-authoritative-ownership-gate"
       ],

@@ -25,6 +25,7 @@ use uuid::Uuid;
 pub const NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 2;
 pub const LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION: u16 = 1;
+pub const NATIVE_STRUCTURED_VALUE_SCHEMA_VERSION: u16 = 1;
 
 const MAX_IDENTIFIER_BYTES: usize = 4_096;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
@@ -236,6 +237,187 @@ pub enum NativeValue {
     PreservedUnknown { type_name: String, value: Value },
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeStructuredValue {
+    type_name: String,
+    fields: BTreeMap<String, NativeValue>,
+}
+
+impl NativeStructuredValue {
+    const MARKER: &'static str = "sim.native-structured-value@1";
+
+    pub fn checked(
+        type_name: impl Into<String>,
+        fields: BTreeMap<String, NativeValue>,
+    ) -> Result<Self, NativeNodeContractError> {
+        let value = Self {
+            type_name: type_name.into(),
+            fields,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn type_name(&self) -> &str {
+        &self.type_name
+    }
+
+    pub fn fields(&self) -> &BTreeMap<String, NativeValue> {
+        &self.fields
+    }
+
+    pub fn get(&self, name: &str) -> Option<&NativeValue> {
+        self.fields.get(name)
+    }
+
+    pub fn validate(&self) -> Result<(), NativeNodeContractError> {
+        validate_identifier("structured value type", &self.type_name)?;
+        if self.fields.len() > MAX_LIST_VALUES {
+            return Err(NativeNodeContractError::TooManyListValues);
+        }
+        for (name, value) in &self.fields {
+            validate_identifier("structured value field", name)?;
+            value.validate()?;
+        }
+        Ok(())
+    }
+
+    pub fn into_native_value(self) -> NativeValue {
+        let fields = self
+            .fields
+            .into_iter()
+            .map(|(name, value)| NativeValue::List {
+                values: vec![
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String(name),
+                    },
+                    value,
+                ],
+            })
+            .collect();
+        NativeValue::List {
+            values: vec![
+                NativeValue::Primitive {
+                    value: NativePrimitive::String(Self::MARKER.to_owned()),
+                },
+                NativeValue::Primitive {
+                    value: NativePrimitive::String(self.type_name),
+                },
+                NativeValue::List { values: fields },
+            ],
+        }
+    }
+
+    pub fn from_native_value(value: &NativeValue) -> Result<Option<Self>, NativeNodeContractError> {
+        let NativeValue::List { values } = value else {
+            return Ok(None);
+        };
+        let marker = match values.first() {
+            Some(NativeValue::Primitive {
+                value: NativePrimitive::String(marker),
+            }) => marker,
+            _ => return Ok(None),
+        };
+        if marker != Self::MARKER {
+            return Ok(None);
+        }
+        if values.len() != 3 {
+            return Err(NativeNodeContractError::InvalidStructuredValue);
+        }
+        let type_name = match values.get(1) {
+            Some(NativeValue::Primitive {
+                value: NativePrimitive::String(type_name),
+            }) => type_name.clone(),
+            _ => return Err(NativeNodeContractError::InvalidStructuredValue),
+        };
+        let field_values = match values.get(2) {
+            Some(NativeValue::List { values }) => values,
+            _ => return Err(NativeNodeContractError::InvalidStructuredValue),
+        };
+        let mut fields = BTreeMap::new();
+        for field in field_values {
+            let NativeValue::List { values } = field else {
+                return Err(NativeNodeContractError::InvalidStructuredValue);
+            };
+            let name = match values.as_slice() {
+                [
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String(name),
+                    },
+                    _,
+                ] => name.clone(),
+                _ => return Err(NativeNodeContractError::InvalidStructuredValue),
+            };
+            let value = values
+                .get(1)
+                .cloned()
+                .ok_or(NativeNodeContractError::InvalidStructuredValue)?;
+            if fields.insert(name, value).is_some() {
+                return Err(NativeNodeContractError::InvalidStructuredValue);
+            }
+        }
+        Self::checked(type_name, fields).map(Some)
+    }
+
+    pub fn into_runtime_value(self) -> Result<NativeValue, NativeNodeContractError> {
+        if let Some(value) = self.as_json_value()? {
+            return Ok(NativeValue::PreservedUnknown {
+                type_name: self.type_name,
+                value,
+            });
+        }
+        Ok(self.into_native_value())
+    }
+
+    fn as_json_value(&self) -> Result<Option<Value>, NativeNodeContractError> {
+        let mut fields = serde_json::Map::new();
+        for (name, value) in &self.fields {
+            let Some(value) = native_value_as_json(value)? else {
+                return Ok(None);
+            };
+            fields.insert(name.clone(), value);
+        }
+        Ok(Some(Value::Object(fields)))
+    }
+}
+
+fn native_value_as_json(value: &NativeValue) -> Result<Option<Value>, NativeNodeContractError> {
+    Ok(Some(match value {
+        NativeValue::Primitive { value } => match value {
+            NativePrimitive::Null => Value::Null,
+            NativePrimitive::Boolean(value) => Value::Bool(*value),
+            NativePrimitive::Integer(value) => Value::Number((*value).into()),
+            NativePrimitive::UnsignedInteger(value) => Value::Number((*value).into()),
+            NativePrimitive::Number(value) => {
+                let Some(value) = serde_json::Number::from_f64(*value) else {
+                    return Err(NativeNodeContractError::InvalidStructuredValue);
+                };
+                Value::Number(value)
+            }
+            NativePrimitive::String(value) => Value::String(value.clone()),
+        },
+        NativeValue::Handle { .. } => return Ok(None),
+        NativeValue::List { values } => {
+            if let Some(structured) = NativeStructuredValue::from_native_value(value)? {
+                let Some(value) = structured.as_json_value()? else {
+                    return Ok(None);
+                };
+                value
+            } else {
+                let mut result = Vec::with_capacity(values.len());
+                for value in values {
+                    let Some(value) = native_value_as_json(value)? else {
+                        return Ok(None);
+                    };
+                    result.push(value);
+                }
+                Value::Array(result)
+            }
+        }
+        NativeValue::PreservedUnknown { value, .. } => value.clone(),
+    }))
+}
+
 impl NativeValue {
     pub fn validate(&self) -> Result<(), NativeNodeContractError> {
         self.validate_at_depth(0)
@@ -312,6 +494,18 @@ impl NativeTypeUnion {
                 NativeValueType::NamedPreservedUnknown(expected),
                 NativeValue::PreservedUnknown { type_name, .. },
             ) => expected == type_name,
+            (NativeValueType::PreservedUnknown, value) => {
+                NativeStructuredValue::from_native_value(value)
+                    .ok()
+                    .flatten()
+                    .is_some()
+            }
+            (NativeValueType::NamedPreservedUnknown(expected), value) => {
+                NativeStructuredValue::from_native_value(value)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|structured| structured.type_name == *expected)
+            }
             _ => false,
         })
     }
@@ -1989,6 +2183,8 @@ pub enum NativeNodeContractError {
     TooManyListValues,
     #[error("native preserved unknown value exceeds its byte limit")]
     PreservedUnknownTooLarge,
+    #[error("native structured value is invalid")]
+    InvalidStructuredValue,
     #[error("native preserved unknown value could not be encoded: {0}")]
     EncodePreservedUnknown(serde_json::Error),
     #[error("native UI presentation value could not be encoded: {0}")]
@@ -2510,6 +2706,63 @@ mod tests {
         assert_eq!(
             serde_json::from_slice::<NativeValue>(&serde_json::to_vec(&value)?)?,
             value
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn structured_values_keep_handles_typed_and_plain_fields_json_compatible()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let model_type = model_type()?;
+        let handle = NativeValue::Handle {
+            value: NativeOpaqueHandle::new(
+                model_type,
+                store_identity(7, 8)?,
+                "structured-model",
+                1,
+                Some("b".repeat(64)),
+            )?,
+        };
+        let structured = NativeStructuredValue::checked(
+            "COMFY_DYNAMICCOMBO_V3",
+            BTreeMap::from([
+                (
+                    "choice".to_owned(),
+                    NativeValue::Primitive {
+                        value: NativePrimitive::String("model".to_owned()),
+                    },
+                ),
+                ("model".to_owned(), handle.clone()),
+            ]),
+        )?;
+        let encoded = structured.into_runtime_value()?;
+        let decoded = NativeStructuredValue::from_native_value(&encoded)?
+            .ok_or("typed structured value was not recognized")?;
+        assert_eq!(decoded.type_name(), "COMFY_DYNAMICCOMBO_V3");
+        assert_eq!(decoded.get("model"), Some(&handle));
+        assert!(
+            NativeTypeUnion::new([NativeValueType::NamedPreservedUnknown(
+                "COMFY_DYNAMICCOMBO_V3".to_owned(),
+            )])?
+            .accepts(&encoded)
+        );
+
+        let plain = NativeStructuredValue::checked(
+            "COMFY_DYNAMICCOMBO_V3",
+            BTreeMap::from([(
+                "choice".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::String("plain".to_owned()),
+                },
+            )]),
+        )?
+        .into_runtime_value()?;
+        assert_eq!(
+            plain,
+            NativeValue::PreservedUnknown {
+                type_name: "COMFY_DYNAMICCOMBO_V3".to_owned(),
+                value: serde_json::json!({"choice": "plain"}),
+            }
         );
         Ok(())
     }

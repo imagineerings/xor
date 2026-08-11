@@ -374,7 +374,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Fixture: A deterministic fixture for every active/conditional node row.
 - Command/runner: `cargo test -p comfy_nodes val_node_002`.
 - Procedure and expected signal: Check success, boundaries, validation, list/lazy mapping, cache/change, effects, cancellation, error, unavailable dependency, persistence, and recovery per node; representative-only evidence fails.
-- Pass artifact: exit status 0 plus `target/comfy-parity/val-node-002.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
+- Pass artifact: exit status 0 plus `target/comfy-parity/val-node-002.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row. While the node task graph is incomplete, a focused foundation producer may identify an explicit non-release scope in this artifact; final release closure must replace it with the aggregate every-row artifact, and representative-only evidence still fails.
 
 ### VAL-RECOVERY-001: Database and settings crash recovery
 
