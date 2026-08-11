@@ -8087,7 +8087,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0019, COMFY-NODE-0126, COMFY-NODE-0171, COMFY-NODE-0219, COMFY-NODE-0244, COMFY-NODE-0268, COMFY-NODE-0273, COMFY-NODE-0399, COMFY-NODE-0400, COMFY-NODE-0401) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 408. Implement native node family: image/mask part 2
+- [x] 408. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
   - Outcome: The 3 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 200
@@ -8104,6 +8104,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0625, COMFY-NODE-0675, COMFY-NODE-0742) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
+
+  - _validation_evidence: 2026-08-11 final-tree Task 408 PASS on native Rust CPU/macOS arm64. Exact source-derived SolidMask, ThresholdMask, and VOIDQuadmaskPreprocess schema, success, bounds, cancellation, handle validation, cache identity, atomic publication, and recovery cases passed 4/4 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. No Python or external Comfy runtime was used.
 
 - [ ] 409. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
@@ -9275,7 +9277,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0752, COMFY-NODE-0753, COMFY-NODE-0754, COMFY-NODE-0755, COMFY-NODE-0771, COMFY-NODE-0778, COMFY-NODE-0783, COMFY-NODE-0786) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 474. Implement native node family: text part 1
+- [x] 474. Implement native node family: text part 1
   - _id: comfy-parity-native-nodes-text-comfy-node-0002
   - Outcome: The 10 rows assigned to this disjoint `text` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated. This task owns the source-compatible text-regex adapter over the workspace-pinned bounded backtracking engine; no leaf-local parser or substring fallback is permitted.
   - Wave: 200
@@ -9292,6 +9294,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0002, COMFY-NODE-0003, COMFY-NODE-0030, COMFY-NODE-0046, COMFY-NODE-0110, COMFY-NODE-0111, COMFY-NODE-0276, COMFY-NODE-0407, COMFY-NODE-0529, COMFY-NODE-0530) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. RegexMatch and RegexExtract cover Python-compatible named and numbered captures, lookaround, backreferences, IGNORECASE, MULTILINE, DOTALL, search/findall/finditer, tuple results, invalid-pattern fallback, bounded backtracking failure, and cancellation without an unbounded or second regex owner.
+
+  - _validation_evidence: 2026-08-11 final-tree Task 474 PASS on native Rust CPU/macOS arm64. All ten assigned source-derived text adapters passed exact schema, JSON/prompt shape, list transform, Python case mode, regex search/findall/finditer, flags, named/numbered capture, invalid-pattern fallback, limit, cancellation, cache, and recovery cases 5/5 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. The canonical bounded regex owner remained unique and no Python or external Comfy runtime was used.
 
 - [ ] 475. Implement native node family: text part 2
   - _id: comfy-parity-native-nodes-text-comfy-node-0531
@@ -9387,7 +9391,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 utilities logic PASS at integrated checkpoint fe06a5eb. ComfyAndNode, ComfyNotNode, ComfyOrNode, and ComfySwitchNode preserve exact source truthiness over primitive/list/preserved JSON values; Switch demands only the selected missing branch and returns the selected value unchanged. Focused schema, execution, lazy-demand, cache, cancellation, and fresh-attempt recovery tests passed 4/4. Final locked two-crate check passed, comfy_nodes all-targets passed 72/72, the complete comfy_test_support target matrix passed with exact permission-enabled reruns for its two sandbox-only filesystem cases, warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Implementation/fixture SHA-256 are 437352c3e9570fbe4850701bd0a974a1dd45595a61d2db5831528c38aa9d0730 and 83703bdd2cb5ba64e1962e52dd99ed3abd506368570f520d8d5a2b83ea6a9e42. Validated on macOS aarch64 native Rust CPU; no accelerator certification is claimed.
 
-- [ ] 480. Implement native node family: utilities/primitive part 1
+- [x] 480. Implement native node family: utilities/primitive part 1
   - _id: comfy-parity-native-nodes-utilities-primitive-comfy-node-0494
   - Outcome: The 6 rows assigned to this disjoint `utilities/primitive` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 200
@@ -9404,6 +9408,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0494, COMFY-NODE-0495, COMFY-NODE-0496, COMFY-NODE-0497, COMFY-NODE-0498, COMFY-NODE-0499) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. PrimitiveStringMultiline preserves bounded source-valid tab, CR, LF, Unicode, and empty values exactly while the shared workflow-text owner rejects NUL, disallowed controls, and oversize strings without weakening identifier validation.
+
+  - _validation_evidence: 2026-08-11 final-tree Task 480 PASS on native Rust CPU/macOS arm64. All six assigned primitive adapters passed exact schema, numeric bounds, scalar identity, bounded multiline tab/CR/LF/Unicode preservation, canonical bounding-box publication, invalid-input, cancellation, stale-handle, persistence, and recovery cases 5/5 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. The shared workflow-text and payload owners remained canonical and no Python or external Comfy runtime was used.
 
 - [ ] 481. Implement native node family: video part 1
   - _id: comfy-parity-native-nodes-video-comfy-node-0124
