@@ -5,6 +5,7 @@ pub mod registry_generator;
 pub mod slice_registry;
 pub mod source_type;
 pub mod stored_payload;
+pub mod text_format;
 pub mod text_regex;
 
 pub use descriptor::{
@@ -54,6 +55,10 @@ pub use stored_payload::{
     NativePayloadResidency, NativeProviderPayload, NativeResidentAllocation,
     NativeResidentAllocationId, NativeResidentPayloadKind, NativeStoredModelPayload,
     NativeStoredPayload, NativeStoredPayloadError,
+};
+pub use text_format::{
+    NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES, NATIVE_TEXT_FORMAT_MAX_TEMPLATE_BYTES,
+    NativeTextFormatError, NativeTextFormatter,
 };
 pub use text_regex::{
     NATIVE_TEXT_REGEX_BACKTRACK_LIMIT, NATIVE_TEXT_REGEX_MAX_CAPTURE_BYTES,

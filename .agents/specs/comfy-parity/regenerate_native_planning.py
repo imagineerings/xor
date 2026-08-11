@@ -8895,6 +8895,38 @@ def native_text_regex_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_text_transform_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-text-transform-foundation",
+        "Implement bounded native regex replacement and source string formatting",
+        [6, 7, 37, 41, 44],
+        [8, 18, 24, 34, 41],
+        ["VAL-NODE-002", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "The canonical text owner exposes bounded, cancellation-aware Python-compatible regex substitution and Python str.format projection for source-declared named autogrow inputs. Regex replacement preserves match spans, zero-width behavior, numbered and named replacement templates, escapes, count, and flags without a second regex engine; formatting has one checked parser/evaluator and exact source schema names.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+            "crates/comfy_nodes/src/text_regex.rs",
+            "crates/comfy_nodes/src/registry_generator.rs",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+        ],
+        [
+            "crates/comfy_nodes/src/text_regex.rs",
+            "crates/comfy_nodes/src/text_format.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/src/registry_generator.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+        ],
+        "Source-derived fixtures prove Python replacement-template expansion for numbered/named groups, escapes, duplicate and zero-width matches, count and flags, invalid-pattern fallback, result and backtracking limits, and cancellation. StringFormat proves exact a-z socket names, autogrow ordering, escaped braces, conversions, nested fields, item/attribute lookup, the supported format mini-language, invalid-field failure, bounded output, and no direct fancy-regex or interpreter path in a leaf.",
+        [dependency],
+        locked=True,
+        criterion_ids=["6.4", "7.4", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-sdpose-execution-foundation",
@@ -8994,14 +9026,185 @@ def native_video_execution_foundation_task(dependency: str) -> dict[str, object]
     )
 
 
+def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-image-source-compatibility-foundation",
+        "Implement source-compatible native image transforms and previews",
+        [11, 18, 26, 28, 36, 37, 41, 44],
+        [11, 18, 25, 26, 28, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical image compatibility boundary owns Pillow-compatible byte quantization, adaptive palette selection and dithering, exact NumPy legacy bounded-integer sampling, and prepared PreviewImage encoding and UI projection. Image-family leaves delegate these source semantics through the existing tensor, media, RNG, effect, cancellation, and attempt-store owners instead of copying host loops or output staging.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_images.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/rng.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/rng.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_media/src/image_quantization.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Source-derived fixtures prove exact u8 quantize/dequantize cropping, adaptive palette identity, NONE/Floyd-Steinberg/Bayer dithering, NumPy RandomState seed and randint behavior, batched preview PNG preparation and UI projection, cancellation at bounded phases, scratch convergence, effect rollback and restart cleanup, and one production owner for each algorithm and effect.",
+        [dependency],
+        locked=True,
+        criterion_ids=["11.4", "18.1", "26.2", "28.2", "36.4", "37.5", "41.2", "44.1"],
+    )
+
+
+def native_structured_input_link_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-structured-input-link-foundation",
+        "Resolve links nested in source-typed structured inputs",
+        [6, 7, 29, 32, 37, 41, 44],
+        [8, 20, 24, 29, 32, 34, 41],
+        [
+            "VAL-NODE-002",
+            "VAL-DOMAIN-004",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical prompt compiler recursively discovers and resolves source-declared links nested inside DynamicCombo V3, MultiType, list, and structured input values. It records exact dependency, lazy-demand, cardinality, cache-identity, cancellation, persistence, and stale-handle semantics without accepting handle-shaped JSON or adding a leaf-specific decoder.",
+        [
+            "projects/comfy/ComfyUI/comfy_api/latest/_io.py",
+            "crates/comfy_nodes/src/descriptor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/cache.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/descriptor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/persistence.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Nested IMAGE/MASK union links and source-derived structured fixtures compile into exact dependency edges, resolve only store-issued handles, participate in lazy demand and cache identity, round-trip through persistence, reject malformed/cardinality/type/store/generation/digest drift, and publish no value on cancellation or downstream failure.",
+        [dependency],
+        locked=True,
+        criterion_ids=["6.4", "7.4", "29.3", "32.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_shader_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-shader-execution-foundation",
+        "Implement bounded native GLSL image-shader execution",
+        [18, 26, 28, 31, 36, 37, 41, 44],
+        [18, 26, 28, 31, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One injected shader execution service owns bounded GLSL ES 3.00 compilation, link diagnostics, image and scalar uniforms, curve inputs, four render targets, multipass ping-pong execution, float readback, cancellation, and intermediate UI projection. Node leaves cannot create hidden device owners, reinterpret WGSL, or replace source shaders with passthrough behavior.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_glsl.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/shader.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Golden shaders prove source-compatible compilation, uniforms, sizing, four-target MRT, pragma pass counts, ping-pong identity, diagnostics, bounded shader/pass/resource admission, wrong-backend and device-loss failure, cancellation and scratch cleanup, intermediate UI projection, restart recovery, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1"],
+    )
+
+
+def native_detection_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-detection-execution-foundation",
+        "Implement native MediaPipe, RT-DETR, and SAM3 execution",
+        [18, 26, 28, 31, 37, 41, 44],
+        [18, 26, 28, 31, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Canonical retained MediaPipe FaceLandmarker, RT-DETR, and SAM3 resources own checked model admission and native image/video execution. They publish exact face landmarks, boxes, scores, segmentation, and track state through the sealed payload boundary and delegate preview video encoding to the native video foundation without metadata-only model facades.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_mediapipe.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_rtdetr.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sam3.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/detection.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Source-derived fixtures prove exact model identity and state admission, RT-DETR 640-square preprocessing and scored boxes, MediaPipe landmarks/blendshapes/transforms, SAM3 image and video segmentation/tracking, canonical preview encoding, cancellation, wrong-model rejection, alias-aware residency, attempt rollback, restart staleness, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def node_tasks(
     schema_dependency: str,
     compute_dependency: str,
     asset_effect_dependency: str,
     provider_dependency: str,
     text_regex_dependency: str,
+    text_transform_dependency: str,
     sdpose_dependency: str,
     video_dependency: str,
+    image_source_dependency: str,
+    structured_link_dependency: str,
+    shader_dependency: str,
+    detection_dependency: str,
 ) -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     result: list[dict[str, object]] = []
     mapping: dict[str, list[str]] = defaultdict(list)
@@ -9040,6 +9243,7 @@ def node_tasks(
                 # leaves compile only after that serialized contract change even when
                 # their own rows do not use asset or effect capabilities.
                 task_dependencies.append(asset_effect_dependency)
+                task_dependencies.append(sdpose_dependency)
             if has_provider:
                 task_dependencies.extend([provider_dependency, sdpose_dependency])
             task_reads = [
@@ -9097,6 +9301,14 @@ def node_tasks(
                     "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
                 ])
                 task_done += " RegexMatch and RegexExtract cover Python-compatible named and numbered captures, lookaround, backreferences, IGNORECASE, MULTILINE, DOTALL, search/findall/finditer, tuple results, invalid-pattern fallback, bounded backtracking failure, and cancellation without an unbounded or second regex owner."
+            if "COMFY-NODE-0531" in feature_ids:
+                task_dependencies.append(text_transform_dependency)
+                task_reads.extend([
+                    "crates/comfy_nodes/src/text_regex.rs",
+                    "crates/comfy_nodes/src/text_format.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+                ])
+                task_done += " RegexReplace delegates Python-compatible substitution spans and replacement templates to the canonical regex owner, and StringFormat delegates exact named autogrow field parsing and formatting to the canonical text-format owner; neither node embeds a second parser or engine."
             if "COMFY-NODE-0494" in feature_ids:
                 task_dependencies.append(text_regex_dependency)
                 task_reads.extend([
@@ -9119,6 +9331,35 @@ def node_tasks(
                     "crates/comfy_model/src/frame_interpolation.rs",
                 ])
                 task_done += " Every video codec, bit-depth, slice, interpolation, preview/save, and LTXV compression path delegates to the canonical native video foundation with bounded cancellation and zero partial publication."
+            if {"COMFY-NODE-0047", "COMFY-NODE-0259"}.intersection(feature_ids):
+                task_dependencies.append(image_source_dependency)
+                task_reads.extend([
+                    "crates/comfy_media/src/image_quantization.rs",
+                    "crates/comfy_tensor/src/rng.rs",
+                    "crates/comfy_runtime/src/native_execution_controller.rs",
+                ])
+                task_done += " Pillow-compatible quantization/cropping, NumPy legacy crop coordinates, and PreviewImage preparation delegate to the canonical image source-compatibility boundary with exact cancellation and effect rollback."
+            if "COMFY-NODE-0541" in feature_ids:
+                task_dependencies.append(structured_link_dependency)
+                task_reads.extend([
+                    "crates/comfy_runtime/src/prompt_compiler.rs",
+                    "crates/comfy_runtime/src/executor.rs",
+                ])
+                task_done += " MATCH_SIZE consumes only the schema-guided recursively resolved IMAGE/MASK handle nested under the DynamicCombo value, with exact dependency, lazy-demand, cache, persistence, and stale-handle behavior."
+            if "COMFY-NODE-0211" in feature_ids:
+                task_dependencies.append(shader_dependency)
+                task_reads.extend([
+                    "crates/comfy_tensor/src/shader.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_glsl.py",
+                ])
+                task_done += " GLSL compilation, uniforms, multipass MRT execution, readback, diagnostics, cancellation, and intermediate UI values delegate to the injected canonical shader execution service."
+            if "COMFY-NODE-0136" in feature_ids:
+                task_dependencies.append(detection_dependency)
+                task_reads.extend([
+                    "crates/comfy_model/src/detection.rs",
+                    "crates/comfy_media/src/video.rs",
+                ])
+                task_done += " RT-DETR, MediaPipe FaceLandmarker, and SAM3 execution delegate to retained canonical model resources, while track-preview encoding delegates to the native video foundation; no model or media facade is accepted."
             if "COMFY-NODE-0115" in feature_ids:
                 task_dependencies.extend([
                     provider_dependency,
@@ -9887,10 +10128,22 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     text_regex_foundation = native_text_regex_foundation_task(
         str(comfy_build_boundary["id"])
     )
+    text_transform_foundation = native_text_transform_foundation_task(
+        str(text_regex_foundation["id"])
+    )
+    image_source_foundation = native_image_source_compatibility_foundation_task(
+        str(text_transform_foundation["id"])
+    )
+    structured_link_foundation = native_structured_input_link_foundation_task(
+        str(image_source_foundation["id"])
+    )
+    shader_foundation = native_shader_execution_foundation_task(
+        str(structured_link_foundation["id"])
+    )
     node_provider_foundation["dependencies"] = list(
         dict.fromkeys(
             list(node_provider_foundation["dependencies"])
-            + [str(comfy_build_boundary["id"]), str(text_regex_foundation["id"])]
+            + [str(comfy_build_boundary["id"]), str(shader_foundation["id"])]
         )
     )
     sdpose_foundation = native_sdpose_execution_foundation_task(
@@ -9899,14 +10152,28 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_foundation = native_video_execution_foundation_task(
         "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
     )
+    detection_foundation = native_detection_execution_foundation_task(
+        str(video_foundation["id"])
+    )
+    detection_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(detection_foundation["dependencies"])
+            + ["comfy-parity-native-nodes-video-comfy-node-0124"]
+        )
+    )
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
         str(node_compute_foundation["id"]),
         str(node_asset_effect_foundation["id"]),
         str(node_provider_foundation["id"]),
         str(text_regex_foundation["id"]),
+        str(text_transform_foundation["id"]),
         str(sdpose_foundation["id"]),
         str(video_foundation["id"]),
+        str(image_source_foundation["id"]),
+        str(structured_link_foundation["id"]),
+        str(shader_foundation["id"]),
+        str(detection_foundation["id"]),
     )
     add_native_node_foundation_mapping(
         node_mapping,
@@ -9939,9 +10206,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_asset_effect_foundation,
             comfy_build_boundary,
             text_regex_foundation,
+            text_transform_foundation,
+            image_source_foundation,
+            structured_link_foundation,
+            shader_foundation,
             node_provider_foundation,
             sdpose_foundation,
             video_foundation,
+            detection_foundation,
         ]
         + nodes
         + user_interface_tasks

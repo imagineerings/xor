@@ -10586,6 +10586,21 @@ fn validate_native_text_regex_boundary(
             "{definition} must be owned by comfy_nodes text_regex: {occurrences:?}"
         );
     }
+    for definition in [
+        "pub struct NativeTextFormatter;",
+        "pub enum NativeTextFormatError {",
+    ] {
+        let occurrences = production_source_occurrences(sources, definition);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "{definition} must have exactly one production owner: {occurrences:?}"
+        );
+        assert!(
+            occurrences[0].contains("crates/comfy_nodes/src/text_format.rs"),
+            "{definition} must be owned by comfy_nodes text_format: {occurrences:?}"
+        );
+    }
     let regex_import = ["use fancy_", "regex"].concat();
     let regex_engine_uses = sources
         .iter()
@@ -10609,6 +10624,8 @@ fn validate_native_text_regex_boundary(
         "maximum_input_bytes",
         "maximum_matches",
         "maximum_capture_bytes",
+        "NativeTextRegexReplacement::checked(replacement)?",
+        "append_bounded(",
         "self.check_cancellation(cancellation)?",
     ] {
         assert!(
@@ -10616,11 +10633,28 @@ fn validate_native_text_regex_boundary(
             "native text regex lacks {required}"
         );
     }
+    let format_source = fs::read_to_string(root.join("crates/comfy_nodes/src/text_format.rs"))?;
+    for required in [
+        "pub struct NativeTextFormatter;",
+        "pub fn format(",
+        "resolve_field(parsed.field_name, values)?",
+        "render_template(parsed.format_spec, values, cancellation, depth + 1)?",
+        "NATIVE_TEXT_FORMAT_MAX_TEMPLATE_BYTES",
+        "NATIVE_TEXT_FORMAT_MAX_RESULT_BYTES",
+        "check_cancellation(cancellation)?",
+    ] {
+        assert!(
+            format_source.contains(required),
+            "native text formatter lacks {required}"
+        );
+    }
     let manifest = fs::read_to_string(root.join("crates/comfy_nodes/Cargo.toml"))?;
     assert!(manifest.contains("fancy-regex.workspace = true"));
     let root_source = fs::read_to_string(root.join("crates/comfy_nodes/src/comfy_nodes.rs"))?;
     assert!(root_source.contains("pub mod text_regex;"));
+    assert!(root_source.contains("pub mod text_format;"));
     assert!(root_source.contains("NativeTextRegexCaptureRows"));
+    assert!(root_source.contains("NativeTextFormatter"));
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
     assert!(
         execution

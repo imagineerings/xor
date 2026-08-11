@@ -6,6 +6,7 @@ pub const NATIVE_TEXT_REGEX_MAX_PATTERN_BYTES: usize = 16 * 1024;
 pub const NATIVE_TEXT_REGEX_MAX_INPUT_BYTES: usize = 1024 * 1024;
 pub const NATIVE_TEXT_REGEX_MAX_MATCHES: usize = 100_000;
 pub const NATIVE_TEXT_REGEX_MAX_CAPTURE_BYTES: usize = 16 * 1024 * 1024;
+pub const NATIVE_TEXT_REGEX_MAX_RESULT_BYTES: usize = 16 * 1024 * 1024;
 pub const NATIVE_TEXT_REGEX_BACKTRACK_LIMIT: usize = 1_000_000;
 const NATIVE_TEXT_REGEX_DELEGATE_SIZE_LIMIT: usize = 2 * 1024 * 1024;
 const NATIVE_TEXT_REGEX_DELEGATE_DFA_SIZE_LIMIT: usize = 2 * 1024 * 1024;
@@ -62,6 +63,10 @@ pub enum NativeTextRegexError {
     MatchLimit { maximum_matches: usize },
     #[error("regex captures exceeded the {maximum_bytes}-byte limit")]
     CaptureLimit { maximum_bytes: usize },
+    #[error("invalid regex replacement template: {0}")]
+    InvalidReplacement(String),
+    #[error("regex replacement exceeded the {maximum_bytes}-byte limit")]
+    ResultLimit { maximum_bytes: usize },
     #[error("regex execution was cancelled")]
     Cancelled,
 }
@@ -187,6 +192,57 @@ impl NativeTextRegex {
         })
     }
 
+    pub fn replace(
+        &self,
+        input: &str,
+        replacement: &str,
+        count: usize,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTextRegexError> {
+        self.validate_input(input, cancellation)?;
+        let replacement = NativeTextRegexReplacement::checked(replacement)?;
+        let mut output = String::with_capacity(input.len().min(NATIVE_TEXT_REGEX_MAX_RESULT_BYTES));
+        let mut previous_end = 0usize;
+        for (replacement_count, captures) in self.regex.captures_iter(input).enumerate() {
+            self.check_cancellation(cancellation)?;
+            if count != 0 && replacement_count >= count {
+                break;
+            }
+            if replacement_count >= self.limits.maximum_matches {
+                return Err(NativeTextRegexError::MatchLimit {
+                    maximum_matches: self.limits.maximum_matches,
+                });
+            }
+            let captures = captures
+                .map_err(|error| NativeTextRegexError::ExecutionLimit(error.to_string()))?;
+            let matched = captures.get(0).ok_or_else(|| {
+                NativeTextRegexError::ExecutionLimit(
+                    "regex capture row did not contain the whole match".to_owned(),
+                )
+            })?;
+            append_bounded(
+                &mut output,
+                input.get(previous_end..matched.start()).ok_or_else(|| {
+                    NativeTextRegexError::ExecutionLimit(
+                        "regex match boundary was not valid UTF-8".to_owned(),
+                    )
+                })?,
+            )?;
+            replacement.append_expansion(&captures, &mut output)?;
+            previous_end = matched.end();
+        }
+        append_bounded(
+            &mut output,
+            input.get(previous_end..).ok_or_else(|| {
+                NativeTextRegexError::ExecutionLimit(
+                    "regex match boundary was not valid UTF-8".to_owned(),
+                )
+            })?,
+        )?;
+        self.check_cancellation(cancellation)?;
+        Ok(output)
+    }
+
     fn validate_input(
         &self,
         input: &str,
@@ -210,6 +266,171 @@ impl NativeTextRegex {
             .check()
             .map_err(|_| NativeTextRegexError::Cancelled)
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum NativeTextRegexReplacementPart {
+    Literal(String),
+    GroupIndex(usize),
+    GroupName(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeTextRegexReplacement {
+    parts: Vec<NativeTextRegexReplacementPart>,
+}
+
+impl NativeTextRegexReplacement {
+    fn checked(replacement: &str) -> Result<Self, NativeTextRegexError> {
+        if replacement.len() > NATIVE_TEXT_REGEX_MAX_PATTERN_BYTES {
+            return Err(NativeTextRegexError::InvalidReplacement(format!(
+                "replacement is {} bytes, above the {}-byte limit",
+                replacement.len(),
+                NATIVE_TEXT_REGEX_MAX_PATTERN_BYTES
+            )));
+        }
+        let mut parts = Vec::new();
+        let mut literal = String::new();
+        let mut characters = replacement.chars().peekable();
+        while let Some(character) = characters.next() {
+            if character != '\\' {
+                literal.push(character);
+                continue;
+            }
+            let escaped = characters.next().ok_or_else(|| {
+                NativeTextRegexError::InvalidReplacement(
+                    "replacement ends with an unescaped backslash".to_owned(),
+                )
+            })?;
+            match escaped {
+                '\\' => literal.push('\\'),
+                'n' => literal.push('\n'),
+                'r' => literal.push('\r'),
+                't' => literal.push('\t'),
+                'f' => literal.push('\u{000c}'),
+                'v' => literal.push('\u{000b}'),
+                'a' => literal.push('\u{0007}'),
+                'b' => literal.push('\u{0008}'),
+                'g' => {
+                    flush_literal(&mut parts, &mut literal);
+                    if characters.next() != Some('<') {
+                        return Err(NativeTextRegexError::InvalidReplacement(
+                            "\\g must be followed by <name> or <number>".to_owned(),
+                        ));
+                    }
+                    let mut group = String::new();
+                    let mut terminated = false;
+                    for character in characters.by_ref() {
+                        if character == '>' {
+                            terminated = true;
+                            break;
+                        }
+                        group.push(character);
+                    }
+                    if !terminated || group.is_empty() {
+                        return Err(NativeTextRegexError::InvalidReplacement(
+                            "\\g group reference is empty or unterminated".to_owned(),
+                        ));
+                    }
+                    if group.chars().all(|character| character.is_ascii_digit()) {
+                        let index = group.parse::<usize>().map_err(|_| {
+                            NativeTextRegexError::InvalidReplacement(
+                                "numeric group reference is too large".to_owned(),
+                            )
+                        })?;
+                        parts.push(NativeTextRegexReplacementPart::GroupIndex(index));
+                    } else if is_python_group_name(&group) {
+                        parts.push(NativeTextRegexReplacementPart::GroupName(group));
+                    } else {
+                        return Err(NativeTextRegexError::InvalidReplacement(
+                            "named group reference is not a valid identifier".to_owned(),
+                        ));
+                    }
+                }
+                '0'..='9' => {
+                    flush_literal(&mut parts, &mut literal);
+                    let mut digits = String::from(escaped);
+                    while digits.len() < 2 && characters.peek().is_some_and(char::is_ascii_digit) {
+                        if let Some(character) = characters.next() {
+                            digits.push(character);
+                        }
+                    }
+                    let index = digits.parse::<usize>().map_err(|_| {
+                        NativeTextRegexError::InvalidReplacement(
+                            "numeric group reference is too large".to_owned(),
+                        )
+                    })?;
+                    parts.push(NativeTextRegexReplacementPart::GroupIndex(index));
+                }
+                character if character.is_ascii_alphabetic() => {
+                    return Err(NativeTextRegexError::InvalidReplacement(format!(
+                        "unsupported replacement escape \\{character}"
+                    )));
+                }
+                character => {
+                    literal.push('\\');
+                    literal.push(character);
+                }
+            }
+        }
+        flush_literal(&mut parts, &mut literal);
+        Ok(Self { parts })
+    }
+
+    fn append_expansion(
+        &self,
+        captures: &fancy_regex::Captures<'_>,
+        output: &mut String,
+    ) -> Result<(), NativeTextRegexError> {
+        for part in &self.parts {
+            let value = match part {
+                NativeTextRegexReplacementPart::Literal(value) => Some(value.as_str()),
+                NativeTextRegexReplacementPart::GroupIndex(index) => {
+                    captures.get(*index).map(|matched| matched.as_str())
+                }
+                NativeTextRegexReplacementPart::GroupName(name) => {
+                    captures.name(name).map(|matched| matched.as_str())
+                }
+            };
+            if let Some(value) = value {
+                append_bounded(output, value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn flush_literal(parts: &mut Vec<NativeTextRegexReplacementPart>, literal: &mut String) {
+    if !literal.is_empty() {
+        parts.push(NativeTextRegexReplacementPart::Literal(std::mem::take(
+            literal,
+        )));
+    }
+}
+
+fn is_python_group_name(name: &str) -> bool {
+    let mut characters = name.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_alphabetic())
+        && characters.all(|character| character == '_' || character.is_alphanumeric())
+}
+
+fn append_bounded(output: &mut String, value: &str) -> Result<(), NativeTextRegexError> {
+    let result_bytes =
+        output
+            .len()
+            .checked_add(value.len())
+            .ok_or(NativeTextRegexError::ResultLimit {
+                maximum_bytes: NATIVE_TEXT_REGEX_MAX_RESULT_BYTES,
+            })?;
+    if result_bytes > NATIVE_TEXT_REGEX_MAX_RESULT_BYTES {
+        return Err(NativeTextRegexError::ResultLimit {
+            maximum_bytes: NATIVE_TEXT_REGEX_MAX_RESULT_BYTES,
+        });
+    }
+    output.push_str(value);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -325,6 +546,57 @@ mod tests {
         );
         assert_eq!(
             regex.capture_rows("aaa", &cancellation),
+            Err(NativeTextRegexError::Cancelled)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn python_replacement_templates_preserve_groups_escapes_counts_and_zero_width_matches()
+    -> Result<(), Box<dyn Error>> {
+        let regex =
+            NativeTextRegex::checked(r"(?P<word>\w+)(?=!)|^", NativeTextRegexFlags::default())?;
+        assert_eq!(
+            regex.replace(
+                "go! stop!",
+                r"<\g<word>>\n",
+                0,
+                &CancellationToken::default(),
+            )?,
+            "<go>\n! <stop>\n!"
+        );
+
+        let zero_width = NativeTextRegex::checked(r"(?=a)", NativeTextRegexFlags::default())?;
+        assert_eq!(
+            zero_width.replace("aba", "X", 0, &CancellationToken::default())?,
+            "XabXa"
+        );
+
+        let numbered =
+            NativeTextRegex::checked(r"([a-z]+)-(\d+)", NativeTextRegexFlags::default())?;
+        assert_eq!(
+            numbered.replace("a-1 b-2", r"\2:\1:\\", 1, &CancellationToken::default(),)?,
+            "1:a:\\ b-2"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_replacement_limits_and_cancellation_fail_closed() -> Result<(), Box<dyn Error>> {
+        let regex = NativeTextRegex::checked("a", NativeTextRegexFlags::default())?;
+        assert!(matches!(
+            regex.replace("a", r"\g<", 0, &CancellationToken::default()),
+            Err(NativeTextRegexError::InvalidReplacement(_))
+        ));
+        assert!(matches!(
+            regex.replace("a", r"\q", 0, &CancellationToken::default()),
+            Err(NativeTextRegexError::InvalidReplacement(_))
+        ));
+
+        let cancellation = CancellationToken::default();
+        assert!(cancellation.cancel());
+        assert_eq!(
+            regex.replace("a", "b", 0, &cancellation),
             Err(NativeTextRegexError::Cancelled)
         );
         Ok(())

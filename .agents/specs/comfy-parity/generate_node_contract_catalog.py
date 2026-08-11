@@ -704,12 +704,22 @@ def v3_dynamic_input(
         if len(names) != len(names_expression.get("items", [])):
             names = []
     elif names_expression is not None:
-        extra.append(
-            {
-                "name": "names_expression",
-                "value": portable_expression(names_expression),
-            }
-        )
+        if names_expression == {
+            "kind": "call",
+            "name": "list",
+            "arguments": [
+                {"kind": "attribute", "name": "string.ascii_lowercase"}
+            ],
+            "keywords": [],
+        }:
+            names = list("abcdefghijklmnopqrstuvwxyz")
+        else:
+            extra.append(
+                {
+                    "name": "names_expression",
+                    "value": portable_expression(names_expression),
+                }
+            )
     minimum = literal_u32(template_keywords.get("min"), 0)
     maximum = literal_u32(
         template_keywords.get("max"), len(names) if names else 65_536

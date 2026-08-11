@@ -156,6 +156,21 @@ class NodeContractCatalogTests(unittest.TestCase):
         self.assertEqual(dynamic[0]["input"]["source_type_names"], ["IMAGE"])
         self.assertEqual(batch["schema"]["portable"]["inputs"], [])
 
+        string_format = self.contracts["COMFY-NODE-0644"]
+        format_dynamic = string_format["schema"]["portable"]["dynamic_inputs"]
+        self.assertEqual(len(format_dynamic), 1)
+        self.assertEqual(format_dynamic[0]["identity"], "{name}")
+        self.assertEqual(
+            format_dynamic[0]["names"], list("abcdefghijklmnopqrstuvwxyz")
+        )
+        self.assertEqual(format_dynamic[0]["start_index"], 0)
+        self.assertEqual(format_dynamic[0]["minimum_count"], 0)
+        self.assertEqual(format_dynamic[0]["maximum_count"], 26)
+        self.assertNotIn(
+            "names_expression",
+            {item["name"] for item in format_dynamic[0]["extra"]},
+        )
+
         math_expression = self.contracts["COMFY-NODE-0083"]
         math_dynamic = math_expression["schema"]["portable"]["dynamic_inputs"]
         self.assertEqual(len(math_dynamic), 1)

@@ -46709,17 +46709,9 @@
                     "kind": "string",
                     "value": "values"
                   }
-                },
-                {
-                  "name": "names_expression",
-                  "value": {
-                    "kind": "preserved_expression",
-                    "sha256": "82b7a5ba65a008e36c2fa62a440f2b417ed1f4dbceb7d9cb156e521eea19267e",
-                    "source": "{\"arguments\":[{\"kind\":\"attribute\",\"name\":\"string.ascii_lowercase\"}],\"keywords\":[],\"kind\":\"call\",\"name\":\"list\"}"
-                  }
                 }
               ],
-              "identity": "value{index}",
+              "identity": "{name}",
               "input": {
                 "advanced": false,
                 "choices": [],
@@ -46743,11 +46735,38 @@
                 "upload": null,
                 "widget_type": null
               },
-              "maximum_count": 65536,
+              "maximum_count": 26,
               "minimum_count": 1,
-              "names": [],
-              "prefix": "value",
-              "start_index": 1
+              "names": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i",
+                "j",
+                "k",
+                "l",
+                "m",
+                "n",
+                "o",
+                "p",
+                "q",
+                "r",
+                "s",
+                "t",
+                "u",
+                "v",
+                "w",
+                "x",
+                "y",
+                "z"
+              ],
+              "prefix": null,
+              "start_index": 0
             }
           ],
           "hidden": [],
@@ -346396,17 +346415,9 @@
                     "kind": "string",
                     "value": "values"
                   }
-                },
-                {
-                  "name": "names_expression",
-                  "value": {
-                    "kind": "preserved_expression",
-                    "sha256": "82b7a5ba65a008e36c2fa62a440f2b417ed1f4dbceb7d9cb156e521eea19267e",
-                    "source": "{\"arguments\":[{\"kind\":\"attribute\",\"name\":\"string.ascii_lowercase\"}],\"keywords\":[],\"kind\":\"call\",\"name\":\"list\"}"
-                  }
                 }
               ],
-              "identity": "value{index}",
+              "identity": "{name}",
               "input": {
                 "advanced": false,
                 "choices": [],
@@ -346428,11 +346439,38 @@
                 "upload": null,
                 "widget_type": null
               },
-              "maximum_count": 65536,
+              "maximum_count": 26,
               "minimum_count": 0,
-              "names": [],
-              "prefix": "value",
-              "start_index": 1
+              "names": [
+                "a",
+                "b",
+                "c",
+                "d",
+                "e",
+                "f",
+                "g",
+                "h",
+                "i",
+                "j",
+                "k",
+                "l",
+                "m",
+                "n",
+                "o",
+                "p",
+                "q",
+                "r",
+                "s",
+                "t",
+                "u",
+                "v",
+                "w",
+                "x",
+                "y",
+                "z"
+              ],
+              "prefix": null,
+              "start_index": 0
             }
           ],
           "hidden": [],

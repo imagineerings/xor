@@ -54,7 +54,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 525)
+        self.assertEqual(len(tasks), 530)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -82,7 +82,7 @@ class ValidationGenerationTests(unittest.TestCase):
                 asset_id,
                 "comfy-parity-extension-host-plugin-adapter",
                 "comfy-parity-opt-in-product-build-boundary",
-                "comfy-parity-native-text-value-regex-foundation",
+                "comfy-parity-native-shader-execution-foundation",
             ],
         )
         dependencies = {
@@ -134,9 +134,20 @@ class ValidationGenerationTests(unittest.TestCase):
         hook_consumers_id = "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
         text_regex_id = "comfy-parity-native-nodes-text-comfy-node-0002"
         text_regex_foundation_id = "comfy-parity-native-text-value-regex-foundation"
+        text_transform_foundation_id = "comfy-parity-native-text-transform-foundation"
         sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
+        image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
+        structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
+        shader_foundation_id = "comfy-parity-native-shader-execution-foundation"
+        detection_foundation_id = "comfy-parity-native-detection-execution-foundation"
         sdpose_id = "comfy-parity-native-nodes-image-detection-comfy-node-0607"
+        detection_id = "comfy-parity-native-nodes-image-detection-comfy-node-0136"
+        image_filter_id = "comfy-parity-native-nodes-image-filters-comfy-node-0045"
+        image_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0047"
+        structured_transform_id = "comfy-parity-native-nodes-image-transform-comfy-node-0541"
+        shader_id = "comfy-parity-native-nodes-image-shader-comfy-node-0211"
+        text_transform_id = "comfy-parity-native-nodes-text-comfy-node-0531"
         primitive_id = "comfy-parity-native-nodes-utilities-primitive-comfy-node-0494"
         video_id = "comfy-parity-native-nodes-video-comfy-node-0124"
         video_preprocessor_id = "comfy-parity-native-nodes-video-preprocessors-comfy-node-0372"
@@ -199,6 +210,16 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[primitive_id]["reads"],
         )
         self.assertTrue(tasks_by_id[text_regex_foundation_id]["locked"])
+        self.assertIn(text_transform_foundation_id, dependencies[text_transform_id])
+        self.assertIn(
+            "crates/comfy_nodes/src/text_format.rs",
+            tasks_by_id[text_transform_foundation_id]["writes"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/test_generate_node_contract_catalog.py",
+            tasks_by_id[text_transform_foundation_id]["writes"],
+        )
+        self.assertTrue(tasks_by_id[text_transform_foundation_id]["locked"])
         self.assertIn(
             "crates/comfy_model/src/sdpose.rs",
             tasks_by_id[sdpose_foundation_id]["writes"],
@@ -227,6 +248,34 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_foundation_id]["writes"],
         )
         self.assertTrue(tasks_by_id[video_foundation_id]["locked"])
+        self.assertIn(image_source_foundation_id, dependencies[image_filter_id])
+        self.assertIn(image_source_foundation_id, dependencies[image_transform_id])
+        self.assertIn(
+            "crates/comfy_media/src/image_quantization.rs",
+            tasks_by_id[image_source_foundation_id]["writes"],
+        )
+        self.assertIn(structured_link_foundation_id, dependencies[structured_transform_id])
+        self.assertIn(
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+            tasks_by_id[structured_link_foundation_id]["writes"],
+        )
+        self.assertIn(shader_foundation_id, dependencies[shader_id])
+        self.assertIn(
+            "crates/comfy_tensor/src/shader.rs",
+            tasks_by_id[shader_foundation_id]["writes"],
+        )
+        self.assertIn(detection_foundation_id, dependencies[detection_id])
+        self.assertIn(
+            "crates/comfy_model/src/detection.rs",
+            tasks_by_id[detection_foundation_id]["writes"],
+        )
+        for identifier in (
+            image_source_foundation_id,
+            structured_link_foundation_id,
+            shader_foundation_id,
+            detection_foundation_id,
+        ):
+            self.assertTrue(tasks_by_id[identifier]["locked"])
         self.assertTrue(tasks_by_id[guidance_id]["locked"])
         self.assertTrue(tasks_by_id[hooks_id]["locked"])
         self.assertTrue(tasks_by_id[hook_consumers_id]["locked"])
@@ -238,15 +287,32 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[asset_id], waves[value_id] + 1)
         self.assertEqual(
             waves[provider_id],
-            waves[text_regex_foundation_id] + 1,
+            waves[shader_foundation_id] + 1,
         )
         self.assertEqual(
             waves[text_regex_foundation_id],
             waves["comfy-parity-opt-in-product-build-boundary"] + 1,
         )
+        self.assertEqual(
+            waves[text_transform_foundation_id], waves[text_regex_foundation_id] + 1
+        )
         self.assertEqual(waves[sdpose_foundation_id], waves[provider_id] + 1)
         self.assertEqual(
             waves[video_foundation_id], waves[hook_consumers_id] + 1
+        )
+        self.assertEqual(
+            waves[image_source_foundation_id], waves[text_transform_foundation_id] + 1
+        )
+        self.assertEqual(
+            waves[structured_link_foundation_id],
+            waves[image_source_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[shader_foundation_id], waves[structured_link_foundation_id] + 1
+        )
+        self.assertEqual(
+            waves[detection_foundation_id],
+            max(waves[video_foundation_id], waves[video_id]) + 1,
         )
         self.assertEqual(
             waves[registry_id], max(waves[identifier] for identifier in node_ids) + 1
