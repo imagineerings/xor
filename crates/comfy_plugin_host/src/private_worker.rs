@@ -1,6 +1,6 @@
 use crate::{
     ComponentHostError, InvocationResult, PluginError, PluginInvocationExecutor,
-    PreparedPluginInvocation,
+    PreparedPluginInvocation, ProviderInvocationResult,
 };
 use comfy_plugin_sdk::InvocationError;
 use comfy_runtime::{
@@ -51,6 +51,65 @@ impl PrivateWorkerPluginExecutor {
             commands,
         }))
     }
+
+    async fn execute_prepared(
+        &self,
+        invocation: PreparedPluginInvocation,
+    ) -> Result<WorkerPluginExecutionOutcome, ComponentHostError> {
+        let context = invocation.context();
+        context.cancellation.check().map_err(|_| {
+            ComponentHostError::Plugin(PluginError::Invocation(InvocationError::Cancelled))
+        })?;
+        verify_profile(
+            self.launch.profile_id,
+            invocation.authorization().capabilities().profile_id(),
+        )?;
+        let timeout =
+            std::time::Duration::from_millis(invocation.worker_invocation().timeout_milliseconds());
+        let deadline = Instant::now().checked_add(timeout).ok_or_else(|| {
+            ComponentHostError::ExecutionBoundary(
+                "plugin invocation deadline overflowed".to_owned(),
+            )
+        })?;
+        let service_context = PluginServiceInvocationContext::new(
+            self.launch.profile_id,
+            context.prompt_id,
+            context.attempt_id,
+            context.node_id.clone(),
+            invocation.authorization().clone(),
+            context.cancellation.clone(),
+            deadline,
+            invocation.worker_invocation().maximum_response_bytes(),
+        )
+        .map_err(worker_boundary_error)?;
+        let capability_invocation = self
+            .broker
+            .begin_invocation(service_context)
+            .map_err(worker_boundary_error)?;
+        let (response, result) = async_channel::bounded(1);
+        let command = PrivateWorkerCommand {
+            deployment: invocation.deployment().clone(),
+            invocation: invocation.worker_invocation().to_bytes()?,
+            prompt_id: context.prompt_id,
+            attempt_id: context.attempt_id,
+            capability_invocation,
+            response,
+        };
+        self.commands.send(command).await.map_err(|_| {
+            ComponentHostError::ExecutionBoundary(
+                "private plugin worker actor is unavailable".to_owned(),
+            )
+        })?;
+        result
+            .recv()
+            .await
+            .map_err(|_| {
+                ComponentHostError::ExecutionBoundary(
+                    "private plugin worker actor closed its response".to_owned(),
+                )
+            })?
+            .map_err(worker_boundary_error)
+    }
 }
 
 impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
@@ -60,61 +119,20 @@ impl PluginInvocationExecutor for PrivateWorkerPluginExecutor {
     ) -> Pin<Box<dyn Future<Output = Result<InvocationResult, ComponentHostError>> + Send + 'a>>
     {
         Box::pin(async move {
-            let context = invocation.context();
-            context.cancellation.check().map_err(|_| {
-                ComponentHostError::Plugin(PluginError::Invocation(InvocationError::Cancelled))
-            })?;
-            verify_profile(
-                self.launch.profile_id,
-                invocation.authorization().capabilities().profile_id(),
-            )?;
-            let timeout = std::time::Duration::from_millis(
-                invocation.worker_invocation().timeout_milliseconds(),
-            );
-            let deadline = Instant::now().checked_add(timeout).ok_or_else(|| {
-                ComponentHostError::ExecutionBoundary(
-                    "plugin invocation deadline overflowed".to_owned(),
-                )
-            })?;
-            let service_context = PluginServiceInvocationContext::new(
-                self.launch.profile_id,
-                context.prompt_id,
-                context.attempt_id,
-                context.node_id.clone(),
-                invocation.authorization().clone(),
-                context.cancellation.clone(),
-                deadline,
-                invocation.worker_invocation().maximum_response_bytes(),
-            )
-            .map_err(worker_boundary_error)?;
-            let capability_invocation = self
-                .broker
-                .begin_invocation(service_context)
-                .map_err(worker_boundary_error)?;
-            let (response, result) = async_channel::bounded(1);
-            let command = PrivateWorkerCommand {
-                deployment: invocation.deployment().clone(),
-                invocation: invocation.worker_invocation().to_bytes()?,
-                prompt_id: context.prompt_id,
-                attempt_id: context.attempt_id,
-                capability_invocation,
-                response,
-            };
-            self.commands.send(command).await.map_err(|_| {
-                ComponentHostError::ExecutionBoundary(
-                    "private plugin worker actor is unavailable".to_owned(),
-                )
-            })?;
-            let outcome = result
-                .recv()
-                .await
-                .map_err(|_| {
-                    ComponentHostError::ExecutionBoundary(
-                        "private plugin worker actor closed its response".to_owned(),
-                    )
-                })?
-                .map_err(worker_boundary_error)?;
+            let outcome = self.execute_prepared(invocation).await?;
             decode_worker_result(outcome)
+        })
+    }
+
+    fn execute_provider<'a>(
+        &'a self,
+        invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            let outcome = self.execute_prepared(invocation).await?;
+            decode_worker_provider_result(outcome)
         })
     }
 }
@@ -274,6 +292,46 @@ fn decode_worker_result(
             ),
         }),
     }
+}
+
+fn decode_worker_provider_result(
+    outcome: WorkerPluginExecutionOutcome,
+) -> Result<ProviderInvocationResult, ComponentHostError> {
+    match outcome {
+        WorkerPluginExecutionOutcome::Succeeded(bytes) => {
+            serde_json::from_slice(&bytes).map_err(|_| {
+                ComponentHostError::ExecutionBoundary(
+                    "private worker returned an invalid provider result".to_owned(),
+                )
+            })
+        }
+        WorkerPluginExecutionOutcome::Failed(failure) => decode_worker_failure(failure),
+    }
+}
+
+fn decode_worker_failure<T>(
+    failure: WorkerPluginExecutionFailure,
+) -> Result<T, ComponentHostError> {
+    Err(match failure {
+        WorkerPluginExecutionFailure::Cancelled => {
+            ComponentHostError::Plugin(PluginError::Invocation(InvocationError::Cancelled))
+        }
+        WorkerPluginExecutionFailure::TimedOut => {
+            ComponentHostError::Plugin(PluginError::Invocation(InvocationError::TimedOut))
+        }
+        WorkerPluginExecutionFailure::Trap { diagnostic } => {
+            ComponentHostError::Plugin(PluginError::WasmTrap(diagnostic))
+        }
+        WorkerPluginExecutionFailure::InvalidInvocation => ComponentHostError::ExecutionBoundary(
+            "private worker rejected the plugin invocation".to_owned(),
+        ),
+        WorkerPluginExecutionFailure::CapabilityDenied => ComponentHostError::ExecutionBoundary(
+            "private worker plugin capability was denied".to_owned(),
+        ),
+        WorkerPluginExecutionFailure::HostFailure => ComponentHostError::ExecutionBoundary(
+            "private worker plugin execution failed".to_owned(),
+        ),
+    })
 }
 
 fn worker_boundary_error(error: impl std::fmt::Display) -> ComponentHostError {

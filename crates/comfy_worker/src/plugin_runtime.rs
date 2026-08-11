@@ -9,7 +9,7 @@ use std::{
 
 use comfy_plugin_host::{
     CapabilityServiceContext, ComponentLimits, InvocationResult, PluginCapabilityServices,
-    PluginError, PluginHost, WorkerPluginInvocation,
+    PluginError, PluginHost, ProviderInvocationResult, WorkerPluginInvocation,
 };
 use comfy_plugin_sdk::{CapabilityKind, InvocationError, ModelValue, PluginManifest};
 use comfy_runtime::{
@@ -28,6 +28,11 @@ use thiserror::Error;
 use crate::AssembledWorkerRegistry;
 
 const CAPABILITY_BRIDGE_POLL_INTERVAL: Duration = Duration::from_millis(5);
+
+pub(crate) enum WorkerPluginInvocationResult {
+    Node(InvocationResult),
+    Provider(ProviderInvocationResult),
+}
 
 pub(crate) struct WorkerCapabilityBridgeRequest {
     pub call_id: u64,
@@ -483,7 +488,7 @@ impl WorkerPluginRegistry {
         invocation: WorkerPluginInvocation,
         bridge: Arc<dyn PluginCapabilityServices>,
         cancellation: CancellationToken,
-    ) -> Result<InvocationResult, WorkerPluginRuntimeError> {
+    ) -> Result<WorkerPluginInvocationResult, WorkerPluginRuntimeError> {
         if invocation.registry_generation() != self.generation
             || invocation.registry_digest_sha256() != &self.registry_digest_sha256
         {
@@ -504,17 +509,38 @@ impl WorkerPluginRegistry {
             return Err(WorkerPluginRuntimeError::StaleGeneration);
         }
         let node_id = invocation.node_id().to_owned();
+        let (inputs, provider_request) = invocation.into_execution_parts();
+        let node_is_provider_bound =
+            component
+                .manifest
+                .provider_binding
+                .as_ref()
+                .is_some_and(|binding| {
+                    binding
+                        .bindings
+                        .iter()
+                        .any(|claim| claim.node_id == node_id)
+                });
+        if node_is_provider_bound != provider_request.is_some() {
+            return Err(WorkerPluginRuntimeError::InvalidDeployment);
+        }
         let invocation_host = self.host.begin_invocation(
             &component.manifest,
             &component.authorization,
             &node_id,
-            invocation.into_inputs(),
+            inputs,
             bridge,
             cancellation,
         )?;
         let mut instance = self
             .host
             .instantiate_component(&component.compiled, invocation_host)?;
+        if let Some(provider_request) = provider_request {
+            return instance
+                .invoke_provider(&node_id, &provider_request)
+                .map(WorkerPluginInvocationResult::Provider)
+                .map_err(Into::into);
+        }
         let node = instance.create_node(&node_id)?;
         if let Err(error) = instance.invoke(node) {
             instance.abort();
@@ -524,7 +550,10 @@ impl WorkerPluginRegistry {
             instance.abort();
             return Err(error.into());
         }
-        instance.finish().map_err(Into::into)
+        instance
+            .finish()
+            .map(WorkerPluginInvocationResult::Node)
+            .map_err(Into::into)
     }
 }
 
@@ -534,10 +563,13 @@ fn digest_matches(bytes: &[u8], expected: &comfy_types::WorkerSha256Digest) -> b
 }
 
 pub(crate) fn encode_plugin_outcome(
-    result: Result<InvocationResult, WorkerPluginRuntimeError>,
+    result: Result<WorkerPluginInvocationResult, WorkerPluginRuntimeError>,
 ) -> WorkerPluginExecutionOutcome {
     match result {
-        Ok(result) => match serde_json::to_vec(&result) {
+        Ok(result) => match match result {
+            WorkerPluginInvocationResult::Node(result) => serde_json::to_vec(&result),
+            WorkerPluginInvocationResult::Provider(result) => serde_json::to_vec(&result),
+        } {
             Ok(bytes) if !bytes.is_empty() && bytes.len() <= MAX_WORKER_PLUGIN_RESULT_BYTES => {
                 WorkerPluginExecutionOutcome::Succeeded(bytes)
             }
@@ -694,6 +726,7 @@ mod tests {
             "authorization_generation": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
             "node_id": "echo",
             "inputs": { "values": {} },
+            "provider_request": [1, 2, 3],
             "timeout_milliseconds": 1_000,
             "maximum_response_bytes": 1_024,
             "component_limits": component_limits
@@ -706,6 +739,7 @@ mod tests {
             .and_then(|bytes| WorkerPluginInvocation::from_bytes(&bytes))
             .expect("tagged invocation values round trip through the bounded JSON DTO");
         assert_eq!(round_trip, invocation);
+        assert_eq!(round_trip.provider_request(), Some([1, 2, 3].as_slice()));
 
         let (sender, _receiver) = async_channel::bounded(1);
         let result = registry.execute(

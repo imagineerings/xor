@@ -995,6 +995,9 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     assert_eq!(result.receipt(), b"provider-fixture-receipt");
     assert!(result.effects.outputs.is_empty());
     assert!(result.effects.routes.is_empty());
+    let encoded = serde_json::to_vec(&result)?;
+    let decoded: comfy_plugin_host::ProviderInvocationResult = serde_json::from_slice(&encoded)?;
+    assert_eq!(decoded, result);
     Ok(())
 }
 
@@ -2120,6 +2123,20 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
     assert_eq!(
         WorkerPluginInvocation::from_bytes(&worker_invocation.to_bytes()?)?,
         worker_invocation
+    );
+    assert!(worker_invocation.provider_request().is_none());
+    assert!(
+        generation
+            .prepare_worker_provider_invocation(
+                "test-extension",
+                "echo",
+                invocation_inputs(true)?,
+                b"provider-request".to_vec(),
+                1_000,
+                1_024,
+                conformance_component_limits(),
+            )
+            .is_err()
     );
     let mut tampered_authorization = deployment.authorization_bytes().to_vec();
     let last = tampered_authorization

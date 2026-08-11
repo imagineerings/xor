@@ -1,6 +1,6 @@
 use crate::{
     ComponentLimits, InvocationInputs, InvocationResult, PluginCapabilityServices, PluginError,
-    PluginHost,
+    PluginHost, ProviderInvocationResult,
 };
 use comfy_plugin_sdk::PluginManifest;
 use comfy_runtime::{
@@ -68,6 +68,13 @@ pub trait PluginInvocationExecutor: Send + Sync {
         &'a self,
         invocation: PreparedPluginInvocation,
     ) -> Pin<Box<dyn Future<Output = Result<InvocationResult, ComponentHostError>> + Send + 'a>>;
+
+    fn execute_provider<'a>(
+        &'a self,
+        invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
+    >;
 }
 
 pub enum ComponentExecutionBoundary {
@@ -173,6 +180,8 @@ pub struct WorkerPluginInvocation {
     authorization_generation: WorkerSha256Digest,
     node_id: String,
     inputs: InvocationInputs,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    provider_request: Option<Vec<u8>>,
     timeout_milliseconds: u64,
     maximum_response_bytes: u64,
     component_limits: ComponentLimits,
@@ -249,6 +258,14 @@ impl WorkerPluginInvocation {
         self.inputs
     }
 
+    pub fn provider_request(&self) -> Option<&[u8]> {
+        self.provider_request.as_deref()
+    }
+
+    pub fn into_execution_parts(self) -> (InvocationInputs, Option<Vec<u8>>) {
+        (self.inputs, self.provider_request)
+    }
+
     pub const fn timeout_milliseconds(&self) -> u64 {
         self.timeout_milliseconds
     }
@@ -273,6 +290,9 @@ impl WorkerPluginInvocation {
             || self.maximum_response_bytes
                 > u64::try_from(MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES)
                     .map_err(worker_deployment_error)?
+            || self.provider_request.as_ref().is_some_and(|request| {
+                request.is_empty() || request.len() > MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES
+            })
         {
             return Err(worker_deployment_error(
                 "worker plugin invocation metadata is invalid",
@@ -342,6 +362,50 @@ impl VerifiedComponentGeneration {
         maximum_response_bytes: u64,
         component_limits: ComponentLimits,
     ) -> Result<WorkerPluginInvocation, ComponentHostError> {
+        self.prepare_worker_invocation_with_provider_request(
+            extension_id,
+            node_id,
+            inputs,
+            None,
+            timeout_milliseconds,
+            maximum_response_bytes,
+            component_limits,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_worker_provider_invocation(
+        &self,
+        extension_id: &str,
+        node_id: &str,
+        inputs: InvocationInputs,
+        provider_request: Vec<u8>,
+        timeout_milliseconds: u64,
+        maximum_response_bytes: u64,
+        component_limits: ComponentLimits,
+    ) -> Result<WorkerPluginInvocation, ComponentHostError> {
+        self.prepare_worker_invocation_with_provider_request(
+            extension_id,
+            node_id,
+            inputs,
+            Some(provider_request),
+            timeout_milliseconds,
+            maximum_response_bytes,
+            component_limits,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_worker_invocation_with_provider_request(
+        &self,
+        extension_id: &str,
+        node_id: &str,
+        inputs: InvocationInputs,
+        provider_request: Option<Vec<u8>>,
+        timeout_milliseconds: u64,
+        maximum_response_bytes: u64,
+        component_limits: ComponentLimits,
+    ) -> Result<WorkerPluginInvocation, ComponentHostError> {
         let component = self
             .components
             .iter()
@@ -358,6 +422,17 @@ impl VerifiedComponentGeneration {
             return Err(ComponentHostError::Plugin(PluginError::UndeclaredNode(
                 node_id.to_owned(),
             )));
+        }
+        let node_is_provider_bound = manifest.provider_binding.as_ref().is_some_and(|binding| {
+            binding
+                .bindings
+                .iter()
+                .any(|claim| claim.node_id == node_id)
+        });
+        if node_is_provider_bound != provider_request.is_some() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "worker invocation mode disagrees with the signed provider binding".to_owned(),
+            ));
         }
         let deployment = self.worker_deployment_plan()?;
         let descriptor = deployment
@@ -378,6 +453,7 @@ impl VerifiedComponentGeneration {
             authorization_generation: descriptor.authorization_generation().clone(),
             node_id: node_id.to_owned(),
             inputs,
+            provider_request,
             timeout_milliseconds,
             maximum_response_bytes,
             component_limits,
@@ -656,6 +732,42 @@ impl PluginInvocationExecutor for ConformanceInProcessExecutor {
                 return Err(error.into());
             }
             instance.finish().map_err(ComponentHostError::from)
+        })
+    }
+
+    fn execute_provider<'a>(
+        &'a self,
+        invocation: PreparedPluginInvocation,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<ProviderInvocationResult, ComponentHostError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            invocation.context.cancellation.check().map_err(|_| {
+                PluginError::Invocation(comfy_plugin_sdk::InvocationError::Cancelled)
+            })?;
+            let provider_request = invocation
+                .worker_invocation
+                .provider_request()
+                .ok_or_else(|| {
+                    ComponentHostError::ExecutionBoundary(
+                        "provider invocation omitted its bounded request".to_owned(),
+                    )
+                })?
+                .to_vec();
+            let host_invocation = self.plugin_host.begin_invocation(
+                &invocation.plugin.inner.manifest,
+                &invocation.plugin.inner.authorization,
+                invocation.worker_invocation.node_id(),
+                invocation.worker_invocation.inputs().clone(),
+                self.services.clone(),
+                invocation.context.cancellation.clone(),
+            )?;
+            let instance = self
+                .plugin_host
+                .instantiate_component(&invocation.plugin.inner.compiled, host_invocation)?;
+            instance
+                .invoke_provider(invocation.worker_invocation.node_id(), &provider_request)
+                .map_err(ComponentHostError::from)
         })
     }
 }
@@ -945,6 +1057,36 @@ impl ComponentHost {
         })
     }
 
+    pub(crate) fn prepare_provider_invocation(
+        &self,
+        plugin: &InstalledVerifiedPlugin,
+        node_id: &str,
+        inputs: InvocationInputs,
+        provider_request: Vec<u8>,
+        context: NodeContext,
+    ) -> Result<PreparedPluginInvocation, ComponentHostError> {
+        let lease = self.begin_invocation_lease(plugin)?;
+        let generation = self.verified_generation()?;
+        let worker_invocation = generation.prepare_worker_provider_invocation(
+            plugin.extension_id(),
+            node_id,
+            inputs,
+            provider_request,
+            self.inner.invocation_timeout_milliseconds,
+            self.inner.invocation_maximum_response_bytes,
+            self.inner.plugin_host.limits().clone(),
+        )?;
+        let deployment = generation.worker_deployment_plan()?;
+        Ok(PreparedPluginInvocation {
+            worker_invocation,
+            deployment,
+            authorization: plugin.authorization().clone(),
+            context,
+            plugin: plugin.clone(),
+            _lease: lease,
+        })
+    }
+
     pub(crate) fn executor(&self) -> Arc<dyn PluginInvocationExecutor> {
         self.inner.executor.clone()
     }
@@ -958,6 +1100,19 @@ impl ComponentHost {
     ) -> Result<InvocationResult, ComponentHostError> {
         let prepared = self.prepare_plugin_invocation(plugin, node_id, inputs, context)?;
         self.executor().execute(prepared).await
+    }
+
+    pub async fn execute_provider(
+        &self,
+        plugin: &InstalledVerifiedPlugin,
+        node_id: &str,
+        inputs: InvocationInputs,
+        provider_request: Vec<u8>,
+        context: NodeContext,
+    ) -> Result<ProviderInvocationResult, ComponentHostError> {
+        let prepared =
+            self.prepare_provider_invocation(plugin, node_id, inputs, provider_request, context)?;
+        self.executor().execute_provider(prepared).await
     }
 
     pub fn invoke(

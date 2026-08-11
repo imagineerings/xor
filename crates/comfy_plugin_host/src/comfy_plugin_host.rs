@@ -235,7 +235,8 @@ enum WasmBindings {
     Provider(provider_wit_contract::ComfyProviderPlugin),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProviderInvocationResult {
     pub outputs: BTreeMap<String, Vec<PluginValue>>,
     pub output_presence: BTreeMap<String, bool>,
