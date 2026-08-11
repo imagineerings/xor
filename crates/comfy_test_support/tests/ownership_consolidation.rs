@@ -8231,6 +8231,10 @@ fn run_ownership_validation(
             "native_stored_payload_boundary_is_closed",
             validate_native_stored_payload_boundary(&root, &sources)?,
         );
+        cases.insert(
+            "native_text_regex_has_one_bounded_owner",
+            validate_native_text_regex_boundary(&root, &sources)?,
+        );
     }
     let cases = cases
         .into_iter()
@@ -8382,6 +8386,8 @@ fn run_ownership_validation(
         "crates/comfy_plugin_host/src/private_worker.rs",
         "crates/comfy_worker/src/plugin_runtime.rs",
         "crates/extension_host/src/extension_host.rs",
+        "crates/comfy_nodes/Cargo.toml",
+        "crates/comfy_nodes/src/text_regex.rs",
         "crates/comfy_backend_metal/src/execution.rs",
         "crates/comfy_backend_metal/src/execution_abi.rs",
         "crates/comfy_backend_metal/abi/execution-v1.json",
@@ -10556,5 +10562,87 @@ fn val_ownership_001_native_stored_payload_boundary_is_closed()
         })
         .collect::<Result<Vec<_>, std::io::Error>>()?;
     assert!(validate_native_stored_payload_boundary(&root, &sources)?);
+    Ok(())
+}
+
+fn validate_native_text_regex_boundary(
+    root: &Path,
+    sources: &[(PathBuf, String)],
+) -> Result<bool, Box<dyn std::error::Error>> {
+    for definition in [
+        "pub struct NativeTextRegex {",
+        "pub struct NativeTextRegexCaptureRows {",
+        "pub enum NativeTextRegexError {",
+        "pub struct NativeTextRegexFlags {",
+    ] {
+        let occurrences = production_source_occurrences(sources, definition);
+        assert_eq!(
+            occurrences.len(),
+            1,
+            "{definition} must have exactly one production owner: {occurrences:?}"
+        );
+        assert!(
+            occurrences[0].contains("crates/comfy_nodes/src/text_regex.rs"),
+            "{definition} must be owned by comfy_nodes text_regex: {occurrences:?}"
+        );
+    }
+    let regex_import = ["use fancy_", "regex"].concat();
+    let regex_engine_uses = sources
+        .iter()
+        .filter(|(path, source)| {
+            path.to_string_lossy().contains("/crates/comfy_") && source.contains(&regex_import)
+        })
+        .map(|(path, _)| path.display().to_string())
+        .collect::<Vec<_>>();
+    assert!(
+        regex_engine_uses
+            .iter()
+            .all(|path| path.contains("crates/comfy_nodes/src/text_regex.rs")),
+        "native Comfy code contains a second regex-engine owner: {regex_engine_uses:?}"
+    );
+    let source = fs::read_to_string(root.join("crates/comfy_nodes/src/text_regex.rs"))?;
+    for required in [
+        "RegexBuilder::new(pattern)",
+        ".backtrack_limit(limits.backtrack_limit)",
+        ".delegate_size_limit(NATIVE_TEXT_REGEX_DELEGATE_SIZE_LIMIT)",
+        ".delegate_dfa_size_limit(NATIVE_TEXT_REGEX_DELEGATE_DFA_SIZE_LIMIT)",
+        "maximum_input_bytes",
+        "maximum_matches",
+        "maximum_capture_bytes",
+        "self.check_cancellation(cancellation)?",
+    ] {
+        assert!(
+            source.contains(required),
+            "native text regex lacks {required}"
+        );
+    }
+    let manifest = fs::read_to_string(root.join("crates/comfy_nodes/Cargo.toml"))?;
+    assert!(manifest.contains("fancy-regex.workspace = true"));
+    let root_source = fs::read_to_string(root.join("crates/comfy_nodes/src/comfy_nodes.rs"))?;
+    assert!(root_source.contains("pub mod text_regex;"));
+    assert!(root_source.contains("NativeTextRegexCaptureRows"));
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    assert!(
+        execution
+            .contains("Self::String(value) => validate_workflow_text(\"primitive string\", value)")
+    );
+    assert!(execution.contains("fn validate_workflow_text("));
+    assert!(execution.contains("'\\n' | '\\r' | '\\t'"));
+    assert!(execution.contains("fn validate_identifier("));
+    Ok(true)
+}
+
+#[test]
+fn val_ownership_001_native_text_regex_has_one_bounded_owner()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let sources = rust_sources(&root)?
+        .into_iter()
+        .map(|path| {
+            let source = fs::read_to_string(&path)?;
+            Ok((path, source))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    assert!(validate_native_text_regex_boundary(&root, &sources)?);
     Ok(())
 }

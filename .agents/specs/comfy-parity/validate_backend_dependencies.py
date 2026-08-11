@@ -493,6 +493,15 @@ def validate_later_task_writes() -> None:
             "crates/extension_host/Cargo.toml",
             "crates/sim/Cargo.toml",
         },
+        "comfy-parity-native-text-value-regex-foundation": {
+            "Cargo.lock",
+            "crates/comfy_nodes/Cargo.toml",
+        },
+        "comfy-parity-native-video-execution-foundation": {
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+        },
     }
     violations = []
     for block in blocks[owner_index + 1 :]:

@@ -54,7 +54,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 522)
+        self.assertEqual(len(tasks), 525)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -82,6 +82,7 @@ class ValidationGenerationTests(unittest.TestCase):
                 asset_id,
                 "comfy-parity-extension-host-plugin-adapter",
                 "comfy-parity-opt-in-product-build-boundary",
+                "comfy-parity-native-text-value-regex-foundation",
             ],
         )
         dependencies = {
@@ -131,6 +132,14 @@ class ValidationGenerationTests(unittest.TestCase):
         guidance_id = "comfy-parity-native-nodes-advanced-guidance-comfy-node-0049"
         hooks_id = "comfy-parity-native-nodes-advanced-hooks-comfy-node-0079"
         hook_consumers_id = "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
+        text_regex_id = "comfy-parity-native-nodes-text-comfy-node-0002"
+        text_regex_foundation_id = "comfy-parity-native-text-value-regex-foundation"
+        sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
+        video_foundation_id = "comfy-parity-native-video-execution-foundation"
+        sdpose_id = "comfy-parity-native-nodes-image-detection-comfy-node-0607"
+        primitive_id = "comfy-parity-native-nodes-utilities-primitive-comfy-node-0494"
+        video_id = "comfy-parity-native-nodes-video-comfy-node-0124"
+        video_preprocessor_id = "comfy-parity-native-nodes-video-preprocessors-comfy-node-0372"
         self.assertIn(provider_id, dependencies[three_d_id])
         self.assertIn(three_d_id, dependencies[splat_id])
         self.assertIn(splat_id, dependencies[modifier_id])
@@ -162,6 +171,62 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_model/src/clip.rs",
             tasks_by_id[hook_consumers_id]["writes"],
         )
+        self.assertIn(text_regex_foundation_id, dependencies[text_regex_id])
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+            tasks_by_id[text_regex_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/Cargo.toml",
+            tasks_by_id[text_regex_foundation_id]["writes"],
+        )
+        self.assertIn("Cargo.lock", tasks_by_id[text_regex_foundation_id]["writes"])
+        self.assertIn(
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            tasks_by_id[text_regex_foundation_id]["writes"],
+        )
+        self.assertIn(
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            tasks_by_id[text_regex_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/execution.rs",
+            tasks_by_id[text_regex_foundation_id]["writes"],
+        )
+        self.assertIn(text_regex_foundation_id, dependencies[primitive_id])
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy_extras/nodes_primitive.py",
+            tasks_by_id[primitive_id]["reads"],
+        )
+        self.assertTrue(tasks_by_id[text_regex_foundation_id]["locked"])
+        self.assertIn(
+            "crates/comfy_model/src/sdpose.rs",
+            tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
+            tasks_by_id[sdpose_id]["reads"],
+        )
+        self.assertIn(
+            sdpose_foundation_id,
+            dependencies[sdpose_id],
+        )
+        self.assertTrue(tasks_by_id[sdpose_foundation_id]["locked"])
+        self.assertIn(video_foundation_id, dependencies[video_id])
+        self.assertIn(video_foundation_id, dependencies[video_preprocessor_id])
+        self.assertIn(
+            "crates/comfy_media/src/video.rs",
+            tasks_by_id[video_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/frame_interpolation.rs",
+            tasks_by_id[video_foundation_id]["writes"],
+        )
+        self.assertTrue(tasks_by_id[video_foundation_id]["locked"])
         self.assertTrue(tasks_by_id[guidance_id]["locked"])
         self.assertTrue(tasks_by_id[hooks_id]["locked"])
         self.assertTrue(tasks_by_id[hook_consumers_id]["locked"])
@@ -173,7 +238,15 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[asset_id], waves[value_id] + 1)
         self.assertEqual(
             waves[provider_id],
+            waves[text_regex_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[text_regex_foundation_id],
             waves["comfy-parity-opt-in-product-build-boundary"] + 1,
+        )
+        self.assertEqual(waves[sdpose_foundation_id], waves[provider_id] + 1)
+        self.assertEqual(
+            waves[video_foundation_id], waves[hook_consumers_id] + 1
         )
         self.assertEqual(
             waves[registry_id], max(waves[identifier] for identifier in node_ids) + 1

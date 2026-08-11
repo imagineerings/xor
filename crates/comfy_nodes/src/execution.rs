@@ -67,7 +67,7 @@ impl NativePrimitive {
             Self::Number(value) if !value.is_finite() => {
                 Err(NativeNodeContractError::NonFiniteNumber)
             }
-            Self::String(value) => validate_text("primitive string", value, MAX_TEXT_BYTES, true),
+            Self::String(value) => validate_workflow_text("primitive string", value),
             _ => Ok(()),
         }
     }
@@ -1927,6 +1927,18 @@ fn validate_text(
     Ok(())
 }
 
+fn validate_workflow_text(field: &'static str, value: &str) -> Result<(), NativeNodeContractError> {
+    if value.len() > MAX_TEXT_BYTES
+        || value.contains('\0')
+        || value
+            .chars()
+            .any(|character| character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+    {
+        return Err(NativeNodeContractError::InvalidText { field });
+    }
+    Ok(())
+}
+
 fn validate_feature_id(value: &str) -> Result<(), NativeNodeContractError> {
     let suffix = value
         .strip_prefix("COMFY-NODE-")
@@ -2301,6 +2313,46 @@ mod tests {
                     if value.primitive_type() == NativePrimitiveType::Integer
             ));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn primitive_strings_preserve_bounded_multiline_text_without_weakening_identifiers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let value = NativeValue::Primitive {
+            value: NativePrimitive::String("first\tcolumn\r\nsecond line\u{2028}third".to_owned()),
+        };
+        value.validate()?;
+        assert_eq!(
+            serde_json::from_slice::<NativeValue>(&serde_json::to_vec(&value)?)?,
+            value
+        );
+        for invalid in ["nul\0text", "bell\u{0007}text"] {
+            assert!(matches!(
+                NativeValue::Primitive {
+                    value: NativePrimitive::String(invalid.to_owned()),
+                }
+                .validate(),
+                Err(NativeNodeContractError::InvalidText {
+                    field: "primitive string"
+                })
+            ));
+        }
+        assert!(matches!(
+            NativeValue::Primitive {
+                value: NativePrimitive::String("a".repeat(MAX_TEXT_BYTES + 1)),
+            }
+            .validate(),
+            Err(NativeNodeContractError::InvalidText {
+                field: "primitive string"
+            })
+        ));
+        assert!(matches!(
+            validate_identifier("test identifier", "line\nbreak"),
+            Err(NativeNodeContractError::InvalidText {
+                field: "test identifier"
+            })
+        ));
         Ok(())
     }
 

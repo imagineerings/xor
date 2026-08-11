@@ -9515,6 +9515,7 @@
         "crates/comfy_nodes/src/execution.rs",
         "crates/comfy_nodes/src/source_type.rs",
         "crates/comfy_nodes/src/stored_payload.rs",
+        "crates/comfy_nodes/src/text_regex.rs",
         "crates/comfy_nodes/src/registry_generator.rs",
         "crates/comfy_tensor/src/native_node_payload.rs",
         "crates/comfy_model/src/native_node_payload.rs",
@@ -9610,6 +9611,10 @@
         "IcLoraParameters",
         "LossMap",
         "NativeProviderPayload",
+        "NativeTextRegex",
+        "NativeTextRegexCaptureRows",
+        "NativeTextRegexError",
+        "NativeTextRegexFlags",
         "NodeRegistry",
         "TypeRegistry",
         "PluginNode"
@@ -9620,6 +9625,8 @@
         "native_image_registry_projection remains a deliberately narrow compatibility projection and is not the production comprehensive registry",
         "comfy_runtime::NativeHandleStoreGeneration is the sole concrete store, canonical per-attempt session, active-execution claim, handle-lease, and resolved-payload-retention owner; it atomically reference-counts the process-local allocation identities derived by NativePayloadResidency without placing addresses or residency facts in semantic digests or persisted handles, rolls back abandoned staged sessions, and rejects concurrent reuse of one AttemptId before mutation; nodes receive only an attempt-scoped comfy_nodes::NativeHandleStore boundary",
         "comfy_nodes::NativeStoredPayload is the closed store value; it derives exact handle type, semantic digest, and resident bytes from explicit comfy_tensor, comfy_model, comfy_sampler, comfy_media, or ProviderTask-only payload variants and exposes no generic structured record, raw Any, or downcast path",
+        "comfy_nodes::NativePrimitive::String uses the canonical bounded workflow-text admission seam, which preserves tab, CR, LF, Unicode, and empty values while identifier and path-like fields retain strict control-character rejection",
+        "comfy_nodes::NativeTextRegex is the sole native text-regex owner; generated text leaves may consume its bounded checked capture rows but may not embed a second parser, regex engine, interpreter, or unbounded backtracking path",
         "the signed plugin adapter may project canonical payloads into neutral SDK values or return an exact imported handle; metadata-only tensor, model, and artifact values cannot mint canonical executable payloads",
         "verified PluginNode metadata maps exact display name, category, ordered output-port names, signed namespace, and typed ports into NativeNodePresentation and NativeNodeBinding in the same atomic batch as its executable descriptor; comfy_runtime may alias NativeNodePresentation as RuntimeNodePresentation",
         "NativeRuntimeHttpServices serializes checked NativeNodePresentation while cataloged built-ins obtain python_module only from ObjectInfoRegistry.source_python_module; unavailable rows remain visible and fail closed before execution"
@@ -10070,6 +10077,30 @@
           "symbol": "NativeMediaTensorResidentAllocation"
         },
         {
+          "path": "crates/comfy_nodes/src/text_regex.rs",
+          "qualified": "comfy_nodes::NativeTextRegex",
+          "role": "canonical",
+          "symbol": "NativeTextRegex"
+        },
+        {
+          "path": "crates/comfy_nodes/src/text_regex.rs",
+          "qualified": "comfy_nodes::NativeTextRegexCaptureRows",
+          "role": "boundary_dto",
+          "symbol": "NativeTextRegexCaptureRows"
+        },
+        {
+          "path": "crates/comfy_nodes/src/text_regex.rs",
+          "qualified": "comfy_nodes::NativeTextRegexError",
+          "role": "boundary_dto",
+          "symbol": "NativeTextRegexError"
+        },
+        {
+          "path": "crates/comfy_nodes/src/text_regex.rs",
+          "qualified": "comfy_nodes::NativeTextRegexFlags",
+          "role": "boundary_dto",
+          "symbol": "NativeTextRegexFlags"
+        },
+        {
           "path": "crates/comfy_runtime/src/executor.rs",
           "qualified": "comfy_runtime::NativeHandleStoreGeneration",
           "role": "canonical",
@@ -10243,6 +10274,10 @@
         "IcLoraParameters",
         "LossMap",
         "NativeProviderPayload",
+        "NativeTextRegex",
+        "NativeTextRegexCaptureRows",
+        "NativeTextRegexError",
+        "NativeTextRegexFlags",
         "NativeValue",
         "NodeRegistry",
         "TypeRegistry",
@@ -10251,6 +10286,13 @@
         "PluginNode"
       ],
       "call_patterns": [
+        {
+          "symbol": "bounded native text regex",
+          "pattern": "NativeTextRegex::checked\\(|\\.capture_rows\\(|\\.is_match\\(",
+          "path_prefixes": [
+            "crates/comfy_nodes/src"
+          ]
+        },
         {
           "symbol": "catalog registry construction",
           "pattern": "\\bNodeRegistry::built_in\\(",
@@ -10325,6 +10367,7 @@
         "comfy-parity-native-node-runtime-foundation",
         "comfy-parity-native-node-schema-metadata-foundation",
         "comfy-parity-native-node-compute-value-foundation",
+        "comfy-parity-native-text-value-regex-foundation",
         "comfy-parity-extension-host-plugin-adapter",
         "comfy-parity-authoritative-ownership-gate"
       ],
@@ -10337,14 +10380,18 @@
       ],
       "requirements": [
         "Requirement 6",
+        "Requirement 7",
+        "Requirement 37",
         "Requirement 34",
         "Requirement 35",
         "Requirement 38",
         "Requirement 39",
+        "Requirement 41",
         "Requirement 44"
       ],
       "design": [
         "D8",
+        "D18",
         "D20",
         "D25",
         "D28",
@@ -10362,7 +10409,7 @@
         "VAL-WORKER-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, explicit audio/video/artifact/File3D/camera/splat/mesh/voxel media values, media annotations, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. NativeNodeComputeSession and NativeNodeServices bind the attempt's exact backend and scratch reservation below the runtime dependency boundary. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
+      "decision_reason": "NativeNodeRegistry alone owns runtime binding identity, dispatch, provider activation, and unavailable state. NativeHandleStoreGeneration and its concrete canonical session, active-attempt claim, staging, lease, and resolved-retention types alone own attempt staging, committed objects, generation checks, and alias-aware resident-byte accounting; production NativeResolvedPayload construction is restricted by ownership validation to that store implementation. NodeRegistry owns built-in catalog metadata and its checked source-module projection; NativeSourceTypeProjection owns the exhaustive case-sensitive socket mapping; TypeRegistry validates every built-in plugin type against that source projection; the verified PluginNode owns signed component metadata. NativeStoredPayload is the only closed store sum over explicit tensor, model through the role-checked NativeStoredModelPayload and NativeDiffusionPayload, conditioning, control, executable noise/guider/sampler, model-derived output, explicit audio/video/artifact/File3D/camera/splat/mesh/voxel media values, media annotations, and ProviderTask-only payload variants, with handle type, semantic digest, and resident bytes derived from each concrete lower-domain object. NativePayloadResidency projects exact process-local shared allocation identities for model Arcs, conditioning-set Arcs, tensor StorageIds, and sealed payload Arcs; the store reference-counts those identities atomically, while addresses and residency placement never enter semantic digests or persisted handles. NativeNodeComputeSession and NativeNodeServices bind the attempt's exact backend and scratch reservation below the runtime dependency boundary. NativePrimitive::String preserves bounded NUL-safe multiline workflow text through its dedicated admission seam, while identifiers and path-like fields retain strict control-character rejection. NativeTextRegex is the sole bounded source-compatible text regex engine and exposes checked capture rows with explicit pattern, input, match, capture, backtracking, and cancellation limits; generated leaves cannot introduce a second parser, interpreter, or unbounded regex path. Structured-compute socket identities authorize no public generic record, wrapper, raw Any, or downcast path. The portable NativeHandleType, NativeHandleStoreIdentity, NativeOpaqueHandle, NativeNodeBinding, NativeNodeContext, NativeNodePresentation, NativeValue, and NativeHandleStore DTOs live below the runtime dependency boundary. Plugin interoperability uses truthful checked neutral views or exact imported handles; an unrepresentable explicit variant fails before mutation, and metadata or ABI bytes cannot mint canonical executable payloads or a parallel store. Production consumers use the comprehensive generated registry, while the early image projection remains compatibility-only."
     },
     {
       "concern": "native_rgb8_tensor_conversion",

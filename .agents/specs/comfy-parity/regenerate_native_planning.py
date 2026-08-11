@@ -7722,6 +7722,8 @@ def model_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]], str, l
             "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_types/src/comfy_types.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
@@ -8858,11 +8860,148 @@ def comfy_opt_in_build_boundary_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_text_regex_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-text-value-regex-foundation",
+        "Implement native workflow text values and bounded regex",
+        [6, 7, 37, 41, 44],
+        [8, 18, 34, 41],
+        ["VAL-NODE-002", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "One native workflow-text owner preserves bounded NUL-safe multiline primitive strings while identifier and path-like fields retain strict control-character rejection. One source-compatible regex owner wraps the workspace-pinned bounded backtracking engine for RegexMatch and RegexExtract without a leaf-local parser, substring fallback, unbounded backtracking path, or production Python dependency.",
+        [
+            "Cargo.toml",
+            "crates/comfy_nodes/Cargo.toml",
+            "crates/comfy_types/src/cancellation.rs",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_primitive.py",
+        ],
+        [
+            "Cargo.lock",
+            "crates/comfy_nodes/Cargo.toml",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/text_regex.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "NativePrimitive::String round-trips empty, Unicode, tab, CR, LF, and multiline workflow text with exact bounded serialization while rejecting NUL, disallowed controls, and oversize values; identifiers still reject every control character. Checked regex construction and matching cover Python-style named and numbered captures, lookaround, backreferences, IGNORECASE, MULTILINE, DOTALL, Unicode, invalid syntax, pattern/input/result limits, catastrophic-backtracking limits, and cancellation, with no second regex engine or interpreter path.",
+        [dependency],
+        locked=True,
+        criterion_ids=["6.4", "7.4", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sdpose-execution-foundation",
+        "Implement the native SDPose model and execution foundation",
+        [18, 26, 28, 31, 37, 41, 44],
+        [18, 26, 28, 31, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-SAMPLER-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical shared SDPose execution owner admits the model resource and implements checked 640-channel output-block feature capture, native heatmap-head execution, Lotus conditioning, one-step Euler sampling, and exact OpenPose projection through the existing model, VAE, sampler, tensor, and sealed-payload boundaries.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lotus.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Source-derived fixtures prove exact resource admission, heatmap geometry and feature capture, VAE resize and encode, Lotus-conditioned one-step Euler execution, whole-body keypoint and score projection, cancellation, wrong-model rejection, alias-aware residency, attempt rollback, restart staleness, and no metadata-only model facade.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-execution-foundation",
+        "Implement native video codecs, transforms, effects, and frame interpolation",
+        [11, 18, 26, 28, 31, 36, 37, 41, 44],
+        [11, 18, 26, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-MODEL-FAMILY-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical native video foundation owns bounded demux, decode, encode, bit-depth metadata, slicing, preview/save effects, and admitted frame-interpolation execution. It supplies source-exact H.264/MP4 compression for LTXV preprocessing and the AV1/VP9 WebM plus ordinary video paths without Python, subprocesses, paths in payloads, or metadata-only model facades.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_media/Cargo.toml",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+        ],
+        "Source-derived fixtures prove 8/10-bit component identity, checked frame-rate/audio/alpha relationships, lossless slicing metadata, bounded H.264/MP4 and AV1/VP9 WebM codec behavior, exact LTXV compression round-trips, safe nested output prefixes, prepared preview/save rollback and recovery, concrete FILM/RIFE model admission and interpolation, cancellation at bounded codec/model phases, alias-aware residency, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["11.4", "18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def node_tasks(
     schema_dependency: str,
     compute_dependency: str,
     asset_effect_dependency: str,
     provider_dependency: str,
+    text_regex_dependency: str,
+    sdpose_dependency: str,
+    video_dependency: str,
 ) -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     result: list[dict[str, object]] = []
     mapping: dict[str, list[str]] = defaultdict(list)
@@ -8902,7 +9041,7 @@ def node_tasks(
                 # their own rows do not use asset or effect capabilities.
                 task_dependencies.append(asset_effect_dependency)
             if has_provider:
-                task_dependencies.append(provider_dependency)
+                task_dependencies.extend([provider_dependency, sdpose_dependency])
             task_reads = [
                 ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
                 ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
@@ -8950,6 +9089,36 @@ def node_tasks(
             task_validations = ["VAL-NODE-001", "VAL-NODE-002", "VAL-NODE-CLOSURE-001"]
             task_designs = [8, 20, 25, 29, 30, 31, 32, 33, 34, 39, 40]
             task_locked = False
+            if "COMFY-NODE-0002" in feature_ids:
+                task_dependencies.append(text_regex_dependency)
+                task_outcome += " This task owns the source-compatible text-regex adapter over the workspace-pinned bounded backtracking engine; no leaf-local parser or substring fallback is permitted."
+                task_reads.extend([
+                    "crates/comfy_nodes/src/text_regex.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
+                ])
+                task_done += " RegexMatch and RegexExtract cover Python-compatible named and numbered captures, lookaround, backreferences, IGNORECASE, MULTILINE, DOTALL, search/findall/finditer, tuple results, invalid-pattern fallback, bounded backtracking failure, and cancellation without an unbounded or second regex owner."
+            if "COMFY-NODE-0494" in feature_ids:
+                task_dependencies.append(text_regex_dependency)
+                task_reads.extend([
+                    "crates/comfy_nodes/src/execution.rs",
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_primitive.py",
+                ])
+                task_done += " PrimitiveStringMultiline preserves bounded source-valid tab, CR, LF, Unicode, and empty values exactly while the shared workflow-text owner rejects NUL, disallowed controls, and oversize strings without weakening identifier validation."
+            if "COMFY-NODE-0607" in feature_ids:
+                task_dependencies.append(sdpose_dependency)
+                task_outcome += " This task consumes the canonical native SDPose execution foundation for exact face bounding-box and keypoint extraction behavior."
+                task_reads.extend([
+                    "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
+                    "crates/comfy_model/src/sdpose.rs",
+                ])
+                task_done += " Source-derived fixtures prove exact whole-body keypoint and score projection, face bounding-box broadcast and cropping, cancellation, wrong-model rejection, and zero partial publication through that shared owner."
+            if {"COMFY-NODE-0124", "COMFY-NODE-0372"}.intersection(feature_ids):
+                task_dependencies.append(video_dependency)
+                task_reads.extend([
+                    "crates/comfy_media/src/video.rs",
+                    "crates/comfy_model/src/frame_interpolation.rs",
+                ])
+                task_done += " Every video codec, bit-depth, slice, interpolation, preview/save, and LTXV compression path delegates to the canonical native video foundation with bounded cancellation and zero partial publication."
             if "COMFY-NODE-0115" in feature_ids:
                 task_dependencies.extend([
                     provider_dependency,
@@ -9715,17 +9884,29 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     comfy_build_boundary = comfy_opt_in_build_boundary_task(
         str(node_asset_effect_foundation["id"])
     )
+    text_regex_foundation = native_text_regex_foundation_task(
+        str(comfy_build_boundary["id"])
+    )
     node_provider_foundation["dependencies"] = list(
         dict.fromkeys(
             list(node_provider_foundation["dependencies"])
-            + [str(comfy_build_boundary["id"])]
+            + [str(comfy_build_boundary["id"]), str(text_regex_foundation["id"])]
         )
+    )
+    sdpose_foundation = native_sdpose_execution_foundation_task(
+        str(node_provider_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
     )
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
         str(node_compute_foundation["id"]),
         str(node_asset_effect_foundation["id"]),
         str(node_provider_foundation["id"]),
+        str(text_regex_foundation["id"]),
+        str(sdpose_foundation["id"]),
+        str(video_foundation["id"]),
     )
     add_native_node_foundation_mapping(
         node_mapping,
@@ -9756,8 +9937,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_schema_foundation,
             node_compute_foundation,
             node_asset_effect_foundation,
-            node_provider_foundation,
             comfy_build_boundary,
+            text_regex_foundation,
+            node_provider_foundation,
+            sdpose_foundation,
+            video_foundation,
         ]
         + nodes
         + user_interface_tasks

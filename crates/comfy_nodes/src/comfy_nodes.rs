@@ -5,6 +5,7 @@ pub mod registry_generator;
 pub mod slice_registry;
 pub mod source_type;
 pub mod stored_payload;
+pub mod text_regex;
 
 pub use descriptor::{
     CatalogNodeDescriptor, CatalogNodeInputSchemaMetadata, CatalogNodeOutputSchemaMetadata,
@@ -53,6 +54,12 @@ pub use stored_payload::{
     NativePayloadResidency, NativeProviderPayload, NativeResidentAllocation,
     NativeResidentAllocationId, NativeResidentPayloadKind, NativeStoredModelPayload,
     NativeStoredPayload, NativeStoredPayloadError,
+};
+pub use text_regex::{
+    NATIVE_TEXT_REGEX_BACKTRACK_LIMIT, NATIVE_TEXT_REGEX_MAX_CAPTURE_BYTES,
+    NATIVE_TEXT_REGEX_MAX_INPUT_BYTES, NATIVE_TEXT_REGEX_MAX_MATCHES,
+    NATIVE_TEXT_REGEX_MAX_PATTERN_BYTES, NativeTextRegex, NativeTextRegexCaptureRows,
+    NativeTextRegexError, NativeTextRegexFlags,
 };
 
 include!(concat!(env!("OUT_DIR"), "/generated_modules.rs"));
