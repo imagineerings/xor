@@ -1283,6 +1283,7 @@ impl ComponentHost {
             &self.inner.base_registry,
             self,
             plugins,
+            verified_generation.clone(),
         )
         .map_err(|error| ComponentHostError::Verification {
             extension_id: Arc::from(COMFY_COMPONENT_ADAPTER_ID),

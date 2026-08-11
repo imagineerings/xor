@@ -66,7 +66,7 @@ pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
 pub const MAX_SEALED_PLUGIN_AUTHORIZATION_BYTES: usize = 2 * 1024 * 1024;
 pub const CUDART_LIBRARY_ID: &str = "nvidia-cudart";
 const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-plugin-authorization-v2\0";
-const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-cost-acceptance-v1\0";
+const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-cost-acceptance-v2\0";
 const MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 const ROCM_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-rocm-package-v1\0";
 const METAL_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-metal-package-v1\0";
@@ -2296,6 +2296,11 @@ pub struct ProviderCostAcceptanceScope {
     principal_id: String,
     profile_id: String,
     prompt_id: String,
+    prompt_sha256: String,
+    attempt_id: String,
+    node_id: String,
+    request_ordinal: u32,
+    request_sha256: String,
     plugin_id: String,
     plugin_digest_sha256: String,
     provider_binding_sha256: String,
@@ -2309,6 +2314,11 @@ impl ProviderCostAcceptanceScope {
         principal_id: impl Into<String>,
         profile_id: impl Into<String>,
         prompt_id: impl Into<String>,
+        prompt_sha256: impl Into<String>,
+        attempt_id: impl Into<String>,
+        node_id: impl Into<String>,
+        request_ordinal: u32,
+        request_sha256: impl Into<String>,
         plugin_id: impl Into<String>,
         plugin_digest_sha256: impl Into<String>,
         provider_binding_sha256: impl Into<String>,
@@ -2319,6 +2329,10 @@ impl ProviderCostAcceptanceScope {
         let principal_id = principal_id.into();
         let profile_id = profile_id.into();
         let prompt_id = prompt_id.into();
+        let prompt_sha256 = prompt_sha256.into();
+        let attempt_id = attempt_id.into();
+        let node_id = node_id.into();
+        let request_sha256 = request_sha256.into();
         let plugin_id = plugin_id.into();
         let plugin_digest_sha256 = plugin_digest_sha256.into();
         let provider_binding_sha256 = provider_binding_sha256.into();
@@ -2328,6 +2342,10 @@ impl ProviderCostAcceptanceScope {
             || principal_id.chars().any(char::is_control)
             || !valid_ascii_identifier(&profile_id, 1_024)
             || !valid_ascii_identifier(&prompt_id, 1_024)
+            || validate_sha256(&prompt_sha256).is_err()
+            || !valid_ascii_identifier(&attempt_id, 1_024)
+            || !valid_ascii_identifier(&node_id, 1_024)
+            || validate_sha256(&request_sha256).is_err()
             || !valid_ascii_identifier(&plugin_id, 1_024)
             || validate_sha256(&plugin_digest_sha256).is_err()
             || validate_sha256(&provider_binding_sha256).is_err()
@@ -2338,6 +2356,11 @@ impl ProviderCostAcceptanceScope {
             principal_id,
             profile_id,
             prompt_id,
+            prompt_sha256,
+            attempt_id,
+            node_id,
+            request_ordinal,
+            request_sha256,
             plugin_id,
             plugin_digest_sha256,
             provider_binding_sha256,
@@ -2356,6 +2379,26 @@ impl ProviderCostAcceptanceScope {
 
     pub fn prompt_id(&self) -> &str {
         &self.prompt_id
+    }
+
+    pub fn prompt_sha256(&self) -> &str {
+        &self.prompt_sha256
+    }
+
+    pub fn attempt_id(&self) -> &str {
+        &self.attempt_id
+    }
+
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+
+    pub fn request_ordinal(&self) -> u32 {
+        self.request_ordinal
+    }
+
+    pub fn request_sha256(&self) -> &str {
+        &self.request_sha256
     }
 
     pub fn plugin_id(&self) -> &str {
@@ -3230,6 +3273,10 @@ fn provider_cost_acceptance_signing_payload(claims: &ProviderCostAcceptanceClaim
         claims.scope.principal_id().as_bytes(),
         claims.scope.profile_id().as_bytes(),
         claims.scope.prompt_id().as_bytes(),
+        claims.scope.prompt_sha256().as_bytes(),
+        claims.scope.attempt_id().as_bytes(),
+        claims.scope.node_id().as_bytes(),
+        claims.scope.request_sha256().as_bytes(),
         claims.scope.plugin_id().as_bytes(),
         claims.scope.plugin_digest_sha256().as_bytes(),
         claims.scope.provider_binding_sha256().as_bytes(),
@@ -3239,6 +3286,7 @@ fn provider_cost_acceptance_signing_payload(claims: &ProviderCostAcceptanceClaim
     ] {
         update_field(&mut digest, field);
     }
+    digest.update(claims.scope.request_ordinal().to_le_bytes());
     digest.update(
         claims
             .scope
@@ -4495,16 +4543,39 @@ mod tests {
         let issuer = ProviderCostAcceptanceIssuer::from_seed([7; 32], origin)?;
         let verifier = issuer.verifier()?;
         let price = ProviderPriceBound::new("USD", 25_000)?;
-        let scope = ProviderCostAcceptanceScope::new(
-            "principal-a",
-            "00000000-0000-0000-0000-000000000001",
-            "00000000-0000-0000-0000-000000000002",
-            "plugin.fixture",
-            DIGEST,
-            &"a".repeat(64),
-            "fixture",
-            "https://fixture.invalid/v1/generate",
-            price.clone(),
+        let scope_for = |prompt_sha256: &str,
+                         attempt_id: &str,
+                         node_id: &str,
+                         request_ordinal: u32,
+                         request_sha256: &str,
+                         provider_binding_sha256: &str| {
+            ProviderCostAcceptanceScope::new(
+                "principal-a",
+                "00000000-0000-0000-0000-000000000001",
+                "00000000-0000-0000-0000-000000000002",
+                prompt_sha256,
+                attempt_id,
+                node_id,
+                request_ordinal,
+                request_sha256,
+                "plugin.fixture",
+                DIGEST,
+                provider_binding_sha256,
+                "fixture",
+                "https://fixture.invalid/v1/generate",
+                price.clone(),
+            )
+        };
+        let prompt_sha256 = "c".repeat(64);
+        let request_sha256 = "d".repeat(64);
+        let binding_sha256 = "a".repeat(64);
+        let scope = scope_for(
+            &prompt_sha256,
+            "00000000-0000-0000-0000-000000000003",
+            "node.fixture",
+            7,
+            &request_sha256,
+            &binding_sha256,
         )?;
         let nonce = ProviderCostNonce::new([9; 32])?;
         let acceptance = issuer.issue(
@@ -4524,21 +4595,61 @@ mod tests {
             verifier.verify(&acceptance, &scope, origin + Duration::from_secs(31)),
             Err(TrustError::ExpiredProviderCostAcceptance)
         );
-        let wrong_binding = ProviderCostAcceptanceScope::new(
-            "principal-a",
-            "00000000-0000-0000-0000-000000000001",
-            "00000000-0000-0000-0000-000000000002",
-            "plugin.fixture",
-            DIGEST,
-            &"b".repeat(64),
-            "fixture",
-            "https://fixture.invalid/v1/generate",
-            price,
-        )?;
-        assert_eq!(
-            verifier.verify(&acceptance, &wrong_binding, origin + Duration::from_secs(2)),
-            Err(TrustError::InvalidProviderCostAcceptance)
-        );
+        for wrong_scope in [
+            scope_for(
+                &"e".repeat(64),
+                scope.attempt_id(),
+                scope.node_id(),
+                scope.request_ordinal(),
+                scope.request_sha256(),
+                scope.provider_binding_sha256(),
+            )?,
+            scope_for(
+                scope.prompt_sha256(),
+                "00000000-0000-0000-0000-000000000004",
+                scope.node_id(),
+                scope.request_ordinal(),
+                scope.request_sha256(),
+                scope.provider_binding_sha256(),
+            )?,
+            scope_for(
+                scope.prompt_sha256(),
+                scope.attempt_id(),
+                "node.other",
+                scope.request_ordinal(),
+                scope.request_sha256(),
+                scope.provider_binding_sha256(),
+            )?,
+            scope_for(
+                scope.prompt_sha256(),
+                scope.attempt_id(),
+                scope.node_id(),
+                8,
+                scope.request_sha256(),
+                scope.provider_binding_sha256(),
+            )?,
+            scope_for(
+                scope.prompt_sha256(),
+                scope.attempt_id(),
+                scope.node_id(),
+                scope.request_ordinal(),
+                &"f".repeat(64),
+                scope.provider_binding_sha256(),
+            )?,
+            scope_for(
+                scope.prompt_sha256(),
+                scope.attempt_id(),
+                scope.node_id(),
+                scope.request_ordinal(),
+                scope.request_sha256(),
+                &"b".repeat(64),
+            )?,
+        ] {
+            assert_eq!(
+                verifier.verify(&acceptance, &wrong_scope, origin + Duration::from_secs(2)),
+                Err(TrustError::InvalidProviderCostAcceptance)
+            );
+        }
 
         let mut forged = acceptance;
         forged.signature[0] ^= 1;

@@ -40,20 +40,25 @@ pub fn registry_with_installed_plugins(
     base: &NativeNodeRegistry,
     component_host: &ComponentHost,
 ) -> Result<NativeNodeRegistry, PluginRegistryAdapterError> {
-    registry_with_plugins(base, component_host, component_host.installed_plugins()?)
+    registry_with_plugins(
+        base,
+        component_host,
+        component_host.installed_plugins()?,
+        component_host.verified_generation()?,
+    )
 }
 
 pub(crate) fn registry_with_plugins(
     base: &NativeNodeRegistry,
     component_host: &ComponentHost,
     plugins: Vec<InstalledVerifiedPlugin>,
+    generation: crate::VerifiedComponentGeneration,
 ) -> Result<NativeNodeRegistry, PluginRegistryAdapterError> {
     let type_registry =
         TypeRegistry::built_in().map_err(|error| PluginRegistryAdapterError::InvalidPort {
             node: "type-registry".to_owned(),
             message: error.to_string(),
         })?;
-    let generation = component_host.verified_generation()?;
     let mut ordinary_bindings = Vec::new();
     let mut provider_activation_sets = Vec::new();
     for plugin in plugins {

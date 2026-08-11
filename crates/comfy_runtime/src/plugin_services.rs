@@ -19,6 +19,7 @@ use comfy_tensor::{
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::{
@@ -837,6 +838,8 @@ impl PluginCapabilityInvocation {
     pub fn execute_priced_provider_request(
         &self,
         provider_binding_sha256: &str,
+        prompt_sha256: &str,
+        request_ordinal: u32,
         provider: &str,
         endpoint: &str,
         secret_id: Option<&SecretId>,
@@ -870,10 +873,16 @@ impl PluginCapabilityInvocation {
             .context
             .principal_id()
             .ok_or(PluginServiceError::ProviderCostPrincipalRequired)?;
+        let request_sha256 = format!("{:x}", Sha256::digest(body));
         let expected_scope = ProviderCostAcceptanceScope::new(
             principal_id,
             self.context.profile_id().0.to_string(),
             self.context.prompt_id().0.to_string(),
+            prompt_sha256,
+            self.context.attempt_id().0.to_string(),
+            self.context.node_id().0.clone(),
+            request_ordinal,
+            request_sha256,
             self.context.plugin_id(),
             self.context.plugin_digest_sha256(),
             provider_binding_sha256,
@@ -1506,6 +1515,9 @@ mod tests {
 
     const SIGNING_KEY: &[u8; 32] = b"0123456789abcdef0123456789abcdef";
     const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const PROMPT_SHA256: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const REQUEST_ORDINAL: u32 = 7;
+    const REQUEST_BODY: &[u8] = b"request";
     const PROFILE_UUID: Uuid = Uuid::from_u128(1);
     const PROMPT_UUID: Uuid = Uuid::from_u128(2);
     const ATTEMPT_UUID: Uuid = Uuid::from_u128(3);
@@ -1880,6 +1892,11 @@ mod tests {
             "principal-a",
             PROFILE_UUID.to_string(),
             PROMPT_UUID.to_string(),
+            PROMPT_SHA256,
+            ATTEMPT_UUID.to_string(),
+            "node.fixture",
+            REQUEST_ORDINAL,
+            format!("{:x}", Sha256::digest(REQUEST_BODY)),
             "plugin.fixture",
             DIGEST,
             provider_binding_sha256,
@@ -1945,7 +1962,16 @@ mod tests {
         let invocation = broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
         assert_eq!(
             invocation.execute_priced_provider_request(
-                &binding, PROVIDER, ENDPOINT, None, &price, nonce, None, b"request",
+                &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
+                PROVIDER,
+                ENDPOINT,
+                None,
+                &price,
+                nonce,
+                None,
+                b"request",
             ),
             Err(PluginServiceError::ProviderCostAcceptanceRequired)
         );
@@ -1961,6 +1987,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -1984,6 +2012,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -1999,6 +2029,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &other_binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -2009,10 +2041,35 @@ mod tests {
             ),
             Err(PluginServiceError::ProviderCostAcceptanceDenied)
         );
+        for (prompt_sha256, request_ordinal, body) in [
+            ("e".repeat(64), REQUEST_ORDINAL, REQUEST_BODY),
+            (PROMPT_SHA256.to_owned(), REQUEST_ORDINAL + 1, REQUEST_BODY),
+            (PROMPT_SHA256.to_owned(), REQUEST_ORDINAL, b"other-request"),
+        ] {
+            let invocation =
+                broker.begin_invocation(priced_context(authorization.clone(), &clock)?)?;
+            assert_eq!(
+                invocation.execute_priced_provider_request(
+                    &binding,
+                    &prompt_sha256,
+                    request_ordinal,
+                    PROVIDER,
+                    ENDPOINT,
+                    None,
+                    &price,
+                    nonce,
+                    Some(&acceptance),
+                    body,
+                ),
+                Err(PluginServiceError::ProviderCostAcceptanceDenied)
+            );
+        }
         let invocation = broker.begin_invocation(priced_context(authorization, &clock)?)?;
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -2055,6 +2112,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -2069,6 +2128,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -2240,6 +2301,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 Some(&secret),
@@ -2258,6 +2321,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 Some(&secret),
@@ -2281,6 +2346,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,
@@ -2300,6 +2367,8 @@ mod tests {
         assert_eq!(
             invocation.execute_priced_provider_request(
                 &binding,
+                PROMPT_SHA256,
+                REQUEST_ORDINAL,
                 PROVIDER,
                 ENDPOINT,
                 None,

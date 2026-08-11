@@ -670,21 +670,10 @@ impl PluginHost {
     }
 
     fn preflight_component(&self, plugin: &CompiledPlugin) -> Result<(), PluginError> {
-        if plugin.world == ComponentWorld::Legacy {
-            let mut linker = Linker::<WasmStoreState>::new(self.runtime.engine());
-            wit_contract::ComfyPlugin::add_to_linker::<
-                WasmStoreState,
-                wasmtime::component::HasSelf<WasmStoreState>,
-            >(&mut linker, |state| state)
-            .map_err(component_compilation_error)?;
-            let instance_pre = linker
-                .instantiate_pre(plugin.component())
-                .map_err(component_compilation_error)?;
-            wit_contract::ComfyPluginPre::new(instance_pre).map_err(component_compilation_error)?;
-            return Ok(());
-        }
         let store = self.new_wasm_store()?;
-        let (store, bindings) = self.instantiate_bindings(plugin, store)?;
+        let (store, bindings) = self
+            .instantiate_bindings(plugin, store)
+            .map_err(preflight_component_error)?;
         let mut instance = WasmPluginInstance {
             store,
             bindings,
@@ -693,7 +682,9 @@ impl PluginHost {
             terminal: false,
         };
         instance.manifest_bytes()?;
-        instance.provider_binding_set()?;
+        if plugin.world == ComponentWorld::Provider {
+            instance.provider_binding_set()?;
+        }
         instance.terminal = true;
         Ok(())
     }
@@ -2696,6 +2687,13 @@ fn component_compilation_error(error: wasmtime::Error) -> PluginError {
 
 fn component_instantiation_error(error: wasmtime::Error) -> PluginError {
     PluginError::WasmTrap(sanitize_diagnostic(&error.to_string()))
+}
+
+fn preflight_component_error(error: PluginError) -> PluginError {
+    match error {
+        PluginError::WasmTrap(message) => PluginError::ComponentCompilation(message),
+        error => error,
+    }
 }
 
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {

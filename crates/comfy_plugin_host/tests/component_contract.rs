@@ -1002,6 +1002,27 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
 }
 
 #[test]
+fn legacy_world_rejects_signed_projection_mismatch_during_preflight() -> Result<(), Box<dyn Error>>
+{
+    let component = component_fixture()?;
+    let digest = format!("{:x}", Sha256::digest(&component));
+    let mut manifest = manifest(digest)?;
+    manifest
+        .nodes
+        .first_mut()
+        .ok_or("legacy fixture node disappeared")?
+        .display_name = "Tampered Echo".to_owned();
+    let authorization = sign_and_authorize(&mut manifest)?;
+    let host = PluginHost::new()?;
+
+    assert!(matches!(
+        host.compile_component(&component, &manifest, &authorization),
+        Err(PluginError::ManifestProjectionMismatch)
+    ));
+    Ok(())
+}
+
+#[test]
 fn provider_world_rejects_binding_mismatch_before_instantiation() -> Result<(), Box<dyn Error>> {
     let component = provider_component_fixture()?;
     let digest = format!("{:x}", Sha256::digest(&component));
