@@ -1098,6 +1098,8 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_t5.rs"))?;
     let model_clip_text_encoder_decoder =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
+    let model_clip_text_encoder_multimodal =
+        fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_multimodal.rs"))?;
     let model_clip_vision = fs::read_to_string(root.join("crates/comfy_model/src/clip_vision.rs"))?;
     let model_clip_vision_production = model_clip_vision
         .split_once("#[cfg(test)]\nmod tests")
@@ -1117,6 +1119,8 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/comfy_model/tests/clip_text_encoder_t5.rs"))?;
     let model_clip_text_encoder_decoder_tests =
         fs::read_to_string(root.join("crates/comfy_model/tests/clip_text_encoder_decoder.rs"))?;
+    let model_clip_text_encoder_multimodal_tests =
+        fs::read_to_string(root.join("crates/comfy_model/tests/clip_text_encoder_multimodal.rs"))?;
     let model_clip_vision_tests =
         fs::read_to_string(root.join("crates/comfy_model/tests/clip_vision.rs"))?;
     let model_patch_adapter_tests =
@@ -2369,6 +2373,79 @@ fn run_ownership_validation(
         .contains("prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope")
         && model_clip_text_encoder_decoder_tests
             .contains("prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation");
+    let task381p_qwen_preparation_has_one_attempt_local_owner =
+        production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
+            && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
+            && production_source_occurrences(&sources, "pub fn prepare_qwen3vl_images(").len() == 1
+            && production_source_occurrences(&sources, "pub fn plan_qwen3vl_markers(").len() == 1
+            && model_clip_text_encoder_multimodal.contains("backend.workspace_vec(context")
+            && model_clip_text_encoder_multimodal.contains("ResizeMode::Bilinear")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache")
+            && !model_clip_text_encoder_multimodal.contains("OutputTransaction");
+    let task381p_qwen_preparation_is_exact_and_executable = model_clip_text_encoder_multimodal
+        .contains("QWEN3VL_IMAGE_MINIMUM_PIXELS")
+        && model_clip_text_encoder_multimodal.contains("round_ties_even")
+        && model_clip_text_encoder_multimodal.contains("marker_count != images.len()")
+        && model_clip_text_encoder_multimodal.contains("visual_position_mask")
+        && model_clip_text_encoder_multimodal_tests
+            .contains("qwen3vl_resize_patch_packing_and_batch_splitting_are_source_exact")
+        && model_clip_text_encoder_multimodal_tests
+            .contains("qwen3vl_marker_plan_expands_real_image_spans_and_fails_closed")
+        && model_clip_text_encoder_multimodal_tests
+            .contains("qwen3vl_preparation_cancellation_and_oom_leave_workspace_empty");
+    let task381p_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_preparation_qwen")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-qwen-image-preparation-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen-preparation-uses-canonical-image-resize-and-workspace",
+                            "qwen-preparation-packs-source-temporal-spatial-merge-order",
+                            "qwen-preparation-requires-exact-marker-media-cardinality",
+                            "qwen-preparation-produces-checked-three-axis-position-inputs",
+                            "qwen-preparation-tests-exact-patches-spans-and-rollback",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task381p_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_text_media_preparation_qwen,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy_model::clip_text_encoder_multimodal")
+                && line.contains("comfy-parity-native-qwen-image-preparation-foundation")
+                && line.contains("VAL-CANCEL-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task343_policy_trace = policy_concerns
         .iter()
         .find(|entry| {
@@ -8290,6 +8367,18 @@ fn run_ownership_validation(
             task380_prepared_decoder_boundaries_are_executable,
         ),
         (
+            "task381p_policy_and_catalog_trace_qwen_preparation",
+            task381p_policy_trace && task381p_catalog_trace,
+        ),
+        (
+            "task381p_qwen_preparation_has_one_attempt_local_owner",
+            task381p_qwen_preparation_has_one_attempt_local_owner,
+        ),
+        (
+            "task381p_qwen_preparation_is_exact_and_executable",
+            task381p_qwen_preparation_is_exact_and_executable,
+        ),
+        (
             "task340_policy_and_catalog_trace_the_canonical_clip_vision_owner",
             task_340_policy_trace && task_340_catalog_trace,
         ),
@@ -8779,6 +8868,17 @@ fn val_ownership_task380_prepared_decoder_001() -> Result<(), Box<dyn std::error
         "val-ownership-task380-prepared-decoder-001.json",
         "val_ownership_task380_prepared_decoder_001",
         Some("task380_"),
+    )
+}
+
+#[test]
+fn val_ownership_task381p_qwen_preparation_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task381p-qwen-image-preparation-and-attempt-local-state-ownership",
+        "val-ownership-task381p-qwen-preparation-001.json",
+        "val_ownership_task381p_qwen_preparation_001",
+        Some("task381p_"),
     )
 }
 

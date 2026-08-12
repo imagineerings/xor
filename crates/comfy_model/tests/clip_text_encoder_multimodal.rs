@@ -3,15 +3,16 @@ use comfy_model::{
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
     OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256,
-    QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256,
-    Sam3EncodedCondition, format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt,
-    ideogram4_project_taps, join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
-    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
-    qwen2vl_mrope_position_ids, trim_ovis_conditioning,
+    QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, SAM3_CLIP_SOURCE_PATH,
+    SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, format_ideogram4_prompt, format_ovis_prompt,
+    format_qwen3vl_prompt, ideogram4_project_taps, join_multimodal_embeddings,
+    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
+    pack_sam3_conditions, parse_sam3_prompts, plan_qwen3vl_markers, prepare_qwen3vl_images,
+    qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
-    StreamId, Tensor, TensorDescriptor, generated_native_diffusion::tensor_to_f32,
+    ImageTensor, StreamId, Tensor, TensorDescriptor, generated_native_diffusion::tensor_to_f32,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -141,6 +142,193 @@ fn qwen_multimodal_positions_match_source_order_and_fail_closed() -> Result<(), 
 }
 
 #[test]
+fn qwen3vl_resize_patch_packing_and_batch_splitting_are_source_exact() -> Result<(), Box<dyn Error>>
+{
+    assert_eq!(qwen3vl_target_dimensions(48, 96)?, (64, 96));
+    assert_eq!(qwen3vl_target_dimensions(17, 31)?, (64, 96));
+    let (large_height, large_width) = qwen3vl_target_dimensions(10_000, 20_000)?;
+    assert_eq!((large_height % 32, large_width % 32), (0, 0));
+    assert!(
+        large_height
+            .checked_mul(large_width)
+            .ok_or("large image overflow")?
+            <= 12_845_056
+    );
+    assert!(qwen3vl_target_dimensions(0, 32).is_err());
+    assert!(qwen3vl_target_dimensions(1, u64::MAX / 2).is_err());
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let context = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let mut pixels = vec![0.5_f32; 2 * 17 * 31 * 3];
+    pixels[17 * 31 * 3] = 0.75;
+    let images = ImageTensor::from_f32(&backend, &context, 2, 17, 31, 3, &pixels)?;
+    let prepared = prepare_qwen3vl_images(&backend, &images, &context)?;
+    assert_eq!(prepared.len(), 2);
+    for image in &prepared {
+        assert_eq!(image.grid_thw(), [1, 4, 6]);
+        assert_eq!(image.merged_tokens(), 6);
+        assert_eq!(image.patches().descriptor().shape(), [24, 3, 2, 16, 16]);
+    }
+    let first = tensor_to_f32(&backend, prepared[0].patches(), &context)?;
+    assert!(first.iter().all(|value| *value == 0.0));
+    let second = tensor_to_f32(&backend, prepared[1].patches(), &context)?;
+    assert!(second.iter().any(|value| *value > 0.0));
+    drop(first);
+    drop(second);
+    drop(prepared);
+    drop(images);
+
+    let mut ordered_pixels = vec![0.5_f32; 64 * 64 * 3];
+    ordered_pixels[0] = 0.75;
+    ordered_pixels[(16 * 3) + 1] = 0.25;
+    ordered_pixels[(16 * 64 * 3) + 2] = 1.0;
+    ordered_pixels[(32 * 3) + 1] = 0.0;
+    let ordered_image = ImageTensor::from_f32(&backend, &context, 1, 64, 64, 3, &ordered_pixels)?;
+    let ordered = prepare_qwen3vl_images(&backend, &ordered_image, &context)?;
+    let ordered_patches = tensor_to_f32(&backend, ordered[0].patches(), &context)?;
+    let patch_width = 3 * 2 * 16 * 16;
+    assert_eq!(ordered_patches[0], 0.5);
+    assert_eq!(ordered_patches[16 * 16], 0.5);
+    assert_eq!(ordered_patches[patch_width + (2 * 16 * 16)], -0.5);
+    assert_eq!(ordered_patches[patch_width + (3 * 16 * 16)], -0.5);
+    assert_eq!(ordered_patches[(2 * patch_width) + (4 * 16 * 16)], 1.0);
+    assert_eq!(ordered_patches[(2 * patch_width) + (5 * 16 * 16)], 1.0);
+    assert_eq!(ordered_patches[(4 * patch_width) + (2 * 16 * 16)], -1.0);
+    assert_eq!(ordered_patches[(4 * patch_width) + (3 * 16 * 16)], -1.0);
+    assert_eq!(
+        ordered_patches
+            .iter()
+            .filter(|value| **value != 0.0)
+            .count(),
+        8
+    );
+    drop(ordered_patches);
+    drop(ordered);
+    drop(ordered_image);
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn qwen3vl_marker_plan_expands_real_image_spans_and_fails_closed() -> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let context = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let first = ImageTensor::from_f32(&backend, &context, 1, 32, 32, 3, &vec![0.5; 3_072])?;
+    let second = ImageTensor::from_f32(&backend, &context, 1, 64, 32, 3, &vec![0.5; 6_144])?;
+    let first = prepare_qwen3vl_images(&backend, &first, &context)?;
+    let second = prepare_qwen3vl_images(&backend, &second, &context)?;
+    let images = [first[0].clone(), second[0].clone()];
+    assert_eq!(
+        (images[0].merged_tokens(), images[1].merged_tokens()),
+        (4, 6)
+    );
+    let plan = plan_qwen3vl_markers(
+        &[10, QWEN3VL_IMAGE_PAD_TOKEN, 11, QWEN3VL_IMAGE_PAD_TOKEN, 12],
+        &images,
+        &cancellation,
+    )?;
+    assert_eq!(
+        plan.expanded_tokens(),
+        &[
+            10,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            11,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            QWEN3VL_IMAGE_PAD_TOKEN,
+            12,
+        ]
+    );
+    assert_eq!(
+        plan.spans(),
+        &[
+            MultimodalSpan {
+                start: 1,
+                size: 4,
+                grid_thw: [1, 4, 4]
+            },
+            MultimodalSpan {
+                start: 6,
+                size: 6,
+                grid_thw: [1, 6, 4]
+            },
+        ]
+    );
+    assert_eq!(
+        plan.visual_position_mask()
+            .iter()
+            .filter(|value| **value)
+            .count(),
+        10
+    );
+    assert!(plan_qwen3vl_markers(&[QWEN3VL_IMAGE_PAD_TOKEN], &images, &cancellation).is_err());
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        plan_qwen3vl_markers(&[], &[], &cancelled),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    drop(plan);
+    drop(images);
+    drop(first);
+    drop(second);
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn qwen3vl_preparation_cancellation_and_oom_leave_workspace_empty() -> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup_context = context(&authority, &cancellation, 8 * 1024 * 1024)?;
+    let image = ImageTensor::from_f32(
+        &backend,
+        &setup_context,
+        1,
+        64,
+        64,
+        3,
+        &vec![0.5; 64 * 64 * 3],
+    )?;
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 8 * 1024 * 1024)?;
+    assert!(matches!(
+        prepare_qwen3vl_images(&backend, &image, &cancelled_context),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+    let constrained = context(&authority, &cancellation, 1_024)?;
+    assert!(prepare_qwen3vl_images(&backend, &image, &constrained).is_err());
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+
+    let invalid = ImageTensor::from_f32(
+        &backend,
+        &setup_context,
+        1,
+        32,
+        32,
+        3,
+        &vec![f32::NAN; 32 * 32 * 3],
+    )?;
+    assert!(matches!(
+        prepare_qwen3vl_images(&backend, &invalid, &setup_context),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+    Ok(())
+}
+
+#[test]
 fn modality_join_deepstack_and_projection_are_native_and_transactional()
 -> Result<(), Box<dyn Error>> {
     let (backend, authority) = backend()?;
@@ -259,8 +447,18 @@ fn ovis_sam3_and_prompt_adapters_preserve_source_semantics() -> Result<(), Box<d
     );
     assert!(format_ovis_prompt("cat").contains("Describe the image"));
     let qwen = format_qwen3vl_prompt("cat", 2, false);
-    assert_eq!(qwen.matches("<|image_pad|>").count(), 2);
-    assert!(qwen.ends_with("<think>\n\n</think>\n\n"));
+    assert_eq!(
+        qwen,
+        "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|><|vision_start|><|image_pad|><|vision_end|>cat<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    );
+    assert_eq!(
+        format_qwen3vl_prompt("cat", 0, true),
+        "<|im_start|>user\ncat<|im_end|>\n<|im_start|>assistant\n"
+    );
+    assert_eq!(
+        format_qwen3vl_prompt("<|im_start|>raw", 3, false),
+        "<|im_start|>raw"
+    );
     Ok(())
 }
 

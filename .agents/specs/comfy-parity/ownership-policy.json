@@ -11738,6 +11738,108 @@
       "decision_reason": "NativeT5TextEncoder is the sole T5, UMT5, and BERT bidirectional graph owner. It owns relative-position bucketing and bias application, bidirectional padding-mask composition, architecture-specific residual ordering, gated multiplication, intermediate capture, and pooling/projection adapters. It delegates verified SentencePiece input, module parameter lifecycle, RMS/LayerNorm and tensor kernels, backend admission, attention selection, workspace, memory, streams, and cancellation to existing canonical owners and introduces no parser, capability model, workspace authority, cache, persistence record, or transaction."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_preparation_qwen",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "Qwen3VlPreparedImage",
+        "Qwen3VlMarkerPlan",
+        "prepare_qwen3vl_images",
+        "plan_qwen3vl_markers",
+        "qwen2vl_mrope_position_ids"
+      ],
+      "allowed_adapters": [
+        "NativePromptTokenizer remains the sole tokenizer and special-token owner; Qwen preparation accepts numeric IDs and never parses tokenizer artifacts",
+        "ImageTensor and comfy_tensor retain IMAGE validation, bilinear resize, tensor storage, workspace, memory, stream, and cancellation ownership",
+        "NativeDecoderTextEncoder remains the sole decoder, KV, sampler, stopping, and borrowed RNG transaction owner; preparation cannot run it",
+        "The retained Qwen vision owner consumes checked prepared patches, spans, masks, and positions in the dependent task and alone retains model weights",
+        "Runtime controller, executor, NativeCache, persistence, and output transactions remain the sole handle-resolution, caching, restart, and publication owners"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct Qwen3VlPreparedImage \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::Qwen3VlPreparedImage",
+          "role": "canonical_state",
+          "symbol": "Qwen3VlPreparedImage"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct Qwen3VlMarkerPlan \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::Qwen3VlMarkerPlan",
+          "role": "canonical_state",
+          "symbol": "Qwen3VlMarkerPlan"
+        }
+      ],
+      "call_symbols": [
+        "prepare_qwen3vl_images",
+        "plan_qwen3vl_markers",
+        "qwen3vl_target_dimensions",
+        "qwen2vl_mrope_position_ids"
+      ],
+      "required_mappings": [
+        {
+          "name": "qwen-preparation-uses-canonical-image-resize-and-workspace",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn prepare_qwen3vl_images[\\s\\S]*ImageTensor[\\s\\S]*ResizeMode::Bilinear[\\s\\S]*backend\\.workspace_vec"
+        },
+        {
+          "name": "qwen-preparation-packs-source-temporal-spatial-merge-order",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "fn prepare_qwen3vl_resized_image[\\s\\S]*for block_y[\\s\\S]*for block_x[\\s\\S]*for merge_y[\\s\\S]*for merge_x[\\s\\S]*for channel[\\s\\S]*for _temporal"
+        },
+        {
+          "name": "qwen-preparation-requires-exact-marker-media-cardinality",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn plan_qwen3vl_markers[\\s\\S]*marker_count != images\\.len\\(\\)[\\s\\S]*visual_position_mask"
+        },
+        {
+          "name": "qwen-preparation-produces-checked-three-axis-position-inputs",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn qwen2vl_mrope_position_ids[\\s\\S]*MultimodalPositionIds[\\s\\S]*temporal[\\s\\S]*height[\\s\\S]*width"
+        },
+        {
+          "name": "qwen-preparation-tests-exact-patches-spans-and-rollback",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "qwen3vl_resize_patch_packing_and_batch_splitting_are_source_exact[\\s\\S]*qwen3vl_marker_plan_expands_real_image_spans_and_fails_closed[\\s\\S]*scratch\\.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-qwen-image-preparation-foundation"
+      ],
+      "production_consumers": [
+        "retained native Qwen multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The multimodal adapter is the sole owner of Qwen3-VL source-specific formatting, bounded IMAGE preparation, temporal/spatial patch ordering, marker-span planning, visual masks, and three-axis position construction. It returns only checked attempt-local tensors and immutable plans, delegates resize/storage/workspace/cancellation to comfy_tensor, and cannot own tokenizer parsing, retained weights, decoder execution, RNG, KV state, caching, persistence, handles, or publication."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

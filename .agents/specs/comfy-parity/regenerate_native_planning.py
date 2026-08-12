@@ -9281,6 +9281,47 @@ def native_prepared_decoder_generation_foundation_task(dependency: str) -> dict[
     )
 
 
+def native_qwen_image_preparation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen-image-preparation-foundation",
+        "Implement exact Qwen multimodal image preparation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical multimodal owner implements source-exact Qwen3-VL chat formatting, image-batch splitting, bounded factor-32 bilinear resizing, RGB normalization, temporal duplication, spatial-merge patch ordering, image-marker replacement planning, three-axis MRoPE positions, visual masks, and deepstack joins. Preparation is checked and cancellation-aware, produces attempt-local tensors only, and cannot run a decoder, retain model weights, open RNG, publish outputs, or substitute marker IDs for image embeddings.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove exact templates and thinking behavior, preformatted-prefix handling, zero/one/multiple-image marker plans, rounding and min/max resize bounds, bilinear RGB normalization, temporal duplication, patch and spatial-merge order, three-axis positions, visual masks, deepstack layer joins, malformed marker/media rejection, cancellation at every bounded loop, workspace rollback, and the absence of RNG, retained weight, cache, persistence, or publication ownership.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-qwen-multimodal-generation-foundation",
@@ -9294,7 +9335,7 @@ def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[s
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "One concrete retained Qwen3-VL/Qwen3.5 vision-text owner implements exact chat formatting, image patch/grid preprocessing, vision projection, marker replacement, three-axis MRoPE, visual masks, and prefill-only deepstack injection through the prepared decoder foundation. Its tensors participate in the CLIP resource semantic identity and alias-aware residency; unsupported video/audio and marker/media mismatches fail before RNG publication.",
+        "One concrete retained Qwen3-VL/Qwen3.5 vision-text owner consumes only the canonical checked image-preparation result, executes the exact vision projection, replaces every admitted marker span with real image embeddings, and performs prefill-only deepstack injection through the prepared decoder foundation. Its tensors participate in the CLIP resource semantic identity and alias-aware residency; unsupported video/audio and marker/media mismatches fail before RNG publication.",
         [
             "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
             "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
@@ -9320,7 +9361,7 @@ def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[s
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Source-fingerprinted fixtures prove exact Qwen templates and thinking behavior, preformatted-prefix handling, zero/one/multiple image batches, patch grids and resizing bounds, marker-span replacement, three-axis positions and continuation, visual masks, deepstack layer order and prefill-only injection, family cleanup, semantic identity/residency, cancellation/OOM rollback, restart staleness, and zero partial publication.",
+        "Source-fingerprinted fixtures prove exact Qwen vision projection, marker-span replacement, three-axis continuation, visual masks, deepstack layer order and prefill-only decoder injection, family cleanup, semantic identity/residency, cancellation/OOM rollback, restart staleness, and zero partial publication while reusing the canonical preparation owner.",
         [dependency],
         locked=True,
         criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
@@ -10553,8 +10594,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     prepared_decoder_generation_foundation = native_prepared_decoder_generation_foundation_task(
         str(decoder_text_generation_foundation["id"])
     )
-    qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
+    qwen_image_preparation_foundation = native_qwen_image_preparation_foundation_task(
         str(prepared_decoder_generation_foundation["id"])
+    )
+    qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
+        str(qwen_image_preparation_foundation["id"])
     )
     gemma_multimodal_generation_foundation = native_gemma_multimodal_generation_foundation_task(
         str(qwen_multimodal_generation_foundation["id"])
@@ -10635,6 +10679,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_provider_foundation,
             decoder_text_generation_foundation,
             prepared_decoder_generation_foundation,
+            qwen_image_preparation_foundation,
             qwen_multimodal_generation_foundation,
             gemma_multimodal_generation_foundation,
             text_generation_foundation,

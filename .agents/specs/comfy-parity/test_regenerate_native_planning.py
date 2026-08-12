@@ -50,6 +50,7 @@ class ValidationGenerationTests(unittest.TestCase):
         registry_id = "comfy-parity-native-registry-integration"
         scalar_generation_id = "comfy-parity-native-decoder-text-generation-foundation"
         prepared_generation_id = "comfy-parity-native-prepared-decoder-generation-foundation"
+        qwen_preparation_id = "comfy-parity-native-qwen-image-preparation-foundation"
         qwen_generation_id = "comfy-parity-native-qwen-multimodal-generation-foundation"
         gemma_generation_id = "comfy-parity-native-gemma-multimodal-generation-foundation"
         multimodal_generation_id = "comfy-parity-native-text-generation-foundation"
@@ -59,7 +60,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 536)
+        self.assertEqual(len(tasks), 537)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -95,8 +96,12 @@ class ValidationGenerationTests(unittest.TestCase):
             [scalar_generation_id],
         )
         self.assertEqual(
-            tasks_by_id[qwen_generation_id]["dependencies"],
+            tasks_by_id[qwen_preparation_id]["dependencies"],
             [prepared_generation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[qwen_generation_id]["dependencies"],
+            [qwen_preparation_id],
         )
         self.assertEqual(
             tasks_by_id[gemma_generation_id]["dependencies"],
@@ -372,7 +377,10 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[decoder_text_generation_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[qwen_generation_id], waves[prepared_generation_id] + 1
+            waves[qwen_preparation_id], waves[prepared_generation_id] + 1
+        )
+        self.assertEqual(
+            waves[qwen_generation_id], waves[qwen_preparation_id] + 1
         )
         self.assertEqual(
             waves[gemma_generation_id], waves[qwen_generation_id] + 1
