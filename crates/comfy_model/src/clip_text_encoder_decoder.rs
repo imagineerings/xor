@@ -1051,6 +1051,7 @@ pub struct DecoderTextConfiguration {
     pub key_value_heads: usize,
     pub head_dimension: usize,
     pub query_key_norm: bool,
+    pub qwen35_linear: Option<Qwen35LinearConfiguration>,
     pub normalization_epsilon_bits: u32,
     pub rope: DecoderRopeConfiguration,
     pub sliding_window: Option<usize>,
@@ -1061,6 +1062,15 @@ pub struct DecoderTextConfiguration {
     pub logits_soft_cap_bits: Option<u32>,
     pub tied_output_head: bool,
     pub stop_tokens: Vec<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Qwen35LinearConfiguration {
+    pub key_heads: usize,
+    pub value_heads: usize,
+    pub key_head_dimension: usize,
+    pub value_head_dimension: usize,
+    pub convolution_kernel_size: usize,
 }
 
 impl DecoderTextConfiguration {
@@ -1173,29 +1183,75 @@ impl DecoderTextConfiguration {
                 "linear attention is owned only by Qwen3.5 profiles",
             ));
         }
-        if self
-            .layer_kinds
-            .contains(&DecoderLayerKind::LinearAttention)
-            && (self.key_value_heads != self.attention_heads
-                || self.hidden_size != self.attention_heads.saturating_mul(self.head_dimension))
+        if self.architecture == DecoderArchitecture::Qwen35
+            && (!self.query_key_norm
+                || self.norm_weight_offset() != 1.0
+                || !self.layer_kinds.len().is_multiple_of(4)
+                || self.layer_kinds.iter().enumerate().any(|(index, kind)| {
+                    *kind
+                        != if (index + 1).is_multiple_of(4) {
+                            DecoderLayerKind::FullAttention
+                        } else {
+                            DecoderLayerKind::LinearAttention
+                        }
+                }))
         {
             return Err(DecoderTextError::InvalidConfiguration(
-                "Qwen3.5 linear-attention profiles require equal projected head counts and hidden width",
+                "Qwen3.5 requires Q/K normalization, weight offset one, and three linear layers before each full-attention layer",
             ));
+        }
+        let has_linear_attention = self
+            .layer_kinds
+            .contains(&DecoderLayerKind::LinearAttention);
+        match (&self.qwen35_linear, has_linear_attention) {
+            (Some(linear), true)
+                if linear.key_heads > 0
+                    && linear.value_heads > 0
+                    && linear.value_heads.is_multiple_of(linear.key_heads)
+                    && linear.key_head_dimension > 0
+                    && linear.value_head_dimension > 0
+                    && linear.convolution_kernel_size > 0 => {}
+            (None, false) => {}
+            _ => {
+                return Err(DecoderTextError::InvalidConfiguration(
+                    "Qwen3.5 linear-attention dimensions must exactly match the hybrid profile",
+                ));
+            }
         }
         Ok(())
     }
 }
 
 #[derive(Clone, Debug)]
+pub enum DecoderAttentionWeights {
+    DotProduct {
+        query_weight: Tensor,
+        key_weight: Tensor,
+        value_weight: Tensor,
+        query_norm_weight: Option<Tensor>,
+        key_norm_weight: Option<Tensor>,
+        output_weight: Tensor,
+    },
+    Qwen35Linear(Qwen35LinearWeights),
+}
+
+#[derive(Clone, Debug)]
+pub struct Qwen35LinearWeights {
+    pub mixed_query_key_value_weight: Tensor,
+    pub gate_weight: Tensor,
+    pub beta_weight: Tensor,
+    pub alpha_weight: Tensor,
+    pub output_weight: Tensor,
+    pub time_bias: Tensor,
+    pub log_decay: Tensor,
+    pub convolution_weight: Tensor,
+    pub normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
 pub struct DecoderLayerWeights {
     pub attention_norm_weight: Tensor,
-    pub query_weight: Tensor,
-    pub key_weight: Tensor,
-    pub value_weight: Tensor,
-    pub query_norm_weight: Option<Tensor>,
-    pub key_norm_weight: Option<Tensor>,
-    pub attention_output_weight: Tensor,
+    pub attention: DecoderAttentionWeights,
     pub feed_forward_norm_weight: Tensor,
     pub feed_forward_gate_weight: Tensor,
     pub feed_forward_up_weight: Tensor,
@@ -1241,6 +1297,7 @@ impl DecoderAttentionCache {
 pub struct Qwen35LinearCache {
     pub convolution_state: Tensor,
     pub recurrent_state: Tensor,
+    pub step_index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -1440,12 +1497,7 @@ pub struct NativeTextGenerationResult {
 struct NativeDecoderLayer {
     kind: DecoderLayerKind,
     attention_norm_weight: Tensor,
-    query: NativeModule,
-    key: NativeModule,
-    value: NativeModule,
-    query_norm_weight: Option<Tensor>,
-    key_norm_weight: Option<Tensor>,
-    attention_output: NativeModule,
+    attention: NativeDecoderAttention,
     feed_forward_norm_weight: Tensor,
     feed_forward_gate: NativeModule,
     feed_forward_up: NativeModule,
@@ -1454,6 +1506,30 @@ struct NativeDecoderLayer {
     post_attention_norm_weight: Option<Tensor>,
     post_feed_forward_norm_weight: Option<Tensor>,
     attention_sink: Option<Tensor>,
+}
+
+#[derive(Clone, Debug)]
+enum NativeDecoderAttention {
+    DotProduct {
+        query: NativeModule,
+        key: NativeModule,
+        value: NativeModule,
+        query_norm_weight: Option<Tensor>,
+        key_norm_weight: Option<Tensor>,
+        output: NativeModule,
+        gated_output: bool,
+    },
+    Qwen35Linear {
+        mixed_query_key_value: NativeModule,
+        gate: NativeModule,
+        beta: NativeModule,
+        alpha: NativeModule,
+        output: NativeModule,
+        time_bias: Tensor,
+        log_decay: Tensor,
+        convolution_weight: Tensor,
+        normalization_weight: Tensor,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -1709,16 +1785,40 @@ impl NativeDecoderTextEncoder {
             ("output_head".to_owned(), &self.output_head),
         ];
         for (index, layer) in self.layers.iter().enumerate() {
-            for (name, module) in [
-                ("query", &layer.query),
-                ("key", &layer.key),
-                ("value", &layer.value),
-                ("attention_output", &layer.attention_output),
+            let attention_modules: Vec<(&str, &NativeModule)> = match &layer.attention {
+                NativeDecoderAttention::DotProduct {
+                    query,
+                    key,
+                    value,
+                    output,
+                    ..
+                } => vec![
+                    ("query", query),
+                    ("key", key),
+                    ("value", value),
+                    ("attention_output", output),
+                ],
+                NativeDecoderAttention::Qwen35Linear {
+                    mixed_query_key_value,
+                    gate,
+                    beta,
+                    alpha,
+                    output,
+                    ..
+                } => vec![
+                    ("mixed_query_key_value", mixed_query_key_value),
+                    ("linear_gate", gate),
+                    ("linear_beta", beta),
+                    ("linear_alpha", alpha),
+                    ("attention_output", output),
+                ],
+            };
+            for (name, module) in attention_modules.into_iter().chain([
                 ("feed_forward_gate", &layer.feed_forward_gate),
                 ("feed_forward_up", &layer.feed_forward_up),
                 ("activation", &layer.activation),
                 ("feed_forward_down", &layer.feed_forward_down),
-            ] {
+            ]) {
                 modules.push((format!("layers.{index}.{name}"), module));
             }
         }
@@ -1748,11 +1848,37 @@ impl NativeDecoderTextEncoder {
             if let Some(tensor) = &layer.attention_sink {
                 tensors.push((format!("layers.{index}.attention_sink"), tensor));
             }
-            if let Some(tensor) = &layer.query_norm_weight {
-                tensors.push((format!("layers.{index}.query_norm_weight"), tensor));
-            }
-            if let Some(tensor) = &layer.key_norm_weight {
-                tensors.push((format!("layers.{index}.key_norm_weight"), tensor));
+            match &layer.attention {
+                NativeDecoderAttention::DotProduct {
+                    query_norm_weight,
+                    key_norm_weight,
+                    ..
+                } => {
+                    if let Some(tensor) = query_norm_weight {
+                        tensors.push((format!("layers.{index}.query_norm_weight"), tensor));
+                    }
+                    if let Some(tensor) = key_norm_weight {
+                        tensors.push((format!("layers.{index}.key_norm_weight"), tensor));
+                    }
+                }
+                NativeDecoderAttention::Qwen35Linear {
+                    time_bias,
+                    log_decay,
+                    convolution_weight,
+                    normalization_weight,
+                    ..
+                } => {
+                    tensors.push((format!("layers.{index}.time_bias"), time_bias));
+                    tensors.push((format!("layers.{index}.log_decay"), log_decay));
+                    tensors.push((
+                        format!("layers.{index}.convolution_weight"),
+                        convolution_weight,
+                    ));
+                    tensors.push((
+                        format!("layers.{index}.linear_norm_weight"),
+                        normalization_weight,
+                    ));
+                }
             }
         }
         tensors
@@ -1767,16 +1893,31 @@ impl NativeDecoderTextEncoder {
         );
         requirements.extend(self.output_head.execution_requirements(DType::F32).iter());
         for layer in &self.layers {
-            for module in [
-                &layer.query,
-                &layer.key,
-                &layer.value,
-                &layer.attention_output,
+            let attention_modules: Vec<&NativeModule> = match &layer.attention {
+                NativeDecoderAttention::DotProduct {
+                    query,
+                    key,
+                    value,
+                    output,
+                    ..
+                } => {
+                    vec![query, key, value, output]
+                }
+                NativeDecoderAttention::Qwen35Linear {
+                    mixed_query_key_value,
+                    gate,
+                    beta,
+                    alpha,
+                    output,
+                    ..
+                } => vec![mixed_query_key_value, gate, beta, alpha, output],
+            };
+            for module in attention_modules.into_iter().chain([
                 &layer.feed_forward_gate,
                 &layer.feed_forward_up,
                 &layer.activation,
                 &layer.feed_forward_down,
-            ] {
+            ]) {
                 requirements.extend(module.execution_requirements(DType::F32).iter());
             }
         }
@@ -2614,19 +2755,45 @@ impl NativeDecoderLayer {
         cache: &mut Option<DecoderLayerCache>,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, DecoderTextError> {
-        let mut query_module = self.query.clone();
-        let mut key_module = self.key.clone();
-        let mut value_module = self.value.clone();
+        let NativeDecoderAttention::DotProduct {
+            query: query_module,
+            key: key_module,
+            value: value_module,
+            query_norm_weight,
+            key_norm_weight,
+            output,
+            gated_output,
+        } = &self.attention
+        else {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "dot-product execution requires dot-product weights",
+            ));
+        };
+        let mut query_module = query_module.clone();
+        let mut key_module = key_module.clone();
+        let mut value_module = value_module.clone();
         let query = query_module.forward_with_context(backend, input, context)?;
         let key = key_module.forward_with_context(backend, input, context)?;
         let value = value_module.forward_with_context(backend, input, context)?;
         let query = tensor_to_f32(backend, &query, context)?;
+        let (query, gate) = if *gated_output {
+            split_qwen35_query_gate(
+                &query,
+                batch,
+                query_tokens,
+                configuration.attention_heads,
+                configuration.head_dimension,
+                context.cancellation,
+            )?
+        } else {
+            (query.iter().copied().collect(), None)
+        };
         let key = tensor_to_f32(backend, &key, context)?;
         let value = tensor_to_f32(backend, &value, context)?;
         let query = normalize_attention_heads(
             backend,
             &query,
-            self.query_norm_weight.as_ref(),
+            query_norm_weight.as_ref(),
             batch,
             query_tokens,
             configuration.attention_heads,
@@ -2636,7 +2803,7 @@ impl NativeDecoderLayer {
         let key = normalize_attention_heads(
             backend,
             &key,
-            self.key_norm_weight.as_ref(),
+            key_norm_weight.as_ref(),
             batch,
             query_tokens,
             configuration.key_value_heads,
@@ -2744,6 +2911,17 @@ impl NativeDecoderLayer {
             Some(prepared_mask.as_attention_mask()),
             context,
         )?;
+        let mut attention_values = outcome.values;
+        if let Some(gate) = gate {
+            if gate.len() != attention_values.len() {
+                return Err(DecoderTextError::InvalidInput(
+                    "Qwen3.5 attention gate does not match the attention output",
+                ));
+            }
+            for (value, gate) in attention_values.iter_mut().zip(gate) {
+                *value *= sigmoid(gate);
+            }
+        }
         let attention = tensor_from_f32(
             backend,
             &[
@@ -2751,10 +2929,10 @@ impl NativeDecoderLayer {
                 usize_to_u64(query_tokens, "attention tokens")?,
                 usize_to_u64(configuration.hidden_size, "attention hidden")?,
             ],
-            &outcome.values,
+            &attention_values,
             context,
         )?;
-        let mut output = self.attention_output.clone();
+        let mut output = output.clone();
         output
             .forward_with_context(backend, &attention, context)
             .map_err(Into::into)
@@ -2771,28 +2949,63 @@ impl NativeDecoderLayer {
         cache: &mut Option<DecoderLayerCache>,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, DecoderTextError> {
-        let mut query = self.query.clone();
-        let mut key = self.key.clone();
-        let mut value = self.value.clone();
-        let query = tensor_to_f32(
+        let Some(linear_configuration) = configuration.qwen35_linear.as_ref() else {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "Qwen3.5 linear execution requires its checked profile",
+            ));
+        };
+        let NativeDecoderAttention::Qwen35Linear {
+            mixed_query_key_value,
+            gate,
+            beta,
+            alpha,
+            output: output_module,
+            time_bias,
+            log_decay,
+            convolution_weight,
+            normalization_weight,
+        } = &self.attention
+        else {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "Qwen3.5 linear execution requires checkpoint-backed linear weights",
+            ));
+        };
+        let mut mixed_query_key_value = mixed_query_key_value.clone();
+        let mut gate = gate.clone();
+        let mut beta = beta.clone();
+        let mut alpha = alpha.clone();
+        let mixed_query_key_value = tensor_to_f32(
             backend,
-            &query.forward_with_context(backend, input, context)?,
+            &mixed_query_key_value.forward_with_context(backend, input, context)?,
             context,
         )?;
-        let key = tensor_to_f32(
+        let gate = tensor_to_f32(
             backend,
-            &key.forward_with_context(backend, input, context)?,
+            &gate.forward_with_context(backend, input, context)?,
             context,
         )?;
-        let value = tensor_to_f32(
+        let beta = tensor_to_f32(
             backend,
-            &value.forward_with_context(backend, input, context)?,
+            &beta.forward_with_context(backend, input, context)?,
             context,
         )?;
-        let state_width = configuration
-            .attention_heads
-            .checked_mul(configuration.head_dimension)
-            .ok_or(DecoderTextError::Overflow("linear-attention state"))?;
+        let alpha = tensor_to_f32(
+            backend,
+            &alpha.forward_with_context(backend, input, context)?,
+            context,
+        )?;
+        let key_width = linear_configuration
+            .key_heads
+            .checked_mul(linear_configuration.key_head_dimension)
+            .ok_or(DecoderTextError::Overflow("linear key width"))?;
+        let value_width = linear_configuration
+            .value_heads
+            .checked_mul(linear_configuration.value_head_dimension)
+            .ok_or(DecoderTextError::Overflow("linear value width"))?;
+        let convolution_width = key_width
+            .checked_mul(2)
+            .and_then(|width| width.checked_add(value_width))
+            .ok_or(DecoderTextError::Overflow("linear convolution width"))?;
         let previous = match cache.as_ref() {
             Some(DecoderLayerCache::Linear(state)) => Some(state),
             None => None,
@@ -2805,57 +3018,84 @@ impl NativeDecoderLayer {
         let recurrent = previous
             .map(|state| tensor_to_f32(backend, &state.recurrent_state, context))
             .transpose()?;
-        let gate_count = batch
-            .checked_mul(query_tokens)
-            .and_then(|value| value.checked_mul(configuration.attention_heads))
-            .ok_or(DecoderTextError::Overflow("linear-attention gates"))?;
-        let log_decay = vec![0.0; gate_count];
-        let beta = vec![1.0; gate_count];
-        let (output, next_recurrent) = qwen35_chunk_gated_delta_rule_exact(
-            &query,
-            &key,
-            &value,
-            &log_decay,
-            &beta,
-            recurrent.as_deref().unwrap_or(&[]),
-            batch,
-            query_tokens,
-            configuration.attention_heads,
-            configuration.head_dimension,
-            configuration.head_dimension,
-            context.cancellation,
-        )?;
         let previous_convolution = previous
             .map(|state| tensor_to_f32(backend, &state.convolution_state, context))
             .transpose()?;
-        let mut convolution_weight = Vec::new();
-        convolution_weight
-            .try_reserve_exact(
-                state_width
-                    .checked_mul(3)
-                    .ok_or(DecoderTextError::Overflow("linear convolution weights"))?,
-            )
-            .map_err(|_| DecoderTextError::Allocation("linear convolution weights"))?;
-        for _ in 0..state_width {
-            convolution_weight.extend_from_slice(&[0.25, 0.5, 0.25]);
-        }
-        let (output, convolution_state) = qwen35_causal_conv1d_update_exact(
-            &output,
+        let convolution_weight = tensor_to_f32(backend, convolution_weight, context)?;
+        let (mixed_query_key_value, convolution_state) = qwen35_causal_conv1d_update_exact(
+            &mixed_query_key_value,
             previous_convolution.as_deref().unwrap_or(&[]),
             &convolution_weight,
             None,
             batch,
             query_tokens,
-            state_width,
-            3,
+            convolution_width,
+            linear_configuration.convolution_kernel_size,
+            context.cancellation,
+        )?;
+        let (query, key, value) = split_qwen35_linear_query_key_value(
+            &mixed_query_key_value,
+            batch,
+            query_tokens,
+            linear_configuration,
+            context.cancellation,
+        )?;
+        let beta = beta.iter().copied().map(sigmoid).collect::<Vec<_>>();
+        let time_bias = tensor_to_f32(backend, time_bias, context)?;
+        let log_decay_weight = tensor_to_f32(backend, log_decay, context)?;
+        let mut decay = Vec::new();
+        decay
+            .try_reserve_exact(beta.len())
+            .map_err(|_| DecoderTextError::Allocation("linear decay gates"))?;
+        for (index, alpha) in alpha.into_iter().enumerate() {
+            context.check()?;
+            let head = index % linear_configuration.value_heads;
+            let bias = *time_bias.get(head).ok_or(DecoderTextError::InvalidInput(
+                "Qwen3.5 time bias is missing",
+            ))?;
+            let weight = *log_decay_weight
+                .get(head)
+                .ok_or(DecoderTextError::InvalidInput(
+                    "Qwen3.5 log-decay weight is missing",
+                ))?;
+            decay.push(-weight.exp() * softplus(alpha + bias));
+        }
+        let (output_values, next_recurrent) = qwen35_chunk_gated_delta_rule_exact(
+            &query,
+            &key,
+            &value,
+            &decay,
+            &beta,
+            recurrent.as_deref().unwrap_or(&[]),
+            batch,
+            query_tokens,
+            linear_configuration.value_heads,
+            linear_configuration.key_head_dimension,
+            linear_configuration.value_head_dimension,
+            context.cancellation,
+        )?;
+        let normalization_weight = tensor_to_f32(backend, normalization_weight, context)?;
+        let output_values = qwen35_gated_rms_norm(
+            &output_values,
+            &gate,
+            &normalization_weight,
+            batch,
+            query_tokens,
+            linear_configuration,
+            configuration,
             context.cancellation,
         )?;
         let convolution_state = tensor_from_f32(
             backend,
             &[
                 usize_to_u64(batch, "linear convolution batch")?,
-                usize_to_u64(state_width, "linear convolution width")?,
-                2,
+                usize_to_u64(convolution_width, "linear convolution width")?,
+                usize_to_u64(
+                    linear_configuration
+                        .convolution_kernel_size
+                        .saturating_sub(1),
+                    "linear convolution history",
+                )?,
             ],
             &convolution_state,
             context,
@@ -2864,9 +3104,15 @@ impl NativeDecoderLayer {
             backend,
             &[
                 usize_to_u64(batch, "linear recurrent batch")?,
-                usize_to_u64(configuration.attention_heads, "linear recurrent heads")?,
-                usize_to_u64(configuration.head_dimension, "linear recurrent key width")?,
-                usize_to_u64(configuration.head_dimension, "linear recurrent value width")?,
+                usize_to_u64(linear_configuration.value_heads, "linear recurrent heads")?,
+                usize_to_u64(
+                    linear_configuration.key_head_dimension,
+                    "linear recurrent key width",
+                )?,
+                usize_to_u64(
+                    linear_configuration.value_head_dimension,
+                    "linear recurrent value width",
+                )?,
             ],
             &next_recurrent,
             context,
@@ -2874,18 +3120,23 @@ impl NativeDecoderLayer {
         *cache = Some(DecoderLayerCache::Linear(Qwen35LinearCache {
             convolution_state,
             recurrent_state: next_recurrent,
+            step_index: previous
+                .map(|state| state.step_index)
+                .unwrap_or(0)
+                .checked_add(query_tokens)
+                .ok_or(DecoderTextError::Overflow("linear cache step"))?,
         }));
         let output = tensor_from_f32(
             backend,
             &[
                 usize_to_u64(batch, "linear-attention batch")?,
                 usize_to_u64(query_tokens, "linear-attention tokens")?,
-                usize_to_u64(configuration.hidden_size, "linear-attention hidden")?,
+                usize_to_u64(value_width, "linear-attention hidden")?,
             ],
-            &output,
+            &output_values,
             context,
         )?;
-        let mut projection = self.attention_output.clone();
+        let mut projection = output_module.clone();
         projection
             .forward_with_context(backend, &output, context)
             .map_err(Into::into)
@@ -4309,50 +4560,157 @@ fn build_layer(
         .key_value_heads
         .checked_mul(configuration.head_dimension)
         .ok_or(DecoderTextError::Overflow("key/value width"))?;
-    match (
-        weights.query_norm_weight.as_ref(),
-        weights.key_norm_weight.as_ref(),
-        configuration.query_key_norm,
-    ) {
-        (Some(query_norm), Some(key_norm), true) => {
-            require_vector_parameter(query_norm, configuration.head_dimension, stream)?;
-            require_vector_parameter(key_norm, configuration.head_dimension, stream)?;
+    let attention = match (kind, weights.attention) {
+        (
+            DecoderLayerKind::FullAttention | DecoderLayerKind::SlidingAttention,
+            DecoderAttentionWeights::DotProduct {
+                query_weight,
+                key_weight,
+                value_weight,
+                query_norm_weight,
+                key_norm_weight,
+                output_weight,
+            },
+        ) => {
+            match (
+                query_norm_weight.as_ref(),
+                key_norm_weight.as_ref(),
+                configuration.query_key_norm,
+            ) {
+                (Some(query_norm), Some(key_norm), true) => {
+                    require_vector_parameter(query_norm, configuration.head_dimension, stream)?;
+                    require_vector_parameter(key_norm, configuration.head_dimension, stream)?;
+                }
+                (None, None, false) => {}
+                _ => {
+                    return Err(DecoderTextError::InvalidConfiguration(
+                        "query/key normalization weights must exactly match the decoder profile",
+                    ));
+                }
+            }
+            let gated_output = configuration.architecture == DecoderArchitecture::Qwen35;
+            let query_projection_width = if gated_output {
+                query_width
+                    .checked_mul(2)
+                    .ok_or(DecoderTextError::Overflow("Qwen3.5 query-gate width"))?
+            } else {
+                query_width
+            };
+            NativeDecoderAttention::DotProduct {
+                query: linear_module(
+                    format!("{prefix}.query"),
+                    configuration.hidden_size,
+                    query_projection_width,
+                    query_weight,
+                    stream,
+                )?,
+                key: linear_module(
+                    format!("{prefix}.key"),
+                    configuration.hidden_size,
+                    key_value_width,
+                    key_weight,
+                    stream,
+                )?,
+                value: linear_module(
+                    format!("{prefix}.value"),
+                    configuration.hidden_size,
+                    key_value_width,
+                    value_weight,
+                    stream,
+                )?,
+                query_norm_weight,
+                key_norm_weight,
+                output: linear_module(
+                    format!("{prefix}.attention_output"),
+                    query_width,
+                    configuration.hidden_size,
+                    output_weight,
+                    stream,
+                )?,
+                gated_output,
+            }
         }
-        (None, None, false) => {}
+        (
+            DecoderLayerKind::LinearAttention,
+            DecoderAttentionWeights::Qwen35Linear(linear_weights),
+        ) if configuration.architecture == DecoderArchitecture::Qwen35 => {
+            let linear = configuration.qwen35_linear.as_ref().ok_or(
+                DecoderTextError::InvalidConfiguration(
+                    "Qwen3.5 linear weights require a checked linear profile",
+                ),
+            )?;
+            let key_width = linear
+                .key_heads
+                .checked_mul(linear.key_head_dimension)
+                .ok_or(DecoderTextError::Overflow("linear key width"))?;
+            let value_width = linear
+                .value_heads
+                .checked_mul(linear.value_head_dimension)
+                .ok_or(DecoderTextError::Overflow("linear value width"))?;
+            let convolution_width = key_width
+                .checked_mul(2)
+                .and_then(|width| width.checked_add(value_width))
+                .ok_or(DecoderTextError::Overflow("linear convolution width"))?;
+            require_tensor_shape(&linear_weights.time_bias, &[linear.value_heads], stream)?;
+            require_tensor_shape(&linear_weights.log_decay, &[linear.value_heads], stream)?;
+            require_tensor_shape(
+                &linear_weights.convolution_weight,
+                &[convolution_width, linear.convolution_kernel_size],
+                stream,
+            )?;
+            require_tensor_shape(
+                &linear_weights.normalization_weight,
+                &[linear.value_head_dimension],
+                stream,
+            )?;
+            NativeDecoderAttention::Qwen35Linear {
+                mixed_query_key_value: linear_module(
+                    format!("{prefix}.mixed_query_key_value"),
+                    configuration.hidden_size,
+                    convolution_width,
+                    linear_weights.mixed_query_key_value_weight,
+                    stream,
+                )?,
+                gate: linear_module(
+                    format!("{prefix}.linear_gate"),
+                    configuration.hidden_size,
+                    value_width,
+                    linear_weights.gate_weight,
+                    stream,
+                )?,
+                beta: linear_module(
+                    format!("{prefix}.linear_beta"),
+                    configuration.hidden_size,
+                    linear.value_heads,
+                    linear_weights.beta_weight,
+                    stream,
+                )?,
+                alpha: linear_module(
+                    format!("{prefix}.linear_alpha"),
+                    configuration.hidden_size,
+                    linear.value_heads,
+                    linear_weights.alpha_weight,
+                    stream,
+                )?,
+                output: linear_module(
+                    format!("{prefix}.attention_output"),
+                    value_width,
+                    configuration.hidden_size,
+                    linear_weights.output_weight,
+                    stream,
+                )?,
+                time_bias: linear_weights.time_bias,
+                log_decay: linear_weights.log_decay,
+                convolution_weight: linear_weights.convolution_weight,
+                normalization_weight: linear_weights.normalization_weight,
+            }
+        }
         _ => {
             return Err(DecoderTextError::InvalidConfiguration(
-                "query/key normalization weights must exactly match the decoder profile",
+                "decoder layer kind and attention weights do not match",
             ));
         }
-    }
-    let query = linear_module(
-        format!("{prefix}.query"),
-        configuration.hidden_size,
-        query_width,
-        weights.query_weight,
-        stream,
-    )?;
-    let key = linear_module(
-        format!("{prefix}.key"),
-        configuration.hidden_size,
-        key_value_width,
-        weights.key_weight,
-        stream,
-    )?;
-    let value = linear_module(
-        format!("{prefix}.value"),
-        configuration.hidden_size,
-        key_value_width,
-        weights.value_weight,
-        stream,
-    )?;
-    let attention_output = linear_module(
-        format!("{prefix}.attention_output"),
-        query_width,
-        configuration.hidden_size,
-        weights.attention_output_weight,
-        stream,
-    )?;
+    };
     let feed_forward_gate = linear_module(
         format!("{prefix}.feed_forward_gate"),
         configuration.hidden_size,
@@ -4384,12 +4742,7 @@ fn build_layer(
     Ok(NativeDecoderLayer {
         kind,
         attention_norm_weight: weights.attention_norm_weight,
-        query,
-        key,
-        value,
-        query_norm_weight: weights.query_norm_weight,
-        key_norm_weight: weights.key_norm_weight,
-        attention_output,
+        attention,
         feed_forward_norm_weight: weights.feed_forward_norm_weight,
         feed_forward_gate,
         feed_forward_up,
@@ -4437,6 +4790,24 @@ fn require_vector_parameter(
     if tensor.descriptor().shape() != [usize_to_u64(width, "normalization width")?] {
         return Err(DecoderTextError::InvalidConfiguration(
             "normalization parameter width is invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn require_tensor_shape(
+    tensor: &Tensor,
+    shape: &[usize],
+    stream: StreamId,
+) -> Result<(), DecoderTextError> {
+    require_parameter(tensor, stream)?;
+    let expected = shape
+        .iter()
+        .map(|dimension| usize_to_u64(*dimension, "parameter shape"))
+        .collect::<Result<Vec<_>, _>>()?;
+    if tensor.descriptor().shape() != expected {
+        return Err(DecoderTextError::InvalidConfiguration(
+            "parameter shape does not match the decoder profile",
         ));
     }
     Ok(())
@@ -4551,7 +4922,7 @@ fn cache_token_count(cache: &DecoderKvState) -> Result<usize, DecoderTextError> 
     for layer in cache.layers.iter().flatten() {
         let layer_tokens = match layer {
             DecoderLayerCache::Attention(cache) => cache.tokens,
-            DecoderLayerCache::Linear(_) => continue,
+            DecoderLayerCache::Linear(cache) => cache.step_index,
         };
         if tokens.is_some_and(|tokens| tokens != layer_tokens) {
             return Err(DecoderTextError::InvalidInput(
@@ -4579,23 +4950,47 @@ fn validate_cache(
         match (kind, cache) {
             (_, None) => {}
             (DecoderLayerKind::LinearAttention, Some(DecoderLayerCache::Linear(cache))) => {
-                let state_width = configuration
-                    .key_value_heads
-                    .checked_mul(configuration.head_dimension)
+                let linear = configuration.qwen35_linear.as_ref().ok_or(
+                    DecoderTextError::InvalidConfiguration(
+                        "Qwen3.5 cache requires a checked linear profile",
+                    ),
+                )?;
+                let key_width = linear
+                    .key_heads
+                    .checked_mul(linear.key_head_dimension)
+                    .ok_or(DecoderTextError::Overflow("linear cache key width"))?;
+                let value_width = linear
+                    .value_heads
+                    .checked_mul(linear.value_head_dimension)
+                    .ok_or(DecoderTextError::Overflow("linear cache value width"))?;
+                let convolution_width = key_width
+                    .checked_mul(2)
+                    .and_then(|width| width.checked_add(value_width))
                     .ok_or(DecoderTextError::Overflow("linear cache width"))?;
                 let expected_shapes = [
                     vec![
                         usize_to_u64(batch, "linear cache batch")?,
-                        usize_to_u64(state_width, "linear cache width")?,
-                        2,
+                        usize_to_u64(convolution_width, "linear cache width")?,
+                        usize_to_u64(
+                            linear.convolution_kernel_size.saturating_sub(1),
+                            "linear cache history",
+                        )?,
                     ],
                     vec![
                         usize_to_u64(batch, "linear cache batch")?,
-                        usize_to_u64(configuration.attention_heads, "linear cache heads")?,
-                        usize_to_u64(configuration.head_dimension, "linear cache key width")?,
-                        usize_to_u64(configuration.head_dimension, "linear cache value width")?,
+                        usize_to_u64(linear.value_heads, "linear cache heads")?,
+                        usize_to_u64(linear.key_head_dimension, "linear cache key width")?,
+                        usize_to_u64(linear.value_head_dimension, "linear cache value width")?,
                     ],
                 ];
+                if cache.step_index > configuration.maximum_tokens
+                    || token_count.is_some_and(|tokens| tokens != cache.step_index)
+                {
+                    return Err(DecoderTextError::InvalidInput(
+                        "Qwen3.5 cache step does not match the decoder cache",
+                    ));
+                }
+                token_count = Some(cache.step_index);
                 for (tensor, expected_shape) in [&cache.convolution_state, &cache.recurrent_state]
                     .into_iter()
                     .zip(expected_shapes)
@@ -5068,6 +5463,209 @@ fn normalize_attention_heads(
         context,
     )
     .map_err(Into::into)
+}
+
+fn sigmoid(value: f32) -> f32 {
+    1.0 / (1.0 + (-value).exp())
+}
+
+fn softplus(value: f32) -> f32 {
+    if value > 20.0 {
+        value
+    } else {
+        value.exp().ln_1p()
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn split_qwen35_query_gate(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    head_dimension: usize,
+    cancellation: &CancellationToken,
+) -> Result<(Vec<f32>, Option<Vec<f32>>), DecoderTextError> {
+    let output_width = heads
+        .checked_mul(head_dimension)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 query width"))?;
+    let expected = batch
+        .checked_mul(tokens)
+        .and_then(|count| count.checked_mul(output_width))
+        .and_then(|count| count.checked_mul(2))
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 query-gate projection"))?;
+    if values.len() != expected {
+        return Err(DecoderTextError::InvalidInput(
+            "Qwen3.5 query-gate projection has the wrong length",
+        ));
+    }
+    let mut query = Vec::new();
+    let mut gate = Vec::new();
+    query
+        .try_reserve_exact(expected / 2)
+        .map_err(|_| DecoderTextError::Allocation("Qwen3.5 query projection"))?;
+    gate.try_reserve_exact(expected / 2)
+        .map_err(|_| DecoderTextError::Allocation("Qwen3.5 attention gate"))?;
+    let token_heads = batch
+        .checked_mul(tokens)
+        .and_then(|count| count.checked_mul(heads))
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 query-gate vectors"))?;
+    for token_head in 0..token_heads {
+        cancellation.check()?;
+        let base = token_head
+            .checked_mul(head_dimension.saturating_mul(2))
+            .ok_or(DecoderTextError::Overflow("Qwen3.5 query-gate offset"))?;
+        query.extend_from_slice(values.get(base..base + head_dimension).ok_or(
+            DecoderTextError::InvalidInput("Qwen3.5 query projection is missing"),
+        )?);
+        gate.extend_from_slice(
+            values
+                .get(base + head_dimension..base + head_dimension * 2)
+                .ok_or(DecoderTextError::InvalidInput(
+                    "Qwen3.5 attention gate is missing",
+                ))?,
+        );
+    }
+    Ok((query, Some(gate)))
+}
+
+#[allow(clippy::type_complexity)]
+fn split_qwen35_linear_query_key_value(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    configuration: &Qwen35LinearConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<(Vec<f32>, Vec<f32>, Vec<f32>), DecoderTextError> {
+    let key_width = configuration
+        .key_heads
+        .checked_mul(configuration.key_head_dimension)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 linear key width"))?;
+    let value_width = configuration
+        .value_heads
+        .checked_mul(configuration.value_head_dimension)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 linear value width"))?;
+    let row_width = key_width
+        .checked_mul(2)
+        .and_then(|width| width.checked_add(value_width))
+        .ok_or(DecoderTextError::Overflow(
+            "Qwen3.5 linear projection width",
+        ))?;
+    let rows = batch
+        .checked_mul(tokens)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 linear rows"))?;
+    let expected = rows
+        .checked_mul(row_width)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 mixed projection"))?;
+    if values.len() != expected {
+        return Err(DecoderTextError::InvalidInput(
+            "Qwen3.5 mixed projection has the wrong length",
+        ));
+    }
+    let expanded_key_width = configuration
+        .value_heads
+        .checked_mul(configuration.key_head_dimension)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 expanded key width"))?;
+    let mut query = Vec::new();
+    let mut key = Vec::new();
+    let mut value = Vec::new();
+    query
+        .try_reserve_exact(
+            rows.checked_mul(expanded_key_width)
+                .ok_or(DecoderTextError::Overflow("Qwen3.5 linear query"))?,
+        )
+        .map_err(|_| DecoderTextError::Allocation("Qwen3.5 linear query"))?;
+    key.try_reserve_exact(
+        rows.checked_mul(expanded_key_width)
+            .ok_or(DecoderTextError::Overflow("Qwen3.5 linear key"))?,
+    )
+    .map_err(|_| DecoderTextError::Allocation("Qwen3.5 linear key"))?;
+    value
+        .try_reserve_exact(
+            rows.checked_mul(value_width)
+                .ok_or(DecoderTextError::Overflow("Qwen3.5 linear value"))?,
+        )
+        .map_err(|_| DecoderTextError::Allocation("Qwen3.5 linear value"))?;
+    let repeats = configuration.value_heads / configuration.key_heads;
+    for row in 0..rows {
+        cancellation.check()?;
+        let base = row * row_width;
+        for head in 0..configuration.key_heads {
+            let query_base = base + head * configuration.key_head_dimension;
+            let key_base = base + key_width + head * configuration.key_head_dimension;
+            let query_head = values
+                .get(query_base..query_base + configuration.key_head_dimension)
+                .ok_or(DecoderTextError::InvalidInput(
+                    "Qwen3.5 linear query head is missing",
+                ))?;
+            let key_head = values
+                .get(key_base..key_base + configuration.key_head_dimension)
+                .ok_or(DecoderTextError::InvalidInput(
+                    "Qwen3.5 linear key head is missing",
+                ))?;
+            for _ in 0..repeats {
+                query.extend_from_slice(query_head);
+                key.extend_from_slice(key_head);
+            }
+        }
+        value.extend_from_slice(values.get(base + key_width * 2..base + row_width).ok_or(
+            DecoderTextError::InvalidInput("Qwen3.5 linear value projection is missing"),
+        )?);
+    }
+    Ok((query, key, value))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn qwen35_gated_rms_norm(
+    values: &[f32],
+    gate: &[f32],
+    weight: &[f32],
+    batch: usize,
+    tokens: usize,
+    linear: &Qwen35LinearConfiguration,
+    decoder: &DecoderTextConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<Vec<f32>, DecoderTextError> {
+    let vectors = batch
+        .checked_mul(tokens)
+        .and_then(|count| count.checked_mul(linear.value_heads))
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 gated norm vectors"))?;
+    let expected = vectors
+        .checked_mul(linear.value_head_dimension)
+        .ok_or(DecoderTextError::Overflow("Qwen3.5 gated norm values"))?;
+    if values.len() != expected
+        || gate.len() != expected
+        || weight.len() != linear.value_head_dimension
+    {
+        return Err(DecoderTextError::InvalidInput(
+            "Qwen3.5 gated normalization tensors have the wrong length",
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(expected)
+        .map_err(|_| DecoderTextError::Allocation("Qwen3.5 gated norm output"))?;
+    for vector in 0..vectors {
+        cancellation.check()?;
+        let base = vector * linear.value_head_dimension;
+        let mean_square = values[base..base + linear.value_head_dimension]
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            / linear.value_head_dimension as f32;
+        let inverse = (mean_square + decoder.normalization_epsilon())
+            .sqrt()
+            .recip();
+        for column in 0..linear.value_head_dimension {
+            output.push(
+                values[base + column]
+                    * inverse
+                    * (weight[column] + decoder.norm_weight_offset())
+                    * (gate[base + column] * sigmoid(gate[base + column])),
+            );
+        }
+    }
+    Ok(output)
 }
 
 fn multiply_tensor(

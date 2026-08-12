@@ -1,13 +1,14 @@
 use comfy_model::{
     ClipBpeTokenizer, DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS,
-    DecoderActivation, DecoderArchitecture, DecoderGenerationConfiguration, DecoderLayerKind,
-    DecoderLayerWeights, DecoderPreparedDeepstack, DecoderPreparedGenerationPrompt,
-    DecoderPreparedTextRequest, DecoderRopeConfiguration, DecoderRopePositions,
-    DecoderSymbolBehavior, DecoderTextConfiguration, DecoderTextError, DecoderTextRequest,
-    DecoderTextWeights, GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH,
-    GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor,
-    NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer,
-    NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256,
+    DecoderActivation, DecoderArchitecture, DecoderAttentionWeights,
+    DecoderGenerationConfiguration, DecoderLayerKind, DecoderLayerWeights,
+    DecoderPreparedDeepstack, DecoderPreparedGenerationPrompt, DecoderPreparedTextRequest,
+    DecoderRopeConfiguration, DecoderRopePositions, DecoderSymbolBehavior,
+    DecoderTextConfiguration, DecoderTextError, DecoderTextRequest, DecoderTextWeights,
+    GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256,
+    LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder,
+    NativeModelPayload, NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily,
+    QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, Qwen35LinearConfiguration, Qwen35LinearWeights,
     RopeScaling, TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256,
     TokenizerConfiguration, apply_rope, decoder_profile_fact, decoder_symbol_behavior,
     gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
@@ -137,6 +138,8 @@ fn configuration(architecture: DecoderArchitecture) -> DecoderTextConfiguration 
         layer_kinds: if qwen {
             vec![
                 DecoderLayerKind::LinearAttention,
+                DecoderLayerKind::LinearAttention,
+                DecoderLayerKind::LinearAttention,
                 DecoderLayerKind::FullAttention,
             ]
         } else {
@@ -148,7 +151,14 @@ fn configuration(architecture: DecoderArchitecture) -> DecoderTextConfiguration 
         attention_heads: 2,
         key_value_heads: if qwen { 2 } else { 1 },
         head_dimension: 2,
-        query_key_norm: false,
+        query_key_norm: qwen,
+        qwen35_linear: qwen.then_some(Qwen35LinearConfiguration {
+            key_heads: 1,
+            value_heads: 2,
+            key_head_dimension: 2,
+            value_head_dimension: 2,
+            convolution_kernel_size: 3,
+        }),
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 10_000.0,
@@ -176,7 +186,7 @@ fn configuration(architecture: DecoderArchitecture) -> DecoderTextConfiguration 
             1.0_f32.to_bits()
         },
         residual_scale_bits: 1.0_f32.to_bits(),
-        norm_weight_offset_bits: if architecture == DecoderArchitecture::Gemma {
+        norm_weight_offset_bits: if architecture == DecoderArchitecture::Gemma || qwen {
             1.0_f32.to_bits()
         } else {
             0.0_f32.to_bits()
@@ -204,33 +214,73 @@ fn weights(
     let query_width = configuration.attention_heads * configuration.head_dimension;
     let key_value_width = configuration.key_value_heads * configuration.head_dimension;
     let mut layers = Vec::new();
-    for layer in 0..configuration.layer_kinds.len() {
+    for (layer, kind) in configuration.layer_kinds.iter().copied().enumerate() {
+        let attention = if kind == DecoderLayerKind::LinearAttention {
+            let linear = configuration
+                .qwen35_linear
+                .as_ref()
+                .ok_or("linear profile missing")?;
+            let key_width = linear.key_heads * linear.key_head_dimension;
+            let value_width = linear.value_heads * linear.value_head_dimension;
+            let convolution_width = key_width * 2 + value_width;
+            DecoderAttentionWeights::Qwen35Linear(Qwen35LinearWeights {
+                mixed_query_key_value_weight: matrix(
+                    backend,
+                    convolution_width,
+                    4,
+                    0.31 + layer as f32 * 0.01,
+                    context,
+                )?,
+                gate_weight: matrix(backend, value_width, 4, 0.29, context)?,
+                beta_weight: matrix(backend, linear.value_heads, 4, 0.17, context)?,
+                alpha_weight: matrix(backend, linear.value_heads, 4, -0.13, context)?,
+                output_weight: matrix(backend, 4, value_width, 0.41, context)?,
+                time_bias: tensor(backend, &[2], &[0.2, -0.3], context)?,
+                log_decay: tensor(backend, &[2], &[-0.4, 0.1], context)?,
+                convolution_weight: matrix(backend, convolution_width, 3, 0.23, context)?,
+                normalization_weight: tensor(backend, &[2], &[0.1, -0.2], context)?,
+            })
+        } else {
+            DecoderAttentionWeights::DotProduct {
+                query_weight: matrix(
+                    backend,
+                    if configuration.architecture == DecoderArchitecture::Qwen35 {
+                        query_width * 2
+                    } else {
+                        query_width
+                    },
+                    4,
+                    0.31 + layer as f32 * 0.01,
+                    context,
+                )?,
+                key_weight: matrix(
+                    backend,
+                    key_value_width,
+                    4,
+                    0.29 + layer as f32 * 0.01,
+                    context,
+                )?,
+                value_weight: matrix(
+                    backend,
+                    key_value_width,
+                    4,
+                    0.37 + layer as f32 * 0.01,
+                    context,
+                )?,
+                query_norm_weight: configuration
+                    .query_key_norm
+                    .then(|| tensor(backend, &[2], &[0.75, 1.25], context))
+                    .transpose()?,
+                key_norm_weight: configuration
+                    .query_key_norm
+                    .then(|| tensor(backend, &[2], &[1.1, 0.8], context))
+                    .transpose()?,
+                output_weight: matrix(backend, 4, query_width, 0.41, context)?,
+            }
+        };
         layers.push(DecoderLayerWeights {
             attention_norm_weight: filled(backend, &[4], 0.2, context)?,
-            query_weight: matrix(backend, query_width, 4, 0.31 + layer as f32 * 0.01, context)?,
-            key_weight: matrix(
-                backend,
-                key_value_width,
-                4,
-                0.29 + layer as f32 * 0.01,
-                context,
-            )?,
-            value_weight: matrix(
-                backend,
-                key_value_width,
-                4,
-                0.37 + layer as f32 * 0.01,
-                context,
-            )?,
-            query_norm_weight: configuration
-                .query_key_norm
-                .then(|| tensor(backend, &[2], &[0.75, 1.25], context))
-                .transpose()?,
-            key_norm_weight: configuration
-                .query_key_norm
-                .then(|| tensor(backend, &[2], &[1.1, 0.8], context))
-                .transpose()?,
-            attention_output_weight: matrix(backend, 4, query_width, 0.41, context)?,
+            attention,
             feed_forward_norm_weight: filled(backend, &[4], 0.25, context)?,
             feed_forward_gate_weight: matrix(backend, 8, 4, 0.23, context)?,
             feed_forward_up_weight: matrix(backend, 8, 4, 0.27, context)?,
@@ -400,8 +450,13 @@ fn qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact()
     }
 
     let mut changed_weights = weights(&backend, &configuration, &execution_context)?;
-    changed_weights.layers[0].query_norm_weight =
-        Some(tensor(&backend, &[2], &[1.5, 0.5], &execution_context)?);
+    let DecoderAttentionWeights::DotProduct {
+        query_norm_weight, ..
+    } = &mut changed_weights.layers[0].attention
+    else {
+        return Err("expected dot-product weights".into());
+    };
+    *query_norm_weight = Some(tensor(&backend, &[2], &[1.5, 0.5], &execution_context)?);
     let changed = NativeDecoderTextEncoder::new(configuration.clone(), changed_weights)?;
     let changed_output = changed.forward(
         &backend,
@@ -429,7 +484,13 @@ fn qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact()
     );
 
     let mut missing_weights = weights(&backend, &configuration, &execution_context)?;
-    missing_weights.layers[0].key_norm_weight = None;
+    let DecoderAttentionWeights::DotProduct {
+        key_norm_weight, ..
+    } = &mut missing_weights.layers[0].attention
+    else {
+        return Err("expected dot-product weights".into());
+    };
+    *key_norm_weight = None;
     assert!(matches!(
         NativeDecoderTextEncoder::new(configuration, missing_weights),
         Err(DecoderTextError::InvalidConfiguration(
@@ -668,8 +729,82 @@ fn qwen35_linear_recurrent_convolution_and_hybrid_graph_execute() -> Result<(), 
     );
     assert_eq!(
         linear_cache.convolution_state.descriptor().shape(),
-        [1, 4, 2]
+        [1, 8, 2]
     );
+    assert_eq!(linear_cache.step_index, 3);
+    let full_tokens = i64_tensor(&backend, &[1, 3], &[1, 2, 3], &context)?;
+    let full = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &full_tokens,
+            attention_mask: None,
+            positions: Some(&[0, 1, 2]),
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    let full_logits = tensor_to_f32(&backend, full.logits(), &context)?;
+    let continued_logits = tensor_to_f32(&backend, continued.logits(), &context)?;
+    for (expected, actual) in full_logits[16..].iter().zip(continued_logits.iter()) {
+        assert!((expected - actual).abs() < 1.0e-5, "{expected} != {actual}");
+    }
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(
+                full_logits
+                    .iter()
+                    .flat_map(|value| value.to_le_bytes())
+                    .collect::<Vec<_>>()
+            )
+        ),
+        "02f4e8afd51de3d86100655bdb69f8c9b673fe42dfc242d47840b74f408ad53c"
+    );
+    let mut changed_weights = weights(&backend, model.configuration(), &context)?;
+    let DecoderAttentionWeights::Qwen35Linear(linear_weights) =
+        &mut changed_weights.layers[0].attention
+    else {
+        return Err("Qwen3.5 linear weights are missing".into());
+    };
+    linear_weights.log_decay = tensor(&backend, &[2], &[0.8, -0.7], &context)?;
+    let changed = NativeDecoderTextEncoder::new(model.configuration().clone(), changed_weights)?;
+    assert_ne!(
+        model.semantic_state_digest(&cancellation)?,
+        changed.semantic_state_digest(&cancellation)?
+    );
+    let changed_output = changed.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &full_tokens,
+            attention_mask: None,
+            positions: Some(&[0, 1, 2]),
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    assert_ne!(
+        full_logits.iter().copied().collect::<Vec<_>>(),
+        tensor_to_f32(&backend, changed_output.logits(), &context)?
+            .iter()
+            .copied()
+            .collect::<Vec<_>>()
+    );
+
+    let mut malformed_weights = weights(&backend, model.configuration(), &context)?;
+    let DecoderAttentionWeights::Qwen35Linear(linear_weights) =
+        &mut malformed_weights.layers[0].attention
+    else {
+        return Err("Qwen3.5 linear weights are missing".into());
+    };
+    linear_weights.convolution_weight = filled(&backend, &[8, 2], 0.2, &context)?;
+    assert!(matches!(
+        NativeDecoderTextEncoder::new(model.configuration().clone(), malformed_weights),
+        Err(DecoderTextError::InvalidConfiguration(
+            "parameter shape does not match the decoder profile"
+        ))
+    ));
     Ok(())
 }
 

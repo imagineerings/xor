@@ -88,7 +88,7 @@ pub use clip_text_encoder_composite::{
 };
 pub use clip_text_encoder_decoder::{
     DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS, DecoderActivation,
-    DecoderArchitecture, DecoderAttentionCache, DecoderAudioProfileFact,
+    DecoderArchitecture, DecoderAttentionCache, DecoderAttentionWeights, DecoderAudioProfileFact,
     DecoderGenerationConfiguration, DecoderGenerationOutcome, DecoderKvState, DecoderLayerCache,
     DecoderLayerKind, DecoderLayerWeights, DecoderPreparedDeepstack,
     DecoderPreparedGenerationOutcome, DecoderPreparedGenerationPrompt, DecoderPreparedTextRequest,
@@ -97,14 +97,14 @@ pub use clip_text_encoder_decoder::{
     DecoderTextWeights, DecoderVisionProfileFact, GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256,
     GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256,
     NativeDecoderTextEncoder, NativeTextGenerationRequest, NativeTextGenerationResult,
-    QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, Qwen35LinearCache, RopeScaling,
-    TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256, apply_rope, decoder_profile_fact,
-    decoder_symbol_behavior, gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions,
-    gemma4_clipped_linear, gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe,
-    gpt_oss_top_k_route, precompute_multidimensional_rope, precompute_rope,
-    qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
-    qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
-    tokenize_decoder_prompt,
+    QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, Qwen35LinearCache, Qwen35LinearConfiguration,
+    Qwen35LinearWeights, RopeScaling, TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256,
+    apply_rope, decoder_profile_fact, decoder_symbol_behavior, gemma4_audio_conv2d_subsample,
+    gemma4_audio_relative_positions, gemma4_clipped_linear, gemma4_vision_patch_embed,
+    gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route, precompute_multidimensional_rope,
+    precompute_rope, qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact,
+    qwen35_chunk_gated_delta_rule, qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed,
+    qwen35_vision_patch_merge, tokenize_decoder_prompt,
 };
 pub use clip_text_encoder_multimodal::{
     IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,

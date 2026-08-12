@@ -2578,6 +2578,75 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner =
+        production_source_occurrences(&sources, "pub struct Qwen35LinearWeights {").len() == 1
+            && production_source_occurrences(&sources, "fn forward_linear_attention(").len() == 1
+            && model_clip_text_encoder_decoder.contains("pub enum DecoderAttentionWeights")
+            && model_clip_text_encoder_decoder.contains("Qwen35Linear(Qwen35LinearWeights)")
+            && !model_clip_text_encoder_multimodal.contains("struct Qwen35LinearWeights");
+    let task385_qwen35_delegates_full_gate_delta_cache_and_residency =
+        model_clip_text_encoder_decoder.contains("split_qwen35_query_gate(")
+            && model_clip_text_encoder_decoder.contains("*value *= sigmoid(gate)")
+            && model_clip_text_encoder_decoder.contains("qwen35_causal_conv1d_update_exact(")
+            && model_clip_text_encoder_decoder.contains("qwen35_chunk_gated_delta_rule_exact(")
+            && model_clip_text_encoder_decoder.contains("qwen35_gated_rms_norm(")
+            && model_clip_text_encoder_decoder.contains("pub step_index: usize")
+            && model_clip_text_encoder_decoder.contains("normalization_tensors(&self)")
+            && !model_clip_text_encoder_decoder.contains("let log_decay = vec![0.0; gate_count]")
+            && !model_clip_text_encoder_decoder.contains("let beta = vec![1.0; gate_count]");
+    let task385_qwen35_fixture_proves_hybrid_equivalence_and_admission =
+        model_clip_text_encoder_decoder_tests
+            .contains("qwen35_linear_recurrent_convolution_and_hybrid_graph_execute")
+            && model_clip_text_encoder_decoder_tests
+                .contains("02f4e8afd51de3d86100655bdb69f8c9b673fe42dfc242d47840b74f408ad53c")
+            && model_clip_text_encoder_decoder_tests.contains("linear_cache.step_index, 3")
+            && model_clip_text_encoder_decoder_tests
+                .contains("parameter shape does not match the decoder profile");
+    let task385_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-qwen35-decoder-exactness-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen35-hybrid-attention-is-closed-and-checkpoint-backed",
+                            "qwen35-full-gating-and-linear-state-use-the-canonical-decoder",
+                            "qwen35-fixture-proves-hybrid-cache-equivalence-and-weight-admission",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task385_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_unidirectional_decoder_execution,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen35-decoder-exactness-foundation")
+                && line.contains("VAL-MODEL-FAMILY-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task381p_qwen_preparation_has_one_attempt_local_owner =
         production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
             && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
@@ -8620,6 +8689,22 @@ fn run_ownership_validation(
             task384_qwen3_fixture_is_exact_and_failure_atomic,
         ),
         (
+            "task385_policy_and_catalog_trace_qwen35_hybrid_decoder",
+            task385_policy_trace && task385_catalog_trace,
+        ),
+        (
+            "task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner",
+            task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner,
+        ),
+        (
+            "task385_qwen35_delegates_full_gate_delta_cache_and_residency",
+            task385_qwen35_delegates_full_gate_delta_cache_and_residency,
+        ),
+        (
+            "task385_qwen35_fixture_proves_hybrid_equivalence_and_admission",
+            task385_qwen35_fixture_proves_hybrid_equivalence_and_admission,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -9154,6 +9239,17 @@ fn val_ownership_task384_qwen3_decoder_001() -> Result<(), Box<dyn std::error::E
         "val-ownership-task384-qwen3-decoder-001.json",
         "val_ownership_task384_qwen3_decoder_001",
         Some("task384_"),
+    )
+}
+
+#[test]
+fn val_ownership_task385_qwen35_decoder_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task385-qwen35-hybrid-attention-and-canonical-decoder-ownership",
+        "val-ownership-task385-qwen35-decoder-001.json",
+        "val_ownership_task385_qwen35_decoder_001",
+        Some("task385_"),
     )
 }
 

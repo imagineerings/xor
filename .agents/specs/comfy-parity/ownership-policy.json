@@ -11883,7 +11883,10 @@
         "DecoderPreparedTextRequest",
         "DecoderPreparedGenerationPrompt",
         "DecoderPreparedDeepstack",
-        "DecoderLayerWeights"
+        "DecoderLayerWeights",
+        "DecoderAttentionWeights",
+        "Qwen35LinearConfiguration",
+        "Qwen35LinearWeights"
       ],
       "allowed_adapters": [
         "NativePromptTokenizer retains vocabulary parsing, prompt tokenization, special-token, packing, and decode ownership; decoder adapters consume canonical I64 token tensors without parsing artifacts",
@@ -11927,13 +11930,16 @@
         "DecoderPreparedTextRequest",
         "DecoderPreparedGenerationPrompt",
         "DecoderPreparedDeepstack",
-        "DecoderLayerWeights"
+        "DecoderLayerWeights",
+        "DecoderAttentionWeights",
+        "Qwen35LinearConfiguration",
+        "Qwen35LinearWeights"
       ],
       "required_mappings": [
         {
           "name": "decoder-llm-assembles-canonical-native-modules",
           "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
-          "pattern": "struct NativeDecoderLayer[\\s\\S]*query: NativeModule[\\s\\S]*feed_forward_down: NativeModule[\\s\\S]*pub struct NativeDecoderTextEncoder[\\s\\S]*token_embedding: NativeModule[\\s\\S]*output_head: NativeModule"
+          "pattern": "struct NativeDecoderLayer[\\s\\S]*attention: NativeDecoderAttention[\\s\\S]*feed_forward_down: NativeModule[\\s\\S]*enum NativeDecoderAttention[\\s\\S]*query: NativeModule[\\s\\S]*mixed_query_key_value: NativeModule[\\s\\S]*pub struct NativeDecoderTextEncoder[\\s\\S]*token_embedding: NativeModule[\\s\\S]*output_head: NativeModule"
         },
         {
           "name": "decoder-llm-delegates-backend-admission",
@@ -11983,7 +11989,7 @@
         {
           "name": "qwen3-query-key-norm-is-checkpoint-backed-per-head-and-pre-rope",
           "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
-          "pattern": "pub struct DecoderLayerWeights[\\s\\S]*query_norm_weight: Option<Tensor>[\\s\\S]*key_norm_weight: Option<Tensor>[\\s\\S]*normalize_attention_heads\\([\\s\\S]*apply_decoder_rope\\("
+          "pattern": "pub enum DecoderAttentionWeights[\\s\\S]*query_norm_weight: Option<Tensor>[\\s\\S]*key_norm_weight: Option<Tensor>[\\s\\S]*normalize_attention_heads\\([\\s\\S]*apply_decoder_rope\\("
         },
         {
           "name": "qwen3-query-key-norm-participates-in-identity-and-residency",
@@ -11994,6 +12000,21 @@
           "name": "qwen3-query-key-norm-fixture-proves-cache-equivalence-admission-and-rollback",
           "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
           "pattern": "qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact[\\s\\S]*e2f7a9dc822b118de4e2b20f5db96609c9d4bb0ab1d7c557fef3ba3b76f3d0f1[\\s\\S]*query/key normalization weights must exactly match the decoder profile[\\s\\S]*scratch\\.in_use_bytes"
+        },
+        {
+          "name": "qwen35-hybrid-attention-is-closed-and-checkpoint-backed",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub enum DecoderAttentionWeights[\\s\\S]*Qwen35Linear\\(Qwen35LinearWeights\\)[\\s\\S]*pub struct Qwen35LinearWeights[\\s\\S]*mixed_query_key_value_weight[\\s\\S]*time_bias[\\s\\S]*log_decay[\\s\\S]*convolution_weight[\\s\\S]*normalization_weight"
+        },
+        {
+          "name": "qwen35-full-gating-and-linear-state-use-the-canonical-decoder",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "split_qwen35_query_gate[\\s\\S]*scaled_dot_product_attention_with_context[\\s\\S]*sigmoid\\(gate\\)[\\s\\S]*forward_linear_attention[\\s\\S]*qwen35_causal_conv1d_update_exact[\\s\\S]*qwen35_chunk_gated_delta_rule_exact[\\s\\S]*qwen35_gated_rms_norm"
+        },
+        {
+          "name": "qwen35-fixture-proves-hybrid-cache-equivalence-and-weight-admission",
+          "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+          "pattern": "qwen35_linear_recurrent_convolution_and_hybrid_graph_execute[\\s\\S]*step_index, 3[\\s\\S]*02f4e8afd51de3d86100655bdb69f8c9b673fe42dfc242d47840b74f408ad53c[\\s\\S]*parameter shape does not match the decoder profile"
         },
         {
           "name": "text-generation-opens-one-attempt-addressed-rng-transaction",
@@ -12059,12 +12080,13 @@
         "comfy-parity-native-decoder-text-generation-foundation",
         "comfy-parity-native-prepared-decoder-generation-foundation",
         "comfy-parity-native-prepared-decoder-deepstack-foundation",
-        "comfy-parity-native-qwen3-decoder-exactness-foundation"
+        "comfy-parity-native-qwen3-decoder-exactness-foundation",
+        "comfy-parity-native-qwen35-decoder-exactness-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",
         "native GPT-OSS decoder text conditioning and generation",
-        "native Qwen3.5 hybrid decoder text conditioning",
+        "native Qwen3.5 checkpoint-backed hybrid decoder text conditioning",
         "native Qwen3 and Qwen3-VL grouped-query decoder attention",
         "dependent native multimodal and composite text adapters"
       ],
@@ -12094,7 +12116,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, Qwen3/Qwen3-VL, GPT-OSS, and Qwen3.5 graph owner, including checkpoint-backed per-head Q/K normalization before RoPE, checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, one shared generation loop, and failure-atomic invocation-local KV transitions. Q/K norm tensors are exact profile-gated parameters and participate in the same semantic digest and StorageId residency projection. Prepared media state is borrowed, checked, and attempt-local. The owner delegates tokenization, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners."
+      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, Qwen3/Qwen3-VL, GPT-OSS, and Qwen3.5 graph owner, including checkpoint-backed per-head Q/K normalization before RoPE, Qwen3.5 combined query/output gating, real DeltaNet projections and decay parameters, depthwise causal-convolution state, gated RMSNorm, recurrent state and exact cache steps, checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, one shared generation loop, and failure-atomic invocation-local KV transitions. Every admitted attention tensor participates in the same semantic digest and StorageId residency projection. Prepared media state is borrowed, checked, and attempt-local. The owner delegates tokenization, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners."
     },
     {
       "concern": "native_vision_transformer_architecture_execution",
