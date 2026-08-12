@@ -1050,6 +1050,7 @@ pub struct DecoderTextConfiguration {
     pub attention_heads: usize,
     pub key_value_heads: usize,
     pub head_dimension: usize,
+    pub query_key_norm: bool,
     pub normalization_epsilon_bits: u32,
     pub rope: DecoderRopeConfiguration,
     pub sliding_window: Option<usize>,
@@ -1192,6 +1193,8 @@ pub struct DecoderLayerWeights {
     pub query_weight: Tensor,
     pub key_weight: Tensor,
     pub value_weight: Tensor,
+    pub query_norm_weight: Option<Tensor>,
+    pub key_norm_weight: Option<Tensor>,
     pub attention_output_weight: Tensor,
     pub feed_forward_norm_weight: Tensor,
     pub feed_forward_gate_weight: Tensor,
@@ -1440,6 +1443,8 @@ struct NativeDecoderLayer {
     query: NativeModule,
     key: NativeModule,
     value: NativeModule,
+    query_norm_weight: Option<Tensor>,
+    key_norm_weight: Option<Tensor>,
     attention_output: NativeModule,
     feed_forward_norm_weight: Tensor,
     feed_forward_gate: NativeModule,
@@ -1742,6 +1747,12 @@ impl NativeDecoderTextEncoder {
             }
             if let Some(tensor) = &layer.attention_sink {
                 tensors.push((format!("layers.{index}.attention_sink"), tensor));
+            }
+            if let Some(tensor) = &layer.query_norm_weight {
+                tensors.push((format!("layers.{index}.query_norm_weight"), tensor));
+            }
+            if let Some(tensor) = &layer.key_norm_weight {
+                tensors.push((format!("layers.{index}.key_norm_weight"), tensor));
             }
         }
         tensors
@@ -2612,6 +2623,26 @@ impl NativeDecoderLayer {
         let query = tensor_to_f32(backend, &query, context)?;
         let key = tensor_to_f32(backend, &key, context)?;
         let value = tensor_to_f32(backend, &value, context)?;
+        let query = normalize_attention_heads(
+            backend,
+            &query,
+            self.query_norm_weight.as_ref(),
+            batch,
+            query_tokens,
+            configuration.attention_heads,
+            configuration,
+            context,
+        )?;
+        let key = normalize_attention_heads(
+            backend,
+            &key,
+            self.key_norm_weight.as_ref(),
+            batch,
+            query_tokens,
+            configuration.key_value_heads,
+            configuration,
+            context,
+        )?;
         let query = apply_decoder_rope(
             &query,
             batch,
@@ -4278,6 +4309,22 @@ fn build_layer(
         .key_value_heads
         .checked_mul(configuration.head_dimension)
         .ok_or(DecoderTextError::Overflow("key/value width"))?;
+    match (
+        weights.query_norm_weight.as_ref(),
+        weights.key_norm_weight.as_ref(),
+        configuration.query_key_norm,
+    ) {
+        (Some(query_norm), Some(key_norm), true) => {
+            require_vector_parameter(query_norm, configuration.head_dimension, stream)?;
+            require_vector_parameter(key_norm, configuration.head_dimension, stream)?;
+        }
+        (None, None, false) => {}
+        _ => {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "query/key normalization weights must exactly match the decoder profile",
+            ));
+        }
+    }
     let query = linear_module(
         format!("{prefix}.query"),
         configuration.hidden_size,
@@ -4340,6 +4387,8 @@ fn build_layer(
         query,
         key,
         value,
+        query_norm_weight: weights.query_norm_weight,
+        key_norm_weight: weights.key_norm_weight,
         attention_output,
         feed_forward_norm_weight: weights.feed_forward_norm_weight,
         feed_forward_gate,
@@ -4975,6 +5024,50 @@ fn rms_norm_tensor(
         context,
     )?;
     tensor_from_f32(backend, input.descriptor().shape(), &values, context).map_err(Into::into)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn normalize_attention_heads(
+    backend: &CpuBackend,
+    values: &[f32],
+    weight: Option<&Tensor>,
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    configuration: &DecoderTextConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, DecoderTextError> {
+    let Some(weight) = weight else {
+        return Ok(values.to_vec());
+    };
+    context.check()?;
+    let expected = batch
+        .checked_mul(tokens)
+        .and_then(|value| value.checked_mul(heads))
+        .and_then(|value| value.checked_mul(configuration.head_dimension))
+        .ok_or(DecoderTextError::Overflow("query/key normalization shape"))?;
+    if values.len() != expected {
+        return Err(DecoderTextError::InvalidInput(
+            "query/key projection length does not match its head geometry",
+        ));
+    }
+    let mut weight_values = tensor_to_f32(backend, weight, context)?;
+    if configuration.norm_weight_offset() != 0.0 {
+        for value in weight_values.iter_mut() {
+            *value += configuration.norm_weight_offset();
+        }
+    }
+    rms_norm_with_context_exact_native(
+        backend,
+        values,
+        &[batch, tokens, heads, configuration.head_dimension],
+        &[configuration.head_dimension],
+        Some(&weight_values),
+        Some(configuration.normalization_epsilon()),
+        DeviceId::CPU,
+        context,
+    )
+    .map_err(Into::into)
 }
 
 fn multiply_tensor(

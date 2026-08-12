@@ -11882,7 +11882,8 @@
         "DecoderLayerCache",
         "DecoderPreparedTextRequest",
         "DecoderPreparedGenerationPrompt",
-        "DecoderPreparedDeepstack"
+        "DecoderPreparedDeepstack",
+        "DecoderLayerWeights"
       ],
       "allowed_adapters": [
         "NativePromptTokenizer retains vocabulary parsing, prompt tokenization, special-token, packing, and decode ownership; decoder adapters consume canonical I64 token tensors without parsing artifacts",
@@ -11925,7 +11926,8 @@
         "DecoderGenerationConfiguration",
         "DecoderPreparedTextRequest",
         "DecoderPreparedGenerationPrompt",
-        "DecoderPreparedDeepstack"
+        "DecoderPreparedDeepstack",
+        "DecoderLayerWeights"
       ],
       "required_mappings": [
         {
@@ -11977,6 +11979,21 @@
           "name": "prepared-deepstack-tests-exact-prefill-only-rollback",
           "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
           "pattern": "prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional[\\s\\S]*transaction\\.checkpoint[\\s\\S]*scratch\\.in_use_bytes"
+        },
+        {
+          "name": "qwen3-query-key-norm-is-checkpoint-backed-per-head-and-pre-rope",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub struct DecoderLayerWeights[\\s\\S]*query_norm_weight: Option<Tensor>[\\s\\S]*key_norm_weight: Option<Tensor>[\\s\\S]*normalize_attention_heads\\([\\s\\S]*apply_decoder_rope\\("
+        },
+        {
+          "name": "qwen3-query-key-norm-participates-in-identity-and-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "semantic_state_digest[\\s\\S]*resident_tensor_allocations[\\s\\S]*fn normalization_tensors\\(&self\\)[\\s\\S]*query_norm_weight[\\s\\S]*key_norm_weight"
+        },
+        {
+          "name": "qwen3-query-key-norm-fixture-proves-cache-equivalence-admission-and-rollback",
+          "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+          "pattern": "qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact[\\s\\S]*e2f7a9dc822b118de4e2b20f5db96609c9d4bb0ab1d7c557fef3ba3b76f3d0f1[\\s\\S]*query/key normalization weights must exactly match the decoder profile[\\s\\S]*scratch\\.in_use_bytes"
         },
         {
           "name": "text-generation-opens-one-attempt-addressed-rng-transaction",
@@ -12041,12 +12058,14 @@
         "comfy-parity-clip-text-encoder-decoder-foundation",
         "comfy-parity-native-decoder-text-generation-foundation",
         "comfy-parity-native-prepared-decoder-generation-foundation",
-        "comfy-parity-native-prepared-decoder-deepstack-foundation"
+        "comfy-parity-native-prepared-decoder-deepstack-foundation",
+        "comfy-parity-native-qwen3-decoder-exactness-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",
         "native GPT-OSS decoder text conditioning and generation",
         "native Qwen3.5 hybrid decoder text conditioning",
+        "native Qwen3 and Qwen3-VL grouped-query decoder attention",
         "dependent native multimodal and composite text adapters"
       ],
       "requirements": [
@@ -12075,7 +12094,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, GPT-OSS, and Qwen3.5 graph owner, including checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, GPT-OSS sinks and routed-expert equations, Qwen3.5 recurrent and causal-convolution equations, one shared generation loop, filtering and stopping, and failure-atomic invocation-local KV transitions. Prepared media state is borrowed, checked, and attempt-local; it cannot define a second sampler, tokenizer, KV cache, RNG opener, persistence record, or publication path. The owner delegates tokenization, model identity, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, memory, streams, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners. Editor rope structures, provider-side llama.cpp state, VAE-private rotary helpers, NativeCache, ModelStore parsing cache, and quantized-weight caches are justified separate domains and are not decoder execution owners."
+      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, Qwen3/Qwen3-VL, GPT-OSS, and Qwen3.5 graph owner, including checkpoint-backed per-head Q/K normalization before RoPE, checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, one shared generation loop, and failure-atomic invocation-local KV transitions. Q/K norm tensors are exact profile-gated parameters and participate in the same semantic digest and StorageId residency projection. Prepared media state is borrowed, checked, and attempt-local. The owner delegates tokenization, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners."
     },
     {
       "concern": "native_vision_transformer_architecture_execution",

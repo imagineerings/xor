@@ -2511,6 +2511,73 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task384_qwen3_query_key_norm_has_one_decoder_owner = model_clip_text_encoder_decoder
+        .matches("fn normalize_attention_heads(")
+        .count()
+        == 1
+        && model_clip_text_encoder_decoder.contains("query_norm_weight: Option<Tensor>")
+        && model_clip_text_encoder_decoder.contains("key_norm_weight: Option<Tensor>")
+        && !model_clip_text_encoder_multimodal.contains("fn normalize_attention_heads(");
+    let task384_qwen3_delegates_rms_rope_attention_cache_and_residency =
+        model_clip_text_encoder_decoder.contains("normalize_attention_heads(")
+            && model_clip_text_encoder_decoder.contains("rms_norm_with_context_exact_native(")
+            && model_clip_text_encoder_decoder.contains("let query = apply_decoder_rope(")
+            && model_clip_text_encoder_decoder.contains("stage_attention_cache(")
+            && model_clip_text_encoder_decoder.contains("expand_grouped_query(")
+            && model_clip_text_encoder_decoder.contains("query_norm_weight")
+            && model_clip_text_encoder_decoder.contains("normalization_tensors(&self)");
+    let task384_qwen3_fixture_is_exact_and_failure_atomic = model_clip_text_encoder_decoder_tests
+        .contains("qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact")
+        && model_clip_text_encoder_decoder_tests
+            .contains("e2f7a9dc822b118de4e2b20f5db96609c9d4bb0ab1d7c557fef3ba3b76f3d0f1")
+        && model_clip_text_encoder_decoder_tests
+            .contains("query/key normalization weights must exactly match the decoder profile")
+        && model_clip_text_encoder_decoder_tests.contains("scratch.in_use_bytes()");
+    let task384_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-qwen3-decoder-exactness-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen3-query-key-norm-is-checkpoint-backed-per-head-and-pre-rope",
+                            "qwen3-query-key-norm-participates-in-identity-and-residency",
+                            "qwen3-query-key-norm-fixture-proves-cache-equivalence-admission-and-rollback",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task384_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_unidirectional_decoder_execution,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen3-decoder-exactness-foundation")
+                && line.contains("VAL-MODEL-FAMILY-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task381p_qwen_preparation_has_one_attempt_local_owner =
         production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
             && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
@@ -8537,6 +8604,22 @@ fn run_ownership_validation(
             task382_deepstack_boundaries_are_executable,
         ),
         (
+            "task384_policy_and_catalog_trace_qwen3_query_key_norm",
+            task384_policy_trace && task384_catalog_trace,
+        ),
+        (
+            "task384_qwen3_query_key_norm_has_one_decoder_owner",
+            task384_qwen3_query_key_norm_has_one_decoder_owner,
+        ),
+        (
+            "task384_qwen3_delegates_rms_rope_attention_cache_and_residency",
+            task384_qwen3_delegates_rms_rope_attention_cache_and_residency,
+        ),
+        (
+            "task384_qwen3_fixture_is_exact_and_failure_atomic",
+            task384_qwen3_fixture_is_exact_and_failure_atomic,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -9060,6 +9143,17 @@ fn val_ownership_task383_qwen2_tokenizer_001() -> Result<(), Box<dyn std::error:
         "val-ownership-task383-qwen2-tokenizer-001.json",
         "val_ownership_task383_qwen2_tokenizer_001",
         Some("task383_"),
+    )
+}
+
+#[test]
+fn val_ownership_task384_qwen3_decoder_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task384-qwen3-query-key-norm-and-canonical-decoder-ownership",
+        "val-ownership-task384-qwen3-decoder-001.json",
+        "val_ownership_task384_qwen3_decoder_001",
+        Some("task384_"),
     )
 }
 

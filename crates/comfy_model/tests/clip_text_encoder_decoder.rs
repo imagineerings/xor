@@ -148,6 +148,7 @@ fn configuration(architecture: DecoderArchitecture) -> DecoderTextConfiguration 
         attention_heads: 2,
         key_value_heads: if qwen { 2 } else { 1 },
         head_dimension: 2,
+        query_key_norm: false,
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 10_000.0,
@@ -221,6 +222,14 @@ fn weights(
                 0.37 + layer as f32 * 0.01,
                 context,
             )?,
+            query_norm_weight: configuration
+                .query_key_norm
+                .then(|| tensor(backend, &[2], &[0.75, 1.25], context))
+                .transpose()?,
+            key_norm_weight: configuration
+                .query_key_norm
+                .then(|| tensor(backend, &[2], &[1.1, 0.8], context))
+                .transpose()?,
             attention_output_weight: matrix(backend, 4, query_width, 0.41, context)?,
             feed_forward_norm_weight: filled(backend, &[4], 0.25, context)?,
             feed_forward_gate_weight: matrix(backend, 8, 4, 0.23, context)?,
@@ -319,6 +328,134 @@ fn decoder_graph_executes_causal_gqa_sliding_cache_and_batch_safe_append()
         assert_eq!(cache.keys().descriptor().shape(), [2, 3, 1, 2]);
     }
     assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let execution_context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let mut configuration = configuration(DecoderArchitecture::Llama);
+    configuration.query_key_norm = true;
+    configuration.layer_kinds = vec![DecoderLayerKind::FullAttention];
+    configuration.rope.theta = 5_000_000.0;
+    configuration.rope.interleaved_sections = vec![1];
+    let admitted_weights = weights(&backend, &configuration, &execution_context)?;
+    let model = NativeDecoderTextEncoder::new(configuration.clone(), admitted_weights)?;
+
+    let tokens = i64_tensor(&backend, &[1, 2], &[1, 2], &execution_context)?;
+    let full = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &tokens,
+            attention_mask: None,
+            positions: Some(&[0, 1]),
+            cache: None,
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let first_token = i64_tensor(&backend, &[1, 1], &[1], &execution_context)?;
+    let first = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &first_token,
+            attention_mask: None,
+            positions: Some(&[0]),
+            cache: None,
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let second_token = i64_tensor(&backend, &[1, 1], &[2], &execution_context)?;
+    let second = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &second_token,
+            attention_mask: None,
+            positions: Some(&[1]),
+            cache: Some(first.cache()),
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let full_logits = tensor_to_f32(&backend, full.logits(), &execution_context)?;
+    let second_logits = tensor_to_f32(&backend, second.logits(), &execution_context)?;
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(
+                full_logits
+                    .iter()
+                    .flat_map(|value| value.to_le_bytes())
+                    .collect::<Vec<_>>()
+            )
+        ),
+        "e2f7a9dc822b118de4e2b20f5db96609c9d4bb0ab1d7c557fef3ba3b76f3d0f1"
+    );
+    for (expected, actual) in full_logits[8..].iter().zip(second_logits.iter()) {
+        assert!((expected - actual).abs() < 1.0e-5, "{expected} != {actual}");
+    }
+
+    let mut changed_weights = weights(&backend, &configuration, &execution_context)?;
+    changed_weights.layers[0].query_norm_weight =
+        Some(tensor(&backend, &[2], &[1.5, 0.5], &execution_context)?);
+    let changed = NativeDecoderTextEncoder::new(configuration.clone(), changed_weights)?;
+    let changed_output = changed.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &tokens,
+            attention_mask: None,
+            positions: Some(&[0, 1]),
+            cache: None,
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let baseline_values = tensor_to_f32(&backend, full.logits(), &execution_context)?
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    let changed_values = tensor_to_f32(&backend, changed_output.logits(), &execution_context)?
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    assert_ne!(baseline_values, changed_values);
+    assert_ne!(
+        model.semantic_state_digest(&cancellation)?,
+        changed.semantic_state_digest(&cancellation)?
+    );
+
+    let mut missing_weights = weights(&backend, &configuration, &execution_context)?;
+    missing_weights.layers[0].key_norm_weight = None;
+    assert!(matches!(
+        NativeDecoderTextEncoder::new(configuration, missing_weights),
+        Err(DecoderTextError::InvalidConfiguration(
+            "query/key normalization weights must exactly match the decoder profile"
+        ))
+    ));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 64 * 1024 * 1024)?;
+    assert!(
+        model
+            .forward(
+                &backend,
+                DecoderTextRequest {
+                    tokens: &tokens,
+                    attention_mask: None,
+                    positions: Some(&[0, 1]),
+                    cache: None,
+                    capture_layer: None,
+                },
+                &cancelled_context,
+            )
+            .is_err()
+    );
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 
