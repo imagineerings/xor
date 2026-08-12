@@ -2032,6 +2032,61 @@ impl NativeDecoderTextEncoder {
         self.embed_validated_tokens(backend, tokens, context)
     }
 
+    pub fn embed_token_values(
+        &self,
+        backend: &CpuBackend,
+        values: &[i64],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, DecoderTextError> {
+        if values.is_empty() {
+            return Err(DecoderTextError::InvalidInput(
+                "decoder token values cannot be empty",
+            ));
+        }
+        let tokens = tensor_from_i64(
+            backend,
+            &[1, usize_to_u64(values.len(), "decoder token values")?],
+            values,
+            context,
+        )?;
+        self.embed_tokens(backend, &tokens, context)
+    }
+
+    pub fn generation_configuration(
+        &self,
+        request: &NativeTextGenerationRequest<'_>,
+    ) -> Result<DecoderGenerationConfiguration, DecoderTextError> {
+        if !(1..=32_768).contains(&request.maximum_new_tokens) {
+            return Err(DecoderTextError::InvalidInput(
+                "maximum new tokens must be between 1 and 32768",
+            ));
+        }
+        let configuration = DecoderGenerationConfiguration {
+            maximum_new_tokens: request.maximum_new_tokens,
+            temperature_bits: if request.do_sample {
+                request.temperature_bits
+            } else {
+                0.0_f32.to_bits()
+            },
+            top_k: request
+                .do_sample
+                .then_some(request.top_k)
+                .filter(|value| *value > 0),
+            top_p_bits: request
+                .do_sample
+                .then_some(request.top_p_bits)
+                .filter(|value| f32::from_bits(*value) != 1.0),
+            minimum_p_bits: request
+                .do_sample
+                .then_some(request.minimum_p_bits)
+                .filter(|value| f32::from_bits(*value) != 0.0),
+            repetition_penalty_bits: request.repetition_penalty_bits,
+            presence_penalty_bits: request.presence_penalty_bits,
+        };
+        configuration.validate(self.configuration.vocabulary_size)?;
+        Ok(configuration)
+    }
+
     pub fn forward_prepared(
         &self,
         backend: &CpuBackend,
@@ -2560,11 +2615,7 @@ impl NativeDecoderTextEncoder {
         context: &ExecutionContext<'_>,
     ) -> Result<NativeTextGenerationResult, DecoderTextError> {
         context.check()?;
-        if !(1..=32_768).contains(&request.maximum_new_tokens) {
-            return Err(DecoderTextError::InvalidInput(
-                "maximum new tokens must be between 1 and 32768",
-            ));
-        }
+        let configuration = self.generation_configuration(&request)?;
         let prompt_tokens =
             tokenizer.encode_numeric(request.formatted_prompt, context.cancellation)?;
         let prompt_length = prompt_tokens.len();
@@ -2591,28 +2642,6 @@ impl NativeDecoderTextEncoder {
             &prompt_values,
             context,
         )?;
-        let configuration = DecoderGenerationConfiguration {
-            maximum_new_tokens: request.maximum_new_tokens,
-            temperature_bits: if request.do_sample {
-                request.temperature_bits
-            } else {
-                0.0_f32.to_bits()
-            },
-            top_k: request
-                .do_sample
-                .then_some(request.top_k)
-                .filter(|value| *value > 0),
-            top_p_bits: request
-                .do_sample
-                .then_some(request.top_p_bits)
-                .filter(|value| f32::from_bits(*value) != 1.0),
-            minimum_p_bits: request
-                .do_sample
-                .then_some(request.minimum_p_bits)
-                .filter(|value| f32::from_bits(*value) != 0.0),
-            repetition_penalty_bits: request.repetition_penalty_bits,
-            presence_penalty_bits: request.presence_penalty_bits,
-        };
         let outcome = self.generate(backend, &prompt, &configuration, transaction, context)?;
         let generated =
             outcome
@@ -2629,6 +2658,29 @@ impl NativeDecoderTextEncoder {
             generated_tokens.push(
                 u32::try_from(*token).map_err(|_| DecoderTextError::TokenOutOfRange(*token))?,
             );
+        }
+        let text = tokenizer.decode_numeric(&generated_tokens, true, context.cancellation)?;
+        context.check()?;
+        Ok(NativeTextGenerationResult {
+            text,
+            generated_tokens,
+            transaction: outcome.transaction,
+        })
+    }
+
+    pub fn finish_prepared_generation(
+        &self,
+        tokenizer: &NativePromptTokenizer,
+        outcome: DecoderPreparedGenerationOutcome,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeTextGenerationResult, DecoderTextError> {
+        let mut generated_tokens = Vec::new();
+        generated_tokens
+            .try_reserve_exact(outcome.generated_tokens.len())
+            .map_err(|_| DecoderTextError::Allocation("generated token projection"))?;
+        for token in outcome.generated_tokens {
+            generated_tokens
+                .push(u32::try_from(token).map_err(|_| DecoderTextError::TokenOutOfRange(token))?);
         }
         let text = tokenizer.decode_numeric(&generated_tokens, true, context.cancellation)?;
         context.check()?;

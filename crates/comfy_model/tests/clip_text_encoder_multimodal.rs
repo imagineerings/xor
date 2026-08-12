@@ -5,23 +5,24 @@ use comfy_model::{
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
     NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
-    NativeQwenVisionEncoder, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
-    QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH,
-    QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
+    NativeQwenVisionEncoder, NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH,
+    OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN,
+    QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
     QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
-    QwenVisionBlockWeights, QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights,
-    QwenVisionWeights, RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256,
-    Sam3EncodedCondition, TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt,
-    format_qwen3vl_prompt, ideogram4_project_taps, join_multimodal_embeddings,
-    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
-    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
-    prepare_qwen_images, prepare_qwen3vl_images, qwen_multimodal_decoder_configuration,
-    qwen_multimodal_tokenizer_profile, qwen2vl_mrope_position_ids, qwen3vl_target_dimensions,
-    trim_ovis_conditioning,
+    QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
+    QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
+    SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
+    plan_qwen_markers, plan_qwen3vl_markers, prepare_qwen_images, prepare_qwen3vl_images,
+    qwen_multimodal_decoder_configuration, qwen_multimodal_tokenizer_profile,
+    qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
-    ImageTensor, StreamId, Tensor, TensorDescriptor, generated_native_diffusion::tensor_to_f32,
+    ImageTensor, RetryRngPolicy, RngAlgorithm, RngProfileVersion, RngStream, RngStreamAddress,
+    StreamId, Tensor, TensorDescriptor, generated_native_diffusion::tensor_to_f32,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -51,6 +52,26 @@ fn context<'a>(
         rng_phase: None,
         cancellation,
     })
+}
+
+fn qwen_generation_transaction() -> Result<comfy_tensor::RngTransaction, Box<dyn Error>> {
+    let address = RngStreamAddress::new(
+        "qwen-workflow",
+        "attempt-1",
+        "qwen-node",
+        0,
+        "qwen-multimodal-generation",
+        0,
+        0,
+        RetryRngPolicy::Replay,
+    )?;
+    Ok(RngStream::new(
+        RngProfileVersion::V2,
+        RngAlgorithm::Philox4x32_10,
+        41,
+        address,
+    )?
+    .begin(None)?)
 }
 
 fn tensor(
@@ -257,7 +278,7 @@ fn reduced_qwen3_decoder(
         rope: DecoderRopeConfiguration {
             theta: 5_000_000.0,
             rotary_dimension: 2,
-            interleaved_sections: Vec::new(),
+            interleaved_sections: vec![1, 0, 0],
             scaling: RopeScaling::None,
         },
         sliding_window: None,
@@ -838,6 +859,130 @@ fn qwen_multimodal_resource_closes_admission_identity_and_residency() -> Result<
         NativeQwenMultimodal::reduced_fixture(tokenizer, decoder, vision, &cancelled),
         Err(MultimodalTextError::Cancelled)
     ));
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn qwen_multimodal_generation_replaces_markers_and_delegates_transactionally()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/qwen_multimodal/generation/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["generation_contract"]["qwen3vl_positions"],
+        "three-axis-prefill-scalar-continuation"
+    );
+    assert_eq!(
+        manifest["generation_contract"]["qwen35_positions"],
+        "scalar-source-generation-route"
+    );
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let vision_configuration =
+        QwenVisionConfiguration::reduced_fixture(QwenVisionFamily::Qwen3Vl4B, 4, 8, 18, 1, 4);
+    let resource = NativeQwenMultimodal::reduced_fixture(
+        qwen25_prompt_tokenizer()?,
+        reduced_qwen3_decoder(&backend, &setup, 0.01)?,
+        Arc::new(NativeQwenVisionEncoder::new(
+            vision_configuration.clone(),
+            reduced_qwen_vision_weights(&backend, &vision_configuration, &setup)?,
+        )?),
+        &cancellation,
+    )?;
+    let image = ImageTensor::from_f32(&backend, &setup, 1, 32, 32, 3, &vec![0.5; 32 * 32 * 3])?;
+    let prepared = prepare_qwen_images(&backend, &image, QwenVisionFamily::Qwen3Vl4B, &setup)?;
+    assert_eq!(prepared[0].merged_tokens(), 4);
+    let request = NativeTextGenerationRequest {
+        formatted_prompt: "<|image_pad|>",
+        maximum_new_tokens: 1,
+        do_sample: false,
+        temperature_bits: 0.0_f32.to_bits(),
+        top_k: 0,
+        top_p_bits: 1.0_f32.to_bits(),
+        minimum_p_bits: 0.0_f32.to_bits(),
+        repetition_penalty_bits: 1.0_f32.to_bits(),
+        presence_penalty_bits: 0.0_f32.to_bits(),
+    };
+    let transaction = qwen_generation_transaction()?;
+    let checkpoint = transaction.checkpoint();
+    let resource_digest = resource.semantic_state_digest(&cancellation)?;
+    let resource_residency = resource.resident_tensor_allocations()?;
+    let outcome = resource.generate(
+        &backend,
+        QwenMultimodalGenerationRequest {
+            text: request.clone(),
+            prepared_images: &prepared,
+            transaction: &transaction,
+        },
+        &setup,
+    )?;
+    assert_eq!(outcome.generated_tokens.len(), 1);
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(
+        resource.semantic_state_digest(&cancellation)?,
+        resource_digest
+    );
+    assert_eq!(resource.resident_tensor_allocations()?, resource_residency);
+
+    assert!(
+        resource
+            .generate(
+                &backend,
+                QwenMultimodalGenerationRequest {
+                    text: NativeTextGenerationRequest {
+                        formatted_prompt: "<|endoftext|>",
+                        ..request.clone()
+                    },
+                    prepared_images: &prepared,
+                    transaction: &transaction,
+                },
+                &setup,
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.checkpoint(), checkpoint);
+
+    let constrained_context = context(&authority, &cancellation, 4)?;
+    assert!(
+        resource
+            .generate(
+                &backend,
+                QwenMultimodalGenerationRequest {
+                    text: request.clone(),
+                    prepared_images: &prepared,
+                    transaction: &transaction,
+                },
+                &constrained_context,
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 64 * 1024 * 1024)?;
+    assert!(matches!(
+        resource.generate(
+            &backend,
+            QwenMultimodalGenerationRequest {
+                text: request,
+                prepared_images: &prepared,
+                transaction: &transaction,
+            },
+            &cancelled_context,
+        ),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        resource.semantic_state_digest(&cancellation)?,
+        resource_digest
+    );
+    assert_eq!(resource.resident_tensor_allocations()?, resource_residency);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }

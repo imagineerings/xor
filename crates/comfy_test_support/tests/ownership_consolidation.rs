@@ -2738,7 +2738,7 @@ fn run_ownership_validation(
         model_clip_text_encoder_multimodal.contains("QWEN25_TOKENIZER_ARTIFACT_DIGEST")
             && model_clip_text_encoder_multimodal.contains("QWEN35_TOKENIZER_ARTIFACT_DIGEST")
             && model_clip_text_encoder_multimodal.contains("qwen_multimodal_decoder_configuration")
-            && model_clip_text_encoder_multimodal.contains("sim.comfy.qwen-multimodal-resource.v1")
+            && model_clip_text_encoder_multimodal.contains("sim.comfy.qwen-multimodal-resource.v2")
             && model_clip_text_encoder_multimodal
                 .contains("shared Qwen tensor storage changed resident size")
             && nodes_stored_payload.contains("resource.qwen_multimodal_resource().is_some()")
@@ -2801,6 +2801,79 @@ fn run_ownership_validation(
         .is_some_and(|line| {
             line.contains("comfy-parity-native-qwen-multimodal-resource-foundation")
                 && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
+    let task388_qwen_generation_has_one_model_domain_adapter =
+        production_source_occurrences(&sources, "pub struct QwenMultimodalGenerationRequest<'a> {")
+            .len()
+            == 1
+            && model_clip_text_encoder_multimodal.contains("pub fn generate(")
+            && model_clip_text_encoder_multimodal.contains("plan_qwen_markers(")
+            && model_clip_text_encoder_multimodal.contains("join_multimodal_embeddings(")
+            && model_clip_text_encoder_multimodal.contains("generate_prepared(")
+            && model_clip_text_encoder_multimodal.contains("finish_prepared_generation(")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task388_qwen_generation_preserves_source_routes_and_atomicity =
+        model_clip_text_encoder_multimodal.contains("sampling_history: &[]")
+            && model_clip_text_encoder_multimodal.contains("attention_mask: None")
+            && model_clip_text_encoder_multimodal
+                .contains("Qwen3.5 generation cannot admit deepstack inputs")
+            && model_clip_text_encoder_multimodal.contains("qwen2vl_mrope_position_ids(")
+            && model_clip_text_encoder_multimodal_tests.contains(
+                "qwen_multimodal_generation_replaces_markers_and_delegates_transactionally",
+            )
+            && model_clip_text_encoder_multimodal_tests
+                .contains("qwen_multimodal/generation/manifest.json")
+            && model_clip_text_encoder_multimodal_tests.contains("transaction.checkpoint()")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task388_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_generation_qwen")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeQwenMultimodal::generate")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-qwen-multimodal-generation-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen-generation-validates-and-plans-before-projection",
+                            "qwen-generation-replaces-every-marker-span-with-real-projections",
+                            "qwen-generation-scopes-mrope-and-deepstack-to-source-route",
+                            "qwen-generation-delegates-empty-history-and-borrowed-transaction",
+                            "qwen-generation-tests-marker-replacement-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task388_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| line.starts_with("native_vision_text_transformer_text_media_generation_qwen,"))
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen-multimodal-generation-foundation")
+                && line.contains("VAL-RNG-001")
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
@@ -8894,6 +8967,18 @@ fn run_ownership_validation(
             task387_qwen_resource_fixture_proves_admission_identity_and_residency,
         ),
         (
+            "task388_policy_and_catalog_trace_qwen_multimodal_generation",
+            task388_policy_trace && task388_catalog_trace,
+        ),
+        (
+            "task388_qwen_generation_has_one_model_domain_adapter",
+            task388_qwen_generation_has_one_model_domain_adapter,
+        ),
+        (
+            "task388_qwen_generation_preserves_source_routes_and_atomicity",
+            task388_qwen_generation_preserves_source_routes_and_atomicity,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -9461,6 +9546,18 @@ fn val_ownership_task387_qwen_multimodal_resource_001() -> Result<(), Box<dyn st
         "val-ownership-task387-qwen-multimodal-resource-001.json",
         "val_ownership_task387_qwen_multimodal_resource_001",
         Some("task387_"),
+    )
+}
+
+#[test]
+fn val_ownership_task388_qwen_multimodal_generation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task388-qwen-multimodal-generation-ownership",
+        "val-ownership-task388-qwen-multimodal-generation-001.json",
+        "val_ownership_task388_qwen_multimodal_generation_001",
+        Some("task388_"),
     )
 }
 

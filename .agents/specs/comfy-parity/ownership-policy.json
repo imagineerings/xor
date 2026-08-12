@@ -11766,6 +11766,101 @@
       "decision_reason": "NativeT5TextEncoder is the sole T5, UMT5, and BERT bidirectional graph owner. It owns relative-position bucketing and bias application, bidirectional padding-mask composition, architecture-specific residual ordering, gated multiplication, intermediate capture, and pooling/projection adapters. It delegates verified SentencePiece input, module parameter lifecycle, RMS/LayerNorm and tensor kernels, backend admission, attention selection, workspace, memory, streams, and cancellation to existing canonical owners and introduces no parser, capability model, workspace authority, cache, persistence record, or transaction."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_generation_qwen",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenMultimodal::generate",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeQwenMultimodal::generate",
+        "QwenMultimodalGenerationRequest"
+      ],
+      "allowed_adapters": [
+        "The canonical Qwen preparation owner supplies private-field family-tagged prepared IMAGE patches and marker plans",
+        "NativeQwenVisionEncoder remains the sole vision projection owner and NativeDecoderTextEncoder remains the sole prepared prefill, deepstack injection, KV, sampling, stopping, and borrowed RNG transaction owner",
+        "NativePromptTokenizer remains the sole Qwen2 encode and generated-suffix skip-special cleanup owner",
+        "The later native text-generation controller remains the sole raw IMAGE, VIDEO, AUDIO, handle resolution, RNG opening, cache, restart, and scalar publication owner",
+        "No prepared image, projected embedding, joined prompt, position, deepstack, KV, RNG, workflow, cache, persistence, or output state is retained by the Qwen resource"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct QwenMultimodalGenerationRequest<'a> \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::QwenMultimodalGenerationRequest",
+          "role": "adapter",
+          "symbol": "QwenMultimodalGenerationRequest"
+        }
+      ],
+      "call_symbols": [
+        "NativeQwenMultimodal::generate",
+        "NativeDecoderTextEncoder::generation_configuration",
+        "NativeDecoderTextEncoder::embed_token_values",
+        "NativeDecoderTextEncoder::generate_prepared",
+        "NativeDecoderTextEncoder::finish_prepared_generation"
+      ],
+      "required_mappings": [
+        {
+          "name": "qwen-generation-validates-and-plans-before-projection",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn generate[\\s\\S]*self.validate[\\s\\S]*generation_configuration[\\s\\S]*encode_numeric[\\s\\S]*plan_qwen_markers[\\s\\S]*vision.project"
+        },
+        {
+          "name": "qwen-generation-replaces-every-marker-span-with-real-projections",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "projection.grid_thw != span.grid_thw[\\s\\S]*MultimodalImageEmbedding[\\s\\S]*image_embeddings.len\\(\\) != marker_plan.spans\\(\\).len\\(\\)[\\s\\S]*join_multimodal_embeddings"
+        },
+        {
+          "name": "qwen-generation-scopes-mrope-and-deepstack-to-source-route",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "QwenVisionFamily::Qwen3Vl4B \\| QwenVisionFamily::Qwen3Vl8B[\\s\\S]*qwen2vl_mrope_position_ids[\\s\\S]*join_qwen3vl_deepstack[\\s\\S]*Qwen3.5 generation cannot admit deepstack inputs"
+        },
+        {
+          "name": "qwen-generation-delegates-empty-history-and-borrowed-transaction",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "DecoderPreparedGenerationPrompt[\\s\\S]*sampling_history: &\\[\\][\\s\\S]*attention_mask: None[\\s\\S]*request.transaction[\\s\\S]*finish_prepared_generation"
+        },
+        {
+          "name": "qwen-generation-tests-marker-replacement-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "qwen_multimodal_generation_replaces_markers_and_delegates_transactionally[\\s\\S]*QwenMultimodalGenerationRequest[\\s\\S]*generated_tokens.len\\(\\), 1[\\s\\S]*transaction.checkpoint[\\s\\S]*scratch.in_use_bytes"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-qwen-multimodal-generation-foundation"
+      ],
+      "production_consumers": [
+        "native multimodal text-generation controller"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-RNG-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeQwenMultimodal::generate is the sole Qwen model-domain composition adapter. It consumes canonical prepared IMAGE patches, replaces every planned marker span with retained vision projections, applies source-routed Qwen3-VL MRoPE and deepstack, and delegates one generated-suffix execution and cleanup to the canonical decoder and tokenizer with a borrowed RNG transaction. It retains no invocation state and leaves raw media, handles, RNG opening, caching, restart, persistence, and scalar publication to the later controller."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_preparation_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal",
       "owner_files": [
@@ -12028,7 +12123,7 @@
         {
           "name": "qwen-multimodal-resource-binds-source-and-component-identities",
           "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
-          "pattern": "sim.comfy.qwen-multimodal-resource.v1[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest"
+          "pattern": "sim.comfy.qwen-multimodal-resource.v2[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest"
         },
         {
           "name": "qwen-multimodal-resource-unions-storage-residency",

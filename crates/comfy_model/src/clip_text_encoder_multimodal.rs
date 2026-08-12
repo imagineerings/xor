@@ -2,16 +2,18 @@ use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
     BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest, ClipTextError,
     ClipTextOutput, ClipTextRequest, ClipVisionError, ClipVisionIntermediate, ClipVisionOutput,
-    DecoderArchitecture, DecoderLayerKind, DecoderTextConfiguration, DecoderTextError,
-    DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText, NativeClipVision,
-    NativeDecoderTextEncoder, NativeModule, NativeOpsError, NativePromptTokenizer,
-    NativeT5TextEncoder, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
+    DecoderArchitecture, DecoderLayerKind, DecoderPreparedDeepstack,
+    DecoderPreparedGenerationPrompt, DecoderRopePositions, DecoderTextConfiguration,
+    DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText,
+    NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError,
+    NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
+    NativeTextGenerationResult, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
     QWEN35_SOURCE_SHA256, QWEN35_TOKENIZER_ARTIFACT_DIGEST, Qwen2PretokenizerProfile,
-    decoder_profile_fact, scaled_dot_product_attention_with_context,
+    SD1_CLIP_SOURCE_SHA256, decoder_profile_fact, scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
-    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, StreamId,
-    Tensor, TensorDescriptor, TensorError,
+    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode,
+    RngTransaction, StreamId, Tensor, TensorDescriptor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
     generated_native_diffusion::{
         NativeDiffusionTensorError, add as native_tensor_add, tensor_from_f32, tensor_to_f32,
@@ -674,6 +676,12 @@ pub struct Qwen3VlMarkerPlan {
     expanded_tokens: Vec<i64>,
     spans: Vec<MultimodalSpan>,
     visual_position_mask: Vec<bool>,
+}
+
+pub struct QwenMultimodalGenerationRequest<'a> {
+    pub text: NativeTextGenerationRequest<'a>,
+    pub prepared_images: &'a [Qwen3VlPreparedImage],
+    pub transaction: &'a RngTransaction,
 }
 
 impl Qwen3VlMarkerPlan {
@@ -1691,7 +1699,7 @@ impl NativeQwenMultimodal {
     ) -> Result<String, MultimodalTextError> {
         self.validate(cancellation)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.qwen-multimodal-resource.v1");
+        hasher.update(b"sim.comfy.qwen-multimodal-resource.v2");
         hasher.update(b"standard-comfy-text-generation-adapter");
         hasher.update(format!("{:?}", self.family()).as_bytes());
         hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());
@@ -1709,6 +1717,7 @@ impl NativeQwenMultimodal {
             .as_bytes(),
         );
         hasher.update(QWEN_VL_SOURCE_SHA256.as_bytes());
+        hasher.update(SD1_CLIP_SOURCE_SHA256.as_bytes());
         hasher.update(
             self.tokenizer
                 .qwen2_artifact_digest()
@@ -1776,6 +1785,170 @@ impl NativeQwenMultimodal {
             },
         )
     }
+
+    pub fn generate(
+        &self,
+        backend: &CpuBackend,
+        request: QwenMultimodalGenerationRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeTextGenerationResult, MultimodalTextError> {
+        context.cancellation.check()?;
+        self.validate(context.cancellation)?;
+        let configuration = self.decoder.generation_configuration(&request.text)?;
+        let prompt_tokens = self
+            .tokenizer
+            .encode_numeric(request.text.formatted_prompt, context.cancellation)?;
+        let prompt_tokens = prompt_tokens.into_iter().map(i64::from).collect::<Vec<_>>();
+        let marker_plan = plan_qwen_markers(
+            &prompt_tokens,
+            request.prepared_images,
+            self.family(),
+            context.cancellation,
+        )?;
+        if marker_plan
+            .expanded_tokens()
+            .len()
+            .checked_add(configuration.maximum_new_tokens)
+            .ok_or(MultimodalTextError::Overflow(
+                "Qwen prompt and generation length",
+            ))?
+            > self.decoder.configuration().maximum_tokens
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen prompt and generation exceed the decoder token limit",
+            ));
+        }
+        let text_embeddings =
+            self.decoder
+                .embed_token_values(backend, marker_plan.expanded_tokens(), context)?;
+        let mut projections = Vec::new();
+        projections
+            .try_reserve_exact(request.prepared_images.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen vision projections"))?;
+        for prepared in request.prepared_images {
+            context.cancellation.check()?;
+            projections.push(self.vision.project(backend, prepared, context)?);
+        }
+        let mut image_embeddings = Vec::new();
+        image_embeddings
+            .try_reserve_exact(projections.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen image embeddings"))?;
+        for (span, projection) in marker_plan.spans().iter().zip(&projections) {
+            if projection.grid_thw != span.grid_thw {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Qwen projected image grid does not match its marker span",
+                ));
+            }
+            image_embeddings.push(MultimodalImageEmbedding {
+                span: *span,
+                embedding: &projection.embedding,
+                deepstack: &projection.deepstack,
+            });
+        }
+        if image_embeddings.len() != marker_plan.spans().len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen projected images do not cover every marker span",
+            ));
+        }
+        let embeddings =
+            join_multimodal_embeddings(backend, &text_embeddings, &image_embeddings, context)?;
+        let sequence_length = marker_plan.expanded_tokens().len();
+        let causal_positions = qwen_causal_positions(sequence_length)?;
+        let multidimensional_positions = if matches!(
+            self.family(),
+            QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B
+        ) {
+            qwen2vl_mrope_position_ids(sequence_length, marker_plan.spans(), context.cancellation)?
+                .map(|positions| qwen_decoder_position_axes(&positions, context.cancellation))
+                .transpose()?
+        } else {
+            None
+        };
+        let rope_positions = multidimensional_positions.as_ref().map_or(
+            DecoderRopePositions::Scalar(&causal_positions),
+            |positions| DecoderRopePositions::Multidimensional(positions),
+        );
+        let deepstack_join = if matches!(
+            self.family(),
+            QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B
+        ) && !image_embeddings.is_empty()
+        {
+            join_qwen3vl_deepstack(backend, sequence_length, &image_embeddings, context)?
+        } else {
+            if image_embeddings
+                .iter()
+                .any(|image| !image.deepstack.is_empty())
+            {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Qwen3.5 generation cannot admit deepstack inputs",
+                ));
+            }
+            None
+        };
+        if deepstack_join
+            .as_ref()
+            .is_some_and(|joined| joined.visual_position_mask != marker_plan.visual_position_mask())
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen deepstack mask does not match the marker plan",
+            ));
+        }
+        let deepstack = deepstack_join
+            .as_ref()
+            .map(|joined| DecoderPreparedDeepstack {
+                visual_position_mask: &joined.visual_position_mask,
+                layers: &joined.layers,
+            });
+        let outcome = self.decoder.generate_prepared(
+            backend,
+            DecoderPreparedGenerationPrompt {
+                embeddings: &embeddings,
+                sampling_history: &[],
+                attention_mask: None,
+                rope_positions,
+                causal_positions: &causal_positions,
+                deepstack,
+            },
+            &configuration,
+            request.transaction,
+            context,
+        )?;
+        context.cancellation.check()?;
+        Ok(self
+            .decoder
+            .finish_prepared_generation(&self.tokenizer, outcome, context)?)
+    }
+}
+
+fn qwen_causal_positions(sequence_length: usize) -> Result<Vec<usize>, MultimodalTextError> {
+    let mut positions = Vec::new();
+    positions
+        .try_reserve_exact(sequence_length)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen causal positions"))?;
+    positions.extend(0..sequence_length);
+    Ok(positions)
+}
+
+fn qwen_decoder_position_axes(
+    positions: &MultimodalPositionIds,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<Vec<Vec<usize>>, MultimodalTextError> {
+    let mut axes = Vec::new();
+    axes.try_reserve_exact(3)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen position axes"))?;
+    for source in [positions.temporal(), positions.height(), positions.width()] {
+        cancellation.check()?;
+        let mut axis = Vec::new();
+        axis.try_reserve_exact(source.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen position axis"))?;
+        for value in source {
+            axis.push(usize::try_from(*value).map_err(|_| {
+                MultimodalTextError::InvalidInput("Qwen position IDs must be nonnegative")
+            })?);
+        }
+        axes.push(axis);
+    }
+    Ok(axes)
 }
 
 fn qwen_decoder_profile_name(family: QwenVisionFamily) -> &'static str {
