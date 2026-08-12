@@ -11963,6 +11963,109 @@
       "decision_reason": "The multimodal adapter is the sole owner of Qwen3-VL source-specific formatting, bounded IMAGE preparation, temporal/spatial patch ordering, marker-span planning, visual masks, and three-axis position construction. It returns only checked attempt-local tensors and immutable plans, delegates resize/storage/workspace/cancellation to comfy_tensor, and cannot own tokenizer parsing, retained weights, decoder execution, RNG, KV state, caching, persistence, handles, or publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_preparation_source_gemma",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::GemmaPreparedVisual",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "GemmaPreparedVisual",
+        "GemmaPreparedVisualKind",
+        "prepare_gemma3_image",
+        "prepare_gemma4_visuals"
+      ],
+      "allowed_adapters": [
+        "ImageTensor and comfy_tensor remain the sole IMAGE storage, canonical resize, workspace, memory, stream, and cancellation owners",
+        "The dependent Gemma vision owners consume checked attempt-local visual preparation and alone retain or execute model and projector weights",
+        "The later native text-generation controller resolves raw IMAGE and VIDEO inputs and maps source FPS without duplicating visual preparation",
+        "NativePromptTokenizer and NativeDecoderTextEncoder remain the sole tokenizer, decoder, KV, sampler, stopping, and borrowed RNG transaction owners",
+        "Runtime controller, executor, NativeCache, persistence, and output transactions remain the sole handle-resolution, caching, restart, and publication owners"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct GemmaPreparedVisual \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::GemmaPreparedVisual",
+          "role": "canonical_state",
+          "symbol": "GemmaPreparedVisual"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub enum GemmaPreparedVisualKind \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::GemmaPreparedVisualKind",
+          "role": "canonical_state",
+          "symbol": "GemmaPreparedVisualKind"
+        }
+      ],
+      "call_symbols": [
+        "gemma3_target_dimensions",
+        "prepare_gemma3_image",
+        "gemma4_target_dimensions",
+        "prepare_gemma4_visuals"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma-preparation-projects-gemma3-source-area-with-canonical-resize",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn prepare_gemma3_image[\\s\\S]*gemma3_target_dimensions[\\s\\S]*ResizeMode::Area[\\s\\S]*ResizeCrop::Disabled"
+        },
+        {
+          "name": "gemma-preparation-preserves-video-precedence-and-source-frame-timestamps",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn prepare_gemma4_visuals[\\s\\S]*\\(_, Some\\(video\\)\\)[\\s\\S]*GEMMA4_VIDEO_SOURCE_FPS[\\s\\S]*source_frame_index[\\s\\S]*timestamp_seconds"
+        },
+        {
+          "name": "gemma-preparation-delegates-source-quantized-bicubic-antialias-resize",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "fn gemma4_quantized_bicubic_resize[\\s\\S]*trunc\\(\\)[\\s\\S]*interpolate_with_context_exact_native[\\s\\S]*InterpolateMode::Bicubic[\\s\\S]*antialias: true"
+        },
+        {
+          "name": "gemma-preparation-is-bounded-cancellable-and-attempt-local",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn prepare_gemma4_visuals[\\s\\S]*context.cancellation.check\\(\\)[\\s\\S]*try_reserve_exact[\\s\\S]*backend.workspace_vec"
+        },
+        {
+          "name": "gemma-preparation-tests-source-fixtures-precedence-and-rollback",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma_image_video_preparation_is_source_exact_bounded_and_transactional[\\s\\S]*Gemma4VideoFrame[\\s\\S]*GEMMA4_VIDEO_SOURCE_FPS[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma-image-video-preparation-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma3 and Gemma4 vision owners",
+        "native Gemma multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "GemmaPreparedVisual and its canonical functions are the sole model-domain owners of source-specific Gemma3 area preparation and Gemma4 IMAGE/VIDEO frame selection, byte projection, bicubic-antialiased resize, RGB projection, soft-token budgets, and timestamp facts. The preparation is attempt-local, weightless, bounded, and RNG-free; it delegates storage and resize mechanics to comfy_tensor and cannot own tokenizer, decoder, retained weights, handles, cache, persistence, or publication."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_projection_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
       "owner_files": [

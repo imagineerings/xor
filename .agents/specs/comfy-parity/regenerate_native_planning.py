@@ -9589,6 +9589,295 @@ def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[s
     )
 
 
+def native_gemma_image_video_preparation_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma-image-video-preparation-foundation",
+        "Implement Gemma image and video preparation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-CLIP-001",
+            "VAL-TENSOR-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical Gemma visual preparation owner performs Gemma3 area projection and Gemma4 image/video source selection, video precedence, 24-to-1 FPS frame selection, source-compatible byte quantization, bicubic-antialiased resizing, RGB projection, soft-token budgets, and timestamp planning without executing or retaining a model.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/image_video",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted reduced fixtures prove Gemma3 896-square-area projection, Gemma4 image and video frame geometry, video-over-image precedence, frame indices 0/24/48, sequential timestamps, 280-versus-70 soft-token budgets, quantized RGB bicubic-antialiased pixels, capability rejection, cancellation, allocation rollback, and zero scratch residue.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma_audio_preparation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma-audio-preparation-foundation",
+        "Implement Gemma4 audio preparation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-TENSOR-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "The canonical Gemma4 audio preparation owner mixes checked AUDIO to mono, resamples to 16 kHz, applies source semicausal padding, exact 320-sample periodic-Hann/512-FFT/128-bin HTK log-mel projection and frame masks, and computes the bounded post-subsample marker count without retaining encoder state.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove mono projection, 16 kHz identity and nonidentity resampling, 128-sample and semicausal padding, exact log-mel and masks, zero/short/stereo inputs, 750-token bounds, cancellation, allocation rollback, and zero scratch residue.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma_tokenizer_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma-tokenizer-foundation",
+        "Implement Gemma tokenizer admission",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "NativePromptTokenizer admits exact Gemma3 SentencePiece and Gemma4 checkpoint tokenizer-json artifacts with their start, pad, control, image, video, audio, turn, and thinking-token classifications, bounded padding rules, canonical encode/decode, semantic identity, and owned residency.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove Gemma3 SentencePiece and Gemma4 tokenizer-json encode/decode, exact special/control cleanup, BOS and left-padding behavior, malformed artifact rejection, semantic-digest sensitivity, cancellation, allocation rollback, and absence of a second prompt tokenizer.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma3_decoder_exactness_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma3-decoder-exactness-foundation",
+        "Implement exact Gemma3 decoder execution",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-RNG-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "NativeDecoderTextEncoder admits and executes exact Gemma3 4B-vision and 12B decoder profiles, including alternating global/local RoPE, Q/K normalization, Gemma RMS normalization and scaling, sliding attention, tied or untied output, stop tokens, staged KV, and borrowed RNG generation.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_decoder",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove Gemma3 profile admission, global/local attention and RoPE, Q/K and Gemma normalization, cache equivalence, stops, seeded replay, cancellation, OOM rollback, identity sensitivity, and rejection of descriptive-only profile facts.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma4_decoder_exactness_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma4-decoder-exactness-foundation",
+        "Implement exact Gemma4 decoder execution",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-RNG-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "NativeDecoderTextEncoder admits and executes exact Gemma4 E2B, E4B, and 31B profiles, including global-head geometry, shared key/value layers, double-wide MLPs, hidden per-layer token embeddings from expanded initial IDs, partial rotary attention, logit softcap, staged KV, and borrowed RNG generation.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_decoder",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove all three Gemma4 profiles, expanded initial-ID layer embeddings, global/shared attention, double-wide MLP, partial RoPE, logit softcap, cache equivalence, seeded replay, cancellation, OOM rollback, and rejection of placeholder execution.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma3_vision_projection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma3-vision-projection-foundation",
+        "Implement retained Gemma3 vision projection",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "A retained Gemma3 vision owner admits the exact CLIP-vision and multimodal-projector tensors, consumes canonical Gemma3 visual preparation, executes the 896-square projection and 256-token replacement, and exposes content identity and StorageId-aware residency without retaining invocation state.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
+            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_vision",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove Gemma3 preprocessing consumption, exact vision/projector execution and 256-token shape, admission, digest and alias residency, cancellation, OOM rollback, and no metadata-only vision facade.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma4_vision_projection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma4-vision-projection-foundation",
+        "Implement retained Gemma4 vision projection",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "A retained Gemma4 vision owner admits and executes exact patch projection, learned positions, two-axis RoPE, attention, pooling, and multimodal projector tensors for E2B, E4B, and 31B while consuming canonical image/video preparation and exposing content identity and alias-aware residency.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_vision",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove patch/position/RoPE/attention/pooling/projector execution, image versus video soft-token limits, all three family admissions, digest and alias residency, cancellation, OOM rollback, and no placeholder projector path.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma4_audio_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma4-audio-execution-foundation",
+        "Implement retained Gemma4 audio execution",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-TENSOR-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "A retained Gemma4 audio owner admits and executes exact convolutional subsampling, relative-position chunk attention, conformer feed-forward and causal convolution layers, masks, output projection, and multimodal projector for audio-capable E2B/E4B profiles; 31B rejects audio.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_audio",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove subsampling, masks, relative positions, block attention, causal convolution, conformer layers and projectors, E2B/E4B capability, 31B rejection, digest and alias residency, cancellation, OOM rollback, and no metadata-only audio path.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma_multimodal_resource_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma-multimodal-resource-foundation",
+        "Implement retained Gemma multimodal resources",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "One sealed Gemma multimodal CLIP resource inseparably retains the exact tokenizer, decoder, required vision owner, and optional admitted audio owner for each closed Gemma3/Gemma4 family, with source-bound semantic identity and size-consistent StorageId-deduplicated residency.",
+        [
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/resource",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove every accepted family diagonal, cross-family and capability rejection, component/source digest sensitivity, shared-StorageId deduplication, distinct-storage charging, sealed CLIP admission, deterministic reconstruction, and absence of prepared/KV/RNG/cache/persistence/publication state.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_gemma_multimodal_generation_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-gemma-multimodal-generation-foundation",
@@ -9610,28 +9899,24 @@ def native_gemma_multimodal_generation_foundation_task(dependency: str) -> dict[
             "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
             "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
             "projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py",
-            "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             "crates/comfy_model/src/clip_tokenizer.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
-            "crates/comfy_model/src/clip_vision.rs",
+            "crates/comfy_tensor/src/rng.rs",
         ],
         [
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
             "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
-            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal",
-            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/generation",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Source-fingerprinted fixtures prove Gemma3/Gemma4 template and skip rules, inert versus active thinking behavior, image token projections, video precedence and frame/timestamp selection, audio mono/resample/log-mel/mask/token bounds, expanded initial IDs, family stop and cleanup rules, capability failures, semantic identity/residency, cancellation/OOM rollback, restart staleness, and zero partial publication.",
+        "Source-fingerprinted fixtures prove Gemma3/Gemma4 template and skip rules, inert versus active thinking behavior, complete image/video/audio marker replacement, expanded initial IDs, family stop and cleanup rules, and one prepared-decoder delegation with borrowed RNG. Cancellation, OOM, capability and marker failures preserve the transaction and retained resource; handle restart, cache, raw media resolution, and scalar publication remain owned by the later native text-generation adapter.",
         [dependency],
         locked=True,
         criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
@@ -10839,8 +11124,37 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
         str(qwen_multimodal_resource_foundation["id"])
     )
+    gemma_image_video_preparation_foundation = (
+        native_gemma_image_video_preparation_foundation_task(
+            str(qwen_multimodal_generation_foundation["id"])
+        )
+    )
+    gemma_audio_preparation_foundation = native_gemma_audio_preparation_foundation_task(
+        str(gemma_image_video_preparation_foundation["id"])
+    )
+    gemma_tokenizer_foundation = native_gemma_tokenizer_foundation_task(
+        str(gemma_audio_preparation_foundation["id"])
+    )
+    gemma3_decoder_exactness_foundation = native_gemma3_decoder_exactness_foundation_task(
+        str(gemma_tokenizer_foundation["id"])
+    )
+    gemma4_decoder_exactness_foundation = native_gemma4_decoder_exactness_foundation_task(
+        str(gemma3_decoder_exactness_foundation["id"])
+    )
+    gemma3_vision_projection_foundation = native_gemma3_vision_projection_foundation_task(
+        str(gemma4_decoder_exactness_foundation["id"])
+    )
+    gemma4_vision_projection_foundation = native_gemma4_vision_projection_foundation_task(
+        str(gemma3_vision_projection_foundation["id"])
+    )
+    gemma4_audio_execution_foundation = native_gemma4_audio_execution_foundation_task(
+        str(gemma4_vision_projection_foundation["id"])
+    )
+    gemma_multimodal_resource_foundation = native_gemma_multimodal_resource_foundation_task(
+        str(gemma4_audio_execution_foundation["id"])
+    )
     gemma_multimodal_generation_foundation = native_gemma_multimodal_generation_foundation_task(
-        str(qwen_multimodal_generation_foundation["id"])
+        str(gemma_multimodal_resource_foundation["id"])
     )
     text_generation_foundation = native_text_generation_foundation_task(
         str(gemma_multimodal_generation_foundation["id"])
@@ -10926,6 +11240,15 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             qwen_vision_projection_foundation,
             qwen_multimodal_resource_foundation,
             qwen_multimodal_generation_foundation,
+            gemma_image_video_preparation_foundation,
+            gemma_audio_preparation_foundation,
+            gemma_tokenizer_foundation,
+            gemma3_decoder_exactness_foundation,
+            gemma4_decoder_exactness_foundation,
+            gemma3_vision_projection_foundation,
+            gemma4_vision_projection_foundation,
+            gemma4_audio_execution_foundation,
+            gemma_multimodal_resource_foundation,
             gemma_multimodal_generation_foundation,
             text_generation_foundation,
             sdpose_foundation,

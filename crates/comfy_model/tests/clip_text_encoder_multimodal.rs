@@ -1,7 +1,9 @@
 use comfy_model::{
     DecoderActivation, DecoderArchitecture, DecoderAttentionWeights, DecoderLayerKind,
     DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration, DecoderTextWeights,
-    IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
+    GEMMA3_IMAGE_AREA_PIXELS, GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_VIDEO_SOFT_TOKENS,
+    GEMMA4_VIDEO_SOURCE_FPS, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
+    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
     NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
@@ -12,10 +14,11 @@ use comfy_model::{
     QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
     QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
     SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
-    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, ideogram4_project_taps,
-    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
-    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
-    plan_qwen_markers, plan_qwen3vl_markers, prepare_qwen_images, prepare_qwen3vl_images,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
+    gemma4_target_dimensions, ideogram4_project_taps, join_multimodal_embeddings,
+    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
+    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
+    prepare_gemma3_image, prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
     qwen_multimodal_decoder_configuration, qwen_multimodal_tokenizer_profile,
     qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
@@ -594,6 +597,119 @@ fn qwen3vl_preparation_cancellation_and_oom_leave_workspace_empty() -> Result<()
         prepare_qwen3vl_images(&backend, &invalid, &setup_context),
         Err(MultimodalTextError::InvalidInput(_))
     ));
+    Ok(())
+}
+
+#[test]
+fn gemma_image_video_preparation_is_source_exact_bounded_and_transactional()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/image_video/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(
+        manifest["sources"][0]["sha256"],
+        "9ddf9e68c4afd1cf848f881b7489abb49d37ac8ad6d5d2893eba4f98c9c37ca2"
+    );
+    assert_eq!(
+        manifest["sources"][1]["sha256"],
+        "c6ffbb2fbecd8f97e781a654a06ccf3910dc670867d38c0ce30542312f00cde6"
+    );
+    assert_eq!(GEMMA3_IMAGE_AREA_PIXELS, 896 * 896);
+    assert_eq!(gemma3_target_dimensions(512, 512)?, (896, 896));
+    assert_eq!(gemma3_target_dimensions(17, 31)?, (664, 1_210));
+    assert!(gemma3_target_dimensions(0, 31).is_err());
+    assert!(gemma3_target_dimensions(1, u64::MAX / 2).is_err());
+    assert_eq!(
+        gemma4_target_dimensions(48, 48, GEMMA4_IMAGE_SOFT_TOKENS)?,
+        (768, 768)
+    );
+    assert_eq!(
+        gemma4_target_dimensions(48, 48, GEMMA4_VIDEO_SOFT_TOKENS)?,
+        (384, 384)
+    );
+    assert!(gemma4_target_dimensions(48, 48, 0).is_err());
+    assert!(gemma4_target_dimensions(1, u64::MAX / 2, GEMMA4_IMAGE_SOFT_TOKENS).is_err());
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let gemma3_source =
+        ImageTensor::from_f32(&backend, &setup, 1, 1, 1, 4, &[1.0, 0.25, 0.0, 0.75])?;
+    let gemma3 = prepare_gemma3_image(&backend, &gemma3_source, &setup)?;
+    assert_eq!(gemma3.kind(), GemmaPreparedVisualKind::Gemma3Image);
+    assert_eq!(gemma3.maximum_soft_tokens(), 256);
+    assert_eq!(gemma3.image().dimensions()?, (1, 896, 896, 3));
+    let gemma3_values = gemma3.image().as_f32_slice()?;
+    assert_eq!(gemma3_values.first().copied(), Some(1.0));
+    assert_eq!(gemma3_values.get(1).copied(), Some(0.25));
+    assert_eq!(gemma3_values.get(2).copied(), Some(0.0));
+    drop(gemma3);
+
+    let image = ImageTensor::from_f32(&backend, &setup, 1, 1, 1, 4, &[1.0, 0.0, 0.0, 1.0])?;
+    let mut video_values = Vec::new();
+    video_values.try_reserve_exact(49 * 4)?;
+    for frame in 0..49 {
+        video_values.extend_from_slice(&[0.0, if frame == 24 { 0.5 } else { 1.0 }, 0.0, 0.25]);
+    }
+    let video = ImageTensor::from_f32(&backend, &setup, 49, 1, 1, 4, &video_values)?;
+    let prepared = prepare_gemma4_visuals(&backend, Some(&image), Some(&video), &setup)?;
+    assert_eq!(prepared.len(), 3);
+    for (index, visual) in prepared.iter().enumerate() {
+        assert_eq!(visual.kind(), GemmaPreparedVisualKind::Gemma4VideoFrame);
+        assert_eq!(visual.maximum_soft_tokens(), GEMMA4_VIDEO_SOFT_TOKENS);
+        assert_eq!(visual.source_frame_index(), index * GEMMA4_VIDEO_SOURCE_FPS);
+        assert_eq!(visual.timestamp_seconds(), Some(index));
+        assert_eq!(visual.image().dimensions()?, (1, 384, 384, 3));
+        assert_eq!(visual.image().as_f32_slice()?.first().copied(), Some(0.0));
+    }
+    let middle_green = prepared
+        .get(1)
+        .ok_or("Gemma4 middle prepared frame is missing")?
+        .image()
+        .as_f32_slice()?
+        .get(1)
+        .copied()
+        .ok_or("Gemma4 middle prepared pixel is missing")?;
+    assert!((middle_green - (127.0 / 255.0)).abs() <= 1.0e-6);
+    assert_ne!(
+        prepared
+            .first()
+            .ok_or("Gemma4 first prepared frame is missing")?
+            .image()
+            .as_f32_slice()?
+            .get(1),
+        Some(&0.0)
+    );
+    drop(prepared);
+
+    let image_only = prepare_gemma4_visuals(&backend, Some(&image), None, &setup)?;
+    let image_visual = image_only
+        .first()
+        .ok_or("Gemma4 prepared image is missing")?;
+    assert_eq!(image_only.len(), 1);
+    assert_eq!(image_visual.kind(), GemmaPreparedVisualKind::Gemma4Image);
+    assert_eq!(image_visual.maximum_soft_tokens(), GEMMA4_IMAGE_SOFT_TOKENS);
+    assert_eq!(image_visual.image().dimensions()?, (1, 768, 768, 3));
+    assert!(prepare_gemma4_visuals(&backend, None, None, &setup)?.is_empty());
+    drop(image_only);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 48 * 1024 * 1024)?;
+    assert!(matches!(
+        prepare_gemma4_visuals(&backend, Some(&image), None, &cancelled_context),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+    let constrained = context(&authority, &cancellation, 4)?;
+    assert!(prepare_gemma4_visuals(&backend, Some(&image), None, &constrained).is_err());
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

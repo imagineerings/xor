@@ -25,6 +25,10 @@ use comfy_tensor::{
     generated_shape_layout_transform_03::{
         ShapeLayoutTransformPartThreeError, tensor_permute_exact_native,
     },
+    generated_spatial_functional_kernel_01::{
+        InterpolateConfiguration, InterpolateMode, SpatialFunctionalKernelError,
+        interpolate_with_context_exact_native,
+    },
 };
 use sha2::{Digest, Sha256};
 use std::{mem, sync::Arc};
@@ -66,6 +70,13 @@ pub const QWEN3VL_IMAGE_MAXIMUM_PIXELS: u64 = 12_845_056;
 pub const QWEN3VL_IMAGE_PATCH_SIZE: usize = 16;
 pub const QWEN3VL_IMAGE_TEMPORAL_PATCH_SIZE: usize = 2;
 pub const QWEN3VL_IMAGE_SPATIAL_MERGE_SIZE: usize = 2;
+pub const GEMMA3_IMAGE_AREA_PIXELS: u64 = 896 * 896;
+pub const GEMMA3_MAXIMUM_PREPARED_PIXELS: u64 = GEMMA3_IMAGE_AREA_PIXELS * 4;
+pub const GEMMA4_IMAGE_PATCH_SIZE: u64 = 16;
+pub const GEMMA4_IMAGE_POOLING_SIZE: u64 = 3;
+pub const GEMMA4_IMAGE_SOFT_TOKENS: usize = 280;
+pub const GEMMA4_VIDEO_SOFT_TOKENS: usize = 70;
+pub const GEMMA4_VIDEO_SOURCE_FPS: usize = 24;
 
 pub const MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS: [&str; 53] = [
     "Qwen3VLTokenizer",
@@ -449,6 +460,44 @@ pub struct Qwen3VlPreparedImage {
     family: QwenVisionFamily,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GemmaPreparedVisualKind {
+    Gemma3Image,
+    Gemma4Image,
+    Gemma4VideoFrame,
+}
+
+#[derive(Clone, Debug)]
+pub struct GemmaPreparedVisual {
+    image: ImageTensor,
+    kind: GemmaPreparedVisualKind,
+    maximum_soft_tokens: usize,
+    source_frame_index: usize,
+    timestamp_seconds: Option<usize>,
+}
+
+impl GemmaPreparedVisual {
+    pub fn image(&self) -> &ImageTensor {
+        &self.image
+    }
+
+    pub const fn kind(&self) -> GemmaPreparedVisualKind {
+        self.kind
+    }
+
+    pub const fn maximum_soft_tokens(&self) -> usize {
+        self.maximum_soft_tokens
+    }
+
+    pub const fn source_frame_index(&self) -> usize {
+        self.source_frame_index
+    }
+
+    pub const fn timestamp_seconds(&self) -> Option<usize> {
+        self.timestamp_seconds
+    }
+}
+
 impl Qwen3VlPreparedImage {
     pub fn patches(&self) -> &Tensor {
         &self.patches
@@ -744,6 +793,8 @@ pub enum MultimodalTextError {
     NativeOps(#[from] NativeOpsError),
     #[error(transparent)]
     NativeTensor(#[from] NativeDiffusionTensorError),
+    #[error(transparent)]
+    Spatial(#[from] SpatialFunctionalKernelError),
     #[error("multimodal text input is invalid: {0}")]
     InvalidInput(&'static str),
     #[error("multimodal text arithmetic overflowed while computing {0}")]
@@ -945,6 +996,343 @@ pub fn qwen3vl_target_dimensions(
         ));
     }
     Ok((target_height, target_width))
+}
+
+pub fn gemma3_target_dimensions(
+    height: u64,
+    width: u64,
+) -> Result<(u64, u64), MultimodalTextError> {
+    let source_pixels = height
+        .checked_mul(width)
+        .ok_or(MultimodalTextError::Overflow("Gemma3 source pixels"))?;
+    if source_pixels == 0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 images require nonzero dimensions",
+        ));
+    }
+    let scale = ((GEMMA3_IMAGE_AREA_PIXELS as f64) / (source_pixels as f64)).sqrt();
+    let target_height = checked_f64_to_u64(
+        ((height as f64) * scale).round_ties_even().max(1.0),
+        "Gemma3 target height",
+    )?;
+    let target_width = checked_f64_to_u64(
+        ((width as f64) * scale).round_ties_even().max(1.0),
+        "Gemma3 target width",
+    )?;
+    let target_pixels = target_height
+        .checked_mul(target_width)
+        .ok_or(MultimodalTextError::Overflow("Gemma3 target pixels"))?;
+    if target_pixels > GEMMA3_MAXIMUM_PREPARED_PIXELS {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 target dimensions exceed the native bounded pixel limit",
+        ));
+    }
+    Ok((target_height, target_width))
+}
+
+pub fn prepare_gemma3_image(
+    backend: &CpuBackend,
+    image: &ImageTensor,
+    context: &ExecutionContext<'_>,
+) -> Result<GemmaPreparedVisual, MultimodalTextError> {
+    context.cancellation.check()?;
+    let (batch, height, width, channels) = image.dimensions()?;
+    if batch == 0 || channels < 3 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 requires a nonempty RGB or RGBA IMAGE batch",
+        ));
+    }
+    let image = project_rgb_channels(backend, image, context)?;
+    let (target_height, target_width) = gemma3_target_dimensions(height, width)?;
+    let image = image.resize(
+        target_width,
+        target_height,
+        ResizeMode::Area,
+        ResizeCrop::Disabled,
+        backend,
+        context,
+    )?;
+    context.cancellation.check()?;
+    Ok(GemmaPreparedVisual {
+        image,
+        kind: GemmaPreparedVisualKind::Gemma3Image,
+        maximum_soft_tokens: 256,
+        source_frame_index: 0,
+        timestamp_seconds: None,
+    })
+}
+
+pub fn gemma4_target_dimensions(
+    height: u64,
+    width: u64,
+    maximum_soft_tokens: usize,
+) -> Result<(u64, u64), MultimodalTextError> {
+    let source_pixels = height
+        .checked_mul(width)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 source pixels"))?;
+    if source_pixels == 0 || maximum_soft_tokens == 0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 visual dimensions and soft-token budget must be nonzero",
+        ));
+    }
+    let maximum_soft_tokens = u64::try_from(maximum_soft_tokens)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 soft-token budget"))?;
+    let side_multiple = GEMMA4_IMAGE_PATCH_SIZE
+        .checked_mul(GEMMA4_IMAGE_POOLING_SIZE)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 side multiple"))?;
+    let target_pixels = maximum_soft_tokens
+        .checked_mul(GEMMA4_IMAGE_POOLING_SIZE)
+        .and_then(|value| value.checked_mul(GEMMA4_IMAGE_POOLING_SIZE))
+        .and_then(|value| value.checked_mul(GEMMA4_IMAGE_PATCH_SIZE))
+        .and_then(|value| value.checked_mul(GEMMA4_IMAGE_PATCH_SIZE))
+        .ok_or(MultimodalTextError::Overflow("Gemma4 target pixels"))?;
+    let scale = ((target_pixels as f64) / (source_pixels as f64)).sqrt();
+    let target_height = checked_f64_to_u64(
+        (((height as f64) * scale) / (side_multiple as f64)).floor(),
+        "Gemma4 target height units",
+    )?
+    .checked_mul(side_multiple)
+    .ok_or(MultimodalTextError::Overflow("Gemma4 target height"))?
+    .max(side_multiple);
+    let target_width = checked_f64_to_u64(
+        (((width as f64) * scale) / (side_multiple as f64)).floor(),
+        "Gemma4 target width units",
+    )?
+    .checked_mul(side_multiple)
+    .ok_or(MultimodalTextError::Overflow("Gemma4 target width"))?
+    .max(side_multiple);
+    let prepared_pixels = target_height
+        .checked_mul(target_width)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 target dimensions"))?;
+    let maximum_prepared_pixels =
+        target_pixels
+            .checked_mul(4)
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 maximum prepared pixels",
+            ))?;
+    if prepared_pixels > maximum_prepared_pixels {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 target dimensions exceed the native bounded pixel limit",
+        ));
+    }
+    Ok((target_height, target_width))
+}
+
+pub fn prepare_gemma4_visuals(
+    backend: &CpuBackend,
+    image: Option<&ImageTensor>,
+    video: Option<&ImageTensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<GemmaPreparedVisual>, MultimodalTextError> {
+    context.cancellation.check()?;
+    let (source, kind, maximum_soft_tokens, frame_step) = match (image, video) {
+        (_, Some(video)) => (
+            video,
+            GemmaPreparedVisualKind::Gemma4VideoFrame,
+            GEMMA4_VIDEO_SOFT_TOKENS,
+            GEMMA4_VIDEO_SOURCE_FPS,
+        ),
+        (Some(image), None) => (
+            image,
+            GemmaPreparedVisualKind::Gemma4Image,
+            GEMMA4_IMAGE_SOFT_TOKENS,
+            1,
+        ),
+        (None, None) => return Ok(Vec::new()),
+    };
+    let (batch, height, width, channels) = source.dimensions()?;
+    if batch == 0 || channels < 3 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 requires a nonempty RGB or RGBA IMAGE batch",
+        ));
+    }
+    let source = project_rgb_channels(backend, source, context)?;
+    let (target_height, target_width) =
+        gemma4_target_dimensions(height, width, maximum_soft_tokens)?;
+    let batch = u64_to_usize(batch, "Gemma4 visual batch")?;
+    let frame_elements = height
+        .checked_mul(width)
+        .and_then(|value| value.checked_mul(3))
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(MultimodalTextError::Overflow("Gemma4 frame elements"))?;
+    let source_values = source.as_f32_slice()?;
+    let selected_count = batch
+        .checked_add(frame_step - 1)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 selected frame count"))?
+        / frame_step;
+    let mut prepared = Vec::new();
+    prepared
+        .try_reserve_exact(selected_count)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 prepared frames"))?;
+    for (timestamp_seconds, source_frame_index) in (0..batch).step_by(frame_step).enumerate() {
+        context.cancellation.check()?;
+        let start = source_frame_index
+            .checked_mul(frame_elements)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 frame offset"))?;
+        let end = start
+            .checked_add(frame_elements)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 frame end"))?;
+        let values = source_values
+            .get(start..end)
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Gemma4 frame storage is incomplete",
+            ))?;
+        let image = gemma4_quantized_bicubic_resize(
+            backend,
+            values,
+            height,
+            width,
+            target_height,
+            target_width,
+            context,
+        )?;
+        prepared.push(GemmaPreparedVisual {
+            image,
+            kind,
+            maximum_soft_tokens,
+            source_frame_index,
+            timestamp_seconds: (kind == GemmaPreparedVisualKind::Gemma4VideoFrame)
+                .then_some(timestamp_seconds),
+        });
+    }
+    context.cancellation.check()?;
+    Ok(prepared)
+}
+
+fn project_rgb_channels(
+    backend: &CpuBackend,
+    image: &ImageTensor,
+    context: &ExecutionContext<'_>,
+) -> Result<ImageTensor, MultimodalTextError> {
+    let (batch, height, width, channels) = image.dimensions()?;
+    if channels == 3 {
+        return Ok(image.clone());
+    }
+    if channels < 3 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma visual preparation requires at least three channels",
+        ));
+    }
+    let pixels = batch
+        .checked_mul(height)
+        .and_then(|value| value.checked_mul(width))
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(MultimodalTextError::Overflow("Gemma RGB pixels"))?;
+    let channels = u64_to_usize(channels, "Gemma source channels")?;
+    let source = image.as_f32_slice()?;
+    let mut values = backend.workspace_vec(
+        context,
+        pixels
+            .checked_mul(3)
+            .ok_or(MultimodalTextError::Overflow("Gemma RGB values"))?,
+    )?;
+    for pixel in 0..pixels {
+        context.cancellation.check()?;
+        let start = pixel
+            .checked_mul(channels)
+            .ok_or(MultimodalTextError::Overflow("Gemma source pixel"))?;
+        for channel in 0..3 {
+            values.try_push(*source.get(start + channel).ok_or(
+                MultimodalTextError::InvalidInput("Gemma source pixel storage is incomplete"),
+            )?)?;
+        }
+    }
+    Ok(ImageTensor::from_f32(
+        backend, context, batch, height, width, 3, &values,
+    )?)
+}
+
+fn gemma4_quantized_bicubic_resize(
+    backend: &CpuBackend,
+    values: &[f32],
+    height: u64,
+    width: u64,
+    target_height: u64,
+    target_width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<ImageTensor, MultimodalTextError> {
+    let height = u64_to_usize(height, "Gemma4 source height")?;
+    let width = u64_to_usize(width, "Gemma4 source width")?;
+    let target_height = u64_to_usize(target_height, "Gemma4 target height")?;
+    let target_width = u64_to_usize(target_width, "Gemma4 target width")?;
+    let source_count = height
+        .checked_mul(width)
+        .and_then(|value| value.checked_mul(3))
+        .ok_or(MultimodalTextError::Overflow("Gemma4 quantized source"))?;
+    if values.len() != source_count {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 source frame has the wrong length",
+        ));
+    }
+    let mut nchw = backend.workspace_vec(context, source_count)?;
+    for channel in 0..3 {
+        for y in 0..height {
+            context.cancellation.check()?;
+            for x in 0..width {
+                let source = (y * width + x) * 3 + channel;
+                let value = values
+                    .get(source)
+                    .copied()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma4 source frame storage is incomplete",
+                    ))?
+                    .clamp(0.0, 1.0);
+                nchw.try_push(f32::from((value * 255.0).trunc() as u8) / 255.0)?;
+            }
+        }
+    }
+    let resized = interpolate_with_context_exact_native(
+        &nchw,
+        &[1, 3, height, width],
+        &InterpolateConfiguration {
+            output_size: Some(vec![target_height, target_width]),
+            scale_factor: None,
+            mode: InterpolateMode::Bicubic,
+            align_corners: Some(false),
+            recompute_scale_factor: None,
+            antialias: true,
+        },
+        DeviceId::CPU,
+        context,
+    )?;
+    if resized.shape != [1, 3, target_height, target_width] {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 bicubic output has the wrong shape",
+        ));
+    }
+    let output_count = target_height
+        .checked_mul(target_width)
+        .and_then(|value| value.checked_mul(3))
+        .ok_or(MultimodalTextError::Overflow("Gemma4 resized output"))?;
+    let mut bhwc = backend.workspace_vec(context, output_count)?;
+    for y in 0..target_height {
+        context.cancellation.check()?;
+        for x in 0..target_width {
+            for channel in 0..3 {
+                let source = (channel * target_height + y) * target_width + x;
+                let value = resized
+                    .values
+                    .get(source)
+                    .copied()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma4 bicubic output storage is incomplete",
+                    ))?
+                    .clamp(0.0, 1.0);
+                bhwc.try_push(f32::from((value * 255.0).round_ties_even() as u8) / 255.0)?;
+            }
+        }
+    }
+    Ok(ImageTensor::from_f32(
+        backend,
+        context,
+        1,
+        u64::try_from(target_height)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 target height"))?,
+        u64::try_from(target_width)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 target width"))?,
+        3,
+        &bhwc,
+    )?)
 }
 
 pub fn prepare_qwen3vl_images(
@@ -3210,6 +3598,13 @@ fn require_cpu_f32(
 
 fn usize_to_i64(value: usize, name: &'static str) -> Result<i64, MultimodalTextError> {
     i64::try_from(value).map_err(|_| MultimodalTextError::Overflow(name))
+}
+
+fn checked_f64_to_u64(value: f64, name: &'static str) -> Result<u64, MultimodalTextError> {
+    if !value.is_finite() || value < 0.0 || value >= 18_446_744_073_709_551_616.0 {
+        return Err(MultimodalTextError::Overflow(name));
+    }
+    Ok(value as u64)
 }
 
 fn usize_to_u64(value: usize, name: &'static str) -> Result<u64, MultimodalTextError> {

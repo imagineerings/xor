@@ -58,6 +58,19 @@ class ValidationGenerationTests(unittest.TestCase):
         qwen_vision_id = "comfy-parity-native-qwen-vision-projection-foundation"
         qwen_resource_id = "comfy-parity-native-qwen-multimodal-resource-foundation"
         qwen_generation_id = "comfy-parity-native-qwen-multimodal-generation-foundation"
+        gemma_image_video_id = (
+            "comfy-parity-native-gemma-image-video-preparation-foundation"
+        )
+        gemma_audio_preparation_id = (
+            "comfy-parity-native-gemma-audio-preparation-foundation"
+        )
+        gemma_tokenizer_id = "comfy-parity-native-gemma-tokenizer-foundation"
+        gemma3_decoder_id = "comfy-parity-native-gemma3-decoder-exactness-foundation"
+        gemma4_decoder_id = "comfy-parity-native-gemma4-decoder-exactness-foundation"
+        gemma3_vision_id = "comfy-parity-native-gemma3-vision-projection-foundation"
+        gemma4_vision_id = "comfy-parity-native-gemma4-vision-projection-foundation"
+        gemma4_audio_id = "comfy-parity-native-gemma4-audio-execution-foundation"
+        gemma_resource_id = "comfy-parity-native-gemma-multimodal-resource-foundation"
         gemma_generation_id = "comfy-parity-native-gemma-multimodal-generation-foundation"
         multimodal_generation_id = "comfy-parity-native-text-generation-foundation"
         node_ids = sorted(
@@ -66,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 543)
+        self.assertEqual(len(tasks), 552)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -116,8 +129,44 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(tasks_by_id[qwen_resource_id]["dependencies"], [qwen_vision_id])
         self.assertEqual(tasks_by_id[qwen_generation_id]["dependencies"], [qwen_resource_id])
         self.assertEqual(
-            tasks_by_id[gemma_generation_id]["dependencies"],
+            tasks_by_id[gemma_image_video_id]["dependencies"],
             [qwen_generation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_audio_preparation_id]["dependencies"],
+            [gemma_image_video_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_tokenizer_id]["dependencies"],
+            [gemma_audio_preparation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma3_decoder_id]["dependencies"],
+            [gemma_tokenizer_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma4_decoder_id]["dependencies"],
+            [gemma3_decoder_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma3_vision_id]["dependencies"],
+            [gemma4_decoder_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma4_vision_id]["dependencies"],
+            [gemma3_vision_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma4_audio_id]["dependencies"],
+            [gemma4_vision_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_resource_id]["dependencies"],
+            [gemma4_audio_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_generation_id]["dependencies"],
+            [gemma_resource_id],
         )
         self.assertEqual(
             tasks_by_id[multimodal_generation_id]["dependencies"],
@@ -398,8 +447,21 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[qwen_vision_id], waves[qwen35_decoder_id] + 1)
         self.assertEqual(waves[qwen_resource_id], waves[qwen_vision_id] + 1)
         self.assertEqual(waves[qwen_generation_id], waves[qwen_resource_id] + 1)
+        self.assertEqual(waves[gemma_image_video_id], waves[qwen_generation_id] + 1)
         self.assertEqual(
-            waves[gemma_generation_id], waves[qwen_generation_id] + 1
+            waves[gemma_audio_preparation_id], waves[gemma_image_video_id] + 1
+        )
+        self.assertEqual(
+            waves[gemma_tokenizer_id], waves[gemma_audio_preparation_id] + 1
+        )
+        self.assertEqual(waves[gemma3_decoder_id], waves[gemma_tokenizer_id] + 1)
+        self.assertEqual(waves[gemma4_decoder_id], waves[gemma3_decoder_id] + 1)
+        self.assertEqual(waves[gemma3_vision_id], waves[gemma4_decoder_id] + 1)
+        self.assertEqual(waves[gemma4_vision_id], waves[gemma3_vision_id] + 1)
+        self.assertEqual(waves[gemma4_audio_id], waves[gemma4_vision_id] + 1)
+        self.assertEqual(waves[gemma_resource_id], waves[gemma4_audio_id] + 1)
+        self.assertEqual(
+            waves[gemma_generation_id], waves[gemma_resource_id] + 1
         )
         self.assertEqual(
             waves[text_generation_foundation_id], waves[gemma_generation_id] + 1

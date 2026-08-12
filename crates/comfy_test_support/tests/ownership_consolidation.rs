@@ -2950,6 +2950,80 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task389p_gemma_preparation_has_one_attempt_local_owner =
+        production_source_occurrences(&sources, "pub struct GemmaPreparedVisual {").len() == 1
+            && production_source_occurrences(&sources, "pub enum GemmaPreparedVisualKind {").len()
+                == 1
+            && production_source_occurrences(&sources, "pub fn prepare_gemma3_image(").len() == 1
+            && production_source_occurrences(&sources, "pub fn prepare_gemma4_visuals(").len() == 1
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache")
+            && !model_clip_text_encoder_multimodal.contains("OutputTransaction");
+    let task389p_gemma_preparation_is_exact_bounded_and_executable =
+        model_clip_text_encoder_multimodal.contains("GEMMA3_IMAGE_AREA_PIXELS")
+            && model_clip_text_encoder_multimodal.contains("ResizeMode::Area")
+            && model_clip_text_encoder_multimodal.contains("GEMMA4_VIDEO_SOURCE_FPS")
+            && model_clip_text_encoder_multimodal.contains("InterpolateMode::Bicubic")
+            && model_clip_text_encoder_multimodal.contains("antialias: true")
+            && model_clip_text_encoder_multimodal_tests.contains(
+                "gemma_image_video_preparation_is_source_exact_bounded_and_transactional",
+            )
+            && model_clip_text_encoder_multimodal_tests.contains("Gemma4VideoFrame")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task389p_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_preparation_source_gemma")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::GemmaPreparedVisual")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some(
+                                    "comfy-parity-native-gemma-image-video-preparation-foundation",
+                                )
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma-preparation-projects-gemma3-source-area-with-canonical-resize",
+                            "gemma-preparation-preserves-video-precedence-and-source-frame-timestamps",
+                            "gemma-preparation-delegates-source-quantized-bicubic-antialias-resize",
+                            "gemma-preparation-is-bounded-cancellable-and-attempt-local",
+                            "gemma-preparation-tests-source-fixtures-precedence-and-rollback",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task389p_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_text_media_preparation_source_gemma,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy_model::clip_text_encoder_multimodal::GemmaPreparedVisual")
+                && line.contains("comfy-parity-native-gemma-image-video-preparation-foundation")
+                && line.contains("VAL-TENSOR-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task343_policy_trace = policy_concerns
         .iter()
         .find(|entry| {
@@ -8991,6 +9065,18 @@ fn run_ownership_validation(
             task381p_qwen_preparation_is_exact_and_executable,
         ),
         (
+            "task389p_policy_and_catalog_trace_gemma_preparation",
+            task389p_policy_trace && task389p_catalog_trace,
+        ),
+        (
+            "task389p_gemma_preparation_has_one_attempt_local_owner",
+            task389p_gemma_preparation_has_one_attempt_local_owner,
+        ),
+        (
+            "task389p_gemma_preparation_is_exact_bounded_and_executable",
+            task389p_gemma_preparation_is_exact_bounded_and_executable,
+        ),
+        (
             "task340_policy_and_catalog_trace_the_canonical_clip_vision_owner",
             task_340_policy_trace && task_340_catalog_trace,
         ),
@@ -9569,6 +9655,17 @@ fn val_ownership_task381p_qwen_preparation_001() -> Result<(), Box<dyn std::erro
         "val-ownership-task381p-qwen-preparation-001.json",
         "val_ownership_task381p_qwen_preparation_001",
         Some("task381p_"),
+    )
+}
+
+#[test]
+fn val_ownership_task389p_gemma_preparation_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task389p-gemma-image-video-preparation-and-attempt-local-state-ownership",
+        "val-ownership-task389p-gemma-preparation-001.json",
+        "val_ownership_task389p_gemma_preparation_001",
+        Some("task389p_"),
     )
 }
 
