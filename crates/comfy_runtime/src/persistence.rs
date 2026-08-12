@@ -800,7 +800,12 @@ mod tests {
             let path = entry.path();
             if path.is_dir() {
                 collect_repository_rust_sources(&path, sources)?;
-            } else if path.extension().is_some_and(|extension| extension == "rs") {
+            } else if path.extension().is_some_and(|extension| extension == "rs")
+                && !path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("._"))
+            {
                 let source = fs::read_to_string(&path)?;
                 sources.push((path, source));
             }

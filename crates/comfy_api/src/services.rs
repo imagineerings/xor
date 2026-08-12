@@ -9,13 +9,13 @@ use comfy_runtime::{
     AuthorizedCapabilities, CompiledPlan, ExecutionCommandAck, ExecutionCommandOutcome,
     ExecutionCommandReceiptState, ExecutionControlCommand, ExecutionControlCommandKind,
     ExecutionController, ExecutionFailureOrigin, ExecutionSnapshot, ExecutionSnapshotStatus,
-    InputBinding, InputMode, NativeInputRequirement, NativeInputSchemaMetadata,
-    NativeNodeBindingDisposition, NativeNodeRegistry, NativePrimitive, NativeSchemaProvenance,
-    NativeSchemaValue, NativeUploadKind, NativeValue, NodeRegistry, ObjectInfoNode,
-    ObjectInfoRegistry, ProfileId, PromptCompiler, PromptId, RECENT_COMMAND_RESULT_CAPACITY,
-    RequestId, RuntimeNodeDescriptor, RuntimeNodePresentation, SharedAssetService,
-    SharedExecutionPresentationService, generated_native_node_registry_projection,
-    native_image_catalog_bindings,
+    InputBinding, InputMode, NativeExecutionRegistryBundle, NativeInputRequirement,
+    NativeInputSchemaMetadata, NativeNodeBindingDisposition, NativeNodeRegistry, NativePrimitive,
+    NativeProviderRegistryPin, NativeSchemaProvenance, NativeSchemaValue, NativeUploadKind,
+    NativeValue, NodeRegistry, ObjectInfoNode, ObjectInfoRegistry, ProfileId, PromptCompiler,
+    PromptId, RECENT_COMMAND_RESULT_CAPACITY, RequestId, RuntimeNodeDescriptor,
+    RuntimeNodePresentation, SharedAssetService, SharedExecutionPresentationService,
+    generated_native_node_registry_projection, native_image_catalog_bindings,
 };
 use comfy_types::{HttpMethod, PromptSubmission};
 use serde::Serialize;
@@ -43,6 +43,7 @@ pub struct NativeRuntimeHttpServices {
     presentation: SharedExecutionPresentationService,
     controller: Arc<dyn ExecutionController>,
     registry: NativeNodeRegistry,
+    provider_registry: Option<NativeProviderRegistryPin>,
     assets: Option<SharedAssetService>,
     asset_reader_authorization: Option<AuthorizedCapabilities>,
 }
@@ -111,10 +112,26 @@ impl NativeRuntimeHttpServices {
             presentation,
             controller,
             registry,
+            provider_registry: None,
             assets: None,
             asset_reader_authorization: None,
         };
         service.snapshot()?;
+        Ok(service)
+    }
+
+    pub fn from_registry_bundle(
+        bundle: &NativeExecutionRegistryBundle,
+        presentation: SharedExecutionPresentationService,
+        controller: Arc<dyn ExecutionController>,
+    ) -> Result<Self, NativeServiceError> {
+        let mut service = Self::new(
+            bundle.profile_id(),
+            presentation,
+            controller,
+            bundle.registry().clone(),
+        )?;
+        service.provider_registry = bundle.provider_registry().cloned();
         Ok(service)
     }
 
@@ -325,15 +342,26 @@ impl NativeRuntimeHttpServices {
                     error.to_string(),
                 )
             })?;
-        PromptCompiler::new(&self.registry)
-            .compile(submission)
-            .map_err(|error| {
-                NativeServiceError::new(
-                    NativeServiceErrorKind::Invalid,
-                    "prompt_validation_failed",
-                    error.to_string(),
-                )
-            })
+        let compiler = PromptCompiler::new(&self.registry);
+        let compiler = match self.provider_registry.as_ref() {
+            Some(provider_registry) => compiler
+                .with_provider_registry_pin(provider_registry.clone())
+                .map_err(|error| {
+                    NativeServiceError::new(
+                        NativeServiceErrorKind::Unavailable,
+                        "provider_registry_unavailable",
+                        error.to_string(),
+                    )
+                })?,
+            None => compiler,
+        };
+        compiler.compile(submission).map_err(|error| {
+            NativeServiceError::new(
+                NativeServiceErrorKind::Invalid,
+                "prompt_validation_failed",
+                error.to_string(),
+            )
+        })
     }
 
     fn reconcile_prompt(

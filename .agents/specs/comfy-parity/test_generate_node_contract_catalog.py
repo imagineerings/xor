@@ -109,6 +109,21 @@ class NodeContractCatalogTests(unittest.TestCase):
             "preserved_expression",
         )
 
+        paid_provider = self.contracts["COMFY-NODE-0024"]
+        paid_provider_node = paid_provider["schema"]["portable"]["node"]
+        self.assertEqual(
+            paid_provider_node["price_badge"]["kind"],
+            "preserved_expression",
+        )
+        self.assertIn(
+            "IO.PriceBadge",
+            paid_provider_node["price_badge"]["source"],
+        )
+        self.assertNotIn(
+            "price_badge",
+            {item["name"] for item in paid_provider_node["extra"]},
+        )
+
     def test_v1_and_autogrow_contracts_are_structured_without_execution(self) -> None:
         sampler = self.contracts["COMFY-NODE-0306"]
         self.assertEqual(sampler["schema"]["status"], "normalized_v1")

@@ -422,6 +422,23 @@ pub fn native_custom_source_type_projection(
 pub fn native_plugin_source_type_projection(
     plugin_type_name: &str,
 ) -> Result<NativeSourceTypeProjection, NativeSourceTypeError> {
+    let custom_identity = match plugin_type_name {
+        "custom-elevenlabs-voice" => Some("ELEVENLABS_VOICE"),
+        "custom-krea-style-ref" => Some("KreaIO.STYLE_REF"),
+        "custom-luma-concepts" => Some("LumaIO.LUMA_CONCEPTS"),
+        "custom-luma-ray32-keyframe" => Some("LumaIO.LUMA_RAY32_KEYFRAME"),
+        "custom-luma-ref" => Some("LumaIO.LUMA_REF"),
+        "custom-pixverse-template" => Some("PixverseIO.TEMPLATE"),
+        "custom-recraft-color" => Some("RecraftIO.COLOR"),
+        "custom-recraft-controls" => Some("RecraftIO.CONTROLS"),
+        "custom-recraft-style-v3" => Some("RecraftIO.STYLEV3"),
+        "custom-runway-aleph2-keyframe" => Some("RunwayAleph2IO.KEYFRAME"),
+        "custom-runway-aleph2-prompt-image" => Some("RunwayAleph2IO.PROMPT_IMAGE"),
+        _ => None,
+    };
+    if let Some(custom_identity) = custom_identity {
+        return native_custom_source_type_projection(custom_identity);
+    }
     let source_type = match plugin_type_name {
         "any" => "*".to_owned(),
         "bounding-box-editor" => "BOUNDING_BOXES".to_owned(),
@@ -437,6 +454,15 @@ pub fn native_plugin_source_type_projection(
         "load-3d-camera" => "LOAD3D_CAMERA".to_owned(),
         "load-3d-model-info" => "LOAD3D_MODEL_INFO".to_owned(),
         "match-type" => "COMFY_MATCHTYPE_V3".to_owned(),
+        "camera-control" => "CAMERA_CONTROL".to_owned(),
+        "gemini-input-files" => "GEMINI_INPUT_FILES".to_owned(),
+        "meshy-rigged-task-id" => "MESHY_RIGGED_TASK_ID".to_owned(),
+        "meshy-task-id" => "MESHY_TASK_ID".to_owned(),
+        "model-task-id" => "MODEL_TASK_ID".to_owned(),
+        "openai-chat-config" => "OPENAI_CHAT_CONFIG".to_owned(),
+        "openai-input-files" => "OPENAI_INPUT_FILES".to_owned(),
+        "retarget-task-id" => "RETARGET_TASK_ID".to_owned(),
+        "rig-task-id" => "RIG_TASK_ID".to_owned(),
         "autogrow" | "custom" | "multi-type" => {
             return Err(NativeSourceTypeError::SourceIdentityRequired(
                 plugin_type_name.to_owned(),

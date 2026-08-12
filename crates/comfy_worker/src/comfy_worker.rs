@@ -577,6 +577,10 @@ async fn run_worker_process_with_configuration(
 ) -> anyhow::Result<()> {
     let (backend_session, cpu_executor_backend) =
         initialize_worker_backend(backend_selection, memory_limit_bytes);
+    if cpu_executor_backend.is_some() {
+        comfy_runtime::generated_native_node_registry_projection(diffusion_provider.clone())?;
+        comfy_runtime::prewarm_native_shader_executor();
+    }
     let mut session = WorkerSession::with_backend_result(backend_session);
     let (input_sender, input_receiver) = async_channel::bounded(8);
     let reader_thread = std::thread::Builder::new()
@@ -598,6 +602,7 @@ async fn run_worker_process_with_configuration(
     let mut active_execution: Option<ActiveExecution> = None;
     let mut native_image_executor: Option<NativeImageExecutor> = None;
     let mut native_image_executor_provider_registry = None;
+    let mut native_provider_capabilities = None;
     let mut plugin_registry: Option<CommittedPluginRegistry> = None;
     let mut pending_plugin_capabilities: BTreeMap<u64, async_channel::Sender<Vec<u8>>> =
         BTreeMap::new();
@@ -702,6 +707,7 @@ async fn run_worker_process_with_configuration(
                         )? {
                             native_image_executor = None;
                             native_image_executor_provider_registry = None;
+                            native_provider_capabilities = None;
                         }
                     }
                     responses
@@ -786,31 +792,84 @@ async fn run_worker_process_with_configuration(
                                             )
                                         })
                                 } else {
-                                    let created = if let Some(provider) = diffusion_provider.clone()
-                                    {
-                                        NativeImageExecutor::new_with_generated_registry_and_diffusion_provider(
+                                    let cpu_backend = cpu_executor_backend.clone().ok_or_else(|| {
+                                        NativeImageRuntimeError::Execution(
+                                            "CPU executor adapter is unavailable for the selected backend"
+                                                .to_owned(),
+                                        )
+                                    })?;
+                                    let created = if worker_plan.provider_registry.is_some() {
+                                        let registry = plugin_registry
+                                            .as_ref()
+                                            .ok_or_else(|| {
+                                                NativeImageRuntimeError::Execution(
+                                                    "native provider registry is unavailable"
+                                                        .to_owned(),
+                                                )
+                                            })?
+                                            .compiled
+                                            .clone();
+                                        let (capability_sender, capability_receiver) =
+                                            async_channel::bounded(8);
+                                        let bridge =
+                                            Arc::new(plugin_runtime::WorkerCapabilityBridge::new(
+                                                capability_sender,
+                                            ));
+                                        native_provider_capabilities = Some(capability_receiver);
+                                        if let Some(provider) = diffusion_provider.clone() {
+                                            NativeImageExecutor::new_with_generated_registry_diffusion_and_registration(
                                                 envelope.profile_id,
                                                 worker_plan.input_assets.clone(),
                                                 worker_plan.metadata_enabled,
-                                                cpu_executor_backend.clone().ok_or_else(|| {
-                                                    NativeImageRuntimeError::Execution(
-                                                        "CPU executor adapter is unavailable for the selected backend"
-                                                            .to_owned(),
-                                                    )
-                                                })?,
+                                                cpu_backend,
                                                 provider,
+                                                {
+                                                    let registry = registry.clone();
+                                                    let bridge = bridge.clone();
+                                                    move |nodes| {
+                                                    registry
+                                                        .activate_native_provider_nodes(nodes, bridge)
+                                                        .map_err(|error| {
+                                                            NativeImageRuntimeError::Execution(
+                                                                error.to_string(),
+                                                            )
+                                                        })
+                                                    }
+                                                },
                                             )
+                                        } else {
+                                            NativeImageExecutor::new_with_generated_registry_and_registration(
+                                                envelope.profile_id,
+                                                worker_plan.input_assets.clone(),
+                                                worker_plan.metadata_enabled,
+                                                cpu_backend,
+                                                move |nodes| {
+                                                    registry
+                                                        .activate_native_provider_nodes(nodes, bridge)
+                                                        .map_err(|error| {
+                                                            NativeImageRuntimeError::Execution(
+                                                                error.to_string(),
+                                                            )
+                                                        })
+                                                },
+                                            )
+                                        }
+                                    } else if let Some(provider) = diffusion_provider.clone() {
+                                        native_provider_capabilities = None;
+                                        NativeImageExecutor::new_with_generated_registry_and_diffusion_provider(
+                                            envelope.profile_id,
+                                            worker_plan.input_assets.clone(),
+                                            worker_plan.metadata_enabled,
+                                            cpu_backend,
+                                            provider,
+                                        )
                                     } else {
+                                        native_provider_capabilities = None;
                                         NativeImageExecutor::new_with_generated_registry(
                                             envelope.profile_id,
                                             worker_plan.input_assets.clone(),
                                             worker_plan.metadata_enabled,
-                                            cpu_executor_backend.clone().ok_or_else(|| {
-                                                NativeImageRuntimeError::Execution(
-                                                    "CPU executor adapter is unavailable for the selected backend"
-                                                        .to_owned(),
-                                                )
-                                            })?,
+                                            cpu_backend,
                                         )
                                     };
                                     created.map(|executor| {
@@ -872,7 +931,7 @@ async fn run_worker_process_with_configuration(
                                     memory: Some(memory),
                                     native_result: Some(result),
                                     plugin_result: None,
-                                    plugin_capabilities: None,
+                                    plugin_capabilities: native_provider_capabilities.clone(),
                                     events: Some(events),
                                 });
                             }
@@ -1019,6 +1078,12 @@ async fn run_worker_process_with_configuration(
                 return Err(anyhow::anyhow!("worker input channel closed: {error}"));
             }
             NextWorkerInput::NativeJob(Ok(result)) => {
+                if !pending_plugin_capabilities.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "native provider execution finished with capability calls still pending"
+                    ));
+                }
+                pending_plugin_capabilities.clear();
                 if let Some(active) = &active_execution
                     && let Some(events) = &active.events
                 {

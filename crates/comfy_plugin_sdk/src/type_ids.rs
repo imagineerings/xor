@@ -482,7 +482,10 @@ fn validate_native_source_projections(
             }
         };
         let source_type = projection.source_type();
-        if registration.source_socket != source_type && !registration.aliases.contains(&source_type)
+        let custom_identity = type_id.name().starts_with("custom-") && source_type == "CUSTOM";
+        if !custom_identity
+            && registration.source_socket != source_type
+            && !registration.aliases.contains(&source_type)
         {
             return Err(TypeRegistryError::SourceProjection {
                 type_id: registration.canonical.to_owned(),
@@ -722,6 +725,91 @@ plugin_types!(
         ["WAN_CAMERA_EMBEDDING"]
     ),
     ("comfy:webcam@1", "Webcam", Tensor, ["WEBCAM"]),
+    ("comfy:camera-control@1", "CAMERA_CONTROL", Artifact, []),
+    (
+        "comfy:gemini-input-files@1",
+        "GEMINI_INPUT_FILES",
+        Model,
+        []
+    ),
+    (
+        "comfy:meshy-rigged-task-id@1",
+        "MESHY_RIGGED_TASK_ID",
+        Model,
+        []
+    ),
+    ("comfy:meshy-task-id@1", "MESHY_TASK_ID", Model, []),
+    ("comfy:model-task-id@1", "MODEL_TASK_ID", Model, []),
+    (
+        "comfy:openai-chat-config@1",
+        "OPENAI_CHAT_CONFIG",
+        Model,
+        []
+    ),
+    (
+        "comfy:openai-input-files@1",
+        "OPENAI_INPUT_FILES",
+        Model,
+        []
+    ),
+    ("comfy:retarget-task-id@1", "RETARGET_TASK_ID", Model, []),
+    ("comfy:rig-task-id@1", "RIG_TASK_ID", Model, []),
+    (
+        "comfy:custom-elevenlabs-voice@1",
+        "ELEVENLABS_VOICE",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-krea-style-ref@1",
+        "KreaIO.STYLE_REF",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-luma-concepts@1",
+        "LumaIO.LUMA_CONCEPTS",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-luma-ray32-keyframe@1",
+        "LumaIO.LUMA_RAY32_KEYFRAME",
+        Model,
+        []
+    ),
+    ("comfy:custom-luma-ref@1", "LumaIO.LUMA_REF", Model, []),
+    (
+        "comfy:custom-pixverse-template@1",
+        "PixverseIO.TEMPLATE",
+        Model,
+        []
+    ),
+    ("comfy:custom-recraft-color@1", "RecraftIO.COLOR", Model, []),
+    (
+        "comfy:custom-recraft-controls@1",
+        "RecraftIO.CONTROLS",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-recraft-style-v3@1",
+        "RecraftIO.STYLEV3",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-runway-aleph2-keyframe@1",
+        "RunwayAleph2IO.KEYFRAME",
+        Model,
+        []
+    ),
+    (
+        "comfy:custom-runway-aleph2-prompt-image@1",
+        "RunwayAleph2IO.PROMPT_IMAGE",
+        Model,
+        []
+    ),
 );
 
 #[cfg(test)]
@@ -746,7 +834,7 @@ mod tests {
     #[test]
     fn built_in_registry_has_one_canonical_entry_per_socket() -> Result<(), Box<dyn Error>> {
         let registry = TypeRegistry::built_in()?;
-        assert_eq!(registry.len(), 66);
+        assert_eq!(registry.len(), 86);
         assert_eq!(
             registry.resolve("CLIP_VISION")?.to_string(),
             "comfy:clip-vision@1"
@@ -767,6 +855,14 @@ mod tests {
         assert_eq!(
             registry.wire_schema(registry.resolve("IMAGE")?)?,
             "sim:comfy-value/tensor@1"
+        );
+        assert_eq!(
+            registry.resolve("MODEL_TASK_ID")?.to_string(),
+            "comfy:model-task-id@1"
+        );
+        assert_eq!(
+            registry.resolve("KreaIO.STYLE_REF")?.to_string(),
+            "comfy:custom-krea-style-ref@1"
         );
         Ok(())
     }
@@ -836,7 +932,31 @@ mod tests {
         {
             resolved.insert(registry.resolve(socket)?.clone());
         }
-        assert_eq!(resolved.len(), 66);
+        for socket in [
+            "CAMERA_CONTROL",
+            "GEMINI_INPUT_FILES",
+            "MESHY_RIGGED_TASK_ID",
+            "MESHY_TASK_ID",
+            "MODEL_TASK_ID",
+            "OPENAI_CHAT_CONFIG",
+            "OPENAI_INPUT_FILES",
+            "RETARGET_TASK_ID",
+            "RIG_TASK_ID",
+            "ELEVENLABS_VOICE",
+            "KreaIO.STYLE_REF",
+            "LumaIO.LUMA_CONCEPTS",
+            "LumaIO.LUMA_RAY32_KEYFRAME",
+            "LumaIO.LUMA_REF",
+            "PixverseIO.TEMPLATE",
+            "RecraftIO.COLOR",
+            "RecraftIO.CONTROLS",
+            "RecraftIO.STYLEV3",
+            "RunwayAleph2IO.KEYFRAME",
+            "RunwayAleph2IO.PROMPT_IMAGE",
+        ] {
+            resolved.insert(registry.resolve(socket)?.clone());
+        }
+        assert_eq!(resolved.len(), 86);
         assert_eq!(resolved.len(), registry.len());
         assert!(
             registry
@@ -886,11 +1006,11 @@ mod tests {
                 .lines()
                 .filter(|line| line.starts_with("type|"))
                 .count(),
-            66
+            86
         );
         assert_eq!(
             format!("{:x}", Sha256::digest(projection.as_bytes())),
-            "65f095269833bbc4b646ed9180dcf07d6c4203387aa22072cf0f994e1bcb708c"
+            "2372fbbb99da8f9ee9fec98f4c775d5eb40448171020b209a3b8d32090cd78a7"
         );
         assert_eq!(
             registry.representation(registry.resolve("IMAGE")?)?,

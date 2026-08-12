@@ -12,6 +12,7 @@ use clock::SystemClock;
 use comfy_model::{
     LoadedModel, ModelFormat, ModelFormatError, ModelLoadAccounting, ModelStore, ModelStoreError,
 };
+use comfy_nodes::NativeSchemaValue;
 use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_tensor::{
     CancellationToken, RetryRngPolicy, RngAlgorithm, RngCheckpoint, RngProfileVersion, RngStream,
@@ -25,9 +26,9 @@ use thiserror::Error;
 
 use crate::{
     AssetError, AssetNamespace, AssetOperation, AuthorizedProviderRequest, Capability,
-    PluginAuthorization, ProviderCostAcceptance, ProviderCostAcceptanceScope,
-    ProviderCostAcceptanceVerifier, ProviderCostNonce, ProviderInvocationIdentity,
-    ProviderMaterializationError, ProviderPolicy, ProviderPriceBound,
+    PluginAuthorization, ProviderCostAcceptance, ProviderCostAcceptanceIssuer,
+    ProviderCostAcceptanceScope, ProviderCostAcceptanceVerifier, ProviderCostNonce,
+    ProviderInvocationIdentity, ProviderMaterializationError, ProviderPolicy, ProviderPriceBound,
     ProviderResultReceiptAuthority, ProviderResultReceiptSession, ResolvedProviderResult, SecretId,
     SecretValue, SharedAssetService,
 };
@@ -37,6 +38,414 @@ pub const MAX_PLUGIN_SERVICE_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PLUGIN_SERVICE_IDENTITY_BYTES: usize = 1_024;
 const MAX_CONSUMED_PROVIDER_COST_NONCES: usize = 65_536;
 const RNG_DEADLINE_CHECK_CHUNK_BYTES: usize = 64 * 1024;
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeProviderWorkerSessionStart {
+    pub session_id: String,
+    pub registry_generation: u64,
+    pub registry_digest_sha256: String,
+    pub extension_id: String,
+    pub extension_version: String,
+    pub plugin_identifier: String,
+    pub plugin_version: String,
+    pub manifest_digest_sha256: String,
+    pub component_digest_sha256: String,
+    pub authorization_generation_sha256: String,
+    pub binding_set_sha256: String,
+    pub node_id: String,
+    pub compiled_plan_sha256: String,
+    pub maximum_response_bytes: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub enum NativeProviderWorkerRequest {
+    Begin(NativeProviderWorkerSessionStart),
+    Call {
+        session_id: String,
+        request: Vec<u8>,
+    },
+    Resolve {
+        session_id: String,
+        receipt_set: Vec<u8>,
+    },
+    Finish {
+        session_id: String,
+    },
+    Abort {
+        session_id: String,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub enum NativeProviderWorkerResponse {
+    Begun,
+    Call(Vec<u8>),
+    Resolved(Vec<Vec<u8>>),
+    Finished,
+    Aborted,
+    Failure(PluginServiceWireFailure),
+}
+
+impl NativeProviderWorkerRequest {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PluginServiceError> {
+        let bytes =
+            postcard::to_stdvec(self).map_err(|_| PluginServiceError::InvalidWirePayload)?;
+        check_request_size(bytes.len())?;
+        Ok(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PluginServiceError> {
+        check_request_size(bytes.len())?;
+        postcard::from_bytes(bytes).map_err(|_| PluginServiceError::InvalidWirePayload)
+    }
+}
+
+impl NativeProviderWorkerResponse {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PluginServiceError> {
+        let bytes =
+            postcard::to_stdvec(self).map_err(|_| PluginServiceError::InvalidWirePayload)?;
+        check_response_size(bytes.len(), MAX_PLUGIN_SERVICE_RESPONSE_BYTES)?;
+        Ok(bytes)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PluginServiceError> {
+        check_response_size(bytes.len(), MAX_PLUGIN_SERVICE_RESPONSE_BYTES)?;
+        postcard::from_bytes(bytes).map_err(|_| PluginServiceError::InvalidWirePayload)
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeProviderInvocationScope {
+    pub profile_id: ProfileId,
+    pub prompt_id: PromptId,
+    pub attempt_id: AttemptId,
+    pub node_id: NodeId,
+    pub cancellation: CancellationToken,
+    pub start: NativeProviderWorkerSessionStart,
+}
+
+pub trait NativeProviderInvocationAuthority: Send + Sync {
+    fn begin(
+        &self,
+        scope: NativeProviderInvocationScope,
+    ) -> Result<PluginCapabilityInvocation, PluginServiceError>;
+}
+
+pub struct ProviderCostAuthorizationRequest<'a> {
+    identity: &'a ProviderInvocationIdentity,
+    price_badge: &'a NativeSchemaValue,
+}
+
+impl<'a> ProviderCostAuthorizationRequest<'a> {
+    pub fn identity(&self) -> &'a ProviderInvocationIdentity {
+        self.identity
+    }
+
+    pub fn price_badge(&self) -> &'a NativeSchemaValue {
+        self.price_badge
+    }
+}
+
+pub struct ProviderCostAuthorization {
+    price_bound: ProviderPriceBound,
+    nonce: ProviderCostNonce,
+    acceptance: ProviderCostAcceptance,
+}
+
+impl ProviderCostAuthorization {
+    pub fn new(
+        price_bound: ProviderPriceBound,
+        nonce: ProviderCostNonce,
+        acceptance: ProviderCostAcceptance,
+    ) -> Result<Self, PluginServiceError> {
+        if acceptance.nonce() != nonce {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        Ok(Self {
+            price_bound,
+            nonce,
+            acceptance,
+        })
+    }
+
+    pub fn price_bound(&self) -> &ProviderPriceBound {
+        &self.price_bound
+    }
+
+    pub fn nonce(&self) -> ProviderCostNonce {
+        self.nonce
+    }
+
+    pub fn acceptance(&self) -> &ProviderCostAcceptance {
+        &self.acceptance
+    }
+}
+
+impl fmt::Debug for ProviderCostAuthorization {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderCostAuthorization([SEALED])")
+    }
+}
+
+pub trait ProviderCostAuthorizationAuthority: Send + Sync {
+    fn authorize(
+        &self,
+        request: ProviderCostAuthorizationRequest<'_>,
+    ) -> Result<ProviderCostAuthorization, PluginServiceError>;
+}
+
+#[derive(Clone, Debug)]
+pub struct ProviderCostApproval {
+    principal_id: String,
+    profile_id: String,
+    prompt_sha256: String,
+    node_id: String,
+    request_ordinal: u32,
+    plugin_id: String,
+    plugin_digest_sha256: String,
+    provider_binding_sha256: String,
+    provider: String,
+    endpoint: String,
+    price_badge_sha256: String,
+    price_bound: ProviderPriceBound,
+    expires_at: Instant,
+    nonce: ProviderCostNonce,
+}
+
+impl ProviderCostApproval {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        principal_id: impl Into<String>,
+        profile_id: impl Into<String>,
+        prompt_sha256: impl Into<String>,
+        node_id: impl Into<String>,
+        request_ordinal: u32,
+        plugin_id: impl Into<String>,
+        plugin_digest_sha256: impl Into<String>,
+        provider_binding_sha256: impl Into<String>,
+        provider: impl Into<String>,
+        endpoint: impl Into<String>,
+        price_badge: &NativeSchemaValue,
+        price_bound: ProviderPriceBound,
+        expires_at: Instant,
+        nonce: ProviderCostNonce,
+    ) -> Result<Self, PluginServiceError> {
+        price_badge
+            .validate()
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        let price_badge_sha256 = schema_value_sha256(price_badge)?;
+        let approval = Self {
+            principal_id: principal_id.into(),
+            profile_id: profile_id.into(),
+            prompt_sha256: prompt_sha256.into(),
+            node_id: node_id.into(),
+            request_ordinal,
+            plugin_id: plugin_id.into(),
+            plugin_digest_sha256: plugin_digest_sha256.into(),
+            provider_binding_sha256: provider_binding_sha256.into(),
+            provider: provider.into(),
+            endpoint: endpoint.into(),
+            price_badge_sha256,
+            price_bound,
+            expires_at,
+            nonce,
+        };
+        approval.key()?;
+        Ok(approval)
+    }
+
+    fn key(&self) -> Result<String, PluginServiceError> {
+        approval_key(
+            &self.principal_id,
+            &self.profile_id,
+            &self.prompt_sha256,
+            &self.node_id,
+            self.request_ordinal,
+            &self.plugin_id,
+            &self.plugin_digest_sha256,
+            &self.provider_binding_sha256,
+            &self.provider,
+            &self.endpoint,
+            &self.price_badge_sha256,
+        )
+    }
+}
+
+pub struct ProviderCostApprovalAuthority {
+    issuer: Arc<ProviderCostAcceptanceIssuer>,
+    clock: Arc<dyn SystemClock>,
+    approvals: Mutex<BTreeMap<String, ProviderCostApproval>>,
+}
+
+impl ProviderCostApprovalAuthority {
+    pub fn new(issuer: Arc<ProviderCostAcceptanceIssuer>, clock: Arc<dyn SystemClock>) -> Self {
+        Self {
+            issuer,
+            clock,
+            approvals: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    pub fn verifier(&self) -> Result<ProviderCostAcceptanceVerifier, PluginServiceError> {
+        self.issuer
+            .verifier()
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)
+    }
+
+    pub fn approve(&self, approval: ProviderCostApproval) -> Result<(), PluginServiceError> {
+        if approval.expires_at <= self.clock.utc_now() {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let key = approval.key()?;
+        let mut approvals = self.approvals.lock();
+        approvals.retain(|_, approval| approval.expires_at > self.clock.utc_now());
+        if approvals.contains_key(&key) {
+            return Err(PluginServiceError::ProviderCostAcceptanceReused);
+        }
+        approvals.insert(key, approval);
+        Ok(())
+    }
+}
+
+impl fmt::Debug for ProviderCostApprovalAuthority {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("ProviderCostApprovalAuthority([REDACTED])")
+    }
+}
+
+impl ProviderCostAuthorizationAuthority for ProviderCostApprovalAuthority {
+    fn authorize(
+        &self,
+        request: ProviderCostAuthorizationRequest<'_>,
+    ) -> Result<ProviderCostAuthorization, PluginServiceError> {
+        let identity = request.identity();
+        let price_badge_sha256 = schema_value_sha256(request.price_badge())?;
+        let key = approval_key(
+            identity.principal_id(),
+            identity.profile_id(),
+            identity.prompt_sha256(),
+            identity.node_id(),
+            identity.request_ordinal(),
+            identity.plugin_id(),
+            identity.plugin_digest_sha256(),
+            identity.provider_binding_sha256(),
+            identity.provider(),
+            identity.endpoint(),
+            &price_badge_sha256,
+        )?;
+        let approval = self
+            .approvals
+            .lock()
+            .remove(&key)
+            .ok_or(PluginServiceError::ProviderCostAcceptanceRequired)?;
+        let now = self.clock.utc_now();
+        if approval.expires_at <= now {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        let scope = ProviderCostAcceptanceScope::new(
+            identity.principal_id(),
+            identity.profile_id(),
+            identity.prompt_id(),
+            identity.prompt_sha256(),
+            identity.attempt_id(),
+            identity.node_id(),
+            identity.request_ordinal(),
+            identity.request_sha256(),
+            identity.plugin_id(),
+            identity.plugin_digest_sha256(),
+            identity.provider_binding_sha256(),
+            identity.provider(),
+            identity.endpoint(),
+            approval.price_bound.clone(),
+        )
+        .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        let maximum_expiration = now
+            .checked_add(Duration::from_secs(5 * 60))
+            .ok_or(PluginServiceError::ProviderCostAcceptanceDenied)?;
+        let acceptance = self
+            .issuer
+            .issue(
+                scope,
+                now,
+                approval.expires_at.min(maximum_expiration),
+                approval.nonce,
+            )
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        ProviderCostAuthorization::new(approval.price_bound, approval.nonce, acceptance)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn approval_key(
+    principal_id: &str,
+    profile_id: &str,
+    prompt_sha256: &str,
+    node_id: &str,
+    request_ordinal: u32,
+    plugin_id: &str,
+    plugin_digest_sha256: &str,
+    provider_binding_sha256: &str,
+    provider: &str,
+    endpoint: &str,
+    price_badge_sha256: &str,
+) -> Result<String, PluginServiceError> {
+    let identity = ProviderInvocationIdentity::new(
+        principal_id,
+        profile_id,
+        "provider-cost-approval",
+        prompt_sha256,
+        "provider-cost-approval",
+        node_id,
+        request_ordinal,
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        plugin_id,
+        plugin_digest_sha256,
+        provider_binding_sha256,
+        provider,
+        endpoint,
+    )
+    .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+    let bytes = serde_json::to_vec(&(
+        identity.principal_id(),
+        identity.profile_id(),
+        identity.prompt_sha256(),
+        identity.node_id(),
+        identity.request_ordinal(),
+        identity.plugin_id(),
+        identity.plugin_digest_sha256(),
+        identity.provider_binding_sha256(),
+        identity.provider(),
+        identity.endpoint(),
+        price_badge_sha256,
+    ))
+    .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn schema_value_sha256(value: &NativeSchemaValue) -> Result<String, PluginServiceError> {
+    let bytes =
+        serde_json::to_vec(value).map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+#[derive(Clone)]
+struct ProviderInvocationCostAuthority {
+    price_badge: NativeSchemaValue,
+    authority: Option<Arc<dyn ProviderCostAuthorizationAuthority>>,
+}
+
+impl fmt::Debug for ProviderInvocationCostAuthority {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ProviderInvocationCostAuthority")
+            .field("price_badge", &self.price_badge)
+            .field("authority", &"[REDACTED]")
+            .finish()
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -175,6 +584,7 @@ pub struct PluginServiceInvocationContext {
     deadline: Instant,
     maximum_response_bytes: u64,
     provider_result_authority: Option<ProviderResultReceiptAuthority>,
+    provider_cost_authority: Option<ProviderInvocationCostAuthority>,
 }
 
 impl PluginServiceInvocationContext {
@@ -272,6 +682,7 @@ impl PluginServiceInvocationContext {
             deadline,
             maximum_response_bytes,
             provider_result_authority: None,
+            provider_cost_authority: None,
         })
     }
 
@@ -283,6 +694,32 @@ impl PluginServiceInvocationContext {
             return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
         }
         self.provider_result_authority = Some(authority);
+        Ok(self)
+    }
+
+    pub fn with_provider_cost_authority(
+        self,
+        price_badge: NativeSchemaValue,
+        authority: Arc<dyn ProviderCostAuthorizationAuthority>,
+    ) -> Result<Self, PluginServiceError> {
+        self.with_provider_cost_requirement(price_badge, Some(authority))
+    }
+
+    pub fn with_provider_cost_requirement(
+        mut self,
+        price_badge: NativeSchemaValue,
+        authority: Option<Arc<dyn ProviderCostAuthorizationAuthority>>,
+    ) -> Result<Self, PluginServiceError> {
+        price_badge
+            .validate()
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
+        if self.principal_id().is_none() || self.provider_result_authority().is_none() {
+            return Err(PluginServiceError::ProviderCostAcceptanceDenied);
+        }
+        self.provider_cost_authority = Some(ProviderInvocationCostAuthority {
+            price_badge,
+            authority,
+        });
         Ok(self)
     }
 
@@ -332,6 +769,10 @@ impl PluginServiceInvocationContext {
 
     pub fn provider_result_authority(&self) -> Option<&ProviderResultReceiptAuthority> {
         self.provider_result_authority.as_ref()
+    }
+
+    fn provider_cost_authority(&self) -> Option<&ProviderInvocationCostAuthority> {
+        self.provider_cost_authority.as_ref()
     }
 }
 
@@ -877,12 +1318,15 @@ impl PluginCapabilityInvocation {
     ) -> Result<Vec<u8>, PluginServiceError> {
         self.check_terminal()?;
         let outcome = OperationOutcomeGuard::new(self.operation_failed.clone());
+        self.require_capability(&Capability::ProviderUpload {
+            provider: provider.to_owned(),
+            endpoint: endpoint.to_owned(),
+        })?;
         let authority = self
             .context
             .provider_result_authority()
             .cloned()
             .ok_or(PluginServiceError::ProviderResultReceiptAuthorityRequired)?;
-        let response = self.execute_provider_request(provider, endpoint, secret_id, body)?;
         let request_ordinal = self
             .provider_result_receipts
             .as_ref()
@@ -905,6 +1349,35 @@ impl PluginCapabilityInvocation {
             endpoint,
         )
         .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let cost_authority = self.context.provider_cost_authority().cloned();
+        let response = if let Some(cost_authority) = cost_authority {
+            self.require_capability(&Capability::ProviderCost {
+                provider: provider.to_owned(),
+                endpoint: endpoint.to_owned(),
+            })?;
+            let authorization = cost_authority
+                .authority
+                .as_ref()
+                .ok_or(PluginServiceError::ProviderCostAcceptanceRequired)?
+                .authorize(ProviderCostAuthorizationRequest {
+                    identity: &identity,
+                    price_badge: &cost_authority.price_badge,
+                })?;
+            self.execute_priced_provider_request(
+                authority.provider_binding_sha256(),
+                authority.prompt_sha256(),
+                request_ordinal,
+                provider,
+                endpoint,
+                secret_id,
+                authorization.price_bound(),
+                authorization.nonce(),
+                Some(authorization.acceptance()),
+                body,
+            )?
+        } else {
+            self.execute_provider_request(provider, endpoint, secret_id, body)?
+        };
         let issued_at = self.broker.inner.clock.utc_now();
         let lifetime_expiration = issued_at
             .checked_add(authority.receipt_lifetime())
@@ -958,6 +1431,14 @@ impl PluginCapabilityInvocation {
         self.check_terminal()?;
         let outcome = OperationOutcomeGuard::new(self.operation_failed.clone());
         check_request_size(body.len())?;
+        self.require_capability(&Capability::ProviderUpload {
+            provider: provider.to_owned(),
+            endpoint: endpoint.to_owned(),
+        })?;
+        self.require_capability(&Capability::ProviderCost {
+            provider: provider.to_owned(),
+            endpoint: endpoint.to_owned(),
+        })?;
         self.require_capability(&Capability::ProviderNetwork {
             provider: provider.to_owned(),
             endpoint: endpoint.to_owned(),
@@ -1019,7 +1500,9 @@ impl PluginCapabilityInvocation {
                 endpoint,
                 secret_id,
             )
-            .map_err(|_| PluginServiceError::ProviderPolicyDenied)?;
+            .map_err(|_| PluginServiceError::ProviderPolicyDenied)?
+            .with_idempotency_key_sha256(expected_scope.identity().idempotency_key_sha256())
+            .map_err(|_| PluginServiceError::ProviderCostAcceptanceDenied)?;
         let cost_nonce_claim = self.broker.inner.claim_provider_cost_nonce(
             nonce,
             verified_acceptance.expires_at(),
@@ -1602,6 +2085,7 @@ fn map_provider_materialization_error(error: ProviderMaterializationError) -> Pl
         | ProviderMaterializationError::UnresolvedReceipts
         | ProviderMaterializationError::InvalidReceiptAuthority
         | ProviderMaterializationError::InvalidTransportProjection
+        | ProviderMaterializationError::InvalidNativePayload
         | ProviderMaterializationError::UnsupportedTransportSchema
         | ProviderMaterializationError::UnsupportedMaterializerSchema => {
             PluginServiceError::ProviderResultReceiptAuthorityDenied
@@ -1716,6 +2200,7 @@ mod tests {
         cancel_during_call: AtomicBool,
         fail_call: AtomicBool,
         last_authorized_request: Mutex<Option<(String, String, Option<String>)>>,
+        last_idempotency_key: Mutex<Option<String>>,
         last_secret: Mutex<Option<Vec<u8>>>,
     }
 
@@ -1752,6 +2237,7 @@ mod tests {
                     .secret_id()
                     .map(|secret_id| secret_id.as_str().to_owned()),
             ));
+            *self.last_idempotency_key.lock() = request.idempotency_key_sha256().map(str::to_owned);
             *self.last_secret.lock() = secret.map(|secret| secret.expose_to(<[u8]>::to_vec));
             if self.cancel_during_call.load(Ordering::Acquire) {
                 context.cancellation().cancel();
@@ -1814,6 +2300,18 @@ mod tests {
                 timeout_milliseconds: 60_000,
             },
         }
+    }
+
+    fn provider_capabilities(include_cost: bool) -> Vec<CapabilityRequest> {
+        let scope = format!("{PROVIDER}|{ENDPOINT}");
+        let mut capabilities = vec![
+            capability(CapabilityKind::NetworkProvider, &scope),
+            capability(CapabilityKind::ProviderUpload, &scope),
+        ];
+        if include_cost {
+            capabilities.push(capability(CapabilityKind::ProviderCost, &scope));
+        }
+        capabilities
     }
 
     fn authorization(
@@ -2081,6 +2579,109 @@ mod tests {
         )
     }
 
+    fn fixture_price_badge() -> NativeSchemaValue {
+        NativeSchemaValue::PreservedExpression {
+            source: r#"{"type":"usd","usd":0.025}"#.to_owned(),
+            sha256: format!(
+                "{:x}",
+                Sha256::digest(r#"{"type":"usd","usd":0.025}"#.as_bytes())
+            ),
+        }
+    }
+
+    #[test]
+    fn provider_world_paid_request_requires_and_consumes_exact_host_approval()
+    -> Result<(), Box<dyn Error>> {
+        let clock = Arc::new(TestClock::new(Instant::now()));
+        let mut capabilities = provider_capabilities(true);
+        capabilities.push(capability(CapabilityKind::Secret, SECRET));
+        let authorization = authorization(capabilities)?;
+        let cost_issuer = Arc::new(ProviderCostAcceptanceIssuer::from_seed(
+            [81; 32],
+            clock.now(),
+        )?);
+        let cost_authority = Arc::new(ProviderCostApprovalAuthority::new(
+            cost_issuer,
+            clock.clone(),
+        ));
+        let (_directory, broker, provider, credential) = broker_with_cost_acceptance(
+            &authorization,
+            clock.clone(),
+            Some(cost_authority.verifier()?),
+        )?;
+        credential.present.store(true, Ordering::Release);
+        provider.set_response(b"paid-provider-response".to_vec());
+        let receipt_issuer = Arc::new(ProviderResultReceiptIssuer::from_seed(
+            [82; 32],
+            clock.now(),
+        )?);
+        let receipt_authority = ProviderResultReceiptAuthority::new(
+            "principal-a",
+            PROMPT_SHA256,
+            DIGEST,
+            receipt_issuer,
+            Duration::from_secs(30),
+        )?;
+        let paid_context = |authorization| {
+            provider_receipt_context(authorization, &clock)?
+                .with_provider_result_authority(receipt_authority.clone())?
+                .with_provider_cost_requirement(fixture_price_badge(), Some(cost_authority.clone()))
+        };
+
+        let mut denied = broker.begin_invocation(paid_context(authorization.clone())?)?;
+        assert_eq!(
+            denied.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+                provider: PROVIDER.to_owned(),
+                endpoint: ENDPOINT.to_owned(),
+                secret_id: Some(SECRET.to_owned()),
+                body: REQUEST_BODY.to_vec(),
+            }),
+            PluginServiceWireResponse::Failure(PluginServiceWireFailure::ProviderDenied)
+        );
+        assert_eq!(provider.calls.load(Ordering::Acquire), 0);
+        denied.abort();
+
+        cost_authority.approve(ProviderCostApproval::new(
+            "principal-a",
+            PROFILE_UUID.to_string(),
+            PROMPT_SHA256,
+            "node.fixture",
+            0,
+            "plugin.fixture",
+            DIGEST,
+            DIGEST,
+            PROVIDER,
+            ENDPOINT,
+            &fixture_price_badge(),
+            ProviderPriceBound::new("USD", 25_000)?,
+            clock.now() + Duration::from_secs(30),
+            ProviderCostNonce::new([83; 32])?,
+        )?)?;
+        let mut invocation = broker.begin_invocation(paid_context(authorization)?)?;
+        let PluginServiceWireResponse::Bytes(receipt) =
+            invocation.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+                provider: PROVIDER.to_owned(),
+                endpoint: ENDPOINT.to_owned(),
+                secret_id: Some(SECRET.to_owned()),
+                body: REQUEST_BODY.to_vec(),
+            })
+        else {
+            return Err("paid provider request did not return a receipt".into());
+        };
+        assert_eq!(provider.calls.load(Ordering::Acquire), 1);
+        let receipt_set = ProviderResultReceiptSet::new(vec![receipt])?;
+        let resolved = invocation.resolve_provider_result_receipt_set(&receipt_set)?;
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].response(), b"paid-provider-response");
+        let expected_idempotency_key = resolved[0].identity().idempotency_key_sha256();
+        assert_eq!(
+            provider.last_idempotency_key.lock().as_deref(),
+            Some(expected_idempotency_key.as_str())
+        );
+        invocation.finish()?;
+        Ok(())
+    }
+
     #[test]
     fn capability_denials_happen_before_provider_or_credential_actuators()
     -> Result<(), Box<dyn Error>> {
@@ -2113,12 +2714,68 @@ mod tests {
     }
 
     #[test]
+    fn provider_upload_and_cost_denials_happen_before_actuation() -> Result<(), Box<dyn Error>> {
+        let origin = Instant::now();
+        let clock = Arc::new(TestClock::new(origin));
+        let scope = format!("{PROVIDER}|{ENDPOINT}");
+
+        let authorization_without_upload =
+            authorization(vec![capability(CapabilityKind::NetworkProvider, &scope)])?;
+        let (_directory, broker_without_upload, provider_without_upload, credential_without_upload) =
+            broker(&authorization_without_upload, clock.clone())?;
+        let authority = ProviderResultReceiptAuthority::new(
+            "principal-a",
+            PROMPT_SHA256,
+            "f".repeat(64),
+            Arc::new(ProviderResultReceiptIssuer::from_seed([61; 32], origin)?),
+            Duration::from_secs(20),
+        )?;
+        let context = provider_receipt_context(authorization_without_upload, &clock)?
+            .with_provider_result_authority(authority)?;
+        let mut invocation = broker_without_upload.begin_invocation(context)?;
+        assert_eq!(
+            invocation.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+                provider: PROVIDER.to_owned(),
+                endpoint: ENDPOINT.to_owned(),
+                secret_id: None,
+                body: REQUEST_BODY.to_vec(),
+            }),
+            PluginServiceWireResponse::Failure(PluginServiceWireFailure::CapabilityDenied)
+        );
+        assert_eq!(provider_without_upload.calls.load(Ordering::Acquire), 0);
+        assert_eq!(credential_without_upload.calls.load(Ordering::Acquire), 0);
+
+        let authorization = authorization(provider_capabilities(false))?;
+        let (_directory, broker, provider, credential) = broker(&authorization, clock.clone())?;
+        let authority = ProviderResultReceiptAuthority::new(
+            "principal-a",
+            PROMPT_SHA256,
+            "f".repeat(64),
+            Arc::new(ProviderResultReceiptIssuer::from_seed([62; 32], origin)?),
+            Duration::from_secs(20),
+        )?;
+        let context = provider_receipt_context(authorization, &clock)?
+            .with_provider_result_authority(authority)?
+            .with_provider_cost_requirement(fixture_price_badge(), None)?;
+        let mut invocation = broker.begin_invocation(context)?;
+        assert_eq!(
+            invocation.handle_wire_request(PluginServiceWireRequest::ExecuteProvider {
+                provider: PROVIDER.to_owned(),
+                endpoint: ENDPOINT.to_owned(),
+                secret_id: None,
+                body: REQUEST_BODY.to_vec(),
+            }),
+            PluginServiceWireResponse::Failure(PluginServiceWireFailure::CapabilityDenied)
+        );
+        assert_eq!(provider.calls.load(Ordering::Acquire), 0);
+        assert_eq!(credential.calls.load(Ordering::Acquire), 0);
+        Ok(())
+    }
+
+    #[test]
     fn provider_wire_requests_return_app_owned_receipts_until_exact_settlement()
     -> Result<(), Box<dyn Error>> {
-        let authorization = authorization(vec![capability(
-            CapabilityKind::NetworkProvider,
-            &format!("{PROVIDER}|{ENDPOINT}"),
-        )])?;
+        let authorization = authorization(provider_capabilities(false))?;
         let origin = Instant::now();
         let clock = Arc::new(TestClock::new(origin));
         let (_directory, broker, provider, _credential) = broker(&authorization, clock.clone())?;
@@ -2190,10 +2847,7 @@ mod tests {
     #[test]
     fn provider_cost_acceptance_denials_make_zero_priced_actuator_calls()
     -> Result<(), Box<dyn Error>> {
-        let authorization = authorization(vec![capability(
-            CapabilityKind::NetworkProvider,
-            &format!("{PROVIDER}|{ENDPOINT}"),
-        )])?;
+        let authorization = authorization(provider_capabilities(true))?;
         let clock = Arc::new(TestClock::new(Instant::now()));
         let issuer = ProviderCostAcceptanceIssuer::from_seed([11; 32], clock.now())?;
         let (_directory, broker, provider, credential) =
@@ -2339,10 +2993,7 @@ mod tests {
     #[test]
     fn provider_cost_acceptance_is_single_use_and_legacy_requests_stay_unpriced()
     -> Result<(), Box<dyn Error>> {
-        let authorization = authorization(vec![capability(
-            CapabilityKind::NetworkProvider,
-            &format!("{PROVIDER}|{ENDPOINT}"),
-        )])?;
+        let authorization = authorization(provider_capabilities(true))?;
         let clock = Arc::new(TestClock::new(Instant::now()));
         let issuer = ProviderCostAcceptanceIssuer::from_seed([31; 32], clock.now())?;
         let (_directory, broker, provider, _credential) =
@@ -2524,13 +3175,9 @@ mod tests {
     #[test]
     fn provider_cost_nonce_rolls_back_before_actuation_and_is_retained_after_attempt()
     -> Result<(), Box<dyn Error>> {
-        let authorization = authorization(vec![
-            capability(
-                CapabilityKind::NetworkProvider,
-                &format!("{PROVIDER}|{ENDPOINT}"),
-            ),
-            capability(CapabilityKind::Secret, SECRET),
-        ])?;
+        let mut capabilities = provider_capabilities(true);
+        capabilities.push(capability(CapabilityKind::Secret, SECRET));
+        let authorization = authorization(capabilities)?;
         let clock = Arc::new(TestClock::new(Instant::now()));
         let issuer = ProviderCostAcceptanceIssuer::from_seed([41; 32], clock.now())?;
         let (_directory, broker, provider, credential) =

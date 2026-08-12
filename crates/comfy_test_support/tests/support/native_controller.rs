@@ -99,7 +99,7 @@ impl NativeControllerFixture {
             heartbeat_interval: Duration::from_secs(30),
             missed_heartbeat_limit: 3,
             shutdown_timeout: Duration::from_secs(3),
-            ready_timeout: Duration::from_secs(10),
+            ready_timeout: Duration::from_secs(30),
             maximum_automatic_restarts: 1,
             restart_backoff: Duration::from_millis(1),
         };

@@ -2211,6 +2211,7 @@ impl ProviderPolicy {
             subject_id: subject_id.to_owned(),
             endpoint: requested_endpoint,
             secret_id: secret_id.cloned(),
+            idempotency_key_sha256: None,
         })
     }
 }
@@ -2221,6 +2222,7 @@ pub struct AuthorizedProviderRequest {
     subject_id: String,
     endpoint: ProviderEndpoint,
     secret_id: Option<SecretId>,
+    idempotency_key_sha256: Option<String>,
 }
 
 impl AuthorizedProviderRequest {
@@ -2242,6 +2244,21 @@ impl AuthorizedProviderRequest {
 
     pub fn secret_id(&self) -> Option<&SecretId> {
         self.secret_id.as_ref()
+    }
+
+    pub fn idempotency_key_sha256(&self) -> Option<&str> {
+        self.idempotency_key_sha256.as_deref()
+    }
+
+    pub(crate) fn with_idempotency_key_sha256(
+        mut self,
+        idempotency_key_sha256: impl Into<String>,
+    ) -> Result<Self, TrustError> {
+        let idempotency_key_sha256 = idempotency_key_sha256.into();
+        validate_sha256(&idempotency_key_sha256)
+            .map_err(|()| TrustError::InvalidProviderInvocationIdentity)?;
+        self.idempotency_key_sha256 = Some(idempotency_key_sha256);
+        Ok(self)
     }
 }
 
@@ -2311,6 +2328,24 @@ pub struct ProviderInvocationIdentity {
 }
 
 impl ProviderInvocationIdentity {
+    pub fn idempotency_key_sha256(&self) -> String {
+        let mut digest = Sha256::new();
+        for field in [
+            b"sim.comfy.provider-idempotency.v1".as_slice(),
+            self.profile_id.as_bytes(),
+            self.prompt_sha256.as_bytes(),
+            self.attempt_id.as_bytes(),
+            self.node_id.as_bytes(),
+            self.provider_binding_sha256.as_bytes(),
+            self.request_sha256.as_bytes(),
+        ] {
+            digest.update((field.len() as u64).to_le_bytes());
+            digest.update(field);
+        }
+        digest.update(self.request_ordinal.to_le_bytes());
+        format!("{:x}", digest.finalize())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         principal_id: impl Into<String>,
@@ -2345,7 +2380,7 @@ impl ProviderInvocationIdentity {
             || !valid_ascii_identifier(&prompt_id, 1_024)
             || validate_sha256(&prompt_sha256).is_err()
             || !valid_ascii_identifier(&attempt_id, 1_024)
-            || !valid_ascii_identifier(&node_id, 1_024)
+            || !valid_ascii_node_identifier(&node_id, 1_024)
             || validate_sha256(&request_sha256).is_err()
             || !valid_ascii_identifier(&plugin_id, 1_024)
             || validate_sha256(&plugin_digest_sha256).is_err()
@@ -3491,6 +3526,29 @@ fn valid_ascii_identifier(value: &str, maximum_bytes: usize) -> bool {
     let mut previous_separator = false;
     for byte in bytes {
         if byte.is_ascii_lowercase() || byte.is_ascii_digit() {
+            previous_separator = false;
+        } else if matches!(byte, b'.' | b'-' | b'_') && !previous_separator {
+            previous_separator = true;
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+fn valid_ascii_node_identifier(value: &str, maximum_bytes: usize) -> bool {
+    if value.is_empty() || value.len() > maximum_bytes || !value.is_ascii() {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    if !bytes.first().is_some_and(u8::is_ascii_alphanumeric)
+        || !bytes.last().is_some_and(u8::is_ascii_alphanumeric)
+    {
+        return false;
+    }
+    let mut previous_separator = false;
+    for byte in bytes {
+        if byte.is_ascii_alphanumeric() {
             previous_separator = false;
         } else if matches!(byte, b'.' | b'-' | b'_') && !previous_separator {
             previous_separator = true;

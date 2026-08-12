@@ -1328,7 +1328,10 @@ impl SupervisorShared {
             }
             WorkerMessage::OutputProposal { .. } if scope.kind == RequestKind::Execute => {}
             WorkerMessage::PluginCapabilityRequest { .. }
-                if scope.kind == RequestKind::ExecutePlugin => {}
+                if matches!(
+                    scope.kind,
+                    RequestKind::Execute | RequestKind::ExecutePlugin
+                ) => {}
             WorkerMessage::PluginResult { .. } if scope.kind == RequestKind::ExecutePlugin => {
                 self.snapshot.health = WorkerHealth::BackendReady;
                 self.snapshot.active_prompt_id = None;
@@ -2066,7 +2069,10 @@ impl RuntimeSupervisor {
             .ok_or(RuntimeSupervisorError::IdentityMismatch)?;
         if scope.prompt_id != prompt_id
             || scope.attempt_id != attempt_id
-            || scope.kind != RequestKind::ExecutePlugin
+            || !matches!(
+                scope.kind,
+                RequestKind::Execute | RequestKind::ExecutePlugin
+            )
         {
             return Err(RuntimeSupervisorError::IdentityMismatch);
         }
@@ -2091,6 +2097,23 @@ impl RuntimeSupervisor {
             .as_mut()
             .ok_or(RuntimeSupervisorError::NotRunning)?;
         write_async_frame(input, &envelope).await
+    }
+
+    pub async fn respond_plugin_capability(
+        &mut self,
+        request_id: RequestId,
+        prompt_id: PromptId,
+        attempt_id: AttemptId,
+        call_id: u64,
+        response: Vec<u8>,
+    ) -> Result<(), RuntimeSupervisorError> {
+        self.send_for_existing_request(
+            request_id,
+            Some(prompt_id),
+            Some(attempt_id),
+            WorkerMessage::PluginCapabilityResponse { call_id, response },
+        )
+        .await
     }
 
     async fn receive_one(

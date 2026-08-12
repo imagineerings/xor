@@ -1047,7 +1047,6 @@ fn build_native_runtime_for_profile(
 ) -> Result<NativeRuntimeApiHost, NativeApiHostError> {
     let profile = headless_native_profile(profile_uuid)
         .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    let profile_id = ProfileId(profile_uuid);
     let root = paths::data_dir()
         .join("comfy")
         .join("native")
@@ -1072,15 +1071,6 @@ fn build_native_runtime_for_profile(
         8 * 1024 * 1024 * 1024,
     )
     .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    let events = ExecutionEventBus::new(1_024)
-        .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
-    let controller = NativeExecutionController::start(
-        NativeExecutionControllerConfig::new(assets.clone(), presentation.clone(), worker, true)
-            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
-            .with_memory_policy(profile.memory_policy),
-        events.clone(),
-    )
-    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
     let idempotency_store = ArtifactIdempotencySnapshotStore::from_directory(
         &private_state_root,
         "native-api-idempotency.json",
@@ -1095,8 +1085,41 @@ fn build_native_runtime_for_profile(
             )
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
     );
-    NativeRuntimeApiHost::native_image(
-        profile_id,
+    let component_host = comfy_plugin_host::ComponentHost::new(
+        extension_host::ComponentRuntime::no_wasi()
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
+        comfy_runtime::PluginTrustPolicy::default(),
+        permission_policy.as_ref().clone(),
+        comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(Arc::new(
+            comfy_plugin_host::UnavailablePluginCapabilityServices,
+        )),
+        comfy_plugin_host::ComponentLimits::default(),
+        comfy_runtime::generated_native_node_registry_projection(None)
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
+    )
+    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    let component_router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
+        component_host,
+        comfy_runtime::DEFAULT_COMPONENT_REGISTRY_GENERATION,
+    )
+    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    let registry_bundle = Arc::new(
+        component_router
+            .active_execution_registry_bundle()
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?,
+    );
+    let worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
+    let events = ExecutionEventBus::new(1_024)
+        .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    let controller = NativeExecutionController::start(
+        NativeExecutionControllerConfig::new(assets.clone(), presentation.clone(), worker, true)
+            .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?
+            .with_memory_policy(profile.memory_policy),
+        events.clone(),
+    )
+    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+    NativeRuntimeApiHost::with_registry_bundle(
+        registry_bundle,
         presentation,
         controller,
         &events,

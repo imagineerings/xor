@@ -1013,7 +1013,7 @@ impl NativeNodePresentation {
             false,
         )?;
         validate_text("node category", &self.category, MAX_IDENTIFIER_BYTES, true)?;
-        validate_text("node description", &self.description, MAX_TEXT_BYTES, true)?;
+        validate_workflow_text("node description", &self.description)?;
         if self.output_names.len() > MAX_PORTS {
             return Err(NativeNodeContractError::InvalidPresentationOutputs);
         }

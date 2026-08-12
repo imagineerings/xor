@@ -13,7 +13,7 @@ impl plugin::Guest for ProviderComponent {
         types::ManifestProjection {
             component_world: "sim:comfy-provider-plugin@1.0.0".to_owned(),
             schema_version: 1,
-            identifier: "test.provider-plugin".to_owned(),
+            identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
             plugin_version: version(1, 0, 0),
             api: types::ApiRequirement {
                 major: 1,
@@ -22,29 +22,50 @@ impl plugin::Guest for ProviderComponent {
                 required_features: vec!["provider.bindings.v1".to_owned()],
             },
             nodes: vec![types::Node {
-                id: "provider.echo".to_owned(),
+                id: "ElevenLabsAudioIsolation".to_owned(),
                 version: version(1, 0, 0),
-                display_name: "Provider Echo".to_owned(),
-                category: "test/provider".to_owned(),
-                ports: vec![types::Port {
-                    id: "result".to_owned(),
-                    name: "Result".to_owned(),
-                    direction: types::PortDirection::Output,
-                    type_id: "comfy:string@1".to_owned(),
-                    cardinality: types::PortCardinality::Singular,
-                    presence: types::PortPresence::Required,
-                    hidden: false,
-                    lazy: false,
-                    default: None,
-                    serialization: types::PortSerialization::Inline,
-                    accepted_legacy_names: Vec::new(),
-                }],
+                display_name: "ElevenLabs Voice Isolation".to_owned(),
+                category: "partner/audio/ElevenLabs".to_owned(),
+                ports: vec![
+                    types::Port {
+                        id: "audio".to_owned(),
+                        name: "audio".to_owned(),
+                        direction: types::PortDirection::Input,
+                        type_id: "comfy:audio@1".to_owned(),
+                        cardinality: types::PortCardinality::Singular,
+                        presence: types::PortPresence::Required,
+                        hidden: false,
+                        lazy: false,
+                        default: None,
+                        serialization: types::PortSerialization::Handle,
+                        accepted_legacy_names: Vec::new(),
+                    },
+                    types::Port {
+                        id: "output_0".to_owned(),
+                        name: "output_0".to_owned(),
+                        direction: types::PortDirection::Output,
+                        type_id: "comfy:audio@1".to_owned(),
+                        cardinality: types::PortCardinality::Singular,
+                        presence: types::PortPresence::Required,
+                        hidden: false,
+                        lazy: false,
+                        default: None,
+                        serialization: types::PortSerialization::Handle,
+                        accepted_legacy_names: Vec::new(),
+                    },
+                ],
                 determinism: types::DeterminismPolicy::External,
                 cache: types::CachePolicy::Never,
                 effects: types::EffectPolicy::Provider,
             }],
-            capabilities: vec![types::CapabilityRequest {
-                kind: types::CapabilityKind::NetworkProvider,
+            capabilities: [
+                types::CapabilityKind::NetworkProvider,
+                types::CapabilityKind::ProviderUpload,
+                types::CapabilityKind::ProviderCost,
+            ]
+            .into_iter()
+            .map(|kind| types::CapabilityRequest {
+                kind,
                 scope: "fixture|https://fixture.invalid/v1/generate".to_owned(),
                 quota: types::CapabilityQuota {
                     maximum_operations: 16,
@@ -54,7 +75,8 @@ impl plugin::Guest for ProviderComponent {
                     maximum_handles: 8,
                     timeout_milliseconds: 5_000,
                 },
-            }],
+            })
+            .collect(),
             ui: Vec::new(),
             routes: Vec::new(),
             legacy_mappings: Vec::new(),
@@ -62,7 +84,7 @@ impl plugin::Guest for ProviderComponent {
     }
 
     fn create_node(node_id: String) -> Result<u64, types::InvocationError> {
-        if node_id == "provider.echo" {
+        if node_id == "ElevenLabsAudioIsolation" {
             Ok(1)
         } else {
             Err(types::InvocationError::PluginFailure(
@@ -88,13 +110,15 @@ impl provider_binding::Guest for ProviderComponent {
     fn binding_set() -> types::ProviderBindingSet {
         types::ProviderBindingSet {
             schema_version: 1,
-            implementation_namespace: "test.provider-plugin".to_owned(),
-            bindings_sha256: "f802af8cb7dd2f4f526136adbbcd1919fefbbd8c4599a5b5eacdc00f5dca309c"
+            implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
+            bindings_sha256: "cbed6307f899b4a0fca14d8ff4acac6065128e64a6dea945a629b1890b42ec6a"
                 .to_owned(),
             bindings: vec![types::ProviderBindingClaim {
-                feature_id: "COMFY-NODE-TEST-PROVIDER".to_owned(),
-                node_id: "provider.echo".to_owned(),
-                contract_sha256: "3".repeat(64),
+                feature_id: "COMFY-NODE-0141".to_owned(),
+                node_id: "ElevenLabsAudioIsolation".to_owned(),
+                contract_sha256:
+                    "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+                        .to_owned(),
                 transport_schema: "sim:comfy-provider-transport@1".to_owned(),
                 materializer_schema: "sim:comfy-provider-materializer@1".to_owned(),
             }],
@@ -105,7 +129,7 @@ impl provider_binding::Guest for ProviderComponent {
         class_type: String,
         request: Vec<u8>,
     ) -> Result<types::ProviderInvocationResponse, types::InvocationError> {
-        if class_type != "provider.echo" || request.is_empty() {
+        if class_type != "ElevenLabsAudioIsolation" || request.is_empty() {
             return Err(types::InvocationError::PluginFailure(
                 "invalid provider request".to_owned(),
             ));
@@ -125,7 +149,7 @@ impl provider_binding::Guest for ProviderComponent {
         };
         let outputs = if request == b"guest-authored-output" {
             vec![types::ProviderMaterializedOutput {
-                port_id: "result".to_owned(),
+                port_id: "output_0".to_owned(),
                 value: types::EncodedValue {
                     type_id: "comfy:string@1".to_owned(),
                     family: types::ValueFamily::Scalar,

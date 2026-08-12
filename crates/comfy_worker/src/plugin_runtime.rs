@@ -7,14 +7,26 @@ use std::{
     time::Duration,
 };
 
-use comfy_plugin_host::{
-    CapabilityServiceContext, ComponentLimits, InvocationResult, PluginCapabilityServices,
-    PluginError, PluginHost, ProviderInvocationResult, WorkerPluginInvocation,
+use comfy_nodes::{
+    NativeCacheDependencies, NativeNode, NativeNodeContext, NativeNodeFailure,
+    NativeNodeFailureKind, NativeNodeOutcome, NativeValue,
 };
-use comfy_plugin_sdk::{CapabilityKind, InvocationError, ModelValue, PluginManifest};
+use comfy_plugin_host::{
+    CapabilityServiceContext, ComponentLimits, InvocationInputs, InvocationResult,
+    PluginCapabilityServices, PluginError, PluginHost, ProviderInvocationResult,
+    WorkerPluginInvocation, materialize_native_provider_response,
+    prepare_native_provider_invocation, rollback_native_provider_outputs,
+};
+use comfy_plugin_sdk::{
+    CapabilityKind, InvocationError, ModelValue, PluginManifest, PluginNode,
+    ProviderResultReceiptSet,
+};
 use comfy_runtime::{
-    AssetIdentity, NativeProviderRegistryPin, PluginAuthorization, PluginAuthorizationVerifier,
-    PluginServiceWireFailure, PluginServiceWireRequest, PluginServiceWireResponse, SecretId,
+    AssetIdentity, NativeNodeRegistry, NativeProviderBindingActivation,
+    NativeProviderBindingActivationSet, NativeProviderRegistryPin, NativeProviderWorkerRequest,
+    NativeProviderWorkerResponse, PluginAuthorization, PluginAuthorizationVerifier,
+    PluginServiceWireFailure, PluginServiceWireRequest, PluginServiceWireResponse,
+    ProviderTransportResponse, SecretId,
 };
 use comfy_tensor::CancellationToken;
 use comfy_types::{
@@ -24,6 +36,7 @@ use comfy_types::{
 };
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::AssembledWorkerRegistry;
 
@@ -44,6 +57,7 @@ pub(crate) struct WorkerCapabilityBridgeRequest {
 pub(crate) struct WorkerCapabilityBridge {
     sender: async_channel::Sender<WorkerCapabilityBridgeRequest>,
     next_call_id: Arc<AtomicU64>,
+    native_provider_session_id: Option<String>,
 }
 
 impl WorkerCapabilityBridge {
@@ -51,7 +65,83 @@ impl WorkerCapabilityBridge {
         Self {
             sender,
             next_call_id: Arc::new(AtomicU64::new(1)),
+            native_provider_session_id: None,
         }
+    }
+
+    pub fn for_native_provider(&self, native_provider_session_id: impl Into<String>) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            next_call_id: self.next_call_id.clone(),
+            native_provider_session_id: Some(native_provider_session_id.into()),
+        }
+    }
+
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "the private worker process has no GPUI dispatcher; its blocking native provider thread must cooperatively poll the async IPC bridge"
+    )]
+    pub fn native_provider_control(
+        &self,
+        request: NativeProviderWorkerRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeProviderWorkerResponse, WorkerPluginRuntimeError> {
+        cancellation
+            .check()
+            .map_err(|_| WorkerPluginRuntimeError::InvocationFailed)?;
+        let request = request
+            .to_bytes()
+            .map_err(|_| WorkerPluginRuntimeError::InvalidDeployment)?;
+        if request.len() > MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES {
+            return Err(WorkerPluginRuntimeError::InvalidDeployment);
+        }
+        let call_id = self.next_call_id.fetch_add(1, Ordering::Relaxed);
+        if call_id == 0 {
+            return Err(WorkerPluginRuntimeError::InvocationFailed);
+        }
+        let (response_sender, response_receiver) = async_channel::bounded(1);
+        let mut bridge_request = WorkerCapabilityBridgeRequest {
+            call_id,
+            request,
+            response_sender,
+        };
+        loop {
+            cancellation
+                .check()
+                .map_err(|_| WorkerPluginRuntimeError::InvocationFailed)?;
+            match self.sender.try_send(bridge_request) {
+                Ok(()) => break,
+                Err(async_channel::TrySendError::Full(returned)) => {
+                    bridge_request = returned;
+                    smol::block_on(async_io::Timer::after(CAPABILITY_BRIDGE_POLL_INTERVAL));
+                }
+                Err(async_channel::TrySendError::Closed(_)) => {
+                    return Err(WorkerPluginRuntimeError::InvocationFailed);
+                }
+            }
+        }
+        let response = loop {
+            cancellation
+                .check()
+                .map_err(|_| WorkerPluginRuntimeError::InvocationFailed)?;
+            let received = smol::block_on(smol::future::race(
+                async { Some(response_receiver.recv().await) },
+                async {
+                    async_io::Timer::after(CAPABILITY_BRIDGE_POLL_INTERVAL).await;
+                    None
+                },
+            ));
+            match received {
+                Some(Ok(response)) => break response,
+                Some(Err(_)) => return Err(WorkerPluginRuntimeError::InvocationFailed),
+                None => {}
+            }
+        };
+        cancellation
+            .check()
+            .map_err(|_| WorkerPluginRuntimeError::InvocationFailed)?;
+        NativeProviderWorkerResponse::from_bytes(&response)
+            .map_err(|_| WorkerPluginRuntimeError::InvocationFailed)
     }
 
     #[allow(
@@ -71,6 +161,19 @@ impl WorkerCapabilityBridge {
                 "plugin capability request cannot be represented".to_owned(),
             )
         })?;
+        let request = match &self.native_provider_session_id {
+            Some(session_id) => NativeProviderWorkerRequest::Call {
+                session_id: session_id.clone(),
+                request,
+            }
+            .to_bytes()
+            .map_err(|_| {
+                InvocationError::InvalidCapabilityRequest(
+                    "native provider capability request cannot be represented".to_owned(),
+                )
+            })?,
+            None => request,
+        };
         if request.len() > MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES {
             return Err(InvocationError::InvalidCapabilityRequest(
                 "plugin capability request exceeds the worker transport bound".to_owned(),
@@ -126,6 +229,24 @@ impl WorkerCapabilityBridge {
             .maximum_response_bytes()
             .saturating_add(64 * 1024)
             .min(u64::try_from(MAX_WORKER_PLUGIN_CAPABILITY_PAYLOAD_BYTES).unwrap_or(u64::MAX));
+        let response = match &self.native_provider_session_id {
+            Some(_) => match NativeProviderWorkerResponse::from_bytes(&response).map_err(|_| {
+                InvocationError::HostFailure(
+                    "native provider capability response is malformed".to_owned(),
+                )
+            })? {
+                NativeProviderWorkerResponse::Call(response) => response,
+                NativeProviderWorkerResponse::Failure(failure) => {
+                    return Err(map_wire_failure(failure, kind, scope));
+                }
+                _ => {
+                    return Err(InvocationError::HostFailure(
+                        "native provider capability response has the wrong phase".to_owned(),
+                    ));
+                }
+            },
+            None => response,
+        };
         let response = PluginServiceWireResponse::from_bytes(&response, transport_maximum)
             .map_err(|_| {
                 InvocationError::HostFailure(
@@ -359,6 +480,209 @@ struct WorkerCompiledPlugin {
     compiled: Arc<comfy_plugin_host::CompiledPlugin>,
 }
 
+struct WorkerNativeProviderNode {
+    registry: Arc<WorkerPluginRegistry>,
+    extension_id: String,
+    node: PluginNode,
+    implementation_version: String,
+    descriptor: comfy_nodes::NativeNodeDescriptor,
+    bridge: Arc<WorkerCapabilityBridge>,
+}
+
+impl NativeNode for WorkerNativeProviderNode {
+    fn class_type(&self) -> &str {
+        &self.node.id
+    }
+
+    fn implementation_version(&self) -> &str {
+        &self.implementation_version
+    }
+
+    fn implementation_namespace(&self) -> &str {
+        self.registry
+            .components
+            .get(&self.extension_id)
+            .map(|component| component.plugin_identifier.as_str())
+            .unwrap_or("invalid.provider")
+    }
+
+    fn cache_change_token(
+        &self,
+        _inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<String, NativeNodeFailure> {
+        Ok(format!(
+            "provider:{}:{}",
+            self.registry.registry_digest_sha256.as_str(),
+            self.node.id
+        ))
+    }
+
+    fn cache_dependencies(
+        &self,
+        _context: &NativeNodeContext,
+        _inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<NativeCacheDependencies, NativeNodeFailure> {
+        Ok(NativeCacheDependencies::default())
+    }
+
+    fn execute<'a>(
+        &'a self,
+        context: NativeNodeContext,
+        inputs: BTreeMap<String, NativeValue>,
+    ) -> futures::future::BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
+        Box::pin(async move {
+            let component = self
+                .registry
+                .components
+                .get(&self.extension_id)
+                .ok_or_else(|| provider_node_failure("provider component is unavailable"))?;
+            let binding_set = component
+                .manifest
+                .provider_binding
+                .as_ref()
+                .ok_or_else(|| provider_node_failure("provider binding is unavailable"))?;
+            let prepared = prepare_native_provider_invocation(
+                &self.node,
+                &self.descriptor,
+                inputs,
+                &self.registry.profile_id.0.to_string(),
+                &context,
+            )?;
+            let session_id = Uuid::new_v4().to_string();
+            let start = comfy_runtime::NativeProviderWorkerSessionStart {
+                session_id: session_id.clone(),
+                registry_generation: self.registry.generation.get(),
+                registry_digest_sha256: self.registry.registry_digest_sha256.as_str().to_owned(),
+                extension_id: self.extension_id.clone(),
+                extension_version: component.extension_version.clone(),
+                plugin_identifier: component.plugin_identifier.clone(),
+                plugin_version: component.plugin_version.clone(),
+                manifest_digest_sha256: component.manifest_digest_sha256.as_str().to_owned(),
+                component_digest_sha256: component.component_digest_sha256.as_str().to_owned(),
+                authorization_generation_sha256: component
+                    .authorization_generation
+                    .as_str()
+                    .to_owned(),
+                binding_set_sha256: binding_set.bindings_sha256.clone(),
+                node_id: self.node.id.clone(),
+                compiled_plan_sha256: context
+                    .provider_execution()
+                    .map_err(provider_node_failure)?
+                    .compiled_plan_sha256()
+                    .to_owned(),
+                maximum_response_bytes: comfy_runtime::MAX_PLUGIN_SERVICE_RESPONSE_BYTES,
+            };
+            match self.bridge.native_provider_control(
+                NativeProviderWorkerRequest::Begin(start),
+                &context.cancellation,
+            ) {
+                Ok(NativeProviderWorkerResponse::Begun) => {}
+                _ => {
+                    return Err(provider_node_failure(
+                        WorkerPluginRuntimeError::InvocationFailed,
+                    ));
+                }
+            }
+            let invocation = (|| {
+                let provider_bridge = Arc::new(self.bridge.for_native_provider(session_id.clone()));
+                let result = self
+                    .registry
+                    .execute_provider_node(
+                        &self.extension_id,
+                        &self.node.id,
+                        prepared.inputs,
+                        prepared.request.to_bytes().map_err(provider_node_failure)?,
+                        provider_bridge,
+                        context.cancellation.clone(),
+                    )
+                    .map_err(provider_node_failure)?;
+                if !result.outputs.is_empty()
+                    || !result.output_presence.is_empty()
+                    || !result.effects.outputs.is_empty()
+                    || !result.effects.logs.is_empty()
+                    || !result.effects.ui_state.is_empty()
+                    || !result.effects.routes.is_empty()
+                {
+                    return Err(provider_node_failure(
+                        WorkerPluginRuntimeError::InvalidDeployment,
+                    ));
+                }
+                let receipt_set = ProviderResultReceiptSet::new(result.receipts().to_vec())
+                    .and_then(|receipts| receipts.to_bytes())
+                    .map_err(provider_node_failure)?;
+                let resolved = self
+                    .bridge
+                    .native_provider_control(
+                        NativeProviderWorkerRequest::Resolve {
+                            session_id: session_id.clone(),
+                            receipt_set,
+                        },
+                        &context.cancellation,
+                    )
+                    .map_err(provider_node_failure)?;
+                let NativeProviderWorkerResponse::Resolved(mut resolved) = resolved else {
+                    return Err(provider_node_failure(
+                        WorkerPluginRuntimeError::InvocationFailed,
+                    ));
+                };
+                if resolved.len() != 1 {
+                    return Err(provider_node_failure(
+                        WorkerPluginRuntimeError::InvalidDeployment,
+                    ));
+                }
+                let response = ProviderTransportResponse::from_bytes(&resolved.remove(0))
+                    .map_err(provider_node_failure)?;
+                let values = materialize_native_provider_response(
+                    &self.node,
+                    &response,
+                    &component.plugin_identifier,
+                    &context,
+                )?;
+                match self.bridge.native_provider_control(
+                    NativeProviderWorkerRequest::Finish {
+                        session_id: session_id.clone(),
+                    },
+                    &context.cancellation,
+                ) {
+                    Ok(NativeProviderWorkerResponse::Finished) => {}
+                    _ => {
+                        rollback_native_provider_outputs(&context, &values)?;
+                        return Err(provider_node_failure(
+                            WorkerPluginRuntimeError::InvocationFailed,
+                        ));
+                    }
+                }
+                Ok(NativeNodeOutcome::Values {
+                    outputs: values,
+                    ui: None,
+                    effects: Vec::new(),
+                })
+            })();
+            match invocation {
+                Ok(outcome) => Ok(outcome),
+                Err(error) => match self.bridge.native_provider_control(
+                    NativeProviderWorkerRequest::Abort { session_id },
+                    &CancellationToken::default(),
+                ) {
+                    Ok(NativeProviderWorkerResponse::Aborted) => Err(error),
+                    Ok(_) | Err(_) => Err(provider_node_failure(format!(
+                        "{error}; provider session cleanup failed"
+                    ))),
+                },
+            }
+        })
+    }
+}
+
+fn provider_node_failure(error: impl std::fmt::Display) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "native_provider_invocation_failed".to_owned(),
+        message: error.to_string(),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
 impl WorkerPluginRegistry {
     pub fn from_assembled(
         profile_id: ProfileId,
@@ -458,6 +782,102 @@ impl WorkerPluginRegistry {
         self.generation.get() == pin.generation()
             && self.registry_digest_sha256.as_str() == pin.registry_digest_sha256()
             && binding_digests == pin.binding_digests_sha256()
+    }
+
+    pub fn activate_native_provider_nodes(
+        self: &Arc<Self>,
+        registry: &mut NativeNodeRegistry,
+        bridge: Arc<WorkerCapabilityBridge>,
+    ) -> Result<(), WorkerPluginRuntimeError> {
+        for (extension_id, component) in &self.components {
+            let Some(binding_set) = component.manifest.provider_binding.clone() else {
+                continue;
+            };
+            let nodes = component
+                .manifest
+                .nodes
+                .iter()
+                .map(|node| (node.id.as_str(), node))
+                .collect::<BTreeMap<_, _>>();
+            let mut bindings = Vec::with_capacity(binding_set.bindings.len());
+            for claim in &binding_set.bindings {
+                let node = nodes
+                    .get(claim.node_id.as_str())
+                    .copied()
+                    .ok_or(WorkerPluginRuntimeError::InvalidDeployment)?
+                    .clone();
+                let descriptor = registry
+                    .descriptor(&node.id)
+                    .cloned()
+                    .ok_or(WorkerPluginRuntimeError::InvalidDeployment)?;
+                bindings.push(NativeProviderBindingActivation::new(
+                    claim.clone(),
+                    Arc::new(WorkerNativeProviderNode {
+                        registry: self.clone(),
+                        extension_id: extension_id.clone(),
+                        implementation_version: node.version.to_string(),
+                        descriptor,
+                        node,
+                        bridge: bridge.clone(),
+                    }),
+                ));
+            }
+            let activation = NativeProviderBindingActivationSet::checked(
+                self.profile_id.0.to_string(),
+                self.generation.get(),
+                self.registry_digest_sha256.as_str().to_owned(),
+                component.component_digest_sha256.as_str().to_owned(),
+                component.authorization_generation.as_str().to_owned(),
+                binding_set,
+                bindings,
+            )
+            .map_err(|_| WorkerPluginRuntimeError::InvalidDeployment)?;
+            registry
+                .activate_provider_binding_set(activation)
+                .map_err(|_| WorkerPluginRuntimeError::InvalidDeployment)?;
+        }
+        Ok(())
+    }
+
+    fn execute_provider_node(
+        &self,
+        extension_id: &str,
+        node_id: &str,
+        inputs: InvocationInputs,
+        provider_request: Vec<u8>,
+        bridge: Arc<dyn PluginCapabilityServices>,
+        cancellation: CancellationToken,
+    ) -> Result<ProviderInvocationResult, WorkerPluginRuntimeError> {
+        let component = self
+            .components
+            .get(extension_id)
+            .ok_or(WorkerPluginRuntimeError::MissingComponent)?;
+        let binding_set = component
+            .manifest
+            .provider_binding
+            .as_ref()
+            .ok_or(WorkerPluginRuntimeError::InvalidDeployment)?;
+        if !binding_set
+            .bindings
+            .iter()
+            .any(|claim| claim.node_id == node_id)
+        {
+            return Err(WorkerPluginRuntimeError::InvalidDeployment);
+        }
+        let invocation_host = self.host.begin_invocation(
+            &component.manifest,
+            &component.authorization,
+            node_id,
+            inputs,
+            bridge,
+            cancellation,
+        )?;
+        let instance = self
+            .host
+            .instantiate_component(&component.compiled, invocation_host)?;
+        instance
+            .invoke_provider(node_id, &provider_request)
+            .map_err(Into::into)
     }
 
     #[cfg(test)]
@@ -589,6 +1009,8 @@ pub(crate) enum WorkerPluginRuntimeError {
     StaleGeneration,
     #[error("worker plugin invocation targets an unavailable component")]
     MissingComponent,
+    #[error("worker native provider capability session failed")]
+    InvocationFailed,
     #[error(transparent)]
     Trust(#[from] comfy_runtime::TrustError),
     #[error(transparent)]
@@ -600,9 +1022,10 @@ impl WorkerPluginRuntimeError {
         &self,
     ) -> WorkerRegistryDeploymentRejectionReason {
         match self {
-            Self::InvalidDeployment | Self::StaleGeneration | Self::MissingComponent => {
-                WorkerRegistryDeploymentRejectionReason::InvalidCandidate
-            }
+            Self::InvalidDeployment
+            | Self::StaleGeneration
+            | Self::MissingComponent
+            | Self::InvocationFailed => WorkerRegistryDeploymentRejectionReason::InvalidCandidate,
             Self::Trust(_) => WorkerRegistryDeploymentRejectionReason::InvalidAuthorization,
             Self::Plugin(_) => WorkerRegistryDeploymentRejectionReason::ComponentCompilationFailed,
         }
@@ -610,9 +1033,10 @@ impl WorkerPluginRuntimeError {
 
     fn failure(&self) -> WorkerPluginExecutionFailure {
         match self {
-            Self::StaleGeneration | Self::MissingComponent | Self::InvalidDeployment => {
-                WorkerPluginExecutionFailure::InvalidInvocation
-            }
+            Self::StaleGeneration
+            | Self::MissingComponent
+            | Self::InvalidDeployment
+            | Self::InvocationFailed => WorkerPluginExecutionFailure::InvalidInvocation,
             Self::Plugin(PluginError::WasmTrap(diagnostic)) => WorkerPluginExecutionFailure::Trap {
                 diagnostic: diagnostic.clone(),
             },
@@ -675,6 +1099,140 @@ fn context_required(service: &str) -> InvocationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_provider_capability_bridge_routes_the_complete_session_protocol() {
+        let (sender, receiver) = async_channel::bounded(1);
+        let bridge = WorkerCapabilityBridge::new(sender);
+        let service = std::thread::spawn(move || {
+            let mut previous_call_id = 0;
+            for expected in ["begin", "call", "resolve", "finish", "abort"] {
+                let request = receiver
+                    .recv_blocking()
+                    .expect("native provider bridge request is available");
+                assert!(request.call_id > previous_call_id);
+                previous_call_id = request.call_id;
+                let request_value = NativeProviderWorkerRequest::from_bytes(&request.request)
+                    .expect("native provider request is canonical");
+                let response = match (expected, request_value) {
+                    ("begin", NativeProviderWorkerRequest::Begin(start)) => {
+                        assert_eq!(start.session_id, "provider-session");
+                        NativeProviderWorkerResponse::Begun
+                    }
+                    (
+                        "call",
+                        NativeProviderWorkerRequest::Call {
+                            session_id,
+                            request,
+                        },
+                    ) => {
+                        assert_eq!(session_id, "provider-session");
+                        assert_eq!(request, b"provider-call");
+                        NativeProviderWorkerResponse::Call(b"provider-response".to_vec())
+                    }
+                    (
+                        "resolve",
+                        NativeProviderWorkerRequest::Resolve {
+                            session_id,
+                            receipt_set,
+                        },
+                    ) => {
+                        assert_eq!(session_id, "provider-session");
+                        assert_eq!(receipt_set, b"receipt-set");
+                        NativeProviderWorkerResponse::Resolved(vec![b"materialized".to_vec()])
+                    }
+                    ("finish", NativeProviderWorkerRequest::Finish { session_id }) => {
+                        assert_eq!(session_id, "provider-session");
+                        NativeProviderWorkerResponse::Finished
+                    }
+                    ("abort", NativeProviderWorkerRequest::Abort { session_id }) => {
+                        assert_eq!(session_id, "provider-session");
+                        NativeProviderWorkerResponse::Aborted
+                    }
+                    _ => panic!("native provider session phase changed"),
+                };
+                request
+                    .response_sender
+                    .send_blocking(
+                        response
+                            .to_bytes()
+                            .expect("native provider response is canonical"),
+                    )
+                    .expect("native provider bridge receives its response");
+            }
+        });
+        let cancellation = CancellationToken::default();
+        let begin =
+            NativeProviderWorkerRequest::Begin(comfy_runtime::NativeProviderWorkerSessionStart {
+                session_id: "provider-session".to_owned(),
+                registry_generation: 7,
+                registry_digest_sha256: "a".repeat(64),
+                extension_id: "provider-extension".to_owned(),
+                extension_version: "1.0.0".to_owned(),
+                plugin_identifier: "provider.plugin".to_owned(),
+                plugin_version: "1.0.0".to_owned(),
+                manifest_digest_sha256: "b".repeat(64),
+                component_digest_sha256: "c".repeat(64),
+                authorization_generation_sha256: "d".repeat(64),
+                binding_set_sha256: "e".repeat(64),
+                node_id: "ProviderNode".to_owned(),
+                compiled_plan_sha256: "f".repeat(64),
+                maximum_response_bytes: 1_024,
+            });
+        assert_eq!(
+            bridge
+                .native_provider_control(begin, &cancellation)
+                .expect("provider session begins"),
+            NativeProviderWorkerResponse::Begun
+        );
+        assert_eq!(
+            bridge
+                .native_provider_control(
+                    NativeProviderWorkerRequest::Call {
+                        session_id: "provider-session".to_owned(),
+                        request: b"provider-call".to_vec(),
+                    },
+                    &cancellation,
+                )
+                .expect("provider session routes a capability call"),
+            NativeProviderWorkerResponse::Call(b"provider-response".to_vec())
+        );
+        assert_eq!(
+            bridge
+                .native_provider_control(
+                    NativeProviderWorkerRequest::Resolve {
+                        session_id: "provider-session".to_owned(),
+                        receipt_set: b"receipt-set".to_vec(),
+                    },
+                    &cancellation,
+                )
+                .expect("provider session resolves app-owned receipts"),
+            NativeProviderWorkerResponse::Resolved(vec![b"materialized".to_vec()])
+        );
+        assert_eq!(
+            bridge
+                .native_provider_control(
+                    NativeProviderWorkerRequest::Finish {
+                        session_id: "provider-session".to_owned(),
+                    },
+                    &cancellation,
+                )
+                .expect("provider session finishes"),
+            NativeProviderWorkerResponse::Finished
+        );
+        assert_eq!(
+            bridge
+                .native_provider_control(
+                    NativeProviderWorkerRequest::Abort {
+                        session_id: "provider-session".to_owned(),
+                    },
+                    &cancellation,
+                )
+                .expect("provider session abort is idempotently routable"),
+            NativeProviderWorkerResponse::Aborted
+        );
+        service.join().expect("provider bridge service joins");
+    }
 
     #[test]
     fn provider_registry_pin_requires_the_exact_committed_generation() {

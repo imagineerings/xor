@@ -125,6 +125,10 @@ struct ComfyComponentHostGlobal {
     #[cfg(not(test))]
     plugin_security: comfy_runtime::NativePluginSecurityPolicy,
     router: comfy_plugin_host::ComponentHostRouter,
+    provider_invocation_authority:
+        Option<Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>>,
+    #[cfg(not(test))]
+    provider_cost_authority: Arc<comfy_runtime::ProviderCostApprovalAuthority>,
 }
 
 #[cfg(feature = "comfy")]
@@ -229,7 +233,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     let profile_id = comfy_ui::LOCAL_EXECUTION_PROFILE_ID.0.to_string();
 
     #[cfg(not(test))]
-    let execution_boundary = {
+    let plugin_services = {
         let asset_service = comfy_ui::native_asset_services(cx)
             .ok_or_else(|| anyhow::anyhow!("native Comfy asset service is unavailable"))?;
         anyhow::ensure!(
@@ -239,7 +243,7 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         let worker = native_comfy_worker_launch(&profile, comfy_types::WorkerId(Uuid::new_v4()))?;
         let profile_bits = profile.id.as_u128();
         let profile_seed = (profile_bits as u64) ^ ((profile_bits >> 64) as u64);
-        comfy_plugin_services::private_worker_boundary(
+        comfy_plugin_services::private_worker_services(
             worker,
             asset_service.assets(),
             plugin_security.provider_policy().clone(),
@@ -247,6 +251,8 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
             cx,
         )?
     };
+    #[cfg(not(test))]
+    let execution_boundary = plugin_services.boundary.clone();
     #[cfg(test)]
     let execution_boundary = comfy_plugin_host::ComponentExecutionBoundary::conformance_in_process(
         Arc::new(comfy_plugin_host::UnavailablePluginCapabilityServices),
@@ -273,6 +279,15 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         comfy_plugin_host::ComponentLimits::default(),
         comfy_runtime::generated_native_node_registry_projection(None)?,
     )?;
+    #[cfg(not(test))]
+    let provider_invocation_authority = Some(
+        plugin_services.invocation_authority(replacement_host.clone())?
+            as Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>,
+    );
+    #[cfg(not(test))]
+    let provider_cost_authority = plugin_services.cost_authority();
+    #[cfg(test)]
+    let provider_invocation_authority = None;
     if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>() {
         let current_profile_id = component_host.profile_id.clone();
         let current_component_generation = component_host.component_generation;
@@ -305,6 +320,11 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
         {
             component_host.plugin_security = plugin_security;
         }
+        component_host.provider_invocation_authority = provider_invocation_authority;
+        #[cfg(not(test))]
+        {
+            component_host.provider_cost_authority = provider_cost_authority;
+        }
         return Ok(());
     }
     let router = comfy_plugin_host::ComponentHostRouter::with_initial_generation(
@@ -313,13 +333,36 @@ fn init_comfy_component_host(cx: &mut App) -> anyhow::Result<()> {
     )?;
     extension_host::register_component_lifecycle_adapter(Arc::new(router.clone()), cx)?;
     register_comfy_plugin_contribution_source(router.clone(), cx);
+    #[cfg(not(test))]
+    let receiver = {
+        let receiver = router.subscribe_execution_registry_bundles()?;
+        let _initial_bundle = receiver.try_recv();
+        receiver
+    };
     cx.set_global(ComfyComponentHostGlobal {
         profile_id,
         component_generation,
         #[cfg(not(test))]
         plugin_security,
         router,
+        provider_invocation_authority,
+        #[cfg(not(test))]
+        provider_cost_authority,
     });
+    #[cfg(not(test))]
+    {
+        cx.spawn(async move |cx| {
+            while receiver.recv().await.is_ok() {
+                let profile = profile.clone();
+                if let Err(error) =
+                    cx.update(|cx| register_native_comfy_execution(&profile, false, cx))
+                {
+                    eprintln!("native Comfy component lifecycle rebind failed: {error}");
+                }
+            }
+        })
+        .detach();
+    }
     Ok(())
 }
 
@@ -333,11 +376,6 @@ pub(crate) fn init_comfy_ui(cx: &mut App) {
         match active_native_comfy_profile(cx) {
             Ok(profile) => {
                 comfy_ui::init_for_profile(comfy_types::ProfileId(profile.id), cx);
-                if let Err(error) = register_native_comfy_execution(&profile, false, cx) {
-                    let message = format!("native Comfy execution initialization failed: {error}");
-                    log::error!("{message}");
-                    comfy_ui::set_initialization_error(message, cx);
-                }
             }
             Err(error) => {
                 let profile_id = configured_native_comfy_profile_id(cx)
@@ -372,29 +410,18 @@ fn sync_active_native_comfy_profile(cx: &mut App) {
             }
             comfy_ui::clear_initialization_error(cx);
             comfy_ui::init_for_profile(profile_id, cx);
-            if let Err(error) = register_native_comfy_execution(&profile, requires_rebind, cx) {
-                let message = format!("native Comfy execution initialization failed: {error}");
+            if let Err(error) = init_comfy_component_host(cx) {
+                let message = format!("native Comfy component host initialization failed: {error}");
                 log::error!("{message}");
                 comfy_ui::set_initialization_error(message, cx);
             } else {
-                match init_comfy_component_host(cx) {
-                    Err(error) => {
-                        let message =
-                            format!("native Comfy component host initialization failed: {error}");
-                        log::error!("{message}");
-                        comfy_ui::set_initialization_error(message, cx);
-                    }
-                    Ok(()) => {
-                        if let Err(error) = register_native_comfy_execution(&profile, false, cx) {
-                            let message = format!(
-                                "native Comfy worker registry initialization failed: {error}"
-                            );
-                            log::error!("{message}");
-                            comfy_ui::set_initialization_error(message, cx);
-                        } else {
-                            cx.set_global(next_binding);
-                        }
-                    }
+                if let Err(error) = register_native_comfy_execution(&profile, requires_rebind, cx) {
+                    let message =
+                        format!("native Comfy worker registry initialization failed: {error}");
+                    log::error!("{message}");
+                    comfy_ui::set_initialization_error(message, cx);
+                } else {
+                    cx.set_global(next_binding);
                 }
             }
         }
@@ -465,7 +492,6 @@ fn default_native_comfy_settings_content() -> anyhow::Result<settings::SettingsC
     <settings::SettingsContent as settings::RootUserSettings>::parse_json_with_comments(
         include_str!("../../../assets/settings/default-comfy.json"),
     )
-    .map_err(Into::into)
 }
 
 #[cfg(feature = "comfy")]
@@ -544,24 +570,31 @@ fn register_native_comfy_execution(
         }
     };
     let mut worker = native_comfy_worker_launch(profile, WorkerId(Uuid::new_v4()))?;
-    let mut provider_registry = None;
-    if let Some(component_host) = cx.try_global::<ComfyComponentHostGlobal>()
-        && component_host.profile_id == profile_id.0.to_string()
-    {
-        let generation = component_host.router.current()?.verified_generation()?;
-        provider_registry = generation.provider_registry_pin()?;
-        worker = worker.with_registry_deployment(generation.worker_deployment_plan()?);
-    }
+    let (registry_bundle, provider_invocation_authority) = {
+        let component_host = cx
+            .try_global::<ComfyComponentHostGlobal>()
+            .filter(|component_host| component_host.profile_id == profile_id.0.to_string())
+            .ok_or_else(|| anyhow::anyhow!("native Comfy component host is unavailable"))?;
+        (
+            Arc::new(component_host.router.active_execution_registry_bundle()?),
+            component_host.provider_invocation_authority.clone(),
+        )
+    };
+    worker = worker.with_registry_deployment(registry_bundle.worker_deployment().clone());
     let presentation = comfy_ui::execution_ui_model(cx)
         .ok_or_else(|| anyhow::anyhow!("native execution UI model is not initialized"))?
         .read(cx)
         .shared_service();
     let mut config = NativeExecutionControllerConfig::new(assets, presentation, worker, true)?
         .with_memory_policy(profile.memory_policy);
-    if let Some(provider_registry) = provider_registry {
-        config = config.with_provider_registry(provider_registry)?;
+    if let Some(provider_registry) = registry_bundle.provider_registry() {
+        config = config.with_provider_registry(provider_registry.clone())?;
+        config =
+            config.with_provider_invocation_authority(provider_invocation_authority.ok_or_else(
+                || anyhow::anyhow!("native provider invocation authority is unavailable"),
+            )?);
     }
-    comfy_ui::register_native_execution_services(config, cx)?;
+    comfy_ui::register_native_execution_services(config, registry_bundle, cx)?;
     Ok(())
 }
 

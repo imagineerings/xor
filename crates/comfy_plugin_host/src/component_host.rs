@@ -2,11 +2,15 @@ use crate::{
     ComponentLimits, InvocationInputs, InvocationResult, PluginCapabilityServices, PluginError,
     PluginHost, ProviderInvocationResult,
 };
+use comfy_nodes::NativeSchemaValue;
 use comfy_plugin_sdk::PluginManifest;
 use comfy_runtime::{
-    NativeNodeRegistry, NativeProviderRegistryPin, NodeContext, PermissionPolicy,
-    PluginAuthorization, PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginTrustPolicy,
-    WorkerRegistryDeploymentPlan,
+    NativeNodeRegistry, NativeProviderInvocationAuthority, NativeProviderInvocationScope,
+    NativeProviderRegistryPin, NodeContext, PermissionPolicy, PluginAuthorization,
+    PluginAuthorizationSealer, PluginAuthorizationVerifier, PluginCapabilityBroker,
+    PluginCapabilityInvocation, PluginServiceError, PluginServiceInvocationContext,
+    PluginTrustPolicy, ProviderCostAuthorizationAuthority, ProviderResultReceiptAuthority,
+    ProviderResultReceiptIssuer, WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     CancellationToken, MAX_WORKER_COMPONENT_CHUNK_BYTES,
@@ -21,6 +25,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{Arc, Condvar, Mutex, RwLock},
+    time::{Duration, Instant},
 };
 use thiserror::Error;
 
@@ -77,6 +82,7 @@ pub trait PluginInvocationExecutor: Send + Sync {
     >;
 }
 
+#[derive(Clone)]
 pub enum ComponentExecutionBoundary {
     PrivateWorker(Arc<dyn PluginInvocationExecutor>),
     ConformanceInProcess(Arc<dyn PluginCapabilityServices>),
@@ -643,6 +649,7 @@ pub struct PreparedPluginInvocation {
     authorization: PluginAuthorization,
     context: NodeContext,
     plugin: InstalledVerifiedPlugin,
+    provider_price_badge: Option<NativeSchemaValue>,
     _lease: InvocationLease,
 }
 
@@ -669,6 +676,10 @@ impl PreparedPluginInvocation {
             .provider_binding
             .as_ref()
             .map(|binding| binding.bindings_sha256.as_str())
+    }
+
+    pub fn provider_price_badge(&self) -> Option<&NativeSchemaValue> {
+        self.provider_price_badge.as_ref()
     }
 }
 
@@ -784,6 +795,7 @@ struct ComponentHostRouterState {
     host: ComponentHost,
     extension_store_replay_snapshot: Vec<InstalledComponent>,
     next_generation: u64,
+    bundle_subscribers: Vec<async_channel::Sender<comfy_runtime::NativeExecutionRegistryBundle>>,
 }
 
 impl ComponentHostRouterState {
@@ -804,6 +816,7 @@ impl ComponentHostRouter {
                 host,
                 extension_store_replay_snapshot: Vec::new(),
                 next_generation: 1,
+                bundle_subscribers: Vec::new(),
             })),
         }
     }
@@ -818,11 +831,13 @@ impl ComponentHostRouter {
                 message: "component generation must be nonzero".to_owned(),
             });
         }
+        host.synchronize_components_at_generation(Vec::new(), initial_generation)?;
         Ok(Self {
             state: Arc::new(Mutex::new(ComponentHostRouterState {
                 host,
                 extension_store_replay_snapshot: Vec::new(),
                 next_generation: initial_generation,
+                bundle_subscribers: Vec::new(),
             })),
         })
     }
@@ -832,6 +847,31 @@ impl ComponentHostRouter {
             .lock()
             .map(|state| state.host.clone())
             .map_err(|_| ComponentHostError::StateUnavailable)
+    }
+
+    pub fn active_execution_registry_bundle(
+        &self,
+    ) -> Result<comfy_runtime::NativeExecutionRegistryBundle, ComponentHostError> {
+        self.current()?.execution_registry_bundle()
+    }
+
+    pub fn subscribe_execution_registry_bundles(
+        &self,
+    ) -> Result<
+        async_channel::Receiver<comfy_runtime::NativeExecutionRegistryBundle>,
+        ComponentHostError,
+    > {
+        let bundle = self.active_execution_registry_bundle()?;
+        let (sender, receiver) = async_channel::bounded(8);
+        sender
+            .try_send(bundle)
+            .map_err(|_| ComponentHostError::StateUnavailable)?;
+        self.state
+            .lock()
+            .map_err(|_| ComponentHostError::StateUnavailable)?
+            .bundle_subscribers
+            .push(sender);
+        Ok(receiver)
     }
 
     pub fn replace(&self, host: ComponentHost) -> Result<(), ComponentHostError> {
@@ -897,6 +937,144 @@ impl Drop for InvocationLease {
 #[derive(Clone)]
 pub struct ComponentHost {
     inner: Arc<ComponentHostInner>,
+}
+
+pub struct ComponentHostProviderInvocationAuthority {
+    host: ComponentHost,
+    broker: PluginCapabilityBroker,
+    principal_id: String,
+    receipt_issuer: Arc<ProviderResultReceiptIssuer>,
+    receipt_lifetime: Duration,
+    cost_authority: Option<Arc<dyn ProviderCostAuthorizationAuthority>>,
+}
+
+impl ComponentHostProviderInvocationAuthority {
+    pub fn new(
+        host: ComponentHost,
+        broker: PluginCapabilityBroker,
+        principal_id: impl Into<String>,
+        receipt_issuer: Arc<ProviderResultReceiptIssuer>,
+        receipt_lifetime: Duration,
+    ) -> Result<Self, PluginServiceError> {
+        let principal_id = principal_id.into();
+        if principal_id.is_empty() || receipt_lifetime.is_zero() {
+            return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
+        }
+        Ok(Self {
+            host,
+            broker,
+            principal_id,
+            receipt_issuer,
+            receipt_lifetime,
+            cost_authority: None,
+        })
+    }
+
+    pub fn with_cost_authority(
+        mut self,
+        cost_authority: Arc<dyn ProviderCostAuthorizationAuthority>,
+    ) -> Self {
+        self.cost_authority = Some(cost_authority);
+        self
+    }
+}
+
+impl NativeProviderInvocationAuthority for ComponentHostProviderInvocationAuthority {
+    fn begin(
+        &self,
+        scope: NativeProviderInvocationScope,
+    ) -> Result<PluginCapabilityInvocation, PluginServiceError> {
+        let state = self
+            .host
+            .inner
+            .state
+            .read()
+            .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let deployment = state
+            .generation
+            .worker_deployment_plan()
+            .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        if deployment.begin().generation().get() != scope.start.registry_generation
+            || deployment.begin().registry_digest_sha256().as_str()
+                != scope.start.registry_digest_sha256
+            || scope.node_id.0 != scope.start.node_id
+        {
+            return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
+        }
+        let descriptor = deployment
+            .begin()
+            .components()
+            .iter()
+            .find(|descriptor| descriptor.extension_id() == scope.start.extension_id)
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        if descriptor.extension_version() != scope.start.extension_version
+            || descriptor.plugin_identifier() != scope.start.plugin_identifier
+            || descriptor.plugin_version() != scope.start.plugin_version
+            || descriptor.manifest_digest_sha256().as_str() != scope.start.manifest_digest_sha256
+            || descriptor.component_digest_sha256().as_str() != scope.start.component_digest_sha256
+            || descriptor.authorization_generation().as_str()
+                != scope.start.authorization_generation_sha256
+        {
+            return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
+        }
+        let plugin = state
+            .by_extension
+            .get(scope.start.extension_id.as_str())
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let price_badge = state
+            .registry
+            .descriptor(&scope.start.node_id)
+            .and_then(|descriptor| descriptor.source_schema.as_ref())
+            .and_then(|schema| schema.node.price_badge.clone());
+        let binding_set = plugin
+            .manifest()
+            .provider_binding
+            .as_ref()
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        if binding_set.bindings_sha256 != scope.start.binding_set_sha256
+            || !binding_set
+                .bindings
+                .iter()
+                .any(|claim| claim.node_id == scope.start.node_id)
+            || scope.start.maximum_response_bytes == 0
+            || scope.start.maximum_response_bytes
+                > self.host.inner.invocation_maximum_response_bytes
+        {
+            return Err(PluginServiceError::ProviderResultReceiptAuthorityDenied);
+        }
+        let authority = ProviderResultReceiptAuthority::new(
+            &self.principal_id,
+            &scope.start.compiled_plan_sha256,
+            &scope.start.binding_set_sha256,
+            self.receipt_issuer.clone(),
+            self.receipt_lifetime,
+        )
+        .map_err(|_| PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let deadline = Instant::now()
+            .checked_add(Duration::from_millis(
+                self.host.inner.invocation_timeout_milliseconds,
+            ))
+            .ok_or(PluginServiceError::ProviderResultReceiptAuthorityDenied)?;
+        let context = PluginServiceInvocationContext::new_with_principal(
+            scope.profile_id,
+            scope.prompt_id,
+            scope.attempt_id,
+            scope.node_id,
+            &self.principal_id,
+            plugin.authorization().clone(),
+            scope.cancellation,
+            deadline,
+            scope.start.maximum_response_bytes,
+        )?
+        .with_provider_result_authority(authority)?;
+        let context = match price_badge {
+            Some(price_badge) => {
+                context.with_provider_cost_requirement(price_badge, self.cost_authority.clone())?
+            }
+            None => context,
+        };
+        self.broker.begin_invocation(context)
+    }
 }
 
 impl ComponentHost {
@@ -1037,6 +1215,34 @@ impl ComponentHost {
             .map_err(|_| ComponentHostError::StateUnavailable)
     }
 
+    pub fn execution_registry_bundle(
+        &self,
+    ) -> Result<comfy_runtime::NativeExecutionRegistryBundle, ComponentHostError> {
+        let state = self
+            .inner
+            .state
+            .read()
+            .map_err(|_| ComponentHostError::StateUnavailable)?;
+        let profile_id = uuid::Uuid::parse_str(state.generation.profile_id()).map_err(|_| {
+            ComponentHostError::Verification {
+                extension_id: Arc::from(COMFY_COMPONENT_ADAPTER_ID),
+                message: "verified component profile identity is invalid".to_owned(),
+            }
+        })?;
+        let deployment = state.generation.worker_deployment_plan()?;
+        let provider_registry = state.generation.provider_registry_pin()?;
+        comfy_runtime::NativeExecutionRegistryBundle::checked(
+            comfy_types::ProfileId(profile_id),
+            state.registry.clone(),
+            deployment,
+            provider_registry,
+        )
+        .map_err(|error| ComponentHostError::Verification {
+            extension_id: Arc::from(COMFY_COMPONENT_ADAPTER_ID),
+            message: error.to_string(),
+        })
+    }
+
     pub(crate) fn prepare_plugin_invocation(
         &self,
         plugin: &InstalledVerifiedPlugin,
@@ -1061,6 +1267,7 @@ impl ComponentHost {
             authorization: plugin.authorization().clone(),
             context,
             plugin: plugin.clone(),
+            provider_price_badge: None,
             _lease: lease,
         })
     }
@@ -1074,7 +1281,18 @@ impl ComponentHost {
         context: NodeContext,
     ) -> Result<PreparedPluginInvocation, ComponentHostError> {
         let lease = self.begin_invocation_lease(plugin)?;
-        let generation = self.verified_generation()?;
+        let state = self
+            .inner
+            .state
+            .read()
+            .map_err(|_| ComponentHostError::StateUnavailable)?;
+        let generation = state.generation.clone();
+        let provider_price_badge = state
+            .registry
+            .descriptor(node_id)
+            .and_then(|descriptor| descriptor.source_schema.as_ref())
+            .and_then(|schema| schema.node.price_badge.clone());
+        drop(state);
         let worker_invocation = generation.prepare_worker_provider_invocation(
             plugin.extension_id(),
             node_id,
@@ -1091,6 +1309,7 @@ impl ComponentHost {
             authorization: plugin.authorization().clone(),
             context,
             plugin: plugin.clone(),
+            provider_price_badge,
             _lease: lease,
         })
     }
@@ -1494,6 +1713,15 @@ impl ComponentLifecycleAdapter for ComponentHostRouter {
                     .checked_add(1)
                     .ok_or(ComponentHostError::StateUnavailable)?;
                 state.extension_store_replay_snapshot = components;
+                if !state.bundle_subscribers.is_empty() {
+                    let bundle = state.host.execution_registry_bundle()?;
+                    state.bundle_subscribers.retain(|subscriber| {
+                        match subscriber.try_send(bundle.clone()) {
+                            Ok(()) | Err(async_channel::TrySendError::Full(_)) => true,
+                            Err(async_channel::TrySendError::Closed(_)) => false,
+                        }
+                    });
+                }
                 Ok::<(), ComponentHostError>(())
             })
             .await

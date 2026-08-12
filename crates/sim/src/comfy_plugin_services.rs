@@ -1,12 +1,14 @@
 use comfy_model::{ModelStore, ParserLimits};
 use comfy_plugin_host::{
-    ComponentExecutionBoundary, ComponentHostError, PrivateWorkerPluginExecutor,
+    ComponentExecutionBoundary, ComponentHost, ComponentHostError,
+    ComponentHostProviderInvocationAuthority, PrivateWorkerPluginExecutor,
 };
 use comfy_runtime::{
     AuthorizedCredentialPresenceRequest, AuthorizedProviderRequest, CredentialPresenceActuator,
     PluginCapabilityBroker, PluginRngPolicy, PluginServiceActuatorError,
-    PluginServiceOperationContext, ProviderPolicy, ProviderRequestActuator,
-    ProviderResultReceiptIssuer, SecretValue, SharedAssetService, WorkerLaunchConfig,
+    PluginServiceOperationContext, ProviderCostAcceptanceIssuer, ProviderCostApprovalAuthority,
+    ProviderPolicy, ProviderRequestActuator, ProviderResultReceiptIssuer, SecretValue,
+    SharedAssetService, WorkerLaunchConfig,
 };
 use comfy_tensor::{RngAlgorithm, RngProfileVersion};
 use futures::AsyncReadExt as _;
@@ -18,24 +20,68 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub fn private_worker_boundary(
+pub struct SimComfyPluginServices {
+    pub boundary: ComponentExecutionBoundary,
+    broker: PluginCapabilityBroker,
+    principal_id: String,
+    receipt_issuer: Arc<ProviderResultReceiptIssuer>,
+    receipt_lifetime: Duration,
+    cost_authority: Arc<ProviderCostApprovalAuthority>,
+}
+
+impl SimComfyPluginServices {
+    pub fn invocation_authority(
+        &self,
+        host: ComponentHost,
+    ) -> Result<Arc<ComponentHostProviderInvocationAuthority>, ComponentHostError> {
+        Ok(Arc::new(
+            ComponentHostProviderInvocationAuthority::new(
+                host,
+                self.broker.clone(),
+                &self.principal_id,
+                self.receipt_issuer.clone(),
+                self.receipt_lifetime,
+            )
+            .map_err(component_boundary_error)?
+            .with_cost_authority(self.cost_authority.clone()),
+        ))
+    }
+
+    pub fn cost_authority(&self) -> Arc<ProviderCostApprovalAuthority> {
+        self.cost_authority.clone()
+    }
+}
+
+pub fn private_worker_services(
     launch: WorkerLaunchConfig,
     assets: SharedAssetService,
     provider_policy: ProviderPolicy,
     profile_seed: u64,
     cx: &mut App,
-) -> Result<ComponentExecutionBoundary, ComponentHostError> {
+) -> Result<SimComfyPluginServices, ComponentHostError> {
     let credentials = credential_bridge(cx);
-    let broker = PluginCapabilityBroker::new(
+    let clock: Arc<dyn clock::SystemClock> = Arc::new(clock::RealSystemClock);
+    let cost_issuer = Arc::new(
+        ProviderCostAcceptanceIssuer::generate(clock.utc_now())
+            .map_err(component_boundary_error)?,
+    );
+    let cost_authority = Arc::new(ProviderCostApprovalAuthority::new(
+        cost_issuer,
+        clock.clone(),
+    ));
+    let broker = PluginCapabilityBroker::new_with_provider_cost_acceptance(
         assets,
         ModelStore::new(ParserLimits::default()).map_err(component_boundary_error)?,
         provider_policy,
+        cost_authority
+            .verifier()
+            .map_err(component_boundary_error)?,
         Arc::new(SimProviderActuator {
             client: cx.http_client(),
             executor: cx.background_executor().clone(),
         }),
         Arc::new(SimCredentialActuator { credentials }),
-        Arc::new(clock::RealSystemClock),
+        clock,
         PluginRngPolicy::new(
             RngProfileVersion::V2,
             RngAlgorithm::Philox4x32_10,
@@ -45,15 +91,26 @@ pub fn private_worker_boundary(
     let receipt_issuer = Arc::new(
         ProviderResultReceiptIssuer::generate(Instant::now()).map_err(component_boundary_error)?,
     );
-    Ok(ComponentExecutionBoundary::private_worker(
-        PrivateWorkerPluginExecutor::new_with_provider_result_receipts(
-            launch.clone(),
-            broker,
-            launch.profile_id.0.to_string(),
-            receipt_issuer,
-            Duration::from_secs(5 * 60),
+    let receipt_lifetime = Duration::from_secs(5 * 60);
+    let principal_id = launch.profile_id.0.to_string();
+    let boundary = ComponentExecutionBoundary::private_worker(
+        PrivateWorkerPluginExecutor::new_with_provider_authorities(
+            launch,
+            broker.clone(),
+            principal_id.clone(),
+            receipt_issuer.clone(),
+            receipt_lifetime,
+            cost_authority.clone(),
         )?,
-    ))
+    );
+    Ok(SimComfyPluginServices {
+        boundary,
+        broker,
+        principal_id,
+        receipt_issuer,
+        receipt_lifetime,
+        cost_authority,
+    })
 }
 
 struct CredentialCommand {
@@ -154,6 +211,9 @@ impl ProviderRequestActuator for SimProviderActuator {
             .uri(request.endpoint())
             .header(http::header::CONTENT_TYPE, "application/octet-stream")
             .header("x-sim-comfy-provider", request.provider());
+        if let Some(idempotency_key) = request.idempotency_key_sha256() {
+            builder = builder.header("idempotency-key", idempotency_key);
+        }
         if let Some(secret) = secret {
             let authorization = secret.expose_to(|bytes| {
                 let mut value = Vec::with_capacity(bytes.len().saturating_add(7));

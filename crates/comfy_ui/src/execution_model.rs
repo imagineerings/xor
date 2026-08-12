@@ -1,3 +1,5 @@
+#[cfg(test)]
+use comfy_runtime::compile_generated_native_prompt;
 use comfy_runtime::{
     AssetAvailability, AssetIdentity, AssetNamespace, AssetService, AttemptEvent, AttemptId,
     AttemptState, AuthorizedCapabilities, ComfyRuntimeDb, CompiledPlan, DEFAULT_NATIVE_PROFILE_ID,
@@ -6,9 +8,9 @@ use comfy_runtime::{
     ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput, ExecutionOutputAvailability,
     ExecutionPresentationError, ExecutionPresentationOwner, ExecutionPresentationService,
     ExecutionReconciliation, ExecutionSnapshot, ExecutionSnapshotStatus, NativeExecutionController,
-    NativeExecutionControllerConfig, OperationEligibility, ProfileId, RequestId, RetryPromptSource,
-    SharedAssetService, SharedExecutionPresentationService, WorkflowFormatDocument,
-    authorize_native_output_ui, compile_generated_native_prompt,
+    NativeExecutionControllerConfig, NativeExecutionRegistryBundle, OperationEligibility,
+    ProfileId, RequestId, RetryPromptSource, SharedAssetService,
+    SharedExecutionPresentationService, WorkflowFormatDocument, authorize_native_output_ui,
     generated_native_frontend_contracts, graph_to_prompt,
 };
 use comfy_tensor::CancellationToken;
@@ -903,12 +905,12 @@ fn command_queue_batch_count(kind: &ExecutionControlCommandKind) -> Option<usize
 }
 
 struct NativeGeneratedPlanProvider {
-    profile_id: ProfileId,
+    bundle: Arc<NativeExecutionRegistryBundle>,
 }
 
 impl ExecutionPlanProvider for NativeGeneratedPlanProvider {
     fn compile(&self, request: &ExecutionPlanRequest) -> Result<CompiledPlan, ExecutionFailure> {
-        if request.profile_id != self.profile_id {
+        if request.profile_id != self.bundle.profile_id() {
             return Err(ExecutionFailure::new(
                 "native_profile_unavailable",
                 "the workflow profile is not registered with the local native runtime",
@@ -922,10 +924,15 @@ impl ExecutionPlanProvider for NativeGeneratedPlanProvider {
             )
             .with_origin(ExecutionFailureOrigin::Validation));
         }
-        compile_generated_native_workflow(&request.workflow_bytes, &request.selected_output_nodes)
+        compile_generated_native_workflow_with_bundle(
+            &request.workflow_bytes,
+            &request.selected_output_nodes,
+            &self.bundle,
+        )
     }
 }
 
+#[cfg(test)]
 pub(crate) fn compile_generated_native_workflow(
     workflow_bytes: &[u8],
     selected_output_nodes: &BTreeSet<NodeId>,
@@ -971,6 +978,63 @@ pub(crate) fn compile_generated_native_workflow(
         plan.output_nodes = selected_output_nodes.iter().cloned().collect();
     }
     Ok(plan)
+}
+
+fn compile_generated_native_workflow_with_bundle(
+    workflow_bytes: &[u8],
+    selected_output_nodes: &BTreeSet<NodeId>,
+    bundle: &NativeExecutionRegistryBundle,
+) -> Result<CompiledPlan, ExecutionFailure> {
+    let workflow = WorkflowFormatDocument::parse(workflow_bytes).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    let contracts = generated_native_frontend_contracts(None).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    let descriptors = contracts
+        .into_iter()
+        .map(|(class_type, contract)| (class_type, contract.graph))
+        .collect();
+    let submission =
+        graph_to_prompt(&workflow, &descriptors, bundle.identity_sha256()).map_err(|error| {
+            ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+                .with_origin(ExecutionFailureOrigin::Validation)
+        })?;
+    let mut plan = bundle.compile(submission).map_err(|error| {
+        ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
+            .with_origin(ExecutionFailureOrigin::Validation)
+    })?;
+    apply_selected_output_nodes(&mut plan, selected_output_nodes)?;
+    Ok(plan)
+}
+
+fn apply_selected_output_nodes(
+    plan: &mut CompiledPlan,
+    selected_output_nodes: &BTreeSet<NodeId>,
+) -> Result<(), ExecutionFailure> {
+    if selected_output_nodes.is_empty() {
+        return Ok(());
+    }
+    for node_id in selected_output_nodes {
+        let node = plan.nodes.get(node_id).ok_or_else(|| {
+            ExecutionFailure::new(
+                "native_plan_compilation_failed",
+                format!("selected output node {node_id:?} is not in the compiled plan"),
+            )
+            .with_origin(ExecutionFailureOrigin::Validation)
+        })?;
+        if !node.descriptor.output_node {
+            return Err(ExecutionFailure::new(
+                "native_plan_compilation_failed",
+                format!("selected node {node_id:?} is not an output node"),
+            )
+            .with_origin(ExecutionFailureOrigin::Validation));
+        }
+    }
+    plan.output_nodes = selected_output_nodes.iter().cloned().collect();
+    Ok(())
 }
 
 struct NativeOutputService {
@@ -1306,9 +1370,18 @@ pub enum NativeExecutionServiceError {
 
 pub fn register_native_execution_services(
     config: NativeExecutionControllerConfig,
+    bundle: Arc<NativeExecutionRegistryBundle>,
     cx: &mut App,
 ) -> Result<(), NativeExecutionServiceError> {
     let profile_id = config.worker.profile_id;
+    if bundle.profile_id() != profile_id
+        || config.provider_registry.as_ref() != bundle.provider_registry()
+    {
+        return Err(NativeExecutionServiceError::Runtime(
+            "native execution controller and plan provider do not share one registry bundle"
+                .to_owned(),
+        ));
+    }
     let model = execution_ui_model(cx).ok_or(NativeExecutionServiceError::ModelUnavailable)?;
     if !Arc::ptr_eq(&model.read(cx).shared_service(), &config.presentation) {
         return Err(NativeExecutionServiceError::PresentationOwnerMismatch);
@@ -1321,7 +1394,7 @@ pub fn register_native_execution_services(
     model
         .update(cx, |model, cx| {
             model.register_runtime_controller(controller, cx);
-            model.register_plan_provider(Arc::new(NativeGeneratedPlanProvider { profile_id }), cx);
+            model.register_plan_provider(Arc::new(NativeGeneratedPlanProvider { bundle }), cx);
             model.register_output_operation_handler(outputs, cx);
             model.attach_profile_event_bus(profile_id, event_bus, cx);
             model.set_snapshot_status(

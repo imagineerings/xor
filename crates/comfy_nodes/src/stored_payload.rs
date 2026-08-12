@@ -36,6 +36,22 @@ pub struct NativeProviderPayload {
 }
 
 impl NativeProviderPayload {
+    pub fn from_abi(
+        handle_type: NativeHandleType,
+        signed_namespace: impl Into<String>,
+        abi_bytes: Vec<u8>,
+    ) -> Result<Self, NativeStoredPayloadError> {
+        let signed_namespace = signed_namespace.into();
+        let semantic_digest_sha256 =
+            provider_semantic_digest_sha256(&handle_type, &signed_namespace, &abi_bytes);
+        Self::checked(
+            handle_type,
+            signed_namespace,
+            semantic_digest_sha256,
+            abi_bytes,
+        )
+    }
+
     pub fn checked(
         handle_type: NativeHandleType,
         signed_namespace: impl Into<String>,
@@ -111,6 +127,24 @@ impl NativeProviderPayload {
         self.resident_bytes()?;
         Ok(())
     }
+}
+
+fn provider_semantic_digest_sha256(
+    handle_type: &NativeHandleType,
+    signed_namespace: &str,
+    abi_bytes: &[u8],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"sim.comfy.provider-payload-semantic.v1");
+    hasher.update([0]);
+    hasher.update([native_handle_kind_tag(handle_type.kind)]);
+    hasher.update([0]);
+    hasher.update(handle_type.type_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(signed_namespace.as_bytes());
+    hasher.update([0]);
+    hasher.update(Sha256::digest(abi_bytes));
+    format!("{:x}", hasher.finalize())
 }
 
 #[derive(Clone)]

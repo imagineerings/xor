@@ -769,7 +769,7 @@ impl WorkerSession {
         &self,
         envelope: &WorkerEnvelope,
     ) -> Result<Vec<WorkerEnvelope>, WorkerSessionError> {
-        self.require_running_execution(envelope, ExecutionKind::Plugin)?;
+        self.require_running_attempt(envelope)?;
         Ok(Vec::new())
     }
 
@@ -895,9 +895,6 @@ impl WorkerSession {
         request: Vec<u8>,
     ) -> Result<WorkerEnvelope, WorkerSessionError> {
         let execution = self.execution.ok_or(WorkerSessionError::StaleAttempt)?;
-        if execution.kind != ExecutionKind::Plugin {
-            return Err(WorkerSessionError::InvalidDirection);
-        }
         let identity = self
             .identity
             .clone()

@@ -487,6 +487,7 @@ def validate_later_task_writes() -> None:
         "comfy-parity-native-node-provider-invocation-foundation": {
             "Cargo.lock",
             "crates/comfy_plugin_host/Cargo.toml",
+            "crates/comfy_worker/Cargo.toml",
         },
         "comfy-parity-opt-in-product-build-boundary": {
             "Cargo.lock",

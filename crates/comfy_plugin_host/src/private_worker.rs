@@ -6,9 +6,9 @@ use comfy_plugin_sdk::InvocationError;
 use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_runtime::{
     PluginAuthorizationVerifier, PluginCapabilityBroker, PluginCapabilityInvocation,
-    PluginServiceInvocationContext, ProviderResultReceiptAuthority, ProviderResultReceiptIssuer,
-    RetainedPluginExecution, RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig,
-    WorkerRegistryDeploymentPlan,
+    PluginServiceInvocationContext, ProviderCostAuthorizationAuthority,
+    ProviderResultReceiptAuthority, ProviderResultReceiptIssuer, RetainedPluginExecution,
+    RuntimeSupervisor, RuntimeSupervisorError, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
 };
 use comfy_types::{
     AttemptId, ProfileId, PromptId, WorkerPluginExecutionFailure, WorkerPluginExecutionOutcome,
@@ -33,6 +33,7 @@ struct PrivateWorkerProviderResultReceipts {
     principal_id: Arc<str>,
     issuer: Arc<ProviderResultReceiptIssuer>,
     lifetime: Duration,
+    cost_authority: Option<Arc<dyn ProviderCostAuthorizationAuthority>>,
 }
 
 struct PrivateWorkerCommand {
@@ -78,6 +79,33 @@ impl PrivateWorkerPluginExecutor {
                 principal_id,
                 issuer,
                 lifetime,
+                cost_authority: None,
+            }),
+        )
+    }
+
+    pub fn new_with_provider_authorities(
+        launch: WorkerLaunchConfig,
+        broker: PluginCapabilityBroker,
+        principal_id: impl Into<Arc<str>>,
+        issuer: Arc<ProviderResultReceiptIssuer>,
+        lifetime: Duration,
+        cost_authority: Arc<dyn ProviderCostAuthorizationAuthority>,
+    ) -> Result<Arc<Self>, ComponentHostError> {
+        let principal_id = principal_id.into();
+        if principal_id.is_empty() || lifetime.is_zero() {
+            return Err(ComponentHostError::ExecutionBoundary(
+                "provider authority configuration is invalid".to_owned(),
+            ));
+        }
+        Self::new_internal(
+            launch,
+            broker,
+            Some(PrivateWorkerProviderResultReceipts {
+                principal_id,
+                issuer,
+                lifetime,
+                cost_authority: Some(cost_authority),
             }),
         )
     }
@@ -145,7 +173,7 @@ impl PrivateWorkerPluginExecutor {
                 receipt_configuration.lifetime,
             )
             .map_err(worker_boundary_error)?;
-            PluginServiceInvocationContext::new_with_principal(
+            let service_context = PluginServiceInvocationContext::new_with_principal(
                 self.launch.profile_id,
                 context.prompt_id,
                 context.attempt_id,
@@ -157,7 +185,16 @@ impl PrivateWorkerPluginExecutor {
                 invocation.worker_invocation().maximum_response_bytes(),
             )
             .and_then(|context| context.with_provider_result_authority(authority))
-            .map_err(worker_boundary_error)?
+            .map_err(worker_boundary_error)?;
+            match invocation.provider_price_badge() {
+                Some(price_badge) => service_context
+                    .with_provider_cost_requirement(
+                        price_badge.clone(),
+                        receipt_configuration.cost_authority.clone(),
+                    )
+                    .map_err(worker_boundary_error)?,
+                None => service_context,
+            }
         } else {
             PluginServiceInvocationContext::new(
                 self.launch.profile_id,

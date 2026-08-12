@@ -149,6 +149,14 @@ pub enum Capability {
         provider: String,
         endpoint: String,
     },
+    ProviderUpload {
+        provider: String,
+        endpoint: String,
+    },
+    ProviderCost {
+        provider: String,
+        endpoint: String,
+    },
     Secret {
         secret_id: String,
     },
@@ -227,6 +235,37 @@ impl Capability {
                     endpoint: endpoint.endpoint().to_owned(),
                 }
             }
+            CapabilityKind::ProviderUpload | CapabilityKind::ProviderCost => {
+                let (provider, endpoint) = scope.split_once('|').ok_or_else(|| {
+                    PermissionError::InvalidPluginCapabilityScope {
+                        kind,
+                        scope: scope.to_owned(),
+                    }
+                })?;
+                if endpoint.contains('|') {
+                    return Err(PermissionError::InvalidPluginCapabilityScope {
+                        kind,
+                        scope: scope.to_owned(),
+                    });
+                }
+                let endpoint = crate::ProviderEndpoint::new(provider, endpoint).map_err(|_| {
+                    PermissionError::InvalidPluginCapabilityScope {
+                        kind,
+                        scope: scope.to_owned(),
+                    }
+                })?;
+                if kind == CapabilityKind::ProviderUpload {
+                    Self::ProviderUpload {
+                        provider: endpoint.provider().as_str().to_owned(),
+                        endpoint: endpoint.endpoint().to_owned(),
+                    }
+                } else {
+                    Self::ProviderCost {
+                        provider: endpoint.provider().as_str().to_owned(),
+                        endpoint: endpoint.endpoint().to_owned(),
+                    }
+                }
+            }
             CapabilityKind::Secret => Self::Secret {
                 secret_id: crate::SecretId::new(scope)
                     .map_err(|_| PermissionError::InvalidPluginCapabilityScope {
@@ -272,6 +311,14 @@ impl Capability {
                 CapabilityKind::NetworkProvider,
                 format!("{provider}|{endpoint}"),
             )),
+            Self::ProviderUpload { provider, endpoint } => Some((
+                CapabilityKind::ProviderUpload,
+                format!("{provider}|{endpoint}"),
+            )),
+            Self::ProviderCost { provider, endpoint } => Some((
+                CapabilityKind::ProviderCost,
+                format!("{provider}|{endpoint}"),
+            )),
             Self::Secret { secret_id } => Some((CapabilityKind::Secret, secret_id.clone())),
             Self::Clock { clock_id } => Some((CapabilityKind::Clock, clock_id.clone())),
             Self::Randomness { stream_id } => Some((CapabilityKind::Randomness, stream_id.clone())),
@@ -298,6 +345,12 @@ impl Capability {
             }
             Self::ProviderNetwork { provider, endpoint } => {
                 format!("provider_network:{provider}|{endpoint}")
+            }
+            Self::ProviderUpload { provider, endpoint } => {
+                format!("provider_upload:{provider}|{endpoint}")
+            }
+            Self::ProviderCost { provider, endpoint } => {
+                format!("provider_cost:{provider}|{endpoint}")
             }
             Self::Secret { secret_id } => format!("secret:{secret_id}"),
             Self::Clock { clock_id } => format!("clock:{clock_id}"),
@@ -345,6 +398,10 @@ impl Capability {
                 .map_err(|_| {
                 PermissionError::InvalidCapabilityWireIdentifier(value.to_owned())
             })?,
+            "provider_upload" => Self::from_plugin_scope(CapabilityKind::ProviderUpload, scope)
+                .map_err(|_| PermissionError::InvalidCapabilityWireIdentifier(value.to_owned()))?,
+            "provider_cost" => Self::from_plugin_scope(CapabilityKind::ProviderCost, scope)
+                .map_err(|_| PermissionError::InvalidCapabilityWireIdentifier(value.to_owned()))?,
             "secret" => Self::Secret {
                 secret_id: scope.to_owned(),
             },
@@ -386,7 +443,10 @@ impl Capability {
     }
 
     fn validate(&self) -> Result<(), PermissionError> {
-        if let Self::ProviderNetwork { provider, endpoint } = self {
+        if let Self::ProviderNetwork { provider, endpoint }
+        | Self::ProviderUpload { provider, endpoint }
+        | Self::ProviderCost { provider, endpoint } = self
+        {
             return crate::ProviderEndpoint::new(provider, endpoint)
                 .map(|_| ())
                 .map_err(|_| PermissionError::InvalidCapability(self.clone()));
@@ -398,7 +458,10 @@ impl Capability {
         }
         let scopes: &[&str] = match self {
             Self::Asset { namespace, .. } | Self::TransactionalOutput { namespace } => &[namespace],
-            Self::ProviderNetwork { .. } | Self::Secret { .. } => &[],
+            Self::ProviderNetwork { .. }
+            | Self::ProviderUpload { .. }
+            | Self::ProviderCost { .. }
+            | Self::Secret { .. } => &[],
             Self::Clock { clock_id } => &[clock_id],
             Self::Randomness { stream_id } => &[stream_id],
             Self::ModelHandle { model_id } => &[model_id],

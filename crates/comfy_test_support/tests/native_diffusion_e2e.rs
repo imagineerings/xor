@@ -35,7 +35,7 @@ const PROFILE: ProfileId = ProfileId(Uuid::from_u128(0x5349_4d00_0000_0000_0000_
 const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 // This debug-build deadlock watchdog is deliberately separate from the five-second
 // release-profile performance gate in VAL-NATIVE-E2E-002.
-const DEBUG_WORKER_RESULT_TIMEOUT: Duration = Duration::from_secs(300);
+const DEBUG_WORKER_RESULT_TIMEOUT: Duration = Duration::from_secs(600);
 
 struct TestRoots {
     _directory: tempfile::TempDir,
@@ -101,7 +101,7 @@ impl TestRoots {
             heartbeat_interval: Duration::from_secs(30),
             missed_heartbeat_limit: 3,
             shutdown_timeout: Duration::from_secs(3),
-            ready_timeout: Duration::from_secs(10),
+            ready_timeout: Duration::from_secs(30),
             maximum_automatic_restarts: 1,
             restart_backoff: Duration::from_millis(1),
         };

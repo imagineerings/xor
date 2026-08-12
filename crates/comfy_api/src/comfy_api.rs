@@ -146,6 +146,47 @@ pub struct NativeRuntimeApiHost {
 
 impl NativeRuntimeApiHost {
     #[allow(clippy::too_many_arguments)]
+    pub fn with_registry_bundle(
+        bundle: Arc<comfy_runtime::NativeExecutionRegistryBundle>,
+        presentation: comfy_runtime::SharedExecutionPresentationService,
+        controller: Arc<dyn comfy_runtime::ExecutionController>,
+        event_bus: &comfy_runtime::ExecutionEventBus,
+        assets: Option<comfy_runtime::SharedAssetService>,
+        http_limits: HttpLimits,
+        websocket_limits: WebSocketLimits,
+        security_config: security::ApiSecurityConfig,
+        permission_policy: Arc<comfy_runtime::PermissionPolicy>,
+        idempotency_store: Arc<dyn security::IdempotencySnapshotStore>,
+    ) -> Result<Self, NativeApiHostError> {
+        let mut services = NativeRuntimeHttpServices::from_registry_bundle(
+            &bundle,
+            presentation.clone(),
+            controller.clone(),
+        )
+        .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+        if let Some(assets) = assets {
+            let asset_authorization =
+                comfy_runtime::authorize_native_api_asset_reader(&permission_policy)
+                    .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+            services = services
+                .with_assets(assets, asset_authorization)
+                .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
+        }
+        Self::from_services(
+            bundle.profile_id(),
+            presentation,
+            controller,
+            event_bus,
+            services,
+            http_limits,
+            websocket_limits,
+            security_config,
+            permission_policy,
+            idempotency_store,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn native_image(
         profile_id: comfy_runtime::ProfileId,
         presentation: comfy_runtime::SharedExecutionPresentationService,
@@ -204,6 +245,33 @@ impl NativeRuntimeApiHost {
                 .with_assets(assets, asset_authorization)
                 .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;
         }
+        Self::from_services(
+            profile_id,
+            presentation,
+            controller,
+            event_bus,
+            services,
+            http_limits,
+            websocket_limits,
+            security_config,
+            permission_policy,
+            idempotency_store,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_services(
+        profile_id: comfy_runtime::ProfileId,
+        presentation: comfy_runtime::SharedExecutionPresentationService,
+        controller: Arc<dyn comfy_runtime::ExecutionController>,
+        event_bus: &comfy_runtime::ExecutionEventBus,
+        services: NativeRuntimeHttpServices,
+        http_limits: HttpLimits,
+        websocket_limits: WebSocketLimits,
+        security_config: security::ApiSecurityConfig,
+        permission_policy: Arc<comfy_runtime::PermissionPolicy>,
+        idempotency_store: Arc<dyn security::IdempotencySnapshotStore>,
+    ) -> Result<Self, NativeApiHostError> {
         let capabilities = services
             .http_capabilities()
             .map_err(|error| NativeApiHostError::Runtime(error.to_string()))?;

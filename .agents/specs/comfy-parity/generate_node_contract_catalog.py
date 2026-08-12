@@ -867,7 +867,7 @@ def v3_portable_schema(
         "accept_all_inputs",
         "essentials_category",
         "search_aliases",
-        "price",
+        "price_badge",
     }
     return {
         "provenance": "source_v3",
@@ -885,7 +885,9 @@ def v3_portable_schema(
             "enable_expand": literal_boolean(node_options.get("enable_expand")),
             "accept_all_inputs": literal_boolean(node_options.get("accept_all_inputs")),
             "essentials_category": literal_text(node_options.get("essentials_category")),
-            "price_badge": portable_expression(node_options["price"]) if "price" in node_options else None,
+            "price_badge": portable_expression(node_options["price_badge"])
+            if "price_badge" in node_options
+            else None,
             "is_deprecated": literal_boolean(node_options.get("is_deprecated")),
             "is_experimental": literal_boolean(node_options.get("is_experimental")),
             "display_name": literal_text(node_options.get("display_name")),

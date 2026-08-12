@@ -4,7 +4,16 @@ use std::{
     time::{Duration, Instant},
 };
 
+use comfy_media::{
+    NativeArtifactKind, NativeArtifactPayload, NativeAudioPayload, NativeCameraPayload,
+    NativeCameraProjection, NativeCameraRole, NativeFile3DFormat, NativeFile3DPayload,
+    NativeFile3DRole, NativeVideoPayload,
+};
+use comfy_nodes::{NativeHandleKind, NativeHandleType, NativeNodeContext, NativeStoredPayload};
 use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet, ValueFamily};
+use comfy_tensor::{
+    DType, DeviceId, ImageTensor, NativeTensorPayload, NativeTensorRole, Tensor, TensorDescriptor,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -49,6 +58,655 @@ pub enum ProviderMaterializationError {
     InvalidReceiptAuthority,
     #[error("provider transport projection is invalid or exceeds its bound")]
     InvalidTransportProjection,
+    #[error("provider payload cannot be materialized by the canonical lower owner")]
+    InvalidNativePayload,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderTransportEncoding {
+    PluginValue,
+    NativePayload,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderTensorData {
+    shape: Vec<u64>,
+    dtype: DType,
+    logical_bytes: Vec<u8>,
+}
+
+impl ProviderTensorData {
+    fn from_tensor(tensor: &Tensor) -> Result<Self, ProviderMaterializationError> {
+        let descriptor = tensor.descriptor();
+        if !matches!(descriptor.dtype(), DType::F32 | DType::U8)
+            || !descriptor
+                .is_contiguous()
+                .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?
+        {
+            return Err(ProviderMaterializationError::InvalidNativePayload);
+        }
+        let bytes = tensor
+            .contiguous_bytes()
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        let logical_bytes = if descriptor.dtype() == DType::F32 {
+            bytes
+                .chunks_exact(4)
+                .flat_map(|chunk| {
+                    f32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).to_le_bytes()
+                })
+                .collect()
+        } else {
+            bytes.to_vec()
+        };
+        let data = Self {
+            shape: descriptor.shape().to_vec(),
+            dtype: descriptor.dtype(),
+            logical_bytes,
+        };
+        data.validate()?;
+        Ok(data)
+    }
+
+    fn validate(&self) -> Result<(), ProviderMaterializationError> {
+        if self.shape.is_empty()
+            || self.shape.len() > 8
+            || self.shape.contains(&0)
+            || !matches!(self.dtype, DType::F32 | DType::U8)
+        {
+            return Err(ProviderMaterializationError::InvalidNativePayload);
+        }
+        let element_bytes = match self.dtype {
+            DType::F32 => 4_u64,
+            DType::U8 => 1_u64,
+            _ => return Err(ProviderMaterializationError::InvalidNativePayload),
+        };
+        let expected = self
+            .shape
+            .iter()
+            .try_fold(element_bytes, |bytes, dimension| {
+                bytes.checked_mul(*dimension)
+            })
+            .and_then(|bytes| usize::try_from(bytes).ok())
+            .ok_or(ProviderMaterializationError::InvalidNativePayload)?;
+        if expected != self.logical_bytes.len()
+            || self.logical_bytes.len() > MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES
+        {
+            return Err(ProviderMaterializationError::InvalidNativePayload);
+        }
+        Ok(())
+    }
+
+    fn materialize(
+        &self,
+        context: &NativeNodeContext,
+    ) -> Result<Tensor, ProviderMaterializationError> {
+        self.validate()?;
+        let compute = context
+            .compute_session()
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        let execution_context = compute
+            .execution_context(context)
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        let descriptor = TensorDescriptor::contiguous(
+            self.shape.clone(),
+            self.dtype,
+            DeviceId::CPU,
+            compute.stream(),
+        )
+        .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        let bytes = if self.dtype == DType::F32 {
+            self.logical_bytes
+                .chunks_exact(4)
+                .flat_map(|chunk| {
+                    f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]).to_ne_bytes()
+                })
+                .collect::<Vec<_>>()
+        } else {
+            self.logical_bytes.clone()
+        };
+        compute
+            .backend()
+            .upload_bytes(descriptor, &bytes, &execution_context)
+            .map(|(tensor, _)| tensor)
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ProviderAudioData {
+    waveform: ProviderTensorData,
+    sample_rate: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ProviderNativePayload {
+    Image {
+        tensor: ProviderTensorData,
+    },
+    Mask {
+        tensor: ProviderTensorData,
+    },
+    Audio {
+        audio: ProviderAudioData,
+    },
+    Video {
+        frames: ProviderTensorData,
+        frame_rate_numerator: u32,
+        frame_rate_denominator: u32,
+        audio: Option<ProviderAudioData>,
+        alpha: Option<ProviderTensorData>,
+        metadata: BTreeMap<String, String>,
+    },
+    Artifact {
+        source_type_id: String,
+        media_type: String,
+        bytes: Vec<u8>,
+    },
+    File3d {
+        source_type_id: String,
+        format: String,
+        bytes: Vec<u8>,
+    },
+    Camera {
+        source_type_id: String,
+        position: [f32; 3],
+        target: [f32; 3],
+        zoom: f32,
+        orientation_wxyz: Option<[f32; 4]>,
+        projection: ProviderCameraProjection,
+        width: u32,
+        height: u32,
+    },
+    ProviderTask {
+        semantic_digest_sha256: String,
+        abi_bytes: Vec<u8>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ProviderCameraProjection {
+    Perspective {
+        fov_degrees: f32,
+        aspect_ratio: f32,
+        near: f32,
+        far: f32,
+    },
+    Orthographic {
+        left: f32,
+        right: f32,
+        bottom: f32,
+        top: f32,
+        near: f32,
+        far: f32,
+    },
+}
+
+impl ProviderNativePayload {
+    fn from_stored(payload: &NativeStoredPayload) -> Result<Self, ProviderMaterializationError> {
+        let payload = match payload {
+            NativeStoredPayload::Tensor(payload) => match payload.role() {
+                NativeTensorRole::Image => Self::Image {
+                    tensor: ProviderTensorData::from_tensor(payload.tensor())?,
+                },
+                NativeTensorRole::Mask => Self::Mask {
+                    tensor: ProviderTensorData::from_tensor(payload.tensor())?,
+                },
+                _ => return Err(ProviderMaterializationError::InvalidNativePayload),
+            },
+            NativeStoredPayload::Audio(payload) => Self::Audio {
+                audio: ProviderAudioData {
+                    waveform: ProviderTensorData::from_tensor(payload.waveform())?,
+                    sample_rate: payload.sample_rate(),
+                },
+            },
+            NativeStoredPayload::Video(payload) => Self::Video {
+                frames: ProviderTensorData::from_tensor(payload.frames())?,
+                frame_rate_numerator: payload.frame_rate().0,
+                frame_rate_denominator: payload.frame_rate().1,
+                audio: payload
+                    .audio()
+                    .map(|audio| {
+                        Ok(ProviderAudioData {
+                            waveform: ProviderTensorData::from_tensor(audio.waveform())?,
+                            sample_rate: audio.sample_rate(),
+                        })
+                    })
+                    .transpose()?,
+                alpha: payload
+                    .alpha()
+                    .map(ProviderTensorData::from_tensor)
+                    .transpose()?,
+                metadata: payload.metadata().clone(),
+            },
+            NativeStoredPayload::Artifact(payload) => Self::Artifact {
+                source_type_id: payload.source_type_id().to_owned(),
+                media_type: payload.media_type().to_owned(),
+                bytes: payload.bytes().to_vec(),
+            },
+            NativeStoredPayload::File3D(payload) => Self::File3d {
+                source_type_id: payload.source_type_id().to_owned(),
+                format: payload.format().extension().to_owned(),
+                bytes: payload.bytes().to_vec(),
+            },
+            NativeStoredPayload::Camera(payload) => Self::Camera {
+                source_type_id: payload.source_type_id().to_owned(),
+                position: *payload.position(),
+                target: *payload.target(),
+                zoom: payload.zoom(),
+                orientation_wxyz: payload.orientation_wxyz().copied(),
+                projection: match payload.projection() {
+                    NativeCameraProjection::Perspective {
+                        fov_degrees,
+                        aspect_ratio,
+                        near,
+                        far,
+                    } => ProviderCameraProjection::Perspective {
+                        fov_degrees,
+                        aspect_ratio,
+                        near,
+                        far,
+                    },
+                    NativeCameraProjection::Orthographic {
+                        left,
+                        right,
+                        bottom,
+                        top,
+                        near,
+                        far,
+                    } => ProviderCameraProjection::Orthographic {
+                        left,
+                        right,
+                        bottom,
+                        top,
+                        near,
+                        far,
+                    },
+                },
+                width: payload.dimensions().0,
+                height: payload.dimensions().1,
+            },
+            NativeStoredPayload::Provider(payload) => Self::ProviderTask {
+                semantic_digest_sha256: payload.semantic_digest_sha256().to_owned(),
+                abi_bytes: payload.abi_bytes().to_vec(),
+            },
+            _ => return Err(ProviderMaterializationError::InvalidNativePayload),
+        };
+        payload.validate()?;
+        Ok(payload)
+    }
+
+    fn validate(&self) -> Result<(), ProviderMaterializationError> {
+        match self {
+            Self::Image { tensor } => {
+                tensor.validate()?;
+                if tensor.dtype != DType::F32
+                    || tensor.shape.len() != 4
+                    || !matches!(tensor.shape.get(3), Some(1 | 3 | 4))
+                {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+            }
+            Self::Mask { tensor } => {
+                tensor.validate()?;
+                if tensor.dtype != DType::F32 || tensor.shape.len() != 3 {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+            }
+            Self::Audio { audio } => validate_provider_audio(audio)?,
+            Self::Video {
+                frames,
+                frame_rate_numerator,
+                frame_rate_denominator,
+                audio,
+                alpha,
+                metadata,
+            } => {
+                frames.validate()?;
+                if frames.shape.len() != 4
+                    || !matches!(frames.shape.get(3), Some(1 | 3 | 4))
+                    || *frame_rate_numerator == 0
+                    || *frame_rate_denominator == 0
+                    || metadata.len() > 128
+                {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+                if let Some(audio) = audio {
+                    validate_provider_audio(audio)?;
+                }
+                if let Some(alpha) = alpha {
+                    alpha.validate()?;
+                    let expected = [frames.shape[0], frames.shape[1], frames.shape[2], 1];
+                    if alpha.dtype != DType::F32 || alpha.shape.as_slice() != expected {
+                        return Err(ProviderMaterializationError::InvalidNativePayload);
+                    }
+                }
+            }
+            Self::Artifact {
+                source_type_id,
+                media_type,
+                bytes,
+            } => {
+                if !matches!(source_type_id.as_str(), "SVG" | "AUDIO_RECORD" | "WEBCAM")
+                    || media_type.is_empty()
+                    || bytes.len() > MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES
+                {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+            }
+            Self::File3d {
+                source_type_id,
+                format,
+                bytes,
+            } => {
+                file_3d_role(source_type_id)?;
+                file_3d_format(format)?;
+                if bytes.is_empty() || bytes.len() > MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+            }
+            Self::Camera { source_type_id, .. } => {
+                camera_role(source_type_id)?;
+            }
+            Self::ProviderTask {
+                semantic_digest_sha256,
+                abi_bytes,
+            } => {
+                if !is_sha256(semantic_digest_sha256)
+                    || abi_bytes.is_empty()
+                    || abi_bytes.len() > MAX_PROVIDER_TRANSPORT_REQUEST_BYTES
+                {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn materialize(
+        &self,
+        expected_type: &NativeHandleType,
+        signed_namespace: &str,
+        context: &NativeNodeContext,
+    ) -> Result<NativeStoredPayload, ProviderMaterializationError> {
+        self.validate()?;
+        let payload = match self {
+            Self::Image { tensor } => {
+                require_expected_type(expected_type, NativeHandleKind::Image, "IMAGE")?;
+                let tensor = tensor.materialize(context)?;
+                let image = ImageTensor::from_tensor(tensor)
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+                NativeStoredPayload::Tensor(Arc::new(
+                    NativeTensorPayload::from_image(NativeTensorRole::Image, image)
+                        .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::Mask { tensor } => {
+                require_expected_type(expected_type, NativeHandleKind::Mask, "MASK")?;
+                let shape = tensor.shape.as_slice();
+                let [batch, height, width] = shape else {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                };
+                let values = provider_f32_values(tensor)?;
+                let compute = context
+                    .compute_session()
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+                let execution_context = compute
+                    .execution_context(context)
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+                let image = ImageTensor::from_f32(
+                    compute.backend(),
+                    &execution_context,
+                    *batch,
+                    *height,
+                    *width,
+                    1,
+                    &values,
+                )
+                .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+                NativeStoredPayload::Tensor(Arc::new(
+                    NativeTensorPayload::from_image(NativeTensorRole::Mask, image)
+                        .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::Audio { audio } => {
+                require_expected_type(expected_type, NativeHandleKind::Audio, "AUDIO")?;
+                NativeStoredPayload::Audio(Arc::new(materialize_audio(audio, context)?))
+            }
+            Self::Video {
+                frames,
+                frame_rate_numerator,
+                frame_rate_denominator,
+                audio,
+                alpha,
+                metadata,
+            } => {
+                require_expected_type(expected_type, NativeHandleKind::Video, "VIDEO")?;
+                NativeStoredPayload::Video(Arc::new(
+                    NativeVideoPayload::checked(
+                        frames.materialize(context)?,
+                        *frame_rate_numerator,
+                        *frame_rate_denominator,
+                        audio
+                            .as_ref()
+                            .map(|audio| materialize_audio(audio, context))
+                            .transpose()?,
+                        alpha
+                            .as_ref()
+                            .map(|alpha| alpha.materialize(context))
+                            .transpose()?,
+                        metadata.clone(),
+                    )
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::Artifact {
+                source_type_id,
+                media_type,
+                bytes,
+            } => {
+                require_expected_type(expected_type, NativeHandleKind::Artifact, source_type_id)?;
+                let kind = match source_type_id.as_str() {
+                    "SVG" => NativeArtifactKind::Svg,
+                    "AUDIO_RECORD" => NativeArtifactKind::AudioRecord,
+                    "WEBCAM" => NativeArtifactKind::Webcam,
+                    _ => return Err(ProviderMaterializationError::InvalidNativePayload),
+                };
+                NativeStoredPayload::Artifact(Arc::new(
+                    NativeArtifactPayload::checked(kind, media_type.clone(), bytes.clone())
+                        .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::File3d {
+                source_type_id,
+                format,
+                bytes,
+            } => {
+                require_expected_type(expected_type, NativeHandleKind::ThreeD, source_type_id)?;
+                NativeStoredPayload::File3D(Arc::new(
+                    NativeFile3DPayload::checked(
+                        file_3d_role(source_type_id)?,
+                        file_3d_format(format)?,
+                        bytes.clone(),
+                    )
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::Camera {
+                source_type_id,
+                position,
+                target,
+                zoom,
+                orientation_wxyz,
+                projection,
+                width,
+                height,
+            } => {
+                require_expected_type(expected_type, NativeHandleKind::ThreeD, source_type_id)?;
+                let projection = match projection {
+                    ProviderCameraProjection::Perspective {
+                        fov_degrees,
+                        aspect_ratio,
+                        near,
+                        far,
+                    } => NativeCameraProjection::Perspective {
+                        fov_degrees: *fov_degrees,
+                        aspect_ratio: *aspect_ratio,
+                        near: *near,
+                        far: *far,
+                    },
+                    ProviderCameraProjection::Orthographic {
+                        left,
+                        right,
+                        bottom,
+                        top,
+                        near,
+                        far,
+                    } => NativeCameraProjection::Orthographic {
+                        left: *left,
+                        right: *right,
+                        bottom: *bottom,
+                        top: *top,
+                        near: *near,
+                        far: *far,
+                    },
+                };
+                NativeStoredPayload::Camera(Arc::new(
+                    NativeCameraPayload::checked(
+                        camera_role(source_type_id)?,
+                        *position,
+                        *target,
+                        *zoom,
+                        *orientation_wxyz,
+                        projection,
+                        *width,
+                        *height,
+                    )
+                    .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+                ))
+            }
+            Self::ProviderTask {
+                semantic_digest_sha256,
+                abi_bytes,
+            } => {
+                if expected_type.kind != NativeHandleKind::ProviderTask {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+                let payload = comfy_nodes::NativeProviderPayload::from_abi(
+                    expected_type.clone(),
+                    signed_namespace,
+                    abi_bytes.clone(),
+                )
+                .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+                if payload.semantic_digest_sha256() != semantic_digest_sha256 {
+                    return Err(ProviderMaterializationError::InvalidNativePayload);
+                }
+                NativeStoredPayload::Provider(Arc::new(payload))
+            }
+        };
+        payload
+            .validate()
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        if payload
+            .handle_type()
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?
+            != *expected_type
+        {
+            return Err(ProviderMaterializationError::InvalidNativePayload);
+        }
+        Ok(payload)
+    }
+}
+
+fn validate_provider_audio(audio: &ProviderAudioData) -> Result<(), ProviderMaterializationError> {
+    audio.waveform.validate()?;
+    if audio.waveform.dtype != DType::F32
+        || audio.waveform.shape.len() != 3
+        || !(8_000..=384_000).contains(&audio.sample_rate)
+    {
+        return Err(ProviderMaterializationError::InvalidNativePayload);
+    }
+    Ok(())
+}
+
+fn materialize_audio(
+    audio: &ProviderAudioData,
+    context: &NativeNodeContext,
+) -> Result<NativeAudioPayload, ProviderMaterializationError> {
+    validate_provider_audio(audio)?;
+    NativeAudioPayload::checked(audio.waveform.materialize(context)?, audio.sample_rate)
+        .map_err(|_| ProviderMaterializationError::InvalidNativePayload)
+}
+
+fn provider_f32_values(
+    tensor: &ProviderTensorData,
+) -> Result<Vec<f32>, ProviderMaterializationError> {
+    if tensor.dtype != DType::F32 {
+        return Err(ProviderMaterializationError::InvalidNativePayload);
+    }
+    Ok(tensor
+        .logical_bytes
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect())
+}
+
+fn require_expected_type(
+    expected_type: &NativeHandleType,
+    kind: NativeHandleKind,
+    source_type_id: &str,
+) -> Result<(), ProviderMaterializationError> {
+    if expected_type.kind != kind || expected_type.type_id != source_type_id {
+        return Err(ProviderMaterializationError::InvalidNativePayload);
+    }
+    Ok(())
+}
+
+fn file_3d_format(format: &str) -> Result<NativeFile3DFormat, ProviderMaterializationError> {
+    match format {
+        "fbx" => Ok(NativeFile3DFormat::Fbx),
+        "gltf" => Ok(NativeFile3DFormat::Gltf),
+        "glb" => Ok(NativeFile3DFormat::Glb),
+        "ksplat" => Ok(NativeFile3DFormat::Ksplat),
+        "obj" => Ok(NativeFile3DFormat::Obj),
+        "ply" => Ok(NativeFile3DFormat::Ply),
+        "splat" => Ok(NativeFile3DFormat::Splat),
+        "spz" => Ok(NativeFile3DFormat::Spz),
+        "stl" => Ok(NativeFile3DFormat::Stl),
+        "usdz" => Ok(NativeFile3DFormat::Usdz),
+        _ => Err(ProviderMaterializationError::InvalidNativePayload),
+    }
+}
+
+fn file_3d_role(source_type_id: &str) -> Result<NativeFile3DRole, ProviderMaterializationError> {
+    match source_type_id {
+        "FILE_3D" => Ok(NativeFile3DRole::Any),
+        "FILE_3D_FBX" => Ok(NativeFile3DRole::Fbx),
+        "FILE_3D_GLTF" => Ok(NativeFile3DRole::Gltf),
+        "FILE_3D_GLB" => Ok(NativeFile3DRole::Glb),
+        "FILE_3D_KSPLAT" => Ok(NativeFile3DRole::Ksplat),
+        "FILE_3D_OBJ" => Ok(NativeFile3DRole::Obj),
+        "FILE_3D_PLY" => Ok(NativeFile3DRole::Ply),
+        "FILE_3D_POINT_CLOUD_ANY" => Ok(NativeFile3DRole::PointCloudAny),
+        "FILE_3D_SPLAT_ANY" => Ok(NativeFile3DRole::SplatAny),
+        "FILE_3D_SPLAT" => Ok(NativeFile3DRole::Splat),
+        "FILE_3D_SPZ" => Ok(NativeFile3DRole::Spz),
+        "FILE_3D_STL" => Ok(NativeFile3DRole::Stl),
+        "FILE_3D_USDZ" => Ok(NativeFile3DRole::Usdz),
+        _ => Err(ProviderMaterializationError::InvalidNativePayload),
+    }
+}
+
+fn camera_role(source_type_id: &str) -> Result<NativeCameraRole, ProviderMaterializationError> {
+    match source_type_id {
+        "CAMERA_CONTROL" => Ok(NativeCameraRole::CameraControl),
+        "LOAD3D_CAMERA" => Ok(NativeCameraRole::Load3D),
+        _ => Err(ProviderMaterializationError::InvalidNativePayload),
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
@@ -56,6 +714,7 @@ pub enum ProviderMaterializationError {
 pub struct ProviderTransportValue {
     type_id: String,
     family: ValueFamily,
+    encoding: ProviderTransportEncoding,
     abi_bytes: Vec<u8>,
 }
 
@@ -68,6 +727,7 @@ impl ProviderTransportValue {
         let value = Self {
             type_id: type_id.into(),
             family,
+            encoding: ProviderTransportEncoding::PluginValue,
             abi_bytes,
         };
         value.validate()?;
@@ -82,6 +742,10 @@ impl ProviderTransportValue {
         self.family
     }
 
+    pub const fn encoding(&self) -> ProviderTransportEncoding {
+        self.encoding
+    }
+
     pub fn abi_bytes(&self) -> &[u8] {
         &self.abi_bytes
     }
@@ -89,11 +753,47 @@ impl ProviderTransportValue {
     fn validate(&self) -> Result<(), ProviderMaterializationError> {
         if !valid_transport_identity(&self.type_id)
             || self.abi_bytes.is_empty()
-            || self.abi_bytes.len() > MAX_PROVIDER_TRANSPORT_REQUEST_BYTES
+            || self.abi_bytes.len() > MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES
         {
             return Err(ProviderMaterializationError::InvalidTransportProjection);
         }
+        if self.encoding == ProviderTransportEncoding::NativePayload {
+            let payload: ProviderNativePayload = postcard::from_bytes(&self.abi_bytes)
+                .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+            payload.validate()?;
+        }
         Ok(())
+    }
+
+    pub fn from_native_payload(
+        type_id: impl Into<String>,
+        family: ValueFamily,
+        payload: &NativeStoredPayload,
+    ) -> Result<Self, ProviderMaterializationError> {
+        let native_payload = ProviderNativePayload::from_stored(payload)?;
+        let value = Self {
+            type_id: type_id.into(),
+            family,
+            encoding: ProviderTransportEncoding::NativePayload,
+            abi_bytes: postcard::to_stdvec(&native_payload)
+                .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+
+    pub fn materialize_native_payload(
+        &self,
+        expected_type: &NativeHandleType,
+        signed_namespace: &str,
+        context: &NativeNodeContext,
+    ) -> Result<NativeStoredPayload, ProviderMaterializationError> {
+        if self.encoding != ProviderTransportEncoding::NativePayload {
+            return Err(ProviderMaterializationError::InvalidNativePayload);
+        }
+        let payload: ProviderNativePayload = postcard::from_bytes(&self.abi_bytes)
+            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?;
+        payload.materialize(expected_type, signed_namespace, context)
     }
 }
 
@@ -634,8 +1334,12 @@ impl ProviderResultReceiptSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use comfy_nodes::{NativeNodeComputeSession, NativeNodeServiceIdentity, NativeNodeServices};
     use comfy_plugin_sdk::{PluginValue, ScalarValue, TypeRegistry};
+    use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
+    use comfy_types::{AttemptId, CancellationToken, NodeId, PromptId};
     use std::time::Duration;
+    use uuid::Uuid;
 
     fn invocation_identity(
         node_id: &str,
@@ -716,6 +1420,78 @@ mod tests {
             )
             .is_err()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_native_image_round_trips_through_the_canonical_lower_owner()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x710));
+        let node_id = NodeId::from("provider-image-materializer");
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x711),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let compute = NativeNodeComputeSession::checked(
+            identity,
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let store_generation = crate::NativeHandleStoreGeneration::with_capacities(4, 1024 * 1024)?;
+        let store = store_generation.handle_store_for_attempt(attempt_id);
+        let context = NativeNodeContext::new_with_services(
+            PromptId(Uuid::from_u128(0x712)),
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            store,
+            NativeNodeServices::checked(None, None, Some(compute))?,
+        )?;
+        let execution_context = context.compute_session()?.execution_context(&context)?;
+        let image = ImageTensor::from_f32(
+            &backend,
+            &execution_context,
+            1,
+            1,
+            2,
+            3,
+            &[0.0, 0.25, 0.5, 0.75, 1.0, 0.125],
+        )?;
+        let source = NativeStoredPayload::Tensor(Arc::new(NativeTensorPayload::from_image(
+            NativeTensorRole::Image,
+            image,
+        )?));
+        let native_payload = ProviderNativePayload::from_stored(&source)
+            .map_err(|error| format!("provider native image projection failed: {error}"))?;
+        native_payload
+            .validate()
+            .map_err(|error| format!("provider native image validation failed: {error}"))?;
+        let value = ProviderTransportValue::from_native_payload(
+            "comfy:image@1",
+            ValueFamily::Tensor,
+            &source,
+        )
+        .map_err(|error| format!("provider image transport encoding failed: {error}"))?;
+        assert_eq!(value.encoding(), ProviderTransportEncoding::NativePayload);
+        let materialized = value
+            .materialize_native_payload(
+                &NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?,
+                "plugin.fixture",
+                &context,
+            )
+            .map_err(|error| format!("provider image materialization failed: {error}"))?;
+        assert_eq!(source.handle_type()?, materialized.handle_type()?);
+        assert_eq!(source.digest_sha256(), materialized.digest_sha256());
+        let NativeStoredPayload::Tensor(materialized) = materialized else {
+            return Err("provider image changed stored payload variant".into());
+        };
+        assert_eq!(materialized.tensor().descriptor().shape(), [1, 1, 2, 3]);
         Ok(())
     }
 

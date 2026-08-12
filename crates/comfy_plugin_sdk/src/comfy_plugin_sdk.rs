@@ -647,6 +647,8 @@ pub enum CapabilityKind {
     SanitizedLog,
     DeclarativeUi,
     Route,
+    ProviderUpload,
+    ProviderCost,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

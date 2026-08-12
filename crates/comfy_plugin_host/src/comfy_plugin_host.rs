@@ -12,10 +12,10 @@ pub use capabilities::{
     check_plugin_cancellation,
 };
 pub use component_host::{
-    ComponentExecutionBoundary, ComponentHost, ComponentHostError, ComponentHostRouter,
-    InstalledComponentBinding, InstalledVerifiedPlugin, PluginInvocationExecutor,
-    PreparedPluginInvocation, VerifiedComponentDeployment, VerifiedComponentGeneration,
-    WorkerPluginInvocation,
+    ComponentExecutionBoundary, ComponentHost, ComponentHostError,
+    ComponentHostProviderInvocationAuthority, ComponentHostRouter, InstalledComponentBinding,
+    InstalledVerifiedPlugin, PluginInvocationExecutor, PreparedPluginInvocation,
+    VerifiedComponentDeployment, VerifiedComponentGeneration, WorkerPluginInvocation,
 };
 pub use legacy_mapping::{
     AcceptedRewrite, InstalledMappingProjection, LegacyCompatibilityProjection,
@@ -25,7 +25,11 @@ pub use legacy_mapping::{
     MappingCandidate, MappingProvenance, MappingSource, MappingTarget,
 };
 pub use private_worker::PrivateWorkerPluginExecutor;
-pub use registry_adapter::{PluginRegistryAdapterError, registry_with_installed_plugins};
+pub use registry_adapter::{
+    PluginRegistryAdapterError, PreparedNativeProviderInvocation,
+    materialize_native_provider_response, prepare_native_provider_invocation,
+    registry_with_installed_plugins, rollback_native_provider_outputs,
+};
 
 use comfy_plugin_sdk::{
     COMPONENT_API_VERSION, CancelReason, CanonicalTypeId, CapabilityCall, CapabilityResponse,
@@ -2332,6 +2336,8 @@ fn wit_capability_kind(
         CapabilityKind::SanitizedLog => WitKind::SanitizedLog,
         CapabilityKind::DeclarativeUi => WitKind::DeclarativeUi,
         CapabilityKind::Route => WitKind::Route,
+        CapabilityKind::ProviderUpload => WitKind::ProviderUpload,
+        CapabilityKind::ProviderCost => WitKind::ProviderCost,
     }
 }
 
@@ -2351,6 +2357,8 @@ fn sdk_capability_kind(
         WitKind::SanitizedLog => CapabilityKind::SanitizedLog,
         WitKind::DeclarativeUi => CapabilityKind::DeclarativeUi,
         WitKind::Route => CapabilityKind::Route,
+        WitKind::ProviderUpload => CapabilityKind::ProviderUpload,
+        WitKind::ProviderCost => CapabilityKind::ProviderCost,
     }
 }
 

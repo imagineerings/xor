@@ -251,23 +251,31 @@ fn signed_host_and_manifest(
 
 fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> {
     let registry = TypeRegistry::built_in()?;
-    let mut result_port = port(
+    let input_port = port(
         &registry,
-        "result",
-        PortDirection::Output,
-        "String",
+        "audio",
+        PortDirection::Input,
+        "Audio",
         PortCardinality::Singular,
         PortPresence::Required,
     )?;
-    result_port.name = "Result".to_owned();
+    let output_port = port(
+        &registry,
+        "output_0",
+        PortDirection::Output,
+        "Audio",
+        PortCardinality::Singular,
+        PortPresence::Required,
+    )?;
     let mut provider_binding = ProviderBindingSet {
         schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
-        implementation_namespace: "test.provider-plugin".to_owned(),
+        implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
-            feature_id: "COMFY-NODE-TEST-PROVIDER".to_owned(),
-            node_id: "provider.echo".to_owned(),
-            contract_sha256: "3".repeat(64),
+            feature_id: "COMFY-NODE-0141".to_owned(),
+            node_id: "ElevenLabsAudioIsolation".to_owned(),
+            contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+                .to_owned(),
             transport_schema: "sim:comfy-provider-transport@1".parse()?,
             materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
         }],
@@ -275,7 +283,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
     provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
     Ok(PluginManifest {
         schema_version: 1,
-        identifier: "test.provider-plugin".to_owned(),
+        identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -296,17 +304,23 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         },
         provider_binding: Some(provider_binding),
         nodes: vec![PluginNode {
-            id: "provider.echo".to_owned(),
+            id: "ElevenLabsAudioIsolation".to_owned(),
             version: ApiVersion::new(1, 0, 0),
-            display_name: "Provider Echo".to_owned(),
-            category: "test/provider".to_owned(),
-            ports: vec![result_port],
+            display_name: "ElevenLabs Voice Isolation".to_owned(),
+            category: "partner/audio/ElevenLabs".to_owned(),
+            ports: vec![input_port, output_port],
             determinism: DeterminismPolicy::External,
             cache: CachePolicy::Never,
             effects: EffectPolicy::Provider,
         }],
-        capabilities: vec![CapabilityRequest {
-            kind: CapabilityKind::NetworkProvider,
+        capabilities: [
+            CapabilityKind::NetworkProvider,
+            CapabilityKind::ProviderUpload,
+            CapabilityKind::ProviderCost,
+        ]
+        .into_iter()
+        .map(|kind| CapabilityRequest {
+            kind,
             scope: "fixture|https://fixture.invalid/v1/generate".to_owned(),
             quota: CapabilityQuota {
                 maximum_operations: 16,
@@ -316,7 +330,8 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
                 maximum_handles: 8,
                 timeout_milliseconds: 5_000,
             },
-        }],
+        })
+        .collect(),
         ui: Vec::new(),
         routes: Vec::new(),
         legacy_mappings: Vec::new(),
@@ -409,6 +424,27 @@ fn tensor_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
         )?,
         &registry,
     )?)
+}
+
+fn provider_invocation_inputs() -> Result<InvocationInputs, Box<dyn Error>> {
+    let registry = TypeRegistry::built_in()?;
+    let audio = PluginValue::tensor(
+        registry.resolve("Audio")?.clone(),
+        TensorValue::new(
+            TensorDescriptor::contiguous(
+                vec![1, 1, 32],
+                DType::F32,
+                DeviceId::CPU,
+                StreamId::DEFAULT,
+            )?,
+            128,
+            "1".repeat(64),
+        )?,
+        &registry,
+    )?;
+    let mut inputs = InvocationInputs::default();
+    inputs.set_present("audio", vec![audio]);
+    Ok(inputs)
 }
 
 fn artifact_value(identifier: &str) -> Result<PluginValue, Box<dyn Error>> {
@@ -992,8 +1028,8 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "provider.echo",
-        InvocationInputs::default(),
+        "ElevenLabsAudioIsolation",
+        provider_invocation_inputs()?,
         empty_services(),
         CancellationToken::default(),
     )?;
@@ -1006,7 +1042,7 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
             .ok_or("provider binding disappeared")?
     );
     let request = scalar_value("provider-output")?.abi_bytes()?;
-    let result = instance.invoke_provider("provider.echo", &request)?;
+    let result = instance.invoke_provider("ElevenLabsAudioIsolation", &request)?;
     assert!(result.outputs.is_empty());
     assert!(result.output_presence.is_empty());
     assert_eq!(result.receipts(), &[b"provider-fixture-receipt".to_vec()]);
@@ -1019,19 +1055,45 @@ fn provider_world_preflights_signed_bindings_and_returns_typed_outputs()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "provider.echo",
-        InvocationInputs::default(),
+        "ElevenLabsAudioIsolation",
+        provider_invocation_inputs()?,
         resources()?,
         CancellationToken::default(),
     )?;
     let instance = host.instantiate_component(&compiled, invocation)?;
-    let request = ProviderTransportRequest::checked("provider.echo", Vec::new())?.to_bytes()?;
-    let result = instance.invoke_provider("provider.echo", &request)?;
+    let request =
+        ProviderTransportRequest::checked("ElevenLabsAudioIsolation", Vec::new())?.to_bytes()?;
+    let result = instance.invoke_provider("ElevenLabsAudioIsolation", &request)?;
     assert_eq!(
         result.receipts(),
         &[b"host-owned-provider-receipt".to_vec()]
     );
     assert!(result.outputs.is_empty());
+    Ok(())
+}
+
+#[test]
+fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(), Box<dyn Error>> {
+    let registry = comfy_runtime::generated_native_node_registry_projection(None)?;
+    let contract = registry
+        .provider_binding_contract_sha256(
+            "ElevenLabsAudioIsolation",
+            "sim:comfy-provider-transport@1",
+            "sim:comfy-provider-materializer@1",
+        )?
+        .ok_or("paid provider contract is absent")?;
+    assert_eq!(
+        contract,
+        "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+    );
+    let manifest = provider_manifest("0".repeat(64))?;
+    assert_eq!(
+        manifest
+            .provider_binding
+            .ok_or("provider binding set is absent")?
+            .bindings_sha256,
+        "cbed6307f899b4a0fca14d8ff4acac6065128e64a6dea945a629b1890b42ec6a"
+    );
     Ok(())
 }
 
@@ -1092,13 +1154,13 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
 
     for (class_type, request, cancellation, expected) in [
         (
-            "provider.echo",
+            "ElevenLabsAudioIsolation",
             b"invalid-provider-receipt".to_vec(),
             CancellationToken::default(),
             "invalid result receipt set",
         ),
         (
-            "provider.echo",
+            "ElevenLabsAudioIsolation",
             b"guest-authored-output".to_vec(),
             CancellationToken::default(),
             "attempted to author materialized output metadata",
@@ -1113,8 +1175,8 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
         let invocation = host.begin_invocation(
             &manifest,
             &authorization,
-            "provider.echo",
-            InvocationInputs::default(),
+            "ElevenLabsAudioIsolation",
+            provider_invocation_inputs()?,
             empty_services(),
             cancellation,
         )?;
@@ -1129,15 +1191,18 @@ fn provider_world_rejects_malformed_cancelled_and_wrong_class_requests()
     let invocation = host.begin_invocation(
         &manifest,
         &authorization,
-        "provider.echo",
-        InvocationInputs::default(),
+        "ElevenLabsAudioIsolation",
+        provider_invocation_inputs()?,
         empty_services(),
         cancellation.clone(),
     )?;
     let instance = host.instantiate_component(&compiled, invocation)?;
     cancellation.cancel();
     assert!(matches!(
-        instance.invoke_provider("provider.echo", &scalar_value("value")?.abi_bytes()?),
+        instance.invoke_provider(
+            "ElevenLabsAudioIsolation",
+            &scalar_value("value")?.abi_bytes()?
+        ),
         Err(PluginError::Invocation(InvocationError::Cancelled))
     ));
     Ok(())
@@ -2391,6 +2456,116 @@ fn extension_owned_component_host_updates_registry_atomically_and_revokes_stale_
             .worker_deployment_plan()?
             .chunks()
             .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
+fn provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_back_rejection()
+-> Result<(), Box<dyn Error>> {
+    let component = provider_component_fixture()?;
+    let mut manifest = provider_manifest(format!("{:x}", Sha256::digest(&component)))?;
+    let profile_id = uuid::Uuid::new_v4().to_string();
+    manifest.signature.value = sign_manifest(&manifest)?;
+    let host = ComponentHost::new(
+        ComponentRuntime::no_wasi()?,
+        trust_policy()?,
+        permission_policy_for_profile(&profile_id, &manifest)?,
+        ComponentExecutionBoundary::conformance_in_process(resources()?),
+        conformance_component_limits(),
+        comfy_runtime::generated_native_node_registry_projection(None)?,
+    )?;
+    let router = ComponentHostRouter::new(host);
+    let installed = InstalledComponent::checked(
+        Arc::from("provider-extension"),
+        Arc::from("1.0.0"),
+        serde_json::to_vec(&manifest)?.into(),
+        component.into(),
+    )?;
+    smol::block_on(router.synchronize(vec![installed.clone()]))?;
+
+    let bundle = router.active_execution_registry_bundle()?;
+    assert_eq!(
+        bundle
+            .registry()
+            .binding_declared_disposition("ElevenLabsAudioIsolation"),
+        Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
+    );
+    assert_eq!(
+        bundle
+            .registry()
+            .binding_disposition("ElevenLabsAudioIsolation"),
+        Some(comfy_nodes::NativeNodeBindingDisposition::Executable)
+    );
+    assert_eq!(
+        bundle
+            .registry()
+            .provider_binding_is_activated("ElevenLabsAudioIsolation"),
+        Some(true)
+    );
+    assert_eq!(
+        bundle
+            .registry()
+            .binding_declared_disposition("ElevenLabsAudioIsolation")
+            .ok_or("provider binding is absent")?,
+        comfy_nodes::NativeNodeBindingDisposition::ProviderRequired
+    );
+    assert_eq!(
+        bundle
+            .registry()
+            .binding_implementation_namespace("ElevenLabsAudioIsolation"),
+        Some("sim.comfy.provider.comfy-node-0141")
+    );
+    assert!(bundle.registry().node("ElevenLabsAudioIsolation").is_some());
+    let pin = bundle
+        .provider_registry()
+        .ok_or("provider registry pin is absent")?;
+    assert_eq!(
+        pin.generation(),
+        bundle.worker_deployment().begin().generation().get()
+    );
+    assert_eq!(pin.binding_digests_sha256().len(), 1);
+    let retained_identity = bundle.identity_sha256().to_owned();
+
+    let mut invalid_manifest = manifest;
+    invalid_manifest
+        .provider_binding
+        .as_mut()
+        .ok_or("provider binding is absent")?
+        .bindings[0]
+        .contract_sha256 = "0".repeat(64);
+    let provider_binding = invalid_manifest
+        .provider_binding
+        .as_mut()
+        .ok_or("provider binding is absent")?;
+    provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
+    invalid_manifest.signature.value = sign_manifest(&invalid_manifest)?;
+    let invalid = InstalledComponent::checked(
+        Arc::from("provider-extension"),
+        Arc::from("1.0.0"),
+        serde_json::to_vec(&invalid_manifest)?.into(),
+        installed.component_bytes().to_vec().into(),
+    )?;
+    assert!(smol::block_on(router.synchronize(vec![invalid])).is_err());
+    assert_eq!(
+        router.active_execution_registry_bundle()?.identity_sha256(),
+        retained_identity
+    );
+
+    smol::block_on(router.synchronize(Vec::new()))?;
+    let removed = router.active_execution_registry_bundle()?;
+    assert!(removed.provider_registry().is_none());
+    assert!(
+        removed
+            .registry()
+            .node("ElevenLabsAudioIsolation")
+            .is_none()
+    );
+    assert_eq!(
+        removed
+            .registry()
+            .binding_declared_disposition("ElevenLabsAudioIsolation"),
+        Some(comfy_nodes::NativeNodeBindingDisposition::ProviderRequired)
     );
     Ok(())
 }

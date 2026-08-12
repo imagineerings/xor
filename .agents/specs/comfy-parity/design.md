@@ -829,6 +829,8 @@ interface types {
         sanitized-log,
         declarative-ui,
         route,
+        provider-upload,
+        provider-cost,
     }
 
     enum cancel-reason {

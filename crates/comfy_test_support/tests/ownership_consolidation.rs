@@ -7778,11 +7778,12 @@ fn run_ownership_validation(
                 && sim_bootstrap.contains("ComponentHostRouter::with_initial_generation(")
                 && sim_bootstrap
                     .contains("extension_host::register_component_lifecycle_adapter(Arc::new(")
-                && sim_bootstrap.contains("comfy_plugin_services::private_worker_boundary(")
-                && sim_plugin_services.contains("PluginCapabilityBroker::new(")
+                && sim_bootstrap.contains("comfy_plugin_services::private_worker_services(")
+                && sim_plugin_services
+                    .contains("PluginCapabilityBroker::new_with_provider_cost_acceptance(")
                 && sim_plugin_services.contains("ComponentExecutionBoundary::private_worker(")
                 && plugin_private_worker.contains("RuntimeSupervisor::start(")
-                && plugin_private_worker.contains(".execute_plugin(")
+                && plugin_private_worker.contains(".execute_plugin_retaining_capabilities(")
                 && worker_plugin_runtime.contains("pub(crate) struct WorkerCapabilityBridge"),
         ),
         (
@@ -7870,10 +7871,10 @@ fn run_ownership_validation(
         ),
         (
             "desktop_api_headless_and_worker_consume_component_registry",
-            sim_bootstrap.contains("component_host.router.current()?.verified_generation()?")
+            sim_bootstrap.contains("component_host.router.active_execution_registry_bundle()?")
                 && sim_bootstrap.contains("worker.with_registry_deployment(")
-                && api_host_production.contains("pub fn with_registry(")
-                && api_host_production.contains("NativeRuntimeHttpServices::new(")
+                && api_host_production.contains("pub fn with_registry_bundle(")
+                && api_host_production.contains("NativeRuntimeHttpServices::from_registry_bundle(")
                 && api_services
                     .contains("for (class_type, runtime) in self.registry.descriptors()")
                 && api_services.contains("project_component_node(")

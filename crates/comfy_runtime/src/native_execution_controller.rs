@@ -6,12 +6,15 @@ use crate::{
     ExecutionControlCommandKind, ExecutionController, ExecutionEngine, ExecutionError,
     ExecutionEventBus, ExecutionFailure, ExecutionFailureOrigin, ExecutionOutput,
     ExecutionOutputAvailability, ExecutionPreview, ExecutionReport, InputBinding, InputMode,
-    MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry, NodeContext, NodeFailure,
-    NodeFailureKind, NodeOutcome, OutputCommitError, OutputCommitReceipt, OutputCommitter,
-    OutputExecutionScope, OutputMediaKind, OutputProposal, PreparedEffect, PreparedEffectRequest,
-    PreparedOutput, ProfileId, PromptCompileError, RuntimeCachePolicy, RuntimeNodeDescriptor,
-    RuntimeOutputDescriptor, RuntimeSupervisor, RuntimeSupervisorError, SharedAssetService,
-    SharedExecutionPresentationService, SharedOutputCommitter, WorkerLaunchConfig,
+    MAX_PLUGIN_SERVICE_RESPONSE_BYTES, MemoryPolicy, NativeCache, NativeNode, NativeNodeRegistry,
+    NativeProviderInvocationAuthority, NativeProviderInvocationScope, NativeProviderWorkerRequest,
+    NativeProviderWorkerResponse, NodeContext, NodeFailure, NodeFailureKind, NodeOutcome,
+    OutputCommitError, OutputCommitReceipt, OutputCommitter, OutputExecutionScope, OutputMediaKind,
+    OutputProposal, PluginCapabilityInvocation, PluginServiceWireFailure, PluginServiceWireRequest,
+    PreparedEffect, PreparedEffectRequest, PreparedOutput, ProfileId, PromptCompileError,
+    RuntimeCachePolicy, RuntimeNodeDescriptor, RuntimeOutputDescriptor, RuntimeSupervisor,
+    RuntimeSupervisorError, SharedAssetService, SharedExecutionPresentationService,
+    SharedOutputCommitter, WorkerLaunchConfig, WorkerRegistryDeploymentPlan,
     WorkflowFormatDocument, authorize_native_input_reader, authorize_native_output_committer,
     graph_to_prompt,
 };
@@ -37,20 +40,24 @@ use comfy_model::{
     },
 };
 use comfy_nodes::{
-    CatalogNodeDescriptor, NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeHandleKind,
-    NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
-    NativeImageEffect, NativeInputDescriptor, NativeNodeBinding, NativeNodeBindingDisposition,
-    NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativePrimitive,
-    NativePrimitiveType, NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload,
-    NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
+    CatalogNodeDescriptor, CatalogNodeStatus, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+    NativeDynamicInputDescriptor, NativeHandleKind, NativeHandleStoreError, NativeHandleType,
+    NativeImageDescriptor, NativeImageDescriptorError, NativeImageEffect, NativeInputDescriptor,
+    NativeInputRequirement, NativeNodeBinding, NativeNodeBindingDisposition,
+    NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
+    NativeOutputSchemaMetadata, NativePortCardinality, NativePrimitive, NativePrimitiveType,
+    NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion,
+    NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
     generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
-    native_source_type_projection,
+    native_source_type_projection, native_value_type_for_output_schema,
+    native_value_types_for_input_schema,
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
     NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape, NativePreparedEffectKind,
     NativePreparedEffectService,
 };
+use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
@@ -100,7 +107,7 @@ use std::{
     ops::Deref,
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
     thread,
@@ -922,6 +929,107 @@ impl NativeProviderRegistryPin {
     }
 }
 
+#[derive(Clone)]
+pub struct NativeExecutionRegistryBundle {
+    profile_id: ProfileId,
+    registry: Arc<NativeNodeRegistry>,
+    worker_deployment: WorkerRegistryDeploymentPlan,
+    provider_registry: Option<NativeProviderRegistryPin>,
+    identity_sha256: String,
+}
+
+impl NativeExecutionRegistryBundle {
+    pub fn checked(
+        profile_id: ProfileId,
+        registry: NativeNodeRegistry,
+        worker_deployment: WorkerRegistryDeploymentPlan,
+        provider_registry: Option<NativeProviderRegistryPin>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        registry
+            .validate_comprehensive_bindings()
+            .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        let deployment_generation = worker_deployment.begin().generation().get();
+        let deployment_digest = worker_deployment.begin().registry_digest_sha256().as_str();
+        if let Some(pin) = &provider_registry {
+            pin.validate()?;
+            if pin.generation() != deployment_generation
+                || pin.registry_digest_sha256() != deployment_digest
+            {
+                return Err(NativeImageRuntimeError::Encoding(
+                    "native execution registry bundle has mismatched deployment identity"
+                        .to_owned(),
+                ));
+            }
+        }
+        let mut digest = Sha256::new();
+        digest.update(b"sim.native-execution-registry-bundle.v1\0");
+        digest.update(profile_id.0.as_bytes());
+        digest.update(deployment_generation.to_le_bytes());
+        digest.update(deployment_digest.as_bytes());
+        digest.update(NATIVE_IMAGE_REGISTRY_VERSION.as_bytes());
+        if let Some(pin) = &provider_registry {
+            digest.update([1]);
+            digest.update(pin.identity_sha256().as_bytes());
+        } else {
+            digest.update([0]);
+        }
+        Ok(Self {
+            profile_id,
+            registry: Arc::new(registry),
+            worker_deployment,
+            provider_registry,
+            identity_sha256: format!("{:x}", digest.finalize()),
+        })
+    }
+
+    pub const fn profile_id(&self) -> ProfileId {
+        self.profile_id
+    }
+
+    pub fn registry(&self) -> &NativeNodeRegistry {
+        &self.registry
+    }
+
+    pub fn registry_arc(&self) -> Arc<NativeNodeRegistry> {
+        self.registry.clone()
+    }
+
+    pub fn worker_deployment(&self) -> &WorkerRegistryDeploymentPlan {
+        &self.worker_deployment
+    }
+
+    pub fn provider_registry(&self) -> Option<&NativeProviderRegistryPin> {
+        self.provider_registry.as_ref()
+    }
+
+    pub fn identity_sha256(&self) -> &str {
+        &self.identity_sha256
+    }
+
+    pub fn compile(
+        &self,
+        submission: comfy_types::PromptSubmission,
+    ) -> Result<CompiledPlan, NativeImageRuntimeError> {
+        let compiler = crate::PromptCompiler::new(&self.registry);
+        let compiler = if let Some(pin) = &self.provider_registry {
+            compiler.with_provider_registry_pin(pin.clone())?
+        } else {
+            compiler
+        };
+        Ok(compiler.compile(submission)?)
+    }
+}
+
+impl std::fmt::Debug for NativeExecutionRegistryBundle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("NativeExecutionRegistryBundle")
+            .field("profile_id", &self.profile_id)
+            .field("identity_sha256", &self.identity_sha256)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NativeImageWorkerPlan {
     pub plan: CompiledPlan,
@@ -1484,15 +1592,190 @@ pub fn generated_native_node_registry_projection(
     Ok(registry)
 }
 
+fn default_native_shader_executor() -> Arc<dyn NativeShaderExecutor> {
+    static EXECUTOR: OnceLock<Arc<dyn NativeShaderExecutor>> = OnceLock::new();
+    EXECUTOR
+        .get_or_init(|| Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()))
+        .clone()
+}
+
+pub fn prewarm_native_shader_executor() {
+    drop(default_native_shader_executor());
+}
+
 fn register_generated_family_bindings(
     registry: &mut NativeNodeRegistry,
 ) -> Result<(), NativeImageRuntimeError> {
+    registry
+        .register_native_bindings(generated_provider_required_bindings()?)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     registry
         .register_native_bindings(generated_family_node_bindings()?)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     registry
         .validate_comprehensive_bindings()
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))
+}
+
+fn generated_provider_required_bindings() -> Result<Vec<NativeNodeBinding>, NativeImageRuntimeError>
+{
+    static PROVIDER_BINDINGS: OnceLock<Result<Vec<NativeNodeBinding>, String>> = OnceLock::new();
+    PROVIDER_BINDINGS
+        .get_or_init(|| {
+            let catalog = NodeRegistry::built_in().map_err(|error| error.to_string())?;
+            catalog
+                .registered()
+                .values()
+                .filter(|descriptor| {
+                    descriptor.catalog_status == CatalogNodeStatus::ProviderRequired
+                })
+                .map(|descriptor| {
+                    provider_required_binding(&catalog, descriptor)
+                        .map_err(|error| error.to_string())
+                })
+                .collect()
+        })
+        .clone()
+        .map_err(NativeImageRuntimeError::Registry)
+}
+
+fn provider_required_binding(
+    catalog: &NodeRegistry,
+    catalog_descriptor: &CatalogNodeDescriptor,
+) -> Result<NativeNodeBinding, NativeImageRuntimeError> {
+    let source_schema = catalog
+        .source_schema(&catalog_descriptor.node_identifier)
+        .ok_or_else(|| {
+            NativeImageRuntimeError::Registry(format!(
+                "provider node `{}` has no checked source schema",
+                catalog_descriptor.node_identifier
+            ))
+        })?;
+    let inputs = source_schema
+        .inputs
+        .iter()
+        .map(|input| {
+            let accepted_types = native_value_types_for_input_schema(&input.schema)
+                .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+            let allows_literal = accepted_types
+                .members()
+                .iter()
+                .all(|value_type| !matches!(value_type, NativeValueType::Handle(_)));
+            Ok(NativeInputDescriptor {
+                name: input.schema.name.clone(),
+                accepted_types,
+                required: input.requirement == NativeInputRequirement::Required,
+                hidden: input.requirement == NativeInputRequirement::Hidden,
+                lazy: false,
+                cardinality: NativePortCardinality::Scalar,
+                allows_literal,
+            })
+        })
+        .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
+    let dynamic_inputs = source_schema
+        .dynamic_inputs
+        .iter()
+        .map(|dynamic| {
+            let accepted_types = native_value_types_for_input_schema(&dynamic.input)
+                .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+            let allows_literal = accepted_types
+                .members()
+                .iter()
+                .all(|value_type| !matches!(value_type, NativeValueType::Handle(_)));
+            Ok(NativeDynamicInputDescriptor {
+                name_template: dynamic.identity.clone(),
+                start_index: dynamic.start_index,
+                minimum_count: dynamic.minimum_count,
+                maximum_count: dynamic.maximum_count,
+                input: NativeInputDescriptor {
+                    name: dynamic.input.name.clone(),
+                    accepted_types,
+                    required: true,
+                    hidden: false,
+                    lazy: false,
+                    cardinality: NativePortCardinality::Scalar,
+                    allows_literal,
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
+    let output_names = source_schema
+        .outputs
+        .iter()
+        .map(|output| {
+            output
+                .source_name
+                .clone()
+                .unwrap_or_else(|| format!("output_{}", output.ordinal))
+        })
+        .collect::<Vec<_>>();
+    let outputs = source_schema
+        .outputs
+        .iter()
+        .zip(&output_names)
+        .map(|(output, name)| {
+            let schema = NativeOutputSchemaMetadata {
+                name: name.clone(),
+                source_type_name: output.source_type_name.clone(),
+                display_name: output.display_name.clone(),
+                tooltip: output.tooltip.clone(),
+                choices: output.choices.clone(),
+                match_template: output.match_template.clone(),
+                extra: output.extra.clone(),
+            };
+            Ok(NativeOutputDescriptor {
+                name: name.clone(),
+                produced_type: native_value_type_for_output_schema(&schema)
+                    .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?,
+                is_list: false,
+            })
+        })
+        .collect::<Result<Vec<_>, NativeImageRuntimeError>>()?;
+    let input_names = source_schema
+        .inputs
+        .iter()
+        .map(|input| input.schema.name.clone())
+        .collect::<Vec<_>>();
+    let execution_schema = source_schema
+        .bind_execution_ports(&input_names, &source_schema.dynamic_inputs, &output_names)
+        .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+    let provider_namespace = format!(
+        "sim.comfy.provider.{}",
+        catalog_descriptor.feature_id.to_ascii_lowercase()
+    );
+    Ok(NativeNodeBinding::ProviderRequired {
+        feature_id: catalog_descriptor.feature_id.clone(),
+        descriptor: RuntimeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: catalog_descriptor.node_identifier.clone(),
+            implementation_version: "1.0.0".to_owned(),
+            source_schema: Some(execution_schema),
+            inputs,
+            dynamic_inputs,
+            outputs,
+            output_node: catalog_descriptor.output_node,
+            effect: EffectClass::Provider,
+            cache: RuntimeCachePolicy::Never,
+        },
+        presentation: NativeNodePresentation {
+            display_name: catalog_descriptor.display_name.clone(),
+            category: match catalog_descriptor.category.as_str() {
+                "(empty root category declared by source)" => String::new(),
+                category => category.to_owned(),
+            },
+            description: source_schema
+                .presentation
+                .description
+                .clone()
+                .unwrap_or_default(),
+            output_names,
+            search_aliases: Vec::new(),
+            is_deprecated: source_schema.presentation.is_deprecated,
+            is_experimental: source_schema.presentation.is_experimental,
+        },
+        provider: provider_namespace,
+        reason: "a verified signed provider component is required".to_owned(),
+    })
 }
 
 pub fn compile_generated_native_prompt(
@@ -2870,7 +3153,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
-            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
+            shader_executor: default_native_shader_executor(),
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -2900,7 +3183,7 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
-            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
+            shader_executor: default_native_shader_executor(),
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -2929,7 +3212,41 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
-            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
+            shader_executor: default_native_shader_executor(),
+            metadata_enabled,
+            diffusion_enabled: false,
+        })
+    }
+
+    pub fn new_with_generated_registry_and_registration(
+        profile_id: ProfileId,
+        input_assets: BTreeMap<String, Vec<u8>>,
+        metadata_enabled: bool,
+        cpu_backend: Arc<CpuBackend>,
+        register: impl FnOnce(&mut NativeNodeRegistry) -> Result<(), NativeImageRuntimeError>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        validate_worker_input_assets(&input_assets)?;
+        let input_assets = Arc::new(Mutex::new(input_assets));
+        let mut nodes = native_image_registry_with_execution_state(
+            input_assets.clone(),
+            cpu_backend.clone(),
+            metadata_enabled,
+        )?;
+        register_generated_family_bindings(&mut nodes)?;
+        register(&mut nodes)?;
+        nodes
+            .validate_comprehensive_bindings()
+            .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        Ok(Self {
+            profile_id,
+            input_assets,
+            nodes: Arc::new(nodes),
+            cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
+                NativeImageRuntimeError::Execution(error.to_string())
+            })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
+            cpu_backend,
+            shader_executor: default_native_shader_executor(),
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -2960,7 +3277,43 @@ impl NativeImageExecutor {
             })?)),
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
-            shader_executor: Arc::new(WgpuNativeShaderExecutor::new_or_unavailable()),
+            shader_executor: default_native_shader_executor(),
+            metadata_enabled,
+            diffusion_enabled: true,
+        })
+    }
+
+    pub fn new_with_generated_registry_diffusion_and_registration(
+        profile_id: ProfileId,
+        input_assets: BTreeMap<String, Vec<u8>>,
+        metadata_enabled: bool,
+        cpu_backend: Arc<CpuBackend>,
+        provider: Arc<dyn NativeDiffusionProvider>,
+        register: impl FnOnce(&mut NativeNodeRegistry) -> Result<(), NativeImageRuntimeError>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        validate_worker_input_assets(&input_assets)?;
+        let input_assets = Arc::new(Mutex::new(input_assets));
+        let mut nodes = native_registry_with_diffusion_provider(
+            input_assets.clone(),
+            cpu_backend.clone(),
+            metadata_enabled,
+            provider,
+        )?;
+        register_generated_family_bindings(&mut nodes)?;
+        register(&mut nodes)?;
+        nodes
+            .validate_comprehensive_bindings()
+            .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
+        Ok(Self {
+            profile_id,
+            input_assets,
+            nodes: Arc::new(nodes),
+            cache: Arc::new(Mutex::new(NativeCache::new(4096).map_err(|error| {
+                NativeImageRuntimeError::Execution(error.to_string())
+            })?)),
+            handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
+            cpu_backend,
+            shader_executor: default_native_shader_executor(),
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4467,6 +4820,7 @@ pub struct NativeExecutionControllerConfig {
     pub memory_policy: MemoryPolicy,
     pub metadata_enabled: bool,
     pub provider_registry: Option<NativeProviderRegistryPin>,
+    pub provider_invocation_authority: Option<Arc<dyn NativeProviderInvocationAuthority>>,
 }
 
 impl NativeExecutionControllerConfig {
@@ -4497,6 +4851,7 @@ impl NativeExecutionControllerConfig {
             memory_policy: MemoryPolicy::default(),
             metadata_enabled,
             provider_registry: None,
+            provider_invocation_authority: None,
         })
     }
 
@@ -4510,9 +4865,29 @@ impl NativeExecutionControllerConfig {
         provider_registry: NativeProviderRegistryPin,
     ) -> Result<Self, NativeImageRuntimeError> {
         provider_registry.validate()?;
+        let deployment = self.worker.registry_deployment.as_ref().ok_or_else(|| {
+            NativeImageRuntimeError::Registry(
+                "provider registry pin requires a worker registry deployment".to_owned(),
+            )
+        })?;
+        if deployment.begin().generation().get() != provider_registry.generation()
+            || deployment.begin().registry_digest_sha256().as_str()
+                != provider_registry.registry_digest_sha256()
+        {
+            return Err(NativeImageRuntimeError::Registry(
+                "provider registry pin differs from the worker registry deployment".to_owned(),
+            ));
+        }
         self.provider_registry = Some(provider_registry);
-        self.validate()?;
         Ok(self)
+    }
+
+    pub fn with_provider_invocation_authority(
+        mut self,
+        authority: Arc<dyn NativeProviderInvocationAuthority>,
+    ) -> Self {
+        self.provider_invocation_authority = Some(authority);
+        self
     }
 
     pub fn validate(&self) -> Result<(), NativeImageRuntimeError> {
@@ -4548,6 +4923,11 @@ impl NativeExecutionControllerConfig {
             {
                 return Err(NativeImageRuntimeError::Registry(
                     "provider registry pin differs from the worker registry deployment".to_owned(),
+                ));
+            }
+            if self.provider_invocation_authority.is_none() {
+                return Err(NativeImageRuntimeError::Registry(
+                    "provider registry pin requires an invocation authority".to_owned(),
                 ));
             }
         }
@@ -4742,6 +5122,8 @@ struct ActiveNativeExecution {
     prompt_id: comfy_types::PromptId,
     attempt_id: AttemptId,
     cancellation: CancellationToken,
+    compiled_plan_sha256: String,
+    provider_node_ids: BTreeSet<String>,
     output_proposals: BTreeMap<Uuid, NativeImageOutputProposal>,
     output_proposal_bytes: usize,
 }
@@ -4754,6 +5136,7 @@ struct NativeControllerState {
     output_committer: SharedOutputCommitter,
     input_authorization: AuthorizedCapabilities,
     output_authorization: AuthorizedCapabilities,
+    provider_sessions: BTreeMap<String, PluginCapabilityInvocation>,
 }
 
 enum ControllerInput {
@@ -4781,6 +5164,7 @@ async fn run_native_controller(
         output_committer,
         input_authorization,
         output_authorization,
+        provider_sessions: BTreeMap::new(),
     };
     state.reconcile_committed_output_receipts().await?;
     loop {
@@ -4927,6 +5311,7 @@ impl NativeControllerState {
     }
 
     async fn shutdown_for_restart(&mut self) -> Result<(), NativeImageRuntimeError> {
+        self.abort_provider_sessions();
         if let Some(active) = self.active.take() {
             active.cancellation.cancel();
             self.publish_kind(
@@ -5093,11 +5478,28 @@ impl NativeControllerState {
             )?;
             return Ok(());
         }
+        let compiled_plan_sha256 = lease
+            .plan
+            .provider_execution
+            .as_ref()
+            .map(|identity| identity.compiled_plan_sha256().to_owned())
+            .unwrap_or_else(|| format!("{:x}", Sha256::digest(lease.plan.prompt_id.0.as_bytes())));
+        let provider_node_ids = lease
+            .plan
+            .nodes
+            .iter()
+            .filter_map(|(node_id, node)| {
+                (node.descriptor.effect == crate::NativeEffectClass::Provider)
+                    .then_some(node_id.0.clone())
+            })
+            .collect();
         self.active = Some(ActiveNativeExecution {
             profile_id: lease.profile_id,
             prompt_id: lease.prompt_id,
             attempt_id: lease.attempt_id,
             cancellation: lease.cancellation.clone(),
+            compiled_plan_sha256,
+            provider_node_ids,
             output_proposals: BTreeMap::new(),
             output_proposal_bytes: 0,
         });
@@ -5238,6 +5640,54 @@ impl NativeControllerState {
         &mut self,
         envelope: comfy_types::WorkerEnvelope,
     ) -> Result<(), NativeImageRuntimeError> {
+        if let comfy_types::WorkerMessage::PluginCapabilityRequest { call_id, request } =
+            &envelope.message
+        {
+            let active = self.active.as_ref().ok_or_else(|| {
+                NativeImageRuntimeError::WorkerEvent(
+                    "provider capability request has no active attempt".to_owned(),
+                )
+            })?;
+            if envelope.prompt_id != Some(active.prompt_id)
+                || envelope.attempt_id != Some(active.attempt_id)
+            {
+                return Err(NativeImageRuntimeError::WorkerEvent(
+                    "provider capability request has stale attempt identity".to_owned(),
+                ));
+            }
+            let prompt_id = active.prompt_id;
+            let attempt_id = active.attempt_id;
+            let response = self
+                .handle_native_provider_capability_request(request)
+                .unwrap_or_else(|_| {
+                    NativeProviderWorkerResponse::Failure(
+                        PluginServiceWireFailure::InvocationFailed,
+                    )
+                })
+                .to_bytes()
+                .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+            if let Err(error) = self
+                .supervisor
+                .as_mut()
+                .ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "provider capability response has no worker".to_owned(),
+                    )
+                })?
+                .respond_plugin_capability(
+                    envelope.request_id,
+                    prompt_id,
+                    attempt_id,
+                    *call_id,
+                    response,
+                )
+                .await
+            {
+                self.abort_provider_sessions();
+                return Err(NativeImageRuntimeError::WorkerEvent(error.to_string()));
+            }
+            return Ok(());
+        }
         let event = match envelope.message {
             comfy_types::WorkerMessage::OutputProposal { proposal } => {
                 let Some(active) = self.active.as_mut() else {
@@ -5288,6 +5738,7 @@ impl NativeControllerState {
                 self.publish_worker_progress(progress)?;
             }
             NativeImageWorkerEvent::Completed { result } => {
+                self.abort_provider_sessions();
                 let ui_outputs = result.decode_ui_outputs()?;
                 let Some(active) = self.active.as_ref() else {
                     return Ok(());
@@ -5446,6 +5897,7 @@ impl NativeControllerState {
                 self.publish_projection_events(applied);
             }
             NativeImageWorkerEvent::BackendUnavailable { unavailable } => {
+                self.abort_provider_sessions();
                 let Some(active) = self.active.take() else {
                     return Ok(());
                 };
@@ -5463,6 +5915,7 @@ impl NativeControllerState {
                 )?;
             }
             NativeImageWorkerEvent::Failed { message, cancelled } => {
+                self.abort_provider_sessions();
                 let Some(active) = self.active.take() else {
                     return Ok(());
                 };
@@ -5491,6 +5944,111 @@ impl NativeControllerState {
             }
         }
         Ok(())
+    }
+
+    fn handle_native_provider_capability_request(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<NativeProviderWorkerResponse, NativeImageRuntimeError> {
+        let request = NativeProviderWorkerRequest::from_bytes(bytes)
+            .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+        match request {
+            NativeProviderWorkerRequest::Begin(start) => {
+                let active = self.active.as_ref().ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "provider session has no active attempt".to_owned(),
+                    )
+                })?;
+                if start.compiled_plan_sha256 != active.compiled_plan_sha256
+                    || !active.provider_node_ids.contains(&start.node_id)
+                    || self.provider_sessions.contains_key(&start.session_id)
+                {
+                    return Err(NativeImageRuntimeError::WorkerEvent(
+                        "provider session identity is stale or invalid".to_owned(),
+                    ));
+                }
+                let authority = self
+                    .config
+                    .provider_invocation_authority
+                    .as_ref()
+                    .ok_or_else(|| {
+                        NativeImageRuntimeError::WorkerEvent(
+                            "provider invocation authority is unavailable".to_owned(),
+                        )
+                    })?;
+                let invocation = authority
+                    .begin(NativeProviderInvocationScope {
+                        profile_id: active.profile_id,
+                        prompt_id: active.prompt_id,
+                        attempt_id: active.attempt_id,
+                        node_id: comfy_types::NodeId(start.node_id.clone()),
+                        cancellation: active.cancellation.clone(),
+                        start: start.clone(),
+                    })
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+                self.provider_sessions.insert(start.session_id, invocation);
+                Ok(NativeProviderWorkerResponse::Begun)
+            }
+            NativeProviderWorkerRequest::Call {
+                session_id,
+                request,
+            } => {
+                let request = PluginServiceWireRequest::from_bytes(&request)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+                let invocation = self.provider_sessions.get_mut(&session_id).ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "provider capability session is unavailable".to_owned(),
+                    )
+                })?;
+                let response = invocation.handle_wire_request(request);
+                let response = response
+                    .to_bytes(MAX_PLUGIN_SERVICE_RESPONSE_BYTES)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+                Ok(NativeProviderWorkerResponse::Call(response))
+            }
+            NativeProviderWorkerRequest::Resolve {
+                session_id,
+                receipt_set,
+            } => {
+                let receipt_set = ProviderResultReceiptSet::from_bytes(&receipt_set)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+                let invocation = self.provider_sessions.get_mut(&session_id).ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "provider receipt session is unavailable".to_owned(),
+                    )
+                })?;
+                let resolved = invocation
+                    .resolve_provider_result_receipt_set(&receipt_set)
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?
+                    .into_iter()
+                    .map(|result| result.response().to_vec())
+                    .collect();
+                Ok(NativeProviderWorkerResponse::Resolved(resolved))
+            }
+            NativeProviderWorkerRequest::Finish { session_id } => {
+                let invocation = self.provider_sessions.remove(&session_id).ok_or_else(|| {
+                    NativeImageRuntimeError::WorkerEvent(
+                        "provider capability session is unavailable".to_owned(),
+                    )
+                })?;
+                invocation
+                    .finish()
+                    .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
+                Ok(NativeProviderWorkerResponse::Finished)
+            }
+            NativeProviderWorkerRequest::Abort { session_id } => {
+                if let Some(invocation) = self.provider_sessions.remove(&session_id) {
+                    invocation.abort();
+                }
+                Ok(NativeProviderWorkerResponse::Aborted)
+            }
+        }
+    }
+
+    fn abort_provider_sessions(&mut self) {
+        for (_, invocation) in std::mem::take(&mut self.provider_sessions) {
+            invocation.abort();
+        }
     }
 
     fn publish_worker_progress(
@@ -5536,6 +6094,7 @@ impl NativeControllerState {
         &mut self,
         error: RuntimeSupervisorError,
     ) -> Result<(), NativeImageRuntimeError> {
+        self.abort_provider_sessions();
         let worker_error = error.to_string();
         if let Some(active) = self.active.take() {
             self.publish_kind(
@@ -6755,6 +7314,34 @@ mod tests {
         let bindings = generated_family_node_bindings()?;
         let registry = generated_native_node_registry_projection(None)?;
         registry.validate_comprehensive_bindings()?;
+        let provider_required = NodeRegistry::built_in()?
+            .registered()
+            .values()
+            .filter(|descriptor| descriptor.catalog_status == CatalogNodeStatus::ProviderRequired)
+            .count();
+        assert_eq!(provider_required, 214);
+        assert_eq!(
+            NodeRegistry::built_in()?
+                .registered()
+                .values()
+                .filter(|descriptor| {
+                    descriptor.catalog_status == CatalogNodeStatus::ProviderRequired
+                        && registry.binding_declared_disposition(&descriptor.node_identifier)
+                            == Some(NativeNodeBindingDisposition::ProviderRequired)
+                })
+                .count(),
+            provider_required
+        );
+        let paid = registry
+            .descriptor("ElevenLabsAudioIsolation")
+            .and_then(|descriptor| descriptor.source_schema.as_ref())
+            .and_then(|schema| schema.node.price_badge.as_ref())
+            .ok_or("paid provider descriptor lost its source price badge")?;
+        paid.validate()?;
+        assert_eq!(
+            registry.binding_implementation_namespace("ElevenLabsAudioIsolation"),
+            Some("sim.comfy.provider.comfy-node-0141")
+        );
         for class_type in [
             "LoadImage",
             "ImageScale",
@@ -7495,6 +8082,7 @@ mod tests {
             output_committer,
             input_authorization,
             output_authorization,
+            provider_sessions: BTreeMap::new(),
         };
         let before = presentation.snapshot(profile_id)?;
         smol::block_on(state.apply_command(ExecutionControlCommand {
@@ -7708,6 +8296,7 @@ mod tests {
                 active: None,
                 input_authorization: authorize_native_input_reader(&roots.profile_id)?,
                 output_authorization: authorization,
+                provider_sessions: BTreeMap::new(),
             };
 
             assert!(state.reconcile_committed_output_receipts().await.is_err());
@@ -7825,12 +8414,15 @@ mod tests {
                 prompt_id: plan.prompt_id,
                 attempt_id,
                 cancellation: lease.cancellation,
+                compiled_plan_sha256: "0".repeat(64),
+                provider_node_ids: BTreeSet::new(),
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
             output_committer,
             input_authorization,
             output_authorization,
+            provider_sessions: BTreeMap::new(),
         };
 
         smol::block_on(state.recover_worker(RuntimeSupervisorError::ChannelClosed))?;
@@ -7940,11 +8532,14 @@ mod tests {
                 prompt_id: plan.prompt_id,
                 attempt_id,
                 cancellation: lease.cancellation,
+                compiled_plan_sha256: "0".repeat(64),
+                provider_node_ids: BTreeSet::new(),
                 output_proposals: BTreeMap::new(),
                 output_proposal_bytes: 0,
             }),
             input_authorization: authorize_native_input_reader(&roots.profile_id)?,
             output_authorization: authorize_native_output_committer(&roots.profile_id)?,
+            provider_sessions: BTreeMap::new(),
         };
         let event = NativeImageWorkerEvent::Failed {
             message: "untrusted worker cancellation observation".to_owned(),
@@ -7986,6 +8581,75 @@ mod tests {
             Some(&json!({"worker_reported_cancelled": true}))
         );
         assert!(!canonical_cancellation.is_cancelled());
+        Ok(())
+    }
+
+    #[test]
+    fn stale_provider_capability_envelope_is_rejected_before_session_creation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_temporary, roots) = fixture_roots()?;
+        let profile_id = ProfileId(Uuid::parse_str(&roots.profile_id)?);
+        let prompt_id = PromptId(Uuid::from_u128(0x19a1));
+        let attempt_id = AttemptId(Uuid::from_u128(0x19a2));
+        let mut presentation = ExecutionPresentationService::new(8)?;
+        presentation.initialize_profile(
+            profile_id,
+            ExecutionDataSource::Live,
+            ExecutionSnapshotStatus::Ready,
+        )?;
+        let presentation = crate::ExecutionPresentationOwner::ephemeral(presentation);
+        let config = NativeExecutionControllerConfig::new(
+            fixture_asset_service(&roots)?,
+            presentation,
+            WorkerLaunchConfig::new(
+                PathBuf::from("unused-native-image-worker"),
+                profile_id,
+                WorkerId(Uuid::from_u128(0x19a3)),
+                NATIVE_IMAGE_REGISTRY_VERSION,
+                1024,
+            ),
+            true,
+        )?;
+        let mut state = NativeControllerState {
+            output_committer: config.output_committer.clone(),
+            input_authorization: authorize_native_input_reader(&roots.profile_id)?,
+            output_authorization: authorize_native_output_committer(&roots.profile_id)?,
+            config,
+            event_bus: ExecutionEventBus::new(8)?,
+            supervisor: None,
+            active: Some(ActiveNativeExecution {
+                profile_id,
+                prompt_id,
+                attempt_id,
+                cancellation: CancellationToken::default(),
+                compiled_plan_sha256: "0".repeat(64),
+                provider_node_ids: BTreeSet::from(["ProviderFixture".to_owned()]),
+                output_proposals: BTreeMap::new(),
+                output_proposal_bytes: 0,
+            }),
+            provider_sessions: BTreeMap::new(),
+        };
+        let envelope = comfy_types::WorkerEnvelope {
+            version: comfy_types::WORKER_PROTOCOL_VERSION,
+            profile_id,
+            worker_id: WorkerId(Uuid::from_u128(0x19a3)),
+            request_id: RequestId(Uuid::from_u128(0x19a4)),
+            prompt_id: Some(prompt_id),
+            attempt_id: Some(AttemptId(Uuid::from_u128(0x19ff))),
+            sequence: 1,
+            registry_version: NATIVE_IMAGE_REGISTRY_VERSION.to_owned(),
+            message: comfy_types::WorkerMessage::PluginCapabilityRequest {
+                call_id: 1,
+                request: vec![0xff],
+            },
+            extensions: BTreeMap::new(),
+        };
+
+        let error = smol::block_on(state.apply_worker_event(envelope))
+            .expect_err("a stale provider capability envelope must fail closed");
+        assert!(error.to_string().contains("stale attempt identity"));
+        assert!(state.provider_sessions.is_empty());
+        assert!(state.active.is_some());
         Ok(())
     }
 

@@ -147,7 +147,8 @@ async fn properties_panel_is_a_right_dock_bound_to_canonical_graph_commands(
 fn sim_loads_properties_panel_through_the_workspace_panel_owner() {
     const SIM_SOURCE: &str = include_str!("../../sim/src/sim.rs");
     assert!(SIM_SOURCE.contains("comfy_ui::GraphPropertiesPanel::load"));
-    assert!(SIM_SOURCE.contains("add_panel_when_ready(\n                graph_properties_panel"));
+    let normalized = SIM_SOURCE.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(normalized.contains("add_panel_when_ready( graph_properties_panel,"));
 }
 
 #[test]

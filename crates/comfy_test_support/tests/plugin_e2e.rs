@@ -6,12 +6,13 @@ use comfy_api::{
     NativeHeadlessService, NativeRuntimeApiHost, NativeRuntimeHttpServices, WebSocketLimits,
     security::{ApiSecurityConfig, ArtifactIdempotencySnapshotStore},
 };
+use comfy_media::NativeAudioPayload;
 use comfy_model::NativeModelPayload;
 use comfy_nodes::NodeRegistry as CatalogNodeRegistry;
 use comfy_nodes::{
-    NativeEffectServiceError, NativeNodeServiceIdentity, NativeNodeServices,
-    NativeOutputEffectRequest, NativePreparedEffectKind, NativePreparedEffectRequest,
-    NativePreparedEffectService,
+    NativeEffectServiceError, NativeNodeComputeSession, NativeNodeServiceIdentity,
+    NativeNodeServices, NativeOutputEffectRequest, NativePreparedEffectKind,
+    NativePreparedEffectRequest, NativePreparedEffectService, NativeProviderExecutionIdentity,
 };
 use comfy_plugin_host::{
     CancellationToken, ComponentExecutionBoundary, ComponentHost, ComponentHostError,
@@ -24,11 +25,12 @@ use comfy_plugin_sdk::{
     ApiRequirement, ApiVersion, ArtifactValue, CachePolicy, CancelReason, CapabilityKind,
     CapabilityQuota, CapabilityRequest, DType, DeterminismPolicy, DeviceId,
     ED25519_SIGNATURE_BYTES, EffectPolicy, InvocationError, ManifestProvenance, ManifestSignature,
-    ModelValue, PLUGIN_SIGNATURE_ALGORITHM, PluginContractError, PluginInvocation, PluginManifest,
+    ModelValue, PLUGIN_SIGNATURE_ALGORITHM, PROVIDER_BINDING_API_FEATURE,
+    PROVIDER_BINDING_SCHEMA_VERSION, PluginContractError, PluginInvocation, PluginManifest,
     PluginNode, PluginPort, PluginSigningKey, PluginValue, PortCardinality, PortDirection,
-    PortPresence, PortSerialization, RouteDeclaration, RustComfyPlugin, RustNodeInstance,
-    ScalarValue, StreamId, TensorDescriptor, TensorValue, TypeRegistry, UiContribution,
-    ValueFamily,
+    PortPresence, PortSerialization, ProviderBindingClaim, ProviderBindingSet, RouteDeclaration,
+    RustComfyPlugin, RustNodeInstance, ScalarValue, StreamId, TensorDescriptor, TensorValue,
+    TypeRegistry, UiContribution, ValueFamily,
 };
 use comfy_runtime::{
     AuthorizedCredentialPresenceRequest, AuthorizedProviderRequest, Capability, CapabilitySet,
@@ -40,22 +42,25 @@ use comfy_runtime::{
     NativeValue, NodeContext, NodeOutcome, OutputCommitter, OutputExecutionScope, PermissionGrant,
     PermissionPolicy, PluginAuthorization, PluginCapabilityBroker, PluginRngPolicy,
     PluginServiceActuatorError, PluginServiceOperationContext, PluginTrustPolicy,
-    PluginVerificationKey, ProfileId, ProviderEndpoint, ProviderMode, ProviderPolicy,
-    ProviderRequestActuator, SecretId, SecretValue, SharedAssetService, WorkerLaunchConfig,
-    authorize_native_output_committer, authorize_native_plugin_asset_broker,
-    native_image_catalog_bindings, native_image_registry_projection,
-    open_native_profile_asset_service,
+    PluginVerificationKey, ProfileId, ProviderCostAcceptanceIssuer, ProviderCostApproval,
+    ProviderCostApprovalAuthority, ProviderCostNonce, ProviderEndpoint, ProviderMode,
+    ProviderPolicy, ProviderPriceBound, ProviderRequestActuator, ProviderResultReceiptIssuer,
+    ProviderTransportPort, ProviderTransportResponse, ProviderTransportValue, SecretId,
+    SecretValue, SharedAssetService, WorkerLaunchConfig, authorize_native_output_committer,
+    authorize_native_plugin_asset_broker, native_image_catalog_bindings,
+    native_image_registry_projection, open_native_profile_asset_service,
 };
 use comfy_sampler::{NativeConditioningPayload, NativeDiffusionPayload};
 use comfy_tensor::{
-    CpuWorkspaceAuthority, ImageTensor, NativeTensorPayload, NativeTensorRole, RngAlgorithm,
-    RngProfileVersion, ScratchReservation, StreamId as TensorStreamId,
+    CpuWorkspaceAuthority, DType as TensorDType, DeviceId as TensorDeviceId, ImageTensor,
+    NativeTensorPayload, NativeTensorRole, RngAlgorithm, RngProfileVersion, ScratchReservation,
+    StreamId as TensorStreamId, TensorDescriptor as NativeTensorDescriptor,
 };
 use comfy_test_support::NativeDiffusionFixture;
 use comfy_types::{AttemptId, HttpMethod, NodeId, PromptId, WorkerId};
 use extension_host::{
     ComponentLifecycleAdapter, ComponentRuntime, ExtensionIndexEntry, ExtensionManifest,
-    ExtensionStore,
+    ExtensionStore, InstalledComponent,
 };
 use gpui::BackgroundExecutor;
 use serde::Deserialize;
@@ -313,6 +318,95 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
                 legacy_output_index: 3,
             }],
         }],
+    })
+}
+
+fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> {
+    let registry = TypeRegistry::built_in()?;
+    let input_port = port(
+        &registry,
+        "audio",
+        PortDirection::Input,
+        "Audio",
+        PortCardinality::Singular,
+        PortPresence::Required,
+    )?;
+    let output_port = port(
+        &registry,
+        "output_0",
+        PortDirection::Output,
+        "Audio",
+        PortCardinality::Singular,
+        PortPresence::Required,
+    )?;
+    let mut provider_binding = ProviderBindingSet {
+        schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
+        implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        bindings_sha256: "0".repeat(64),
+        bindings: vec![ProviderBindingClaim {
+            feature_id: "COMFY-NODE-0141".to_owned(),
+            node_id: "ElevenLabsAudioIsolation".to_owned(),
+            contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+                .to_owned(),
+            transport_schema: "sim:comfy-provider-transport@1".parse()?,
+            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+        }],
+    };
+    provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
+    Ok(PluginManifest {
+        schema_version: 1,
+        identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        plugin_version: ApiVersion::new(1, 0, 0),
+        api: ApiRequirement {
+            major: 1,
+            minimum_minor: 0,
+            maximum_minor: 0,
+            required_features: vec![PROVIDER_BINDING_API_FEATURE.to_owned()],
+        },
+        digest_sha256: component_digest,
+        signature: ManifestSignature {
+            algorithm: PLUGIN_SIGNATURE_ALGORITHM.to_owned(),
+            key_id: KEY_ID.to_owned(),
+            value: "0".repeat(ED25519_SIGNATURE_BYTES * 2),
+        },
+        provenance: ManifestProvenance {
+            source: "fixture://test.provider-plugin".to_owned(),
+            publisher: "Sim provider fixture".to_owned(),
+            registry: Some("fixture://signed-registry".to_owned()),
+        },
+        provider_binding: Some(provider_binding),
+        nodes: vec![PluginNode {
+            id: "ElevenLabsAudioIsolation".to_owned(),
+            version: ApiVersion::new(1, 0, 0),
+            display_name: "ElevenLabs Voice Isolation".to_owned(),
+            category: "partner/audio/ElevenLabs".to_owned(),
+            ports: vec![input_port, output_port],
+            determinism: DeterminismPolicy::External,
+            cache: CachePolicy::Never,
+            effects: EffectPolicy::Provider,
+        }],
+        capabilities: [
+            CapabilityKind::NetworkProvider,
+            CapabilityKind::ProviderUpload,
+            CapabilityKind::ProviderCost,
+        ]
+        .into_iter()
+        .map(|kind| CapabilityRequest {
+            kind,
+            scope: "fixture|https://fixture.invalid/v1/generate".to_owned(),
+            quota: CapabilityQuota {
+                maximum_operations: 16,
+                maximum_request_bytes: 16 * 1024 * 1024,
+                maximum_response_bytes: 64 * 1024 * 1024,
+                maximum_total_bytes: 80 * 1024 * 1024,
+                maximum_handles: 8,
+                timeout_milliseconds: 5_000,
+            },
+        })
+        .collect(),
+        ui: Vec::new(),
+        routes: Vec::new(),
+        legacy_mappings: Vec::new(),
     })
 }
 
@@ -687,6 +781,37 @@ impl ProviderRequestActuator for WorkerPluginProvider {
     }
 }
 
+struct ProviderWorldActuator {
+    calls: AtomicUsize,
+    response: Vec<u8>,
+}
+
+impl ProviderRequestActuator for ProviderWorldActuator {
+    fn execute(
+        &self,
+        request: &AuthorizedProviderRequest,
+        secret: Option<&SecretValue>,
+        body: &[u8],
+        context: &PluginServiceOperationContext<'_>,
+    ) -> Result<Vec<u8>, PluginServiceActuatorError> {
+        context
+            .check_active()
+            .map_err(|error| PluginServiceActuatorError::new(error.to_string()))?;
+        if request.provider() != "fixture"
+            || request.endpoint() != "https://fixture.invalid/v1/generate"
+            || request.secret_id().is_some()
+            || secret.is_some()
+            || comfy_runtime::ProviderTransportRequest::from_bytes(body).is_err()
+        {
+            return Err(PluginServiceActuatorError::new(
+                "provider-world request identity changed",
+            ));
+        }
+        self.calls.fetch_add(1, Ordering::AcqRel);
+        Ok(self.response.clone())
+    }
+}
+
 #[derive(Default)]
 struct WorkerPluginCredentials {
     presence_calls: AtomicUsize,
@@ -850,6 +975,241 @@ async fn synchronize_extension_store_with_router(
     .await
 }
 
+async fn exercise_provider_world_private_worker(
+    profile_id: ProfileId,
+) -> Result<(), Box<dyn Error>> {
+    const COMPILED_PLAN_SHA256: &str =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let component = provider_component_fixture()?;
+    let component_digest = format!("{:x}", Sha256::digest(&component));
+    let mut manifest = provider_manifest(component_digest.clone())?;
+    let trust = trust_policy()?;
+    sign(&trust, &mut manifest)?;
+    let binding_sha256 = manifest
+        .provider_binding
+        .as_ref()
+        .ok_or("provider binding is absent")?
+        .bindings_sha256
+        .clone();
+    let (_asset_directory, assets) = worker_plugin_assets()?;
+    let clock = Arc::new(WorkerPluginClock::new(Instant::now()));
+    let output_payload = canonical_audio_payload(&[0.5, -0.25, 0.125, 0.0])?;
+    let response = ProviderTransportResponse::checked(
+        "ElevenLabsAudioIsolation",
+        vec![ProviderTransportPort::checked(
+            "output_0",
+            true,
+            vec![ProviderTransportValue::from_native_payload(
+                "comfy:audio@1",
+                ValueFamily::Tensor,
+                &output_payload,
+            )?],
+        )?],
+    )?
+    .to_bytes()?;
+    let provider = Arc::new(ProviderWorldActuator {
+        calls: AtomicUsize::new(0),
+        response,
+    });
+    let cost_issuer = Arc::new(ProviderCostAcceptanceIssuer::generate(clock.utc_now())?);
+    let cost_authority = Arc::new(ProviderCostApprovalAuthority::new(
+        cost_issuer.clone(),
+        clock.clone(),
+    ));
+    let broker = PluginCapabilityBroker::new_with_provider_cost_acceptance(
+        assets,
+        comfy_model::ModelStore::new(comfy_model::ParserLimits::default())?,
+        ProviderPolicy::new(
+            TEST_PROFILE_ID,
+            ProviderMode::Enabled,
+            [ProviderEndpoint::new(
+                "fixture",
+                "https://fixture.invalid/v1/generate",
+            )?],
+            std::iter::empty::<CredentialScope>(),
+        )?,
+        cost_authority.verifier()?,
+        provider.clone(),
+        Arc::new(WorkerPluginCredentials::default()),
+        clock.clone(),
+        PluginRngPolicy::new(RngProfileVersion::V2, RngAlgorithm::Philox4x32_10, 21_078),
+    );
+    let receipt_issuer = Arc::new(ProviderResultReceiptIssuer::generate(clock.utc_now())?);
+    let launch = WorkerLaunchConfig::new(
+        env!("CARGO_BIN_EXE_comfy_plugin_worker_fixture"),
+        profile_id,
+        WorkerId(Uuid::from_u128(0x21079)),
+        "worker-provider-v1",
+        8 * 1024 * 1024 * 1024,
+    );
+    let boundary = ComponentExecutionBoundary::private_worker(
+        PrivateWorkerPluginExecutor::new_with_provider_authorities(
+            launch,
+            broker,
+            TEST_PROFILE_ID,
+            receipt_issuer,
+            Duration::from_secs(30),
+            cost_authority.clone(),
+        )?,
+    );
+    let host = ComponentHost::new(
+        ComponentRuntime::no_wasi()?,
+        trust,
+        permission_policy(&manifest)?,
+        boundary,
+        conformance_component_limits(),
+        comfy_runtime::generated_native_node_registry_projection(None)?,
+    )?;
+    let router = ComponentHostRouter::new(host.clone());
+    router
+        .synchronize(vec![InstalledComponent::checked(
+            Arc::from("provider-extension"),
+            Arc::from("1.0.0"),
+            serde_json::to_vec(&manifest)?.into(),
+            component.into(),
+        )?])
+        .await?;
+    let bundle = router.active_execution_registry_bundle()?;
+    let registry = bundle.registry();
+    let price_badge = registry
+        .descriptor("ElevenLabsAudioIsolation")
+        .and_then(|descriptor| descriptor.source_schema.as_ref())
+        .and_then(|schema| schema.node.price_badge.clone())
+        .ok_or("paid provider price badge is absent")?;
+    price_badge
+        .validate()
+        .map_err(|error| format!("generated provider price badge is invalid: {error}"))?;
+    comfy_runtime::ProviderInvocationIdentity::new(
+        TEST_PROFILE_ID,
+        TEST_PROFILE_ID,
+        "provider-cost-approval",
+        COMPILED_PLAN_SHA256,
+        "provider-cost-approval",
+        "ElevenLabsAudioIsolation",
+        0,
+        "0".repeat(64),
+        manifest.identifier.clone(),
+        component_digest.clone(),
+        binding_sha256.clone(),
+        "fixture",
+        "https://fixture.invalid/v1/generate",
+    )
+    .map_err(|error| format!("provider approval identity is invalid: {error}"))?;
+    let cost_approval = ProviderCostApproval::new(
+        TEST_PROFILE_ID,
+        TEST_PROFILE_ID,
+        COMPILED_PLAN_SHA256,
+        "ElevenLabsAudioIsolation",
+        0,
+        manifest.identifier.clone(),
+        component_digest,
+        binding_sha256,
+        "fixture",
+        "https://fixture.invalid/v1/generate",
+        &price_badge,
+        ProviderPriceBound::new("USD", 25_000)?,
+        clock.utc_now() + Duration::from_secs(30),
+        ProviderCostNonce::new([0x79; 32])?,
+    )
+    .map_err(|error| format!("provider cost approval construction failed: {error}"))?;
+    cost_authority
+        .approve(cost_approval)
+        .map_err(|error| format!("provider cost approval admission failed: {error}"))?;
+
+    let prompt_id = PromptId(Uuid::from_u128(0x2107_9001));
+    let attempt_id = AttemptId(Uuid::from_u128(0x2107_9002));
+    let cancellation = CancellationToken::default();
+    let generation = NativeHandleStoreGeneration::new()?;
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let input = canonical_audio_payload(&[0.0, 0.25, -0.5, 1.0])?;
+    let input_handle = store.publish(input, &cancellation)?;
+    let context = provider_node_context(
+        prompt_id,
+        attempt_id,
+        NodeId("ElevenLabsAudioIsolation".to_owned()),
+        cancellation.clone(),
+        store.clone(),
+        COMPILED_PLAN_SHA256,
+    )?;
+    let outcome = registry
+        .node("ElevenLabsAudioIsolation")
+        .ok_or("provider binding is not executable")?
+        .execute(
+            context,
+            BTreeMap::from([(
+                "audio".to_owned(),
+                NativeValue::Handle {
+                    value: input_handle,
+                },
+            )]),
+        )
+        .await?;
+    let NodeOutcome::Values {
+        outputs, effects, ..
+    } = outcome
+    else {
+        return Err("provider node returned a non-value outcome".into());
+    };
+    assert!(effects.is_empty());
+    let [
+        NativeValue::Handle {
+            value: output_handle,
+        },
+    ] = outputs.as_slice()
+    else {
+        return Err("provider output was not one canonical audio handle".into());
+    };
+    let resolved = store.resolve(
+        output_handle,
+        &NativeHandleType::new(comfy_nodes::NativeHandleKind::Audio, "AUDIO")?,
+        &cancellation,
+    )?;
+    let NativeStoredPayload::Audio(audio) = resolved.as_ref() else {
+        return Err("provider output resolved to the wrong payload owner".into());
+    };
+    audio.validate()?;
+    assert_eq!(
+        audio.semantic_digest_sha256(),
+        match &output_payload {
+            NativeStoredPayload::Audio(expected) => expected.semantic_digest_sha256(),
+            _ => return Err("provider fixture output is not audio".into()),
+        }
+    );
+    assert_eq!(provider.calls.load(Ordering::Acquire), 1);
+
+    let replay_generation = NativeHandleStoreGeneration::new()?;
+    let replay_store =
+        replay_generation.handle_store_for_attempt(AttemptId(Uuid::from_u128(0x2107_9003)));
+    let replay_input = replay_store.publish(
+        canonical_audio_payload(&[0.0, 0.25, -0.5, 1.0])?,
+        &CancellationToken::default(),
+    )?;
+    let replay = registry
+        .node("ElevenLabsAudioIsolation")
+        .ok_or("provider binding disappeared")?
+        .execute(
+            provider_node_context(
+                prompt_id,
+                AttemptId(Uuid::from_u128(0x2107_9003)),
+                NodeId("ElevenLabsAudioIsolation".to_owned()),
+                CancellationToken::default(),
+                replay_store,
+                COMPILED_PLAN_SHA256,
+            )?,
+            BTreeMap::from([(
+                "audio".to_owned(),
+                NativeValue::Handle {
+                    value: replay_input,
+                },
+            )]),
+        )
+        .await
+        .expect_err("spent cost approval must deny replay before provider actuation");
+    assert!(replay.message.contains("cost") || replay.message.contains("denied"));
+    assert_eq!(provider.calls.load(Ordering::Acquire), 1);
+    Ok(())
+}
+
 fn component_inventory_error_contains(
     errors: &BTreeMap<String, String>,
     component_host: &ComponentHost,
@@ -879,6 +1239,31 @@ fn canonical_image_payload(seed: u8) -> Result<NativeStoredPayload, Box<dyn Erro
     let image = ImageTensor::from_f32(&backend, &context, 1, 1, 1, 3, &[value, value, value])?;
     Ok(NativeStoredPayload::Tensor(Arc::new(
         NativeTensorPayload::from_image(NativeTensorRole::Image, image)?,
+    )))
+}
+
+fn canonical_audio_payload(values: &[f32]) -> Result<NativeStoredPayload, Box<dyn Error>> {
+    let bytes = values
+        .iter()
+        .flat_map(|value| value.to_ne_bytes())
+        .collect::<Vec<_>>();
+    let descriptor = NativeTensorDescriptor::contiguous(
+        vec![1, 1, u64::try_from(values.len())?],
+        TensorDType::F32,
+        TensorDeviceId::CPU,
+        TensorStreamId::DEFAULT,
+    )?;
+    let (backend, workspace_authority) =
+        CpuWorkspaceAuthority::create_backend(u64::try_from(bytes.len())?.saturating_add(64))?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        TensorStreamId::DEFAULT,
+        workspace_authority.authorize_workspace(0)?,
+        &cancellation,
+    );
+    let (waveform, _) = backend.upload_bytes(descriptor, &bytes, &context)?;
+    Ok(NativeStoredPayload::Audio(Arc::new(
+        NativeAudioPayload::checked(waveform, 48_000)?,
     )))
 }
 
@@ -1064,6 +1449,47 @@ fn plugin_node_context(
         prepared: Mutex::new(BTreeMap::new()),
     });
     let services = NativeNodeServices::checked(None, Some(effects), None)?;
+    Ok(NodeContext::new_with_services(
+        prompt_id,
+        attempt_id,
+        node_id,
+        cancellation,
+        scratch,
+        store,
+        services,
+    )?)
+}
+
+fn provider_node_context(
+    prompt_id: PromptId,
+    attempt_id: AttemptId,
+    node_id: NodeId,
+    cancellation: CancellationToken,
+    store: Arc<dyn NativeHandleStore>,
+    compiled_plan_sha256: &str,
+) -> Result<NodeContext, Box<dyn Error>> {
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+    let scratch = workspace_authority.authorize_workspace(64 * 1024 * 1024)?;
+    let identity = NativeNodeServiceIdentity::checked(
+        Uuid::from_u128(0x2100_0000_0000_0000_0000_0000_0000_0079),
+        attempt_id,
+        node_id.clone(),
+    )?;
+    let compute = NativeNodeComputeSession::checked(
+        identity.clone(),
+        Arc::new(backend),
+        TensorStreamId::DEFAULT,
+        &scratch,
+    )?;
+    let effects = Arc::new(TestPreparedEffectService {
+        identity,
+        ordinal: AtomicUsize::new(0),
+        prepared: Mutex::new(BTreeMap::new()),
+    });
+    let services = NativeNodeServices::checked(None, Some(effects), Some(compute))?
+        .with_provider_execution(NativeProviderExecutionIdentity::checked(
+            compiled_plan_sha256,
+        )?);
     Ok(NodeContext::new_with_services(
         prompt_id,
         attempt_id,
@@ -1477,6 +1903,10 @@ fn component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
     let component = decode_base64(base64.trim())?;
     assert_no_wasi_component(&component)?;
     Ok(component)
+}
+
+fn provider_component_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    decode_base64(include_str!("../../comfy_plugin_host/tests/fixtures/provider_component").trim())
 }
 
 fn assert_no_wasi_component(component: &[u8]) -> Result<(), Box<dyn Error>> {
@@ -2086,6 +2516,7 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
             .and_then(Path::parent)
             .ok_or("workspace root is unavailable")?;
         let profile_id = ProfileId(Uuid::parse_str(TEST_PROFILE_ID)?);
+        exercise_provider_world_private_worker(profile_id).await?;
         let component = component_fixture()?;
         let trust = trust_policy()?;
         let mut signed_manifest = manifest(format!("{:x}", Sha256::digest(&component)))?;
@@ -3654,18 +4085,8 @@ async fn val_e2e_003(executor: BackgroundExecutor) {
             maximum_fuel: 50_000,
             ..conformance_component_limits()
         })?;
-        let compiled_hang =
-            hang_host.compile_component(&hang_component, &hang_manifest, &hang_authorization)?;
-        let hang_invocation = hang_host.begin_invocation(
-            &hang_manifest,
-            &hang_authorization,
-            "echo",
-            invocation_inputs()?,
-            empty_services(),
-            CancellationToken::default(),
-        )?;
         assert!(matches!(
-            hang_host.instantiate_component(&compiled_hang, hang_invocation),
+            hang_host.compile_component(&hang_component, &hang_manifest, &hang_authorization),
             Err(PluginError::WasmTrap(_))
         ));
 

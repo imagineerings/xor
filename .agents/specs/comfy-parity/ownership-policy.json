@@ -12306,7 +12306,7 @@
         {
           "name": "sdk-capability-to-runtime-capability-is-exhaustive",
           "path": "crates/comfy_runtime/src/permissions.rs",
-          "pattern": "CapabilityKind::Filesystem[\\s\\S]*CapabilityKind::NetworkProvider[\\s\\S]*CapabilityKind::Secret[\\s\\S]*CapabilityKind::Clock[\\s\\S]*CapabilityKind::Randomness[\\s\\S]*CapabilityKind::Model[\\s\\S]*CapabilityKind::TransactionalOutput[\\s\\S]*CapabilityKind::SanitizedLog[\\s\\S]*CapabilityKind::DeclarativeUi[\\s\\S]*CapabilityKind::Route"
+          "pattern": "CapabilityKind::Filesystem[\\s\\S]*CapabilityKind::NetworkProvider[\\s\\S]*CapabilityKind::Secret[\\s\\S]*CapabilityKind::Clock[\\s\\S]*CapabilityKind::Randomness[\\s\\S]*CapabilityKind::Model[\\s\\S]*CapabilityKind::TransactionalOutput[\\s\\S]*CapabilityKind::SanitizedLog[\\s\\S]*CapabilityKind::DeclarativeUi[\\s\\S]*CapabilityKind::Route[\\s\\S]*CapabilityKind::ProviderUpload[\\s\\S]*CapabilityKind::ProviderCost"
         },
         {
           "name": "plugin-host-delegates-sdk-capability-mapping",
@@ -12322,6 +12322,7 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-trust-foundation",
+        "comfy-parity-native-node-provider-invocation-foundation",
         "comfy-parity-authoritative-domain-ownership",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
       ],
@@ -12515,16 +12516,17 @@
         {
           "name": "private-worker-transfers-canonical-invocation-session",
           "path": "crates/comfy_plugin_host/src/private_worker.rs",
-          "pattern": "PluginCapabilityInvocation[\\s\\S]*RuntimeSupervisor::start[\\s\\S]*execute_plugin\\("
+          "pattern": "PluginCapabilityBroker[\\s\\S]*RuntimeSupervisor::start[\\s\\S]*execute_plugin_retaining_capabilities\\("
         },
         {
           "name": "sim-production-composes-existing-service-owners",
           "path": "crates/sim/src/comfy_plugin_services.rs",
-          "pattern": "PluginCapabilityBroker::new\\([\\s\\S]*ModelStore::new[\\s\\S]*SimProviderActuator[\\s\\S]*SimCredentialActuator[\\s\\S]*RealSystemClock[\\s\\S]*PrivateWorkerPluginExecutor::new"
+        "pattern": "RealSystemClock[\\s\\S]*PluginCapabilityBroker::new_with_provider_cost_acceptance\\([\\s\\S]*ModelStore::new[\\s\\S]*SimProviderActuator[\\s\\S]*SimCredentialActuator[\\s\\S]*PrivateWorkerPluginExecutor::new_with_provider_authorities"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-node-provider-invocation-foundation",
         "comfy-parity-extension-host-plugin-adapter",
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
@@ -12790,7 +12792,7 @@
         {
           "name": "sdk-capability-dto-runtime-domain-mapping",
           "path": "crates/comfy_runtime/src/permissions.rs",
-          "pattern": "from_plugin_scope[\\s\\S]*CapabilityKind::Filesystem[\\s\\S]*CapabilityKind::Route"
+          "pattern": "from_plugin_scope[\\s\\S]*CapabilityKind::Filesystem[\\s\\S]*CapabilityKind::NetworkProvider[\\s\\S]*CapabilityKind::ProviderUpload[\\s\\S]*CapabilityKind::ProviderCost[\\s\\S]*CapabilityKind::Secret[\\s\\S]*CapabilityKind::Route"
         },
         {
           "name": "sdk-capability-host-delegation",
