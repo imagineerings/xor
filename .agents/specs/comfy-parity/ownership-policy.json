@@ -11971,6 +11971,123 @@
       "decision_reason": "NativeQwenVisionEncoder is the sole retained Qwen3-VL and Qwen3.5 visual graph owner. It validates a closed family profile and complete checkpoint tensor set, executes patch projection, learned position interpolation, two-axis rotary attention, exact affine block and merger equations, and Qwen3-VL capture mergers, and returns only checked invocation-local tensors. It delegates preparation, primitive kernels, decoder state, RNG, resource handles, caching, persistence, and publication to their canonical owners."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_resource_qwen",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenMultimodal",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeQwenMultimodal",
+        "NativeModelPayload::qwen_multimodal_clip",
+        "NativeModelPayload::qwen_multimodal_resource",
+        "NativeModelBackingKind::NativeQwenMultimodal"
+      ],
+      "allowed_adapters": [
+        "NativePromptTokenizer, NativeDecoderTextEncoder, and NativeQwenVisionEncoder remain the sole tokenizer, decoder, and vision graph owners retained by the composite",
+        "NativeModelPayload binds the composite to one sealed CLIP role and NativeStoredModelPayload admits that concrete resource without down-projecting it to decoder-only CLIP",
+        "The native handle store remains the sole owner of allocation deduplication, leases, capacity rollback, forgery checks, and generation-stale restart behavior",
+        "The dependent Qwen generation adapter may borrow this retained resource but cannot duplicate its identity, residency, tokenizer, decoder, vision, or handle ownership",
+        "Runtime controller, executor, NativeCache, persistence, workflow, RNG, KV, prepared tensors, and output transactions remain outside this resource"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeQwenMultimodal \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeQwenMultimodal",
+          "role": "canonical_state",
+          "symbol": "NativeQwenMultimodal"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "^    pub fn qwen_multimodal_clip\\(",
+          "qualified": "comfy_model::native_node_payload::NativeModelPayload::qwen_multimodal_clip",
+          "role": "adapter",
+          "symbol": "qwen_multimodal_clip"
+        }
+      ],
+      "call_symbols": [
+        "NativeQwenMultimodal::new",
+        "NativeQwenMultimodal::validate",
+        "NativeQwenMultimodal::semantic_state_digest",
+        "NativeQwenMultimodal::resident_tensor_allocations",
+        "NativeModelPayload::qwen_multimodal_clip",
+        "NativeModelPayload::qwen_multimodal_resource"
+      ],
+      "required_mappings": [
+        {
+          "name": "qwen-multimodal-resource-retains-one-tokenizer-decoder-and-vision",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeQwenMultimodal[\\s\\S]*tokenizer: Arc<NativePromptTokenizer>[\\s\\S]*decoder: Arc<NativeDecoderTextEncoder>[\\s\\S]*vision: Arc<NativeQwenVisionEncoder>"
+        },
+        {
+          "name": "qwen-multimodal-resource-cross-admission-is-closed",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn validate[\\s\\S]*QWEN25_TOKENIZER_ARTIFACT_DIGEST[\\s\\S]*execution_stream[\\s\\S]*qwen_multimodal_decoder_configuration"
+        },
+        {
+          "name": "qwen-multimodal-resource-binds-source-and-component-identities",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "sim.comfy.qwen-multimodal-resource.v1[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest"
+        },
+        {
+          "name": "qwen-multimodal-resource-unions-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn resident_tensor_allocations[\\s\\S]*decoder.resident_tensor_allocations[\\s\\S]*vision.resident_tensor_allocations[\\s\\S]*shared Qwen tensor storage changed resident size"
+        },
+        {
+          "name": "qwen-multimodal-resource-is-sealed-clip-payload",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn qwen_multimodal_clip[\\s\\S]*NativeModelResourceRole::Clip[\\s\\S]*NativeModelResource::QwenMultimodalClip"
+        },
+        {
+          "name": "qwen-multimodal-resource-stored-adapter-preserves-specialization",
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "pattern": "NativeModelResourceRole::Clip =>[\\s\\S]*decoder_clip_resource[\\s\\S]*qwen_multimodal_resource"
+        },
+        {
+          "name": "qwen-multimodal-resource-tests-identity-residency-and-reduced-rejection",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "qwen_multimodal_resource_closes_admission_identity_and_residency[\\s\\S]*resident_tensor_allocations[\\s\\S]*semantic_state_digest[\\s\\S]*qwen_multimodal_clip"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-qwen-multimodal-resource-foundation"
+      ],
+      "production_consumers": [
+        "retained native Qwen multimodal generation owner",
+        "native multimodal text generation controller"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeQwenMultimodal is the sole retained Qwen vision-text CLIP resource. It derives one of seven closed family identities from concrete tokenizer, decoder, and vision owners, binds pinned source and artifact identities, and exposes exact owned and StorageId-deduplicated residency through NativeModelPayload. It owns no execution transaction, prepared state, KV, RNG, cache, persistence, workflow, handle-store lifecycle, or output publication."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

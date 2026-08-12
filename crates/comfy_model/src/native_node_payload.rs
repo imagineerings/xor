@@ -11,7 +11,8 @@ use thiserror::Error;
 use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 
 use crate::{
-    NativeDecoderTextEncoder, NativePromptTokenizer, NativeRaftLarge, NativeVae,
+    NativeDecoderTextEncoder, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
+    NativeVae, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -271,6 +272,9 @@ enum NativeModelResource {
         tokenizer: Arc<NativePromptTokenizer>,
         decoder: Arc<NativeDecoderTextEncoder>,
     },
+    QwenMultimodalClip {
+        resource: Arc<NativeQwenMultimodal>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -283,6 +287,8 @@ pub enum NativeModelBackingKind {
     ClipVision,
     NativePromptTokenizer,
     NativeDecoderTextEncoder,
+    NativeQwenMultimodal,
+    NativeQwenVisionEncoder,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -562,6 +568,58 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn qwen_multimodal_clip(
+        resource: Arc<NativeQwenMultimodal>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "Qwen production source-exact profile",
+            ));
+        }
+        let family_source_sha256 = match resource.family() {
+            crate::QwenVisionFamily::Qwen3Vl4B | crate::QwenVisionFamily::Qwen3Vl8B => {
+                QWEN3VL_SOURCE_SHA256
+            }
+            crate::QwenVisionFamily::Qwen35_08B
+            | crate::QwenVisionFamily::Qwen35_2B
+            | crate::QwenVisionFamily::Qwen35_4B
+            | crate::QwenVisionFamily::Qwen35_9B
+            | crate::QwenVisionFamily::Qwen35_27B => QWEN35_SOURCE_SHA256,
+        };
+        let artifact_sha256 = digest_fields(
+            b"sim.comfy.native-qwen-multimodal-artifacts.v1",
+            [
+                family_source_sha256,
+                QWEN_VL_SOURCE_SHA256,
+                resource.tokenizer().qwen2_artifact_digest().ok_or(
+                    NativeModelPayloadError::ResourceMismatch("Qwen tokenizer artifact identity"),
+                )?,
+            ],
+        )?;
+        let execution_sha256 = resource
+            .semantic_state_digest(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Clip,
+            format!("native-qwen-multimodal-{:?}", resource.family()),
+            "sim-native-qwen-multimodal-clip-v1",
+            artifact_sha256,
+            execution_sha256,
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::QwenMultimodalClip { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -663,6 +721,52 @@ impl NativeModelPayload {
                     },
                 ]
             }
+            NativeModelResource::QwenMultimodalClip { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeQwenMultimodal,
+                        address: Arc::as_ptr(resource) as usize,
+                        resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativePromptTokenizer,
+                        address: Arc::as_ptr(resource.tokenizer()) as usize,
+                        resident_bytes: resource.tokenizer().resident_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeDecoderTextEncoder,
+                        address: Arc::as_ptr(resource.decoder()) as usize,
+                        resident_bytes: resource.decoder().resident_owned_bytes().map_err(
+                            |error| NativeModelPayloadError::ResourceAccounting(error.to_string()),
+                        )?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeQwenVisionEncoder,
+                        address: Arc::as_ptr(resource.vision()) as usize,
+                        resident_bytes: resource.vision().resident_owned_bytes().map_err(
+                            |error| NativeModelPayloadError::ResourceAccounting(error.to_string()),
+                        )?,
+                    },
+                ]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -684,7 +788,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
-            | NativeModelResource::DecoderClip { .. } => None,
+            | NativeModelResource::DecoderClip { .. }
+            | NativeModelResource::QwenMultimodalClip { .. } => None,
         }
     }
 
@@ -697,7 +802,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
-            | NativeModelResource::DecoderClip { .. } => None,
+            | NativeModelResource::DecoderClip { .. }
+            | NativeModelResource::QwenMultimodalClip { .. } => None,
         }
     }
 
@@ -708,7 +814,8 @@ impl NativeModelPayload {
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
-            | NativeModelResource::DecoderClip { .. } => None,
+            | NativeModelResource::DecoderClip { .. }
+            | NativeModelResource::QwenMultimodalClip { .. } => None,
         }
     }
 
@@ -719,7 +826,8 @@ impl NativeModelPayload {
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::ClipVision { .. }
-            | NativeModelResource::DecoderClip { .. } => None,
+            | NativeModelResource::DecoderClip { .. }
+            | NativeModelResource::QwenMultimodalClip { .. } => None,
         }
     }
 
@@ -730,7 +838,8 @@ impl NativeModelPayload {
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
-            | NativeModelResource::DecoderClip { .. } => None,
+            | NativeModelResource::DecoderClip { .. }
+            | NativeModelResource::QwenMultimodalClip { .. } => None,
         }
     }
 
@@ -739,6 +848,13 @@ impl NativeModelPayload {
     ) -> Option<(&Arc<NativePromptTokenizer>, &Arc<NativeDecoderTextEncoder>)> {
         match &self.resource {
             NativeModelResource::DecoderClip { tokenizer, decoder } => Some((tokenizer, decoder)),
+            _ => None,
+        }
+    }
+
+    pub fn qwen_multimodal_resource(&self) -> Option<&Arc<NativeQwenMultimodal>> {
+        match &self.resource {
+            NativeModelResource::QwenMultimodalClip { resource } => Some(resource),
             _ => None,
         }
     }
@@ -756,6 +872,9 @@ impl NativeModelPayload {
             }
             NativeModelResource::DecoderClip { tokenizer, decoder } => {
                 Self::decoder_clip(tokenizer.clone(), decoder.clone())?
+            }
+            NativeModelResource::QwenMultimodalClip { resource } => {
+                Self::qwen_multimodal_clip(resource.clone())?
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes

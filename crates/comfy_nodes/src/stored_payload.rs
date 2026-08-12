@@ -269,7 +269,10 @@ fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
     match resource.identity().role() {
         NativeModelResourceRole::OpticalFlow => resource.optical_flow_resource().is_some(),
         NativeModelResourceRole::ClipVision => resource.clip_vision_resource().is_some(),
-        NativeModelResourceRole::Clip => resource.decoder_clip_resource().is_some(),
+        NativeModelResourceRole::Clip => {
+            resource.decoder_clip_resource().is_some()
+                || resource.qwen_multimodal_resource().is_some()
+        }
         _ => false,
     }
 }

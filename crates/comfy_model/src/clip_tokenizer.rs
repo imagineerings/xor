@@ -1167,6 +1167,10 @@ impl ClipBpeTokenizer {
 
 const QWEN2_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
 const QWEN35_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?[\p{L}\p{M}]+|\p{N}| ?[^\s\p{L}\p{M}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
+pub const QWEN25_TOKENIZER_ARTIFACT_DIGEST: &str =
+    "c24475458600e650d71943977840489c018993267821ce92f7c3c7843c125de4";
+pub const QWEN35_TOKENIZER_ARTIFACT_DIGEST: &str =
+    "1388589740cd1075d5d495ae728a4c69fa377d5fadfd8bc72cd18465707056ea";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Qwen2PretokenizerProfile {
@@ -1758,6 +1762,28 @@ pub struct NativePromptTokenizer {
 }
 
 impl NativePromptTokenizer {
+    pub fn configuration(&self) -> &TokenizerConfiguration {
+        &self.configuration
+    }
+
+    pub fn qwen2_profile(&self) -> Option<Qwen2PretokenizerProfile> {
+        match &self.family {
+            NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => Some(tokenizer.profile()),
+            NativeTokenizerFamily::ClipBpe(_) | NativeTokenizerFamily::SentencePiece(_) => None,
+        }
+    }
+
+    pub fn qwen2_artifact_digest(&self) -> Option<&str> {
+        match &self.family {
+            NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => Some(tokenizer.artifact_digest()),
+            NativeTokenizerFamily::ClipBpe(_) | NativeTokenizerFamily::SentencePiece(_) => None,
+        }
+    }
+
+    pub fn has_textual_inversion_embeddings(&self) -> bool {
+        !self.embeddings.is_empty()
+    }
+
     pub fn semantic_digest(
         &self,
         cancellation: &CancellationToken,

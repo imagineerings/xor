@@ -1100,6 +1100,10 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
     let model_clip_text_encoder_multimodal =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_multimodal.rs"))?;
+    let model_native_node_payload =
+        fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    let nodes_stored_payload =
+        fs::read_to_string(root.join("crates/comfy_nodes/src/stored_payload.rs"))?;
     let model_clip_vision = fs::read_to_string(root.join("crates/comfy_model/src/clip_vision.rs"))?;
     let model_clip_vision_production = model_clip_vision
         .split_once("#[cfg(test)]\nmod tests")
@@ -2719,6 +2723,84 @@ fn run_ownership_validation(
         .is_some_and(|line| {
             line.contains("comfy-parity-native-qwen-vision-projection-foundation")
                 && line.contains("VAL-MODEL-FAMILY-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
+    let task387_qwen_resource_has_one_retained_composite =
+        production_source_occurrences(&sources, "pub struct NativeQwenMultimodal {").len() == 1
+            && model_clip_text_encoder_multimodal.contains("tokenizer: Arc<NativePromptTokenizer>")
+            && model_clip_text_encoder_multimodal
+                .contains("decoder: Arc<NativeDecoderTextEncoder>")
+            && model_clip_text_encoder_multimodal.contains("vision: Arc<NativeQwenVisionEncoder>")
+            && model_native_node_payload.contains("QwenMultimodalClip")
+            && model_native_node_payload.contains("qwen_multimodal_resource");
+    let task387_qwen_resource_closes_identity_residency_and_storage =
+        model_clip_text_encoder_multimodal.contains("QWEN25_TOKENIZER_ARTIFACT_DIGEST")
+            && model_clip_text_encoder_multimodal.contains("QWEN35_TOKENIZER_ARTIFACT_DIGEST")
+            && model_clip_text_encoder_multimodal.contains("qwen_multimodal_decoder_configuration")
+            && model_clip_text_encoder_multimodal.contains("sim.comfy.qwen-multimodal-resource.v1")
+            && model_clip_text_encoder_multimodal
+                .contains("shared Qwen tensor storage changed resident size")
+            && nodes_stored_payload.contains("resource.qwen_multimodal_resource().is_some()")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task387_qwen_resource_fixture_proves_admission_identity_and_residency =
+        model_clip_text_encoder_multimodal_tests
+            .contains("qwen_multimodal_resource_closes_admission_identity_and_residency")
+            && model_clip_text_encoder_multimodal_tests
+                .contains("NativeQwenMultimodal::reduced_fixture")
+            && model_clip_text_encoder_multimodal_tests
+                .contains("NativeModelPayload::qwen_multimodal_clip")
+            && model_clip_text_encoder_multimodal_tests.contains("resident_tensor_allocations")
+            && model_clip_text_encoder_multimodal_tests.contains("semantic_state_digest");
+    let task387_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_resource_qwen")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeQwenMultimodal")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-qwen-multimodal-resource-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen-multimodal-resource-retains-one-tokenizer-decoder-and-vision",
+                            "qwen-multimodal-resource-cross-admission-is-closed",
+                            "qwen-multimodal-resource-binds-source-and-component-identities",
+                            "qwen-multimodal-resource-unions-storage-residency",
+                            "qwen-multimodal-resource-is-sealed-clip-payload",
+                            "qwen-multimodal-resource-stored-adapter-preserves-specialization",
+                            "qwen-multimodal-resource-tests-identity-residency-and-reduced-rejection",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task387_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| line.starts_with("native_vision_text_transformer_text_media_resource_qwen,"))
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen-multimodal-resource-foundation")
+                && line.contains("VAL-CLIP-001")
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
@@ -8796,6 +8878,22 @@ fn run_ownership_validation(
             task386_qwen_vision_fixture_proves_family_exactness_and_rollback,
         ),
         (
+            "task387_policy_and_catalog_trace_qwen_multimodal_resource",
+            task387_policy_trace && task387_catalog_trace,
+        ),
+        (
+            "task387_qwen_resource_has_one_retained_composite",
+            task387_qwen_resource_has_one_retained_composite,
+        ),
+        (
+            "task387_qwen_resource_closes_identity_residency_and_storage",
+            task387_qwen_resource_closes_identity_residency_and_storage,
+        ),
+        (
+            "task387_qwen_resource_fixture_proves_admission_identity_and_residency",
+            task387_qwen_resource_fixture_proves_admission_identity_and_residency,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -9352,6 +9450,17 @@ fn val_ownership_task386_qwen_vision_001() -> Result<(), Box<dyn std::error::Err
         "val-ownership-task386-qwen-vision-001.json",
         "val_ownership_task386_qwen_vision_001",
         Some("task386_"),
+    )
+}
+
+#[test]
+fn val_ownership_task387_qwen_multimodal_resource_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task387-qwen-multimodal-clip-resource-ownership",
+        "val-ownership-task387-qwen-multimodal-resource-001.json",
+        "val_ownership_task387_qwen_multimodal_resource_001",
+        Some("task387_"),
     )
 }
 

@@ -2,13 +2,16 @@ use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
     BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest, ClipTextError,
     ClipTextOutput, ClipTextRequest, ClipVisionError, ClipVisionIntermediate, ClipVisionOutput,
-    DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText,
-    NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError, NativeT5TextEncoder,
-    scaled_dot_product_attention_with_context,
+    DecoderArchitecture, DecoderLayerKind, DecoderTextConfiguration, DecoderTextError,
+    DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText, NativeClipVision,
+    NativeDecoderTextEncoder, NativeModule, NativeOpsError, NativePromptTokenizer,
+    NativeT5TextEncoder, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
+    QWEN35_SOURCE_SHA256, QWEN35_TOKENIZER_ARTIFACT_DIGEST, Qwen2PretokenizerProfile,
+    decoder_profile_fact, scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
-    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, Tensor,
-    TensorDescriptor, TensorError,
+    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, StreamId,
+    Tensor, TensorDescriptor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
     generated_native_diffusion::{
         NativeDiffusionTensorError, add as native_tensor_add, tensor_from_f32, tensor_to_f32,
@@ -22,6 +25,7 @@ use comfy_tensor::{
     },
 };
 use sha2::{Digest, Sha256};
+use std::{mem, sync::Arc};
 use thiserror::Error;
 
 pub const IDEOGRAM4_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/ideogram4.py";
@@ -52,6 +56,9 @@ pub const QWEN3VL_IMAGE_PAD_TOKEN: i64 = 151_655;
 pub const QWEN35_IMAGE_PAD_TOKEN: i64 = 248_056;
 pub const QWEN35_IMAGE_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
 pub const QWEN35_IMAGE_STANDARD_DEVIATION: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
+pub const QWEN_MULTIMODAL_ROUTING_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/sd.py";
+pub const QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256: &str =
+    "9c378edbcaab01d00397cc0ef1cab7d37d25fca49c707a87cde451030ac6bf42";
 pub const QWEN3VL_IMAGE_MINIMUM_PIXELS: u64 = 3_136;
 pub const QWEN3VL_IMAGE_MAXIMUM_PIXELS: u64 = 12_845_056;
 pub const QWEN3VL_IMAGE_PATCH_SIZE: usize = 16;
@@ -437,6 +444,7 @@ pub struct Qwen3VlPreparedImage {
     patches: Tensor,
     grid_thw: [usize; 3],
     merged_tokens: usize,
+    family: QwenVisionFamily,
 }
 
 impl Qwen3VlPreparedImage {
@@ -450,6 +458,10 @@ impl Qwen3VlPreparedImage {
 
     pub const fn merged_tokens(&self) -> usize {
         self.merged_tokens
+    }
+
+    pub const fn family(&self) -> QwenVisionFamily {
+        self.family
     }
 }
 
@@ -712,6 +724,8 @@ pub enum MultimodalTextError {
     Bidirectional(#[from] BidirectionalTextError),
     #[error(transparent)]
     Decoder(#[from] DecoderTextError),
+    #[error(transparent)]
+    Tokenizer(#[from] NativeTokenizerError),
     #[error(transparent)]
     ClipText(#[from] ClipTextError),
     #[error(transparent)]
@@ -1017,6 +1031,11 @@ pub fn plan_qwen_markers(
     cancellation: &comfy_types::CancellationToken,
 ) -> Result<Qwen3VlMarkerPlan, MultimodalTextError> {
     cancellation.check()?;
+    if images.iter().any(|image| image.family != family) {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen prepared image family does not match the marker plan",
+        ));
+    }
     let image_pad_token = family.image_pad_token();
     let marker_count = tokens
         .iter()
@@ -1182,6 +1201,10 @@ impl NativeQwenVisionEncoder {
         &self.configuration
     }
 
+    pub fn execution_stream(&self) -> StreamId {
+        self.position_embedding.descriptor().stream()
+    }
+
     pub fn semantic_state_digest(
         &self,
         cancellation: &comfy_types::CancellationToken,
@@ -1221,13 +1244,62 @@ impl NativeQwenVisionEncoder {
 
     pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
         self.resident_tensor_allocations().into_iter().try_fold(
-            std::mem::size_of::<Self>() as u64,
+            self.resident_owned_bytes()?,
             |total, (_, bytes)| {
                 total
                     .checked_add(bytes)
                     .ok_or(MultimodalTextError::Overflow("Qwen vision residency"))
             },
         )
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let block_bytes = self
+            .blocks
+            .capacity()
+            .checked_mul(mem::size_of::<NativeQwenVisionBlock>())
+            .ok_or(MultimodalTextError::Overflow("Qwen vision block residency"))?;
+        let merger_bytes = self
+            .deepstack_mergers
+            .capacity()
+            .checked_mul(mem::size_of::<NativeQwenVisionMerger>())
+            .ok_or(MultimodalTextError::Overflow(
+                "Qwen deepstack merger residency",
+            ))?;
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .ok()
+            .and_then(|bytes| {
+                u64::try_from(block_bytes)
+                    .ok()
+                    .and_then(|part| bytes.checked_add(part))
+            })
+            .and_then(|bytes| {
+                u64::try_from(merger_bytes)
+                    .ok()
+                    .and_then(|part| bytes.checked_add(part))
+            })
+            .ok_or(MultimodalTextError::Overflow("Qwen vision owned residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, allocation)| {
+                    total
+                        .checked_add(allocation)
+                        .ok_or(MultimodalTextError::Overflow(
+                            "Qwen vision tensor residency",
+                        ))
+                },
+            )?;
+            let module_bytes = module.resident_storage_bytes()?;
+            bytes = bytes
+                .checked_add(module_bytes.checked_sub(tensor_bytes).ok_or(
+                    MultimodalTextError::Overflow("Qwen vision module residency projection"),
+                )?)
+                .ok_or(MultimodalTextError::Overflow(
+                    "Qwen vision module residency",
+                ))?;
+        }
+        Ok(bytes)
     }
 
     pub fn project(
@@ -1237,6 +1309,11 @@ impl NativeQwenVisionEncoder {
         context: &ExecutionContext<'_>,
     ) -> Result<QwenVisionProjection, MultimodalTextError> {
         context.cancellation.check()?;
+        if prepared.family != self.configuration.family {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen prepared image family does not match the retained vision encoder",
+            ));
+        }
         let patch_shape = prepared.patches.descriptor().shape();
         let patch_count = patch_shape
             .first()
@@ -1339,6 +1416,408 @@ impl NativeQwenVisionEncoder {
             }
         }
         modules
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeQwenMultimodal {
+    tokenizer: Arc<NativePromptTokenizer>,
+    decoder: Arc<NativeDecoderTextEncoder>,
+    vision: Arc<NativeQwenVisionEncoder>,
+}
+
+pub fn qwen_multimodal_tokenizer_profile(family: QwenVisionFamily) -> Qwen2PretokenizerProfile {
+    match family {
+        QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B => {
+            Qwen2PretokenizerProfile::Qwen2
+        }
+        QwenVisionFamily::Qwen35_08B
+        | QwenVisionFamily::Qwen35_2B
+        | QwenVisionFamily::Qwen35_4B
+        | QwenVisionFamily::Qwen35_9B
+        | QwenVisionFamily::Qwen35_27B => Qwen2PretokenizerProfile::Qwen35Declared,
+    }
+}
+
+pub fn qwen_multimodal_decoder_configuration(
+    family: QwenVisionFamily,
+) -> Result<DecoderTextConfiguration, MultimodalTextError> {
+    let profile = decoder_profile_fact(qwen_decoder_profile_name(family)).ok_or(
+        MultimodalTextError::InvalidInput("Qwen decoder source profile is missing"),
+    )?;
+    let layer_kinds = if profile.architecture == DecoderArchitecture::Qwen35 {
+        let period = profile
+            .linear_attention_period
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen3.5 linear-attention period is missing",
+            ))?;
+        (0..profile.hidden_layers)
+            .map(|index| {
+                if (index + 1).is_multiple_of(period) {
+                    DecoderLayerKind::FullAttention
+                } else {
+                    DecoderLayerKind::LinearAttention
+                }
+            })
+            .collect()
+    } else {
+        vec![DecoderLayerKind::FullAttention; profile.hidden_layers]
+    };
+    let qwen35_linear = match (
+        profile.linear_key_heads,
+        profile.linear_value_heads,
+        profile.linear_key_head_dimension,
+        profile.linear_value_head_dimension,
+        profile.convolution_kernel_size,
+    ) {
+        (
+            Some(key_heads),
+            Some(value_heads),
+            Some(key_head_dimension),
+            Some(value_head_dimension),
+            Some(convolution_kernel_size),
+        ) => Some(crate::Qwen35LinearConfiguration {
+            key_heads,
+            value_heads,
+            key_head_dimension,
+            value_head_dimension,
+            convolution_kernel_size,
+        }),
+        (None, None, None, None, None) => None,
+        _ => {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen decoder linear-attention profile is incomplete",
+            ));
+        }
+    };
+    let theta = profile
+        .rope_theta()
+        .next()
+        .ok_or(MultimodalTextError::InvalidInput(
+            "Qwen decoder RoPE theta is missing",
+        ))?;
+    let rotary_dimension = if profile.architecture == DecoderArchitecture::Qwen35 {
+        ((profile.head_dimension as f32) * profile.partial_rotary_factor()).round() as usize
+    } else {
+        profile.head_dimension
+    };
+    let configuration = DecoderTextConfiguration {
+        architecture: profile.architecture,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        vocabulary_size: profile.vocabulary_size,
+        maximum_tokens: profile.maximum_positions,
+        hidden_size: profile.hidden_size,
+        feed_forward_size: profile.intermediate_size,
+        layer_kinds,
+        attention_heads: profile.attention_heads,
+        key_value_heads: profile.key_value_heads,
+        head_dimension: profile.head_dimension,
+        query_key_norm: profile.query_key_norm,
+        qwen35_linear,
+        normalization_epsilon_bits: profile.normalization_epsilon_bits,
+        rope: crate::DecoderRopeConfiguration {
+            theta,
+            rotary_dimension,
+            interleaved_sections: profile.rope_sections.to_vec(),
+            scaling: crate::RopeScaling::None,
+        },
+        sliding_window: None,
+        activation: profile.activation,
+        embedding_scale_bits: 1.0_f32.to_bits(),
+        residual_scale_bits: 1.0_f32.to_bits(),
+        norm_weight_offset_bits: if profile.rms_norm_add {
+            1.0_f32.to_bits()
+        } else {
+            0.0_f32.to_bits()
+        },
+        logits_soft_cap_bits: profile.final_logit_soft_cap_bits,
+        tied_output_head: !profile.untied_output_head,
+        stop_tokens: profile.stop_tokens.to_vec(),
+    };
+    configuration.validate()?;
+    Ok(configuration)
+}
+
+impl NativeQwenMultimodal {
+    pub fn new(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeQwenVisionEncoder>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        if !vision.configuration().source_exact_profile {
+            return Err(MultimodalTextError::InvalidInput(
+                "production Qwen multimodal resources require closed source-exact profiles",
+            ));
+        }
+        if vision.configuration() != &QwenVisionConfiguration::source(vision.configuration().family)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "production Qwen multimodal vision configuration is not the closed source profile",
+            ));
+        }
+        Self::checked(tokenizer, decoder, vision, cancellation)
+    }
+
+    #[doc(hidden)]
+    pub fn reduced_fixture(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeQwenVisionEncoder>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        if vision.configuration().source_exact_profile {
+            return Err(MultimodalTextError::InvalidInput(
+                "reduced Qwen fixture resources require a reduced vision profile",
+            ));
+        }
+        Self::checked(tokenizer, decoder, vision, cancellation)
+    }
+
+    fn checked(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeQwenVisionEncoder>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        let resource = Self {
+            tokenizer,
+            decoder,
+            vision,
+        };
+        resource.validate(cancellation)?;
+        Ok(resource)
+    }
+
+    pub fn family(&self) -> QwenVisionFamily {
+        self.vision.configuration().family
+    }
+
+    pub fn tokenizer(&self) -> &Arc<NativePromptTokenizer> {
+        &self.tokenizer
+    }
+
+    pub fn decoder(&self) -> &Arc<NativeDecoderTextEncoder> {
+        &self.decoder
+    }
+
+    pub fn vision(&self) -> &Arc<NativeQwenVisionEncoder> {
+        &self.vision
+    }
+
+    pub fn is_source_exact_profile(&self) -> bool {
+        self.vision.configuration().source_exact_profile
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        let family = self.family();
+        let expected_tokenizer_profile = qwen_multimodal_tokenizer_profile(family);
+        let expected_tokenizer_digest = match expected_tokenizer_profile {
+            Qwen2PretokenizerProfile::Qwen2 => QWEN25_TOKENIZER_ARTIFACT_DIGEST,
+            Qwen2PretokenizerProfile::Qwen35Declared => QWEN35_TOKENIZER_ARTIFACT_DIGEST,
+        };
+        if self.tokenizer.qwen2_profile() != Some(expected_tokenizer_profile)
+            || self.tokenizer.qwen2_artifact_digest() != Some(expected_tokenizer_digest)
+            || self.tokenizer.has_textual_inversion_embeddings()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen multimodal resources require the exact canonical Qwen2 tokenizer family",
+            ));
+        }
+        let tokenizer_configuration = self.tokenizer.configuration();
+        let expected_pad = match expected_tokenizer_profile {
+            Qwen2PretokenizerProfile::Qwen2 => 151_643,
+            Qwen2PretokenizerProfile::Qwen35Declared => 248_044,
+        };
+        if tokenizer_configuration.pad_token != expected_pad
+            || tokenizer_configuration.minimum_length != Some(1)
+            || tokenizer_configuration.minimum_padding.is_some()
+            || tokenizer_configuration.pad_to_maximum_length
+            || tokenizer_configuration.pad_left
+            || tokenizer_configuration.start_token.is_some()
+            || tokenizer_configuration.end_token.is_some()
+            || !tokenizer_configuration.disable_weights
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen multimodal tokenizer configuration is not source-compatible",
+            ));
+        }
+        let marker = u32::try_from(family.image_pad_token())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen image marker"))?;
+        if self
+            .tokenizer
+            .encode_numeric("<|image_pad|>", cancellation)?
+            != [marker]
+            || self.tokenizer.encode_numeric("", cancellation)? != [expected_pad]
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen multimodal tokenizer control-token projection changed",
+            ));
+        }
+        let decoder_configuration = self.decoder.configuration();
+        if decoder_configuration.hidden_size != self.vision.configuration().output_hidden_size
+            || tokenizer_configuration.maximum_length < decoder_configuration.maximum_tokens
+            || tokenizer_configuration.maximum_word_length != 8
+            || tokenizer_configuration.embedding_width.is_some()
+            || self.decoder.execution_stream() != self.vision.execution_stream()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen tokenizer, decoder, and vision sequence or hidden dimensions differ",
+            ));
+        }
+        if self.vision.configuration().source_exact_profile {
+            if decoder_configuration != &qwen_multimodal_decoder_configuration(family)? {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Qwen decoder configuration does not match the closed source profile",
+                ));
+            }
+        } else if !qwen_reduced_decoder_is_compatible(decoder_configuration, family) {
+            return Err(MultimodalTextError::InvalidInput(
+                "reduced Qwen decoder fixture is not structurally compatible with its family",
+            ));
+        }
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        self.validate(cancellation)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.qwen-multimodal-resource.v1");
+        hasher.update(b"standard-comfy-text-generation-adapter");
+        hasher.update(format!("{:?}", self.family()).as_bytes());
+        hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());
+        hasher.update(crate::LLAMA_SOURCE_SHA256.as_bytes());
+        hasher.update(QWEN35_SOURCE_SHA256.as_bytes());
+        hasher.update(
+            match self.family() {
+                QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B => QWEN3VL_SOURCE_SHA256,
+                QwenVisionFamily::Qwen35_08B
+                | QwenVisionFamily::Qwen35_2B
+                | QwenVisionFamily::Qwen35_4B
+                | QwenVisionFamily::Qwen35_9B
+                | QwenVisionFamily::Qwen35_27B => QWEN35_SOURCE_SHA256,
+            }
+            .as_bytes(),
+        );
+        hasher.update(QWEN_VL_SOURCE_SHA256.as_bytes());
+        hasher.update(
+            self.tokenizer
+                .qwen2_artifact_digest()
+                .ok_or(MultimodalTextError::InvalidInput(
+                    "Qwen tokenizer artifact identity is unavailable",
+                ))?
+                .as_bytes(),
+        );
+        hasher.update(self.tokenizer.semantic_digest(cancellation)?.as_bytes());
+        hasher.update(self.decoder.semantic_state_digest(cancellation)?.as_bytes());
+        hasher.update(self.vision.semantic_state_digest(cancellation)?.as_bytes());
+        cancellation.check()?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen multimodal owner residency"))
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = self.decoder.resident_tensor_allocations();
+        for (storage_id, resident_bytes) in self.vision.resident_tensor_allocations() {
+            if let Some((_, existing_bytes)) = allocations
+                .iter()
+                .find(|(existing, _)| *existing == storage_id)
+            {
+                if *existing_bytes != resident_bytes {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "shared Qwen tensor storage changed resident size",
+                    ));
+                }
+            } else {
+                allocations.push((storage_id, resident_bytes));
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let mut bytes = self.resident_owned_bytes()?;
+        bytes = bytes.checked_add(self.tokenizer.resident_bytes()?).ok_or(
+            MultimodalTextError::Overflow("Qwen multimodal backing residency"),
+        )?;
+        bytes = bytes
+            .checked_add(self.decoder.resident_owned_bytes()?)
+            .ok_or(MultimodalTextError::Overflow(
+                "Qwen multimodal backing residency",
+            ))?;
+        bytes = bytes
+            .checked_add(self.vision.resident_owned_bytes()?)
+            .ok_or(MultimodalTextError::Overflow(
+                "Qwen multimodal backing residency",
+            ))?;
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            bytes,
+            |total, (_, resident_bytes)| {
+                total
+                    .checked_add(resident_bytes)
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Qwen multimodal tensor residency",
+                    ))
+            },
+        )
+    }
+}
+
+fn qwen_decoder_profile_name(family: QwenVisionFamily) -> &'static str {
+    match family {
+        QwenVisionFamily::Qwen3Vl4B => "Qwen3VL_4BConfig",
+        QwenVisionFamily::Qwen3Vl8B => "Qwen3VL_8BConfig",
+        QwenVisionFamily::Qwen35_08B => "qwen35_08b",
+        QwenVisionFamily::Qwen35_2B => "qwen35_2b",
+        QwenVisionFamily::Qwen35_4B => "qwen35_4b",
+        QwenVisionFamily::Qwen35_9B => "qwen35_9b",
+        QwenVisionFamily::Qwen35_27B => "qwen35_27b",
+    }
+}
+
+fn qwen_reduced_decoder_is_compatible(
+    configuration: &DecoderTextConfiguration,
+    family: QwenVisionFamily,
+) -> bool {
+    let is_qwen35 = matches!(
+        family,
+        QwenVisionFamily::Qwen35_08B
+            | QwenVisionFamily::Qwen35_2B
+            | QwenVisionFamily::Qwen35_4B
+            | QwenVisionFamily::Qwen35_9B
+            | QwenVisionFamily::Qwen35_27B
+    );
+    if is_qwen35 {
+        configuration.architecture == DecoderArchitecture::Qwen35
+            && configuration.query_key_norm
+            && configuration.qwen35_linear.is_some()
+            && configuration
+                .layer_kinds
+                .contains(&DecoderLayerKind::LinearAttention)
+    } else {
+        configuration.architecture == DecoderArchitecture::Llama
+            && configuration.query_key_norm
+            && configuration.qwen35_linear.is_none()
+            && configuration
+                .layer_kinds
+                .iter()
+                .all(|kind| *kind == DecoderLayerKind::FullAttention)
+            && configuration.layer_kinds.len() >= family.deepstack_layers().len()
     }
 }
 
@@ -2436,6 +2915,7 @@ fn prepare_qwen3vl_resized_image(
         patches,
         grid_thw: [1, grid_height_usize, grid_width_usize],
         merged_tokens,
+        family,
     })
 }
 

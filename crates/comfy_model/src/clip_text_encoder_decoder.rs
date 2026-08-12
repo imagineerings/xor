@@ -1685,6 +1685,10 @@ impl NativeDecoderTextEncoder {
         &self.configuration
     }
 
+    pub const fn execution_stream(&self) -> StreamId {
+        self.stream
+    }
+
     pub fn semantic_state_digest(
         &self,
         cancellation: &CancellationToken,

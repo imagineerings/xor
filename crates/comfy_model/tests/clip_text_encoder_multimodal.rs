@@ -1,17 +1,23 @@
 use comfy_model::{
+    DecoderActivation, DecoderArchitecture, DecoderAttentionWeights, DecoderLayerKind,
+    DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration, DecoderTextWeights,
     IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
-    NativeQwenVisionEncoder, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
-    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
-    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION,
+    NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
+    NativeQwenVisionEncoder, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
+    QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH,
+    QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
+    QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
     QwenVisionBlockWeights, QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights,
-    QwenVisionWeights, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
-    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, ideogram4_project_taps,
-    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
-    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
-    plan_qwen_markers, plan_qwen3vl_markers, prepare_qwen_images, prepare_qwen3vl_images,
-    qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
+    QwenVisionWeights, RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256,
+    Sam3EncodedCondition, TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt,
+    format_qwen3vl_prompt, ideogram4_project_taps, join_multimodal_embeddings,
+    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
+    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
+    prepare_qwen_images, prepare_qwen3vl_images, qwen_multimodal_decoder_configuration,
+    qwen_multimodal_tokenizer_profile, qwen2vl_mrope_position_ids, qwen3vl_target_dimensions,
+    trim_ovis_conditioning,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
@@ -19,7 +25,7 @@ use comfy_tensor::{
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{error::Error, fs, path::Path};
+use std::{collections::BTreeMap, error::Error, fs, path::Path, sync::Arc};
 
 const MEMORY_LIMIT: u64 = 64 * 1024 * 1024;
 const TASK_ID: &str = "comfy-parity-clip-text-encoder-multimodal-foundation";
@@ -160,6 +166,141 @@ fn reduced_qwen_vision_weights(
         merger,
         deepstack_mergers,
     })
+}
+
+fn qwen25_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
+    let family = Qwen2BpeTokenizer::from_artifacts(
+        Qwen2PretokenizerProfile::Qwen2,
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
+        ),
+        &CancellationToken::default(),
+    )?;
+    Ok(Arc::new(NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Qwen2ByteBpe(family),
+        TokenizerConfiguration {
+            maximum_length: 8,
+            minimum_length: Some(1),
+            minimum_padding: None,
+            pad_to_maximum_length: false,
+            pad_left: false,
+            start_token: None,
+            end_token: None,
+            pad_token: 151_643,
+            maximum_word_length: 8,
+            disable_weights: true,
+            embedding_width: None,
+        },
+        BTreeMap::new(),
+    )?))
+}
+
+fn qwen35_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
+    let family = Qwen2BpeTokenizer::from_artifacts(
+        Qwen2PretokenizerProfile::Qwen35Declared,
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
+        ),
+        &CancellationToken::default(),
+    )?;
+    Ok(Arc::new(NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Qwen2ByteBpe(family),
+        TokenizerConfiguration {
+            maximum_length: 8,
+            minimum_length: Some(1),
+            minimum_padding: None,
+            pad_to_maximum_length: false,
+            pad_left: false,
+            start_token: None,
+            end_token: None,
+            pad_token: 248_044,
+            maximum_word_length: 8,
+            disable_weights: true,
+            embedding_width: None,
+        },
+        BTreeMap::new(),
+    )?))
+}
+
+fn reduced_qwen3_decoder(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    token_scale: f32,
+) -> Result<Arc<NativeDecoderTextEncoder>, Box<dyn Error>> {
+    let configuration = DecoderTextConfiguration {
+        architecture: DecoderArchitecture::Llama,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        vocabulary_size: 151_936,
+        maximum_tokens: 8,
+        hidden_size: 4,
+        feed_forward_size: 8,
+        layer_kinds: vec![DecoderLayerKind::FullAttention; 3],
+        attention_heads: 2,
+        key_value_heads: 1,
+        head_dimension: 2,
+        query_key_norm: true,
+        qwen35_linear: None,
+        normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+        rope: DecoderRopeConfiguration {
+            theta: 5_000_000.0,
+            rotary_dimension: 2,
+            interleaved_sections: Vec::new(),
+            scaling: RopeScaling::None,
+        },
+        sliding_window: None,
+        activation: DecoderActivation::Silu,
+        embedding_scale_bits: 1.0_f32.to_bits(),
+        residual_scale_bits: 1.0_f32.to_bits(),
+        norm_weight_offset_bits: 0.0_f32.to_bits(),
+        logits_soft_cap_bits: None,
+        tied_output_head: true,
+        stop_tokens: vec![151_643, 151_645],
+    };
+    let token_embedding = filled_tensor(backend, &[151_936, 4], token_scale, context)?;
+    let mut layers = Vec::new();
+    for layer in 0..3 {
+        let scale = 0.01 + layer as f32 * 0.001;
+        layers.push(DecoderLayerWeights {
+            attention_norm_weight: filled_tensor(backend, &[4], 1.0, context)?,
+            attention: DecoderAttentionWeights::DotProduct {
+                query_weight: filled_tensor(backend, &[4, 4], scale, context)?,
+                key_weight: filled_tensor(backend, &[2, 4], scale, context)?,
+                value_weight: filled_tensor(backend, &[2, 4], scale, context)?,
+                query_norm_weight: Some(filled_tensor(backend, &[2], 1.0, context)?),
+                key_norm_weight: Some(filled_tensor(backend, &[2], 1.0, context)?),
+                output_weight: filled_tensor(backend, &[4, 4], scale, context)?,
+            },
+            feed_forward_norm_weight: filled_tensor(backend, &[4], 1.0, context)?,
+            feed_forward_gate_weight: filled_tensor(backend, &[8, 4], scale, context)?,
+            feed_forward_up_weight: filled_tensor(backend, &[8, 4], scale, context)?,
+            feed_forward_down_weight: filled_tensor(backend, &[4, 8], scale, context)?,
+            post_attention_norm_weight: None,
+            post_feed_forward_norm_weight: None,
+            attention_sink: None,
+        });
+    }
+    Ok(Arc::new(NativeDecoderTextEncoder::new(
+        configuration,
+        DecoderTextWeights {
+            token_embedding,
+            layers,
+            final_norm_weight: filled_tensor(backend, &[4], 1.0, context)?,
+            output_head_weight: None,
+        },
+    )?))
 }
 
 #[test]
@@ -552,6 +693,151 @@ fn retained_qwen_vision_executes_closed_family_graphs_and_rolls_back() -> Result
     drop(qwen35_projection);
     drop(qwen3_prepared);
     drop(qwen35_prepared);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn qwen_multimodal_resource_closes_admission_identity_and_residency() -> Result<(), Box<dyn Error>>
+{
+    let families = [
+        QwenVisionFamily::Qwen3Vl4B,
+        QwenVisionFamily::Qwen3Vl8B,
+        QwenVisionFamily::Qwen35_08B,
+        QwenVisionFamily::Qwen35_2B,
+        QwenVisionFamily::Qwen35_4B,
+        QwenVisionFamily::Qwen35_9B,
+        QwenVisionFamily::Qwen35_27B,
+    ];
+    let mut configurations = Vec::new();
+    for family in families {
+        let decoder_configuration = qwen_multimodal_decoder_configuration(family)?;
+        let vision_configuration = QwenVisionConfiguration::source(family);
+        assert_eq!(
+            decoder_configuration.hidden_size,
+            vision_configuration.output_hidden_size
+        );
+        assert_eq!(
+            qwen_multimodal_tokenizer_profile(family),
+            if matches!(
+                family,
+                QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B
+            ) {
+                Qwen2PretokenizerProfile::Qwen2
+            } else {
+                Qwen2PretokenizerProfile::Qwen35Declared
+            }
+        );
+        configurations.push((family, decoder_configuration, vision_configuration));
+    }
+    for (left_index, (left_family, left_decoder, left_vision)) in configurations.iter().enumerate()
+    {
+        for (right_index, (right_family, right_decoder, right_vision)) in
+            configurations.iter().enumerate()
+        {
+            if left_index == right_index {
+                assert_eq!(left_family, right_family);
+                assert_eq!(left_decoder, right_decoder);
+                assert_eq!(left_vision, right_vision);
+            } else {
+                assert!(
+                    left_family != right_family
+                        && (left_decoder != right_decoder || left_vision != right_vision)
+                );
+            }
+        }
+    }
+    let resource_manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/qwen_multimodal/resource/manifest.json"
+    ))?;
+    assert_eq!(
+        resource_manifest["accepted_families"]
+            .as_array()
+            .ok_or("resource family matrix is missing")?
+            .len(),
+        7
+    );
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let configuration =
+        QwenVisionConfiguration::reduced_fixture(QwenVisionFamily::Qwen3Vl4B, 4, 8, 18, 1, 4);
+    let vision = Arc::new(NativeQwenVisionEncoder::new(
+        configuration.clone(),
+        reduced_qwen_vision_weights(&backend, &configuration, &setup)?,
+    )?);
+    let tokenizer = qwen25_prompt_tokenizer()?;
+    let decoder = reduced_qwen3_decoder(&backend, &setup, 0.01)?;
+    let resource = NativeQwenMultimodal::reduced_fixture(
+        tokenizer.clone(),
+        decoder.clone(),
+        vision.clone(),
+        &cancellation,
+    )?;
+    assert_eq!(resource.family(), QwenVisionFamily::Qwen3Vl4B);
+    assert!(Arc::ptr_eq(resource.tokenizer(), &tokenizer));
+    assert!(Arc::ptr_eq(resource.decoder(), &decoder));
+    assert!(Arc::ptr_eq(resource.vision(), &vision));
+    assert!(!resource.is_source_exact_profile());
+    assert_eq!(resource.semantic_state_digest(&cancellation)?.len(), 64);
+    let tensor_bytes = resource
+        .resident_tensor_allocations()?
+        .into_iter()
+        .try_fold(0_u64, |total, (_, bytes)| total.checked_add(bytes))
+        .ok_or("resource tensor residency overflowed")?;
+    assert!(resource.resident_bytes()? > tensor_bytes);
+
+    let clone = NativeQwenMultimodal::reduced_fixture(
+        tokenizer.clone(),
+        decoder.clone(),
+        vision.clone(),
+        &cancellation,
+    )?;
+    assert_eq!(
+        resource.semantic_state_digest(&cancellation)?,
+        clone.semantic_state_digest(&cancellation)?
+    );
+    assert_eq!(
+        resource.resident_tensor_allocations()?,
+        clone.resident_tensor_allocations()?
+    );
+
+    let changed = NativeQwenMultimodal::reduced_fixture(
+        tokenizer.clone(),
+        reduced_qwen3_decoder(&backend, &setup, 0.02)?,
+        vision.clone(),
+        &cancellation,
+    )?;
+    assert_ne!(
+        resource.semantic_state_digest(&cancellation)?,
+        changed.semantic_state_digest(&cancellation)?
+    );
+    assert!(
+        NativeQwenMultimodal::reduced_fixture(
+            qwen35_prompt_tokenizer()?,
+            decoder.clone(),
+            vision.clone(),
+            &cancellation,
+        )
+        .is_err()
+    );
+    assert!(
+        NativeQwenMultimodal::new(
+            tokenizer.clone(),
+            decoder.clone(),
+            vision.clone(),
+            &cancellation,
+        )
+        .is_err()
+    );
+    assert!(NativeModelPayload::qwen_multimodal_clip(Arc::new(resource)).is_err());
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        NativeQwenMultimodal::reduced_fixture(tokenizer, decoder, vision, &cancelled),
+        Err(MultimodalTextError::Cancelled)
+    ));
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }
