@@ -1,17 +1,18 @@
 use comfy_model::{
     ClipBpeTokenizer, DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS,
     DecoderActivation, DecoderArchitecture, DecoderGenerationConfiguration, DecoderLayerKind,
-    DecoderLayerWeights, DecoderRopeConfiguration, DecoderSymbolBehavior, DecoderTextConfiguration,
-    DecoderTextError, DecoderTextRequest, DecoderTextWeights, GEMMA4_SOURCE_PATH,
-    GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH,
-    LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder, NativeModelPayload,
-    NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH,
-    QWEN35_SOURCE_SHA256, RopeScaling, TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256,
-    TokenizerConfiguration, apply_rope, decoder_profile_fact, decoder_symbol_behavior,
-    gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
-    gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route,
-    precompute_multidimensional_rope, precompute_rope, qwen35_causal_conv1d_update,
-    qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
+    DecoderLayerWeights, DecoderPreparedGenerationPrompt, DecoderPreparedTextRequest,
+    DecoderRopeConfiguration, DecoderRopePositions, DecoderSymbolBehavior,
+    DecoderTextConfiguration, DecoderTextError, DecoderTextRequest, DecoderTextWeights,
+    GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256,
+    LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder,
+    NativeModelPayload, NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily,
+    QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, RopeScaling, TEXT_GENERATION_SOURCE_PATH,
+    TEXT_GENERATION_SOURCE_SHA256, TokenizerConfiguration, apply_rope, decoder_profile_fact,
+    decoder_symbol_behavior, gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions,
+    gemma4_clipped_linear, gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe,
+    gpt_oss_top_k_route, precompute_multidimensional_rope, precompute_rope,
+    qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
     qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
     tokenize_decoder_prompt,
 };
@@ -829,6 +830,164 @@ fn target_shape_cache_generation_cancellation_and_oom_fail_typed_and_atomic()
         attention_cache_storage_ids(first.cache())?,
         original_cache_storage
     );
+    Ok(())
+}
+
+#[test]
+fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let mut prepared_configuration = configuration(DecoderArchitecture::Llama);
+    prepared_configuration.stop_tokens.clear();
+    let model = NativeDecoderTextEncoder::new(
+        prepared_configuration.clone(),
+        weights(&backend, &prepared_configuration, &context)?,
+    )?;
+    let tokens = i64_tensor(&backend, &[1, 2], &[1, 2], &context)?;
+    let embeddings = model.embed_tokens(&backend, &tokens, &context)?;
+    let scalar_positions = [0_usize, 1];
+    let prepared = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&scalar_positions),
+            causal_positions: &scalar_positions,
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    let numeric = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &tokens,
+            attention_mask: None,
+            positions: Some(&scalar_positions),
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    let prepared_logits = tensor_to_f32(&backend, prepared.logits(), &context)?
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    let numeric_logits = tensor_to_f32(&backend, numeric.logits(), &context)?
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(prepared_logits, numeric_logits);
+
+    let transaction = generation_transaction()?;
+    let original_checkpoint = transaction.checkpoint();
+    let attention_mask = tensor(&backend, &[1, 2], &[1.0, 0.0], &context)?;
+    let generation = model.generate_prepared(
+        &backend,
+        DecoderPreparedGenerationPrompt {
+            embeddings: &embeddings,
+            sampling_history: &[1, 2],
+            attention_mask: Some(&attention_mask),
+            rope_positions: DecoderRopePositions::Scalar(&scalar_positions),
+            causal_positions: &scalar_positions,
+        },
+        &DecoderGenerationConfiguration {
+            maximum_new_tokens: 2,
+            temperature_bits: 0.0_f32.to_bits(),
+            top_k: None,
+            top_p_bits: None,
+            minimum_p_bits: None,
+            repetition_penalty_bits: 1.0_f32.to_bits(),
+            presence_penalty_bits: 0.0_f32.to_bits(),
+        },
+        &transaction,
+        &context,
+    )?;
+    assert_eq!(generation.generated_tokens.len(), 2);
+    assert_eq!(transaction.checkpoint(), original_checkpoint);
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+
+    let mut qwen_configuration = configuration(DecoderArchitecture::Llama);
+    qwen_configuration.rope.interleaved_sections = vec![1, 0, 0];
+    let qwen_model = NativeDecoderTextEncoder::new(
+        qwen_configuration.clone(),
+        weights(&backend, &qwen_configuration, &context)?,
+    )?;
+    let qwen_embeddings = qwen_model.embed_tokens(&backend, &tokens, &context)?;
+    let axes = vec![vec![0, 1], vec![0, 2], vec![0, 3]];
+    let qwen_output = qwen_model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &qwen_embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Multidimensional(&axes),
+            causal_positions: &scalar_positions,
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    assert_eq!(qwen_output.logits().descriptor().shape(), [1, 2, 8]);
+    Ok(())
+}
+
+#[test]
+fn prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority, model, cancellation) = model(DecoderArchitecture::Llama)?;
+    let context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let tokens = i64_tensor(&backend, &[1, 2], &[1, 2], &context)?;
+    let embeddings = model.embed_tokens(&backend, &tokens, &context)?;
+    let positions = [0_usize, 1];
+    let first = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &tokens,
+            attention_mask: None,
+            positions: Some(&positions),
+            cache: None,
+            capture_layer: None,
+        },
+        &context,
+    )?;
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: Some(first.cache()),
+                    capture_layer: None,
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let malformed = tensor(&backend, &[1, 2, 3], &[0.0; 6], &context)?;
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &malformed,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                },
+                &context,
+            )
+            .is_err()
+    );
+    cancellation.cancel();
+    assert!(model.embed_tokens(&backend, &tokens, &context).is_err());
+    assert_eq!(context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

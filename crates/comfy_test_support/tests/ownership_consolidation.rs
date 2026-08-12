@@ -2343,6 +2343,32 @@ fn run_ownership_validation(
                 .contains("source_profile_facts_cover_every_static_and_factory_decoder_profile_exactly")
             && model_clip_text_encoder_decoder_tests
                 .contains("decoder_symbol_behavior(symbol).is_some()");
+    let prepared_text_request_definitions =
+        production_source_occurrences(&sources, "pub struct DecoderPreparedTextRequest");
+    let prepared_generation_prompt_definitions =
+        production_source_occurrences(&sources, "pub struct DecoderPreparedGenerationPrompt");
+    let task380_prepared_decoder_has_one_borrowed_invocation_local_owner =
+        prepared_text_request_definitions.len() == 1
+            && prepared_text_request_definitions[0]
+                .contains("crates/comfy_model/src/clip_text_encoder_decoder.rs")
+            && prepared_generation_prompt_definitions.len() == 1
+            && prepared_generation_prompt_definitions[0]
+                .contains("crates/comfy_model/src/clip_text_encoder_decoder.rs")
+            && model_clip_text_encoder_decoder.contains("embeddings: &'a Tensor")
+            && model_clip_text_encoder_decoder.contains("sampling_history: &'a [i64]")
+            && !model_clip_text_encoder_decoder.contains("Serialize for DecoderPrepared")
+            && !model_clip_text_encoder_decoder.contains("Deserialize for DecoderPrepared");
+    let task380_prepared_decoder_delegates_one_graph_cache_rng_and_rope_owner =
+        model_clip_text_encoder_decoder.contains("pub fn forward_prepared(")
+            && model_clip_text_encoder_decoder.contains("self.forward_hidden(")
+            && model_clip_text_encoder_decoder.contains("pub fn generate_prepared(")
+            && model_clip_text_encoder_decoder.contains("self.generate_with_prefill(")
+            && model_clip_text_encoder_decoder.contains("precompute_multidimensional_rope(")
+            && model_clip_text_encoder_decoder.contains("transaction: &RngTransaction");
+    let task380_prepared_decoder_boundaries_are_executable = model_clip_text_encoder_decoder_tests
+        .contains("prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope")
+        && model_clip_text_encoder_decoder_tests
+            .contains("prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation");
     let task343_policy_trace = policy_concerns
         .iter()
         .find(|entry| {
@@ -2396,6 +2422,51 @@ fn run_ownership_validation(
             line.contains("comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder")
                 && line.contains("comfy-parity-clip-text-encoder-decoder-foundation")
                 && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-RNG-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
+    let task380_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-prepared-decoder-generation-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "prepared-decoder-prefill-delegates-one-generation-loop-and-kv-owner",
+                            "prepared-decoder-prefill-executes-checked-multidimensional-rope",
+                            "prepared-decoder-state-remains-invocation-local-and-borrowed",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task380_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_unidirectional_decoder_execution,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-prepared-decoder-generation-foundation")
                 && line.contains("VAL-RNG-001")
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
@@ -8203,6 +8274,22 @@ fn run_ownership_validation(
             task343_decoder_adapters_and_failure_atomicity_are_executable,
         ),
         (
+            "task380_policy_and_catalog_trace_the_prepared_decoder_boundary",
+            task380_policy_trace && task380_catalog_trace,
+        ),
+        (
+            "task380_prepared_decoder_has_one_borrowed_invocation_local_owner",
+            task380_prepared_decoder_has_one_borrowed_invocation_local_owner,
+        ),
+        (
+            "task380_prepared_decoder_delegates_one_graph_cache_rng_and_rope_owner",
+            task380_prepared_decoder_delegates_one_graph_cache_rng_and_rope_owner,
+        ),
+        (
+            "task380_prepared_decoder_boundaries_are_executable",
+            task380_prepared_decoder_boundaries_are_executable,
+        ),
+        (
             "task340_policy_and_catalog_trace_the_canonical_clip_vision_owner",
             task_340_policy_trace && task_340_catalog_trace,
         ),
@@ -8681,6 +8768,17 @@ fn val_ownership_task343_decoder_001() -> Result<(), Box<dyn std::error::Error>>
         "val-ownership-task343-decoder-001.json",
         "val_ownership_task343_decoder_001",
         Some("task343_"),
+    )
+}
+
+#[test]
+fn val_ownership_task380_prepared_decoder_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task380-prepared-decoder-prefill-and-shared-generation-ownership",
+        "val-ownership-task380-prepared-decoder-001.json",
+        "val_ownership_task380_prepared_decoder_001",
+        Some("task380_"),
     )
 }
 

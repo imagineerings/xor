@@ -48,13 +48,18 @@ class ValidationGenerationTests(unittest.TestCase):
         provider_id = "comfy-parity-native-node-provider-invocation-foundation"
         compute_id = "comfy-parity-native-compute-breadth-integration"
         registry_id = "comfy-parity-native-registry-integration"
+        scalar_generation_id = "comfy-parity-native-decoder-text-generation-foundation"
+        prepared_generation_id = "comfy-parity-native-prepared-decoder-generation-foundation"
+        qwen_generation_id = "comfy-parity-native-qwen-multimodal-generation-foundation"
+        gemma_generation_id = "comfy-parity-native-gemma-multimodal-generation-foundation"
+        multimodal_generation_id = "comfy-parity-native-text-generation-foundation"
         node_ids = sorted(
             identifier
             for identifier in tasks_by_id
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 533)
+        self.assertEqual(len(tasks), 536)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -84,6 +89,22 @@ class ValidationGenerationTests(unittest.TestCase):
                 "comfy-parity-opt-in-product-build-boundary",
                 "comfy-parity-native-shader-execution-foundation",
             ],
+        )
+        self.assertEqual(
+            tasks_by_id[prepared_generation_id]["dependencies"],
+            [scalar_generation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[qwen_generation_id]["dependencies"],
+            [prepared_generation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_generation_id]["dependencies"],
+            [qwen_generation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[multimodal_generation_id]["dependencies"],
+            [gemma_generation_id],
         )
         dependencies = {
             identifier: set(tasks_by_id[identifier]["dependencies"])
@@ -241,7 +262,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(text_generation_foundation_id, dependencies[text_generation_id])
         self.assertIn(
-            decoder_text_generation_foundation_id,
+            gemma_generation_id,
             tasks_by_id[text_generation_foundation_id]["dependencies"],
         )
         self.assertIn(
@@ -313,6 +334,9 @@ class ValidationGenerationTests(unittest.TestCase):
         for identifier in (
             image_source_foundation_id,
             decoder_text_generation_foundation_id,
+            prepared_generation_id,
+            qwen_generation_id,
+            gemma_generation_id,
             text_generation_foundation_id,
             media_text_foundation_id,
             structured_link_foundation_id,
@@ -344,8 +368,17 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[decoder_text_generation_foundation_id], waves[provider_id] + 1
         )
         self.assertEqual(
-            waves[text_generation_foundation_id],
+            waves[prepared_generation_id],
             waves[decoder_text_generation_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[qwen_generation_id], waves[prepared_generation_id] + 1
+        )
+        self.assertEqual(
+            waves[gemma_generation_id], waves[qwen_generation_id] + 1
+        )
+        self.assertEqual(
+            waves[text_generation_foundation_id], waves[gemma_generation_id] + 1
         )
         self.assertEqual(
             waves[sdpose_foundation_id], waves[text_generation_foundation_id] + 1

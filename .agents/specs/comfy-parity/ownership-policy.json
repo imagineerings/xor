@@ -11749,7 +11749,9 @@
         "DecoderProfileFact",
         "decoder_symbol_behavior",
         "DecoderKvState",
-        "DecoderLayerCache"
+        "DecoderLayerCache",
+        "DecoderPreparedTextRequest",
+        "DecoderPreparedGenerationPrompt"
       ],
       "allowed_adapters": [
         "NativePromptTokenizer retains vocabulary parsing, prompt tokenization, special-token, packing, and decode ownership; decoder adapters consume canonical I64 token tensors without parsing artifacts",
@@ -11758,7 +11760,8 @@
         "comfy_model::attention retains scaled-dot-product attention selection and execution while comfy_tensor retains exact RMS normalization, tensors, backend capabilities, caller workspace authorization, memory, streams, cancellation, and caller-addressed RngTransaction state",
         "DecoderKvState is invocation-local staged graph state only; ModelStore remains the parsed-model cache and comfy_runtime::NativeCache remains the durable publication cache, while runtime persistence and output transactions retain every commit transition",
         "NativeModelPayload::decoder_clip derives an inseparable tokenizer and decoder semantic identity and alias-aware residency projection; NativeStoredModelPayload admits it only as a concrete CLIP resource, and the runtime resolver retains its checked handle lease",
-        "comfy_nodes::native_text_generation_transaction alone opens the prompt-attempt-node-addressed Philox transaction for this boundary; NativeDecoderTextEncoder continues to consume only a borrowed transaction and publishes its advanced clone only on success"
+        "comfy_nodes::native_text_generation_transaction alone opens the prompt-attempt-node-addressed Philox transaction for this boundary; NativeDecoderTextEncoder continues to consume only a borrowed transaction and publishes its advanced clone only on success",
+        "DecoderPreparedTextRequest and DecoderPreparedGenerationPrompt are invocation-local checked adapters for model-owned media embeddings, attention masks, sampling-history IDs, and scalar or multidimensional positions; they delegate to the same NativeDecoderTextEncoder graph, KV state, sampler, and borrowed RNG transaction and are never persisted"
       ],
       "definitions": [
         {
@@ -11788,7 +11791,9 @@
         "DecoderTextConfiguration",
         "DecoderKvState",
         "DecoderLayerCache",
-        "DecoderGenerationConfiguration"
+        "DecoderGenerationConfiguration",
+        "DecoderPreparedTextRequest",
+        "DecoderPreparedGenerationPrompt"
       ],
       "required_mappings": [
         {
@@ -11812,9 +11817,24 @@
           "pattern": "pub fn generate[\\s\\S]*transaction: &RngTransaction[\\s\\S]*let mut staged_transaction = transaction\\.clone\\(\\)[\\s\\S]*sample_token"
         },
         {
+          "name": "prepared-decoder-prefill-delegates-one-generation-loop-and-kv-owner",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub struct DecoderPreparedTextRequest[\\s\\S]*pub struct DecoderPreparedGenerationPrompt[\\s\\S]*pub fn forward_prepared[\\s\\S]*forward_hidden[\\s\\S]*pub fn generate_prepared[\\s\\S]*generate_with_prefill"
+        },
+        {
+          "name": "prepared-decoder-prefill-executes-checked-multidimensional-rope",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub enum DecoderRopePositions[\\s\\S]*validate_prepared_positions[\\s\\S]*apply_decoder_rope[\\s\\S]*precompute_multidimensional_rope"
+        },
+        {
+          "name": "prepared-decoder-state-remains-invocation-local-and-borrowed",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub struct DecoderPreparedGenerationPrompt<'a>[\\s\\S]*embeddings: &'a Tensor[\\s\\S]*sampling_history: &'a \\[i64\\][\\s\\S]*transaction: &RngTransaction"
+        },
+        {
           "name": "text-generation-opens-one-attempt-addressed-rng-transaction",
           "path": "crates/comfy_nodes/src/execution.rs",
-          "pattern": "pub const NATIVE_TEXT_GENERATION_RNG_PHASE[\\s\\S]*pub fn native_text_generation_transaction[\\s\\S]*context\\.prompt_id[\\s\\S]*context\\.attempt_id[\\s\\S]*context\\.node_id[\\s\\S]*RngAlgorithm::Philox4x32_10[\\s\\S]*RetryRngPolicy::Replay"
+          "pattern": "pub const NATIVE_TEXT_GENERATION_RNG_PHASE[\\s\\S]*pub fn native_text_generation_transaction[\\s\\S]*context\\.prompt_id[\\s\\S]*context\\.attempt_id[\\s\\S]*context\\.node_id[\\s\\S]*RetryRngPolicy::Replay[\\s\\S]*RngAlgorithm::Philox4x32_10"
         },
         {
           "name": "decoder-generation-decodes-only-the-generated-suffix",
@@ -11872,7 +11892,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-clip-text-encoder-decoder-foundation",
-        "comfy-parity-native-decoder-text-generation-foundation"
+        "comfy-parity-native-decoder-text-generation-foundation",
+        "comfy-parity-native-prepared-decoder-generation-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",
@@ -11906,7 +11927,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, GPT-OSS, and Qwen3.5 graph owner, including checked RoPE variants, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, GPT-OSS sinks and routed-expert equations, Qwen3.5 recurrent and causal-convolution equations, generation filtering and stopping, and failure-atomic invocation-local KV transitions. It delegates tokenization, model identity, parsing, module lifecycle, exact tensor kernels, attention execution, backend admission, workspace, memory, streams, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners. Editor rope structures, provider-side llama.cpp state, VAE-private rotary helpers, NativeCache, ModelStore parsing cache, and quantized-weight caches are justified separate domains and are not decoder execution owners."
+      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, GPT-OSS, and Qwen3.5 graph owner, including checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, GPT-OSS sinks and routed-expert equations, Qwen3.5 recurrent and causal-convolution equations, one shared generation loop, filtering and stopping, and failure-atomic invocation-local KV transitions. Prepared media state is borrowed, checked, and attempt-local; it cannot define a second sampler, tokenizer, KV cache, RNG opener, persistence record, or publication path. The owner delegates tokenization, model identity, parsing, module lifecycle, exact tensor kernels, attention execution, backend admission, workspace, memory, streams, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners. Editor rope structures, provider-side llama.cpp state, VAE-private rotary helpers, NativeCache, ModelStore parsing cache, and quantized-weight caches are justified separate domains and are not decoder execution owners."
     },
     {
       "concern": "native_vision_transformer_architecture_execution",

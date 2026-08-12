@@ -9239,6 +9239,143 @@ def native_decoder_text_generation_foundation_task(dependency: str) -> dict[str,
     )
 
 
+def native_prepared_decoder_generation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-prepared-decoder-generation-foundation",
+        "Implement prepared decoder generation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-RNG-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical retained decoder accepts one checked prepared-prefill representation beside numeric token IDs, including joined embeddings, source sampling-history IDs, optional attention masks, and scalar or multidimensional positions. Both scalar and prepared execution delegate to one bounded generation loop and one KV/RNG transaction; prepared state remains attempt-local and cannot create a second sampler, tokenizer, cache, or persistence form.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_tensor/src/rng.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Deterministic tests prove numeric and prepared text-only parity, checked prepared embedding shape/device/stream, scalar and three-axis positions, source sampling-history projection, prompt/new-token bounds, greedy zero-draw and seeded replay, prefill-only state consumption, cancellation before and after prefill and every decode step, KV/workspace/RNG rollback, and no prepared state or partial output publication across retry or restart.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen-multimodal-generation-foundation",
+        "Implement retained Qwen multimodal generation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-RNG-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One concrete retained Qwen3-VL/Qwen3.5 vision-text owner implements exact chat formatting, image patch/grid preprocessing, vision projection, marker replacement, three-axis MRoPE, visual masks, and prefill-only deepstack injection through the prepared decoder foundation. Its tensors participate in the CLIP resource semantic identity and alias-aware residency; unsupported video/audio and marker/media mismatches fail before RNG publication.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lumina2.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove exact Qwen templates and thinking behavior, preformatted-prefix handling, zero/one/multiple image batches, patch grids and resizing bounds, marker-span replacement, three-axis positions and continuation, visual masks, deepstack layer order and prefill-only injection, family cleanup, semantic identity/residency, cancellation/OOM rollback, restart staleness, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_gemma_multimodal_generation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-gemma-multimodal-generation-foundation",
+        "Implement retained Gemma multimodal generation",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-RNG-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Concrete retained Gemma3 and Gemma4 vision/audio owners implement exact family templates, image projection, Gemma4 video-over-image preprocessing, 24-to-1 FPS timestamp projection, 16 kHz audio features, marker replacement, expanded initial IDs, and family cleanup through the prepared decoder foundation. Family capability gates, model configuration, projectors, and encoder tensors participate in semantic identity and alias-aware residency.",
+        [
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/sd1_clip.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove Gemma3/Gemma4 template and skip rules, inert versus active thinking behavior, image token projections, video precedence and frame/timestamp selection, audio mono/resample/log-mel/mask/token bounds, expanded initial IDs, family stop and cleanup rules, capability failures, semantic identity/residency, cancellation/OOM rollback, restart staleness, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_text_generation_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-text-generation-foundation",
@@ -9256,6 +9393,17 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
         "One canonical native multimodal embedding boundary preprocesses source template text with optional image, video, and audio inputs, joins the resulting token, embedding, position, mask, and deep-stack state, and delegates bounded seeded generation to the retained decoder foundation. Generated text leaves receive only checked CLIP handles and attempt-scoped RNG transactions; they cannot insert marker IDs in place of media embeddings, ignore supported media, or introduce a second tokenizer or generation loop.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/sd1_clip.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lt.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lumina2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/spiece_tokenizer.py",
+            "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             "crates/comfy_model/src/clip_tokenizer.rs",
@@ -9271,14 +9419,19 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
             "crates/comfy_model/src/clip_tokenizer.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_nodes/src/comfy_nodes.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/fixtures/text_generation/multimodal",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
         "Source-derived fixtures prove exact prompt/template/media tokenization, skip-template and thinking behavior, Qwen3VL and Gemma3/Gemma4 image handling, Gemma4 video precedence and 24-to-1 FPS projection, 16 kHz audio features, prepared-embedding and position joins, family-specific special-token cleanup, cancellation at every bounded preprocessing and generation phase, scratch/RNG rollback, restart behavior, and zero partial publication.",
         [dependency],
@@ -10397,8 +10550,17 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     decoder_text_generation_foundation = native_decoder_text_generation_foundation_task(
         str(node_provider_foundation["id"])
     )
-    text_generation_foundation = native_text_generation_foundation_task(
+    prepared_decoder_generation_foundation = native_prepared_decoder_generation_foundation_task(
         str(decoder_text_generation_foundation["id"])
+    )
+    qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
+        str(prepared_decoder_generation_foundation["id"])
+    )
+    gemma_multimodal_generation_foundation = native_gemma_multimodal_generation_foundation_task(
+        str(qwen_multimodal_generation_foundation["id"])
+    )
+    text_generation_foundation = native_text_generation_foundation_task(
+        str(gemma_multimodal_generation_foundation["id"])
     )
     sdpose_foundation = native_sdpose_execution_foundation_task(
         str(text_generation_foundation["id"])
@@ -10472,6 +10634,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             shader_foundation,
             node_provider_foundation,
             decoder_text_generation_foundation,
+            prepared_decoder_generation_foundation,
+            qwen_multimodal_generation_foundation,
+            gemma_multimodal_generation_foundation,
             text_generation_foundation,
             sdpose_foundation,
             video_foundation,

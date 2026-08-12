@@ -1272,6 +1272,31 @@ pub struct DecoderTextRequest<'a> {
     pub capture_layer: Option<isize>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum DecoderRopePositions<'a> {
+    Scalar(&'a [usize]),
+    Multidimensional(&'a [Vec<usize>]),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DecoderPreparedTextRequest<'a> {
+    pub embeddings: &'a Tensor,
+    pub attention_mask: Option<&'a Tensor>,
+    pub rope_positions: DecoderRopePositions<'a>,
+    pub causal_positions: &'a [usize],
+    pub cache: Option<&'a DecoderKvState>,
+    pub capture_layer: Option<isize>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DecoderPreparedGenerationPrompt<'a> {
+    pub embeddings: &'a Tensor,
+    pub sampling_history: &'a [i64],
+    pub attention_mask: Option<&'a Tensor>,
+    pub rope_positions: DecoderRopePositions<'a>,
+    pub causal_positions: &'a [usize],
+}
+
 #[derive(Clone, Debug)]
 pub struct DecoderTextOutput {
     last_hidden_state: Tensor,
@@ -1365,6 +1390,13 @@ pub struct DecoderGenerationOutcome {
     pub transaction: RngTransaction,
 }
 
+#[derive(Clone)]
+pub struct DecoderPreparedGenerationOutcome {
+    pub generated_tokens: Vec<i64>,
+    pub cache: DecoderKvState,
+    pub transaction: RngTransaction,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NativeTextGenerationRequest<'a> {
     pub formatted_prompt: &'a str,
@@ -1411,6 +1443,41 @@ pub struct NativeDecoderTextEncoder {
     final_norm_weight: Tensor,
     output_head: NativeModule,
     stream: StreamId,
+}
+
+#[derive(Clone, Debug)]
+struct ValidatedDecoderPositions {
+    rope_axes: Vec<Vec<usize>>,
+    causal: Vec<usize>,
+}
+
+enum DecoderGenerationPrefill<'a> {
+    Tokens(&'a Tensor),
+    Prepared(DecoderPreparedTextRequest<'a>),
+}
+
+struct InternalDecoderGenerationOutcome {
+    history_and_generated: Vec<i64>,
+    generated_start: usize,
+    cache: DecoderKvState,
+    transaction: RngTransaction,
+}
+
+impl ValidatedDecoderPositions {
+    fn scalar(positions: Vec<usize>) -> Self {
+        Self {
+            causal: positions.clone(),
+            rope_axes: vec![positions],
+        }
+    }
+
+    fn rope(&self) -> DecoderRopePositions<'_> {
+        if self.rope_axes.len() == 1 {
+            DecoderRopePositions::Scalar(&self.rope_axes[0])
+        } else {
+            DecoderRopePositions::Multidimensional(&self.rope_axes)
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -1754,17 +1821,79 @@ impl NativeDecoderTextEncoder {
             self.configuration.maximum_tokens,
             context,
         )?;
-        let positions = validate_positions(request.positions, query_tokens, request.cache)?;
-        let mut staged_cache = match request.cache {
-            Some(cache) => validate_cache(cache, batch, self.stream, &self.configuration)?,
-            None => DecoderKvState::new(self.layers.len())?,
-        };
-        let capture = request
-            .capture_layer
-            .map(|layer| resolve_layer(layer, self.layers.len()))
-            .transpose()?;
+        let positions = ValidatedDecoderPositions::scalar(validate_positions(
+            request.positions,
+            query_tokens,
+            request.cache,
+        )?);
+        let hidden = self.embed_validated_tokens(backend, request.tokens, context)?;
+        self.forward_hidden(
+            backend,
+            hidden,
+            request.attention_mask,
+            &positions,
+            request.cache,
+            request.capture_layer,
+            batch,
+            query_tokens,
+            context,
+        )
+    }
+
+    pub fn embed_tokens(
+        &self,
+        backend: &CpuBackend,
+        tokens: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, DecoderTextError> {
+        self.admit_execution_target(backend, context)?;
+        validate_tokens(
+            backend,
+            tokens,
+            self.configuration.vocabulary_size,
+            self.configuration.maximum_tokens,
+            context,
+        )?;
+        self.embed_validated_tokens(backend, tokens, context)
+    }
+
+    pub fn forward_prepared(
+        &self,
+        backend: &CpuBackend,
+        request: DecoderPreparedTextRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderTextOutput, DecoderTextError> {
+        self.admit_execution_target(backend, context)?;
+        let (batch, query_tokens) =
+            self.validate_prepared_embeddings(request.embeddings, context)?;
+        let positions = validate_prepared_positions(
+            request.rope_positions,
+            request.causal_positions,
+            query_tokens,
+            request.cache,
+            &self.configuration.rope,
+        )?;
+        self.forward_hidden(
+            backend,
+            request.embeddings.clone(),
+            request.attention_mask,
+            &positions,
+            request.cache,
+            request.capture_layer,
+            batch,
+            query_tokens,
+            context,
+        )
+    }
+
+    fn embed_validated_tokens(
+        &self,
+        backend: &CpuBackend,
+        tokens: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, DecoderTextError> {
         let mut embedding = self.token_embedding.clone();
-        let mut hidden = embedding.forward_with_context(backend, request.tokens, context)?;
+        let mut hidden = embedding.forward_with_context(backend, tokens, context)?;
         if self.configuration.embedding_scale() != 1.0 {
             hidden = scale_tensor(
                 backend,
@@ -1773,14 +1902,37 @@ impl NativeDecoderTextEncoder {
                 context,
             )?;
         }
+        Ok(hidden)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward_hidden(
+        &self,
+        backend: &CpuBackend,
+        mut hidden: Tensor,
+        attention_mask: Option<&Tensor>,
+        positions: &ValidatedDecoderPositions,
+        cache: Option<&DecoderKvState>,
+        capture_layer: Option<isize>,
+        batch: usize,
+        query_tokens: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderTextOutput, DecoderTextError> {
+        let mut staged_cache = match cache {
+            Some(cache) => validate_cache(cache, batch, self.stream, &self.configuration)?,
+            None => DecoderKvState::new(self.layers.len())?,
+        };
+        let capture = capture_layer
+            .map(|layer| resolve_layer(layer, self.layers.len()))
+            .transpose()?;
         let mut intermediate = None;
         for (layer_index, layer) in self.layers.iter().enumerate() {
             context.check()?;
             hidden = layer.forward(
                 backend,
                 &hidden,
-                request.attention_mask,
-                &positions,
+                attention_mask,
+                positions,
                 batch,
                 query_tokens,
                 &self.configuration,
@@ -1820,6 +1972,85 @@ impl NativeDecoderTextEncoder {
         })
     }
 
+    fn validate_prepared_embeddings(
+        &self,
+        embeddings: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<(usize, usize), DecoderTextError> {
+        context.check()?;
+        let descriptor = embeddings.descriptor();
+        let shape = descriptor.shape();
+        if descriptor.dtype() != self.configuration.dtype
+            || descriptor.device() != self.configuration.device
+            || descriptor.stream() != self.stream
+            || !descriptor.is_contiguous()?
+            || shape.len() != 3
+            || shape[0] != 1
+            || shape[1] == 0
+            || shape[2] != usize_to_u64(self.configuration.hidden_size, "prepared hidden width")?
+        {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared embeddings must be contiguous [1, tokens, hidden] on the decoder target",
+            ));
+        }
+        let tokens = usize::try_from(shape[1])
+            .map_err(|_| DecoderTextError::Overflow("prepared token count"))?;
+        if tokens > self.configuration.maximum_tokens {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared embeddings exceed the decoder token limit",
+            ));
+        }
+        Ok((1, tokens))
+    }
+
+    fn prepared_attention_values(
+        &self,
+        backend: &CpuBackend,
+        mask: &Tensor,
+        prompt_count: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<f32>, DecoderTextError> {
+        let descriptor = mask.descriptor();
+        if descriptor.shape() != [1, usize_to_u64(prompt_count, "prepared attention mask")?]
+            || descriptor.dtype() != DType::F32
+            || descriptor.device() != self.configuration.device
+            || descriptor.stream() != self.stream
+            || !descriptor.is_contiguous()?
+        {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared attention mask must be contiguous F32 [1, tokens] on the decoder target",
+            ));
+        }
+        let values = tensor_to_f32(backend, mask, context)?;
+        if values.iter().any(|value| !matches!(*value, 0.0 | 1.0)) {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared attention mask values must be zero or one",
+            ));
+        }
+        Ok(values.iter().copied().collect())
+    }
+
+    fn continuation_attention_mask(
+        &self,
+        backend: &CpuBackend,
+        prefix: &[f32],
+        generated_count: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, DecoderTextError> {
+        let total = prefix
+            .len()
+            .checked_add(generated_count)
+            .ok_or(DecoderTextError::Overflow("continuation attention mask"))?;
+        let mut values = prefix.to_vec();
+        values.resize(total, 1.0);
+        Ok(tensor_from_f32(
+            backend,
+            &[1, usize_to_u64(total, "continuation attention mask")?],
+            &values,
+            context,
+        )?)
+    }
+
     pub fn generate(
         &self,
         backend: &CpuBackend,
@@ -1828,8 +2059,6 @@ impl NativeDecoderTextEncoder {
         transaction: &RngTransaction,
         context: &ExecutionContext<'_>,
     ) -> Result<DecoderGenerationOutcome, DecoderTextError> {
-        configuration.validate(self.configuration.vocabulary_size)?;
-        transaction.require_device(self.configuration.device)?;
         let (_, prompt_count) = validate_tokens(
             backend,
             prompt_tokens,
@@ -1843,27 +2072,154 @@ impl NativeDecoderTextEncoder {
             ));
         }
         let prompt_values = read_i64_tensor(backend, prompt_tokens, context)?;
-        let mut generated = prompt_values.to_vec();
+        let outcome = self.generate_with_prefill(
+            backend,
+            DecoderGenerationPrefill::Tokens(prompt_tokens),
+            &prompt_values,
+            prompt_count,
+            configuration,
+            transaction,
+            None,
+            context,
+        )?;
+        Ok(DecoderGenerationOutcome {
+            tokens: outcome.history_and_generated,
+            cache: outcome.cache,
+            transaction: outcome.transaction,
+        })
+    }
+
+    pub fn generate_prepared(
+        &self,
+        backend: &CpuBackend,
+        prompt: DecoderPreparedGenerationPrompt<'_>,
+        configuration: &DecoderGenerationConfiguration,
+        transaction: &RngTransaction,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderPreparedGenerationOutcome, DecoderTextError> {
+        let (_, prompt_count) = self.validate_prepared_embeddings(prompt.embeddings, context)?;
+        if prompt_count
+            .checked_add(configuration.maximum_new_tokens)
+            .ok_or(DecoderTextError::Overflow(
+                "prepared generation token limit",
+            ))?
+            > self.configuration.maximum_tokens
+        {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared prompt and generated tokens exceed the decoder limit",
+            ));
+        }
+        let prepared = DecoderPreparedTextRequest {
+            embeddings: prompt.embeddings,
+            attention_mask: prompt.attention_mask,
+            rope_positions: prompt.rope_positions,
+            causal_positions: prompt.causal_positions,
+            cache: None,
+            capture_layer: None,
+        };
+        let continuation_attention = prompt
+            .attention_mask
+            .map(|mask| self.prepared_attention_values(backend, mask, prompt_count, context))
+            .transpose()?;
+        let next_position = maximum_rope_position(prompt.rope_positions)?
+            .checked_add(1)
+            .ok_or(DecoderTextError::Overflow("prepared continuation position"))?;
+        let outcome = self.generate_with_prefill(
+            backend,
+            DecoderGenerationPrefill::Prepared(prepared),
+            prompt.sampling_history,
+            next_position,
+            configuration,
+            transaction,
+            continuation_attention,
+            context,
+        )?;
+        let generated_tokens = outcome
+            .history_and_generated
+            .get(outcome.generated_start..)
+            .ok_or(DecoderTextError::InvalidInput(
+                "prepared generation history boundary is invalid",
+            ))?
+            .to_vec();
+        Ok(DecoderPreparedGenerationOutcome {
+            generated_tokens,
+            cache: outcome.cache,
+            transaction: outcome.transaction,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn generate_with_prefill(
+        &self,
+        backend: &CpuBackend,
+        prefill: DecoderGenerationPrefill<'_>,
+        sampling_history: &[i64],
+        continuation_position: usize,
+        configuration: &DecoderGenerationConfiguration,
+        transaction: &RngTransaction,
+        continuation_attention: Option<Vec<f32>>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<InternalDecoderGenerationOutcome, DecoderTextError> {
+        configuration.validate(self.configuration.vocabulary_size)?;
+        transaction.require_device(self.configuration.device)?;
+        let generated_start = sampling_history.len();
+        let mut generated = sampling_history.to_vec();
         let mut staged_transaction = transaction.clone();
         let mut cache = None;
-        let mut current = prompt_tokens.clone();
+        let mut current = None;
+        let mut prefill = Some(prefill);
+        let mut next_position = continuation_position;
+        let mut generated_count = 0_usize;
         for _ in 0..configuration.maximum_new_tokens {
             context.check()?;
-            let positions = match &cache {
-                Some(cache) => Some(vec![cache_token_count(cache)?]),
-                None => Some((0..prompt_count).collect()),
+            let output = match prefill.take() {
+                Some(DecoderGenerationPrefill::Tokens(tokens)) => self.forward(
+                    backend,
+                    DecoderTextRequest {
+                        tokens,
+                        attention_mask: None,
+                        positions: None,
+                        cache: None,
+                        capture_layer: None,
+                    },
+                    context,
+                )?,
+                Some(DecoderGenerationPrefill::Prepared(request)) => {
+                    self.forward_prepared(backend, request, context)?
+                }
+                None => {
+                    let token = current.as_ref().ok_or(DecoderTextError::InvalidInput(
+                        "decoder continuation token is missing",
+                    ))?;
+                    let position = [next_position];
+                    let continuation_mask = continuation_attention
+                        .as_ref()
+                        .map(|prefix| {
+                            self.continuation_attention_mask(
+                                backend,
+                                prefix,
+                                generated_count,
+                                context,
+                            )
+                        })
+                        .transpose()?;
+                    let output = self.forward(
+                        backend,
+                        DecoderTextRequest {
+                            tokens: token,
+                            attention_mask: continuation_mask.as_ref(),
+                            positions: Some(&position),
+                            cache: cache.as_ref(),
+                            capture_layer: None,
+                        },
+                        context,
+                    )?;
+                    next_position = next_position
+                        .checked_add(1)
+                        .ok_or(DecoderTextError::Overflow("generation position"))?;
+                    output
+                }
             };
-            let output = self.forward(
-                backend,
-                DecoderTextRequest {
-                    tokens: &current,
-                    attention_mask: None,
-                    positions: positions.as_deref(),
-                    cache: cache.as_ref(),
-                    capture_layer: None,
-                },
-                context,
-            )?;
             let logits = tensor_to_f32(backend, output.logits(), context)?;
             let token_logits = logits
                 .get(
@@ -1882,14 +2238,18 @@ impl NativeDecoderTextEncoder {
                 context.cancellation,
             )?;
             generated.push(next);
+            generated_count = generated_count
+                .checked_add(1)
+                .ok_or(DecoderTextError::Overflow("generated token count"))?;
             cache = Some(output.cache);
             if self.configuration.stop_tokens.contains(&next) {
                 break;
             }
-            current = tensor_from_i64(backend, &[1, 1], &[next], context)?;
+            current = Some(tensor_from_i64(backend, &[1, 1], &[next], context)?);
         }
-        Ok(DecoderGenerationOutcome {
-            tokens: generated,
+        Ok(InternalDecoderGenerationOutcome {
+            history_and_generated: generated,
+            generated_start,
             cache: cache.unwrap_or(DecoderKvState::new(self.layers.len())?),
             transaction: staged_transaction,
         })
@@ -1991,7 +2351,7 @@ impl NativeDecoderLayer {
         backend: &CpuBackend,
         input: &Tensor,
         padding_mask: Option<&Tensor>,
-        positions: &[usize],
+        positions: &ValidatedDecoderPositions,
         batch: usize,
         query_tokens: usize,
         configuration: &DecoderTextConfiguration,
@@ -2096,7 +2456,7 @@ impl NativeDecoderLayer {
         backend: &CpuBackend,
         input: &Tensor,
         padding_mask: Option<&Tensor>,
-        positions: &[usize],
+        positions: &ValidatedDecoderPositions,
         batch: usize,
         query_tokens: usize,
         configuration: &DecoderTextConfiguration,
@@ -2112,23 +2472,23 @@ impl NativeDecoderLayer {
         let query = tensor_to_f32(backend, &query, context)?;
         let key = tensor_to_f32(backend, &key, context)?;
         let value = tensor_to_f32(backend, &value, context)?;
-        let query = apply_rope(
+        let query = apply_decoder_rope(
             &query,
             batch,
             query_tokens,
             configuration.attention_heads,
             configuration.head_dimension,
-            positions,
+            positions.rope(),
             &configuration.rope,
             context.cancellation,
         )?;
-        let key = apply_rope(
+        let key = apply_decoder_rope(
             &key,
             batch,
             query_tokens,
             configuration.key_value_heads,
             configuration.head_dimension,
-            positions,
+            positions.rope(),
             &configuration.rope,
             context.cancellation,
         )?;
@@ -2184,7 +2544,7 @@ impl NativeDecoderLayer {
             configuration.attention_heads,
             query_tokens,
             key_tokens,
-            positions,
+            &positions.causal,
             (self.kind == DecoderLayerKind::SlidingAttention)
                 .then_some(configuration.sliding_window)
                 .flatten(),
@@ -2589,6 +2949,116 @@ pub fn apply_rope(
                         .ok_or(DecoderTextError::InvalidInput(
                             "RoPE output right component is missing",
                         ))? = rotated_right;
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_decoder_rope(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    head_dimension: usize,
+    positions: DecoderRopePositions<'_>,
+    configuration: &DecoderRopeConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<Vec<f32>, DecoderTextError> {
+    let table = match positions {
+        DecoderRopePositions::Scalar(positions) => {
+            if positions.len() != tokens {
+                return Err(DecoderTextError::InvalidInput(
+                    "RoPE position count must equal query token count",
+                ));
+            }
+            precompute_rope(positions, configuration, cancellation)?
+        }
+        DecoderRopePositions::Multidimensional(position_axes) => {
+            if position_axes.iter().any(|axis| axis.len() != tokens) {
+                return Err(DecoderTextError::InvalidInput(
+                    "multidimensional RoPE position count must equal query token count",
+                ));
+            }
+            precompute_multidimensional_rope(position_axes, configuration, cancellation)?
+        }
+    };
+    apply_rope_table(
+        values,
+        batch,
+        tokens,
+        heads,
+        head_dimension,
+        &table,
+        configuration,
+        cancellation,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_rope_table(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    head_dimension: usize,
+    table: &[[f32; 2]],
+    configuration: &DecoderRopeConfiguration,
+    cancellation: &CancellationToken,
+) -> Result<Vec<f32>, DecoderTextError> {
+    if configuration.rotary_dimension > head_dimension {
+        return Err(DecoderTextError::InvalidInput(
+            "RoPE rotary width exceeds the attention head width",
+        ));
+    }
+    let expected = batch
+        .checked_mul(tokens)
+        .and_then(|value| value.checked_mul(heads))
+        .and_then(|value| value.checked_mul(head_dimension))
+        .ok_or(DecoderTextError::Overflow("RoPE input"))?;
+    if values.len() != expected {
+        return Err(DecoderTextError::InvalidInput(
+            "RoPE input length does not match its dimensions",
+        ));
+    }
+    let pairs = configuration.rotary_dimension / 2;
+    if table.len() != tokens.saturating_mul(pairs) {
+        return Err(DecoderTextError::InvalidInput(
+            "RoPE table length does not match the query tokens",
+        ));
+    }
+    let mut output = values.to_vec();
+    for batch_index in 0..batch {
+        for token in 0..tokens {
+            for head in 0..heads {
+                for pair in 0..pairs {
+                    let work = (((batch_index * tokens + token) * heads + head) * pairs) + pair;
+                    if work.is_multiple_of(256) {
+                        cancellation.check()?;
+                    }
+                    let base = ((batch_index * tokens + token) * heads + head) * head_dimension;
+                    let left_index = base + pair;
+                    let right_index = base + pair + pairs;
+                    let left = *values
+                        .get(left_index)
+                        .ok_or(DecoderTextError::InvalidInput(
+                            "RoPE left component is missing",
+                        ))?;
+                    let right = *values
+                        .get(right_index)
+                        .ok_or(DecoderTextError::InvalidInput(
+                            "RoPE right component is missing",
+                        ))?;
+                    let [cosine, sine] =
+                        *table
+                            .get(token * pairs + pair)
+                            .ok_or(DecoderTextError::InvalidInput(
+                                "RoPE table entry is missing",
+                            ))?;
+                    output[left_index] = left * cosine - right * sine;
+                    output[right_index] = right * cosine + left * sine;
                 }
             }
         }
@@ -3822,6 +4292,69 @@ fn validate_positions(
                 .ok_or(DecoderTextError::Overflow("token position"))
         })
         .collect()
+}
+
+fn validate_prepared_positions(
+    rope_positions: DecoderRopePositions<'_>,
+    causal_positions: &[usize],
+    query_tokens: usize,
+    cache: Option<&DecoderKvState>,
+    configuration: &DecoderRopeConfiguration,
+) -> Result<ValidatedDecoderPositions, DecoderTextError> {
+    if cache.is_some() {
+        return Err(DecoderTextError::InvalidInput(
+            "prepared embeddings are valid only for an uncached prefill",
+        ));
+    }
+    if causal_positions.len() != query_tokens {
+        return Err(DecoderTextError::InvalidInput(
+            "prepared causal position count must equal query token count",
+        ));
+    }
+    let rope_axes = match rope_positions {
+        DecoderRopePositions::Scalar(positions) => {
+            if positions.len() != query_tokens {
+                return Err(DecoderTextError::InvalidInput(
+                    "prepared scalar positions do not match the decoder RoPE profile",
+                ));
+            }
+            if configuration.interleaved_sections.is_empty() {
+                vec![positions.to_vec()]
+            } else {
+                vec![positions.to_vec(); configuration.interleaved_sections.len()]
+            }
+        }
+        DecoderRopePositions::Multidimensional(position_axes) => {
+            if position_axes.len() != configuration.interleaved_sections.len()
+                || position_axes.is_empty()
+                || position_axes.iter().any(|axis| axis.len() != query_tokens)
+            {
+                return Err(DecoderTextError::InvalidInput(
+                    "prepared multidimensional positions do not match the decoder RoPE profile",
+                ));
+            }
+            position_axes.to_vec()
+        }
+    };
+    Ok(ValidatedDecoderPositions {
+        rope_axes,
+        causal: causal_positions.to_vec(),
+    })
+}
+
+fn maximum_rope_position(
+    rope_positions: DecoderRopePositions<'_>,
+) -> Result<usize, DecoderTextError> {
+    match rope_positions {
+        DecoderRopePositions::Scalar(positions) => positions.iter().copied().max(),
+        DecoderRopePositions::Multidimensional(position_axes) => position_axes
+            .iter()
+            .flat_map(|axis| axis.iter().copied())
+            .max(),
+    }
+    .ok_or(DecoderTextError::InvalidInput(
+        "prepared generation positions are empty",
+    ))
 }
 
 fn cache_token_count(cache: &DecoderKvState) -> Result<usize, DecoderTextError> {
