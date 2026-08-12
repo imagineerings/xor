@@ -9,9 +9,9 @@ use comfy_model::clip_tokenizer::{
 use comfy_model::{
     ArtifactIndex, ArtifactKey, ArtifactRoot, ClipBpeTokenizer, ModelParsedFacts,
     ModelParsedTensorFact, ModelProbe, ModelStore, ModelTokenizerDescriptor, NativePromptTokenizer,
-    NativeTokenValue, NativeTokenizerError, NativeTokenizerFamily, ParserLimits,
-    SentencePieceTokenizer, TextualInversionEmbedding, TokenizerConfiguration,
-    parse_prompt_weights,
+    NativeTokenValue, NativeTokenizerError, NativeTokenizerFamily, ParserLimits, Qwen2BpeTokenizer,
+    Qwen2PretokenizerProfile, SentencePieceTokenizer, TextualInversionEmbedding,
+    TokenizerConfiguration, parse_prompt_weights,
 };
 use comfy_tensor::CancellationToken;
 use serde_json::{Value, json};
@@ -25,11 +25,11 @@ use std::{
 const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     (
         "crates/comfy_model/src/clip.rs",
-        "9181a69ce876c525463373a5dc58d288435006182063a26be5e9200bb6d3950c",
+        "82150391c0c32d64137fcd1b66e2323bca4f7110160dc1895bb03fe70172d7b5",
     ),
     (
         "crates/comfy_model/src/clip_tokenizer.rs",
-        "24eb0bf943a25e9cbe5c2d182e7597d996c928c38e8a8429731624082d53715c",
+        "530f85685d457aff47f5e70965ec667d681eb845e52d7acefb13513f3f6e26f8",
     ),
     (
         "crates/comfy_model/src/formats.rs",
@@ -41,11 +41,11 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/slices/native_diffusion.rs",
-        "494413ff17ec6ed6e1c8ae3f26b99b7868470fda997619cb026185ebeb5a2d38",
+        "d372f05ff5b2da3c79d095c8ac1a91dc561187b0b009cc548329a6a58bdde0aa",
     ),
     (
         "crates/comfy_runtime/src/native_execution_controller.rs",
-        "6a604b5781c44e64fb94880a6d3f92508559d3fec0452981afa89d41f0a96eff",
+        "f72601e33649f8a023e6fb68831905324617353762094fe335f0754040149e32",
     ),
     (
         "crates/comfy_test_support/src/native_diffusion_fixture.rs",
@@ -361,6 +361,54 @@ fn configuration(maximum_length: usize) -> TokenizerConfiguration {
         disable_weights: false,
         embedding_width: None,
     }
+}
+
+fn qwen_configuration(maximum_length: usize, pad_token: u32) -> TokenizerConfiguration {
+    TokenizerConfiguration {
+        maximum_length,
+        minimum_length: Some(1),
+        minimum_padding: None,
+        pad_to_maximum_length: false,
+        pad_left: false,
+        start_token: None,
+        end_token: None,
+        pad_token,
+        maximum_word_length: maximum_length,
+        disable_weights: true,
+        embedding_width: None,
+    }
+}
+
+fn qwen25_tokenizer() -> Result<Qwen2BpeTokenizer, NativeTokenizerError> {
+    Qwen2BpeTokenizer::from_artifacts(
+        Qwen2PretokenizerProfile::Qwen2,
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
+        ),
+        &CancellationToken::default(),
+    )
+}
+
+fn qwen35_tokenizer() -> Result<Qwen2BpeTokenizer, NativeTokenizerError> {
+    Qwen2BpeTokenizer::from_artifacts(
+        Qwen2PretokenizerProfile::Qwen35Declared,
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
+        ),
+        include_str!(
+            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
+        ),
+        &CancellationToken::default(),
+    )
 }
 
 fn numeric_tokens(prompt: &comfy_model::NativeTokenizedPrompt) -> Vec<Vec<u32>> {
@@ -702,6 +750,180 @@ fn decoder_numeric_adapter_has_stable_identity_and_does_not_pad_generation_input
         tokenizer.semantic_digest(&cancellation)?,
         changed.semantic_digest(&cancellation)?
     );
+    Ok(())
+}
+
+#[test]
+fn qwen2_real_artifacts_preserve_text_added_tokens_and_minimum_padding()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let cases = [
+        (
+            qwen25_tokenizer()?,
+            Qwen2PretokenizerProfile::Qwen2,
+            151_643,
+            151_655,
+            151_667,
+            &[9707, 11, 51950, 220, 99489, 61804, 233, 319][..],
+        ),
+        (
+            qwen35_tokenizer()?,
+            Qwen2PretokenizerProfile::Qwen35Declared,
+            248_044,
+            248_056,
+            248_068,
+            &[9419, 11, 50203, 220, 96748, 59720, 233, 317][..],
+        ),
+    ];
+    for (family, profile, pad, image, think, expected) in cases {
+        assert_eq!(family.profile(), profile);
+        let tokenizer = NativePromptTokenizer::checked(
+            NativeTokenizerFamily::Qwen2ByteBpe(family),
+            qwen_configuration(256, pad),
+            BTreeMap::new(),
+        )?;
+        let text = "Hello, café 世界 👋\r\n";
+        let encoded = tokenizer.encode_numeric(text, &cancellation)?;
+        assert_eq!(encoded, expected);
+        assert_eq!(
+            tokenizer.decode_numeric(&encoded, false, &cancellation)?,
+            text
+        );
+        assert_eq!(
+            tokenizer.encode_numeric("a\u{323}\u{301}", &cancellation)?,
+            match profile {
+                Qwen2PretokenizerProfile::Qwen2 => &[20229, 53839][..],
+                Qwen2PretokenizerProfile::Qwen35Declared => &[19614, 52033][..],
+            }
+        );
+        assert_eq!(
+            tokenizer.encode_numeric("cafe\u{301}", &cancellation)?,
+            tokenizer.encode_numeric("café", &cancellation)?
+        );
+        assert_eq!(tokenizer.encode_numeric("", &cancellation)?, [pad]);
+        assert_eq!(
+            tokenizer.encode_numeric("<|image_pad|><think>", &cancellation)?,
+            [image, think]
+        );
+        assert_eq!(
+            tokenizer.decode_numeric(&[image, think], true, &cancellation)?,
+            "<think>"
+        );
+        assert_eq!(
+            tokenizer.decode_numeric(&[image, think], false, &cancellation)?,
+            "<|image_pad|><think>"
+        );
+        if profile == Qwen2PretokenizerProfile::Qwen35Declared {
+            assert_eq!(
+                tokenizer.decode_numeric(&[248_076, think], true, &cancellation)?,
+                "<think>"
+            );
+        }
+        assert!(matches!(
+            tokenizer.decode_numeric(&[u32::MAX], false, &cancellation),
+            Err(NativeTokenizerError::UnknownToken(value)) if value == u32::MAX
+        ));
+        assert_eq!(tokenizer.semantic_digest(&cancellation)?.len(), 64);
+        assert!(tokenizer.resident_bytes()? > 1_000_000);
+    }
+    Ok(())
+}
+
+#[test]
+fn qwen2_fixture_manifest_pins_source_artifacts_and_provenance()
+-> Result<(), Box<dyn std::error::Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/qwen_multimodal/tokenizer/manifest.json"
+    ))?;
+    assert_eq!(manifest["evidence_mode"], "code-inferred");
+    assert!(manifest["runtime_oracle"].is_null());
+    assert_eq!(
+        manifest["snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    let profiles = manifest["profiles"].as_array().ok_or("profiles")?;
+    assert_eq!(profiles.len(), 2);
+    let roots = [
+        (
+            "qwen25",
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json").as_slice(),
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json").as_slice(),
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt").as_slice(),
+        ),
+        (
+            "qwen35",
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json").as_slice(),
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json").as_slice(),
+            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt").as_slice(),
+        ),
+    ];
+    for (profile, (name, configuration, vocabulary, merges)) in profiles.iter().zip(roots) {
+        assert_eq!(profile["name"], name);
+        assert_eq!(
+            profile["configuration_sha256"],
+            format!("{:x}", Sha256::digest(configuration))
+        );
+        assert_eq!(
+            profile["vocabulary_sha256"],
+            format!("{:x}", Sha256::digest(vocabulary))
+        );
+        assert_eq!(
+            profile["merges_sha256"],
+            format!("{:x}", Sha256::digest(merges))
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn qwen2_artifact_admission_and_cancellation_are_typed() -> Result<(), Box<dyn std::error::Error>> {
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        Qwen2BpeTokenizer::from_artifacts(
+            Qwen2PretokenizerProfile::Qwen2,
+            include_str!(
+                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
+            ),
+            include_str!(
+                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
+            ),
+            include_str!(
+                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
+            ),
+            &cancelled,
+        ),
+        Err(NativeTokenizerError::Cancellation(_))
+    ));
+
+    let cancellation = CancellationToken::default();
+    assert!(matches!(
+        Qwen2BpeTokenizer::from_artifacts(
+            Qwen2PretokenizerProfile::Qwen2,
+            "{}",
+            "{}",
+            "",
+            &cancellation,
+        ),
+        Err(NativeTokenizerError::InvalidVocabulary)
+    ));
+    let qwen35_configuration = include_str!(
+        "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
+    );
+    assert!(matches!(
+        Qwen2BpeTokenizer::from_artifacts(
+            Qwen2PretokenizerProfile::Qwen2,
+            qwen35_configuration,
+            include_str!(
+                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
+            ),
+            include_str!(
+                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
+            ),
+            &cancellation,
+        ),
+        Err(NativeTokenizerError::InvalidTokenizerConfiguration(_))
+    ));
     Ok(())
 }
 
@@ -1238,8 +1460,9 @@ fn competing_foundational_owners_are_absent_from_the_adapter_source() {
         source
             .contains("MAX_NATIVE_WEIGHT_SEGMENTS: usize = crate::clip::SD1_MAX_WEIGHTED_SEGMENTS")
     );
-    assert!(!source.contains("merge_ranks:"));
-    assert!(!source.contains("byte_decoder:"));
+    assert_eq!(source.matches("merge_ranks:").count(), 1);
+    assert_eq!(source.matches("byte_decoder:").count(), 1);
+    assert!(source.contains("pub struct Qwen2BpeTokenizer {"));
     assert_eq!(source.matches("fn pack(").count(), 1);
     assert!(source.contains("pub struct ClipBpeTokenizer {\n    tokenizer: Sd1Tokenizer,\n}"));
     assert!(!source.contains("UnverifiedEmbeddingTensorRows"));

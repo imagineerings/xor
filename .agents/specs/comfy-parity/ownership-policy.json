@@ -6202,7 +6202,7 @@
     },
     {
       "concern": "native_diffusion_language_tokenization_and_embedding_artifacts",
-      "canonical_owner": "comfy_model::{clip::Sd1Tokenizer, clip_tokenizer::NativePromptTokenizer, formats::{SentencePieceVocabulary, parse_verified_embedding_archive_file}, model_store::{VerifiedSentencePieceVocabulary, VerifiedModelTensorPayload, VerifiedEmbeddingArchivePayload}}",
+      "canonical_owner": "comfy_model::{clip::Sd1Tokenizer, clip_tokenizer::{NativePromptTokenizer, Qwen2BpeTokenizer}, formats::{SentencePieceVocabulary, parse_verified_embedding_archive_file}, model_store::{VerifiedSentencePieceVocabulary, VerifiedModelTensorPayload, VerifiedEmbeddingArchivePayload}}",
       "owner_files": [
         "crates/comfy_model/src/clip.rs",
         "crates/comfy_model/src/clip_tokenizer.rs",
@@ -6212,6 +6212,8 @@
       "owner_symbols": [
         "Sd1Tokenizer",
         "NativePromptTokenizer",
+        "Qwen2BpeTokenizer",
+        "Qwen2PretokenizerProfile",
         "SentencePieceType",
         "SentencePieceVocabularyEntry",
         "SentencePieceVocabulary",
@@ -6222,6 +6224,7 @@
       ],
       "allowed_adapters": [
         "clip_tokenizer::ClipBpeTokenizer delegates SD1 content encoding and decoding to clip::Sd1Tokenizer and owns only source-family section and option projection",
+        "clip_tokenizer::Qwen2BpeTokenizer is the sole Qwen2/Qwen3.5 checked-artifact NFC, pretokenization, reversible byte-alphabet, ordered-merge, atomic-added-token, and replacement-decode adapter under NativePromptTokenizer",
         "clip_tokenizer::SentencePieceTokenizer consumes only ModelStore-issued VerifiedSentencePieceVocabulary and owns only bounded source-compatible segmentation",
         "clip_tokenizer::TextualInversionEmbedding consumes only inseparable store-scoped VerifiedModelTensorPayload or VerifiedEmbeddingArchivePayload values and cannot accept caller-paired artifact identity, rows, raw archive entries, or raw float bytes",
         "clip_tokenizer::NativePromptTokenizer alone owns bounded section progress and source-compatible missing textual-inversion comma fallback; it delegates vocabulary traversal and artifact admission to the canonical owners",
@@ -6285,6 +6288,12 @@
         },
         {
           "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "qualified": "comfy_model::clip_tokenizer::Qwen2BpeTokenizer",
+          "role": "canonical",
+          "symbol": "Qwen2BpeTokenizer"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
           "qualified": "comfy_model::clip_tokenizer::SentencePieceTokenizer",
           "role": "allowed_adapter",
           "symbol": "SentencePieceTokenizer"
@@ -6312,6 +6321,8 @@
         "VerifiedSentencePieceVocabulary",
         "VerifiedEmbeddingArchivePayload",
         "ClipBpeTokenizer",
+        "Qwen2BpeTokenizer",
+        "Qwen2PretokenizerProfile",
         "SentencePieceTokenizer",
         "TextualInversionEmbedding",
         "NativePromptTokenizer"
@@ -6326,6 +6337,21 @@
           "name": "clip-bpe-adapter-delegates-untruncated-content-and-decode",
           "path": "crates/comfy_model/src/clip_tokenizer.rs",
           "pattern": "pub struct ClipBpeTokenizer[\\s\\S]*tokenizer: Sd1Tokenizer[\\s\\S]*tokenizer\\.encode_content\\(text, cancellation\\)[\\s\\S]*self\\.tokenizer[\\s\\S]*\\.decode\\(tokens, skip_special, cancellation\\)"
+        },
+        {
+          "name": "qwen2-byte-bpe-is-one-checked-native-prompt-tokenizer-family",
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "pattern": "pub struct Qwen2BpeTokenizer[\\s\\S]*pub fn from_artifacts\\([\\s\\S]*validate_qwen2_configuration[\\s\\S]*text\\.nfc\\(\\)\\.collect\\(\\)[\\s\\S]*fn apply_merges\\([\\s\\S]*String::from_utf8_lossy"
+        },
+        {
+          "name": "qwen2-artifacts-bind-semantic-identity-and-owned-residency",
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "pattern": "sim\\.comfy\\.qwen2-byte-bpe\\.v1[\\s\\S]*tokenizer_configuration_json\\.as_bytes\\(\\)[\\s\\S]*vocabulary_json\\.as_bytes\\(\\)[\\s\\S]*merges\\.as_bytes\\(\\)[\\s\\S]*fn resident_bytes\\(&self\\)"
+        },
+        {
+          "name": "qwen2-source-fingerprinted-tests-cover-specials-nfc-profiles-and-failures",
+          "path": "crates/comfy_model/tests/clip_tokenizer.rs",
+          "pattern": "qwen2_real_artifacts_preserve_text_added_tokens_and_minimum_padding[\\s\\S]*qwen2_fixture_manifest_pins_source_artifacts_and_provenance[\\s\\S]*qwen2_artifact_admission_and_cancellation_are_typed"
         },
         {
           "name": "sentencepiece-parser-retains-ordered-score-and-type-vocabulary",
@@ -6382,12 +6408,14 @@
       "consolidation_tasks": [
         "comfy-parity-sd1-tokenizer-owner-consolidation",
         "comfy-parity-clip-tokenizer-foundation",
-        "comfy-parity-native-decoder-text-generation-foundation"
+        "comfy-parity-native-decoder-text-generation-foundation",
+        "comfy-parity-native-qwen2-tokenizer-foundation"
       ],
       "production_consumers": [
         "native CLIP prompt tokenization",
         "native textual-inversion prompt expansion",
         "native SentencePiece tokenizer-family adapters"
+        ,"native Qwen2 and Qwen3.5 byte-BPE prompt tokenization"
       ],
       "requirements": [
         "Requirement 7",
@@ -6411,7 +6439,7 @@
         "VAL-OWNERSHIP-001",
         "VAL-NATIVE-E2E-002"
       ],
-      "decision_reason": "Sd1Tokenizer is the sole SD1 vocabulary, merge-rank, byte codec, BPE, shared prompt-bound constants, cancellation, and fixed-77 padding/token-sequence owner and exposes bounded untruncated content only so section consumers cannot truncate early or rebuild its mechanics. NativePromptTokenizer is the separate sole generic source-family owner for weighting, configurable multi-section packing, special tokens, configurable padding, and word identity; generate_empty_tokens delegates to that owner. formats owns the sole bounded ModelProto and verified fallback-archive parsing. ModelStore owns verified artifact identity, bytes, parser, and cache and issues private-field store-scoped SentencePiece, tensor, and fallback-archive payloads. SentencePieceTokenizer and TextualInversionEmbedding consume only those payloads, retain provenance, and expose no forgeable record, handle, vocabulary, archive-entry, identity/rows, or raw-byte pairing. Native diffusion aliases canonical SD1 bounds and binds TokenizerIdentity through the provider, handle, and cache dependency boundary. The focused adapters create no path, cache, tensor, workspace, cancellation, persistence, security, or publication subsystem."
+      "decision_reason": "Sd1Tokenizer remains the sole SD1 vocabulary, merge-rank, byte codec, BPE, shared prompt-bound constants, cancellation, and fixed-77 padding/token-sequence owner. NativePromptTokenizer is the sole generic source-family owner for weighting, configurable multi-section packing, special tokens, configurable padding, and word identity. Qwen2BpeTokenizer extends that owner with one checked-artifact Qwen2/Qwen3.5 byte-BPE family whose NFC and pretokenizer profile, reversible byte alphabet, ordered merges, atomic added-token classification, replacement decode, semantic identity, residency, and cancellation are inseparable. formats owns ModelProto and verified fallback-archive parsing; ModelStore owns verified artifact identity and store-scoped payloads. The focused adapters create no decoder, vision, RNG, cache, tensor workspace, persistence, security, or publication subsystem."
     },
     {
       "concern": "native_diffusion_model_slice",

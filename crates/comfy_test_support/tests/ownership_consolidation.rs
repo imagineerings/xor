@@ -2109,6 +2109,77 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let qwen2_tokenizer_definitions =
+        production_source_occurrences(&sources, "pub struct Qwen2BpeTokenizer");
+    let task383_qwen2_has_one_native_prompt_tokenizer_family = qwen2_tokenizer_definitions.len()
+        == 1
+        && qwen2_tokenizer_definitions[0].contains("crates/comfy_model/src/clip_tokenizer.rs")
+        && model_clip_tokenizer.contains("Qwen2ByteBpe(Qwen2BpeTokenizer)")
+        && model_clip_tokenizer.contains("NativeTokenizerFamily::Qwen2ByteBpe(tokenizer)")
+        && !model_clip_tokenizer.contains("struct QwenTokenizer");
+    let task383_qwen2_admission_identity_and_residency_are_canonical = model_clip_tokenizer
+        .contains("pub fn from_artifacts(")
+        && model_clip_tokenizer.contains("validate_qwen2_configuration(")
+        && model_clip_tokenizer.contains("text.nfc().collect()")
+        && model_clip_tokenizer.contains("fn apply_merges(")
+        && model_clip_tokenizer.contains("String::from_utf8_lossy(bytes)")
+        && model_clip_tokenizer.contains("sim.comfy.qwen2-byte-bpe.v1")
+        && model_clip_tokenizer.contains("NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) =>")
+        && !model_clip_tokenizer.contains("RngStreamAddress")
+        && !model_clip_tokenizer.contains("NativeCache")
+        && !model_clip_tokenizer.contains("OutputTransaction");
+    let task383_qwen2_source_fixtures_and_failures_are_executable = model_clip_tokenizer_tests
+        .contains("qwen2_real_artifacts_preserve_text_added_tokens_and_minimum_padding")
+        && model_clip_tokenizer_tests
+            .contains("qwen2_fixture_manifest_pins_source_artifacts_and_provenance")
+        && model_clip_tokenizer_tests
+            .contains("qwen2_artifact_admission_and_cancellation_are_typed")
+        && model_clip_tokenizer_tests.contains("\"code-inferred\"");
+    let task383_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_diffusion_language_tokenization_and_embedding_artifacts")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-qwen2-tokenizer-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen2-byte-bpe-is-one-checked-native-prompt-tokenizer-family",
+                            "qwen2-artifacts-bind-semantic-identity-and-owned-residency",
+                            "qwen2-source-fingerprinted-tests-cover-specials-nfc-profiles-and-failures",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task383_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_diffusion_language_tokenization_and_embedding_artifacts,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen2-tokenizer-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let native_clip_text_definitions =
         production_source_occurrences(&sources, "pub struct NativeClipText");
     let clip_text_configuration_definitions =
@@ -8370,6 +8441,22 @@ fn run_ownership_validation(
             task_512_native_diffusion_binds_canonical_tokenizer_identity,
         ),
         (
+            "task383_policy_and_catalog_trace_qwen2_tokenizer",
+            task383_policy_trace && task383_catalog_trace,
+        ),
+        (
+            "task383_qwen2_has_one_native_prompt_tokenizer_family",
+            task383_qwen2_has_one_native_prompt_tokenizer_family,
+        ),
+        (
+            "task383_qwen2_admission_identity_and_residency_are_canonical",
+            task383_qwen2_admission_identity_and_residency_are_canonical,
+        ),
+        (
+            "task383_qwen2_source_fixtures_and_failures_are_executable",
+            task383_qwen2_source_fixtures_and_failures_are_executable,
+        ),
+        (
             "task339_policy_and_catalog_trace_the_canonical_clip_text_owner",
             task_339_policy_trace && task_339_catalog_trace,
         ),
@@ -8962,6 +9049,17 @@ fn val_ownership_task382_prepared_deepstack_001() -> Result<(), Box<dyn std::err
         "val-ownership-task382-prepared-deepstack-001.json",
         "val_ownership_task382_prepared_deepstack_001",
         Some("task382_"),
+    )
+}
+
+#[test]
+fn val_ownership_task383_qwen2_tokenizer_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task383-qwen2-byte-bpe-and-native-prompt-tokenizer-ownership",
+        "val-ownership-task383-qwen2-tokenizer-001.json",
+        "val_ownership_task383_qwen2_tokenizer_001",
+        Some("task383_"),
     )
 }
 

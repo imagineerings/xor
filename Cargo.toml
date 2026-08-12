@@ -765,6 +765,7 @@ quote = "1.0.9"
 rand = "0.9"
 rayon = "1.8"
 regex = "1.5"
+unicode-normalization = "0.1"
 ring = "0.17.14"
 # WARNING: If you change this, you must also publish a new version of sim-reqwest to crates.io
 reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c6e14025e406a0c5cb0c96a4a969e601c9fef3c9", default-features = false, features = [

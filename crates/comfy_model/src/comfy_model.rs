@@ -144,9 +144,10 @@ pub use clip_tokenizer::{
     MAX_NATIVE_PROMPT_BATCH, MAX_NATIVE_PROMPT_BYTES, MAX_NATIVE_TOKEN_SECTIONS,
     MAX_NATIVE_WEIGHT_SEGMENTS, NativePromptTokenizer, NativeTokenSection, NativeTokenValue,
     NativeTokenizedPrompt, NativeTokenizerError, NativeTokenizerFamily, NativeWeightedToken,
-    PromptWeightSegment, SentencePieceTokenizer, TextualInversionEmbedding, TokenizerConfiguration,
-    apply_empty_baseline_token_weights, escape_important, generate_empty_tokens, parse_parentheses,
-    parse_prompt_weights, token_weights, unescape_important,
+    PromptWeightSegment, Qwen2BpeTokenizer, Qwen2PretokenizerProfile, SentencePieceTokenizer,
+    TextualInversionEmbedding, TokenizerConfiguration, apply_empty_baseline_token_weights,
+    escape_important, generate_empty_tokens, parse_parentheses, parse_prompt_weights,
+    token_weights, unescape_important,
 };
 pub use clip_vision::{
     CLIP_VISION_CATALOG_SYMBOLS, CLIP_VISION_RESOURCE_ROLE, CLIP_VISION_SOURCE_PATH,

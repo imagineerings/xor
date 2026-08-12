@@ -4,9 +4,14 @@ use crate::{
     clip::{ClipError, NativeTokenizer, Sd1Tokenizer},
 };
 use comfy_tensor::{CancellationToken, TensorError};
+use fancy_regex::Regex as FancyRegex;
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 use thiserror::Error;
+use unicode_normalization::UnicodeNormalization;
 
 pub const MAX_NATIVE_PROMPT_BYTES: usize = crate::clip::SD1_MAX_PROMPT_BYTES;
 pub const MAX_NATIVE_WEIGHT_SEGMENTS: usize = crate::clip::SD1_MAX_WEIGHTED_SEGMENTS;
@@ -1160,9 +1165,561 @@ impl ClipBpeTokenizer {
     }
 }
 
+const QWEN2_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
+const QWEN35_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?[\p{L}\p{M}]+|\p{N}| ?[^\s\p{L}\p{M}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Qwen2PretokenizerProfile {
+    Qwen2,
+    Qwen35Declared,
+}
+
+impl Qwen2PretokenizerProfile {
+    fn pattern(self) -> &'static str {
+        match self {
+            Self::Qwen2 => QWEN2_PRETOKENIZER_PATTERN,
+            Self::Qwen35Declared => QWEN35_PRETOKENIZER_PATTERN,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Qwen2AddedToken {
+    content: String,
+    token: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct Qwen2BpeTokenizer {
+    profile: Qwen2PretokenizerProfile,
+    pretokenizer: FancyRegex,
+    vocabulary: BTreeMap<String, u32>,
+    tokens: Vec<String>,
+    merge_ranks: BTreeMap<(String, String), usize>,
+    added_tokens: Vec<Qwen2AddedToken>,
+    special_tokens: BTreeSet<u32>,
+    byte_encoder: [char; 256],
+    byte_decoder: BTreeMap<char, u8>,
+    artifact_digest: String,
+}
+
+impl Qwen2BpeTokenizer {
+    pub fn from_artifacts(
+        profile: Qwen2PretokenizerProfile,
+        tokenizer_configuration_json: &str,
+        vocabulary_json: &str,
+        merges: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        let vocabulary: BTreeMap<String, u32> = serde_json::from_str(vocabulary_json)
+            .map_err(|error| NativeTokenizerError::InvalidVocabularyJson(error.to_string()))?;
+        if vocabulary.is_empty() {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+        let mut tokens = Vec::<String>::new();
+        tokens
+            .try_reserve_exact(vocabulary.len())
+            .map_err(|_| NativeTokenizerError::Allocation("Qwen2 vocabulary"))?;
+        tokens.resize(vocabulary.len(), String::new());
+        for (piece, token) in &vocabulary {
+            cancellation.check()?;
+            let index = usize::try_from(*token)
+                .map_err(|_| NativeTokenizerError::ArithmeticOverflow("Qwen2 token ID"))?;
+            let target = tokens
+                .get_mut(index)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            if !target.is_empty() || piece.is_empty() {
+                return Err(NativeTokenizerError::InvalidVocabulary);
+            }
+            target
+                .try_reserve_exact(piece.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Qwen2 vocabulary token"))?;
+            target.push_str(piece);
+        }
+        if tokens.iter().any(String::is_empty) {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+
+        let configuration: serde_json::Value = serde_json::from_str(tokenizer_configuration_json)
+            .map_err(|error| {
+            NativeTokenizerError::InvalidTokenizerConfiguration(error.to_string())
+        })?;
+        validate_qwen2_configuration(&configuration, profile)?;
+        let added_decoder = configuration
+            .get("added_tokens_decoder")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "added_tokens_decoder is missing".to_owned(),
+                )
+            })?;
+        let mut added_tokens = Vec::new();
+        added_tokens
+            .try_reserve_exact(added_decoder.len())
+            .map_err(|_| NativeTokenizerError::Allocation("Qwen2 added tokens"))?;
+        let mut special_tokens = BTreeSet::new();
+        for (token_text, record) in added_decoder {
+            cancellation.check()?;
+            let token = token_text.parse::<u32>().map_err(|_| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "added token ID is invalid".to_owned(),
+                )
+            })?;
+            let expected = vocabulary
+                .len()
+                .checked_add(added_tokens.len())
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "Qwen2 added token ID",
+                ))?;
+            if token != expected {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "added token IDs must be contiguous after the base vocabulary".to_owned(),
+                ));
+            }
+            let object = record.as_object().ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "added token record is invalid".to_owned(),
+                )
+            })?;
+            let content = object
+                .get("content")
+                .and_then(serde_json::Value::as_str)
+                .filter(|content| !content.is_empty())
+                .ok_or_else(|| {
+                    NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "added token content is invalid".to_owned(),
+                    )
+                })?;
+            for flag in ["lstrip", "normalized", "rstrip", "single_word"] {
+                if object.get(flag).and_then(serde_json::Value::as_bool) != Some(false) {
+                    return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                        format!("unsupported added token flag {flag}"),
+                    ));
+                }
+            }
+            let special = object
+                .get("special")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| {
+                    NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "added token special classification is missing".to_owned(),
+                    )
+                })?;
+            if vocabulary.contains_key(content)
+                || added_tokens
+                    .iter()
+                    .any(|added: &Qwen2AddedToken| added.content == content)
+            {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "added token content is duplicated".to_owned(),
+                ));
+            }
+            if special {
+                special_tokens.insert(token);
+            }
+            added_tokens.push(Qwen2AddedToken {
+                content: content.to_owned(),
+                token,
+            });
+        }
+        added_tokens.sort_by(|left, right| {
+            right
+                .content
+                .len()
+                .cmp(&left.content.len())
+                .then_with(|| left.token.cmp(&right.token))
+        });
+
+        let mut merge_ranks = BTreeMap::new();
+        for line in merges.lines() {
+            cancellation.check()?;
+            let line = line.trim_end_matches('\r');
+            if line.is_empty() || line == "#version: 0.2" {
+                continue;
+            }
+            let mut pieces = line.split(' ');
+            let left = pieces.next().unwrap_or_default();
+            let right = pieces.next().unwrap_or_default();
+            if left.is_empty() || right.is_empty() || pieces.next().is_some() {
+                return Err(NativeTokenizerError::InvalidMerges);
+            }
+            let merged = format!("{left}{right}");
+            if !vocabulary.contains_key(left)
+                || !vocabulary.contains_key(right)
+                || !vocabulary.contains_key(&merged)
+            {
+                return Err(NativeTokenizerError::InvalidMerges);
+            }
+            let rank = merge_ranks.len();
+            if merge_ranks
+                .insert((left.to_owned(), right.to_owned()), rank)
+                .is_some()
+            {
+                return Err(NativeTokenizerError::InvalidMerges);
+            }
+        }
+        if merge_ranks.is_empty() {
+            return Err(NativeTokenizerError::InvalidMerges);
+        }
+        let pretokenizer = FancyRegex::new(profile.pattern()).map_err(|error| {
+            NativeTokenizerError::InvalidTokenizerConfiguration(error.to_string())
+        })?;
+        let (byte_encoder, byte_decoder) = qwen2_byte_alphabet()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.qwen2-byte-bpe.v1");
+        hasher.update(format!("{profile:?}").as_bytes());
+        hasher.update(tokenizer_configuration_json.as_bytes());
+        hasher.update(vocabulary_json.as_bytes());
+        hasher.update(merges.as_bytes());
+        Ok(Self {
+            profile,
+            pretokenizer,
+            vocabulary,
+            tokens,
+            merge_ranks,
+            added_tokens,
+            special_tokens,
+            byte_encoder,
+            byte_decoder,
+            artifact_digest: format!("{:x}", hasher.finalize()),
+        })
+    }
+
+    pub fn artifact_digest(&self) -> &str {
+        &self.artifact_digest
+    }
+
+    pub const fn profile(&self) -> Qwen2PretokenizerProfile {
+        self.profile
+    }
+
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        cancellation.check()?;
+        if text.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+        }
+        let normalized: String = text.nfc().collect();
+        if normalized.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(normalized.len()));
+        }
+        let mut output = Vec::new();
+        let mut cursor = 0;
+        while cursor < normalized.len() {
+            cancellation.check()?;
+            let next = self.next_added_token(&normalized, cursor);
+            let end = next
+                .as_ref()
+                .map_or(normalized.len(), |(position, _)| *position);
+            self.encode_ordinary(&normalized[cursor..end], cancellation, &mut output)?;
+            if let Some((position, added)) = next {
+                output
+                    .try_reserve(1)
+                    .map_err(|_| NativeTokenizerError::Allocation("Qwen2 token output"))?;
+                output.push(added.token);
+                cursor = position.checked_add(added.content.len()).ok_or(
+                    NativeTokenizerError::ArithmeticOverflow("Qwen2 added token"),
+                )?;
+            } else {
+                cursor = end;
+            }
+        }
+        cancellation.check()?;
+        Ok(output)
+    }
+
+    fn next_added_token(&self, text: &str, cursor: usize) -> Option<(usize, &Qwen2AddedToken)> {
+        self.added_tokens
+            .iter()
+            .filter_map(|added| {
+                text[cursor..]
+                    .find(&added.content)
+                    .map(|offset| (cursor + offset, added))
+            })
+            .min_by(|(left_position, left), (right_position, right)| {
+                left_position
+                    .cmp(right_position)
+                    .then_with(|| right.content.len().cmp(&left.content.len()))
+                    .then_with(|| left.token.cmp(&right.token))
+            })
+    }
+
+    fn encode_ordinary(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+        output: &mut Vec<u32>,
+    ) -> Result<(), NativeTokenizerError> {
+        let mut covered = 0;
+        for matched in self.pretokenizer.find_iter(text) {
+            cancellation.check()?;
+            let matched = matched
+                .map_err(|error| NativeTokenizerError::Pretokenization(error.to_string()))?;
+            if matched.start() != covered {
+                return Err(NativeTokenizerError::Pretokenization(
+                    "pretokenizer did not cover the input contiguously".to_owned(),
+                ));
+            }
+            covered = matched.end();
+            let mut symbols = Vec::new();
+            symbols
+                .try_reserve_exact(matched.as_str().len())
+                .map_err(|_| NativeTokenizerError::Allocation("Qwen2 byte symbols"))?;
+            for byte in matched.as_str().as_bytes() {
+                symbols.push(self.byte_encoder[usize::from(*byte)].to_string());
+            }
+            self.apply_merges(&mut symbols, cancellation)?;
+            output
+                .try_reserve(symbols.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Qwen2 token output"))?;
+            for symbol in symbols {
+                output.push(
+                    *self
+                        .vocabulary
+                        .get(&symbol)
+                        .ok_or(NativeTokenizerError::InvalidVocabulary)?,
+                );
+            }
+            if output.len() > MAX_NATIVE_PROMPT_BYTES {
+                return Err(NativeTokenizerError::TooManyTokenValues(output.len()));
+            }
+        }
+        if covered != text.len() {
+            return Err(NativeTokenizerError::Pretokenization(
+                "pretokenizer did not consume the complete input".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn apply_merges(
+        &self,
+        symbols: &mut Vec<String>,
+        cancellation: &CancellationToken,
+    ) -> Result<(), NativeTokenizerError> {
+        loop {
+            cancellation.check()?;
+            let Some((selected_left, selected_right)) = symbols
+                .windows(2)
+                .filter_map(|pair| {
+                    self.merge_ranks
+                        .get(&(pair[0].clone(), pair[1].clone()))
+                        .map(|rank| (*rank, pair[0].as_str(), pair[1].as_str()))
+                })
+                .min_by_key(|(rank, _, _)| *rank)
+                .map(|(_, left, right)| (left.to_owned(), right.to_owned()))
+            else {
+                break;
+            };
+            let mut merged = Vec::new();
+            merged
+                .try_reserve_exact(symbols.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Qwen2 BPE merge"))?;
+            let mut index = 0;
+            while index < symbols.len() {
+                if index.is_multiple_of(256) {
+                    cancellation.check()?;
+                }
+                if symbols
+                    .get(index)
+                    .is_some_and(|value| value == &selected_left)
+                    && symbols
+                        .get(index + 1)
+                        .is_some_and(|value| value == &selected_right)
+                {
+                    let mut value = selected_left.clone();
+                    value.push_str(&selected_right);
+                    merged.push(value);
+                    index += 2;
+                } else {
+                    merged.push(symbols[index].clone());
+                    index += 1;
+                }
+            }
+            *symbols = merged;
+        }
+        Ok(())
+    }
+
+    pub fn decode(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokens.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(tokens.len()));
+        }
+        let mut output = String::new();
+        let mut bytes = Vec::new();
+        for (index, token) in tokens.iter().copied().enumerate() {
+            if index.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            if skip_special && self.special_tokens.contains(&token) {
+                continue;
+            }
+            if let Some(added) = self.added_tokens.iter().find(|added| added.token == token) {
+                flush_qwen2_bytes(&mut output, &mut bytes)?;
+                output
+                    .try_reserve(added.content.len())
+                    .map_err(|_| NativeTokenizerError::Allocation("Qwen2 decoded text"))?;
+                output.push_str(&added.content);
+                continue;
+            }
+            let piece = self
+                .tokens
+                .get(token as usize)
+                .ok_or(NativeTokenizerError::UnknownToken(token))?;
+            bytes
+                .try_reserve(piece.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Qwen2 decoded bytes"))?;
+            for character in piece.chars() {
+                bytes.push(
+                    *self
+                        .byte_decoder
+                        .get(&character)
+                        .ok_or(NativeTokenizerError::InvalidQwenByte(character))?,
+                );
+            }
+        }
+        flush_qwen2_bytes(&mut output, &mut bytes)?;
+        cancellation.check()?;
+        Ok(output)
+    }
+
+    fn resident_bytes(&self) -> Result<u64, NativeTokenizerError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| NativeTokenizerError::ArithmeticOverflow("Qwen2 residency"))?;
+        for value in self
+            .vocabulary
+            .keys()
+            .chain(self.tokens.iter())
+            .chain(self.added_tokens.iter().map(|token| &token.content))
+        {
+            bytes = bytes
+                .checked_add(
+                    u64::try_from(value.capacity())
+                        .map_err(|_| NativeTokenizerError::ArithmeticOverflow("Qwen2 residency"))?,
+                )
+                .ok_or(NativeTokenizerError::ArithmeticOverflow("Qwen2 residency"))?;
+        }
+        for (left, right) in self.merge_ranks.keys() {
+            bytes =
+                bytes
+                    .checked_add(u64::try_from(left.capacity() + right.capacity()).map_err(
+                        |_| NativeTokenizerError::ArithmeticOverflow("Qwen2 merge residency"),
+                    )?)
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow("Qwen2 residency"))?;
+        }
+        Ok(bytes)
+    }
+}
+
+fn validate_qwen2_configuration(
+    configuration: &serde_json::Value,
+    profile: Qwen2PretokenizerProfile,
+) -> Result<(), NativeTokenizerError> {
+    let string = |name| configuration.get(name).and_then(serde_json::Value::as_str);
+    let boolean = |name| configuration.get(name).and_then(serde_json::Value::as_bool);
+    if string("tokenizer_class") != Some("Qwen2Tokenizer")
+        || string("errors") != Some("replace")
+        || boolean("clean_up_tokenization_spaces") != Some(false)
+        || boolean("add_bos_token") != Some(false)
+        || boolean("add_prefix_space") != Some(false)
+        || boolean("split_special_tokens") != Some(false)
+        || !configuration
+            .get("bos_token")
+            .is_some_and(serde_json::Value::is_null)
+        || !configuration
+            .get("unk_token")
+            .is_some_and(serde_json::Value::is_null)
+    {
+        return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+            "Qwen2 tokenizer flags are unsupported".to_owned(),
+        ));
+    }
+    match profile {
+        Qwen2PretokenizerProfile::Qwen2 => {
+            if configuration.get("pretokenize_regex").is_some() {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Qwen2 profile unexpectedly declares a pretokenizer regex".to_owned(),
+                ));
+            }
+        }
+        Qwen2PretokenizerProfile::Qwen35Declared => {
+            if string("pretokenize_regex") != Some(QWEN35_PRETOKENIZER_PATTERN) {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Qwen3.5 pretokenizer regex does not match the checked artifact".to_owned(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn qwen2_byte_alphabet() -> Result<([char; 256], BTreeMap<char, u8>), NativeTokenizerError> {
+    let mut bytes = (b'!'..=b'~')
+        .chain(0xA1..=0xAC)
+        .chain(0xAE..=0xFF)
+        .collect::<Vec<_>>();
+    let mut codepoints = bytes
+        .iter()
+        .map(|byte| u32::from(*byte))
+        .collect::<Vec<_>>();
+    let mut extension = 0_u32;
+    for byte in 0_u8..=u8::MAX {
+        if !bytes.contains(&byte) {
+            bytes.push(byte);
+            codepoints.push(256 + extension);
+            extension += 1;
+        }
+    }
+    let mut encoder = ['\0'; 256];
+    let mut decoder = BTreeMap::new();
+    for (byte, codepoint) in bytes.into_iter().zip(codepoints) {
+        let character = char::from_u32(codepoint).ok_or(NativeTokenizerError::InvalidVocabulary)?;
+        encoder[usize::from(byte)] = character;
+        if decoder.insert(character, byte).is_some() {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+    }
+    Ok((encoder, decoder))
+}
+
+fn flush_qwen2_bytes(output: &mut String, bytes: &mut Vec<u8>) -> Result<(), NativeTokenizerError> {
+    if bytes.is_empty() {
+        return Ok(());
+    }
+    let decoded = String::from_utf8_lossy(bytes);
+    let length =
+        output
+            .len()
+            .checked_add(decoded.len())
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "Qwen2 decoded text",
+            ))?;
+    if length > MAX_NATIVE_PROMPT_BYTES {
+        return Err(NativeTokenizerError::TooManyTokenValues(length));
+    }
+    output
+        .try_reserve(decoded.len())
+        .map_err(|_| NativeTokenizerError::Allocation("Qwen2 decoded text"))?;
+    output.push_str(&decoded);
+    bytes.clear();
+    Ok(())
+}
+
 #[derive(Clone, Debug)]
 pub enum NativeTokenizerFamily {
     ClipBpe(ClipBpeTokenizer),
+    Qwen2ByteBpe(Qwen2BpeTokenizer),
     SentencePiece(SentencePieceTokenizer),
 }
 
@@ -1174,6 +1731,7 @@ impl NativeTokenizerFamily {
     ) -> Result<Vec<u32>, NativeTokenizerError> {
         match self {
             Self::ClipBpe(tokenizer) => tokenizer.encode(text, cancellation),
+            Self::Qwen2ByteBpe(tokenizer) => tokenizer.encode(text, cancellation),
             Self::SentencePiece(tokenizer) => tokenizer.encode(text, cancellation),
         }
     }
@@ -1186,6 +1744,7 @@ impl NativeTokenizerFamily {
     ) -> Result<String, NativeTokenizerError> {
         match self {
             Self::ClipBpe(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
+            Self::Qwen2ByteBpe(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
             Self::SentencePiece(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
         }
     }
@@ -1211,6 +1770,10 @@ impl NativePromptTokenizer {
             NativeTokenizerFamily::ClipBpe(tokenizer) => {
                 hasher.update(b"clip-bpe");
                 hasher.update(tokenizer.tokenizer.identity().digest().as_bytes());
+            }
+            NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => {
+                hasher.update(b"qwen2-byte-bpe");
+                hasher.update(tokenizer.artifact_digest().as_bytes());
             }
             NativeTokenizerFamily::SentencePiece(tokenizer) => {
                 hasher.update(b"sentencepiece");
@@ -1245,7 +1808,7 @@ impl NativePromptTokenizer {
             return Err(NativeTokenizerError::PromptTooLarge(text.len()));
         }
         let content = self.family.encode(text, cancellation)?;
-        let token_count = content
+        let unpadded_count = content
             .len()
             .checked_add(usize::from(self.configuration.start_token.is_some()))
             .and_then(|count| {
@@ -1254,6 +1817,7 @@ impl NativePromptTokenizer {
             .ok_or(NativeTokenizerError::ArithmeticOverflow(
                 "numeric prompt tokens",
             ))?;
+        let token_count = unpadded_count.max(self.configuration.minimum_length.unwrap_or(0));
         if token_count == 0 || token_count > self.configuration.maximum_length {
             return Err(NativeTokenizerError::TooManyTokenValues(token_count));
         }
@@ -1264,6 +1828,7 @@ impl NativePromptTokenizer {
         tokens.extend(self.configuration.start_token);
         tokens.extend(content);
         tokens.extend(self.configuration.end_token);
+        tokens.resize(token_count, self.configuration.pad_token);
         cancellation.check()?;
         Ok(tokens)
     }
@@ -1291,6 +1856,7 @@ impl NativePromptTokenizer {
                 .tokenizer
                 .resident_bytes()
                 .map_err(NativeTokenizerError::from)?,
+            NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => tokenizer.resident_bytes()?,
             NativeTokenizerFamily::SentencePiece(tokenizer) => {
                 let mut family_bytes = u64::try_from(std::mem::size_of::<SentencePieceTokenizer>())
                     .map_err(|_| {
@@ -1787,10 +2353,18 @@ pub enum NativeTokenizerError {
     InvalidVocabulary,
     #[error("native tokenizer vocabulary JSON is invalid: {0}")]
     InvalidVocabularyJson(String),
+    #[error("native tokenizer configuration is invalid: {0}")]
+    InvalidTokenizerConfiguration(String),
+    #[error("native tokenizer merge table is invalid")]
+    InvalidMerges,
+    #[error("native tokenizer pretokenization failed: {0}")]
+    Pretokenization(String),
     #[error("unknown token ID {0}")]
     UnknownToken(u32),
     #[error("CLIP vocabulary contains an invalid byte-encoding character {0:?}")]
     InvalidClipByte(char),
+    #[error("Qwen2 vocabulary contains an invalid byte-encoding character {0:?}")]
+    InvalidQwenByte(char),
     #[error("decoded CLIP bytes are not valid UTF-8")]
     InvalidDecodedUtf8,
     #[error("invalid UTF-8 token boundary")]

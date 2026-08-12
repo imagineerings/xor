@@ -3758,6 +3758,7 @@ dependencies = [
  "cap-std",
  "comfy_tensor",
  "comfy_types",
+ "fancy-regex 0.17.0",
  "libc",
  "regex",
  "serde",
@@ -3765,6 +3766,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "thiserror 2.0.18",
+ "unicode-normalization",
  "windows 0.61.3",
 ]
 
