@@ -11868,6 +11868,109 @@
       "decision_reason": "The multimodal adapter is the sole owner of Qwen3-VL source-specific formatting, bounded IMAGE preparation, temporal/spatial patch ordering, marker-span planning, visual masks, and three-axis position construction. It returns only checked attempt-local tensors and immutable plans, delegates resize/storage/workspace/cancellation to comfy_tensor, and cannot own tokenizer parsing, retained weights, decoder execution, RNG, KV state, caching, persistence, handles, or publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_projection_qwen",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeQwenVisionEncoder",
+        "QwenVisionConfiguration",
+        "QwenVisionFamily",
+        "QwenVisionWeights",
+        "QwenVisionProjection"
+      ],
+      "allowed_adapters": [
+        "The canonical Qwen IMAGE preparation owner supplies bounded normalized and merge-ordered patches and remains the sole marker and resize owner",
+        "NativeModule, comfy_tensor attention, tensor storage, workspace, memory, stream, and cancellation owners supply exact numerical primitives without retaining a second vision graph",
+        "The dependent Qwen multimodal resource may retain this owner and include its semantic digest and StorageId projection but cannot duplicate its graph",
+        "NativeDecoderTextEncoder remains the sole decoder, deepstack injection, KV, sampler, stopping, and borrowed RNG transaction owner",
+        "Runtime controller, executor, NativeCache, persistence, and output transactions remain the sole handle-resolution, caching, restart, and publication owners"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeQwenVisionEncoder \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
+          "role": "canonical_state",
+          "symbol": "NativeQwenVisionEncoder"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct QwenVisionWeights \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::QwenVisionWeights",
+          "role": "canonical_state",
+          "symbol": "QwenVisionWeights"
+        }
+      ],
+      "call_symbols": [
+        "NativeQwenVisionEncoder::new",
+        "NativeQwenVisionEncoder::project",
+        "NativeQwenVisionEncoder::semantic_state_digest",
+        "NativeQwenVisionEncoder::resident_tensor_allocations"
+      ],
+      "required_mappings": [
+        {
+          "name": "qwen-vision-retains-complete-checked-module-graph",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeQwenVisionEncoder[\\s\\S]*patch_projection: NativeModule[\\s\\S]*position_embedding: Tensor[\\s\\S]*blocks: Vec<NativeQwenVisionBlock>[\\s\\S]*deepstack_mergers: Vec<NativeQwenVisionMerger>"
+        },
+        {
+          "name": "qwen-vision-projects-positions-attention-and-exact-mergers",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn project[\\s\\S]*qwen_add_interpolated_positions[\\s\\S]*block.forward[\\s\\S]*deepstack_mergers[\\s\\S]*merger.forward"
+        },
+        {
+          "name": "qwen-vision-delegates-canonical-attention-and-module-kernels",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "fn qwen_vision_attention[\\s\\S]*scaled_dot_product_attention_with_context[\\s\\S]*AttentionFallbackPolicy::AllowExactNative"
+        },
+        {
+          "name": "qwen-vision-binds-semantic-state-and-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn semantic_state_digest[\\s\\S]*position_embedding.contiguous_bytes[\\s\\S]*module.semantic_state_digest[\\s\\S]*pub fn resident_tensor_allocations"
+        },
+        {
+          "name": "qwen-vision-tests-family-exactness-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "retained_qwen_vision_executes_closed_family_graphs_and_rolls_back[\\s\\S]*QWEN35_IMAGE_MEAN[\\s\\S]*QWEN35_IMAGE_PAD_TOKEN[\\s\\S]*deepstack.len\\(\\), 3[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-qwen-vision-projection-foundation"
+      ],
+      "production_consumers": [
+        "retained native Qwen multimodal CLIP resource",
+        "retained native Qwen multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeQwenVisionEncoder is the sole retained Qwen3-VL and Qwen3.5 visual graph owner. It validates a closed family profile and complete checkpoint tensor set, executes patch projection, learned position interpolation, two-axis rotary attention, exact affine block and merger equations, and Qwen3-VL capture mergers, and returns only checked invocation-local tensors. It delegates preparation, primitive kernels, decoder state, RNG, resource handles, caching, persistence, and publication to their canonical owners."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

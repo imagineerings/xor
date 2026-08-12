@@ -2647,6 +2647,81 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task386_qwen_vision_has_one_retained_checkpoint_owner =
+        production_source_occurrences(&sources, "pub struct NativeQwenVisionEncoder {").len() == 1
+            && production_source_occurrences(&sources, "fn qwen_vision_attention(").len() == 1
+            && model_clip_text_encoder_multimodal.contains("pub struct QwenVisionWeights")
+            && model_clip_text_encoder_multimodal.contains("pub struct QwenVisionProjection")
+            && !model_clip_text_encoder_multimodal.contains("NativeClipVision::new");
+    let task386_qwen_vision_delegates_preparation_modules_attention_and_residency =
+        model_clip_text_encoder_multimodal.contains("pub fn prepare_qwen_images(")
+            && model_clip_text_encoder_multimodal.contains("pub fn plan_qwen_markers(")
+            && model_clip_text_encoder_multimodal
+                .contains("scaled_dot_product_attention_with_context(")
+            && model_clip_text_encoder_multimodal.contains("GeluApproximation::Tanh")
+            && model_clip_text_encoder_multimodal.contains("GeluApproximation::None")
+            && model_clip_text_encoder_multimodal.contains("semantic_state_digest(")
+            && model_clip_text_encoder_multimodal.contains("resident_tensor_allocations(")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task386_qwen_vision_fixture_proves_family_exactness_and_rollback =
+        model_clip_text_encoder_multimodal_tests
+            .contains("retained_qwen_vision_executes_closed_family_graphs_and_rolls_back")
+            && model_clip_text_encoder_multimodal_tests.contains("QWEN35_IMAGE_PAD_TOKEN")
+            && model_clip_text_encoder_multimodal_tests.contains("QWEN35_IMAGE_MEAN")
+            && model_clip_text_encoder_multimodal_tests
+                .contains("16a13ffa41fb0a5f742f0e8c3b2364fa4020dd2cb9a71e1309e62d6e143cb8ed")
+            && model_clip_text_encoder_multimodal_tests.contains("deepstack.len(), 3")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task386_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_projection_qwen")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-qwen-vision-projection-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "qwen-vision-retains-complete-checked-module-graph",
+                            "qwen-vision-projects-positions-attention-and-exact-mergers",
+                            "qwen-vision-delegates-canonical-attention-and-module-kernels",
+                            "qwen-vision-binds-semantic-state-and-storage-residency",
+                            "qwen-vision-tests-family-exactness-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task386_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| line.starts_with("native_vision_text_transformer_text_media_projection_qwen,"))
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-qwen-vision-projection-foundation")
+                && line.contains("VAL-MODEL-FAMILY-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task381p_qwen_preparation_has_one_attempt_local_owner =
         production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
             && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
@@ -8705,6 +8780,22 @@ fn run_ownership_validation(
             task385_qwen35_fixture_proves_hybrid_equivalence_and_admission,
         ),
         (
+            "task386_policy_and_catalog_trace_qwen_vision",
+            task386_policy_trace && task386_catalog_trace,
+        ),
+        (
+            "task386_qwen_vision_has_one_retained_checkpoint_owner",
+            task386_qwen_vision_has_one_retained_checkpoint_owner,
+        ),
+        (
+            "task386_qwen_vision_delegates_preparation_modules_attention_and_residency",
+            task386_qwen_vision_delegates_preparation_modules_attention_and_residency,
+        ),
+        (
+            "task386_qwen_vision_fixture_proves_family_exactness_and_rollback",
+            task386_qwen_vision_fixture_proves_family_exactness_and_rollback,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -9250,6 +9341,17 @@ fn val_ownership_task385_qwen35_decoder_001() -> Result<(), Box<dyn std::error::
         "val-ownership-task385-qwen35-decoder-001.json",
         "val_ownership_task385_qwen35_decoder_001",
         Some("task385_"),
+    )
+}
+
+#[test]
+fn val_ownership_task386_qwen_vision_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task386-qwen-vision-and-retained-projection-ownership",
+        "val-ownership-task386-qwen-vision-001.json",
+        "val_ownership_task386_qwen_vision_001",
+        Some("task386_"),
     )
 }
 

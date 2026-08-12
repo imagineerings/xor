@@ -2,12 +2,15 @@ use comfy_model::{
     IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
-    OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256,
-    QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, SAM3_CLIP_SOURCE_PATH,
-    SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, format_ideogram4_prompt, format_ovis_prompt,
-    format_qwen3vl_prompt, ideogram4_project_taps, join_multimodal_embeddings,
-    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
-    pack_sam3_conditions, parse_sam3_prompts, plan_qwen3vl_markers, prepare_qwen3vl_images,
+    NativeQwenVisionEncoder, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
+    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
+    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION,
+    QwenVisionBlockWeights, QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights,
+    QwenVisionWeights, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
+    plan_qwen_markers, plan_qwen3vl_markers, prepare_qwen_images, prepare_qwen3vl_images,
     qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
 use comfy_tensor::{
@@ -53,6 +56,110 @@ fn tensor(
     let descriptor =
         TensorDescriptor::contiguous(shape.to_vec(), DType::F32, DeviceId::CPU, context.stream)?;
     Ok(backend.upload_f32(descriptor, values, context)?.0)
+}
+
+fn filled_tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    value: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn Error>> {
+    let elements = shape.iter().try_fold(1_usize, |total, dimension| {
+        total.checked_mul(usize::try_from(*dimension).ok()?)
+    });
+    tensor(
+        backend,
+        shape,
+        &vec![value; elements.ok_or("fixture tensor shape overflowed")?],
+        context,
+    )
+}
+
+fn reduced_qwen_vision_weights(
+    backend: &CpuBackend,
+    configuration: &QwenVisionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<QwenVisionWeights, Box<dyn Error>> {
+    let hidden = u64::try_from(configuration.hidden_size)?;
+    let intermediate = u64::try_from(configuration.intermediate_size)?;
+    let output = u64::try_from(configuration.output_hidden_size)?;
+    let merge_width = hidden.checked_mul(4).ok_or("merge width overflowed")?;
+    let patch_width = 3 * 2 * 16 * 16;
+    let mut patch_values = vec![0.0_f32; configuration.hidden_size * patch_width];
+    for hidden_index in 0..configuration.hidden_size {
+        patch_values[hidden_index * patch_width + hidden_index] =
+            0.125 + hidden_index as f32 * 0.025;
+    }
+    let patch_weight = tensor(
+        backend,
+        &[hidden, u64::try_from(patch_width)?],
+        &patch_values,
+        context,
+    )?;
+    let patch_bias = filled_tensor(backend, &[hidden], 0.01, context)?;
+    let mut position_values = vec![0.0_f32; 2304 * configuration.hidden_size];
+    for position in 0..2304 {
+        for hidden_index in 0..configuration.hidden_size {
+            position_values[position * configuration.hidden_size + hidden_index] =
+                position as f32 * 0.0001 + hidden_index as f32 * 0.001;
+        }
+    }
+    let position_embedding = tensor(backend, &[2304, hidden], &position_values, context)?;
+    let mut blocks = Vec::new();
+    for layer in 0..configuration.layer_count {
+        let scale = 0.001 + layer as f32 * 0.00001;
+        blocks.push(QwenVisionBlockWeights {
+            normalization_one_weight: filled_tensor(backend, &[hidden], 1.0, context)?,
+            normalization_one_bias: filled_tensor(backend, &[hidden], 0.0, context)?,
+            query_key_value_weight: filled_tensor(backend, &[hidden * 3, hidden], scale, context)?,
+            query_key_value_bias: filled_tensor(backend, &[hidden * 3], 0.0, context)?,
+            attention_output_weight: filled_tensor(backend, &[hidden, hidden], scale, context)?,
+            attention_output_bias: filled_tensor(backend, &[hidden], 0.0, context)?,
+            normalization_two_weight: filled_tensor(backend, &[hidden], 1.0, context)?,
+            normalization_two_bias: filled_tensor(backend, &[hidden], 0.0, context)?,
+            feed_forward_up_weight: filled_tensor(
+                backend,
+                &[intermediate, hidden],
+                scale,
+                context,
+            )?,
+            feed_forward_up_bias: filled_tensor(backend, &[intermediate], 0.0, context)?,
+            feed_forward_down_weight: filled_tensor(
+                backend,
+                &[hidden, intermediate],
+                scale,
+                context,
+            )?,
+            feed_forward_down_bias: filled_tensor(backend, &[hidden], 0.0, context)?,
+        });
+    }
+    let merger = QwenVisionMergerWeights {
+        normalization_weight: filled_tensor(backend, &[hidden], 1.0, context)?,
+        normalization_bias: filled_tensor(backend, &[hidden], 0.0, context)?,
+        first_weight: filled_tensor(backend, &[merge_width, merge_width], 0.01, context)?,
+        first_bias: filled_tensor(backend, &[merge_width], 0.0, context)?,
+        second_weight: filled_tensor(backend, &[output, merge_width], 0.02, context)?,
+        second_bias: filled_tensor(backend, &[output], 0.0, context)?,
+    };
+    let mut deepstack_mergers = Vec::new();
+    for _ in configuration.family.deepstack_layers() {
+        deepstack_mergers.push(QwenVisionMergerWeights {
+            normalization_weight: filled_tensor(backend, &[merge_width], 1.0, context)?,
+            normalization_bias: filled_tensor(backend, &[merge_width], 0.0, context)?,
+            first_weight: filled_tensor(backend, &[merge_width, merge_width], 0.015, context)?,
+            first_bias: filled_tensor(backend, &[merge_width], 0.0, context)?,
+            second_weight: filled_tensor(backend, &[output, merge_width], 0.025, context)?,
+            second_bias: filled_tensor(backend, &[output], 0.0, context)?,
+        });
+    }
+    Ok(QwenVisionWeights {
+        patch_weight,
+        patch_bias,
+        position_embedding,
+        blocks,
+        merger,
+        deepstack_mergers,
+    })
 }
 
 #[test]
@@ -325,6 +432,127 @@ fn qwen3vl_preparation_cancellation_and_oom_leave_workspace_empty() -> Result<()
         prepare_qwen3vl_images(&backend, &invalid, &setup_context),
         Err(MultimodalTextError::InvalidInput(_))
     ));
+    Ok(())
+}
+
+#[test]
+fn retained_qwen_vision_executes_closed_family_graphs_and_rolls_back() -> Result<(), Box<dyn Error>>
+{
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let image = ImageTensor::from_f32(&backend, &setup, 1, 32, 32, 3, &vec![0.5; 32 * 32 * 3])?;
+    let qwen35_prepared =
+        prepare_qwen_images(&backend, &image, QwenVisionFamily::Qwen35_08B, &setup)?;
+    let qwen35_values = tensor_to_f32(&backend, qwen35_prepared[0].patches(), &setup)?;
+    assert!(
+        (qwen35_values[0] - (0.5 - QWEN35_IMAGE_MEAN[0]) / QWEN35_IMAGE_STANDARD_DEVIATION[0])
+            .abs()
+            < 1.0e-6
+    );
+    drop(qwen35_values);
+    let qwen35_plan = plan_qwen_markers(
+        &[1, QWEN35_IMAGE_PAD_TOKEN, 2],
+        &qwen35_prepared,
+        QwenVisionFamily::Qwen35_08B,
+        &cancellation,
+    )?;
+    assert_eq!(qwen35_plan.spans()[0].size, 4);
+    assert!(
+        plan_qwen_markers(
+            &[1, QWEN3VL_IMAGE_PAD_TOKEN, 2],
+            &qwen35_prepared,
+            QwenVisionFamily::Qwen35_08B,
+            &cancellation,
+        )
+        .is_err()
+    );
+
+    let qwen35_configuration =
+        QwenVisionConfiguration::reduced_fixture(QwenVisionFamily::Qwen35_08B, 4, 8, 2, 1, 6);
+    let qwen35 = NativeQwenVisionEncoder::new(
+        qwen35_configuration.clone(),
+        reduced_qwen_vision_weights(&backend, &qwen35_configuration, &setup)?,
+    )?;
+    let qwen35_digest = qwen35.semantic_state_digest(&cancellation)?;
+    assert_eq!(qwen35_digest.len(), 64);
+    assert!(qwen35.resident_bytes()? > 0);
+    let qwen35_projection = qwen35.project(&backend, &qwen35_prepared[0], &setup)?;
+    assert_eq!(qwen35_projection.embedding.descriptor().shape(), [4, 6]);
+    assert!(qwen35_projection.deepstack.is_empty());
+    let qwen35_output = tensor_to_f32(&backend, &qwen35_projection.embedding, &setup)?;
+    assert!(qwen35_output.iter().all(|value| value.is_finite()));
+    assert!(qwen35_output.iter().any(|value| *value != 0.0));
+    let qwen35_output_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            qwen35_output
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(
+        qwen35_output_digest,
+        "16a13ffa41fb0a5f742f0e8c3b2364fa4020dd2cb9a71e1309e62d6e143cb8ed"
+    );
+    let mut batch_pixels = vec![0.5_f32; 2 * 32 * 32 * 3];
+    batch_pixels[32 * 32 * 3..].fill(0.75);
+    let image_batch = ImageTensor::from_f32(&backend, &setup, 2, 32, 32, 3, &batch_pixels)?;
+    let batch_prepared =
+        prepare_qwen_images(&backend, &image_batch, QwenVisionFamily::Qwen35_08B, &setup)?;
+    let isolated_first = qwen35.project(&backend, &batch_prepared[0], &setup)?;
+    let isolated_second = qwen35.project(&backend, &batch_prepared[1], &setup)?;
+    assert_eq!(
+        &*tensor_to_f32(&backend, &isolated_first.embedding, &setup)?,
+        &*qwen35_output
+    );
+    assert_ne!(
+        &*tensor_to_f32(&backend, &isolated_second.embedding, &setup)?,
+        &*qwen35_output
+    );
+    drop(qwen35_output);
+
+    let qwen3_prepared =
+        prepare_qwen_images(&backend, &image, QwenVisionFamily::Qwen3Vl4B, &setup)?;
+    let qwen3_configuration =
+        QwenVisionConfiguration::reduced_fixture(QwenVisionFamily::Qwen3Vl4B, 4, 8, 18, 1, 6);
+    let qwen3 = NativeQwenVisionEncoder::new(
+        qwen3_configuration.clone(),
+        reduced_qwen_vision_weights(&backend, &qwen3_configuration, &setup)?,
+    )?;
+    let qwen3_projection = qwen3.project(&backend, &qwen3_prepared[0], &setup)?;
+    assert_eq!(qwen3_projection.embedding.descriptor().shape(), [4, 6]);
+    assert_eq!(qwen3_projection.deepstack.len(), 3);
+    assert!(
+        qwen3_projection
+            .deepstack
+            .iter()
+            .all(|tensor| tensor.descriptor().shape() == [4, 6])
+    );
+    assert_ne!(qwen3.semantic_state_digest(&cancellation)?, qwen35_digest);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 48 * 1024 * 1024)?;
+    assert!(matches!(
+        qwen35.project(&backend, &qwen35_prepared[0], &cancelled_context),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+    let constrained = context(&authority, &cancellation, 4)?;
+    assert!(
+        qwen35
+            .project(&backend, &qwen35_prepared[0], &constrained)
+            .is_err()
+    );
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    drop(qwen3_projection);
+    drop(qwen35_projection);
+    drop(qwen3_prepared);
+    drop(qwen35_prepared);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

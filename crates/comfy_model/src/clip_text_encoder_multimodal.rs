@@ -1,13 +1,18 @@
 use crate::{
+    AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
     BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest, ClipTextError,
     ClipTextOutput, ClipTextRequest, ClipVisionError, ClipVisionIntermediate, ClipVisionOutput,
-    DecoderTextError, DecoderTextOutput, DecoderTextRequest, NativeClipText, NativeClipVision,
-    NativeDecoderTextEncoder, NativeT5TextEncoder,
+    DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText,
+    NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError, NativeT5TextEncoder,
+    scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode, Tensor,
     TensorDescriptor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
+    generated_native_diffusion::{
+        NativeDiffusionTensorError, add as native_tensor_add, tensor_from_f32, tensor_to_f32,
+    },
     generated_shape_layout_transform_02::{
         ShapeLayoutTransformPartTwoError, torch_cat_with_context_exact_native,
         torch_reshape_with_context_exact_native,
@@ -16,6 +21,7 @@ use comfy_tensor::{
         ShapeLayoutTransformPartThreeError, tensor_permute_exact_native,
     },
 };
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub const IDEOGRAM4_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/ideogram4.py";
@@ -43,6 +49,9 @@ pub const QWEN3VL_4B_DEEPSTACK_LAYERS: [usize; 3] = [5, 11, 17];
 pub const QWEN3VL_8B_DEEPSTACK_LAYERS: [usize; 3] = [8, 16, 24];
 pub const QWEN2VL_FULL_ATTENTION_LAYERS: [usize; 4] = [7, 15, 23, 31];
 pub const QWEN3VL_IMAGE_PAD_TOKEN: i64 = 151_655;
+pub const QWEN35_IMAGE_PAD_TOKEN: i64 = 248_056;
+pub const QWEN35_IMAGE_MEAN: [f32; 3] = [0.48145466, 0.4578275, 0.40821073];
+pub const QWEN35_IMAGE_STANDARD_DEVIATION: [f32; 3] = [0.26862954, 0.26130258, 0.27577711];
 pub const QWEN3VL_IMAGE_MINIMUM_PIXELS: u64 = 3_136;
 pub const QWEN3VL_IMAGE_MAXIMUM_PIXELS: u64 = 12_845_056;
 pub const QWEN3VL_IMAGE_PATCH_SIZE: usize = 16;
@@ -444,6 +453,210 @@ impl Qwen3VlPreparedImage {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QwenVisionFamily {
+    Qwen3Vl4B,
+    Qwen3Vl8B,
+    Qwen35_08B,
+    Qwen35_2B,
+    Qwen35_4B,
+    Qwen35_9B,
+    Qwen35_27B,
+}
+
+impl QwenVisionFamily {
+    pub const fn image_pad_token(self) -> i64 {
+        match self {
+            Self::Qwen3Vl4B | Self::Qwen3Vl8B => QWEN3VL_IMAGE_PAD_TOKEN,
+            Self::Qwen35_08B
+            | Self::Qwen35_2B
+            | Self::Qwen35_4B
+            | Self::Qwen35_9B
+            | Self::Qwen35_27B => QWEN35_IMAGE_PAD_TOKEN,
+        }
+    }
+
+    pub const fn normalization(self) -> ([f32; 3], [f32; 3]) {
+        match self {
+            Self::Qwen3Vl4B | Self::Qwen3Vl8B => ([0.5; 3], [0.5; 3]),
+            Self::Qwen35_08B
+            | Self::Qwen35_2B
+            | Self::Qwen35_4B
+            | Self::Qwen35_9B
+            | Self::Qwen35_27B => (QWEN35_IMAGE_MEAN, QWEN35_IMAGE_STANDARD_DEVIATION),
+        }
+    }
+
+    pub const fn deepstack_layers(self) -> &'static [usize] {
+        match self {
+            Self::Qwen3Vl4B => &QWEN3VL_4B_DEEPSTACK_LAYERS,
+            Self::Qwen3Vl8B => &QWEN3VL_8B_DEEPSTACK_LAYERS,
+            _ => &[],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QwenVisionConfiguration {
+    pub family: QwenVisionFamily,
+    pub hidden_size: usize,
+    pub intermediate_size: usize,
+    pub layer_count: usize,
+    pub attention_heads: usize,
+    pub output_hidden_size: usize,
+    pub position_embeddings: usize,
+    pub spatial_merge_size: usize,
+    pub source_exact_profile: bool,
+}
+
+impl QwenVisionConfiguration {
+    pub fn source(family: QwenVisionFamily) -> Self {
+        let (hidden_size, intermediate_size, layer_count, attention_heads, output_hidden_size) =
+            match family {
+                QwenVisionFamily::Qwen3Vl4B => (1024, 4096, 24, 16, 2560),
+                QwenVisionFamily::Qwen3Vl8B => (1152, 4304, 27, 16, 4096),
+                QwenVisionFamily::Qwen35_08B => (768, 3072, 12, 12, 1024),
+                QwenVisionFamily::Qwen35_2B => (1024, 4096, 24, 16, 2048),
+                QwenVisionFamily::Qwen35_4B => (1024, 4096, 24, 16, 2560),
+                QwenVisionFamily::Qwen35_9B => (1152, 4304, 27, 16, 4096),
+                QwenVisionFamily::Qwen35_27B => (1152, 4304, 27, 16, 5120),
+            };
+        Self {
+            family,
+            hidden_size,
+            intermediate_size,
+            layer_count,
+            attention_heads,
+            output_hidden_size,
+            position_embeddings: 2304,
+            spatial_merge_size: 2,
+            source_exact_profile: true,
+        }
+    }
+
+    pub fn reduced_fixture(
+        family: QwenVisionFamily,
+        hidden_size: usize,
+        intermediate_size: usize,
+        layer_count: usize,
+        attention_heads: usize,
+        output_hidden_size: usize,
+    ) -> Self {
+        Self {
+            family,
+            hidden_size,
+            intermediate_size,
+            layer_count,
+            attention_heads,
+            output_hidden_size,
+            position_embeddings: 2304,
+            spatial_merge_size: 2,
+            source_exact_profile: false,
+        }
+    }
+
+    fn validate(&self) -> Result<(), MultimodalTextError> {
+        if self.hidden_size == 0
+            || self.intermediate_size == 0
+            || self.layer_count == 0
+            || self.attention_heads == 0
+            || !self.hidden_size.is_multiple_of(self.attention_heads)
+            || self.output_hidden_size == 0
+            || self.position_embeddings != 2304
+            || self.spatial_merge_size != 2
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen vision configuration dimensions are invalid",
+            ));
+        }
+        if self.source_exact_profile && self != &Self::source(self.family) {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen production vision configuration does not match its closed source profile",
+            ));
+        }
+        let deepstack = self.family.deepstack_layers();
+        if !deepstack.is_empty() && deepstack.iter().any(|layer| *layer >= self.layer_count) {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen deepstack capture layers exceed the vision depth",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct QwenVisionBlockWeights {
+    pub normalization_one_weight: Tensor,
+    pub normalization_one_bias: Tensor,
+    pub query_key_value_weight: Tensor,
+    pub query_key_value_bias: Tensor,
+    pub attention_output_weight: Tensor,
+    pub attention_output_bias: Tensor,
+    pub normalization_two_weight: Tensor,
+    pub normalization_two_bias: Tensor,
+    pub feed_forward_up_weight: Tensor,
+    pub feed_forward_up_bias: Tensor,
+    pub feed_forward_down_weight: Tensor,
+    pub feed_forward_down_bias: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct QwenVisionMergerWeights {
+    pub normalization_weight: Tensor,
+    pub normalization_bias: Tensor,
+    pub first_weight: Tensor,
+    pub first_bias: Tensor,
+    pub second_weight: Tensor,
+    pub second_bias: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct QwenVisionWeights {
+    pub patch_weight: Tensor,
+    pub patch_bias: Tensor,
+    pub position_embedding: Tensor,
+    pub blocks: Vec<QwenVisionBlockWeights>,
+    pub merger: QwenVisionMergerWeights,
+    pub deepstack_mergers: Vec<QwenVisionMergerWeights>,
+}
+
+#[derive(Clone, Debug)]
+struct NativeQwenVisionBlock {
+    normalization_one: NativeModule,
+    query_key_value: NativeModule,
+    attention_output: NativeModule,
+    normalization_two: NativeModule,
+    feed_forward_up: NativeModule,
+    feed_forward_activation: NativeModule,
+    feed_forward_down: NativeModule,
+}
+
+#[derive(Clone, Debug)]
+struct NativeQwenVisionMerger {
+    normalization: NativeModule,
+    first: NativeModule,
+    activation: NativeModule,
+    second: NativeModule,
+    normalization_after_merge: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeQwenVisionEncoder {
+    configuration: QwenVisionConfiguration,
+    patch_projection: NativeModule,
+    position_embedding: Tensor,
+    blocks: Vec<NativeQwenVisionBlock>,
+    merger: NativeQwenVisionMerger,
+    deepstack_mergers: Vec<NativeQwenVisionMerger>,
+}
+
+#[derive(Clone, Debug)]
+pub struct QwenVisionProjection {
+    pub embedding: Tensor,
+    pub deepstack: Vec<Tensor>,
+    pub grid_thw: [usize; 3],
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Qwen3VlMarkerPlan {
     expanded_tokens: Vec<i64>,
@@ -503,6 +716,12 @@ pub enum MultimodalTextError {
     ClipText(#[from] ClipTextError),
     #[error(transparent)]
     ClipVision(#[from] ClipVisionError),
+    #[error(transparent)]
+    Attention(#[from] AttentionError),
+    #[error(transparent)]
+    NativeOps(#[from] NativeOpsError),
+    #[error(transparent)]
+    NativeTensor(#[from] NativeDiffusionTensorError),
     #[error("multimodal text input is invalid: {0}")]
     InvalidInput(&'static str),
     #[error("multimodal text arithmetic overflowed while computing {0}")]
@@ -711,6 +930,15 @@ pub fn prepare_qwen3vl_images(
     images: &ImageTensor,
     context: &ExecutionContext<'_>,
 ) -> Result<Vec<Qwen3VlPreparedImage>, MultimodalTextError> {
+    prepare_qwen_images(backend, images, QwenVisionFamily::Qwen3Vl8B, context)
+}
+
+pub fn prepare_qwen_images(
+    backend: &CpuBackend,
+    images: &ImageTensor,
+    family: QwenVisionFamily,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Qwen3VlPreparedImage>, MultimodalTextError> {
     context.cancellation.check()?;
     let (batch, height, width, channels) = images.dimensions()?;
     if batch == 0 || channels != 3 {
@@ -766,6 +994,7 @@ pub fn prepare_qwen3vl_images(
             &resized,
             target_height,
             target_width,
+            family,
             context,
         )?);
     }
@@ -778,10 +1007,20 @@ pub fn plan_qwen3vl_markers(
     images: &[Qwen3VlPreparedImage],
     cancellation: &comfy_types::CancellationToken,
 ) -> Result<Qwen3VlMarkerPlan, MultimodalTextError> {
+    plan_qwen_markers(tokens, images, QwenVisionFamily::Qwen3Vl8B, cancellation)
+}
+
+pub fn plan_qwen_markers(
+    tokens: &[i64],
+    images: &[Qwen3VlPreparedImage],
+    family: QwenVisionFamily,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<Qwen3VlMarkerPlan, MultimodalTextError> {
     cancellation.check()?;
+    let image_pad_token = family.image_pad_token();
     let marker_count = tokens
         .iter()
-        .filter(|token| **token == QWEN3VL_IMAGE_PAD_TOKEN)
+        .filter(|token| **token == image_pad_token)
         .count();
     if marker_count != images.len() {
         return Err(MultimodalTextError::InvalidInput(
@@ -791,7 +1030,7 @@ pub fn plan_qwen3vl_markers(
     let mut expanded_length = 0_usize;
     let mut length_image_index = 0_usize;
     for token in tokens {
-        let token_length = if *token == QWEN3VL_IMAGE_PAD_TOKEN {
+        let token_length = if *token == image_pad_token {
             let image = images
                 .get(length_image_index)
                 .ok_or(MultimodalTextError::InvalidInput(
@@ -821,7 +1060,7 @@ pub fn plan_qwen3vl_markers(
         if token_index.is_multiple_of(256) {
             cancellation.check()?;
         }
-        if token != QWEN3VL_IMAGE_PAD_TOKEN {
+        if token != image_pad_token {
             expanded_tokens.push(token);
             continue;
         }
@@ -869,6 +1108,867 @@ pub fn plan_qwen3vl_markers(
         spans,
         visual_position_mask,
     })
+}
+
+impl NativeQwenVisionEncoder {
+    pub fn new(
+        configuration: QwenVisionConfiguration,
+        weights: QwenVisionWeights,
+    ) -> Result<Self, MultimodalTextError> {
+        configuration.validate()?;
+        if weights.blocks.len() != configuration.layer_count
+            || weights.deepstack_mergers.len() != configuration.family.deepstack_layers().len()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen vision block or deepstack weight count does not match the profile",
+            ));
+        }
+        let stream = weights.patch_weight.descriptor().stream();
+        let patch_width = 3
+            * QWEN3VL_IMAGE_TEMPORAL_PATCH_SIZE
+            * QWEN3VL_IMAGE_PATCH_SIZE
+            * QWEN3VL_IMAGE_PATCH_SIZE;
+        let patch_projection = qwen_linear_module(
+            "qwen_vision.patch_projection",
+            patch_width,
+            configuration.hidden_size,
+            weights.patch_weight,
+            Some(weights.patch_bias),
+            stream,
+        )?;
+        qwen_require_parameter_shape(
+            &weights.position_embedding,
+            &[configuration.position_embeddings, configuration.hidden_size],
+            stream,
+        )?;
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(configuration.layer_count)
+            .map_err(|_| MultimodalTextError::Overflow("Qwen vision blocks"))?;
+        for (index, weights) in weights.blocks.into_iter().enumerate() {
+            blocks.push(qwen_vision_block(index, &configuration, weights, stream)?);
+        }
+        let merger = qwen_vision_merger(
+            "qwen_vision.merger",
+            &configuration,
+            weights.merger,
+            false,
+            stream,
+        )?;
+        let mut deepstack_mergers = Vec::new();
+        deepstack_mergers
+            .try_reserve_exact(weights.deepstack_mergers.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen deepstack mergers"))?;
+        for (index, weights) in weights.deepstack_mergers.into_iter().enumerate() {
+            deepstack_mergers.push(qwen_vision_merger(
+                &format!("qwen_vision.deepstack.{index}"),
+                &configuration,
+                weights,
+                true,
+                stream,
+            )?);
+        }
+        Ok(Self {
+            configuration,
+            patch_projection,
+            position_embedding: weights.position_embedding,
+            blocks,
+            merger,
+            deepstack_mergers,
+        })
+    }
+
+    pub fn configuration(&self) -> &QwenVisionConfiguration {
+        &self.configuration
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.qwen-vision.v1");
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(self.position_embedding.contiguous_bytes()?);
+        for (name, module) in self.named_modules() {
+            cancellation.check()?;
+            hasher.update([0]);
+            hasher.update(name.as_bytes());
+            hasher.update(module.semantic_state_digest(cancellation)?.as_bytes());
+        }
+        cancellation.check()?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Vec<(comfy_tensor::StorageId, u64)> {
+        let mut allocations = vec![(
+            self.position_embedding.storage_id(),
+            self.position_embedding.storage_byte_len(),
+        )];
+        for (_, module) in self.named_modules() {
+            for (storage_id, bytes) in module.resident_tensor_allocations() {
+                if !allocations
+                    .iter()
+                    .any(|(existing, _)| *existing == storage_id)
+                {
+                    allocations.push((storage_id, bytes));
+                }
+            }
+        }
+        allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        self.resident_tensor_allocations().into_iter().try_fold(
+            std::mem::size_of::<Self>() as u64,
+            |total, (_, bytes)| {
+                total
+                    .checked_add(bytes)
+                    .ok_or(MultimodalTextError::Overflow("Qwen vision residency"))
+            },
+        )
+    }
+
+    pub fn project(
+        &self,
+        backend: &CpuBackend,
+        prepared: &Qwen3VlPreparedImage,
+        context: &ExecutionContext<'_>,
+    ) -> Result<QwenVisionProjection, MultimodalTextError> {
+        context.cancellation.check()?;
+        let patch_shape = prepared.patches.descriptor().shape();
+        let patch_count = patch_shape
+            .first()
+            .copied()
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen prepared patch count is invalid",
+            ))?;
+        if patch_shape != [usize_to_u64(patch_count, "Qwen patch count")?, 3, 2, 16, 16] {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen prepared patches must use the exact flattened Conv3d geometry",
+            ));
+        }
+        let flattened = qwen_tensor(
+            backend,
+            &[patch_count, 3 * 2 * 16 * 16],
+            &tensor_to_f32(backend, &prepared.patches, context)?,
+            context,
+        )?;
+        let mut patch_projection = self.patch_projection.clone();
+        let hidden = patch_projection.forward_with_context(backend, &flattened, context)?;
+        let mut hidden_values = tensor_to_f32(backend, &hidden, context)?
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        qwen_add_interpolated_positions(
+            &mut hidden_values,
+            prepared.grid_thw,
+            &tensor_to_f32(backend, &self.position_embedding, context)?,
+            self.configuration.hidden_size,
+            self.configuration.spatial_merge_size,
+            context.cancellation,
+        )?;
+        let mut hidden = qwen_tensor(
+            backend,
+            &[patch_count, self.configuration.hidden_size],
+            &hidden_values,
+            context,
+        )?;
+        let mut captured = Vec::new();
+        captured
+            .try_reserve_exact(self.deepstack_mergers.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen deepstack captures"))?;
+        for (index, block) in self.blocks.iter().enumerate() {
+            context.cancellation.check()?;
+            hidden = block.forward(
+                backend,
+                &hidden,
+                prepared.grid_thw,
+                &self.configuration,
+                context,
+            )?;
+            if let Some(capture_index) = self
+                .configuration
+                .family
+                .deepstack_layers()
+                .iter()
+                .position(|layer| *layer == index)
+            {
+                let merger = self.deepstack_mergers.get(capture_index).ok_or(
+                    MultimodalTextError::InvalidInput("Qwen deepstack merger is missing"),
+                )?;
+                captured.push(merger.forward(backend, &hidden, &self.configuration, context)?);
+            }
+        }
+        let embedding = self
+            .merger
+            .forward(backend, &hidden, &self.configuration, context)?;
+        if embedding.descriptor().shape()
+            != [
+                usize_to_u64(prepared.merged_tokens, "Qwen merged tokens")?,
+                usize_to_u64(self.configuration.output_hidden_size, "Qwen output hidden")?,
+            ]
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen merged vision output does not match the prepared span",
+            ));
+        }
+        context.cancellation.check()?;
+        Ok(QwenVisionProjection {
+            embedding,
+            deepstack: captured,
+            grid_thw: prepared.grid_thw,
+        })
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![("patch_projection".to_owned(), &self.patch_projection)];
+        for (index, block) in self.blocks.iter().enumerate() {
+            for (name, module) in block.modules() {
+                modules.push((format!("blocks.{index}.{name}"), module));
+            }
+        }
+        for (child, module) in self.merger.modules() {
+            modules.push((format!("merger.{child}"), module));
+        }
+        for (index, merger) in self.deepstack_mergers.iter().enumerate() {
+            for (child, module) in merger.modules() {
+                modules.push((format!("deepstack.{index}.{child}"), module));
+            }
+        }
+        modules
+    }
+}
+
+impl NativeQwenVisionBlock {
+    fn modules(&self) -> [(&'static str, &NativeModule); 7] {
+        [
+            ("normalization_one", &self.normalization_one),
+            ("query_key_value", &self.query_key_value),
+            ("attention_output", &self.attention_output),
+            ("normalization_two", &self.normalization_two),
+            ("feed_forward_up", &self.feed_forward_up),
+            ("feed_forward_activation", &self.feed_forward_activation),
+            ("feed_forward_down", &self.feed_forward_down),
+        ]
+    }
+
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        grid_thw: [usize; 3],
+        configuration: &QwenVisionConfiguration,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let mut normalization_one = self.normalization_one.clone();
+        let normalized = normalization_one.forward_with_context(backend, input, context)?;
+        let mut query_key_value = self.query_key_value.clone();
+        let projected = query_key_value.forward_with_context(backend, &normalized, context)?;
+        let projected = tensor_to_f32(backend, &projected, context)?;
+        let attention = qwen_vision_attention(
+            backend,
+            &projected,
+            grid_thw,
+            configuration.hidden_size,
+            configuration.attention_heads,
+            context,
+        )?;
+        let attention = qwen_tensor(
+            backend,
+            &[
+                grid_thw[0] * grid_thw[1] * grid_thw[2],
+                configuration.hidden_size,
+            ],
+            &attention,
+            context,
+        )?;
+        let mut attention_output = self.attention_output.clone();
+        let attention = attention_output.forward_with_context(backend, &attention, context)?;
+        let residual = qwen_add_tensors(backend, input, &attention, context)?;
+        let mut normalization_two = self.normalization_two.clone();
+        let normalized = normalization_two.forward_with_context(backend, &residual, context)?;
+        let mut feed_forward_up = self.feed_forward_up.clone();
+        let up = feed_forward_up.forward_with_context(backend, &normalized, context)?;
+        let mut activation = self.feed_forward_activation.clone();
+        let up = activation.forward_with_context(backend, &up, context)?;
+        let mut feed_forward_down = self.feed_forward_down.clone();
+        let down = feed_forward_down.forward_with_context(backend, &up, context)?;
+        qwen_add_tensors(backend, &residual, &down, context)
+    }
+}
+
+impl NativeQwenVisionMerger {
+    fn modules(&self) -> [(&'static str, &NativeModule); 4] {
+        [
+            ("normalization", &self.normalization),
+            ("first", &self.first),
+            ("activation", &self.activation),
+            ("second", &self.second),
+        ]
+    }
+
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        configuration: &QwenVisionConfiguration,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let shape = input.descriptor().shape();
+        let tokens = shape
+            .first()
+            .copied()
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen merger input token count is invalid",
+            ))?;
+        let merge_unit = configuration
+            .spatial_merge_size
+            .checked_mul(configuration.spatial_merge_size)
+            .ok_or(MultimodalTextError::Overflow("Qwen merger unit"))?;
+        if shape
+            != [
+                usize_to_u64(tokens, "Qwen merger tokens")?,
+                usize_to_u64(configuration.hidden_size, "Qwen merger hidden")?,
+            ]
+            || !tokens.is_multiple_of(merge_unit)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen merger input does not contain complete spatial groups",
+            ));
+        }
+        let merge_width = configuration
+            .hidden_size
+            .checked_mul(merge_unit)
+            .ok_or(MultimodalTextError::Overflow("Qwen merger width"))?;
+        let mut normalization = self.normalization.clone();
+        let merged = if self.normalization_after_merge {
+            let reshaped = qwen_tensor(
+                backend,
+                &[tokens / merge_unit, merge_width],
+                &tensor_to_f32(backend, input, context)?,
+                context,
+            )?;
+            normalization.forward_with_context(backend, &reshaped, context)?
+        } else {
+            let normalized = normalization.forward_with_context(backend, input, context)?;
+            qwen_tensor(
+                backend,
+                &[tokens / merge_unit, merge_width],
+                &tensor_to_f32(backend, &normalized, context)?,
+                context,
+            )?
+        };
+        let mut first = self.first.clone();
+        let hidden = first.forward_with_context(backend, &merged, context)?;
+        let mut activation = self.activation.clone();
+        let hidden = activation.forward_with_context(backend, &hidden, context)?;
+        let mut second = self.second.clone();
+        Ok(second.forward_with_context(backend, &hidden, context)?)
+    }
+}
+
+fn qwen_linear_module(
+    name: &str,
+    input_features: usize,
+    output_features: usize,
+    weight: Tensor,
+    bias: Option<Tensor>,
+    stream: comfy_tensor::StreamId,
+) -> Result<NativeModule, MultimodalTextError> {
+    qwen_require_parameter_shape(&weight, &[output_features, input_features], stream)?;
+    if let Some(bias) = bias.as_ref() {
+        qwen_require_parameter_shape(bias, &[output_features], stream)?;
+    }
+    let mut module =
+        NativeModule::linear(name, input_features, output_features, bias.is_some(), false)?;
+    module.load_dense_parameters(weight, bias)?;
+    Ok(module)
+}
+
+fn qwen_layer_norm_module(
+    name: &str,
+    width: usize,
+    weight: Tensor,
+    bias: Tensor,
+    stream: comfy_tensor::StreamId,
+) -> Result<NativeModule, MultimodalTextError> {
+    qwen_require_parameter_shape(&weight, &[width], stream)?;
+    qwen_require_parameter_shape(&bias, &[width], stream)?;
+    let mut module = NativeModule::layer_norm(name, vec![width], 1.0e-6, true, true, false)?;
+    module.load_dense_parameters(weight, Some(bias))?;
+    Ok(module)
+}
+
+fn qwen_vision_block(
+    index: usize,
+    configuration: &QwenVisionConfiguration,
+    weights: QwenVisionBlockWeights,
+    stream: comfy_tensor::StreamId,
+) -> Result<NativeQwenVisionBlock, MultimodalTextError> {
+    let hidden_size = configuration.hidden_size;
+    let intermediate_size = configuration.intermediate_size;
+    let prefix = format!("qwen_vision.blocks.{index}");
+    Ok(NativeQwenVisionBlock {
+        normalization_one: qwen_layer_norm_module(
+            &format!("{prefix}.norm1"),
+            hidden_size,
+            weights.normalization_one_weight,
+            weights.normalization_one_bias,
+            stream,
+        )?,
+        query_key_value: qwen_linear_module(
+            &format!("{prefix}.qkv"),
+            hidden_size,
+            hidden_size
+                .checked_mul(3)
+                .ok_or(MultimodalTextError::Overflow("Qwen vision QKV width"))?,
+            weights.query_key_value_weight,
+            Some(weights.query_key_value_bias),
+            stream,
+        )?,
+        attention_output: qwen_linear_module(
+            &format!("{prefix}.attention_output"),
+            hidden_size,
+            hidden_size,
+            weights.attention_output_weight,
+            Some(weights.attention_output_bias),
+            stream,
+        )?,
+        normalization_two: qwen_layer_norm_module(
+            &format!("{prefix}.norm2"),
+            hidden_size,
+            weights.normalization_two_weight,
+            weights.normalization_two_bias,
+            stream,
+        )?,
+        feed_forward_up: qwen_linear_module(
+            &format!("{prefix}.mlp_up"),
+            hidden_size,
+            intermediate_size,
+            weights.feed_forward_up_weight,
+            Some(weights.feed_forward_up_bias),
+            stream,
+        )?,
+        feed_forward_activation: NativeModule::gelu(
+            format!("{prefix}.mlp_activation"),
+            GeluApproximation::Tanh,
+        )?,
+        feed_forward_down: qwen_linear_module(
+            &format!("{prefix}.mlp_down"),
+            intermediate_size,
+            hidden_size,
+            weights.feed_forward_down_weight,
+            Some(weights.feed_forward_down_bias),
+            stream,
+        )?,
+    })
+}
+
+fn qwen_vision_merger(
+    name: &str,
+    configuration: &QwenVisionConfiguration,
+    weights: QwenVisionMergerWeights,
+    normalization_after_merge: bool,
+    stream: comfy_tensor::StreamId,
+) -> Result<NativeQwenVisionMerger, MultimodalTextError> {
+    let merge_unit = configuration
+        .spatial_merge_size
+        .checked_mul(configuration.spatial_merge_size)
+        .ok_or(MultimodalTextError::Overflow("Qwen vision merge unit"))?;
+    let merge_width = configuration
+        .hidden_size
+        .checked_mul(merge_unit)
+        .ok_or(MultimodalTextError::Overflow("Qwen vision merge width"))?;
+    let normalization_width = if normalization_after_merge {
+        merge_width
+    } else {
+        configuration.hidden_size
+    };
+    Ok(NativeQwenVisionMerger {
+        normalization: qwen_layer_norm_module(
+            &format!("{name}.norm"),
+            normalization_width,
+            weights.normalization_weight,
+            weights.normalization_bias,
+            stream,
+        )?,
+        first: qwen_linear_module(
+            &format!("{name}.linear_one"),
+            merge_width,
+            merge_width,
+            weights.first_weight,
+            Some(weights.first_bias),
+            stream,
+        )?,
+        activation: NativeModule::gelu(format!("{name}.activation"), GeluApproximation::None)?,
+        second: qwen_linear_module(
+            &format!("{name}.linear_two"),
+            merge_width,
+            configuration.output_hidden_size,
+            weights.second_weight,
+            Some(weights.second_bias),
+            stream,
+        )?,
+        normalization_after_merge,
+    })
+}
+
+fn qwen_require_parameter_shape(
+    tensor: &Tensor,
+    expected: &[usize],
+    stream: comfy_tensor::StreamId,
+) -> Result<(), MultimodalTextError> {
+    let mut expected_shape = Vec::new();
+    expected_shape
+        .try_reserve_exact(expected.len())
+        .map_err(|_| MultimodalTextError::Overflow("Qwen parameter shape"))?;
+    for value in expected {
+        expected_shape.push(usize_to_u64(*value, "Qwen parameter shape")?);
+    }
+    let descriptor = tensor.descriptor();
+    if descriptor.shape() != expected_shape
+        || descriptor.dtype() != DType::F32
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != stream
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen vision parameter shape or execution target is invalid",
+        ));
+    }
+    for chunk in tensor
+        .contiguous_bytes()?
+        .chunks_exact(std::mem::size_of::<f32>())
+    {
+        let bytes: [u8; 4] = chunk.try_into().map_err(|_| {
+            MultimodalTextError::InvalidInput("Qwen vision parameter storage is malformed")
+        })?;
+        if !f32::from_ne_bytes(bytes).is_finite() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen vision parameters must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn qwen_tensor(
+    backend: &CpuBackend,
+    shape: &[usize],
+    values: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let mut tensor_shape = Vec::new();
+    tensor_shape
+        .try_reserve_exact(shape.len())
+        .map_err(|_| MultimodalTextError::Overflow("Qwen tensor shape"))?;
+    for value in shape {
+        tensor_shape.push(usize_to_u64(*value, "Qwen tensor shape")?);
+    }
+    Ok(tensor_from_f32(backend, &tensor_shape, values, context)?)
+}
+
+fn qwen_add_tensors(
+    backend: &CpuBackend,
+    left: &Tensor,
+    right: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    Ok(native_tensor_add(backend, left, right, context)?)
+}
+
+fn qwen_add_interpolated_positions(
+    hidden: &mut [f32],
+    grid_thw: [usize; 3],
+    position_embedding: &[f32],
+    hidden_size: usize,
+    merge_size: usize,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<(), MultimodalTextError> {
+    let [frames, height, width] = grid_thw;
+    if frames == 0
+        || height == 0
+        || width == 0
+        || !height.is_multiple_of(merge_size)
+        || !width.is_multiple_of(merge_size)
+        || position_embedding.len()
+            != 48_usize
+                .checked_mul(48)
+                .and_then(|value| value.checked_mul(hidden_size))
+                .ok_or(MultimodalTextError::Overflow("Qwen position table"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen vision position interpolation geometry is invalid",
+        ));
+    }
+    let token_count = frames
+        .checked_mul(height)
+        .and_then(|value| value.checked_mul(width))
+        .ok_or(MultimodalTextError::Overflow("Qwen position token count"))?;
+    if hidden.len()
+        != token_count
+            .checked_mul(hidden_size)
+            .ok_or(MultimodalTextError::Overflow("Qwen hidden positions"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen hidden state does not match its image grid",
+        ));
+    }
+    let denominator_height = height.saturating_sub(1).max(1) as f32;
+    let denominator_width = width.saturating_sub(1).max(1) as f32;
+    let merged_height = height / merge_size;
+    let merged_width = width / merge_size;
+    let mut output_token = 0_usize;
+    for _frame in 0..frames {
+        for block_y in 0..merged_height {
+            for block_x in 0..merged_width {
+                cancellation.check()?;
+                for merge_y in 0..merge_size {
+                    for merge_x in 0..merge_size {
+                        let y = block_y * merge_size + merge_y;
+                        let x = block_x * merge_size + merge_x;
+                        let source_y = y as f32 * 47.0 / denominator_height;
+                        let source_x = x as f32 * 47.0 / denominator_width;
+                        let low_y = source_y.floor() as usize;
+                        let low_x = source_x.floor() as usize;
+                        let high_y = low_y.saturating_add(1).min(47);
+                        let high_x = low_x.saturating_add(1).min(47);
+                        let fraction_y = source_y - low_y as f32;
+                        let fraction_x = source_x - low_x as f32;
+                        let neighbors = [
+                            (low_y, low_x, (1.0 - fraction_y) * (1.0 - fraction_x)),
+                            (low_y, high_x, (1.0 - fraction_y) * fraction_x),
+                            (high_y, low_x, fraction_y * (1.0 - fraction_x)),
+                            (high_y, high_x, fraction_y * fraction_x),
+                        ];
+                        let output_start = output_token
+                            .checked_mul(hidden_size)
+                            .ok_or(MultimodalTextError::Overflow("Qwen position output"))?;
+                        for hidden_index in 0..hidden_size {
+                            let mut position_value = 0.0_f32;
+                            for (source_y, source_x, weight) in neighbors {
+                                let source_index = source_y
+                                    .checked_mul(48)
+                                    .and_then(|value| value.checked_add(source_x))
+                                    .and_then(|value| value.checked_mul(hidden_size))
+                                    .and_then(|value| value.checked_add(hidden_index))
+                                    .ok_or(MultimodalTextError::Overflow("Qwen position source"))?;
+                                position_value += *position_embedding.get(source_index).ok_or(
+                                    MultimodalTextError::InvalidInput(
+                                        "Qwen position table storage is incomplete",
+                                    ),
+                                )? * weight;
+                            }
+                            let output_index = output_start
+                                .checked_add(hidden_index)
+                                .ok_or(MultimodalTextError::Overflow("Qwen position output"))?;
+                            *hidden.get_mut(output_index).ok_or(
+                                MultimodalTextError::InvalidInput(
+                                    "Qwen hidden state storage is incomplete",
+                                ),
+                            )? += position_value;
+                        }
+                        output_token += 1;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn qwen_vision_attention(
+    backend: &CpuBackend,
+    projected: &[f32],
+    grid_thw: [usize; 3],
+    hidden_size: usize,
+    heads: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<f32>, MultimodalTextError> {
+    let token_count = grid_thw[0]
+        .checked_mul(grid_thw[1])
+        .and_then(|value| value.checked_mul(grid_thw[2]))
+        .ok_or(MultimodalTextError::Overflow("Qwen attention tokens"))?;
+    let head_dimension = hidden_size
+        .checked_div(heads)
+        .ok_or(MultimodalTextError::Overflow(
+            "Qwen attention head dimension",
+        ))?;
+    if token_count == 0
+        || heads == 0
+        || head_dimension == 0
+        || !head_dimension.is_multiple_of(4)
+        || projected.len()
+            != token_count
+                .checked_mul(hidden_size)
+                .and_then(|value| value.checked_mul(3))
+                .ok_or(MultimodalTextError::Overflow("Qwen QKV projection"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen vision attention geometry is invalid",
+        ));
+    }
+    let vector_count = token_count
+        .checked_mul(hidden_size)
+        .ok_or(MultimodalTextError::Overflow("Qwen attention vectors"))?;
+    let mut query = Vec::new();
+    let mut key = Vec::new();
+    let mut value = Vec::new();
+    for output in [&mut query, &mut key, &mut value] {
+        output
+            .try_reserve_exact(vector_count)
+            .map_err(|_| MultimodalTextError::Overflow("Qwen attention vectors"))?;
+    }
+    let [frames, height, width] = grid_thw;
+    let merge_size = QWEN3VL_IMAGE_SPATIAL_MERGE_SIZE;
+    let merged_height = height / merge_size;
+    let merged_width = width / merge_size;
+    let frequency_width = head_dimension / 4;
+    let mut token_index = 0_usize;
+    for _frame in 0..frames {
+        for block_y in 0..merged_height {
+            for block_x in 0..merged_width {
+                context.cancellation.check()?;
+                for merge_y in 0..merge_size {
+                    for merge_x in 0..merge_size {
+                        let row = block_y * merge_size + merge_y;
+                        let column = block_x * merge_size + merge_x;
+                        let row_offset = token_index
+                            .checked_mul(hidden_size)
+                            .and_then(|value| value.checked_mul(3))
+                            .ok_or(MultimodalTextError::Overflow("Qwen QKV row"))?;
+                        for head in 0..heads {
+                            let head_offset = head
+                                .checked_mul(head_dimension)
+                                .ok_or(MultimodalTextError::Overflow("Qwen attention head"))?;
+                            let mut query_head = Vec::new();
+                            let mut key_head = Vec::new();
+                            query_head
+                                .try_reserve_exact(head_dimension)
+                                .map_err(|_| MultimodalTextError::Overflow("Qwen query head"))?;
+                            key_head
+                                .try_reserve_exact(head_dimension)
+                                .map_err(|_| MultimodalTextError::Overflow("Qwen key head"))?;
+                            for dimension in 0..head_dimension {
+                                let query_index = row_offset
+                                    .checked_add(head_offset)
+                                    .and_then(|value| value.checked_add(dimension))
+                                    .ok_or(MultimodalTextError::Overflow("Qwen query index"))?;
+                                let key_index = row_offset
+                                    .checked_add(hidden_size)
+                                    .and_then(|value| value.checked_add(head_offset))
+                                    .and_then(|value| value.checked_add(dimension))
+                                    .ok_or(MultimodalTextError::Overflow("Qwen key index"))?;
+                                query_head.push(*projected.get(query_index).ok_or(
+                                    MultimodalTextError::InvalidInput(
+                                        "Qwen query projection storage is incomplete",
+                                    ),
+                                )?);
+                                key_head.push(*projected.get(key_index).ok_or(
+                                    MultimodalTextError::InvalidInput(
+                                        "Qwen key projection storage is incomplete",
+                                    ),
+                                )?);
+                            }
+                            qwen_apply_vision_rope(&mut query_head, row, column, frequency_width)?;
+                            qwen_apply_vision_rope(&mut key_head, row, column, frequency_width)?;
+                            query.extend_from_slice(&query_head);
+                            key.extend_from_slice(&key_head);
+                            let value_start = row_offset
+                                .checked_add(hidden_size.checked_mul(2).ok_or(
+                                    MultimodalTextError::Overflow("Qwen value projection"),
+                                )?)
+                                .and_then(|value| value.checked_add(head_offset))
+                                .ok_or(MultimodalTextError::Overflow("Qwen value head"))?;
+                            let value_end = value_start
+                                .checked_add(head_dimension)
+                                .ok_or(MultimodalTextError::Overflow("Qwen value head"))?;
+                            value.extend_from_slice(projected.get(value_start..value_end).ok_or(
+                                MultimodalTextError::InvalidInput(
+                                    "Qwen value projection storage is incomplete",
+                                ),
+                            )?);
+                        }
+                        token_index += 1;
+                    }
+                }
+            }
+        }
+    }
+    let workspace_limit_bytes = token_count
+        .checked_mul(std::mem::size_of::<f32>())
+        .ok_or(MultimodalTextError::Overflow("Qwen attention workspace"))?;
+    let outcome = scaled_dot_product_attention_with_context(
+        backend,
+        AttentionRequest {
+            backend: AttentionBackend::PytorchSdp,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch: 1,
+            query_tokens: token_count,
+            key_tokens: token_count,
+            heads,
+            head_dimension,
+            value_dimension: head_dimension,
+            scale: None,
+            workspace_limit_bytes,
+        },
+        &query,
+        &key,
+        &value,
+        None,
+        context,
+    )?;
+    Ok(outcome.values)
+}
+
+fn qwen_apply_vision_rope(
+    values: &mut [f32],
+    row: usize,
+    column: usize,
+    frequency_width: usize,
+) -> Result<(), MultimodalTextError> {
+    let expected_width = frequency_width
+        .checked_mul(4)
+        .ok_or(MultimodalTextError::Overflow("Qwen rotary width"))?;
+    if frequency_width == 0 || values.len() != expected_width {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen rotary vector width is invalid",
+        ));
+    }
+    let half = values.len() / 2;
+    for index in 0..half {
+        let coordinate = if index < frequency_width { row } else { column };
+        let frequency_index = index % frequency_width;
+        let exponent = (frequency_index * 2) as f32 / (frequency_width * 2) as f32;
+        let angle = coordinate as f32 / 10_000.0_f32.powf(exponent);
+        let cosine = angle.cos();
+        let sine = angle.sin();
+        let second_index = index
+            .checked_add(half)
+            .ok_or(MultimodalTextError::Overflow("Qwen rotary index"))?;
+        let first = *values.get(index).ok_or(MultimodalTextError::InvalidInput(
+            "Qwen rotary vector storage is incomplete",
+        ))?;
+        let second = *values
+            .get(second_index)
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen rotary vector storage is incomplete",
+            ))?;
+        *values
+            .get_mut(index)
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen rotary vector storage is incomplete",
+            ))? = first * cosine - second * sine;
+        *values
+            .get_mut(second_index)
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen rotary vector storage is incomplete",
+            ))? = second * cosine + first * sine;
+    }
+    Ok(())
 }
 
 pub fn join_multimodal_embeddings(
@@ -1188,6 +2288,7 @@ fn prepare_qwen3vl_resized_image(
     image: &ImageTensor,
     height: u64,
     width: u64,
+    family: QwenVisionFamily,
     context: &ExecutionContext<'_>,
 ) -> Result<Qwen3VlPreparedImage, MultimodalTextError> {
     context.cancellation.check()?;
@@ -1231,6 +2332,7 @@ fn prepare_qwen3vl_resized_image(
         .checked_mul(patch_width)
         .ok_or(MultimodalTextError::Overflow("Qwen3-VL patch elements"))?;
     let values = image.as_f32_slice()?;
+    let (mean, standard_deviation) = family.normalization();
     if values.iter().any(|value| !value.is_finite()) {
         return Err(MultimodalTextError::InvalidInput(
             "Qwen3-VL image pixels must be finite",
@@ -1269,7 +2371,9 @@ fn prepare_qwen3vl_resized_image(
                                             "Qwen3-VL resized image storage is incomplete",
                                         ),
                                     )?;
-                                    patches.try_push((value - 0.5) / 0.5)?;
+                                    patches.try_push(
+                                        (value - mean[channel]) / standard_deviation[channel],
+                                    )?;
                                 }
                             }
                         }
