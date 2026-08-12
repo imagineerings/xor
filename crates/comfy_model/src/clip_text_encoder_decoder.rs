@@ -13,12 +13,17 @@ use comfy_tensor::{
     generated_native_diffusion::{NativeDiffusionTensorError, add, tensor_from_f32, tensor_to_f32},
 };
 use comfy_types::CancellationToken;
+use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use thiserror::Error;
 
 pub const LLAMA_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/llama.py";
 pub const LLAMA_SOURCE_SHA256: &str =
     "f4adf96f7ff8d320da909038285eebd1b36714123865cb5a8748276f718b345a";
+pub const TEXT_GENERATION_SOURCE_PATH: &str =
+    "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py";
+pub const TEXT_GENERATION_SOURCE_SHA256: &str =
+    "b328e8a2dc89cfd3a93ab49c1be880a3e89ec4521eef506823753617c86c99e9";
 pub const GEMMA4_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py";
 pub const GEMMA4_SOURCE_SHA256: &str =
     "c6ffbb2fbecd8f97e781a654a06ccf3910dc670867d38c0ce30542312f00cde6";
@@ -1337,12 +1342,12 @@ impl DecoderGenerationConfiguration {
                 .is_some_and(|top_k| top_k == 0 || top_k > vocabulary_size)
             || self
                 .top_p()
-                .is_some_and(|value| !value.is_finite() || value <= 0.0 || value > 1.0)
+                .is_some_and(|value| !value.is_finite() || value < 0.0 || value > 1.0)
             || self
                 .minimum_p()
                 .is_some_and(|value| !value.is_finite() || value < 0.0 || value > 1.0)
             || !repetition_penalty.is_finite()
-            || repetition_penalty <= 0.0
+            || repetition_penalty < 0.0
             || !presence_penalty.is_finite()
         {
             return Err(DecoderTextError::InvalidInput(
@@ -1357,6 +1362,26 @@ impl DecoderGenerationConfiguration {
 pub struct DecoderGenerationOutcome {
     pub tokens: Vec<i64>,
     pub cache: DecoderKvState,
+    pub transaction: RngTransaction,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeTextGenerationRequest<'a> {
+    pub formatted_prompt: &'a str,
+    pub maximum_new_tokens: usize,
+    pub do_sample: bool,
+    pub temperature_bits: u32,
+    pub top_k: usize,
+    pub top_p_bits: u32,
+    pub minimum_p_bits: u32,
+    pub repetition_penalty_bits: u32,
+    pub presence_penalty_bits: u32,
+}
+
+#[derive(Clone)]
+pub struct NativeTextGenerationResult {
+    pub text: String,
+    pub generated_tokens: Vec<u32>,
     pub transaction: RngTransaction,
 }
 
@@ -1492,6 +1517,149 @@ impl NativeDecoderTextEncoder {
 
     pub fn configuration(&self) -> &DecoderTextConfiguration {
         &self.configuration
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, DecoderTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.native-decoder-text.v1");
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        for (name, module) in self.named_modules() {
+            cancellation.check()?;
+            hasher.update([0]);
+            hasher.update(name.as_bytes());
+            hasher.update([0]);
+            hasher.update(module.semantic_state_digest(cancellation)?.as_bytes());
+        }
+        for (name, tensor) in self.normalization_tensors() {
+            cancellation.check()?;
+            hasher.update([0]);
+            hasher.update(name.as_bytes());
+            hasher.update([0]);
+            hasher.update(tensor.contiguous_bytes()?);
+        }
+        cancellation.check()?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, DecoderTextError> {
+        self.resident_tensor_allocations().into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |bytes, (_, allocation)| {
+                bytes
+                    .checked_add(allocation)
+                    .ok_or(DecoderTextError::Overflow("decoder residency"))
+            },
+        )
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, DecoderTextError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| DecoderTextError::Overflow("decoder residency"))?;
+        bytes = bytes
+            .checked_add(
+                u64::try_from(
+                    self.layers
+                        .capacity()
+                        .checked_mul(std::mem::size_of::<NativeDecoderLayer>())
+                        .ok_or(DecoderTextError::Overflow("decoder layers"))?,
+                )
+                .map_err(|_| DecoderTextError::Overflow("decoder layers"))?,
+            )
+            .ok_or(DecoderTextError::Overflow("decoder residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |bytes, (_, allocation)| {
+                    bytes
+                        .checked_add(allocation)
+                        .ok_or(DecoderTextError::Overflow("decoder tensor residency"))
+                },
+            )?;
+            let module_bytes = module.resident_storage_bytes()?;
+            bytes = bytes
+                .checked_add(module_bytes.checked_sub(tensor_bytes).ok_or(
+                    DecoderTextError::Overflow("decoder module residency projection"),
+                )?)
+                .ok_or(DecoderTextError::Overflow("decoder module residency"))?;
+        }
+        Ok(bytes)
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Vec<(comfy_tensor::StorageId, u64)> {
+        let mut allocations = Vec::new();
+        for (_, module) in self.named_modules() {
+            for (storage_id, resident_bytes) in module.resident_tensor_allocations() {
+                if !allocations
+                    .iter()
+                    .any(|(existing, _)| *existing == storage_id)
+                {
+                    allocations.push((storage_id, resident_bytes));
+                }
+            }
+        }
+        for (_, tensor) in self.normalization_tensors() {
+            let storage_id = tensor.storage_id();
+            if !allocations
+                .iter()
+                .any(|(existing, _)| *existing == storage_id)
+            {
+                allocations.push((storage_id, tensor.storage_byte_len()));
+            }
+        }
+        allocations
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![
+            ("token_embedding".to_owned(), &self.token_embedding),
+            ("output_head".to_owned(), &self.output_head),
+        ];
+        for (index, layer) in self.layers.iter().enumerate() {
+            for (name, module) in [
+                ("query", &layer.query),
+                ("key", &layer.key),
+                ("value", &layer.value),
+                ("attention_output", &layer.attention_output),
+                ("feed_forward_gate", &layer.feed_forward_gate),
+                ("feed_forward_up", &layer.feed_forward_up),
+                ("activation", &layer.activation),
+                ("feed_forward_down", &layer.feed_forward_down),
+            ] {
+                modules.push((format!("layers.{index}.{name}"), module));
+            }
+        }
+        modules
+    }
+
+    fn normalization_tensors(&self) -> Vec<(String, &Tensor)> {
+        let mut tensors = vec![("final_norm_weight".to_owned(), &self.final_norm_weight)];
+        for (index, layer) in self.layers.iter().enumerate() {
+            tensors.push((
+                format!("layers.{index}.attention_norm_weight"),
+                &layer.attention_norm_weight,
+            ));
+            tensors.push((
+                format!("layers.{index}.feed_forward_norm_weight"),
+                &layer.feed_forward_norm_weight,
+            ));
+            if let Some(tensor) = &layer.post_attention_norm_weight {
+                tensors.push((format!("layers.{index}.post_attention_norm_weight"), tensor));
+            }
+            if let Some(tensor) = &layer.post_feed_forward_norm_weight {
+                tensors.push((
+                    format!("layers.{index}.post_feed_forward_norm_weight"),
+                    tensor,
+                ));
+            }
+            if let Some(tensor) = &layer.attention_sink {
+                tensors.push((format!("layers.{index}.attention_sink"), tensor));
+            }
+        }
+        tensors
     }
 
     pub fn execution_requirements(&self) -> NativeExecutionRequirements {
@@ -1724,6 +1892,94 @@ impl NativeDecoderTextEncoder {
             tokens: generated,
             cache: cache.unwrap_or(DecoderKvState::new(self.layers.len())?),
             transaction: staged_transaction,
+        })
+    }
+
+    pub fn generate_text(
+        &self,
+        tokenizer: &NativePromptTokenizer,
+        backend: &CpuBackend,
+        request: NativeTextGenerationRequest<'_>,
+        transaction: &RngTransaction,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeTextGenerationResult, DecoderTextError> {
+        context.check()?;
+        if !(1..=32_768).contains(&request.maximum_new_tokens) {
+            return Err(DecoderTextError::InvalidInput(
+                "maximum new tokens must be between 1 and 32768",
+            ));
+        }
+        let prompt_tokens =
+            tokenizer.encode_numeric(request.formatted_prompt, context.cancellation)?;
+        let prompt_length = prompt_tokens.len();
+        let maximum_total = prompt_length
+            .checked_add(request.maximum_new_tokens)
+            .ok_or(DecoderTextError::Overflow("text generation token limit"))?;
+        if maximum_total > self.configuration.maximum_tokens {
+            return Err(DecoderTextError::InvalidInput(
+                "prompt and generated tokens exceed the decoder limit",
+            ));
+        }
+        let prompt_values = prompt_tokens
+            .iter()
+            .copied()
+            .map(i64::from)
+            .collect::<Vec<_>>();
+        let prompt = tensor_from_i64(
+            backend,
+            &[
+                1,
+                u64::try_from(prompt_length)
+                    .map_err(|_| DecoderTextError::Overflow("prompt token count"))?,
+            ],
+            &prompt_values,
+            context,
+        )?;
+        let configuration = DecoderGenerationConfiguration {
+            maximum_new_tokens: request.maximum_new_tokens,
+            temperature_bits: if request.do_sample {
+                request.temperature_bits
+            } else {
+                0.0_f32.to_bits()
+            },
+            top_k: request
+                .do_sample
+                .then_some(request.top_k)
+                .filter(|value| *value > 0),
+            top_p_bits: request
+                .do_sample
+                .then_some(request.top_p_bits)
+                .filter(|value| f32::from_bits(*value) != 1.0),
+            minimum_p_bits: request
+                .do_sample
+                .then_some(request.minimum_p_bits)
+                .filter(|value| f32::from_bits(*value) != 0.0),
+            repetition_penalty_bits: request.repetition_penalty_bits,
+            presence_penalty_bits: request.presence_penalty_bits,
+        };
+        let outcome = self.generate(backend, &prompt, &configuration, transaction, context)?;
+        let generated =
+            outcome
+                .tokens
+                .get(prompt_length..)
+                .ok_or(DecoderTextError::InvalidInput(
+                    "generated tokens do not retain the prompt prefix",
+                ))?;
+        let mut generated_tokens = Vec::new();
+        generated_tokens
+            .try_reserve_exact(generated.len())
+            .map_err(|_| DecoderTextError::Allocation("generated token projection"))?;
+        for token in generated {
+            generated_tokens.push(
+                u32::try_from(*token).map_err(|_| DecoderTextError::TokenOutOfRange(*token))?,
+            );
+        }
+        let text = tokenizer.decode_numeric(&generated_tokens, true, context.cancellation)?;
+        context.check()?;
+        Ok(NativeTextGenerationResult {
+            text,
+            generated_tokens,
+            transaction: outcome.transaction,
         })
     }
 }
@@ -4226,9 +4482,26 @@ fn sample_token(
             "generation logits must be nonempty and finite",
         ));
     }
+    if configuration.temperature() == 0.0 {
+        return logits
+            .iter()
+            .enumerate()
+            .max_by(|(left_index, left), (right_index, right)| {
+                left.partial_cmp(right)
+                    .unwrap_or(Ordering::Equal)
+                    .then_with(|| right_index.cmp(left_index))
+            })
+            .and_then(|(index, _)| i64::try_from(index).ok())
+            .ok_or(DecoderTextError::InvalidInput("generation argmax failed"));
+    }
     let mut adjusted = logits.to_vec();
-    for token in prior_tokens {
-        let Ok(index) = usize::try_from(*token) else {
+    let mut seen_tokens = std::collections::BTreeSet::new();
+    for token in prior_tokens
+        .iter()
+        .copied()
+        .filter(|token| seen_tokens.insert(*token))
+    {
+        let Ok(index) = usize::try_from(token) else {
             continue;
         };
         let Some(value) = adjusted.get_mut(index) else {
@@ -4242,17 +4515,10 @@ fn sample_token(
         };
         *value -= configuration.presence_penalty();
     }
-    if configuration.temperature() == 0.0 {
-        return adjusted
-            .iter()
-            .enumerate()
-            .max_by(|(left_index, left), (right_index, right)| {
-                left.partial_cmp(right)
-                    .unwrap_or(Ordering::Equal)
-                    .then_with(|| right_index.cmp(left_index))
-            })
-            .and_then(|(index, _)| i64::try_from(index).ok())
-            .ok_or(DecoderTextError::InvalidInput("generation argmax failed"));
+    if adjusted.iter().any(|value| !value.is_finite()) {
+        return Err(DecoderTextError::InvalidInput(
+            "generation penalties produced non-finite logits",
+        ));
     }
     for value in &mut adjusted {
         *value /= configuration.temperature();
@@ -4265,7 +4531,9 @@ fn sample_token(
             .then_with(|| left_index.cmp(right_index))
     });
     if let Some(top_k) = configuration.top_k {
-        candidates.truncate(top_k);
+        if let Some((_, threshold)) = candidates.get(top_k.saturating_sub(1)).copied() {
+            candidates.retain(|(_, value)| *value >= threshold);
+        }
     }
     let maximum =
         candidates
@@ -4294,13 +4562,23 @@ fn sample_token(
             .fold(0.0_f32, f32::max);
         probabilities.retain(|(_, value)| *value >= maximum_probability * minimum_p);
     }
+    let filtered_total = probabilities.iter().map(|(_, value)| *value).sum::<f32>();
+    if filtered_total <= 0.0 || !filtered_total.is_finite() {
+        return Err(DecoderTextError::InvalidInput(
+            "generation filters removed every candidate",
+        ));
+    }
+    for (_, value) in &mut probabilities {
+        *value /= filtered_total;
+    }
     if let Some(top_p) = configuration.top_p() {
         let mut cumulative = 0.0;
         let mut keep = 0;
         for (_, probability) in &probabilities {
             cumulative += *probability;
-            keep += 1;
-            if cumulative >= top_p {
+            if keep == 0 || cumulative <= top_p {
+                keep += 1;
+            } else {
                 break;
             }
         }
@@ -4328,4 +4606,143 @@ fn sample_token(
 
 fn usize_to_u64(value: usize, name: &'static str) -> Result<u64, DecoderTextError> {
     u64::try_from(value).map_err(|_| DecoderTextError::Overflow(name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use comfy_tensor::{
+        RetryRngPolicy, RngAlgorithm, RngProfileVersion, RngStream, RngStreamAddress,
+    };
+    use std::error::Error;
+
+    fn transaction(seed: u64) -> Result<RngTransaction, Box<dyn Error>> {
+        let address = RngStreamAddress::new(
+            "text-generation-test",
+            "attempt-1",
+            "node-1",
+            0,
+            "text-generation",
+            0,
+            0,
+            RetryRngPolicy::Replay,
+        )?;
+        Ok(RngStream::new(
+            RngProfileVersion::V2,
+            RngAlgorithm::Philox4x32_10,
+            seed,
+            address,
+        )?
+        .begin(None)?)
+    }
+
+    fn sampling_configuration() -> DecoderGenerationConfiguration {
+        DecoderGenerationConfiguration {
+            maximum_new_tokens: 1,
+            temperature_bits: 1.0_f32.to_bits(),
+            top_k: None,
+            top_p_bits: None,
+            minimum_p_bits: None,
+            repetition_penalty_bits: 1.0_f32.to_bits(),
+            presence_penalty_bits: 0.0_f32.to_bits(),
+        }
+    }
+
+    #[test]
+    fn source_sampling_filters_and_penalties_match_base_generate() -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+
+        let mut unique_penalty = sampling_configuration();
+        unique_penalty.top_k = Some(1);
+        unique_penalty.repetition_penalty_bits = 2.0_f32.to_bits();
+        unique_penalty.presence_penalty_bits = 0.5_f32.to_bits();
+        assert_eq!(
+            sample_token(
+                &[4.0, 1.0],
+                &[0, 0],
+                &unique_penalty,
+                &mut transaction(1)?,
+                &cancellation,
+            )?,
+            0
+        );
+
+        let mut top_p = sampling_configuration();
+        top_p.top_p_bits = Some(0.7_f32.to_bits());
+        for seed in 0..16 {
+            assert_eq!(
+                sample_token(
+                    &[2.0, 1.0, 0.0],
+                    &[],
+                    &top_p,
+                    &mut transaction(seed)?,
+                    &cancellation,
+                )?,
+                0
+            );
+        }
+
+        let mut top_k_ties = sampling_configuration();
+        top_k_ties.top_k = Some(2);
+        let mut retained_tied_tail = false;
+        for seed in 0..64 {
+            retained_tied_tail |= sample_token(
+                &[1.0, 1.0, 1.0],
+                &[],
+                &top_k_ties,
+                &mut transaction(seed)?,
+                &cancellation,
+            )? == 2;
+        }
+        assert!(retained_tied_tail);
+
+        Ok(())
+    }
+
+    #[test]
+    fn greedy_generation_ignores_sampling_penalties_and_draws_no_rng() -> Result<(), Box<dyn Error>>
+    {
+        let cancellation = CancellationToken::default();
+        let mut configuration = sampling_configuration();
+        configuration.temperature_bits = 0.0_f32.to_bits();
+        configuration.repetition_penalty_bits = 10.0_f32.to_bits();
+        configuration.presence_penalty_bits = 5.0_f32.to_bits();
+        let mut transaction = transaction(7)?;
+        let checkpoint = transaction.checkpoint();
+        assert_eq!(
+            sample_token(
+                &[4.0, 3.0],
+                &[0],
+                &configuration,
+                &mut transaction,
+                &cancellation,
+            )?,
+            0
+        );
+        assert_eq!(transaction.checkpoint(), checkpoint);
+        Ok(())
+    }
+
+    #[test]
+    fn zero_repetition_penalty_fails_typed_without_rng_advance() -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let mut configuration = sampling_configuration();
+        configuration.repetition_penalty_bits = 0.0_f32.to_bits();
+        let mut transaction = transaction(9)?;
+        let checkpoint = transaction.checkpoint();
+        assert!(matches!(
+            sample_token(
+                &[4.0, 0.0],
+                &[0],
+                &configuration,
+                &mut transaction,
+                &cancellation,
+            ),
+            Err(DecoderTextError::InvalidInput(
+                "generation penalties produced non-finite logits"
+            ))
+        ));
+        assert_eq!(transaction.checkpoint(), checkpoint);
+        Ok(())
+    }
 }

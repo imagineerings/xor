@@ -673,6 +673,39 @@ fn sentencepiece_uses_canonical_scores_types_and_viterbi_segmentation()
 }
 
 #[test]
+fn decoder_numeric_adapter_has_stable_identity_and_does_not_pad_generation_input()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let tokenizer = NativePromptTokenizer::checked(
+        NativeTokenizerFamily::SentencePiece(sentencepiece()?),
+        configuration(5),
+        BTreeMap::new(),
+    )?;
+    assert_eq!(tokenizer.encode_numeric("ab", &cancellation)?, [1, 18, 2]);
+    let cloned = tokenizer.clone();
+    assert_eq!(
+        tokenizer.semantic_digest(&cancellation)?,
+        cloned.semantic_digest(&cancellation)?
+    );
+    assert!(
+        !tokenizer
+            .decode_numeric(&[18], true, &cancellation)?
+            .is_empty()
+    );
+
+    let changed = NativePromptTokenizer::checked(
+        NativeTokenizerFamily::SentencePiece(sentencepiece()?),
+        configuration(6),
+        BTreeMap::new(),
+    )?;
+    assert_ne!(
+        tokenizer.semantic_digest(&cancellation)?,
+        changed.semantic_digest(&cancellation)?
+    );
+    Ok(())
+}
+
+#[test]
 fn multi_section_packing_never_silently_truncates_and_preserves_word_ids()
 -> Result<(), Box<dyn std::error::Error>> {
     let tokenizer = NativePromptTokenizer::checked(

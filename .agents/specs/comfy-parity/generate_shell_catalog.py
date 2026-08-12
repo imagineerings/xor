@@ -730,7 +730,9 @@ def generate_command_catalog() -> dict[str, dict[str, str]]:
             ]
         )
     with COMMAND_OWNERSHIP_OUTPUT.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(output_rows[0]))
+        writer = csv.DictWriter(
+            handle, fieldnames=list(output_rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(output_rows)
     rust_source = [
@@ -868,7 +870,9 @@ def generate_component_catalog() -> list[str]:
             ]
         )
     with COMPONENT_OWNERSHIP_OUTPUT.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(output_rows[0]))
+        writer = csv.DictWriter(
+            handle, fieldnames=list(output_rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(output_rows)
     return rust_rows
@@ -1041,7 +1045,9 @@ def main() -> None:
         )
 
     with OWNERSHIP_OUTPUT.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(output_rows[0]))
+        writer = csv.DictWriter(
+            handle, fieldnames=list(output_rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(output_rows)
 

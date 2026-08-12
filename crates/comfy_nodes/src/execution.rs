@@ -8,7 +8,8 @@ use comfy_media::{
 use comfy_tensor::{
     CpuBackend, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS, MAX_SHADER_PASSES,
     NativeShaderError, NativeShaderExecutor, NativeShaderRequest, NativeShaderResult,
-    ScratchBindingIdentity, ScratchReservation, StreamId, TensorError,
+    RetryRngPolicy, RngAlgorithm, RngError, RngProfileVersion, RngStream, RngStreamAddress,
+    RngTransaction, ScratchBindingIdentity, ScratchReservation, StreamId, TensorError,
 };
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
@@ -27,6 +28,7 @@ pub const NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 2;
 pub const LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_STRUCTURED_VALUE_SCHEMA_VERSION: u16 = 1;
+pub const NATIVE_TEXT_GENERATION_RNG_PHASE: &str = "native-text-generation";
 
 const MAX_IDENTIFIER_BYTES: usize = 4_096;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
@@ -2003,6 +2005,32 @@ impl NativeNodeContext {
     }
 }
 
+pub fn native_text_generation_transaction(
+    context: &NativeNodeContext,
+    seed: u64,
+) -> Result<RngTransaction, RngError> {
+    if context.cancellation.is_cancelled() {
+        return Err(RngError::Cancelled);
+    }
+    let address = RngStreamAddress::new(
+        context.prompt_id.0.to_string(),
+        context.attempt_id.0.to_string(),
+        context.node_id.0.clone(),
+        0,
+        NATIVE_TEXT_GENERATION_RNG_PHASE,
+        0,
+        0,
+        RetryRngPolicy::Replay,
+    )?;
+    RngStream::new(
+        RngProfileVersion::V2,
+        RngAlgorithm::Philox4x32_10,
+        seed,
+        address,
+    )?
+    .begin(None)
+}
+
 impl NativeNodeComputeSession {
     pub fn execution_context<'a>(
         &self,
@@ -3234,6 +3262,43 @@ mod tests {
         assert_eq!(interrupted.kind, NativeNodeFailureKind::Interrupted);
         assert_eq!(handle_store.object_count()?, 1);
         drop(backend);
+        Ok(())
+    }
+
+    #[test]
+    fn text_generation_rng_is_attempt_addressed_replayable_and_cancellable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(20));
+        let attempt_id = AttemptId(Uuid::from_u128(21));
+        let handle_store = Arc::new(TestHandleStore::new(store_identity(22, 23)?, attempt_id));
+        let make_context = |cancellation| -> Result<NativeNodeContext, Box<dyn std::error::Error>> {
+            Ok(NativeNodeContext::new(
+                prompt_id,
+                attempt_id,
+                NodeId::from("text-generation"),
+                cancellation,
+                authority.authorize_workspace(1024)?,
+                handle_store.clone(),
+            )?)
+        };
+
+        let first =
+            native_text_generation_transaction(&make_context(CancellationToken::default())?, 42)?;
+        let replay =
+            native_text_generation_transaction(&make_context(CancellationToken::default())?, 42)?;
+        let different_seed =
+            native_text_generation_transaction(&make_context(CancellationToken::default())?, 43)?;
+        assert_eq!(first.checkpoint(), replay.checkpoint());
+        assert_ne!(first.checkpoint(), different_seed.checkpoint());
+        assert_eq!(NATIVE_TEXT_GENERATION_RNG_PHASE, "native-text-generation");
+
+        let cancellation = CancellationToken::default();
+        assert!(cancellation.cancel());
+        assert!(matches!(
+            native_text_generation_transaction(&make_context(cancellation)?, 42),
+            Err(RngError::Cancelled)
+        ));
         Ok(())
     }
 

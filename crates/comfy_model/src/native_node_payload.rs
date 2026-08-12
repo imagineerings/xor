@@ -11,7 +11,7 @@ use thiserror::Error;
 use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 
 use crate::{
-    NativeRaftLarge, NativeVae,
+    NativeDecoderTextEncoder, NativePromptTokenizer, NativeRaftLarge, NativeVae,
     clip::{LoadedSd1Clip, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -267,6 +267,10 @@ enum NativeModelResource {
     ClipVision {
         clip_vision: Arc<NativeClipVision>,
     },
+    DecoderClip {
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -277,6 +281,8 @@ pub enum NativeModelBackingKind {
     NativeVae,
     OpticalFlow,
     ClipVision,
+    NativePromptTokenizer,
+    NativeDecoderTextEncoder,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -523,6 +529,39 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn decoder_clip(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        let tokenizer_digest = tokenizer
+            .semantic_digest(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let decoder_digest = decoder
+            .semantic_state_digest(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Clip,
+            format!("native-decoder-{:?}", decoder.configuration().architecture),
+            "sim-native-decoder-clip-v1",
+            tokenizer_digest,
+            decoder_digest,
+        )?;
+        let backing_bytes =
+            tokenizer
+                .resident_bytes()
+                .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?
+                .checked_add(decoder.resident_bytes().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?)
+                .ok_or(NativeModelPayloadError::LengthOverflow)?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::DecoderClip { tokenizer, decoder },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -600,6 +639,30 @@ impl NativeModelPayload {
                     resident_bytes: parts.owned_bytes(),
                 }]
             }
+            NativeModelResource::DecoderClip { tokenizer, decoder } => {
+                tensor_allocations.extend(decoder.resident_tensor_allocations().into_iter().map(
+                    |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                        storage_id,
+                        resident_bytes,
+                    },
+                ));
+                vec![
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativePromptTokenizer,
+                        address: Arc::as_ptr(tokenizer) as usize,
+                        resident_bytes: tokenizer.resident_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeDecoderTextEncoder,
+                        address: Arc::as_ptr(decoder) as usize,
+                        resident_bytes: decoder.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                ]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -620,7 +683,8 @@ impl NativeModelPayload {
             NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
-            | NativeModelResource::ClipVision { .. } => None,
+            | NativeModelResource::ClipVision { .. }
+            | NativeModelResource::DecoderClip { .. } => None,
         }
     }
 
@@ -632,7 +696,8 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
-            | NativeModelResource::ClipVision { .. } => None,
+            | NativeModelResource::ClipVision { .. }
+            | NativeModelResource::DecoderClip { .. } => None,
         }
     }
 
@@ -642,7 +707,8 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::OpticalFlow { .. }
-            | NativeModelResource::ClipVision { .. } => None,
+            | NativeModelResource::ClipVision { .. }
+            | NativeModelResource::DecoderClip { .. } => None,
         }
     }
 
@@ -652,7 +718,8 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
-            | NativeModelResource::ClipVision { .. } => None,
+            | NativeModelResource::ClipVision { .. }
+            | NativeModelResource::DecoderClip { .. } => None,
         }
     }
 
@@ -662,7 +729,17 @@ impl NativeModelPayload {
             NativeModelResource::Sd15Model { .. }
             | NativeModelResource::Sd1Clip { .. }
             | NativeModelResource::NativeVae { .. }
-            | NativeModelResource::OpticalFlow { .. } => None,
+            | NativeModelResource::OpticalFlow { .. }
+            | NativeModelResource::DecoderClip { .. } => None,
+        }
+    }
+
+    pub fn decoder_clip_resource(
+        &self,
+    ) -> Option<(&Arc<NativePromptTokenizer>, &Arc<NativeDecoderTextEncoder>)> {
+        match &self.resource {
+            NativeModelResource::DecoderClip { tokenizer, decoder } => Some((tokenizer, decoder)),
+            _ => None,
         }
     }
 
@@ -676,6 +753,9 @@ impl NativeModelPayload {
             NativeModelResource::OpticalFlow { raft } => Self::optical_flow(raft.clone())?,
             NativeModelResource::ClipVision { clip_vision } => {
                 Self::clip_vision(clip_vision.clone())?
+            }
+            NativeModelResource::DecoderClip { tokenizer, decoder } => {
+                Self::decoder_clip(tokenizer.clone(), decoder.clone())?
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes

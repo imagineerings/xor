@@ -255,7 +255,9 @@ fn require_model_resource_role(
 ) -> Result<(), NativeStoredPayloadError> {
     if matches!(
         role,
-        NativeModelResourceRole::OpticalFlow | NativeModelResourceRole::ClipVision
+        NativeModelResourceRole::OpticalFlow
+            | NativeModelResourceRole::ClipVision
+            | NativeModelResourceRole::Clip
     ) {
         Ok(())
     } else {
@@ -267,6 +269,7 @@ fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
     match resource.identity().role() {
         NativeModelResourceRole::OpticalFlow => resource.optical_flow_resource().is_some(),
         NativeModelResourceRole::ClipVision => resource.clip_vision_resource().is_some(),
+        NativeModelResourceRole::Clip => resource.decoder_clip_resource().is_some(),
         _ => false,
     }
 }
@@ -1493,13 +1496,9 @@ mod tests {
     }
 
     #[test]
-    fn model_resource_admission_is_closed_to_optical_flow_and_cannot_fall_back_to_diffusion()
+    fn model_resource_admission_is_closed_to_concrete_resources_and_cannot_fall_back_to_diffusion()
     -> Result<(), Box<dyn Error>> {
-        for role in [
-            NativeModelResourceRole::Model,
-            NativeModelResourceRole::Clip,
-            NativeModelResourceRole::Vae,
-        ] {
+        for role in [NativeModelResourceRole::Model, NativeModelResourceRole::Vae] {
             assert!(matches!(
                 require_model_resource_role(role),
                 Err(NativeStoredPayloadError::NonCanonicalModelResourceRole {
@@ -1509,6 +1508,7 @@ mod tests {
         }
         require_model_resource_role(NativeModelResourceRole::OpticalFlow)?;
         require_model_resource_role(NativeModelResourceRole::ClipVision)?;
+        require_model_resource_role(NativeModelResourceRole::Clip)?;
 
         let raft = loaded_zero_raft()?;
         let optical_flow = Arc::new(NativeModelPayload::optical_flow(raft)?);

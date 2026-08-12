@@ -843,7 +843,7 @@ def generate():
     rows = [build_row(source_row, basis) for source_row, basis in candidate_rows()]
     path = CATALOGS / "frontend-component-surfaces.csv"
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     return rows
@@ -883,7 +883,9 @@ def augment_source_ledger():
             changed = True
     if changed:
         with path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+            writer = csv.DictWriter(
+                handle, fieldnames=list(rows[0].keys()), lineterminator="\n"
+            )
             writer.writeheader()
             writer.writerows(rows)
 

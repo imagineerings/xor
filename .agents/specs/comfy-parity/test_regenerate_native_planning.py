@@ -54,7 +54,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 532)
+        self.assertEqual(len(tasks), 533)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -135,6 +135,9 @@ class ValidationGenerationTests(unittest.TestCase):
         text_regex_id = "comfy-parity-native-nodes-text-comfy-node-0002"
         text_regex_foundation_id = "comfy-parity-native-text-value-regex-foundation"
         text_transform_foundation_id = "comfy-parity-native-text-transform-foundation"
+        decoder_text_generation_foundation_id = (
+            "comfy-parity-native-decoder-text-generation-foundation"
+        )
         text_generation_foundation_id = "comfy-parity-native-text-generation-foundation"
         media_text_foundation_id = "comfy-parity-native-media-text-rendering-foundation"
         sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
@@ -238,8 +241,12 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(text_generation_foundation_id, dependencies[text_generation_id])
         self.assertIn(
+            decoder_text_generation_foundation_id,
+            tasks_by_id[text_generation_foundation_id]["dependencies"],
+        )
+        self.assertIn(
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
-            tasks_by_id[text_generation_foundation_id]["writes"],
+            tasks_by_id[decoder_text_generation_foundation_id]["writes"],
         )
         self.assertIn(media_text_foundation_id, dependencies[media_text_id])
         self.assertIn(
@@ -305,6 +312,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         for identifier in (
             image_source_foundation_id,
+            decoder_text_generation_foundation_id,
             text_generation_foundation_id,
             media_text_foundation_id,
             structured_link_foundation_id,
@@ -333,7 +341,11 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[text_transform_foundation_id], waves[text_regex_foundation_id] + 1
         )
         self.assertEqual(
-            waves[text_generation_foundation_id], waves[provider_id] + 1
+            waves[decoder_text_generation_foundation_id], waves[provider_id] + 1
+        )
+        self.assertEqual(
+            waves[text_generation_foundation_id],
+            waves[decoder_text_generation_foundation_id] + 1,
         )
         self.assertEqual(
             waves[sdpose_foundation_id], waves[text_generation_foundation_id] + 1

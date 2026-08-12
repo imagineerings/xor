@@ -1,9 +1,10 @@
 use crate::{
     ArtifactKey, ModelStoreError, ModelTokenizerDescriptor, SentencePieceType,
     VerifiedEmbeddingArchivePayload, VerifiedModelTensorPayload, VerifiedSentencePieceVocabulary,
-    clip::{ClipError, Sd1Tokenizer},
+    clip::{ClipError, NativeTokenizer, Sd1Tokenizer},
 };
 use comfy_tensor::{CancellationToken, TensorError};
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, sync::Arc};
 use thiserror::Error;
 
@@ -1190,6 +1191,7 @@ impl NativeTokenizerFamily {
     }
 }
 
+#[derive(Clone)]
 pub struct NativePromptTokenizer {
     family: NativeTokenizerFamily,
     configuration: TokenizerConfiguration,
@@ -1197,6 +1199,165 @@ pub struct NativePromptTokenizer {
 }
 
 impl NativePromptTokenizer {
+    pub fn semantic_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.native-prompt-tokenizer.v1");
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        match &self.family {
+            NativeTokenizerFamily::ClipBpe(tokenizer) => {
+                hasher.update(b"clip-bpe");
+                hasher.update(tokenizer.tokenizer.identity().digest().as_bytes());
+            }
+            NativeTokenizerFamily::SentencePiece(tokenizer) => {
+                hasher.update(b"sentencepiece");
+                hasher.update(tokenizer.artifact_sha256.as_bytes());
+                for entry in &tokenizer.entries {
+                    cancellation.check()?;
+                    hasher.update([0]);
+                    hasher.update(entry.piece.as_bytes());
+                    hasher.update(entry.score.to_bits().to_le_bytes());
+                    hasher.update(format!("{:?}", entry.piece_type).as_bytes());
+                }
+            }
+        }
+        for (name, embedding) in &self.embeddings {
+            cancellation.check()?;
+            hasher.update([0]);
+            hasher.update(name.as_bytes());
+            hasher.update([0]);
+            hasher.update(embedding.artifact_sha256().as_bytes());
+        }
+        cancellation.check()?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn encode_numeric(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        cancellation.check()?;
+        if text.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+        }
+        let content = self.family.encode(text, cancellation)?;
+        let token_count = content
+            .len()
+            .checked_add(usize::from(self.configuration.start_token.is_some()))
+            .and_then(|count| {
+                count.checked_add(usize::from(self.configuration.end_token.is_some()))
+            })
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "numeric prompt tokens",
+            ))?;
+        if token_count == 0 || token_count > self.configuration.maximum_length {
+            return Err(NativeTokenizerError::TooManyTokenValues(token_count));
+        }
+        let mut tokens = Vec::new();
+        tokens
+            .try_reserve_exact(token_count)
+            .map_err(|_| NativeTokenizerError::Allocation("numeric prompt tokens"))?;
+        tokens.extend(self.configuration.start_token);
+        tokens.extend(content);
+        tokens.extend(self.configuration.end_token);
+        cancellation.check()?;
+        Ok(tokens)
+    }
+
+    pub fn decode_numeric(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokens.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(tokens.len()));
+        }
+        let decoded = self.family.decode(tokens, skip_special, cancellation)?;
+        cancellation.check()?;
+        Ok(decoded)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeTokenizerError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| NativeTokenizerError::ArithmeticOverflow("tokenizer residency"))?;
+        let family_bytes = match &self.family {
+            NativeTokenizerFamily::ClipBpe(tokenizer) => tokenizer
+                .tokenizer
+                .resident_bytes()
+                .map_err(NativeTokenizerError::from)?,
+            NativeTokenizerFamily::SentencePiece(tokenizer) => {
+                let mut family_bytes = u64::try_from(std::mem::size_of::<SentencePieceTokenizer>())
+                    .map_err(|_| {
+                        NativeTokenizerError::ArithmeticOverflow("SentencePiece residency")
+                    })?;
+                for entry in &tokenizer.entries {
+                    family_bytes = family_bytes
+                        .checked_add(u64::try_from(entry.piece.capacity()).map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("SentencePiece text")
+                        })?)
+                        .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                            "SentencePiece residency",
+                        ))?;
+                }
+                family_bytes = family_bytes
+                    .checked_add(
+                        u64::try_from(
+                            tokenizer
+                                .control_tokens
+                                .capacity()
+                                .checked_mul(std::mem::size_of::<u32>())
+                                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                                    "SentencePiece controls",
+                                ))?,
+                        )
+                        .map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("SentencePiece controls")
+                        })?,
+                    )
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                        "SentencePiece residency",
+                    ))?;
+                family_bytes
+            }
+        };
+        bytes = bytes
+            .checked_add(family_bytes)
+            .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                "tokenizer residency",
+            ))?;
+        for (name, embedding) in &self.embeddings {
+            let embedding_bytes = embedding.rows().iter().try_fold(0_u64, |total, row| {
+                let row_bytes = row
+                    .len()
+                    .checked_mul(std::mem::size_of::<f32>())
+                    .and_then(|bytes| u64::try_from(bytes).ok())
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                        "embedding residency",
+                    ))?;
+                total
+                    .checked_add(row_bytes)
+                    .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                        "embedding residency",
+                    ))
+            })?;
+            bytes = bytes
+                .checked_add(u64::try_from(name.capacity()).map_err(|_| {
+                    NativeTokenizerError::ArithmeticOverflow("embedding name residency")
+                })?)
+                .and_then(|value| value.checked_add(embedding_bytes))
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "embedding residency",
+                ))?;
+        }
+        Ok(bytes)
+    }
+
     pub fn empty_token_ids(
         start_token: Option<u32>,
         end_token: Option<u32>,

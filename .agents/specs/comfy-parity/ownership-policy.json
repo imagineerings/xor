@@ -6225,6 +6225,7 @@
         "clip_tokenizer::SentencePieceTokenizer consumes only ModelStore-issued VerifiedSentencePieceVocabulary and owns only bounded source-compatible segmentation",
         "clip_tokenizer::TextualInversionEmbedding consumes only inseparable store-scoped VerifiedModelTensorPayload or VerifiedEmbeddingArchivePayload values and cannot accept caller-paired artifact identity, rows, raw archive entries, or raw float bytes",
         "clip_tokenizer::NativePromptTokenizer alone owns bounded section progress and source-compatible missing textual-inversion comma fallback; it delegates vocabulary traversal and artifact admission to the canonical owners",
+        "NativeDecoderTextEncoder::generate_text delegates numeric encode and generated-token decode to NativePromptTokenizer; it cannot flatten textual-inversion embeddings or introduce a second vocabulary codec",
         "native-diffusion maps only the canonical fixed-77 SD1 projection, aliases canonical SD1 bounds, and binds canonical tokenizer identity into runtime handles and cache dependencies"
       ],
       "definitions": [
@@ -6352,6 +6353,11 @@
           "pattern": "pub fn from_verified_tensor_payload\\([\\s\\S]*VerifiedModelTensorPayload[\\s\\S]*pub fn from_verified_archive_payload\\([\\s\\S]*VerifiedEmbeddingArchivePayload[\\s\\S]*select_embedding_tensors"
         },
         {
+          "name": "decoder-generation-delegates-numeric-encode-and-decode-to-canonical-tokenizer",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub fn generate_text[\\s\\S]*tokenizer\\.encode_numeric[\\s\\S]*tokenizer\\.decode_numeric"
+        },
+        {
           "name": "native-diffusion-delegates-canonical-fixed-context-projection",
           "path": "crates/comfy_model/src/slices/native_diffusion.rs",
           "pattern": "pub const SD15_TOKEN_COUNT: usize = crate::clip::SD1_CONTEXT_LENGTH;[\\s\\S]*tokenizer[\\s\\S]*\\.encode_fixed_token_ids\\(text, cancellation\\)[\\s\\S]*map_err\\(map_sd15_tokenizer_error\\)"
@@ -6375,7 +6381,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-sd1-tokenizer-owner-consolidation",
-        "comfy-parity-clip-tokenizer-foundation"
+        "comfy-parity-clip-tokenizer-foundation",
+        "comfy-parity-native-decoder-text-generation-foundation"
       ],
       "production_consumers": [
         "native CLIP prompt tokenization",
@@ -11749,7 +11756,9 @@
         "NativeModule retains embedding, linear, activation, parameter-shape, materialization, and backend-admission ownership; NativeDecoderTextEncoder only assembles the source decoder graphs",
         "DecoderProfileFact is an immutable source-derived projection and decoder_symbol_behavior is the total catalog-to-native conformance mapping; neither is a loader, mutable registry, backend selector, or executor",
         "comfy_model::attention retains scaled-dot-product attention selection and execution while comfy_tensor retains exact RMS normalization, tensors, backend capabilities, caller workspace authorization, memory, streams, cancellation, and caller-addressed RngTransaction state",
-        "DecoderKvState is invocation-local staged graph state only; ModelStore remains the parsed-model cache and comfy_runtime::NativeCache remains the durable publication cache, while runtime persistence and output transactions retain every commit transition"
+        "DecoderKvState is invocation-local staged graph state only; ModelStore remains the parsed-model cache and comfy_runtime::NativeCache remains the durable publication cache, while runtime persistence and output transactions retain every commit transition",
+        "NativeModelPayload::decoder_clip derives an inseparable tokenizer and decoder semantic identity and alias-aware residency projection; NativeStoredModelPayload admits it only as a concrete CLIP resource, and the runtime resolver retains its checked handle lease",
+        "comfy_nodes::native_text_generation_transaction alone opens the prompt-attempt-node-addressed Philox transaction for this boundary; NativeDecoderTextEncoder continues to consume only a borrowed transaction and publishes its advanced clone only on success"
       ],
       "definitions": [
         {
@@ -11803,6 +11812,36 @@
           "pattern": "pub fn generate[\\s\\S]*transaction: &RngTransaction[\\s\\S]*let mut staged_transaction = transaction\\.clone\\(\\)[\\s\\S]*sample_token"
         },
         {
+          "name": "text-generation-opens-one-attempt-addressed-rng-transaction",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "pub const NATIVE_TEXT_GENERATION_RNG_PHASE[\\s\\S]*pub fn native_text_generation_transaction[\\s\\S]*context\\.prompt_id[\\s\\S]*context\\.attempt_id[\\s\\S]*context\\.node_id[\\s\\S]*RngAlgorithm::Philox4x32_10[\\s\\S]*RetryRngPolicy::Replay"
+        },
+        {
+          "name": "decoder-generation-decodes-only-the-generated-suffix",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub fn generate_text[\\s\\S]*let prompt_length[\\s\\S]*outcome[\\s\\S]*\\.tokens[\\s\\S]*\\.get\\(prompt_length\\.\\.\\)[\\s\\S]*decode_numeric"
+        },
+        {
+          "name": "decoder-clip-resource-is-concrete-derived-and-retained",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn decoder_clip[\\s\\S]*semantic_digest[\\s\\S]*semantic_state_digest[\\s\\S]*NativeModelResourceRole::Clip[\\s\\S]*NativeModelResource::DecoderClip"
+        },
+        {
+          "name": "decoder-residency-projects-canonical-tensor-storage-identities",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub fn resident_owned_bytes[\\s\\S]*pub fn resident_tensor_allocations[\\s\\S]*module\\.resident_tensor_allocations[\\s\\S]*tensor\\.storage_id\\(\\)"
+        },
+        {
+          "name": "runtime-decoder-clip-resolver-rejects-diffusion-clip-and-retains-lease",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "pub struct NativeDecoderClipResource[\\s\\S]*_resolved_payload: NativeResolvedPayload[\\s\\S]*pub fn resolve_native_decoder_clip[\\s\\S]*payload\\.diffusion\\(\\)\\.is_some\\(\\)[\\s\\S]*decoder_clip_resource"
+        },
+        {
+          "name": "runtime-text-generation-stages-resolution-rng-and-generated-text",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "pub fn execute_native_decoder_text_generation[\\s\\S]*resolve_native_decoder_clip[\\s\\S]*native_text_generation_transaction[\\s\\S]*\\.generate_text[\\s\\S]*context\\.cancellation\\.check\\(\\)"
+        },
+        {
           "name": "decoder-llm-delegates-token-input-to-canonical-tokenizer",
           "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
           "pattern": "pub fn tokenize_decoder_prompt[\\s\\S]*NativePromptTokenizer[\\s\\S]*tokenizer[\\s\\S]*\\.tokenize\\(text, cancellation\\)"
@@ -11832,7 +11871,8 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-clip-text-encoder-decoder-foundation"
+        "comfy-parity-clip-text-encoder-decoder-foundation",
+        "comfy-parity-native-decoder-text-generation-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",

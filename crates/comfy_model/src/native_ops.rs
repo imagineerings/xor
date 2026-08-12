@@ -1476,6 +1476,60 @@ impl NativeModule {
         self.collect_resident_storage_bytes(&mut tensor_storages)
     }
 
+    pub fn resident_tensor_allocations(&self) -> Vec<(StorageId, u64)> {
+        let mut allocations = Vec::new();
+        self.collect_resident_tensor_allocations(&mut allocations);
+        allocations
+    }
+
+    fn collect_resident_tensor_allocations(&self, allocations: &mut Vec<(StorageId, u64)>) {
+        fn insert_tensor(allocations: &mut Vec<(StorageId, u64)>, tensor: &Tensor) {
+            let storage_id = tensor.storage_id();
+            if !allocations
+                .iter()
+                .any(|(existing, _)| *existing == storage_id)
+            {
+                allocations.push((storage_id, tensor.storage_byte_len()));
+            }
+        }
+
+        fn insert_weight(allocations: &mut Vec<(StorageId, u64)>, weight: &NativeWeight) {
+            match weight {
+                NativeWeight::Dense(tensor) => insert_tensor(allocations, tensor),
+                NativeWeight::WeightNorm(weight) => {
+                    insert_tensor(allocations, &weight.magnitude);
+                    insert_tensor(allocations, &weight.direction);
+                }
+                NativeWeight::SpectralNorm(weight) => {
+                    insert_tensor(allocations, &weight.original);
+                }
+                NativeWeight::Quantized(_) => {}
+            }
+        }
+
+        if let Some(weight) = &self.weight {
+            insert_weight(allocations, weight);
+        }
+        if let Some(bias) = &self.bias {
+            insert_tensor(allocations, bias);
+        }
+        if let Some(buffer) = &self.registered_buffer {
+            insert_tensor(allocations, buffer);
+        }
+        if let Some(prefetched) = &self.prefetched {
+            insert_tensor(allocations, &prefetched.weight);
+            if let Some(bias) = &prefetched.bias {
+                insert_tensor(allocations, bias);
+            }
+            if let Some(weight) = &prefetched.next_weight {
+                insert_weight(allocations, weight);
+            }
+        }
+        for child in &self.children {
+            child.collect_resident_tensor_allocations(allocations);
+        }
+    }
+
     fn collect_resident_storage_bytes(
         &self,
         tensor_storages: &mut HashSet<StorageId>,
@@ -4659,6 +4713,7 @@ mod tests {
             ],
         )?;
         assert_eq!(aliased.resident_storage_bytes()?, shared.storage_byte_len());
+        assert_eq!(aliased.resident_tensor_allocations().len(), 1);
         assert_eq!(
             distinct.resident_storage_bytes()?,
             shared
@@ -4666,6 +4721,7 @@ mod tests {
                 .checked_mul(2)
                 .ok_or(NativeOpsError::ResidentBytesOverflow)?
         );
+        assert_eq!(distinct.resident_tensor_allocations().len(), 2);
         assert_eq!(state_digest(&aliased)?, state_digest(&distinct)?);
         Ok(())
     }

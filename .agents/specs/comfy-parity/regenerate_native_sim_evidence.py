@@ -173,7 +173,9 @@ def write_execution_disposition_registry() -> None:
         for feature_id, (kind, owner) in sorted(TASK_18_QUEUE_DISPOSITIONS.items())
     ]
     with EXECUTION_DISPOSITIONS.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(
+            handle, fieldnames=list(rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -533,7 +535,7 @@ def write_catalog() -> None:
         by_id[row["architecture_id"]] = row
     ordered = [by_id[key] for key in sorted(by_id, key=lambda value: int(value.rsplit("-", 1)[1]))]
     with CATALOG.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(ordered)
 

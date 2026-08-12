@@ -25,8 +25,9 @@ use comfy_media::{
     MetadataWritePolicy, PngError, PngLimits, decode_png, encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
-    AttentionError, ClipTextError, LatentFormatError, ModelStoreError, NativeModelPayload,
-    NativeOpsError, NativeVae, PatchGraph, QuantizationError, VaeArchitectureError,
+    AttentionError, ClipTextError, LatentFormatError, ModelStoreError, NativeDecoderTextEncoder,
+    NativeModelPayload, NativeOpsError, NativePromptTokenizer, NativeTextGenerationRequest,
+    NativeTextGenerationResult, NativeVae, PatchGraph, QuantizationError, VaeArchitectureError,
     VaeBoundaryKind, VaeError, VaeKernelProfile,
     clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
@@ -49,8 +50,8 @@ use comfy_nodes::{
     NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion,
     NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
     generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
-    native_source_type_projection, native_value_type_for_output_schema,
-    native_value_types_for_input_schema,
+    native_source_type_projection, native_text_generation_transaction,
+    native_value_type_for_output_schema, native_value_types_for_input_schema,
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
@@ -2293,6 +2294,93 @@ struct ResolvedNative<Value> {
     _resolved_payload: NativeResolvedPayload,
 }
 
+#[derive(Clone)]
+pub struct NativeDecoderClipResource {
+    tokenizer: Arc<NativePromptTokenizer>,
+    decoder: Arc<NativeDecoderTextEncoder>,
+    _resolved_payload: NativeResolvedPayload,
+}
+
+impl NativeDecoderClipResource {
+    pub fn tokenizer(&self) -> &Arc<NativePromptTokenizer> {
+        &self.tokenizer
+    }
+
+    pub fn decoder(&self) -> &Arc<NativeDecoderTextEncoder> {
+        &self.decoder
+    }
+}
+
+pub fn resolve_native_decoder_clip(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<NativeDecoderClipResource, NodeFailure> {
+    let expected_type = NativeHandleType::new(NativeHandleKind::Clip, "CLIP")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Model(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native decoder CLIP handle stored the wrong object type",
+        ));
+    };
+    if payload.diffusion().is_some() {
+        return Err(invalid_diffusion_input(
+            "native decoder CLIP handle stored a diffusion CLIP resource",
+        ));
+    }
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let (tokenizer, decoder) =
+        payload
+            .model_payload()
+            .decoder_clip_resource()
+            .ok_or_else(|| {
+                invalid_diffusion_input(
+                    "native decoder CLIP handle lacks concrete decoder resources",
+                )
+            })?;
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(NativeDecoderClipResource {
+        tokenizer: tokenizer.clone(),
+        decoder: decoder.clone(),
+        _resolved_payload: stored,
+    })
+}
+
+pub fn execute_native_decoder_text_generation(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+    seed: u64,
+    request: NativeTextGenerationRequest<'_>,
+) -> Result<NativeTextGenerationResult, NodeFailure> {
+    context.cancellation.check().map_err(cancellation_failure)?;
+    let resource = resolve_native_decoder_clip(context, handle)?;
+    let compute = context
+        .compute_session()
+        .map_err(classified_diffusion_failure)?;
+    let execution = compute
+        .execution_context(context)
+        .map_err(classified_diffusion_failure)?;
+    let transaction =
+        native_text_generation_transaction(context, seed).map_err(classified_diffusion_failure)?;
+    let result = resource
+        .decoder()
+        .generate_text(
+            resource.tokenizer(),
+            compute.backend(),
+            request,
+            &transaction,
+            &execution,
+        )
+        .map_err(classified_diffusion_failure)?;
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(result)
+}
+
 impl<Value> Deref for ResolvedNative<Value> {
     type Target = Value;
 
@@ -4133,6 +4221,9 @@ fn typed_failure_class(error: &(dyn std::error::Error + 'static)) -> Option<Type
                 }
                 _ => {}
             }
+        }
+        if error.downcast_ref::<CancellationError>().is_some() {
+            return Some(TypedFailureClass::Cancelled);
         }
         if let Some(error) = error.downcast_ref::<RngCompatibilityError>() {
             match error {

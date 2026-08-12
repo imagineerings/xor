@@ -9182,6 +9182,63 @@ def native_structured_input_link_foundation_task(dependency: str) -> dict[str, o
     )
 
 
+def native_decoder_text_generation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-decoder-text-generation-foundation",
+        "Implement retained decoder text generation",
+        [6, 7, 18, 26, 28, 37, 41, 44],
+        [8, 18, 25, 26, 28, 32, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-RNG-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical native scalar text-generation boundary retains an exact decoder and tokenizer as a concrete CLIP resource, admits only checked attempt-local handles, opens the addressed text-generation RNG transaction, executes source-compatible bounded sampling, and decodes only newly generated tokens. It cannot introduce a metadata-only model, global generator, second tokenizer, template facade, or pretend that media marker IDs are equivalent to multimodal embeddings.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_tensor/src/rng.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/generate_frontend_component_surfaces.py",
+            ".agents/specs/comfy-parity/generate_shell_catalog.py",
+            ".agents/specs/comfy-parity/regenerate_native_sim_evidence.py",
+        ],
+        "Source-derived fixtures prove maximum-new-token bounds, greedy zero-draw behavior, schema and fallback sampling values, top-k ties, top-p crossing, distinct-token penalties, deterministic replay, generated-token-only decoding, retained tokenizer/decoder identity and alias-aware residency, direct legacy diffusion-CLIP rejection, wrong-store/generation/digest rejection, cancellation, scratch/RNG rollback, restart staleness, and zero partial publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["6.4", "7.4", "18.1", "26.2", "28.2", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_text_generation_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-text-generation-foundation",
@@ -9196,7 +9253,7 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "One canonical native text-generation boundary admits retained decoder text encoders as exact MODEL resources, tokenizes source template text with optional image, video, and audio inputs, executes bounded seeded generation, and decodes generated tokens. Generated text leaves receive only checked model handles and an attempt-scoped RNG transaction; they cannot introduce a metadata-only model, template facade, global generator, or second tokenizer.",
+        "One canonical native multimodal embedding boundary preprocesses source template text with optional image, video, and audio inputs, joins the resulting token, embedding, position, mask, and deep-stack state, and delegates bounded seeded generation to the retained decoder foundation. Generated text leaves receive only checked CLIP handles and attempt-scoped RNG transactions; they cannot insert marker IDs in place of media embeddings, ignore supported media, or introduce a second tokenizer or generation loop.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
@@ -9223,7 +9280,7 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
         ],
-        "Source-derived fixtures prove exact prompt/template/media tokenization, skip-template and thinking behavior, min/max length, seeded sampling and replay, generated-token decoding, retained decoder model identity and alias-aware residency, wrong-model and stale-handle rejection, cancellation at every bounded phase, scratch/RNG rollback, restart behavior, and zero partial publication.",
+        "Source-derived fixtures prove exact prompt/template/media tokenization, skip-template and thinking behavior, Qwen3VL and Gemma3/Gemma4 image handling, Gemma4 video precedence and 24-to-1 FPS projection, 16 kHz audio features, prepared-embedding and position joins, family-specific special-token cleanup, cancellation at every bounded preprocessing and generation phase, scratch/RNG rollback, restart behavior, and zero partial publication.",
         [dependency],
         locked=True,
         criterion_ids=["6.4", "7.4", "18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
@@ -10337,8 +10394,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             + [str(comfy_build_boundary["id"]), str(shader_foundation["id"])]
         )
     )
-    text_generation_foundation = native_text_generation_foundation_task(
+    decoder_text_generation_foundation = native_decoder_text_generation_foundation_task(
         str(node_provider_foundation["id"])
+    )
+    text_generation_foundation = native_text_generation_foundation_task(
+        str(decoder_text_generation_foundation["id"])
     )
     sdpose_foundation = native_sdpose_execution_foundation_task(
         str(text_generation_foundation["id"])
@@ -10411,6 +10471,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             structured_link_foundation,
             shader_foundation,
             node_provider_foundation,
+            decoder_text_generation_foundation,
             text_generation_foundation,
             sdpose_foundation,
             video_foundation,

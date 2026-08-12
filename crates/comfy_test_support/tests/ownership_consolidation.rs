@@ -11092,3 +11092,80 @@ fn val_ownership_001_native_text_regex_has_one_bounded_owner()
     assert!(validate_native_text_regex_boundary(&root, &sources)?);
     Ok(())
 }
+
+#[test]
+fn val_ownership_001_native_decoder_text_generation_has_one_boundary()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let decoder =
+        fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
+    for required in [
+        "pub fn generate_text(",
+        "tokenizer.encode_numeric(",
+        ".get(prompt_length..)",
+        "tokenizer.decode_numeric(",
+        "let mut staged_transaction = transaction.clone();",
+    ] {
+        assert!(
+            decoder.contains(required),
+            "decoder boundary lacks {required}"
+        );
+    }
+    let nodes = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    for required in [
+        "pub const NATIVE_TEXT_GENERATION_RNG_PHASE",
+        "pub fn native_text_generation_transaction(",
+        "RngAlgorithm::Philox4x32_10",
+        "RetryRngPolicy::Replay",
+    ] {
+        assert!(
+            nodes.contains(required),
+            "node RNG boundary lacks {required}"
+        );
+    }
+    let runtime =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    for required in [
+        "pub struct NativeDecoderClipResource",
+        "pub fn resolve_native_decoder_clip(",
+        "pub fn execute_native_decoder_text_generation(",
+        "payload.diffusion().is_some()",
+        "native_text_generation_transaction(context, seed)",
+        "decoder_clip_resource()",
+        "_resolved_payload: stored",
+    ] {
+        assert!(
+            runtime.contains(required),
+            "runtime boundary lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+            })
+        })
+        .ok_or("missing decoder text-generation ownership concern")?;
+    let mappings = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing decoder text-generation ownership mappings")?;
+    for name in [
+        "text-generation-opens-one-attempt-addressed-rng-transaction",
+        "decoder-generation-decodes-only-the-generated-suffix",
+        "decoder-clip-resource-is-concrete-derived-and-retained",
+        "runtime-decoder-clip-resolver-rejects-diffusion-clip-and-retains-lease",
+        "runtime-text-generation-stages-resolution-rng-and-generated-text",
+    ] {
+        assert!(mappings.iter().any(|mapping| {
+            mapping.get("name").and_then(serde_json::Value::as_str) == Some(name)
+        }));
+    }
+    Ok(())
+}

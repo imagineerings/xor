@@ -4,8 +4,9 @@ use comfy_model::{
     DecoderLayerWeights, DecoderRopeConfiguration, DecoderSymbolBehavior, DecoderTextConfiguration,
     DecoderTextError, DecoderTextRequest, DecoderTextWeights, GEMMA4_SOURCE_PATH,
     GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH,
-    LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder, NativePromptTokenizer,
-    NativeTokenizerFamily, QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, RopeScaling,
+    LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder, NativeModelPayload,
+    NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH,
+    QWEN35_SOURCE_SHA256, RopeScaling, TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256,
     TokenizerConfiguration, apply_rope, decoder_profile_fact, decoder_symbol_behavior,
     gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
     gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route,
@@ -21,7 +22,7 @@ use comfy_tensor::{
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, error::Error, fs, path::Path};
+use std::{collections::BTreeMap, error::Error, fs, path::Path, sync::Arc};
 
 const MEMORY_LIMIT: u64 = 128 * 1024 * 1024;
 const TASK_ID: &str = "comfy-parity-clip-text-encoder-decoder-foundation";
@@ -629,6 +630,38 @@ fn generation_transaction() -> Result<comfy_tensor::RngTransaction, Box<dyn Erro
     .begin(None)?)
 }
 
+fn generation_tokenizer() -> Result<NativePromptTokenizer, Box<dyn Error>> {
+    let vocabulary = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../comfy_test_support/fixtures/models/sd15-tiny-v1/vocab.json"
+    ))?;
+    let merges = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../comfy_test_support/fixtures/models/sd15-tiny-v1/merges.txt"
+    ))?;
+    Ok(NativePromptTokenizer::checked(
+        NativeTokenizerFamily::ClipBpe(ClipBpeTokenizer::from_json_and_merges(
+            ModelTokenizerDescriptor::checked("comfy.decoder.generation.tokenizer")?,
+            &vocabulary,
+            &merges,
+        )?),
+        TokenizerConfiguration {
+            maximum_length: 8,
+            minimum_length: None,
+            minimum_padding: None,
+            pad_to_maximum_length: false,
+            pad_left: false,
+            start_token: Some(1),
+            end_token: Some(2),
+            pad_token: 2,
+            maximum_word_length: 32,
+            disable_weights: true,
+            embedding_width: None,
+        },
+        BTreeMap::new(),
+    )?)
+}
+
 #[test]
 fn caller_addressed_generation_is_deterministic_and_does_not_mutate_input_transaction()
 -> Result<(), Box<dyn Error>> {
@@ -649,6 +682,58 @@ fn caller_addressed_generation_is_deterministic_and_does_not_mutate_input_transa
     let second = model.generate(&backend, &prompt, &generation, &transaction, &context)?;
     assert_eq!(first.tokens, second.tokens);
     assert!(first.tokens.len() >= 3 && first.tokens.len() <= 5);
+    Ok(())
+}
+
+#[test]
+fn retained_decoder_clip_generation_decodes_only_new_tokens_and_reuses_backing()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority, model, cancellation) = model(DecoderArchitecture::Llama)?;
+    let context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let tokenizer = Arc::new(generation_tokenizer()?);
+    let model = Arc::new(model);
+    let transaction = generation_transaction()?;
+    let original_checkpoint = transaction.checkpoint();
+    let request = NativeTextGenerationRequest {
+        formatted_prompt: "",
+        maximum_new_tokens: 1,
+        do_sample: false,
+        temperature_bits: 1.0_f32.to_bits(),
+        top_k: 50,
+        top_p_bits: 1.0_f32.to_bits(),
+        minimum_p_bits: 0.0_f32.to_bits(),
+        repetition_penalty_bits: 1.0_f32.to_bits(),
+        presence_penalty_bits: 0.0_f32.to_bits(),
+    };
+    for invalid_limit in [0, 32_769] {
+        let mut invalid = request.clone();
+        invalid.maximum_new_tokens = invalid_limit;
+        assert!(matches!(
+            model.generate_text(&tokenizer, &backend, invalid, &transaction, &context),
+            Err(DecoderTextError::InvalidInput(
+                "maximum new tokens must be between 1 and 32768"
+            ))
+        ));
+        assert_eq!(transaction.checkpoint(), original_checkpoint);
+    }
+    let outcome = model.generate_text(&tokenizer, &backend, request, &transaction, &context)?;
+    assert_eq!(outcome.generated_tokens.len(), 1);
+    assert_eq!(transaction.checkpoint(), original_checkpoint);
+
+    let first = NativeModelPayload::decoder_clip(tokenizer.clone(), model.clone())?;
+    let second = NativeModelPayload::decoder_clip(tokenizer.clone(), model.clone())?;
+    assert_eq!(first.identity(), second.identity());
+    assert_eq!(first.resident_parts()?, second.resident_parts()?);
+    let shared_tensor_model = Arc::new(model.as_ref().clone());
+    let shared_tensor_payload = NativeModelPayload::decoder_clip(tokenizer, shared_tensor_model)?;
+    assert_eq!(first.identity(), shared_tensor_payload.identity());
+    assert!(!first.resident_parts()?.tensor_allocations().is_empty());
+    assert_eq!(
+        first.resident_parts()?.tensor_allocations(),
+        shared_tensor_payload.resident_parts()?.tensor_allocations()
+    );
+    assert!(first.decoder_clip_resource().is_some());
+    first.validate()?;
     Ok(())
 }
 
@@ -1487,6 +1572,7 @@ fn source_constants_match_the_pinned_decoder_files() -> Result<(), Box<dyn Error
         (GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256),
         (GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256),
         (QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256),
+        (TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256),
     ] {
         assert_eq!(
             format!("{:x}", Sha256::digest(fs::read(workspace.join(path))?)),
