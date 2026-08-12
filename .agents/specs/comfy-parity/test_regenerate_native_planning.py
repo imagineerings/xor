@@ -51,6 +51,12 @@ class ValidationGenerationTests(unittest.TestCase):
         scalar_generation_id = "comfy-parity-native-decoder-text-generation-foundation"
         prepared_generation_id = "comfy-parity-native-prepared-decoder-generation-foundation"
         qwen_preparation_id = "comfy-parity-native-qwen-image-preparation-foundation"
+        deepstack_id = "comfy-parity-native-prepared-decoder-deepstack-foundation"
+        qwen_tokenizer_id = "comfy-parity-native-qwen2-tokenizer-foundation"
+        qwen3_decoder_id = "comfy-parity-native-qwen3-decoder-exactness-foundation"
+        qwen35_decoder_id = "comfy-parity-native-qwen35-decoder-exactness-foundation"
+        qwen_vision_id = "comfy-parity-native-qwen-vision-projection-foundation"
+        qwen_resource_id = "comfy-parity-native-qwen-multimodal-resource-foundation"
         qwen_generation_id = "comfy-parity-native-qwen-multimodal-generation-foundation"
         gemma_generation_id = "comfy-parity-native-gemma-multimodal-generation-foundation"
         multimodal_generation_id = "comfy-parity-native-text-generation-foundation"
@@ -60,7 +66,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 537)
+        self.assertEqual(len(tasks), 543)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -100,9 +106,15 @@ class ValidationGenerationTests(unittest.TestCase):
             [prepared_generation_id],
         )
         self.assertEqual(
-            tasks_by_id[qwen_generation_id]["dependencies"],
+            tasks_by_id[deepstack_id]["dependencies"],
             [qwen_preparation_id],
         )
+        self.assertEqual(tasks_by_id[qwen_tokenizer_id]["dependencies"], [deepstack_id])
+        self.assertEqual(tasks_by_id[qwen3_decoder_id]["dependencies"], [qwen_tokenizer_id])
+        self.assertEqual(tasks_by_id[qwen35_decoder_id]["dependencies"], [qwen3_decoder_id])
+        self.assertEqual(tasks_by_id[qwen_vision_id]["dependencies"], [qwen35_decoder_id])
+        self.assertEqual(tasks_by_id[qwen_resource_id]["dependencies"], [qwen_vision_id])
+        self.assertEqual(tasks_by_id[qwen_generation_id]["dependencies"], [qwen_resource_id])
         self.assertEqual(
             tasks_by_id[gemma_generation_id]["dependencies"],
             [qwen_generation_id],
@@ -379,9 +391,13 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             waves[qwen_preparation_id], waves[prepared_generation_id] + 1
         )
-        self.assertEqual(
-            waves[qwen_generation_id], waves[qwen_preparation_id] + 1
-        )
+        self.assertEqual(waves[deepstack_id], waves[qwen_preparation_id] + 1)
+        self.assertEqual(waves[qwen_tokenizer_id], waves[deepstack_id] + 1)
+        self.assertEqual(waves[qwen3_decoder_id], waves[qwen_tokenizer_id] + 1)
+        self.assertEqual(waves[qwen35_decoder_id], waves[qwen3_decoder_id] + 1)
+        self.assertEqual(waves[qwen_vision_id], waves[qwen35_decoder_id] + 1)
+        self.assertEqual(waves[qwen_resource_id], waves[qwen_vision_id] + 1)
+        self.assertEqual(waves[qwen_generation_id], waves[qwen_resource_id] + 1)
         self.assertEqual(
             waves[gemma_generation_id], waves[qwen_generation_id] + 1
         )

@@ -2373,6 +2373,73 @@ fn run_ownership_validation(
         .contains("prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope")
         && model_clip_text_encoder_decoder_tests
             .contains("prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation");
+    let task382_deepstack_has_one_borrowed_decoder_owner =
+        production_source_occurrences(&sources, "pub struct DecoderPreparedDeepstack").len() == 1
+            && model_clip_text_encoder_decoder.contains("visual_position_mask: &'a [bool]")
+            && model_clip_text_encoder_decoder.contains("layers: &'a [Tensor]")
+            && !model_clip_text_encoder_decoder.contains("Serialize for DecoderPreparedDeepstack")
+            && !model_clip_text_encoder_decoder
+                .contains("Deserialize for DecoderPreparedDeepstack");
+    let task382_deepstack_delegates_canonical_prefill_cache_rng_and_indexing =
+        model_clip_text_encoder_decoder.contains("fn validate_prepared_deepstack(")
+            && model_clip_text_encoder_decoder
+                .contains("prepared deepstack is valid only for uncached prefill")
+            && model_clip_text_encoder_decoder
+                .contains("index_add_in_place_with_context_exact_native(")
+            && model_clip_text_encoder_decoder.contains("if capture == Some(layer_index)")
+            && model_clip_text_encoder_decoder.contains("prompt.deepstack")
+            && model_clip_text_encoder_decoder.contains("transaction: &RngTransaction");
+    let task382_deepstack_boundaries_are_executable = model_clip_text_encoder_decoder_tests
+        .contains("prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional")
+        && model_clip_text_encoder_decoder_tests.contains("visual_position_mask: &no_visual")
+        && model_clip_text_encoder_decoder_tests.contains("too_many_layers")
+        && model_clip_text_encoder_decoder_tests.contains("transaction.checkpoint()")
+        && model_clip_text_encoder_decoder_tests.contains("scratch.in_use_bytes()");
+    let task382_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-prepared-decoder-deepstack-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "prepared-deepstack-is-borrowed-validated-and-prefill-only",
+                            "prepared-deepstack-adds-after-layer-before-capture-through-canonical-indexing",
+                            "prepared-deepstack-tests-exact-prefill-only-rollback",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task382_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_unidirectional_decoder_execution,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-prepared-decoder-deepstack-foundation")
+                && line.contains("VAL-TENSOR-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task381p_qwen_preparation_has_one_attempt_local_owner =
         production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
             && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
@@ -8367,6 +8434,22 @@ fn run_ownership_validation(
             task380_prepared_decoder_boundaries_are_executable,
         ),
         (
+            "task382_policy_and_catalog_trace_prepared_deepstack",
+            task382_policy_trace && task382_catalog_trace,
+        ),
+        (
+            "task382_deepstack_has_one_borrowed_decoder_owner",
+            task382_deepstack_has_one_borrowed_decoder_owner,
+        ),
+        (
+            "task382_deepstack_delegates_canonical_prefill_cache_rng_and_indexing",
+            task382_deepstack_delegates_canonical_prefill_cache_rng_and_indexing,
+        ),
+        (
+            "task382_deepstack_boundaries_are_executable",
+            task382_deepstack_boundaries_are_executable,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -8868,6 +8951,17 @@ fn val_ownership_task380_prepared_decoder_001() -> Result<(), Box<dyn std::error
         "val-ownership-task380-prepared-decoder-001.json",
         "val_ownership_task380_prepared_decoder_001",
         Some("task380_"),
+    )
+}
+
+#[test]
+fn val_ownership_task382_prepared_deepstack_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task382-prepared-decoder-deepstack-and-shared-generation-ownership",
+        "val-ownership-task382-prepared-deepstack-001.json",
+        "val_ownership_task382_prepared_deepstack_001",
+        Some("task382_"),
     )
 }
 

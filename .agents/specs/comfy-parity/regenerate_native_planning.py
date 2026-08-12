@@ -9322,6 +9322,213 @@ def native_qwen_image_preparation_foundation_task(dependency: str) -> dict[str, 
     )
 
 
+def native_qwen2_tokenizer_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen2-tokenizer-foundation",
+        "Implement exact Qwen2 byte-BPE tokenization",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        [
+            "VAL-CLIP-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "NativePromptTokenizer gains one exact Qwen2 byte-BPE family backed by the pinned Qwen3-VL and Qwen3.5 vocabularies, ordered merges, and atomic added-token configurations. It applies NFC, the checked Qwen2 or Qwen3.5 declared regex profile, reversible Unicode byte encoding, no end-of-word suffix, no automatic BOS/EOS, source min-one pad behavior, case/whitespace preservation, added-token special classification, skip-special decode, replacement-error decode, no cleanup-spaces behavior, semantic identity, bounded allocation, and cancellation without creating a second tokenizer owner.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy/sd1_clip.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/clip.rs",
+        ],
+        [
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_model/Cargo.toml",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal/tokenizer",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted code-inferred fixtures pin both artifact triples and their contiguous ID ranges, merge counts and header forms; prove Qwen2 versus Qwen3.5 Mark-category pretokenization, NFC, byte-alphabet/no-end-of-word semantics, no BOS/EOS, min-one pad, ASCII/Unicode/contraction/whitespace/punctuation IDs, image/chat/think/audio added-token atomicity, exact special versus non-special skip behavior, invalid artifacts, bounds, cancellation, allocation failure, replacement decode, round trips, semantic digest changes, and resident-byte accounting. Because Comfy pins only minimum Transformers/tokenizers versions and the snapshot has no executable runtime oracle, fixtures remain explicitly code-inferred unless an exact dependency runtime is separately pinned. Whole-repository scans prove NativePromptTokenizer remains the sole generic tokenizer and no CLIP-BPE, SentencePiece, decoder, vision, RNG, cache, persistence, or publication owner is duplicated.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_prepared_decoder_deepstack_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-prepared-decoder-deepstack-foundation",
+        "Implement prepared decoder deepstack injection",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-TENSOR-001", "VAL-RNG-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "NativeDecoderTextEncoder accepts one optional borrowed and fully checked prepared deepstack plan only for uncached prefill. After decoder layer i and before intermediate capture, layer i's projected visual values are added at exactly the true visual-mask positions; continuation receives no deepstack. This extends one canonical decoder graph, KV transition, and borrowed RNG transaction without retaining vision weights, preprocessing images, tokenizing, opening RNG, caching, persisting, or publishing.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_tensor/src/rng.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Deterministic tests prove no-deepstack parity, exact one/two/three-layer post-layer additions, injection-before-capture, unchanged nonvisual positions, prefill-only behavior across continuation, full mask/layer/shape/device/stream admission, too-many-layer rejection, cancellation and OOM around every bounded injection phase, unchanged caller RNG/KV/tensors, workspace convergence, and no second decoder, sampler, cache, persistence, or publication owner.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_qwen3_decoder_exactness_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen3-decoder-exactness-foundation",
+        "Implement exact Qwen3 decoder attention",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "The canonical decoder owner admits and executes checkpoint-backed Qwen3/Qwen3-VL attention with exact per-head query/key RMS normalization, grouped-query projection, multidimensional RoPE, causal masking, output projection, KV staging, semantic identity, and residency. It extends the existing decoder graph and cache only; it cannot add another generation loop, tokenizer, RNG owner, vision graph, cache, persistence form, or publication path.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/native_ops.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal/qwen3_decoder",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove Q/K RMS normalization, grouped-query expansion, scalar and three-axis RoPE, prefill and continuation KV equivalence, weight/config admission, semantic identity and residency, cancellation/OOM rollback, and zero partial KV/output publication while reusing the canonical prepared decoder and generation transaction.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_qwen35_decoder_exactness_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen35-decoder-exactness-foundation",
+        "Implement exact Qwen3.5 hybrid decoder execution",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "The canonical decoder owner replaces Qwen3.5 profile facades with complete checkpoint-backed full-attention and linear-attention variants: Q/K normalization, attention output gating, DeltaNet projections and parameters, depthwise causal convolution, gated normalization, recurrent state, and exact cache step tracking. It preserves one decoder loop, KV/cache representation, prepared-prefill path, semantic identity, and residency and introduces no tokenizer, vision, RNG, durable cache, persistence, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/native_ops.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal/qwen35_decoder",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove source layer ordering, full-attention gating, Q/K normalization, checkpoint-backed DeltaNet prefill and recurrent continuation, depthwise causal-convolution state, cache step tracking, prefill/decode equivalence, identity/residency, cancellation/OOM rollback, and absence of synthesized placeholder weights or partial state publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_qwen_vision_projection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen-vision-projection-foundation",
+        "Implement retained Qwen vision projection",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "One retained Qwen3-VL/Qwen3.5 vision owner extends canonical preparation with a closed family profile for the correct marker ID and RGB normalization, then consumes checked patches and executes the complete checkpoint-backed patch projection, learned 48-by-48 positional interpolation, vision RoPE, per-image attention blocks, exact learned normalization and merger graph, and Qwen3-VL-only deepstack captures. It returns checked projected embeddings and optional deepstack tensors only; it cannot tokenize, decode, generate, open RNG, resolve handles, cache, persist, or publish.",
+        [
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/clip_vision.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/qwen_multimodal/vision",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Reduced exact-weight fixtures prove Qwen3-VL marker 151655 and 0.5 normalization, Qwen3.5 marker 248056 and pinned CLIP mean/std normalization, Qwen3.5 no-deepstack admission, patch projection, learned positional interpolation, rotary ordering, per-image attention isolation, every admitted visual block, exact affine normalization and GELU merger equations, Qwen3-VL capture/merger layer order, output/deepstack shapes, semantic identity and alias-aware residency, cancellation/OOM rollback, and the absence of NativeClipVision substitution or metadata-only execution.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_qwen_multimodal_resource_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-qwen-multimodal-resource-foundation",
+        "Retain concrete Qwen multimodal CLIP resources",
+        [7, 18, 28, 31, 37, 41, 44],
+        [18, 25, 26, 28, 31, 32, 41],
+        ["VAL-CLIP-001", "VAL-MODEL-FAMILY-001", "VAL-NATIVE-E2E-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "One concrete Qwen multimodal CLIP resource inseparably retains the canonical Qwen2 tokenizer, exact Qwen decoder, and retained Qwen vision owner with closed family/configuration admission. Tokenizer, decoder, vision, deepstack, and source execution identities participate in one semantic digest and StorageId-aware alias residency; the resource remains a sealed CLIP-role model payload and stores no prepared embeddings, KV, RNG, cache, persistence, workflow, or output state.",
+        [
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Lifecycle tests prove exact family/tokenizer/decoder/vision cross-admission, rejection of legacy diffusion/SD1/decoder-only/ClipVision or metadata-only CLIP resources, semantic-digest sensitivity, shared-StorageId alias deduplication, distinct-storage charging, sealed handle resolution, retained leases, capacity rollback, wrong store/generation/type/digest failures, restart staleness, deterministic reconstruction, and absence of prepared/KV/RNG/cache/persistence/publication state.",
+        [dependency],
+        locked=True,
+        criterion_ids=["7.4", "18.1", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-qwen-multimodal-generation-foundation",
@@ -9340,7 +9547,7 @@ def native_qwen_multimodal_generation_foundation_task(dependency: str) -> dict[s
             "projects/comfy/ComfyUI/comfy/text_encoders/qwen3vl.py",
             "projects/comfy/ComfyUI/comfy/text_encoders/qwen35.py",
             "projects/comfy/ComfyUI/comfy/text_encoders/qwen_vl.py",
-            "projects/comfy/ComfyUI/comfy/text_encoders/lumina2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             "crates/comfy_model/src/clip_tokenizer.rs",
@@ -10597,8 +10804,26 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     qwen_image_preparation_foundation = native_qwen_image_preparation_foundation_task(
         str(prepared_decoder_generation_foundation["id"])
     )
-    qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
+    prepared_decoder_deepstack_foundation = native_prepared_decoder_deepstack_foundation_task(
         str(qwen_image_preparation_foundation["id"])
+    )
+    qwen2_tokenizer_foundation = native_qwen2_tokenizer_foundation_task(
+        str(prepared_decoder_deepstack_foundation["id"])
+    )
+    qwen3_decoder_exactness_foundation = native_qwen3_decoder_exactness_foundation_task(
+        str(qwen2_tokenizer_foundation["id"])
+    )
+    qwen35_decoder_exactness_foundation = native_qwen35_decoder_exactness_foundation_task(
+        str(qwen3_decoder_exactness_foundation["id"])
+    )
+    qwen_vision_projection_foundation = native_qwen_vision_projection_foundation_task(
+        str(qwen35_decoder_exactness_foundation["id"])
+    )
+    qwen_multimodal_resource_foundation = native_qwen_multimodal_resource_foundation_task(
+        str(qwen_vision_projection_foundation["id"])
+    )
+    qwen_multimodal_generation_foundation = native_qwen_multimodal_generation_foundation_task(
+        str(qwen_multimodal_resource_foundation["id"])
     )
     gemma_multimodal_generation_foundation = native_gemma_multimodal_generation_foundation_task(
         str(qwen_multimodal_generation_foundation["id"])
@@ -10680,6 +10905,12 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             decoder_text_generation_foundation,
             prepared_decoder_generation_foundation,
             qwen_image_preparation_foundation,
+            prepared_decoder_deepstack_foundation,
+            qwen2_tokenizer_foundation,
+            qwen3_decoder_exactness_foundation,
+            qwen35_decoder_exactness_foundation,
+            qwen_vision_projection_foundation,
+            qwen_multimodal_resource_foundation,
             qwen_multimodal_generation_foundation,
             gemma_multimodal_generation_foundation,
             text_generation_foundation,

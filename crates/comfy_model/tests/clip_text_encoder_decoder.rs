@@ -1,18 +1,19 @@
 use comfy_model::{
     ClipBpeTokenizer, DECODER_PROFILE_FACTS, DECODER_TEXT_ENCODER_CATALOG_SYMBOLS,
     DecoderActivation, DecoderArchitecture, DecoderGenerationConfiguration, DecoderLayerKind,
-    DecoderLayerWeights, DecoderPreparedGenerationPrompt, DecoderPreparedTextRequest,
-    DecoderRopeConfiguration, DecoderRopePositions, DecoderSymbolBehavior,
-    DecoderTextConfiguration, DecoderTextError, DecoderTextRequest, DecoderTextWeights,
-    GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256,
-    LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder,
-    NativeModelPayload, NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily,
-    QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256, RopeScaling, TEXT_GENERATION_SOURCE_PATH,
-    TEXT_GENERATION_SOURCE_SHA256, TokenizerConfiguration, apply_rope, decoder_profile_fact,
-    decoder_symbol_behavior, gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions,
-    gemma4_clipped_linear, gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe,
-    gpt_oss_top_k_route, precompute_multidimensional_rope, precompute_rope,
-    qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
+    DecoderLayerWeights, DecoderPreparedDeepstack, DecoderPreparedGenerationPrompt,
+    DecoderPreparedTextRequest, DecoderRopeConfiguration, DecoderRopePositions,
+    DecoderSymbolBehavior, DecoderTextConfiguration, DecoderTextError, DecoderTextRequest,
+    DecoderTextWeights, GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH,
+    GPT_OSS_SOURCE_SHA256, LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor,
+    NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer,
+    NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256,
+    RopeScaling, TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256,
+    TokenizerConfiguration, apply_rope, decoder_profile_fact, decoder_symbol_behavior,
+    gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
+    gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route,
+    precompute_multidimensional_rope, precompute_rope, qwen35_causal_conv1d_update,
+    qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
     qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
     tokenize_decoder_prompt,
 };
@@ -857,6 +858,7 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
             causal_positions: &scalar_positions,
             cache: None,
             capture_layer: None,
+            deepstack: None,
         },
         &context,
     )?;
@@ -892,6 +894,7 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
             attention_mask: Some(&attention_mask),
             rope_positions: DecoderRopePositions::Scalar(&scalar_positions),
             causal_positions: &scalar_positions,
+            deepstack: None,
         },
         &DecoderGenerationConfiguration {
             maximum_new_tokens: 2,
@@ -926,10 +929,466 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
             causal_positions: &scalar_positions,
             cache: None,
             capture_layer: None,
+            deepstack: None,
         },
         &context,
     )?;
     assert_eq!(qwen_output.logits().descriptor().shape(), [1, 2, 8]);
+    Ok(())
+}
+
+#[test]
+fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let mut decoder_configuration = configuration(DecoderArchitecture::Llama);
+    decoder_configuration.stop_tokens.clear();
+    let model = NativeDecoderTextEncoder::new(
+        decoder_configuration.clone(),
+        weights(&backend, &decoder_configuration, &context)?,
+    )?;
+    let tokens = i64_tensor(&backend, &[1, 2], &[1, 2], &context)?;
+    let embeddings = model.embed_tokens(&backend, &tokens, &context)?;
+    let positions = [0_usize, 1];
+    let baseline = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(0),
+            deepstack: None,
+        },
+        &context,
+    )?;
+    let layer = tensor(&backend, &[1, 4], &[1.0, -2.0, 3.0, -4.0], &context)?;
+    let mask = [true, false];
+    let layers = [layer];
+    let deepstack = DecoderPreparedDeepstack {
+        visual_position_mask: &mask,
+        layers: &layers,
+    };
+    let injected = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(0),
+            deepstack: Some(deepstack),
+        },
+        &context,
+    )?;
+    let baseline_intermediate = tensor_to_f32(
+        &backend,
+        baseline.intermediate().ok_or("baseline capture missing")?,
+        &context,
+    )?;
+    let injected_intermediate = tensor_to_f32(
+        &backend,
+        injected.intermediate().ok_or("deepstack capture missing")?,
+        &context,
+    )?;
+    let differences = injected_intermediate
+        .iter()
+        .zip(baseline_intermediate.iter())
+        .map(|(injected, baseline)| injected - baseline)
+        .collect::<Vec<_>>();
+    assert_eq!(&differences[..4], &[1.0, -2.0, 3.0, -4.0]);
+    assert_eq!(&differences[4..], &[0.0; 4]);
+
+    let second_layer = tensor(&backend, &[1, 4], &[-0.5, 1.5, -2.5, 3.5], &context)?;
+    let first_two_layers = [layers[0].clone(), second_layer];
+    let before_second = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(1),
+            deepstack: Some(deepstack),
+        },
+        &context,
+    )?;
+    let after_second = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(1),
+            deepstack: Some(DecoderPreparedDeepstack {
+                visual_position_mask: &mask,
+                layers: &first_two_layers,
+            }),
+        },
+        &context,
+    )?;
+    let before_second_values = tensor_to_f32(
+        &backend,
+        before_second
+            .intermediate()
+            .ok_or("second baseline missing")?,
+        &context,
+    )?;
+    let after_second_values = tensor_to_f32(
+        &backend,
+        after_second
+            .intermediate()
+            .ok_or("second capture missing")?,
+        &context,
+    )?;
+    let second_difference = after_second_values
+        .iter()
+        .zip(before_second_values.iter())
+        .map(|(after, before)| after - before)
+        .collect::<Vec<_>>();
+    assert_eq!(&second_difference[..4], &[-0.5, 1.5, -2.5, 3.5]);
+    assert_eq!(&second_difference[4..], &[0.0; 4]);
+
+    let mut three_layer_configuration = decoder_configuration.clone();
+    three_layer_configuration
+        .layer_kinds
+        .push(DecoderLayerKind::FullAttention);
+    let three_layer_model = NativeDecoderTextEncoder::new(
+        three_layer_configuration.clone(),
+        weights(&backend, &three_layer_configuration, &context)?,
+    )?;
+    let three_layer_embeddings = three_layer_model.embed_tokens(&backend, &tokens, &context)?;
+    let third_layer = tensor(&backend, &[1, 4], &[0.25, -0.75, 1.25, -1.75], &context)?;
+    let first_three_layers = [
+        first_two_layers[0].clone(),
+        first_two_layers[1].clone(),
+        third_layer,
+    ];
+    let before_third = three_layer_model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &three_layer_embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(2),
+            deepstack: Some(DecoderPreparedDeepstack {
+                visual_position_mask: &mask,
+                layers: &first_two_layers,
+            }),
+        },
+        &context,
+    )?;
+    let after_third = three_layer_model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            embeddings: &three_layer_embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            cache: None,
+            capture_layer: Some(2),
+            deepstack: Some(DecoderPreparedDeepstack {
+                visual_position_mask: &mask,
+                layers: &first_three_layers,
+            }),
+        },
+        &context,
+    )?;
+    let before_third_values = tensor_to_f32(
+        &backend,
+        before_third
+            .intermediate()
+            .ok_or("third baseline missing")?,
+        &context,
+    )?;
+    let after_third_values = tensor_to_f32(
+        &backend,
+        after_third.intermediate().ok_or("third capture missing")?,
+        &context,
+    )?;
+    let third_difference = after_third_values
+        .iter()
+        .zip(before_third_values.iter())
+        .map(|(after, before)| after - before)
+        .collect::<Vec<_>>();
+    assert_eq!(&third_difference[..4], &[0.25, -0.75, 1.25, -1.75]);
+    assert_eq!(&third_difference[4..], &[0.0; 4]);
+
+    let transaction = generation_transaction()?;
+    let checkpoint = transaction.checkpoint();
+    let generated = model.generate_prepared(
+        &backend,
+        DecoderPreparedGenerationPrompt {
+            embeddings: &embeddings,
+            sampling_history: &[],
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&positions),
+            causal_positions: &positions,
+            deepstack: Some(deepstack),
+        },
+        &DecoderGenerationConfiguration {
+            maximum_new_tokens: 2,
+            temperature_bits: 0.0_f32.to_bits(),
+            top_k: None,
+            top_p_bits: None,
+            minimum_p_bits: None,
+            repetition_penalty_bits: 1.0_f32.to_bits(),
+            presence_penalty_bits: 0.0_f32.to_bits(),
+        },
+        &transaction,
+        &context,
+    )?;
+    assert_eq!(generated.generated_tokens.len(), 2);
+    assert_eq!(transaction.checkpoint(), checkpoint);
+
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: Some(baseline.cache()),
+                    capture_layer: None,
+                    deepstack: Some(deepstack),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let too_many_layers = first_three_layers.clone();
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &mask,
+                        layers: &too_many_layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+
+    let no_visual = [false, false];
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &no_visual,
+                        layers: &layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let short_mask = [true];
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &short_mask,
+                        layers: &layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let wrong_width = tensor(&backend, &[1, 3], &[0.0; 3], &context)?;
+    let wrong_layers = [wrong_width];
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &mask,
+                        layers: &wrong_layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let wrong_dtype = i64_tensor(&backend, &[1, 4], &[0, 0, 0, 0], &context)?;
+    let wrong_dtype_layers = [wrong_dtype];
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &mask,
+                        layers: &wrong_dtype_layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let foreign_context = ExecutionContext {
+        stream: StreamId::new(9),
+        scratch: authority.authorize_workspace(64 * 1024 * 1024)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let foreign_stream_layer = tensor(&backend, &[1, 4], &[0.0; 4], &foreign_context)?;
+    let foreign_stream_layers = [foreign_stream_layer];
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(DecoderPreparedDeepstack {
+                        visual_position_mask: &mask,
+                        layers: &foreign_stream_layers,
+                    }),
+                },
+                &context,
+            )
+            .is_err()
+    );
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(64 * 1024 * 1024)?,
+        rng_phase: None,
+        cancellation: &cancelled,
+    };
+    assert!(
+        model
+            .generate_prepared(
+                &backend,
+                DecoderPreparedGenerationPrompt {
+                    embeddings: &embeddings,
+                    sampling_history: &[],
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    deepstack: Some(deepstack),
+                },
+                &DecoderGenerationConfiguration {
+                    maximum_new_tokens: 1,
+                    temperature_bits: 0.0_f32.to_bits(),
+                    top_k: None,
+                    top_p_bits: None,
+                    minimum_p_bits: None,
+                    repetition_penalty_bits: 1.0_f32.to_bits(),
+                    presence_penalty_bits: 0.0_f32.to_bits(),
+                },
+                &transaction,
+                &cancelled_context,
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+    let constrained = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(8)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    assert!(
+        model
+            .forward_prepared(
+                &backend,
+                DecoderPreparedTextRequest {
+                    embeddings: &embeddings,
+                    attention_mask: None,
+                    rope_positions: DecoderRopePositions::Scalar(&positions),
+                    causal_positions: &positions,
+                    cache: None,
+                    capture_layer: None,
+                    deepstack: Some(deepstack),
+                },
+                &constrained,
+            )
+            .is_err()
+    );
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    drop(baseline_intermediate);
+    drop(injected_intermediate);
+    drop(before_second_values);
+    drop(after_second_values);
+    drop(before_third_values);
+    drop(after_third_values);
+    drop(generated);
+    drop(after_third);
+    drop(before_third);
+    drop(three_layer_embeddings);
+    drop(first_three_layers);
+    drop(after_second);
+    drop(before_second);
+    drop(first_two_layers);
+    drop(injected);
+    drop(baseline);
+    drop(layers);
+    drop(too_many_layers);
+    drop(wrong_layers);
+    drop(wrong_dtype_layers);
+    drop(foreign_stream_layers);
+    assert_eq!(foreign_context.scratch.in_use_bytes(), 0);
+    drop(embeddings);
+    drop(tokens);
+    assert_eq!(context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 
@@ -963,6 +1422,7 @@ fn prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation()
                     causal_positions: &positions,
                     cache: Some(first.cache()),
                     capture_layer: None,
+                    deepstack: None,
                 },
                 &context,
             )
@@ -980,6 +1440,7 @@ fn prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation()
                     causal_positions: &positions,
                     cache: None,
                     capture_layer: None,
+                    deepstack: None,
                 },
                 &context,
             )

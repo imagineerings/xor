@@ -10,6 +10,9 @@ use comfy_tensor::{
     generated_activation_normalization_functional_01::{
         FunctionalError, rms_norm_with_context_exact_native,
     },
+    generated_indexing_masking_01::{
+        IndexingMaskingPartOneError, index_add_in_place_with_context_exact_native,
+    },
     generated_native_diffusion::{NativeDiffusionTensorError, add, tensor_from_f32, tensor_to_f32},
 };
 use comfy_types::CancellationToken;
@@ -1286,6 +1289,13 @@ pub struct DecoderPreparedTextRequest<'a> {
     pub causal_positions: &'a [usize],
     pub cache: Option<&'a DecoderKvState>,
     pub capture_layer: Option<isize>,
+    pub deepstack: Option<DecoderPreparedDeepstack<'a>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DecoderPreparedDeepstack<'a> {
+    pub visual_position_mask: &'a [bool],
+    pub layers: &'a [Tensor],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1295,6 +1305,12 @@ pub struct DecoderPreparedGenerationPrompt<'a> {
     pub attention_mask: Option<&'a Tensor>,
     pub rope_positions: DecoderRopePositions<'a>,
     pub causal_positions: &'a [usize],
+    pub deepstack: Option<DecoderPreparedDeepstack<'a>>,
+}
+
+struct ValidatedPreparedDeepstack {
+    indices: Tensor,
+    layers: Vec<Tensor>,
 }
 
 #[derive(Clone, Debug)]
@@ -1490,6 +1506,8 @@ pub enum DecoderTextError {
     TensorOperation(#[from] NativeDiffusionTensorError),
     #[error(transparent)]
     Functional(#[from] FunctionalError),
+    #[error(transparent)]
+    TensorIndexing(#[from] IndexingMaskingPartOneError),
     #[error(transparent)]
     Attention(#[from] AttentionError),
     #[error(transparent)]
@@ -1834,6 +1852,7 @@ impl NativeDecoderTextEncoder {
             &positions,
             request.cache,
             request.capture_layer,
+            None,
             batch,
             query_tokens,
             context,
@@ -1873,6 +1892,13 @@ impl NativeDecoderTextEncoder {
             request.cache,
             &self.configuration.rope,
         )?;
+        let deepstack = self.validate_prepared_deepstack(
+            backend,
+            request.deepstack,
+            query_tokens,
+            request.cache,
+            context,
+        )?;
         self.forward_hidden(
             backend,
             request.embeddings.clone(),
@@ -1880,6 +1906,7 @@ impl NativeDecoderTextEncoder {
             &positions,
             request.cache,
             request.capture_layer,
+            deepstack.as_ref(),
             batch,
             query_tokens,
             context,
@@ -1914,6 +1941,7 @@ impl NativeDecoderTextEncoder {
         positions: &ValidatedDecoderPositions,
         cache: Option<&DecoderKvState>,
         capture_layer: Option<isize>,
+        deepstack: Option<&ValidatedPreparedDeepstack>,
         batch: usize,
         query_tokens: usize,
         context: &ExecutionContext<'_>,
@@ -1942,6 +1970,19 @@ impl NativeDecoderTextEncoder {
                     .ok_or(DecoderTextError::InvalidInput("cache layer is missing"))?,
                 context,
             )?;
+            if let Some(deepstack) = deepstack
+                && let Some(layer) = deepstack.layers.get(layer_index)
+            {
+                index_add_in_place_with_context_exact_native(
+                    backend,
+                    &mut hidden,
+                    1,
+                    &deepstack.indices,
+                    layer,
+                    1.0,
+                    context,
+                )?;
+            }
             if capture == Some(layer_index) {
                 intermediate = Some(hidden.clone());
             }
@@ -1970,6 +2011,104 @@ impl NativeDecoderTextEncoder {
             logits,
             cache: staged_cache,
         })
+    }
+
+    fn validate_prepared_deepstack(
+        &self,
+        backend: &CpuBackend,
+        deepstack: Option<DecoderPreparedDeepstack<'_>>,
+        query_tokens: usize,
+        cache: Option<&DecoderKvState>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Option<ValidatedPreparedDeepstack>, DecoderTextError> {
+        let Some(deepstack) = deepstack else {
+            return Ok(None);
+        };
+        context.check()?;
+        if cache.is_some() {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared deepstack is valid only for uncached prefill",
+            ));
+        }
+        if deepstack.visual_position_mask.len() != query_tokens
+            || deepstack.layers.is_empty()
+            || deepstack.layers.len() > self.layers.len()
+        {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared deepstack mask and layer count are invalid",
+            ));
+        }
+        let visual_tokens = deepstack
+            .visual_position_mask
+            .iter()
+            .filter(|selected| **selected)
+            .count();
+        if visual_tokens == 0 {
+            return Err(DecoderTextError::InvalidInput(
+                "prepared deepstack requires at least one visual position",
+            ));
+        }
+        let mut layers = Vec::new();
+        layers
+            .try_reserve_exact(deepstack.layers.len())
+            .map_err(|_| DecoderTextError::Allocation("deepstack layers"))?;
+        for layer in deepstack.layers {
+            context.check()?;
+            let descriptor = layer.descriptor();
+            if descriptor.dtype() != self.configuration.dtype
+                || descriptor.device() != self.configuration.device
+                || descriptor.stream() != self.stream
+                || !descriptor.is_contiguous()?
+                || descriptor.shape()
+                    != [
+                        usize_to_u64(visual_tokens, "deepstack visual tokens")?,
+                        usize_to_u64(self.configuration.hidden_size, "deepstack hidden width")?,
+                    ]
+            {
+                return Err(DecoderTextError::InvalidInput(
+                    "prepared deepstack layers must be contiguous [visual tokens, hidden] tensors on the decoder target",
+                ));
+            }
+            let values = tensor_to_f32(backend, layer, context)?;
+            if values.iter().any(|value| !value.is_finite()) {
+                return Err(DecoderTextError::InvalidInput(
+                    "prepared deepstack values must be finite",
+                ));
+            }
+            layers.push(tensor_from_f32(
+                backend,
+                &[
+                    1,
+                    usize_to_u64(visual_tokens, "deepstack visual tokens")?,
+                    usize_to_u64(self.configuration.hidden_size, "deepstack hidden width")?,
+                ],
+                &values,
+                context,
+            )?);
+        }
+        let mut indices = Vec::new();
+        indices
+            .try_reserve_exact(visual_tokens)
+            .map_err(|_| DecoderTextError::Allocation("deepstack indices"))?;
+        for (position, selected) in deepstack.visual_position_mask.iter().copied().enumerate() {
+            if position.is_multiple_of(256) {
+                context.check()?;
+            }
+            if selected {
+                indices.push(
+                    i64::try_from(position)
+                        .map_err(|_| DecoderTextError::Overflow("deepstack index"))?,
+                );
+            }
+        }
+        let indices = tensor_from_i64(
+            backend,
+            &[usize_to_u64(visual_tokens, "deepstack indices")?],
+            &indices,
+            context,
+        )?;
+        context.check()?;
+        Ok(Some(ValidatedPreparedDeepstack { indices, layers }))
     }
 
     fn validate_prepared_embeddings(
@@ -2116,6 +2255,7 @@ impl NativeDecoderTextEncoder {
             causal_positions: prompt.causal_positions,
             cache: None,
             capture_layer: None,
+            deepstack: prompt.deepstack,
         };
         let continuation_attention = prompt
             .attention_mask
