@@ -3255,6 +3255,7 @@
         "RecoveryJournal records commit receipts but never performs a second commit",
         "PluginOutputPublicationAdapter maps checked invocation-local PluginOutputProposal DTOs once into attempt-scoped OutputProposal values and delegates one batch to OutputCommitter",
         "NativePreparedEffectService creates sealed attempt-and-node-scoped tickets from typed NativeOutputEffectRequest values; ExecutionEngine validates and rolls back those tickets before EffectCoordinator may delegate a final batch to OutputCommitter",
+        "NativeOutputEffectRequest admits only bounded slash-separated relative prefix segments; OutputCommitter revalidates the prefix and remains the sole owner of path normalization, containment, collision, journaling, and publication",
         "AssetService registration runs as the final rollback-safe hook inside OutputCommitter's publication transaction",
         "OutputCommitter receipts retain bounded opaque projection metadata so the native controller can durably reconstruct a missing canonical output event without a second receipt journal",
         "NativeExecutionController holds ExecutionPresentationOwner's mutation lease across precommit validation, publication, asset registration, and durable output projection, then reconciles committed-but-unprojected receipts exactly once at startup",
@@ -3432,6 +3433,16 @@
           "pattern": "(?s)(?=.*NativePreparedEffectService)(?=.*rollback_node_prepared_effects)(?=.*prepared_effect\\(&effect)(?=.*commit_batch\\(&state\\.prepared_effects)(?=.*rollback_batch\\(&state\\.prepared_effects)"
         },
         {
+          "name": "native-output-effects-admit-safe-nested-relative-prefixes",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "is_safe_output_filename_prefix[\\s\\S]*split\\('/'\\)[\\s\\S]*segment, \\\".\\\" \\| \\\"..\\\""
+        },
+        {
+          "name": "output-committer-revalidates-relative-prefix-containment",
+          "path": "crates/comfy_runtime/src/output_committer.rs",
+          "pattern": "normalize_output_prefix[\\s\\S]*normalize_optional_relative_path"
+        },
+        {
           "name": "worker-output-wire-round-trip-is-bounded",
           "path": "crates/comfy_types/src/worker_protocol.rs",
           "pattern": "impl TryFrom<WorkerOutputProposalWire> for WorkerOutputProposal[\\s\\S]*WorkerOutputProposal::new"
@@ -3467,7 +3478,8 @@
         "comfy-parity-execution-output-owner-consolidation",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
-        ,"comfy-parity-native-node-asset-effect-foundation"
+        ,"comfy-parity-native-node-asset-effect-foundation",
+        "comfy-parity-native-video-output-prefix-foundation"
       ],
       "production_consumers": [
         "native image execution controller",

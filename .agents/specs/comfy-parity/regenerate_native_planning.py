@@ -9414,6 +9414,77 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
     )
 
 
+def native_video_output_prefix_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-output-prefix-foundation",
+        "Admit safe nested native video output prefixes",
+        [28, 34, 36, 38, 41],
+        [11, 28, 34, 41],
+        [
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The portable native output-effect request admits source-compatible nested relative prefixes such as video/ComfyUI while the authoritative OutputCommitter retains final path normalization, containment, collision, journal, and publication ownership.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests accept video/ComfyUI and bind it into request identity while rejecting absolute, trailing, empty, dot, parent, backslash, NUL, control-character, and oversized segments; OutputCommitter remains the sole defense-in-depth path-containment and publication owner.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.2", "34.6", "36.4", "38.4", "41.2"],
+    )
+
+
+def native_video_component_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-component-foundation",
+        "Implement native video component and bit-depth identity",
+        [34, 35, 36, 37, 41],
+        [25, 28, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical NativeVideoPayload owns exact in-memory VIDEO component identity: checked 8-bit or 10-bit depth, rational frame rate, frames, optional audio and separate alpha, bounded metadata, duration and dimensions. Provider transport preserves that identity without quantization, codec work, path state, or a second video value owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_bit_depth_test.py",
+            "projects/comfy/ComfyUI/tests-unit/comfy_api_test/video_types_test.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_test_support/fixtures/video/components",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted fixtures prove typed 8/10-bit identity, exact rational frame rate, dimensions and duration, optional audio/alpha/metadata relationships, provider round-trip preservation, content-sensitive semantic digest, placement-independent alias-aware residency, checked malformed component rejection, and no demux, codec, interpolation, cache, path, or publication ownership.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.5", "35.6", "36.4", "37.5", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11592,8 +11663,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_output_prefix_foundation = native_video_output_prefix_foundation_task(
         "comfy-parity-native-nodes-advanced-hooks-comfy-node-0119"
+    )
+    video_component_foundation = native_video_component_foundation_task(
+        str(video_output_prefix_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_component_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11686,6 +11763,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             lotusd_sampling_foundation,
             sdpose_head_projection_foundation,
             sdpose_foundation,
+            video_output_prefix_foundation,
+            video_component_foundation,
             video_foundation,
             detection_foundation,
         ]

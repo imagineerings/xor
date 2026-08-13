@@ -13469,6 +13469,40 @@ fn val_ownership_task407_sdpose_execution_001() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn val_ownership_video_output_prefix_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    assert!(execution.contains("fn is_safe_output_filename_prefix("));
+    assert!(execution.contains(".split('/')"));
+    assert!(execution.contains("\"video/ComfyUI\""));
+    let committer = fs::read_to_string(root.join("crates/comfy_runtime/src/output_committer.rs"))?;
+    assert!(committer.contains("fn normalize_output_prefix("));
+    assert!(committer.contains("normalize_optional_relative_path(Path::new(prefix))"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("final_output_commit")
+            })
+        })
+        .ok_or("missing final output ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-output-prefix-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

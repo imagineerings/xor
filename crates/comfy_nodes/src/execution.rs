@@ -1376,11 +1376,7 @@ impl NativeOutputEffectRequest {
     ) -> Result<Self, NativeEffectServiceError> {
         let filename_prefix = filename_prefix.into();
         let extension = extension.into();
-        if filename_prefix.is_empty()
-            || filename_prefix.len() > MAX_IDENTIFIER_BYTES
-            || filename_prefix
-                .bytes()
-                .any(|byte| byte.is_ascii_control() || matches!(byte, b'/' | b'\\'))
+        if !is_safe_output_filename_prefix(&filename_prefix)
             || extension.is_empty()
             || extension.len() > 32
             || !extension
@@ -1441,6 +1437,20 @@ impl NativeOutputEffectRequest {
     pub fn request_digest_sha256(&self) -> &str {
         &self.request_digest_sha256
     }
+}
+
+fn is_safe_output_filename_prefix(filename_prefix: &str) -> bool {
+    if filename_prefix.is_empty()
+        || filename_prefix.len() > MAX_IDENTIFIER_BYTES
+        || filename_prefix
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || matches!(byte, b'\\' | b':'))
+    {
+        return false;
+    }
+    filename_prefix
+        .split('/')
+        .all(|segment| !segment.is_empty() && !matches!(segment, "." | ".."))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -2570,6 +2580,48 @@ mod tests {
         next_ordinal: AtomicU64,
         prepared: Mutex<Vec<NativePreparedEffectRequest>>,
         rolled_back: Mutex<Vec<Uuid>>,
+    }
+
+    #[test]
+    fn output_effect_request_admits_only_safe_nested_relative_prefixes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let request = |prefix: &str| {
+            NativeOutputEffectRequest::checked(
+                NativeOutputNamespace::Output,
+                prefix,
+                "webm",
+                0,
+                NativeOutputShape::File,
+                Arc::from([1_u8, 2, 3]),
+                1024,
+            )
+        };
+        let nested = request("video/ComfyUI")?;
+        assert_eq!(nested.filename_prefix(), "video/ComfyUI");
+        assert_ne!(
+            nested.request_digest_sha256(),
+            request("video/Other")?.request_digest_sha256()
+        );
+        for invalid in [
+            "/video/ComfyUI",
+            "video/ComfyUI/",
+            "video//ComfyUI",
+            ".",
+            "..",
+            "video/./ComfyUI",
+            "video/../ComfyUI",
+            "video\\ComfyUI",
+            "C:/video/ComfyUI",
+            "video\0ComfyUI",
+            "video\nComfyUI",
+        ] {
+            assert!(
+                request(invalid).is_err(),
+                "accepted unsafe prefix {invalid:?}"
+            );
+        }
+        assert!(request(&"a".repeat(MAX_IDENTIFIER_BYTES + 1)).is_err());
+        Ok(())
     }
 
     #[derive(Debug)]
