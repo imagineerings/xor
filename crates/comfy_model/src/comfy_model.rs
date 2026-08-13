@@ -17,6 +17,7 @@ pub mod cosmos_family;
 pub mod descriptor;
 pub mod flux_chroma_family;
 pub mod formats;
+pub mod frame_interpolation;
 pub mod hidream_o1_family;
 pub mod hunyuan3d_family;
 pub mod hunyuan_video_family;
@@ -222,6 +223,9 @@ pub use formats::{
     ModelFormatError, ParsedModel, ParsedModelPayload, SentencePieceType, SentencePieceVocabulary,
     SentencePieceVocabularyEntry, TensorMetadata, TorchArchiveFileLoader, detect_model_format,
     load_torch_archive_file, parse_model_file,
+};
+pub use frame_interpolation::{
+    FrameInterpolationError, FrameInterpolationProfile, NativeFrameInterpolationModel,
 };
 pub use hidream_o1_family::{
     HIDREAM_O1_ARCHITECTURE_VERSION, HIDREAM_O1_ASSISTANT_TOKEN_ID, HIDREAM_O1_BOI_TOKEN_ID,

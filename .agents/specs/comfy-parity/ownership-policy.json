@@ -8758,6 +8758,80 @@
       "decision_reason": "comfy_backend_xpu is the sole focused owner of reviewed Level Zero and oneDNN declarations, discovery observations, retained-handle symbol resolution, unsafe vendor calls, and opaque execution resources. comfy_runtime::XpuPackageVerificationKey reuses the canonical NativePackageVerificationAuthority under a backend-specific domain; ArtifactRoot and the canonical native-package admission owner perform filesystem and coverage validation; the canonical native-library owner captures, digests, seals or snapshots, and retains exact images; native_ffi_xpu is only the strict signed DTO, target, contract, registry, discovery, and handle-projection adapter. NativeFfiRegistry alone certifies exact images, NativeBackendBindingStatus alone carries binding state, and comfy_tensor remains the semantic capability, storage, workspace, memory, event, and TensorBackend owner."
     },
     {
+      "concern": "native_frame_interpolation_model_state",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel",
+        "FrameInterpolationProfile",
+        "FrameInterpolationError"
+      ],
+      "allowed_adapters": [
+        "comfy_tensor Tensor storage and cancellation"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel",
+          "role": "canonical",
+          "symbol": "NativeFrameInterpolationModel"
+        }
+      ],
+      "call_symbols": [
+        "NativeFrameInterpolationModel"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-detection-normalization-and-manifests-share-one-owner",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "FILM_MARKER[\\s\\S]*normalize_and_detect[\\s\\S]*film_manifest[\\s\\S]*rife_manifest"
+        },
+        {
+          "name": "frame-interpolation-state-binds-content-and-alias-aware-residency",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "semantic_digest[\\s\\S]*resident_tensor_allocations[\\s\\S]*resident_owned_bytes"
+        },
+        {
+          "name": "frame-interpolation-admission-is-source-fingerprinted-and-test-backed",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json",
+          "pattern": "nodes_frame_interpolation.py[\\s\\S]*film_net.py[\\s\\S]*ifnet.py[\\s\\S]*licensed_checkpoint_included"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-model-foundation"
+      ],
+      "production_consumers": [
+        "future native frame interpolation payload and execution foundations"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The retained checkpoint owner implements source-order FILM/RIFE detection, exact complete state manifests, collision-safe RIFE normalization, artifact/content identity, and tensor residency. Actual interpolation, handle storage, invocation-local feature caches, output effects, and publication remain separate later owners."
+    },
+    {
       "concern": "native_image_to_tensor_conversion",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_01::to_tensor_with_context_exact_native",
       "owner_files": [

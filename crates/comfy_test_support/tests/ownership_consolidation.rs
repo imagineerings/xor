@@ -13644,6 +13644,41 @@ fn val_ownership_video_output_projection_foundation_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_frame_interpolation_model_foundation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub struct NativeFrameInterpolationModel",
+        "const FILM_MARKER",
+        "fn normalize_and_detect(",
+        "fn film_manifest(",
+        "fn rife_manifest(",
+        "pub fn resident_tensor_allocations(",
+    ] {
+        assert!(
+            model.contains(required),
+            "frame interpolation owner lacks {required}"
+        );
+    }
+    assert!(!model.contains("NativeCache"));
+    assert!(!model.contains("NativeStoredPayload"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_frame_interpolation_model_state")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

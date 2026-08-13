@@ -9554,6 +9554,44 @@ def native_video_output_projection_foundation_task(dependency: str) -> dict[str,
     )
 
 
+def native_frame_interpolation_model_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolation-model-foundation",
+        "Admit retained FILM and RIFE checkpoint state",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One immutable NativeFrameInterpolationModel owns source-order FILM/RIFE detection, collision-safe RIFE checkpoint normalization, complete closed state manifests, artifact/content semantic identity, and alias-aware residency. It retains weights only and does not execute interpolation, cache pair features, resolve handles, or publish output.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/admission",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted tests prove FILM marker precedence and its exact 82-tensor fixed manifest; sequential module/flownet stripping, raw block remap, teacher/caltime filtering, collision rejection, checkpoint-derived RIFE configuration and its exact 158-tensor manifest; strict shape/dtype/device/stream/state rejection; content-sensitive identity, alias-aware residency, cancellation, and no execution/payload/cache/publication facade.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11744,8 +11782,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_output_projection_foundation = native_video_output_projection_foundation_task(
         str(video_output_media_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    frame_interpolation_model_foundation = native_frame_interpolation_model_foundation_task(
         str(video_output_projection_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(frame_interpolation_model_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11842,6 +11883,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             video_component_foundation,
             video_output_media_foundation,
             video_output_projection_foundation,
+            frame_interpolation_model_foundation,
             video_foundation,
             detection_foundation,
         ]
