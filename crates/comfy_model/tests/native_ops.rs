@@ -330,6 +330,171 @@ fn unloaded_modules_commit_checked_parameters_atomically_and_execute()
 }
 
 #[test]
+fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = backend()?;
+    let cancellation = CancellationToken::default();
+    let input = tensor(&backend, &[2, 2], &[1.0, -2.0, 0.5, 3.0], &cancellation)?;
+
+    let mut linear = disable_weight_init_linear_exact_native("linear", 2, 3, true)?;
+    linear.load_dense_parameters(
+        tensor(
+            &backend,
+            &[3, 2],
+            &[0.5, 1.0, -1.0, 2.0, 0.25, -0.5],
+            &cancellation,
+        )?,
+        Some(tensor(&backend, &[3], &[0.25, -0.75, 1.0], &cancellation)?),
+    )?;
+
+    let geometry =
+        ConvolutionGeometry::new(2, vec![1, 1], vec![0, 0], vec![1, 1], 1, false, vec![0, 0])?;
+    let mut convolution =
+        disable_weight_init_convolution_exact_native("conv2d", 1, 1, vec![2, 2], true, geometry)?;
+    convolution.load_dense_parameters(
+        tensor(
+            &backend,
+            &[1, 1, 2, 2],
+            &[1.0, 0.0, 0.0, -1.0],
+            &cancellation,
+        )?,
+        Some(tensor(&backend, &[1], &[0.5], &cancellation)?),
+    )?;
+    let convolution_input = tensor(
+        &backend,
+        &[1, 1, 3, 3],
+        &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+        &cancellation,
+    )?;
+
+    let mut layer_norm =
+        layer_norm_module_exact_native("layer_norm", vec![2], 1.0e-5, true, true, &cancellation)?;
+    layer_norm.load_dense_parameters(
+        tensor(&backend, &[2], &[1.25, 0.75], &cancellation)?,
+        Some(tensor(&backend, &[2], &[0.5, -0.25], &cancellation)?),
+    )?;
+
+    let mut group_norm =
+        group_norm_module_exact_native("group_norm", 1, 2, 1.0e-5, true, &cancellation)?;
+    group_norm.load_dense_parameters(
+        tensor(&backend, &[2], &[1.5, 0.5], &cancellation)?,
+        Some(tensor(&backend, &[2], &[0.25, -0.75], &cancellation)?),
+    )?;
+    let group_input = tensor(
+        &backend,
+        &[1, 2, 1, 2],
+        &[1.0, 2.0, 3.0, 4.0],
+        &cancellation,
+    )?;
+
+    let silu = silu_module_exact_native("silu", false, &cancellation)?;
+    let gelu = gelu_module_exact_native("gelu", GeluApproximation::Tanh, &cancellation)?;
+
+    for (module, module_input) in [
+        (&linear, &input),
+        (&convolution, &convolution_input),
+        (&layer_norm, &input),
+        (&group_norm, &group_input),
+        (&silu, &input),
+        (&gelu, &input),
+    ] {
+        let generation = module.generation();
+        let prefetched = module.prefetched_dtype_device();
+        let digest = module.semantic_state_digest(&cancellation)?;
+        let immutable = module.forward_dense_inference_with_context(
+            &backend,
+            module_input,
+            &context(&backend, &cancellation)?,
+        )?;
+        let mut mutable = module.clone();
+        let ordinary = mutable.forward_with_context(
+            &backend,
+            module_input,
+            &context(&backend, &cancellation)?,
+        )?;
+
+        assert_eq!(immutable.contiguous_bytes()?, ordinary.contiguous_bytes()?);
+        assert_eq!(
+            immutable.descriptor().dtype(),
+            module_input.descriptor().dtype()
+        );
+        assert_eq!(
+            immutable.descriptor().device(),
+            module_input.descriptor().device()
+        );
+        assert_eq!(
+            immutable.descriptor().stream(),
+            module_input.descriptor().stream()
+        );
+        assert_eq!(module.generation(), generation);
+        assert_eq!(module.prefetched_dtype_device(), prefetched);
+        assert_eq!(module.semantic_state_digest(&cancellation)?, digest);
+    }
+    Ok(())
+}
+
+#[test]
+fn immutable_dense_inference_rejects_unsupported_state_and_rolls_back_cancellation()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = backend()?;
+    let cancellation = CancellationToken::default();
+    let input = tensor(&backend, &[1, 2], &[1.0, -1.0], &cancellation)?;
+    let tanh = tanh_module_exact_native("tanh", &cancellation)?;
+    assert!(matches!(
+        tanh.forward_dense_inference_with_context(
+            &backend,
+            &input,
+            &context(&backend, &cancellation)?,
+        ),
+        Err(NativeOpsError::Invalid(
+            "module does not support immutable dense inference"
+        ))
+    ));
+
+    let mut linear = disable_weight_init_linear_exact_native("linear", 2, 2, false)?;
+    linear.load_dense_parameters(
+        tensor(&backend, &[2, 2], &[1.0, 0.0, 0.0, 1.0], &cancellation)?,
+        None,
+    )?;
+    let generation = linear.generation();
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&backend, &cancelled)?;
+    assert!(matches!(
+        linear.forward_dense_inference_with_context(&backend, &input, &cancelled_context),
+        Err(NativeOpsError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    assert_eq!(linear.generation(), generation);
+    assert!(linear.prefetched_dtype_device().is_none());
+
+    let convolution_1d_geometry =
+        ConvolutionGeometry::new(1, vec![1], vec![0], vec![1], 1, false, vec![0])?;
+    let mut convolution_1d = disable_weight_init_convolution_exact_native(
+        "conv1d",
+        1,
+        1,
+        vec![1],
+        false,
+        convolution_1d_geometry,
+    )?;
+    convolution_1d
+        .load_dense_parameters(tensor(&backend, &[1, 1, 1], &[1.0], &cancellation)?, None)?;
+    let convolution_input = tensor(&backend, &[1, 1, 2], &[1.0, 2.0], &cancellation)?;
+    assert!(matches!(
+        convolution_1d.forward_dense_inference_with_context(
+            &backend,
+            &convolution_input,
+            &context(&backend, &cancellation)?,
+        ),
+        Err(NativeOpsError::Invalid(
+            "immutable dense inference supports only ordinary Conv2d modules"
+        ))
+    ));
+    Ok(())
+}
+
+#[test]
 fn canonical_module_owns_zero_weight_fast_forward_and_bias_semantics()
 -> Result<(), Box<dyn std::error::Error>> {
     let backend = backend()?;

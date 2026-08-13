@@ -1005,6 +1005,7 @@
         "AttentionRequest",
         "AttentionOutcome",
         "scaled_dot_product_attention_with_context",
+        "scaled_dot_product_attention_tensor_with_context",
         "SdpaBackend",
         "SdpaKernelSelection",
         "sdpa_kernel_exact_native",
@@ -1019,7 +1020,8 @@
         "Task 57 allow_fp16_bf16_reduction_math_sdp_exact_native extends the same canonical attention policy with an immutable reduction-policy value",
         "Task 58 enable_flash_sdp_exact_native extends the same canonical attention policy with an immutable flash-selection value and no process-global setter",
         "Task 60 sdpa_kernel_exact_native returns an immutable ordered unique backend selection from the same owner and introduces no process-global setter",
-        "Task 63 enable_mem_efficient_sdp_exact_native extends the same canonical attention policy with an immutable request-scoped selection and no process-global setter"
+        "Task 63 enable_mem_efficient_sdp_exact_native extends the same canonical attention policy with an immutable request-scoped selection and no process-global setter",
+        "Task 401 scaled_dot_product_attention_tensor_with_context is the dtype-preserving Tensor result adapter over the same CheckedAttentionInvocation; it uses caller ExecutionContext workspace accounting and canonical backend upload without owning a second attention equation, tensor, allocator, or policy"
       ],
       "definitions": [
         {
@@ -1049,6 +1051,13 @@
         },
         {
           "path": "crates/comfy_model/src/attention.rs",
+          "qualified": "comfy_model::scaled_dot_product_attention_tensor_with_context",
+          "role": "canonical",
+          "symbol": "scaled_dot_product_attention_tensor_with_context",
+          "pattern": "^pub fn scaled_dot_product_attention_tensor_with_context\\("
+        },
+        {
+          "path": "crates/comfy_model/src/attention.rs",
           "qualified": "comfy_model::SdpaKernelSelection",
           "role": "canonical_policy",
           "symbol": "SdpaKernelSelection"
@@ -1073,6 +1082,7 @@
         "AttentionRequest",
         "AttentionOutcome",
         "scaled_dot_product_attention_with_context",
+        "scaled_dot_product_attention_tensor_with_context",
         "SdpaBackend",
         "SdpaKernelSelection",
         "sdpa_kernel_exact_native",
@@ -1128,11 +1138,22 @@
           "name": "task63-memory-efficient-sdp-policy-test",
           "path": "crates/comfy_model/tests/elementwise_runtime_part20.rs",
           "pattern": "mem_efficient_sdp_is_an_immutable_attention_policy"
+        },
+        {
+          "name": "task401-tensor-attention-delegates-and-accounts-canonical-kernel",
+          "path": "crates/comfy_model/src/attention.rs",
+          "pattern": "pub fn scaled_dot_product_attention_tensor_with_context[\\s\\S]*prepare_attention[\\s\\S]*reserve_workspace[\\s\\S]*execute_with_context[\\s\\S]*upload_bytes"
+        },
+        {
+          "name": "task401-tensor-attention-dtype-workspace-and-cancellation-tests",
+          "path": "crates/comfy_model/src/attention.rs",
+          "pattern": "tensor_attention_supports_self_and_cross_attention_with_explicit_scale[\\s\\S]*tensor_attention_preserves_supported_float_dtypes_and_accounts_temporaries[\\s\\S]*tensor_attention_releases_workspace_on_exhaustion_and_cancellation"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-numeric-formats",
+        "comfy-parity-native-immutable-dense-inference-attention-foundation",
         "comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-861ee6173859",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-9cd229514f61",
@@ -1164,7 +1185,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "comfy_model::attention alone selects the exact native or explicitly permitted fallback contract, owns immutable math, flash, reduction, and ordered SDPA selections, applies the authorized workspace and chunk policy, and maps tensor errors into model-facing outcomes. It delegates dimension, mask, layout, numeric, and gradient mechanics to the canonical tensor invocation and owns no backend storage, process-global setter, or device memory policy."
+      "decision_reason": "comfy_model::attention alone selects the exact native or explicitly permitted fallback contract, owns immutable math, flash, reduction, ordered SDPA selections, and the dtype-preserving Tensor result adapter, applies the authorized workspace and chunk policy, and maps tensor errors into model-facing outcomes. It delegates dimension, mask, layout, numeric, and gradient mechanics to the canonical tensor invocation and Tensor storage and upload to the canonical backend, and owns no backend storage, process-global setter, second attention equation, or device memory policy."
     },
     {
       "concern": "autograd_checkpoint_execution",
@@ -9045,6 +9066,7 @@
       ],
       "owner_symbols": [
         "NativeModule",
+        "forward_dense_inference_with_context",
         "NativeOperationSet",
         "WeightCastLease",
         "pick_operations_exact_native",
@@ -9065,7 +9087,8 @@
         "Task 59 registers, stores, advances, and materializes spectral normalization inside NativeModule; its facade owns no parameters, power-iteration state, commit, or second generation",
         "Task 63 extends NativeModuleSpec with an empty Container initialized through module_init_exact_native; NativeAliasFreeActivation1d embeds that canonical base and remains a focused audio component rather than a second generic module lifecycle",
         "Task 77 extends NativeModuleSpec with Buffer, Sequential, pooling, activation, loss, and upsample configurations; comfy_tensor owns only numerical kernels and checked source adapters, never module state, child publication, parameters, or generations",
-        "Task 78 extends the same NativeModuleSpec with running normalization state, embedding weights, focused padding and loss configurations, and four named attention projection children; no tensor adapter owns parameters, running statistics, children, generations, or commit transitions"
+        "Task 78 extends the same NativeModuleSpec with running normalization state, embedding weights, focused padding and loss configurations, and four named attention projection children; no tensor adapter owns parameters, running statistics, children, generations, or commit transitions",
+        "Task 401 adds an immutable &self forward for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules; it delegates equations to the established tensor kernels and cannot change generation, prefetch, semantic state, parameters, or lifecycle visibility"
       ],
       "definitions": [
         {
@@ -9073,6 +9096,13 @@
           "qualified": "comfy_model::NativeModule",
           "role": "canonical",
           "symbol": "NativeModule"
+        },
+        {
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "qualified": "comfy_model::NativeModule::forward_dense_inference_with_context",
+          "role": "canonical",
+          "symbol": "forward_dense_inference_with_context",
+          "pattern": "^    pub fn forward_dense_inference_with_context\\("
         },
         {
           "path": "crates/comfy_model/src/native_ops.rs",
@@ -9162,6 +9192,7 @@
       ],
       "call_symbols": [
         "NativeModule",
+        "forward_dense_inference_with_context",
         "NativeOperationSet",
         "WeightCastLease",
         "pick_operations_exact_native",
@@ -9273,10 +9304,21 @@
           "name": "task78-lifecycle-and-atomicity-tests",
           "path": "crates/comfy_model/tests/native_ops.rs",
           "pattern": "neural_network_module_part_two_uses_one_native_lifecycle[\\s\\S]*part_two_stateful_and_parameterized_modules_are_atomic[\\s\\S]*multihead_attention_commits_all_projection_children_together"
+        },
+        {
+          "name": "task401-immutable-dense-forward-stays-on-native-module",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "pub fn forward_dense_inference_with_context[\\s\\S]*NativeModuleSpec::Linear[\\s\\S]*NativeModuleSpec::Convolution[\\s\\S]*NativeModuleSpec::LayerNorm[\\s\\S]*NativeModuleSpec::GroupNorm[\\s\\S]*NativeModuleSpec::Silu[\\s\\S]*NativeModuleSpec::Gelu"
+        },
+        {
+          "name": "task401-immutable-dense-forward-preserves-state-and-rolls-back",
+          "path": "crates/comfy_model/tests/native_ops.rs",
+          "pattern": "immutable_dense_inference_preserves_module_state_and_tensor_placement[\\s\\S]*immutable_dense_inference_rejects_unsupported_state_and_rolls_back_cancellation"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-immutable-dense-inference-attention-foundation",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797",
@@ -9290,6 +9332,7 @@
         "native model-family builders",
         "native model prefetch and parameter casting",
         "native mixed-precision linear execution",
+        "immutable retained dense inference for SD2 and other native architecture owners",
         "native zero-initialization and direct, manual-cast, or mixed-precision operation selection",
         "native neural-network module constructors, registered buffers, transactional sequential execution, running normalization statistics, embedding weights, and atomic attention projections"
       ],
@@ -9312,7 +9355,7 @@
         "VAL-NUMERIC-FORMATS-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeModule alone owns unloaded and empty-container construction, registered buffers, ordered child modules, running normalization statistics, exact parameter-shape admission, atomic dense, quantized, weight-normalized, spectral-normalized, or embedding parameter state, parametrization registration/materialization/removal, power-iteration state, transactional prefetch, sequential-child, and multihead-projection visibility, monotonic generations, and one-shot cast leases. Task 49 weight normalization, Task 60 spectral normalization, Task 63 module initialization, and Tasks 77-78 source module constructors delegate directly to that lifecycle. Focused tensor and model components own only their numerical or layout adapter mechanics and cannot create a second generic module state machine. NativeModule composes existing Tensor, DType, quantization, attention, functional-kernel, and resize owners without duplicating their validation or mechanics."
+      "decision_reason": "NativeModule alone owns unloaded and empty-container construction, registered buffers, ordered child modules, running normalization statistics, exact parameter-shape admission, atomic dense, quantized, weight-normalized, spectral-normalized, or embedding parameter state, parametrization registration/materialization/removal, power-iteration state, transactional prefetch, sequential-child, and multihead-projection visibility, monotonic generations, one-shot cast leases, and immutable retained dense inference that cannot publish lifecycle changes. Task 49 weight normalization, Task 60 spectral normalization, Task 63 module initialization, Tasks 77-78 source module constructors, and Task 401 immutable dense inference delegate directly to that lifecycle. Focused tensor and model components own only their numerical or layout adapter mechanics and cannot create a second generic module state machine. NativeModule composes existing Tensor, DType, quantization, attention, functional-kernel, and resize owners without duplicating their validation or mechanics."
     },
     {
       "concern": "native_model_vae_domain",
@@ -11316,6 +11359,98 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "comfy_model::sdpose is the sole checked CPU owner for the pinned SDPose heatmap DARK refinement and 133-to-134 OpenPose mapping, while comfy_media remains the sole typed pose payload owner and preserves finite raw heatmap confidence without probability clamping. The owner uses canonical workspace and cancellation primitives, retains no invocation state, and delegates all model, sampling, handle, cache, persistence, and publication behavior to dependent owners."
+    },
+    {
+      "concern": "native_sdpose_sd2_denoiser_execution_and_capture",
+      "canonical_owner": "comfy_model::sdpose::NativeSdPoseSd2Denoiser",
+      "owner_files": [
+        "crates/comfy_model/src/sdpose.rs"
+      ],
+      "owner_symbols": [
+        "NativeSdPoseSd2Denoiser",
+        "SdPoseSd2Configuration",
+        "sdpose_sd2_weight_manifest"
+      ],
+      "allowed_adapters": [
+        "ResolvedModelFamily and MappedModelWeights retain detection, normalization, binding, and patch ownership",
+        "NativeModule immutable dense inference and comfy_model attention retain canonical operator execution",
+        "The retained SDPose resource may retain this owner but cannot store invocation captures or duplicate the U-Net graph",
+        "Sampler, VAE, media, handle store, cache, persistence, RNG, and output publication remain outside this owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub struct NativeSdPoseSd2Denoiser",
+          "qualified": "comfy_model::sdpose::NativeSdPoseSd2Denoiser",
+          "role": "canonical",
+          "symbol": "NativeSdPoseSd2Denoiser"
+        }
+      ],
+      "call_symbols": [
+        "NativeSdPoseSd2Denoiser",
+        "forward_dense_inference_with_context",
+        "scaled_dot_product_attention_tensor_with_context",
+        "sdpose_sd2_weight_manifest"
+      ],
+      "required_mappings": [
+        {
+          "name": "task402-sd2-admission-is-complete-and-lotus-bound",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub fn sdpose_sd2_weight_manifest[\\s\\S]*pub fn from_mapped_weights[\\s\\S]*MODEL_FAMILY_FEATURE_ID[\\s\\S]*WeightKeys"
+        },
+        {
+          "name": "task402-sd2-forward-delegates-immutable-dense-and-tensor-attention",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub fn forward[\\s\\S]*forward_dense_inference_with_context[\\s\\S]*scaled_dot_product_attention_tensor_with_context"
+        },
+        {
+          "name": "task402-capture-is-last-preconcat-deep-copy",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "if hidden_shape.get\\(1\\)[\\s\\S]*copy_tensor\\(backend, &hidden[\\s\\S]*concat_channel_tensors[\\s\\S]*capture_output_block"
+        },
+        {
+          "name": "task402-schema-reduced-dtype-and-atomic-tests",
+          "path": "crates/comfy_model/tests/sdpose.rs",
+          "pattern": "sdpose_sd2_manifest_is_complete_and_source_sized[\\s\\S]*sdpose_sd2_reduced_execution_captures_last_preconcat_feature_transactionally[\\s\\S]*sdpose_sd2_reduced_execution_preserves_low_precision_dtype"
+        },
+        {
+          "name": "task402-production-and-reduced-fixtures-are-truthfully-split",
+          "path": "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest/manifest.json",
+          "pattern": "code-inferred-source-schema[\\s\\S]*licensed_checkpoint_oracle"
+        }
+      ],
+      "consolidation_tasks": [
+        "comfy-parity-native-sdpose-sd2-capture-foundation"
+      ],
+      "production_consumers": [
+        "retained native SDPose model resource",
+        "native SDPose extraction composition"
+      ],
+      "requirements": [
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeSdPoseSd2Denoiser is the sole immutable retained owner of the complete normalized LotusD OpenAI U-Net and the attempt-local last-640 pre-concat capture. It binds the exact family and exhaustive state schema, delegates dense math and attention to canonical operators, keeps capture state local to each call, and excludes reduced family programs, tiny diffusion models, sampler state, handles, cache, persistence, and publication."
     },
     {
       "concern": "native_sgd_optimizer_state",

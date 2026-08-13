@@ -13270,3 +13270,60 @@ fn val_ownership_task400p_sdpose_projection_001() -> Result<(), Box<dyn std::err
     assert_eq!(mappings.len(), 4);
     Ok(())
 }
+
+#[test]
+fn val_ownership_task402_sdpose_sd2_capture_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let production = fs::read_to_string(root.join("crates/comfy_model/src/sdpose.rs"))?;
+    for required in [
+        "pub struct NativeSdPoseSd2Denoiser",
+        "pub fn sdpose_sd2_weight_manifest(",
+        "pub fn from_mapped_weights(",
+        "forward_dense_inference_with_context",
+        "scaled_dot_product_attention_tensor_with_context",
+        "capture_output_block",
+    ] {
+        assert!(production.contains(required), "SD2 owner lacks {required}");
+    }
+    for forbidden in [
+        "SD2_FORWARD_PROGRAM",
+        "Sd15TinyModel",
+        "forward_checkpoints(",
+    ] {
+        assert!(
+            !production.contains(forbidden),
+            "SD2 owner must not route production through {forbidden}"
+        );
+    }
+    let manifest = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest/manifest.json",
+    ))?;
+    for required in [
+        "code-inferred-source-schema",
+        "\"tensor_count\": 690",
+        "\"scalar_count\": 867556804",
+        "\"output_block\": 9",
+        "\"licensed_checkpoint_oracle\": null",
+    ] {
+        assert!(manifest.contains(required), "SD2 manifest lacks {required}");
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_sdpose_sd2_denoiser_execution_and_capture")
+            })
+        })
+        .ok_or("missing SDPose SD2 capture ownership concern")?;
+    let mappings = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing SDPose SD2 capture mappings")?;
+    assert_eq!(mappings.len(), 5);
+    Ok(())
+}

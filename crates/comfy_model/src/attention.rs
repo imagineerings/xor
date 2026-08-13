@@ -1,5 +1,6 @@
 use comfy_tensor::{
-    CpuBackend, DeviceId, ExecutionContext, TensorError,
+    CpuBackend, DType, DecodedScalar, DeviceId, ExecutionContext, Scalar, Tensor, TensorDescriptor,
+    TensorError,
     generated_accelerated_attention_kernel_01::{
         AttentionKernelError, AttentionKernelKind, AttentionKernelRequest,
         AttentionLayout as TensorAttentionLayout, AttentionMask as TensorAttentionMask,
@@ -142,6 +143,14 @@ pub enum AttentionError {
     MaskValueCount { expected: usize, actual: usize },
     #[error("attention scale must be finite and greater than zero")]
     InvalidScale,
+    #[error("attention tensor {name} expected shape {expected:?}, got {actual:?}")]
+    TensorShape {
+        name: &'static str,
+        expected: Vec<u64>,
+        actual: Vec<u64>,
+    },
+    #[error("attention tensor dtype {dtype:?} is unsupported; expected F32, F16, or BF16")]
+    UnsupportedTensorDType { dtype: DType },
     #[error("attention workspace requires at least {required} bytes, got {available}")]
     WorkspaceTooSmall { required: usize, available: usize },
     #[error("attention backend {backend:?} is unavailable: {reason}")]
@@ -247,6 +256,223 @@ pub fn scaled_dot_product_attention_with_context(
         .execute_with_context(backend, prepared.query_chunk_size, context)
         .map_err(|error| map_kernel_error(error, request.backend))?;
     Ok(prepared.outcome(output))
+}
+
+pub fn scaled_dot_product_attention_tensor_with_context(
+    backend: &CpuBackend,
+    request: AttentionRequest,
+    query: &Tensor,
+    key: &Tensor,
+    value: &Tensor,
+    mask: Option<AttentionMask<'_>>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, AttentionError> {
+    context.cancellation.check()?;
+    validate_tensor_inputs(request, query, key, value, context)?;
+
+    let query_values = tensor_to_f32_workspace(backend, query, context)?;
+    let key_values = tensor_to_f32_workspace(backend, key, context)?;
+    let value_values = tensor_to_f32_workspace(backend, value, context)?;
+    let prepared = prepare_attention(
+        request,
+        &query_values,
+        &key_values,
+        &value_values,
+        mask,
+        context.cancellation,
+    )?;
+    let output_length = checked_product(&[
+        request.batch,
+        request.query_tokens,
+        request.heads,
+        request.value_dimension,
+    ])?;
+    let output_temporary_bytes = checked_bytes::<f32>(output_length)?;
+    let output_workspace = backend.reserve_workspace(context, output_temporary_bytes)?;
+    let output = prepared
+        .invocation
+        .execute_with_context(backend, prepared.query_chunk_size, context)
+        .map_err(|error| map_kernel_error(error, request.backend))?;
+    drop(query_values);
+    drop(key_values);
+    drop(value_values);
+
+    let dtype = query.descriptor().dtype();
+    let encoded_length = output_length
+        .checked_mul(
+            usize::try_from(dtype.byte_width()).map_err(|_| AttentionError::ShapeOverflow)?,
+        )
+        .ok_or(AttentionError::ShapeOverflow)?;
+    let mut encoded = backend.workspace_vec::<u8>(context, encoded_length)?;
+    for value in output {
+        context.cancellation.check()?;
+        for byte in dtype.encode_scalar(
+            Scalar::Float(f64::from(value)),
+            "sim.comfy-model.scaled-dot-product-attention",
+            query.descriptor().device(),
+        )? {
+            encoded.try_push(byte)?;
+        }
+    }
+    context.cancellation.check()?;
+    let output_shape = expected_tensor_shape(
+        request.batch,
+        request.query_tokens,
+        request.heads,
+        request.value_dimension,
+    )?;
+    let descriptor = TensorDescriptor::contiguous(
+        output_shape,
+        dtype,
+        query.descriptor().device(),
+        query.descriptor().stream(),
+    )?;
+    let tensor = backend.upload_bytes(descriptor, &encoded, context)?.0;
+    drop(encoded);
+    drop(output_workspace);
+    context.cancellation.check()?;
+    Ok(tensor)
+}
+
+fn validate_tensor_inputs(
+    request: AttentionRequest,
+    query: &Tensor,
+    key: &Tensor,
+    value: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<(), AttentionError> {
+    let expected_query = expected_tensor_shape(
+        request.batch,
+        request.query_tokens,
+        request.heads,
+        request.head_dimension,
+    )?;
+    let expected_key = expected_tensor_shape(
+        request.batch,
+        request.key_tokens,
+        request.heads,
+        request.head_dimension,
+    )?;
+    let expected_value = expected_tensor_shape(
+        request.batch,
+        request.key_tokens,
+        request.heads,
+        request.value_dimension,
+    )?;
+    for (name, tensor, expected) in [
+        ("query", query, expected_query),
+        ("key", key, expected_key),
+        ("value", value, expected_value),
+    ] {
+        if tensor.descriptor().shape() != expected {
+            return Err(AttentionError::TensorShape {
+                name,
+                expected,
+                actual: tensor.descriptor().shape().to_vec(),
+            });
+        }
+        if tensor.descriptor().device() != DeviceId::CPU {
+            return Err(TensorError::DeviceMismatch {
+                expected: DeviceId::CPU,
+                actual: tensor.descriptor().device(),
+            }
+            .into());
+        }
+        if tensor.descriptor().stream() != context.stream {
+            return Err(TensorError::StreamMismatch {
+                expected: context.stream,
+                actual: tensor.descriptor().stream(),
+            }
+            .into());
+        }
+    }
+    let dtype = query.descriptor().dtype();
+    if !matches!(dtype, DType::F32 | DType::F16 | DType::Bf16) {
+        return Err(AttentionError::UnsupportedTensorDType { dtype });
+    }
+    for tensor in [key, value] {
+        if tensor.descriptor().dtype() != dtype {
+            return Err(TensorError::DTypeMismatch {
+                expected: dtype,
+                actual: tensor.descriptor().dtype(),
+            }
+            .into());
+        }
+        if tensor.descriptor().device() != query.descriptor().device() {
+            return Err(TensorError::DeviceMismatch {
+                expected: query.descriptor().device(),
+                actual: tensor.descriptor().device(),
+            }
+            .into());
+        }
+        if tensor.descriptor().stream() != query.descriptor().stream() {
+            return Err(TensorError::StreamMismatch {
+                expected: query.descriptor().stream(),
+                actual: tensor.descriptor().stream(),
+            }
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn expected_tensor_shape(
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    dimension: usize,
+) -> Result<Vec<u64>, AttentionError> {
+    [batch, tokens, heads, dimension]
+        .into_iter()
+        .map(|value| u64::try_from(value).map_err(|_| AttentionError::ShapeOverflow))
+        .collect()
+}
+
+fn tensor_to_f32_workspace(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<comfy_tensor::CpuWorkspaceVec<f32>, AttentionError> {
+    let length = usize::try_from(tensor.descriptor().element_count()?)
+        .map_err(|_| AttentionError::ShapeOverflow)?;
+    let mut values = backend.workspace_vec(context, length)?;
+    for index in 0..length {
+        context.cancellation.check()?;
+        let index = u64::try_from(index).map_err(|_| AttentionError::ShapeOverflow)?;
+        let value = match tensor
+            .descriptor()
+            .dtype()
+            .decode_scalar(tensor.linear_element_bytes(index)?)?
+        {
+            DecodedScalar::Real(value) => value as f32,
+            _ => {
+                return Err(AttentionError::UnsupportedTensorDType {
+                    dtype: tensor.descriptor().dtype(),
+                });
+            }
+        };
+        values.try_push(value)?;
+    }
+    Ok(values)
+}
+
+fn checked_product(values: &[usize]) -> Result<usize, AttentionError> {
+    values.iter().try_fold(1_usize, |product, value| {
+        product
+            .checked_mul(*value)
+            .ok_or(AttentionError::ShapeOverflow)
+    })
+}
+
+fn checked_bytes<T>(elements: usize) -> Result<u64, AttentionError> {
+    u64::try_from(elements)
+        .ok()
+        .and_then(|elements| {
+            u64::try_from(std::mem::size_of::<T>())
+                .ok()
+                .and_then(|width| elements.checked_mul(width))
+        })
+        .ok_or(AttentionError::ShapeOverflow)
 }
 
 struct PreparedAttention<'a> {
@@ -415,6 +641,41 @@ fn map_kernel_error(error: AttentionKernelError, backend: AttentionBackend) -> A
 mod tests {
     use super::*;
 
+    fn tensor(
+        backend: &CpuBackend,
+        dtype: DType,
+        shape: Vec<u64>,
+        values: &[f32],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, Box<dyn std::error::Error>> {
+        let mut bytes = Vec::new();
+        for value in values {
+            bytes.extend_from_slice(&dtype.encode_scalar(
+                Scalar::Float(f64::from(*value)),
+                "sim.comfy-model.attention-test",
+                DeviceId::CPU,
+            )?);
+        }
+        let descriptor = TensorDescriptor::contiguous(shape, dtype, DeviceId::CPU, context.stream)?;
+        Ok(backend.upload_bytes(descriptor, &bytes, context)?.0)
+    }
+
+    fn real_values(tensor: &Tensor) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let length = tensor.descriptor().element_count()?;
+        let mut values = Vec::new();
+        for index in 0..length {
+            match tensor
+                .descriptor()
+                .dtype()
+                .decode_scalar(tensor.linear_element_bytes(index)?)?
+            {
+                DecodedScalar::Real(value) => values.push(value as f32),
+                value => return Err(format!("expected real tensor value, got {value:?}").into()),
+            }
+        }
+        Ok(values)
+    }
+
     fn request(backend: AttentionBackend) -> AttentionRequest {
         AttentionRequest {
             backend,
@@ -552,6 +813,245 @@ mod tests {
             )
             .is_err()
         );
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn tensor_attention_supports_self_and_cross_attention_with_explicit_scale()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, workspace_authority) =
+            comfy_tensor::CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            comfy_tensor::StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(256)?,
+            &cancellation,
+        );
+        let query = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 2, 1, 2],
+            &[1.0, 0.0, 0.0, 1.0],
+            &context,
+        )?;
+        let key = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 3, 1, 2],
+            &[1.0, 0.0, 0.0, 1.0, -1.0, 0.0],
+            &context,
+        )?;
+        let value = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 3, 1, 2],
+            &[1.0, 0.0, 0.0, 2.0, 3.0, 0.0],
+            &context,
+        )?;
+        let input_storage = [query.storage_id(), key.storage_id(), value.storage_id()];
+        let cross = scaled_dot_product_attention_tensor_with_context(
+            &backend,
+            AttentionRequest {
+                backend: AttentionBackend::SplitOrSubQuadratic,
+                fallback: AttentionFallbackPolicy::AllowExactNative,
+                batch: 1,
+                query_tokens: 2,
+                key_tokens: 3,
+                heads: 1,
+                head_dimension: 2,
+                value_dimension: 2,
+                scale: Some(0.5),
+                workspace_limit_bytes: 12,
+            },
+            &query,
+            &key,
+            &value,
+            None,
+            &context,
+        )?;
+        assert_eq!(cross.descriptor().shape(), &[1, 2, 1, 2]);
+        assert_eq!(cross.descriptor().dtype(), DType::F32);
+        assert_eq!(cross.descriptor().device(), DeviceId::CPU);
+        assert_eq!(cross.descriptor().stream(), context.stream);
+        assert!(!input_storage.contains(&cross.storage_id()));
+        assert_eq!(
+            [query.storage_id(), key.storage_id(), value.storage_id()],
+            input_storage
+        );
+        let cross_values = real_values(&cross)?;
+        let first_denominator = 0.5_f32.exp() + 1.0 + (-0.5_f32).exp();
+        let expected_first = (0.5_f32.exp() + 3.0 * (-0.5_f32).exp()) / first_denominator;
+        assert!(
+            cross_values
+                .first()
+                .is_some_and(|value| (*value - expected_first).abs() < 1.0e-6)
+        );
+        assert!(
+            cross_values
+                .get(1)
+                .is_some_and(|value| (*value - (2.0 / first_denominator)).abs() < 1.0e-6)
+        );
+
+        let self_attention = scaled_dot_product_attention_tensor_with_context(
+            &backend,
+            AttentionRequest {
+                backend: AttentionBackend::PytorchSdp,
+                fallback: AttentionFallbackPolicy::AllowExactNative,
+                batch: 1,
+                query_tokens: 2,
+                key_tokens: 2,
+                heads: 1,
+                head_dimension: 2,
+                value_dimension: 2,
+                scale: Some(1.0),
+                workspace_limit_bytes: 8,
+            },
+            &query,
+            &query,
+            &query,
+            None,
+            &context,
+        )?;
+        assert_eq!(self_attention.descriptor().shape(), &[1, 2, 1, 2]);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn tensor_attention_preserves_supported_float_dtypes_and_accounts_temporaries()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for dtype in [DType::F32, DType::F16, DType::Bf16] {
+            let (backend, workspace_authority) =
+                comfy_tensor::CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+            let cancellation = CancellationToken::default();
+            let context = backend.execution_context(
+                comfy_tensor::StreamId::DEFAULT,
+                workspace_authority.authorize_workspace(92)?,
+                &cancellation,
+            );
+            let query = tensor(
+                &backend,
+                dtype,
+                vec![1, 2, 1, 2],
+                &[1.0, 0.0, 0.0, 1.0],
+                &context,
+            )?;
+            let key = tensor(
+                &backend,
+                dtype,
+                vec![1, 3, 1, 2],
+                &[1.0, 0.0, 0.0, 1.0, -1.0, 0.0],
+                &context,
+            )?;
+            let value = tensor(
+                &backend,
+                dtype,
+                vec![1, 3, 1, 2],
+                &[1.0, 0.0, 0.0, 2.0, 3.0, 0.0],
+                &context,
+            )?;
+            let output = scaled_dot_product_attention_tensor_with_context(
+                &backend,
+                AttentionRequest {
+                    backend: AttentionBackend::SplitOrSubQuadratic,
+                    fallback: AttentionFallbackPolicy::AllowExactNative,
+                    batch: 1,
+                    query_tokens: 2,
+                    key_tokens: 3,
+                    heads: 1,
+                    head_dimension: 2,
+                    value_dimension: 2,
+                    scale: Some(1.0),
+                    workspace_limit_bytes: 12,
+                },
+                &query,
+                &key,
+                &value,
+                None,
+                &context,
+            )?;
+            assert_eq!(output.descriptor().dtype(), dtype);
+            assert_eq!(context.scratch.peak_bytes(), 92);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn tensor_attention_releases_workspace_on_exhaustion_and_cancellation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, workspace_authority) =
+            comfy_tensor::CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = backend.execution_context(
+            comfy_tensor::StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(91)?,
+            &cancellation,
+        );
+        let query = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 2, 1, 2],
+            &[1.0, 0.0, 0.0, 1.0],
+            &context,
+        )?;
+        let key = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 3, 1, 2],
+            &[1.0, 0.0, 0.0, 1.0, -1.0, 0.0],
+            &context,
+        )?;
+        let value = tensor(
+            &backend,
+            DType::F32,
+            vec![1, 3, 1, 2],
+            &[1.0, 0.0, 0.0, 2.0, 3.0, 0.0],
+            &context,
+        )?;
+        let request = AttentionRequest {
+            backend: AttentionBackend::SplitOrSubQuadratic,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch: 1,
+            query_tokens: 2,
+            key_tokens: 3,
+            heads: 1,
+            head_dimension: 2,
+            value_dimension: 2,
+            scale: Some(1.0),
+            workspace_limit_bytes: 12,
+        };
+        assert!(matches!(
+            scaled_dot_product_attention_tensor_with_context(
+                &backend, request, &query, &key, &value, None, &context,
+            ),
+            Err(AttentionError::Tensor(
+                TensorError::WorkspaceAuthorizationExceeded { .. }
+            ))
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = backend.execution_context(
+            comfy_tensor::StreamId::DEFAULT,
+            workspace_authority.authorize_workspace(92)?,
+            &cancelled,
+        );
+        assert!(matches!(
+            scaled_dot_product_attention_tensor_with_context(
+                &backend,
+                request,
+                &query,
+                &key,
+                &value,
+                None,
+                &cancelled_context,
+            ),
+            Err(AttentionError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.peak_bytes(), 0);
         assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
         Ok(())
     }

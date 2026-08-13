@@ -1,12 +1,97 @@
 use comfy_media::NativePoseKeypoint;
 use comfy_model::{
-    SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH, SdPoseProjectionError,
-    SdPoseRawKeypoint, decode_sdpose_heatmaps, project_sdpose_openpose_person,
+    NativeSdPoseSd2Denoiser, SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH,
+    SdPoseProjectionError, SdPoseRawKeypoint, SdPoseSd2Configuration, SdPoseSd2Error,
+    decode_sdpose_heatmaps, project_sdpose_openpose_person, sdpose_sd2_weight_manifest,
 };
-use comfy_tensor::{CancellationToken, CpuWorkspaceAuthority, ExecutionContext, StreamId};
-use std::error::Error;
+use comfy_tensor::{
+    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, StreamId,
+    Tensor, TensorBackend,
+    generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
+};
+use serde::Deserialize;
+use std::{collections::BTreeMap, error::Error, fs, path::Path};
 
 const WORKSPACE_BYTES: u64 = 4 * 1024 * 1024;
+const SD2_WORKSPACE_BYTES: u64 = 64 * 1024 * 1024;
+
+#[derive(Deserialize)]
+struct ProductionManifest {
+    comfyui_tree_sha256: String,
+    tensor_count: usize,
+    scalar_count: u64,
+    capture: ProductionCapture,
+    licensed_checkpoint_oracle: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ProductionCapture {
+    output_block: usize,
+    shape: Vec<u64>,
+}
+
+fn fixture(path: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../comfy_test_support/fixtures/sdpose/sd2_capture")
+        .join(path)
+}
+
+fn tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    values: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn Error>> {
+    tensor_with_dtype(backend, shape, values, DType::F32, context)
+}
+
+fn tensor_with_dtype(
+    backend: &CpuBackend,
+    shape: &[u64],
+    values: &[f32],
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn Error>> {
+    Ok(tensor_from_f32_with_context_exact_native(
+        backend,
+        shape,
+        values,
+        dtype,
+        backend.device(),
+        context,
+    )?)
+}
+
+fn reduced_sd2_weights(
+    backend: &CpuBackend,
+    configuration: &SdPoseSd2Configuration,
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<BTreeMap<String, Tensor>, Box<dyn Error>> {
+    let mut weights = BTreeMap::new();
+    for specification in sdpose_sd2_weight_manifest(configuration)? {
+        context.check()?;
+        let element_count = specification
+            .shape()
+            .iter()
+            .try_fold(1usize, |count, dimension| {
+                count.checked_mul(usize::try_from(*dimension).ok()?)
+            });
+        let element_count = element_count
+            .ok_or_else(|| std::io::Error::other("SD2 fixture weight is too large"))?;
+        weights.insert(
+            specification.key().to_owned(),
+            tensor_with_dtype(
+                backend,
+                specification.shape(),
+                &vec![0.0; element_count],
+                dtype,
+                context,
+            )?,
+        );
+    }
+    Ok(weights)
+}
 
 fn raw_points(score: f32) -> Result<Vec<SdPoseRawKeypoint>, SdPoseProjectionError> {
     (0..SDPOSE_HEATMAP_CHANNELS)
@@ -132,5 +217,155 @@ fn sdpose_heatmap_decode_rejects_shape_nonfinite_and_workspace_exhaustion()
         Err(SdPoseProjectionError::Tensor(_))
     ));
     assert_eq!(tiny_context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_sd2_manifest_is_complete_and_source_sized() -> Result<(), Box<dyn Error>> {
+    let tracked: ProductionManifest =
+        serde_json::from_slice(&fs::read(fixture("production_manifest/manifest.json"))?)?;
+    assert_eq!(
+        tracked.comfyui_tree_sha256,
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(tracked.tensor_count, 690);
+    assert_eq!(tracked.scalar_count, 867_556_804);
+    assert_eq!(tracked.capture.output_block, 9);
+    assert_eq!(tracked.capture.shape, [1, 640, 128, 96]);
+    assert!(tracked.licensed_checkpoint_oracle.is_none());
+    let manifest = sdpose_sd2_weight_manifest(&SdPoseSd2Configuration::source())?;
+    assert_eq!(manifest.len(), 690);
+    let scalar_count = manifest.iter().try_fold(0u64, |count, specification| {
+        let elements = specification
+            .shape()
+            .iter()
+            .try_fold(1u64, |elements, dimension| elements.checked_mul(*dimension))?;
+        count.checked_add(elements)
+    });
+    assert_eq!(scalar_count, Some(867_556_804));
+    assert!(
+        manifest
+            .iter()
+            .any(|specification| specification.key() == "native.output_blocks.9.1.proj_out.weight")
+    );
+    assert!(
+        manifest
+            .iter()
+            .all(|specification| !specification.key().starts_with("native.heatmap_head."))
+    );
+    Ok(())
+}
+
+#[test]
+fn sdpose_sd2_reduced_execution_captures_last_preconcat_feature_transactionally()
+-> Result<(), Box<dyn Error>> {
+    let configuration = SdPoseSd2Configuration::reduced_fixture(4, 3, 1, 1, 8, 8)?;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let weights = reduced_sd2_weights(&backend, &configuration, DType::F32, &context)?;
+    let denoiser =
+        NativeSdPoseSd2Denoiser::from_reduced_fixture(configuration, weights, &cancellation)?;
+    assert_eq!(denoiser.resident_tensor_allocations()?.len(), 690);
+
+    let latent = tensor(&backend, &[1, 4, 8, 8], &vec![0.0; 256], &context)?;
+    let conditioning = tensor(&backend, &[1, 2, 3], &[0.0; 6], &context)?;
+    let adm = tensor(&backend, &[1, 4], &[0.0; 4], &context)?;
+    let first = denoiser.forward(&backend, &latent, &[999.0], &conditioning, &adm, &context)?;
+    assert_eq!(first.denoised().descriptor().shape(), [1, 4, 8, 8]);
+    assert_eq!(first.feature_640().descriptor().shape(), [1, 8, 8, 8]);
+    assert_eq!(first.capture_output_block(), 9);
+    assert_ne!(first.feature_640().storage_id(), latent.storage_id());
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+
+    let second = denoiser.forward(&backend, &latent, &[999.0], &conditioning, &adm, &context)?;
+    assert_ne!(
+        first.feature_640().storage_id(),
+        second.feature_640().storage_id()
+    );
+    assert_eq!(
+        first.feature_640().contiguous_bytes()?,
+        second.feature_640().contiguous_bytes()?
+    );
+
+    cancellation.cancel();
+    assert!(matches!(
+        denoiser.forward(&backend, &latent, &[999.0], &conditioning, &adm, &context,),
+        Err(SdPoseSd2Error::Cancellation(_))
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_sd2_admission_rejects_missing_and_nonfinite_weights() -> Result<(), Box<dyn Error>> {
+    let configuration = SdPoseSd2Configuration::reduced_fixture(4, 3, 1, 1, 8, 8)?;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let mut missing = reduced_sd2_weights(&backend, &configuration, DType::F32, &context)?;
+    missing.remove("native.out.2.bias");
+    assert!(matches!(
+        NativeSdPoseSd2Denoiser::from_reduced_fixture(
+            configuration.clone(),
+            missing,
+            &cancellation,
+        ),
+        Err(SdPoseSd2Error::WeightKeys { .. })
+    ));
+
+    let mut nonfinite = reduced_sd2_weights(&backend, &configuration, DType::F32, &context)?;
+    nonfinite.insert(
+        "native.out.2.bias".to_owned(),
+        tensor(&backend, &[4], &[f32::NAN, 0.0, 0.0, 0.0], &context)?,
+    );
+    assert!(matches!(
+        NativeSdPoseSd2Denoiser::from_reduced_fixture(configuration, nonfinite, &cancellation,),
+        Err(SdPoseSd2Error::NonFinite)
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_sd2_reduced_execution_preserves_low_precision_dtype() -> Result<(), Box<dyn Error>> {
+    let mut semantic_digests = Vec::new();
+    for dtype in [DType::F16, DType::Bf16] {
+        let configuration = SdPoseSd2Configuration::reduced_fixture(4, 3, 1, 1, 8, 8)?;
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let weights = reduced_sd2_weights(&backend, &configuration, dtype, &context)?;
+        let denoiser =
+            NativeSdPoseSd2Denoiser::from_reduced_fixture(configuration, weights, &cancellation)?;
+        semantic_digests.push(denoiser.semantic_state_digest_sha256().to_owned());
+        let latent = tensor_with_dtype(&backend, &[1, 4, 8, 8], &vec![0.0; 256], dtype, &context)?;
+        let conditioning = tensor_with_dtype(&backend, &[1, 2, 3], &[0.0; 6], dtype, &context)?;
+        let adm = tensor_with_dtype(&backend, &[1, 4], &[0.0; 4], dtype, &context)?;
+        let output =
+            denoiser.forward(&backend, &latent, &[999.0], &conditioning, &adm, &context)?;
+        assert_eq!(output.denoised().descriptor().dtype(), dtype);
+        assert_eq!(output.feature_640().descriptor().dtype(), dtype);
+        assert_eq!(output.capture_output_block(), 9);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+    }
+    assert!(semantic_digests.windows(2).all(|pair| {
+        matches!((pair.first(), pair.get(1)), (Some(first), Some(second)) if first != second)
+    }));
     Ok(())
 }

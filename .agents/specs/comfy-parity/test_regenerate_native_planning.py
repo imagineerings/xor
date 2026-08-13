@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 555)
+        self.assertEqual(len(tasks), 556)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -406,6 +406,9 @@ class ValidationGenerationTests(unittest.TestCase):
         sdpose_projection_id = (
             "comfy-parity-native-sdpose-heatmap-projection-foundation"
         )
+        immutable_dense_attention_id = (
+            "comfy-parity-native-immutable-dense-inference-attention-foundation"
+        )
         sdpose_capture_id = "comfy-parity-native-sdpose-sd2-capture-foundation"
         sdpose_resource_id = "comfy-parity-native-sdpose-model-resource-foundation"
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
@@ -542,12 +545,147 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[sdpose_capture_id]["reads"],
         )
         self.assertIn(
+            "crates/comfy_model/src/native_ops.rs",
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/tests/native_ops.rs",
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/attention.rs",
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_tensor/src/ops/native_diffusion.rs",
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/comfy_model.rs",
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+        )
+        self.assertIn(
+            "leaving generation, prefetch, semantic digest",
+            tasks_by_id[immutable_dense_attention_id]["done"],
+        )
+        self.assertIn(
+            "Tensor SDPA fixtures",
+            tasks_by_id[immutable_dense_attention_id]["done"],
+        )
+        self.assertEqual(
+            tasks_by_id[immutable_dense_attention_id]["validation_packages"],
+            ["comfy_test_support"],
+        )
+        self.assertEqual(
+            tasks_by_id[immutable_dense_attention_id]["writes"],
+            [
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_model/tests/native_ops.rs",
+                "crates/comfy_model/src/attention.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/sd2_family.rs",
+            tasks_by_id[sdpose_capture_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/families/lotusd_comfy_model_0106.rs",
+            tasks_by_id[sdpose_capture_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/families/sd20_comfy_model_0119.rs",
+            tasks_by_id[sdpose_capture_id]["reads"],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/attention.rs",
+            tasks_by_id[sdpose_capture_id]["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/native_ops.rs",
+            tasks_by_id[sdpose_capture_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest",
+            tasks_by_id[sdpose_capture_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/reduced_numeric",
+            tasks_by_id[sdpose_capture_id]["writes"],
+        )
+        self.assertIn(
+            "manifest-only production fixture",
+            tasks_by_id[sdpose_capture_id]["done"],
+        )
+        self.assertIn(
+            "test-support-only shape-reduced numeric oracle",
+            tasks_by_id[sdpose_capture_id]["done"],
+        )
+        self.assertEqual(
+            tasks_by_id[sdpose_capture_id]["reads"],
+            [
+                "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+                "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+                "projects/comfy/ComfyUI/comfy/ops.py",
+                "projects/comfy/ComfyUI/comfy/model_base.py",
+                "projects/comfy/ComfyUI/comfy/supported_models.py",
+                "projects/comfy/ComfyUI/comfy/supported_models_base.py",
+                "crates/comfy_model/src/attention.rs",
+                "crates/comfy_model/src/model_family.rs",
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_model/src/sd2_family.rs",
+                "crates/comfy_model/src/families/lotusd_comfy_model_0106.rs",
+                "crates/comfy_model/src/families/sd20_comfy_model_0119.rs",
+                "crates/comfy_model/src/slices/native_diffusion.rs",
+                "crates/comfy_model/src/sdpose.rs",
+                "crates/comfy_model/tests/families/lotusd_comfy_model_0106.rs",
+                "crates/comfy_model/tests/families/sd20_comfy_model_0119.rs",
+            ],
+        )
+        self.assertEqual(
+            tasks_by_id[sdpose_capture_id]["writes"],
+            [
+                "crates/comfy_model/src/sdpose.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/tests/sdpose.rs",
+                "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest",
+                "crates/comfy_test_support/fixtures/sdpose/sd2_capture/reduced_numeric",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertIn(
             "crates/comfy_model/src/native_node_payload.rs",
             tasks_by_id[sdpose_resource_id]["writes"],
         )
         self.assertIn(
             sdpose_projection_id,
+            tasks_by_id[immutable_dense_attention_id]["dependencies"],
+        )
+        self.assertIn(
+            immutable_dense_attention_id,
             tasks_by_id[sdpose_capture_id]["dependencies"],
+        )
+        self.assertIn(
+            "comfy-parity-native-model-family-lotusd-comfy-model-0106",
+            tasks_by_id[sdpose_capture_id]["dependencies"],
+        )
+        self.assertIn(
+            "comfy-parity-native-model-family-sd20-comfy-model-0119",
+            tasks_by_id[sdpose_capture_id]["dependencies"],
+        )
+        self.assertEqual(
+            tasks_by_id[sdpose_capture_id]["dependencies"],
+            [
+                immutable_dense_attention_id,
+                "comfy-parity-native-model-family-lotusd-comfy-model-0106",
+                "comfy-parity-native-model-family-sd20-comfy-model-0119",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
         )
         self.assertIn(
             sdpose_capture_id,
@@ -678,7 +816,12 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             waves[sdpose_projection_id], waves[text_generation_foundation_id] + 1
         )
-        self.assertEqual(waves[sdpose_capture_id], waves[sdpose_projection_id] + 1)
+        self.assertEqual(
+            waves[immutable_dense_attention_id], waves[sdpose_projection_id] + 1
+        )
+        self.assertEqual(
+            waves[sdpose_capture_id], waves[immutable_dense_attention_id] + 1
+        )
         self.assertEqual(waves[sdpose_resource_id], waves[sdpose_capture_id] + 1)
         self.assertEqual(waves[sdpose_foundation_id], waves[sdpose_resource_id] + 1)
         self.assertEqual(

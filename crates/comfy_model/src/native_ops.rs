@@ -2568,6 +2568,201 @@ impl NativeModule {
         .map(Some)
     }
 
+    pub fn forward_dense_inference_with_context(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, NativeOpsError> {
+        self.execution_requirements(DType::F32)
+            .admit_backend_target(
+                backend,
+                input.descriptor().device(),
+                DType::F32,
+                Layout::Contiguous,
+                input.descriptor().stream(),
+                context,
+            )?;
+        let output_dtype = input.descriptor().dtype();
+        let output_device = input.descriptor().device();
+        let input_values = tensor_to_f32(backend, input, context)?;
+        let input_shape = shape_to_usize(input.descriptor().shape())?;
+        let result = match &self.spec {
+            NativeModuleSpec::Linear {
+                input_features,
+                output_features,
+                ..
+            } => {
+                let (weight, bias) = self.dense_inference_parameters(input)?;
+                let weight_values = tensor_to_f32(backend, weight, context)?;
+                let bias_values = bias
+                    .map(|bias| tensor_to_f32(backend, bias, context))
+                    .transpose()?;
+                linear_with_context_exact_native(
+                    &input_values,
+                    &input_shape,
+                    &weight_values,
+                    &[*output_features, *input_features],
+                    bias_values.as_deref(),
+                    output_device,
+                    context,
+                )?
+            }
+            NativeModuleSpec::Convolution {
+                input_channels,
+                output_channels,
+                kernel_shape,
+                geometry,
+                ..
+            } => {
+                if geometry.spatial_dimensions() != 2 || geometry.transposed() {
+                    return Err(NativeOpsError::Invalid(
+                        "immutable dense inference supports only ordinary Conv2d modules",
+                    ));
+                }
+                let (weight, bias) = self.dense_inference_parameters(input)?;
+                let weight_values = tensor_to_f32(backend, weight, context)?;
+                let bias_values = bias
+                    .map(|bias| tensor_to_f32(backend, bias, context))
+                    .transpose()?;
+                let mut weight_shape = vec![*output_channels, input_channels / geometry.groups()];
+                weight_shape.extend_from_slice(kernel_shape);
+                convolution_with_context_exact_native(
+                    &input_values,
+                    &input_shape,
+                    &weight_values,
+                    &weight_shape,
+                    bias_values.as_deref(),
+                    geometry,
+                    output_device,
+                    context,
+                )?
+            }
+            NativeModuleSpec::LayerNorm {
+                normalized_shape,
+                epsilon,
+                elementwise_affine,
+                ..
+            } => {
+                let (weight_values, bias_values) = if *elementwise_affine {
+                    let (weight, bias) = self.dense_inference_parameters(input)?;
+                    (
+                        Some(tensor_to_f32(backend, weight, context)?),
+                        bias.map(|bias| tensor_to_f32(backend, bias, context))
+                            .transpose()?,
+                    )
+                } else {
+                    self.validate_parameter_presence()?;
+                    (None, None)
+                };
+                TensorValues {
+                    values: layer_norm_with_context_exact_native(
+                        backend,
+                        &input_values,
+                        &input_shape,
+                        normalized_shape,
+                        weight_values.as_deref(),
+                        bias_values.as_deref(),
+                        *epsilon,
+                        output_device,
+                        context,
+                    )?,
+                    shape: input_shape,
+                }
+            }
+            NativeModuleSpec::GroupNorm {
+                groups,
+                channels,
+                epsilon,
+                affine,
+            } => {
+                if input_shape.len() < 2 || input_shape.get(1) != Some(channels) {
+                    return Err(NativeOpsError::Invalid(
+                        "group-normalization input channels do not match the module",
+                    ));
+                }
+                let (weight_values, bias_values) = if *affine {
+                    let (weight, bias) = self.dense_inference_parameters(input)?;
+                    (
+                        Some(tensor_to_f32(backend, weight, context)?),
+                        bias.map(|bias| tensor_to_f32(backend, bias, context))
+                            .transpose()?,
+                    )
+                } else {
+                    self.validate_parameter_presence()?;
+                    (None, None)
+                };
+                TensorValues {
+                    values: group_norm_with_context_exact_native(
+                        backend,
+                        &input_values,
+                        &input_shape,
+                        *groups,
+                        weight_values.as_deref(),
+                        bias_values.as_deref(),
+                        *epsilon,
+                        output_device,
+                        context,
+                    )?,
+                    shape: input_shape,
+                }
+            }
+            NativeModuleSpec::Silu => TensorValues {
+                values: silu_module_with_context_exact_native(
+                    backend,
+                    &input_values,
+                    output_device,
+                    context,
+                )?,
+                shape: input_shape,
+            },
+            NativeModuleSpec::Gelu { approximation } => TensorValues {
+                values: gelu_module_with_context_exact_native(
+                    backend,
+                    &input_values,
+                    *approximation,
+                    output_device,
+                    context,
+                )?,
+                shape: input_shape,
+            },
+            _ => {
+                return Err(NativeOpsError::Invalid(
+                    "module does not support immutable dense inference",
+                ));
+            }
+        };
+        let output = tensor_from_f32(
+            backend,
+            &shape_to_u64(&result.shape)?,
+            &result.values,
+            output_dtype,
+            output_device,
+            context,
+        )?;
+        context.cancellation.check()?;
+        Ok(output)
+    }
+
+    fn dense_inference_parameters(
+        &self,
+        input: &Tensor,
+    ) -> Result<(&Tensor, Option<&Tensor>), NativeOpsError> {
+        self.validate_parameter_presence()?;
+        let (weight, bias) = self.dense_parameters()?;
+        for parameter in [Some(weight), bias].into_iter().flatten() {
+            if parameter.descriptor().dtype() != input.descriptor().dtype()
+                || parameter.descriptor().device() != input.descriptor().device()
+                || parameter.descriptor().stream() != input.descriptor().stream()
+            {
+                return Err(NativeOpsError::Invalid(
+                    "immutable dense inference parameters must match input dtype, device, and stream",
+                ));
+            }
+        }
+        Ok((weight, bias))
+    }
+
     pub fn forward_with_autopad_with_context(
         &mut self,
         backend: &CpuBackend,
@@ -6505,7 +6700,7 @@ fn scaled_dimension(input: u64, scale: f64, subject: &'static str) -> Result<u64
     Ok(output as u64)
 }
 
-fn tensor_to_f32(
+pub(crate) fn tensor_to_f32(
     backend: &CpuBackend,
     input: &Tensor,
     context: &ExecutionContext<'_>,
@@ -6540,7 +6735,7 @@ fn tensor_to_f32(
     Ok(values)
 }
 
-fn tensor_from_f32(
+pub(crate) fn tensor_from_f32(
     backend: &CpuBackend,
     shape: &[u64],
     values: &[f32],

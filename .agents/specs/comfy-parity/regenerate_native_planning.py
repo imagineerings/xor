@@ -9040,7 +9040,61 @@ def native_sdpose_heatmap_projection_foundation_task(
     )
 
 
-def native_sdpose_sd2_capture_foundation_task(dependency: str) -> dict[str, object]:
+def native_immutable_dense_inference_attention_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-immutable-dense-inference-attention-foundation",
+        "Implement immutable dtype-preserving dense inference and attention primitives",
+        [26, 28, 34, 37, 41, 44],
+        [26, 28, 34, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-NUMERIC-FORMATS-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical NativeModule owner exposes one immutable forward_dense_inference_with_context entry point for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules, while comfy_model::attention exposes one tensor-returning scaled-dot-product-attention entry point over the retained checked tensor kernel. Both preserve F16, BF16, or F32 dtype, device, and stream, accumulate deterministically in f32 where the source does, return fresh backend-accounted Tensor results, and account every data-sized decode, encoded-output, result-staging, and score temporary through the caller's ExecutionContext without changing module generation, prefetch, semantic state, or parameter ownership.",
+        [
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/ops/accelerated_attention_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+        ],
+        [
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/tests/native_ops.rs",
+            "crates/comfy_model/src/attention.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "F16, BF16, and F32 fixtures prove the immutable NativeModule path matches the established mutable forward values for Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU while leaving generation, prefetch, semantic digest, parameters, dtype, device, and stream unchanged; unsupported modules, transposed or non-2D convolutions, unloaded or mismatched parameters, and arbitrary unsupported layouts reject typed before publication. Tensor SDPA fixtures prove self- and cross-attention, explicit scale, masks, causal behavior, deterministic chunking, matching query/key/value dtype-device-stream admission, fresh result StorageId, and exact dtype and placement preservation. Cancellation and injected backend-capacity or workspace exhaustion release every Q/K/V decode, kernel-score, result-staging, and encoding reservation without a result or lifecycle mutation. Ownership policy and repository scans bind both APIs to the existing NativeModule and comfy_model::attention owners and reject a second tensor kernel, native_diffusion rewrite, private workspace, mutable-forward facade, or metadata-only implementation.",
+        [
+            dependency,
+            "comfy-parity-tensor-ops-accelerated-attention-kernel-comfy-tensor-op-1354ac34a777",
+            "comfy-parity-workspace-final-ownership-audit",
+            "comfy-parity-cpu-low-precision-bmm-model-execution-closure",
+        ],
+        locked=True,
+        criterion_ids=["26.2", "28.2", "34.1", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_model"],
+        validation_packages=["comfy_test_support"],
+    )
+
+
+def native_sdpose_sd2_capture_foundation_task(
+    dependencies: list[str],
+) -> dict[str, object]:
     return task(
         "comfy-parity-native-sdpose-sd2-capture-foundation",
         "Implement full SD2 denoiser execution and SDPose feature capture",
@@ -9056,24 +9110,35 @@ def native_sdpose_sd2_capture_foundation_task(dependency: str) -> dict[str, obje
         "The canonical production SD2/OpenAI U-Net owner loads and executes the complete checked SDPose denoiser topology and returns an attempt-local clone of the last output-block input whose channel count is 640. It does not route production through the reduced NativeFamilyModel conformance graph or Sd15TinyModel.",
         [
             "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
             "projects/comfy/ComfyUI/comfy/model_base.py",
             "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "projects/comfy/ComfyUI/comfy/supported_models_base.py",
+            "crates/comfy_model/src/attention.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/sd2_family.rs",
+            "crates/comfy_model/src/families/lotusd_comfy_model_0106.rs",
+            "crates/comfy_model/src/families/sd20_comfy_model_0119.rs",
+            "crates/comfy_model/src/slices/native_diffusion.rs",
             "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/tests/families/lotusd_comfy_model_0106.rs",
+            "crates/comfy_model/tests/families/sd20_comfy_model_0119.rs",
         ],
         [
             "crates/comfy_model/src/sdpose.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/tests/sdpose.rs",
-            "crates/comfy_test_support/fixtures/sdpose/sd2_capture",
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest",
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/reduced_numeric",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "A reduced exact-weight fixture crosses every production block class and proves complete checkpoint admission, full forward execution, pre-output-block capture timing, last-640 selection, expected 128-by-96 geometry, concurrent attempt isolation, wrong or missing capture rejection, cancellation and workspace exhaustion rollback, tensor alias accounting, and repository scans rejecting reduced-model or metadata-only production routes.",
-        [dependency],
+        "A source-fingerprinted manifest-only production fixture enumerates the complete canonical LotusD/SD2 normalized key, dtype, and shape contract and proves full-topology admission plus the 768-by-1024 shape trace to an exact 1-by-640-by-128-by-96 capture without fabricating licensed checkpoint values. A separately named, test-support-only shape-reduced numeric oracle that is unreachable from production admission crosses every production block class and proves the equations, skip ordering, pre-output-block capture timing, and last-640 selection. Together they prove typed missing, extra, wrong-shape, wrong-dtype, wrong-family, ordinary SD15, and ambiguous-layout rejection; concurrent attempt isolation; a deep capture clone with a fresh StorageId; cancellation and workspace or backend-capacity exhaustion rollback; and ownership scans rejecting reduced-model, shallow-alias, mutable NativeModule-forward, duplicate-kernel, or metadata-only production routes.",
+        dependencies,
         locked=True,
         criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
     )
@@ -11317,8 +11382,17 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(text_generation_foundation["id"])
         )
     )
+    immutable_dense_inference_attention_foundation = (
+        native_immutable_dense_inference_attention_foundation_task(
+            str(sdpose_heatmap_projection_foundation["id"])
+        )
+    )
     sdpose_sd2_capture_foundation = native_sdpose_sd2_capture_foundation_task(
-        str(sdpose_heatmap_projection_foundation["id"])
+        [
+            str(immutable_dense_inference_attention_foundation["id"]),
+            "comfy-parity-native-model-family-lotusd-comfy-model-0106",
+            "comfy-parity-native-model-family-sd20-comfy-model-0119",
+        ]
     )
     sdpose_model_resource_foundation = native_sdpose_model_resource_foundation_task(
         str(sdpose_sd2_capture_foundation["id"])
@@ -11416,6 +11490,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             gemma_multimodal_generation_foundation,
             text_generation_foundation,
             sdpose_heatmap_projection_foundation,
+            immutable_dense_inference_attention_foundation,
             sdpose_sd2_capture_foundation,
             sdpose_model_resource_foundation,
             sdpose_foundation,
