@@ -9953,6 +9953,45 @@ def native_film_warp_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_film_padded_convolution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-padded-convolution-foundation",
+        "Execute bounded FILM padded convolutions",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The frame-interpolation owner exposes one borrowed-weight FILM convolution adapter. It applies source-specific right and bottom zero padding before even kernels, symmetric convolution padding for odd kernels, optional LeakyReLU with slope 0.2, and delegates all padding, convolution, activation, allocation, storage, stream, workspace, and cancellation mechanics to their canonical owners without retaining invocation state or adding a second graph, codec, cache, handle, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-warp/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted analytic oracle proves two-by-two right/bottom zero padding and same-extent convolution, three-by-three symmetric padding, optional LeakyReLU slope 0.2, F16/BF16/F32 output dtype preservation, fresh nonaliasing storage, immutable input/weight/bias tensors, pre-cancellation, caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM pyramid/flow/fusion graph, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12173,8 +12212,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_warp_foundation = native_film_warp_foundation_task(
         str(film_tensor_average_pool_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_padded_convolution_foundation = native_film_padded_convolution_foundation_task(
         str(film_warp_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_padded_convolution_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12281,6 +12323,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             rife_sequence_execution_foundation,
             film_tensor_average_pool_foundation,
             film_warp_foundation,
+            film_padded_convolution_foundation,
             video_foundation,
             detection_foundation,
         ]

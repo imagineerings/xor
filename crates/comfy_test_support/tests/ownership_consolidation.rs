@@ -14152,6 +14152,59 @@ fn val_ownership_native_film_warp_foundation_001() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn val_ownership_native_film_padded_convolution_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_conv_2d_with_context_exact_native(",
+        "&[0, 1, 0, 1]",
+        "FunctionalPadMode::Constant",
+        "ConvolutionPaddingMode::Zeros",
+        "disable_weight_init_convolution_exact_native(",
+        "leaky_relu(backend, &output, context)",
+        "film_conv_uses_source_padding_activation_and_failure_atomicity",
+    ] {
+        assert!(
+            model.contains(required),
+            "bounded FILM convolution lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution/manifest.json",
+    ))?;
+    assert!(fixture.contains("FilmConv2d.forward"));
+    assert!(fixture.contains("even_kernel_right_bottom_zero_padding"));
+    assert!(fixture.contains("odd_kernel_symmetric_padding_and_leaky_relu"));
+    assert!(fixture.contains("\"film_checkpoint_execution\": false"));
+    assert!(fixture.contains("\"codec_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_padded_convolution_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-film-padded-convolution-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

@@ -1480,6 +1480,114 @@ pub fn film_warp_with_context_exact_native(
     )
 }
 
+pub fn film_conv_2d_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: &Tensor,
+    activation: bool,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let input_shape = input.descriptor().shape();
+    let weight_shape = weight.descriptor().shape();
+    let bias_shape = bias.descriptor().shape();
+    if input_shape.len() != 4
+        || input_shape.first() == Some(&0)
+        || input_shape.get(1) == Some(&0)
+        || input_shape.get(2) == Some(&0)
+        || input_shape.get(3) == Some(&0)
+        || weight_shape.len() != 4
+        || weight_shape.first() == Some(&0)
+        || weight_shape.get(1) != input_shape.get(1)
+        || weight_shape.get(2) != weight_shape.get(3)
+        || !matches!(weight_shape.get(2), Some(1..=3))
+        || bias_shape.len() != 1
+        || bias_shape.first() != weight_shape.first()
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM convolution tensor shapes are invalid",
+        ));
+    }
+    let input_channels = usize::try_from(
+        *input_shape
+            .get(1)
+            .ok_or(FrameInterpolationError::Overflow)?,
+    )
+    .map_err(|_| FrameInterpolationError::Overflow)?;
+    let output_channels = usize::try_from(
+        *weight_shape
+            .first()
+            .ok_or(FrameInterpolationError::Overflow)?,
+    )
+    .map_err(|_| FrameInterpolationError::Overflow)?;
+    let kernel = usize::try_from(
+        *weight_shape
+            .get(2)
+            .ok_or(FrameInterpolationError::Overflow)?,
+    )
+    .map_err(|_| FrameInterpolationError::Overflow)?;
+    let input = if kernel.is_multiple_of(2) {
+        execution_result(
+            functional_pad_with_context_exact_native(
+                backend,
+                input,
+                &[0, 1, 0, 1],
+                FunctionalPadMode::Constant,
+                None,
+                context,
+            ),
+            context,
+        )?
+    } else {
+        input.clone()
+    };
+    let geometry = execution_result(
+        ConvolutionGeometry::new_with_padding_mode(
+            2,
+            vec![1; 2],
+            vec![
+                if kernel.is_multiple_of(2) {
+                    0
+                } else {
+                    kernel / 2
+                };
+                2
+            ],
+            vec![1; 2],
+            1,
+            false,
+            vec![0; 2],
+            ConvolutionPaddingMode::Zeros,
+        ),
+        context,
+    )?;
+    let mut module = execution_result(
+        disable_weight_init_convolution_exact_native(
+            "film.conv2d",
+            input_channels,
+            output_channels,
+            vec![kernel; 2],
+            true,
+            geometry,
+        ),
+        context,
+    )?;
+    execution_result(
+        module.load_dense_parameters(weight.clone(), Some(bias.clone())),
+        context,
+    )?;
+    let output = execution_result(
+        module.forward_dense_inference_with_context(backend, &input, context),
+        context,
+    )?;
+    if activation {
+        leaky_relu(backend, &output, context)
+    } else {
+        Ok(output)
+    }
+}
+
 fn film_base_grid(
     backend: &CpuBackend,
     height: u64,
@@ -1905,6 +2013,146 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_conv_uses_source_padding_activation_and_failure_atomicity()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for dtype in [DType::F16, DType::Bf16, DType::F32] {
+            let input = tensor_from_f32(
+                &backend,
+                &[1, 1, 2, 2],
+                &[1.0, 2.0, 3.0, 4.0],
+                dtype,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let weight = tensor_from_f32(
+                &backend,
+                &[1, 1, 2, 2],
+                &[1.0; 4],
+                dtype,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let bias = tensor_from_f32(&backend, &[1], &[0.0], dtype, DeviceId::CPU, &context)
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let input_bytes = input.contiguous_bytes()?;
+            let weight_bytes = weight.contiguous_bytes()?;
+            let bias_bytes = bias.contiguous_bytes()?;
+            let output = film_conv_2d_with_context_exact_native(
+                &backend, &input, &weight, &bias, false, &context,
+            )?;
+            assert_eq!(output.descriptor().shape(), &[1, 1, 2, 2]);
+            assert_eq!(output.descriptor().dtype(), dtype);
+            assert_ne!(output.storage_id(), input.storage_id());
+            assert_ne!(output.storage_id(), weight.storage_id());
+            assert_ne!(output.storage_id(), bias.storage_id());
+            for (index, expected) in [10.0_f32, 6.0, 7.0, 4.0].into_iter().enumerate() {
+                let index = u64::try_from(index).map_err(|_| FrameInterpolationError::Overflow)?;
+                let actual = match dtype.decode_scalar(output.linear_element_bytes(index)?)? {
+                    DecodedScalar::Real(value) => value as f32,
+                    _ => return Err(FrameInterpolationError::StateMismatch),
+                };
+                assert!((actual - expected).abs() <= 0.01);
+            }
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+            assert_eq!(weight.contiguous_bytes()?, weight_bytes);
+            assert_eq!(bias.contiguous_bytes()?, bias_bytes);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+
+            let constrained_context = ExecutionContext {
+                stream: StreamId::DEFAULT,
+                scratch: authority
+                    .authorize_workspace(35)
+                    .map_err(|_| FrameInterpolationError::Overflow)?,
+                rng_phase: None,
+                cancellation: &cancellation,
+            };
+            assert!(matches!(
+                film_conv_2d_with_context_exact_native(
+                    &backend,
+                    &input,
+                    &weight,
+                    &bias,
+                    false,
+                    &constrained_context,
+                ),
+                Err(FrameInterpolationError::Execution(_))
+            ));
+            assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+            assert_eq!(weight.contiguous_bytes()?, weight_bytes);
+            assert_eq!(bias.contiguous_bytes()?, bias_bytes);
+        }
+
+        let input = tensor_from_f32(
+            &backend,
+            &[1, 1, 2, 2],
+            &[-2.0, 1.0, 3.0, 4.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let weight = tensor_from_f32(
+            &backend,
+            &[1, 1, 3, 3],
+            &[0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let bias = tensor_from_f32(&backend, &[1], &[0.0], DType::F32, DeviceId::CPU, &context)
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let output = film_conv_2d_with_context_exact_native(
+            &backend, &input, &weight, &bias, true, &context,
+        )?;
+        let first = match DType::F32.decode_scalar(output.linear_element_bytes(0)?)? {
+            DecodedScalar::Real(value) => value as f32,
+            _ => return Err(FrameInterpolationError::StateMismatch),
+        };
+        assert!((first + 0.4).abs() <= 1.0e-6);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_conv_2d_with_context_exact_native(
+                &backend,
+                &input,
+                &weight,
+                &bias,
+                true,
+                &cancelled_context,
+            ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_warp_uses_pixel_centers_and_is_failure_atomic() -> Result<(), FrameInterpolationError> {

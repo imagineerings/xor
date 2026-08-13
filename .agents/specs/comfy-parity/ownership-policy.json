@@ -11292,6 +11292,87 @@
       "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_padded_convolution_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::film_conv_2d_with_context_exact_native",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "film_conv_2d_with_context_exact_native"
+      ],
+      "allowed_adapters": [
+        "comfy_tensor functional pad, canonical convolution, and LeakyReLU owners retain their equations, allocation, workspace, storage, stream, and cancellation authority",
+        "future retained FILM extraction, flow, and fusion execution may borrow admitted weight and bias tensors through this adapter but cannot copy or retain them in a second model owner",
+        "RIFE convolution execution remains bound to its distinct checkpoint topology and cannot replace FILM even-kernel right/bottom padding"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_conv_2d_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "film_conv_2d_with_context_exact_native",
+          "pattern": "^pub fn film_conv_2d_with_context_exact_native\\("
+        }
+      ],
+      "call_symbols": [
+        "film_conv_2d_with_context_exact_native"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-convolution-applies-source-even-and-odd-padding-rules",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_conv_2d_with_context_exact_native[\\s\\S]*kernel\\.is_multiple_of\\(2\\)[\\s\\S]*functional_pad_with_context_exact_native[\\s\\S]*&\\[0, 1, 0, 1\\][\\s\\S]*FunctionalPadMode::Constant[\\s\\S]*kernel / 2"
+        },
+        {
+          "name": "film-convolution-delegates-canonical-convolution-and-activation-owners",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_conv_2d_with_context_exact_native[\\s\\S]*disable_weight_init_convolution_exact_native[\\s\\S]*load_dense_parameters[\\s\\S]*forward_dense_inference_with_context[\\s\\S]*leaky_relu\\(backend, &output, context\\)"
+        },
+        {
+          "name": "film-convolution-oracle-proves-low-precision-padding-and-failure-atomicity",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_conv_uses_source_padding_activation_and_failure_atomicity[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*\\[10\\.0_f32, 6\\.0, 7\\.0, 4\\.0\\][\\s\\S]*first \\+ 0\\.4[\\s\\S]*authorize_workspace\\(35\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-convolution-fixture-bounds-equation-only-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution/manifest.json",
+          "pattern": "(?=[\\s\\S]*FilmConv2d.forward)(?=[\\s\\S]*even_kernel_right_bottom_zero_padding)(?=[\\s\\S]*odd_kernel_symmetric_padding_and_leaky_relu)(?=[\\s\\S]*codec_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-padded-convolution-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM feature, flow, and fusion graph execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation owner applies only FILM's source padding and optional activation policy over borrowed tensors, while canonical tensor owners retain every numerical and allocation mechanism and the retained model remains the sole checkpoint-weight owner."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_pixel_center_warp_execution",
       "canonical_owner": "comfy_model::frame_interpolation::film_warp_with_context_exact_native",
       "owner_files": [
