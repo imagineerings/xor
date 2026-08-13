@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 552)
+        self.assertEqual(len(tasks), 555)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -403,6 +403,11 @@ class ValidationGenerationTests(unittest.TestCase):
         text_generation_foundation_id = "comfy-parity-native-text-generation-foundation"
         media_text_foundation_id = "comfy-parity-native-media-text-rendering-foundation"
         sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
+        sdpose_projection_id = (
+            "comfy-parity-native-sdpose-heatmap-projection-foundation"
+        )
+        sdpose_capture_id = "comfy-parity-native-sdpose-sd2-capture-foundation"
+        sdpose_resource_id = "comfy-parity-native-sdpose-model-resource-foundation"
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
@@ -517,11 +522,40 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             "crates/comfy_model/src/sdpose.rs",
-            tasks_by_id[sdpose_foundation_id]["writes"],
+            tasks_by_id[sdpose_projection_id]["writes"],
         )
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs",
             tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_media/src/native_node_payload.rs",
+            tasks_by_id[sdpose_projection_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/Cargo.toml",
+            tasks_by_id[sdpose_projection_id]["writes"],
+        )
+        self.assertIn("Cargo.lock", tasks_by_id[sdpose_projection_id]["writes"])
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            tasks_by_id[sdpose_capture_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/native_node_payload.rs",
+            tasks_by_id[sdpose_resource_id]["writes"],
+        )
+        self.assertIn(
+            sdpose_projection_id,
+            tasks_by_id[sdpose_capture_id]["dependencies"],
+        )
+        self.assertIn(
+            sdpose_capture_id,
+            tasks_by_id[sdpose_resource_id]["dependencies"],
+        )
+        self.assertIn(
+            sdpose_resource_id,
+            tasks_by_id[sdpose_foundation_id]["dependencies"],
         )
         self.assertIn(
             "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
@@ -642,8 +676,11 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[text_generation_foundation_id], waves[gemma_generation_id] + 1
         )
         self.assertEqual(
-            waves[sdpose_foundation_id], waves[text_generation_foundation_id] + 1
+            waves[sdpose_projection_id], waves[text_generation_foundation_id] + 1
         )
+        self.assertEqual(waves[sdpose_capture_id], waves[sdpose_projection_id] + 1)
+        self.assertEqual(waves[sdpose_resource_id], waves[sdpose_capture_id] + 1)
+        self.assertEqual(waves[sdpose_foundation_id], waves[sdpose_resource_id] + 1)
         self.assertEqual(
             waves[video_foundation_id], waves[hook_consumers_id] + 1
         )

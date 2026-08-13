@@ -517,7 +517,7 @@ impl NativePoseKeypoint {
     pub fn checked(x: f64, y: f64, score: f64) -> Result<Self, NativeMediaPayloadError> {
         require_finite("pose keypoint x", x)?;
         require_finite("pose keypoint y", y)?;
-        require_probability("pose keypoint score", score)?;
+        require_finite("pose keypoint score", score)?;
         Ok(Self { x, y, score })
     }
 
@@ -3419,6 +3419,8 @@ mod tests {
         );
         assert!(NativePoseFrame::checked(0, 1080, vec![]).is_err());
         assert!(NativePoseKeypoint::checked(0.0, 0.0, f64::NAN).is_err());
+        assert!(NativePoseKeypoint::checked(0.0, 0.0, -0.25).is_ok());
+        assert!(NativePoseKeypoint::checked(0.0, 0.0, 1.25).is_ok());
         Ok(())
     }
 

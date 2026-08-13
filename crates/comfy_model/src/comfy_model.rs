@@ -41,6 +41,7 @@ pub mod qwen_image_family;
 pub mod registry_generator;
 pub mod restricted_pickle;
 pub mod sd2_family;
+pub mod sdpose;
 pub mod sdxl_family;
 pub mod vae;
 pub mod vae_architecture;
@@ -531,6 +532,11 @@ pub use sd2_family::{
     configuration_for_probe as sd2_configuration_for_probe, lotus_task_embedding,
     state_plan_for_layout as sd2_state_plan_for_layout,
     weight_statistic_request_for_probe as sd2_weight_statistic_request_for_probe,
+};
+pub use sdpose::{
+    SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH, SDPOSE_INPUT_HEIGHT,
+    SDPOSE_INPUT_WIDTH, SdPoseProjectionError, SdPoseRawKeypoint, decode_sdpose_heatmaps,
+    project_sdpose_openpose_person,
 };
 pub use sdxl_family::{
     SDXL_ADM_INPUT_DIMENSION, SDXL_ATTENTION_HEAD_CHANNELS, SDXL_CLIP_CANDIDATES, SDXL_CLIP_TARGET,

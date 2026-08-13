@@ -11227,6 +11227,97 @@
       "decision_reason": "roi_align_with_context_exact_native and its private RoiAlignPlan own the distinct ROI coordinate, adaptive-grid, boundary, and bilinear traversal. Its analytical maps reuse the same plan while Tensor and CpuBackend retain storage and allocation."
     },
     {
+      "concern": "native_sdpose_heatmap_and_openpose_projection",
+      "canonical_owner": "comfy_model::sdpose",
+      "owner_files": [
+        "crates/comfy_model/src/sdpose.rs",
+        "crates/comfy_media/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "decode_sdpose_heatmaps",
+        "project_sdpose_openpose_person",
+        "SdPoseRawKeypoint",
+        "NativePoseKeypoint"
+      ],
+      "allowed_adapters": [
+        "NativePoseKeypoint remains the canonical finite raw-confidence and absolute-coordinate media value",
+        "CpuBackend, ExecutionContext, workspace authority, and CancellationToken remain the sole allocation, execution, and cancellation owners",
+        "The dependent SD2 capture, retained SDPose model, and runtime composition leaves may consume this projection but cannot duplicate DARK or OpenPose mapping equations",
+        "Model weights, VAE, sampler, RNG, handle store, cache, persistence, and output publication remain outside this projection owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub fn decode_sdpose_heatmaps\\(",
+          "qualified": "comfy_model::sdpose::decode_sdpose_heatmaps",
+          "role": "canonical",
+          "symbol": "decode_sdpose_heatmaps"
+        },
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub fn project_sdpose_openpose_person\\(",
+          "qualified": "comfy_model::sdpose::project_sdpose_openpose_person",
+          "role": "canonical",
+          "symbol": "project_sdpose_openpose_person"
+        }
+      ],
+      "call_symbols": [
+        "decode_sdpose_heatmaps",
+        "project_sdpose_openpose_person",
+        "NativePoseKeypoint::checked"
+      ],
+      "required_mappings": [
+        {
+          "name": "sdpose-heatmap-decode-is-source-exact-bounded-and-cancellable",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub fn decode_sdpose_heatmaps[\\s\\S]*gaussian_kernel\\(\\)[\\s\\S]*hessian_xx[\\s\\S]*context.check\\(\\)"
+        },
+        {
+          "name": "sdpose-openpose-projection-has-exact-source-cardinalities-and-remap",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub fn project_sdpose_openpose_person[\\s\\S]*MMPOSE_INDICES[\\s\\S]*OPENPOSE_INDICES[\\s\\S]*points\\[24\\.\\.92\\]"
+        },
+        {
+          "name": "sdpose-pose-payload-preserves-finite-raw-confidence",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "pub fn checked\\(x: f64, y: f64, score: f64\\)[\\s\\S]*require_finite\\(\"pose keypoint score\", score\\)"
+        },
+        {
+          "name": "sdpose-projection-fixture-pins-source-and-atomic-boundary",
+          "path": "crates/comfy_test_support/fixtures/sdpose/projection/manifest.json",
+          "pattern": "comfy-parity-native-sdpose-heatmap-projection-foundation"
+        }
+      ],
+      "consolidation_tasks": [
+        "comfy-parity-native-sdpose-heatmap-projection-foundation"
+      ],
+      "production_consumers": [
+        "retained native SDPose heatmap-head execution",
+        "native SDPose runtime composition"
+      ],
+      "requirements": [
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D26",
+        "D34",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "comfy_model::sdpose is the sole checked CPU owner for the pinned SDPose heatmap DARK refinement and 133-to-134 OpenPose mapping, while comfy_media remains the sole typed pose payload owner and preserves finite raw heatmap confidence without probability clamping. The owner uses canonical workspace and cancellation primitives, retains no invocation state, and delegates all model, sampling, handle, cache, persistence, and publication behavior to dependent owners."
+    },
+    {
       "concern": "native_sgd_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_07::NativeSgd",
       "owner_files": [

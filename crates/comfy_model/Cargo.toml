@@ -14,6 +14,7 @@ test-support = []
 [dependencies]
 anyhow.workspace = true
 cap-std.workspace = true
+comfy_media.workspace = true
 comfy_tensor.workspace = true
 comfy_types.workspace = true
 fancy-regex.workspace = true

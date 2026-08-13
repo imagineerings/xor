@@ -8996,6 +8996,133 @@ def native_text_transform_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_sdpose_heatmap_projection_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sdpose-heatmap-projection-foundation",
+        "Implement exact SDPose heatmap and OpenPose projection",
+        [18, 26, 37, 41, 44],
+        [18, 26, 34, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical SDPose projection owner decodes fixed 133-channel heatmaps with source-exact row-major argmax, max-preserving Gaussian DARK refinement, checked Hessian correction, input-canvas scaling, and 133-to-134 OpenPose whole-body projection. The canonical pose payload admits finite raw heatmap confidence rather than incorrectly constraining SDPose scores to probabilities.",
+        [
+            "projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_types/src/cancellation.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "Cargo.lock",
+            "crates/comfy_model/Cargo.toml",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/sdpose.rs",
+            "crates/comfy_test_support/fixtures/sdpose/projection",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted synthetic heatmaps prove stable first-index ties, positive, zero, negative, boundary, nonfinite, and singular-Hessian behavior; exact 768-by-1024 scaling; neck threshold and remap order; 18/6/70/21/21 cardinalities; finite raw scores below zero and above one; cancellation and allocation failure with no partial payload; and no model, sampler, RNG, cache, handle, or publication owner in this projection leaf.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_sdpose_sd2_capture_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sdpose-sd2-capture-foundation",
+        "Implement full SD2 denoiser execution and SDPose feature capture",
+        [18, 26, 28, 31, 37, 41, 44],
+        [18, 26, 28, 31, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-TENSOR-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical production SD2/OpenAI U-Net owner loads and executes the complete checked SDPose denoiser topology and returns an attempt-local clone of the last output-block input whose channel count is 640. It does not route production through the reduced NativeFamilyModel conformance graph or Sd15TinyModel.",
+        [
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy/model_base.py",
+            "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/sdpose.rs",
+        ],
+        [
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/sdpose.rs",
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A reduced exact-weight fixture crosses every production block class and proves complete checkpoint admission, full forward execution, pre-output-block capture timing, last-640 selection, expected 128-by-96 geometry, concurrent attempt isolation, wrong or missing capture rejection, cancellation and workspace exhaustion rollback, tensor alias accounting, and repository scans rejecting reduced-model or metadata-only production routes.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
+def native_sdpose_model_resource_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sdpose-model-resource-foundation",
+        "Implement the retained SDPose model and heatmap-head resource",
+        [18, 26, 28, 31, 37, 41, 44],
+        [18, 26, 28, 31, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One sealed MODEL-role SDPose resource retains the exact full SD2 denoiser and 640-to-133 heatmap head, validates the complete checkpoint and family contract, and projects content identity plus StorageId-aware residency through NativeModelPayload and NativeStoredPayload without retaining invocation capture, heatmaps, sampler state, or output payloads.",
+        [
+            "projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py",
+            "projects/comfy/ComfyUI/comfy/model_detection.py",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_model/tests/sdpose.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_test_support/fixtures/sdpose/resource",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Fixtures prove exact denoiser and heatmap-head key/shape admission, wrong family and ordinary SD15/Lotus rejection, content-sensitive semantic identity, size-consistent StorageId union and alias deduplication, concrete sealed MODEL publication, lease retention, capacity rollback, forged handle rejection, restart staleness, and absence of metadata-only or invocation-state resource fields.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+    )
+
+
 def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-sdpose-execution-foundation",
@@ -9010,10 +9137,15 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "One canonical shared SDPose execution owner admits the model resource and implements checked 640-channel output-block feature capture, native heatmap-head execution, Lotus conditioning, one-step Euler sampling, and exact OpenPose projection through the existing model, VAE, sampler, tensor, and sealed-payload boundaries.",
+        "One canonical shared SDPose runtime composition owner resolves the sealed SDPose model, VAE, image, and optional bounding boxes and delegates exact resize, Lotus conditioning, one-step Euler sampling, last-640 capture, heatmap-head execution, and OpenPose projection through the established model, VAE, sampler, tensor, media, and attempt-publication boundaries.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_lotus.py",
+            "projects/comfy/ComfyUI/comfy/sample.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
+            "projects/comfy/ComfyUI/comfy/utils.py",
+            "crates/comfy_model/src/sdpose.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/vae.rs",
@@ -9022,19 +9154,17 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
-            "crates/comfy_model/src/sdpose.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
-            "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
-            "crates/comfy_nodes/src/stored_payload.rs",
-            "crates/comfy_nodes/src/comfy_nodes.rs",
-            "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            "crates/comfy_test_support/fixtures/sdpose/execution",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Source-derived fixtures prove exact resource admission, heatmap geometry and feature capture, VAE resize and encode, Lotus-conditioned one-step Euler execution, whole-body keypoint and score projection, cancellation, wrong-model rejection, alias-aware residency, attempt rollback, restart staleness, and no metadata-only model facade.",
+        "Source-derived fixtures prove exact 768-by-1024 stretch resize mode, VAE encode, immutable 1-by-2-by-1024 Lotus conditioning, zero-noise one-step simple-schedule Euler execution with no RNG draw, whole-image batching, bounding-box normalization and remap, typed cancellation and workspace exhaustion at every bounded phase, final-only pose publication, deterministic retry, and no second model, VAE, sampler, RNG, cache, persistence, or publication owner.",
         [dependency],
         locked=True,
         criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
@@ -11182,8 +11312,19 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     text_generation_foundation = native_text_generation_foundation_task(
         str(gemma_multimodal_generation_foundation["id"])
     )
+    sdpose_heatmap_projection_foundation = (
+        native_sdpose_heatmap_projection_foundation_task(
+            str(text_generation_foundation["id"])
+        )
+    )
+    sdpose_sd2_capture_foundation = native_sdpose_sd2_capture_foundation_task(
+        str(sdpose_heatmap_projection_foundation["id"])
+    )
+    sdpose_model_resource_foundation = native_sdpose_model_resource_foundation_task(
+        str(sdpose_sd2_capture_foundation["id"])
+    )
     sdpose_foundation = native_sdpose_execution_foundation_task(
-        str(text_generation_foundation["id"])
+        str(sdpose_model_resource_foundation["id"])
     )
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
@@ -11274,6 +11415,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             gemma_multimodal_resource_foundation,
             gemma_multimodal_generation_foundation,
             text_generation_foundation,
+            sdpose_heatmap_projection_foundation,
+            sdpose_sd2_capture_foundation,
+            sdpose_model_resource_foundation,
             sdpose_foundation,
             video_foundation,
             detection_foundation,

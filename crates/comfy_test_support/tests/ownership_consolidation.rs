@@ -13214,3 +13214,59 @@ fn val_ownership_001_native_decoder_text_generation_has_one_boundary()
     }
     Ok(())
 }
+
+#[test]
+fn val_ownership_task400p_sdpose_projection_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let projection = fs::read_to_string(root.join("crates/comfy_model/src/sdpose.rs"))?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/sdpose/projection/manifest.json"),
+    )?;
+    for required in [
+        "pub fn decode_sdpose_heatmaps(",
+        "fn gaussian_kernel()",
+        "hessian_xx",
+        "pub fn project_sdpose_openpose_person(",
+        "MMPOSE_INDICES",
+        "OPENPOSE_INDICES",
+    ] {
+        assert!(
+            projection.contains(required),
+            "SDPose owner lacks {required}"
+        );
+    }
+    assert!(media.contains("require_finite(\"pose keypoint score\", score)?;"));
+    assert!(!media.contains("require_probability(\"pose keypoint score\", score)?;"));
+    for required in [
+        "comfy-parity-native-sdpose-heatmap-projection-foundation",
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+        "19a55d1ecf16796226ed204241852b9b237a563addf636ff738167d9273cf97a",
+        "d9b38524b1ee4b09b0ba4373537fb53526f08a6b2d8f714bb80225379342ee21",
+        "No licensed SDPose checkpoint is bundled.",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "SDPose fixture lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_sdpose_heatmap_and_openpose_projection")
+            })
+        })
+        .ok_or("missing SDPose projection ownership concern")?;
+    let mappings = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing SDPose projection mappings")?;
+    assert_eq!(mappings.len(), 4);
+    Ok(())
+}
