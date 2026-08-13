@@ -11292,6 +11292,87 @@
       "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_image_pyramid_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::film_image_pyramid_with_context_exact_native",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "film_image_pyramid_with_context_exact_native"
+      ],
+      "allowed_adapters": [
+        "the canonical tensor AvgPool2d owner retains its averaging equation, F32 accumulation, dtype encoding, allocation, workspace, storage, stream, and cancellation authority",
+        "future retained FILM feature extraction may consume the attempt-local image pyramid but cannot retain it in the model resource, NativeCache, payload, handle, effect, or publication state",
+        "level zero intentionally aliases the immutable input exactly as the pinned source list does while every pooled level is a fresh tensor"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_image_pyramid_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "film_image_pyramid_with_context_exact_native",
+          "pattern": "^pub fn film_image_pyramid_with_context_exact_native\\("
+        }
+      ],
+      "call_symbols": [
+        "film_image_pyramid_with_context_exact_native"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-image-pyramid-validates-levels-and-production-extent",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_image_pyramid_with_context_exact_native[\\s\\S]*1\\.\\.=7[\\s\\S]*required_extent[\\s\\S]*FILM image pyramid extent cannot support every level"
+        },
+        {
+          "name": "film-image-pyramid-delegates-repeated-canonical-average-pooling",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_image_pyramid_with_context_exact_native[\\s\\S]*AveragePoolConfiguration[\\s\\S]*kernel_size: vec!\\[2, 2\\][\\s\\S]*stride: Some\\(vec!\\[2, 2\\]\\)[\\s\\S]*average_pool_2d_tensor_with_context_exact_native"
+        },
+        {
+          "name": "film-image-pyramid-oracle-proves-aliasing-low-precision-and-failure-atomicity",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_image_pyramid_repeats_exact_pooling_and_is_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*storage_id\\(\\), input\\.storage_id[\\s\\S]*\\[3\\.5, 5\\.5, 11\\.5, 13\\.5\\][\\s\\S]*authorize_workspace\\(63\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-image-pyramid-fixture-bounds-composition-only-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-image-pyramid/manifest.json",
+          "pattern": "(?=[\\s\\S]*build_image_pyramid)(?=[\\s\\S]*three_level_four_by_four_image_pyramid)(?=[\\s\\S]*aliases_input)(?=[\\s\\S]*film_feature_extractor_execution)(?=[\\s\\S]*codec_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-image-pyramid-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM feature extraction and frame interpolation execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation owner composes only the ordered attempt-local FILM image levels while the canonical tensor AvgPool2d owner retains all numerical and resource mechanics and the retained FILM model remains the sole weight owner."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_padded_convolution_execution",
       "canonical_owner": "comfy_model::frame_interpolation::film_conv_2d_with_context_exact_native",
       "owner_files": [

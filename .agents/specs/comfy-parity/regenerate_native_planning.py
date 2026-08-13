@@ -9992,6 +9992,42 @@ def native_film_padded_convolution_foundation_task(dependency: str) -> dict[str,
     )
 
 
+def native_film_image_pyramid_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-image-pyramid-foundation",
+        "Execute bounded FILM image pyramids",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The frame-interpolation owner composes FILM's bounded image pyramid by preserving level zero as the borrowed input and repeatedly delegating two-by-two stride-two average pooling to the canonical tensor owner. The helper returns only attempt-local tensor views and fresh pooled levels, validates the production seven-level extent before allocation, and adds no second pooling equation, retained graph, allocator, workspace, codec, cache, handle, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-convolution/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-image-pyramid",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced oracle proves a four-by-four, three-level image pyramid with exact repeated two-by-two averages, production seven-level minimum extents, F16/BF16/F32 output dtype preservation, level-zero input aliasing, fresh nonaliasing pooled storage, immutable input, invalid level and extent rejection, pre-cancellation, one-byte-short caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM feature/flow/fusion execution, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12215,8 +12251,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_padded_convolution_foundation = native_film_padded_convolution_foundation_task(
         str(film_warp_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_image_pyramid_foundation = native_film_image_pyramid_foundation_task(
         str(film_padded_convolution_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_image_pyramid_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12324,6 +12363,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             film_tensor_average_pool_foundation,
             film_warp_foundation,
             film_padded_convolution_foundation,
+            film_image_pyramid_foundation,
             video_foundation,
             detection_foundation,
         ]

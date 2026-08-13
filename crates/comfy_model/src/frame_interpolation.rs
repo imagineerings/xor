@@ -20,9 +20,10 @@ use comfy_tensor::{
         FunctionalPadMode, functional_pad_with_context_exact_native, tensor_permute_exact_native,
     },
     generated_spatial_functional_kernel_01::{
-        GridPaddingMode, GridSampleConfiguration, GridSampleMode, InterpolateConfiguration,
-        InterpolateMode, grid_sample_tensor_with_context_exact_native,
-        interpolate_tensor_with_context_exact_native,
+        AveragePoolConfiguration, GridPaddingMode, GridSampleConfiguration, GridSampleMode,
+        InterpolateConfiguration, InterpolateMode,
+        average_pool_2d_tensor_with_context_exact_native,
+        grid_sample_tensor_with_context_exact_native, interpolate_tensor_with_context_exact_native,
     },
     generated_storage_dtype_device_01::contiguous_with_context_exact_native,
 };
@@ -1480,6 +1481,70 @@ pub fn film_warp_with_context_exact_native(
     )
 }
 
+pub fn film_image_pyramid_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    levels: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let shape = input.descriptor().shape();
+    if shape.len() != 4
+        || shape.first() == Some(&0)
+        || shape.get(1) == Some(&0)
+        || shape.get(2) == Some(&0)
+        || shape.get(3) == Some(&0)
+        || !(1..=7).contains(&levels)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM image pyramid input or level count is invalid",
+        ));
+    }
+    let required_extent = 1_u64
+        .checked_shl(
+            u32::try_from(levels.saturating_sub(1))
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+        )
+        .ok_or(FrameInterpolationError::Overflow)?;
+    if shape.get(2).copied().unwrap_or_default() < required_extent
+        || shape.get(3).copied().unwrap_or_default() < required_extent
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM image pyramid extent cannot support every level",
+        ));
+    }
+
+    let configuration = AveragePoolConfiguration {
+        kernel_size: vec![2, 2],
+        stride: Some(vec![2, 2]),
+        padding: vec![0, 0],
+        ceil_mode: false,
+        count_include_pad: true,
+        divisor_override: None,
+    };
+    let mut pyramid = Vec::new();
+    pyramid
+        .try_reserve_exact(levels)
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    let mut image = input.clone();
+    pyramid.push(image.clone());
+    for _ in 1..levels {
+        context.cancellation.check()?;
+        image = execution_result(
+            average_pool_2d_tensor_with_context_exact_native(
+                backend,
+                &image,
+                &configuration,
+                context,
+            ),
+            context,
+        )?;
+        pyramid.push(image.clone());
+    }
+    context.cancellation.check()?;
+    Ok(pyramid)
+}
+
 pub fn film_conv_2d_with_context_exact_native(
     backend: &CpuBackend,
     input: &Tensor,
@@ -2013,6 +2078,133 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_image_pyramid_repeats_exact_pooling_and_is_failure_atomic()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let values = (1_u8..=16).map(f32::from).collect::<Vec<_>>();
+        for dtype in [DType::F16, DType::Bf16, DType::F32] {
+            let input = tensor_from_f32(
+                &backend,
+                &[1, 1, 4, 4],
+                &values,
+                dtype,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let input_bytes = input.contiguous_bytes()?;
+            let pyramid =
+                film_image_pyramid_with_context_exact_native(&backend, &input, 3, &context)?;
+            assert_eq!(pyramid.len(), 3);
+            assert_eq!(pyramid[0].storage_id(), input.storage_id());
+            assert_eq!(pyramid[0].descriptor().shape(), &[1, 1, 4, 4]);
+            assert_eq!(pyramid[1].descriptor().shape(), &[1, 1, 2, 2]);
+            assert_eq!(pyramid[2].descriptor().shape(), &[1, 1, 1, 1]);
+            assert_ne!(pyramid[1].storage_id(), input.storage_id());
+            assert_ne!(pyramid[2].storage_id(), input.storage_id());
+            assert_ne!(pyramid[1].storage_id(), pyramid[2].storage_id());
+            for level in &pyramid {
+                assert_eq!(level.descriptor().dtype(), dtype);
+            }
+            let expected_levels: [&[f32]; 2] = [&[3.5, 5.5, 11.5, 13.5], &[8.5]];
+            for (level, expected) in pyramid.iter().skip(1).zip(expected_levels) {
+                for (index, expected) in expected.iter().copied().enumerate() {
+                    let index =
+                        u64::try_from(index).map_err(|_| FrameInterpolationError::Overflow)?;
+                    let actual = match dtype.decode_scalar(level.linear_element_bytes(index)?)? {
+                        DecodedScalar::Real(value) => value as f32,
+                        _ => return Err(FrameInterpolationError::StateMismatch),
+                    };
+                    assert!((actual - expected).abs() <= 0.01);
+                }
+            }
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+
+            let constrained_context = ExecutionContext {
+                stream: StreamId::DEFAULT,
+                scratch: authority
+                    .authorize_workspace(63)
+                    .map_err(|_| FrameInterpolationError::Overflow)?,
+                rng_phase: None,
+                cancellation: &cancellation,
+            };
+            assert!(matches!(
+                film_image_pyramid_with_context_exact_native(
+                    &backend,
+                    &input,
+                    3,
+                    &constrained_context,
+                ),
+                Err(FrameInterpolationError::Execution(_))
+            ));
+            assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+        }
+
+        let input = tensor_from_f32(
+            &backend,
+            &[1, 1, 4, 4],
+            &values,
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        assert!(matches!(
+            film_image_pyramid_with_context_exact_native(&backend, &input, 0, &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        assert!(matches!(
+            film_image_pyramid_with_context_exact_native(&backend, &input, 4, &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        let production_input = tensor_from_f32(
+            &backend,
+            &[1, 1, 64, 64],
+            &vec![0.0; 64 * 64],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let production_pyramid =
+            film_image_pyramid_with_context_exact_native(&backend, &production_input, 7, &context)?;
+        assert_eq!(production_pyramid.len(), 7);
+        assert_eq!(production_pyramid[6].descriptor().shape(), &[1, 1, 1, 1]);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_image_pyramid_with_context_exact_native(&backend, &input, 3, &cancelled_context,),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_conv_uses_source_padding_activation_and_failure_atomicity()
