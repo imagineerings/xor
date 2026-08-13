@@ -9,6 +9,7 @@ const FRAME_INTERPOLATION_SOURCE_SHA256: &str =
     "038762ff4e248c91e168685796f590a2e5aa0dc3b3c2922aa5f9d936b1fff369";
 const FILM_SOURCE_SHA256: &str = "e4efa6666846cecb5dc83cb4668410b37b6c4ffae6b08e48b74184bc037c4ab1";
 const RIFE_SOURCE_SHA256: &str = "854b808a425d01a82df2395cb925d7a5dab86669c62485f95fb790736ced11a3";
+const MAXIMUM_INTERPOLATION_MULTIPLIER: u64 = 16;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FrameInterpolationProfile {
@@ -57,6 +58,8 @@ pub enum FrameInterpolationError {
     ArtifactDigest,
     #[error("frame interpolation accounting overflow")]
     Overflow,
+    #[error("frame interpolation invocation is invalid: {0}")]
+    InvalidInvocation(&'static str),
     #[error("frame interpolation tensor error: {0}")]
     Tensor(#[from] TensorError),
     #[error("frame interpolation operation was cancelled")]
@@ -64,6 +67,178 @@ pub enum FrameInterpolationError {
     #[cfg(any(test, feature = "test-support"))]
     #[error("frame interpolation test fixture failed: {0}")]
     TestFixture(String),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FrameInterpolationInvocationPlan {
+    frame_count: u64,
+    multiplier: u64,
+    output_frame_count: u64,
+    output_element_count: u64,
+    total_interpolation_steps: u64,
+    padded_height: u64,
+    padded_width: u64,
+    padding_bottom: u64,
+    padding_right: u64,
+    timesteps: Vec<f32>,
+}
+
+impl FrameInterpolationInvocationPlan {
+    pub fn checked(
+        profile: &FrameInterpolationProfile,
+        frame_count: u64,
+        multiplier: u64,
+        height: u64,
+        width: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, FrameInterpolationError> {
+        cancellation.check()?;
+        if height == 0 || width == 0 {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "frame extent is zero",
+            ));
+        }
+        if multiplier > MAXIMUM_INTERPOLATION_MULTIPLIER {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "multiplier exceeds the source schema maximum",
+            ));
+        }
+        let bypass = frame_count < 2 || multiplier < 2;
+        let interpolation_count = if bypass { 0 } else { multiplier - 1 };
+        let pair_count = frame_count.saturating_sub(1);
+        let total_interpolation_steps = pair_count
+            .checked_mul(interpolation_count)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let output_frame_count = if bypass {
+            frame_count
+        } else {
+            pair_count
+                .checked_mul(multiplier)
+                .and_then(|count| count.checked_add(1))
+                .ok_or(FrameInterpolationError::Overflow)?
+        };
+        let output_element_count = output_frame_count
+            .checked_mul(3)
+            .and_then(|count| count.checked_mul(height))
+            .and_then(|count| count.checked_mul(width))
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let alignment = profile.alignment();
+        let padding_bottom = (alignment - height % alignment) % alignment;
+        let padding_right = (alignment - width % alignment) % alignment;
+        if alignment > 1 && (padding_bottom >= height || padding_right >= width) {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "reflection padding is not representable",
+            ));
+        }
+        let padded_height = height
+            .checked_add(padding_bottom)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let padded_width = width
+            .checked_add(padding_right)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let timestep_capacity =
+            usize::try_from(interpolation_count).map_err(|_| FrameInterpolationError::Overflow)?;
+        let mut timesteps = Vec::new();
+        timesteps
+            .try_reserve_exact(timestep_capacity)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        for index in 1..=interpolation_count {
+            cancellation.check()?;
+            let index = u16::try_from(index).map_err(|_| FrameInterpolationError::Overflow)?;
+            let multiplier =
+                u16::try_from(multiplier).map_err(|_| FrameInterpolationError::Overflow)?;
+            timesteps.push(f32::from(index) / f32::from(multiplier));
+        }
+        Ok(Self {
+            frame_count,
+            multiplier,
+            output_frame_count,
+            output_element_count,
+            total_interpolation_steps,
+            padded_height,
+            padded_width,
+            padding_bottom,
+            padding_right,
+            timesteps,
+        })
+    }
+
+    pub const fn is_bypass(&self) -> bool {
+        self.frame_count < 2 || self.multiplier < 2
+    }
+    pub const fn frame_count(&self) -> u64 {
+        self.frame_count
+    }
+    pub const fn multiplier(&self) -> u64 {
+        self.multiplier
+    }
+    pub const fn output_frame_count(&self) -> u64 {
+        self.output_frame_count
+    }
+    pub const fn output_element_count(&self) -> u64 {
+        self.output_element_count
+    }
+    pub const fn total_interpolation_steps(&self) -> u64 {
+        self.total_interpolation_steps
+    }
+    pub const fn padded_height(&self) -> u64 {
+        self.padded_height
+    }
+    pub const fn padded_width(&self) -> u64 {
+        self.padded_width
+    }
+    pub const fn padding_bottom(&self) -> u64 {
+        self.padding_bottom
+    }
+    pub const fn padding_right(&self) -> u64 {
+        self.padding_right
+    }
+    pub fn timesteps(&self) -> &[f32] {
+        &self.timesteps
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameInterpolationFallbackState {
+    multi_timestep_enabled: bool,
+    single_timestep_batch: u64,
+}
+
+impl FrameInterpolationFallbackState {
+    pub fn for_plan(
+        plan: &FrameInterpolationInvocationPlan,
+        multi_timestep_available: bool,
+    ) -> Result<Self, FrameInterpolationError> {
+        if plan.is_bypass() {
+            return Ok(Self {
+                multi_timestep_enabled: false,
+                single_timestep_batch: 0,
+            });
+        }
+        Ok(Self {
+            multi_timestep_enabled: multi_timestep_available,
+            single_timestep_batch: plan.multiplier - 1,
+        })
+    }
+
+    pub const fn multi_timestep_enabled(&self) -> bool {
+        self.multi_timestep_enabled
+    }
+    pub const fn single_timestep_batch(&self) -> u64 {
+        self.single_timestep_batch
+    }
+    pub fn record_multi_timestep_oom(&mut self) {
+        self.multi_timestep_enabled = false;
+    }
+    pub fn record_single_timestep_oom(&mut self) -> Result<(), FrameInterpolationError> {
+        if self.single_timestep_batch <= 1 {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "single-timestep batch one exhausted memory",
+            ));
+        }
+        self.single_timestep_batch = (self.single_timestep_batch / 2).max(1);
+        Ok(())
+    }
 }
 
 impl From<CancellationError> for FrameInterpolationError {
@@ -585,6 +760,96 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invocation_plans_order_midpoints_align_rife_and_persist_oom_downgrades()
+    -> Result<(), FrameInterpolationError> {
+        let cancellation = CancellationToken::default();
+        let rife = FrameInterpolationProfile::Rife {
+            head_channels: 4,
+            block_channels: [192, 128, 96, 64, 32],
+        };
+        let plan = FrameInterpolationInvocationPlan::checked(&rife, 3, 4, 65, 66, &cancellation)?;
+        assert!(!plan.is_bypass());
+        assert_eq!(plan.output_frame_count(), 9);
+        assert_eq!(plan.output_element_count(), 115_830);
+        assert_eq!(plan.total_interpolation_steps(), 6);
+        assert_eq!((plan.padded_height(), plan.padded_width()), (128, 128));
+        assert_eq!((plan.padding_bottom(), plan.padding_right()), (63, 62));
+        assert_eq!(plan.timesteps(), &[0.25, 0.5, 0.75]);
+
+        let mut fallback = FrameInterpolationFallbackState::for_plan(&plan, true)?;
+        assert!(fallback.multi_timestep_enabled());
+        assert_eq!(fallback.single_timestep_batch(), 3);
+        fallback.record_multi_timestep_oom();
+        assert!(!fallback.multi_timestep_enabled());
+        fallback.record_single_timestep_oom()?;
+        assert_eq!(fallback.single_timestep_batch(), 1);
+        assert!(matches!(
+            fallback.record_single_timestep_oom(),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+
+        let film = FrameInterpolationInvocationPlan::checked(
+            &FrameInterpolationProfile::Film,
+            5,
+            2,
+            65,
+            66,
+            &cancellation,
+        )?;
+        assert_eq!((film.padded_height(), film.padded_width()), (65, 66));
+        assert_eq!(film.output_frame_count(), 9);
+        assert_eq!(film.timesteps(), &[0.5]);
+        Ok(())
+    }
+
+    #[test]
+    fn invocation_plans_bypass_and_reject_unbounded_or_unreflectable_requests()
+    -> Result<(), FrameInterpolationError> {
+        let cancellation = CancellationToken::default();
+        let rife = FrameInterpolationProfile::Rife {
+            head_channels: 2,
+            block_channels: [2; 5],
+        };
+        let bypass = FrameInterpolationInvocationPlan::checked(&rife, 1, 2, 64, 64, &cancellation)?;
+        assert!(bypass.is_bypass());
+        assert_eq!(bypass.output_frame_count(), 1);
+        assert!(bypass.timesteps().is_empty());
+        assert_eq!(
+            FrameInterpolationFallbackState::for_plan(&bypass, true)?,
+            FrameInterpolationFallbackState {
+                multi_timestep_enabled: false,
+                single_timestep_batch: 0,
+            }
+        );
+        assert!(matches!(
+            FrameInterpolationInvocationPlan::checked(&rife, 2, 17, 64, 64, &cancellation),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        assert!(matches!(
+            FrameInterpolationInvocationPlan::checked(&rife, 2, 2, 1, 1, &cancellation),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        assert!(matches!(
+            FrameInterpolationInvocationPlan::checked(
+                &FrameInterpolationProfile::Film,
+                2,
+                16,
+                u64::MAX,
+                u64::MAX,
+                &cancellation
+            ),
+            Err(FrameInterpolationError::Overflow)
+        ));
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            FrameInterpolationInvocationPlan::checked(&rife, 2, 2, 64, 64, &cancelled),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        Ok(())
+    }
 
     #[test]
     fn manifests_close_exact_source_tensor_counts() -> Result<(), FrameInterpolationError> {

@@ -8832,6 +8832,84 @@
       "decision_reason": "The retained checkpoint owner implements source-order FILM/RIFE detection, exact complete state manifests, collision-safe RIFE normalization, artifact/content identity, and tensor residency. Actual interpolation, handle storage, invocation-local feature caches, output effects, and publication remain separate later owners."
     },
     {
+      "concern": "native_frame_interpolation_model_execution_planning",
+      "canonical_owner": "comfy_model::frame_interpolation::FrameInterpolationInvocationPlan",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "FrameInterpolationInvocationPlan",
+        "FrameInterpolationFallbackState"
+      ],
+      "allowed_adapters": [
+        "future FILM and RIFE execution consumes the immutable checked plan",
+        "ExecutionContext remains the cancellation and bounded-workspace owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::FrameInterpolationInvocationPlan",
+          "role": "canonical",
+          "symbol": "FrameInterpolationInvocationPlan"
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::FrameInterpolationFallbackState",
+          "role": "canonical",
+          "symbol": "FrameInterpolationFallbackState"
+        }
+      ],
+      "call_symbols": [
+        "FrameInterpolationInvocationPlan::checked",
+        "FrameInterpolationFallbackState::for_plan"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-plan-binds-count-order-time-and-alignment",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "FrameInterpolationInvocationPlan[\\s\\S]*output_frame_count[\\s\\S]*total_interpolation_steps[\\s\\S]*timesteps[\\s\\S]*padding_bottom[\\s\\S]*padding_right"
+        },
+        {
+          "name": "frame-interpolation-fallback-is-attempt-local-and-source-ordered",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "FrameInterpolationFallbackState[\\s\\S]*record_multi_timestep_oom[\\s\\S]*record_single_timestep_oom[\\s\\S]*single_timestep_batch / 2"
+        },
+        {
+          "name": "frame-interpolation-invocation-fixture-is-source-scoped",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/invocation/manifest.json",
+          "pattern": "rife_three_frames_multiplier_four_65x66[\\s\\S]*film_five_frames_multiplier_two_65x66[\\s\\S]*model_execution"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-invocation-foundation"
+      ],
+      "production_consumers": [
+        "future native FILM and RIFE execution foundations"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The invocation plan owns only checked sequence geometry and attempt-local fallback state. Retained weights, tensor equations, feature/grid reuse, handles, caches, and output publication remain separate owners."
+    },
+    {
       "concern": "native_frame_interpolation_model_resource",
       "canonical_owner": "comfy_model::native_node_payload::NativeModelPayload::frame_interpolation",
       "owner_files": [

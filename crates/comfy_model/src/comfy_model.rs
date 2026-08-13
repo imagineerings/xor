@@ -225,7 +225,8 @@ pub use formats::{
     load_torch_archive_file, parse_model_file,
 };
 pub use frame_interpolation::{
-    FrameInterpolationError, FrameInterpolationProfile, NativeFrameInterpolationModel,
+    FrameInterpolationError, FrameInterpolationFallbackState, FrameInterpolationInvocationPlan,
+    FrameInterpolationProfile, NativeFrameInterpolationModel,
 };
 pub use hidream_o1_family::{
     HIDREAM_O1_ARCHITECTURE_VERSION, HIDREAM_O1_ASSISTANT_TOKEN_ID, HIDREAM_O1_BOI_TOKEN_ID,

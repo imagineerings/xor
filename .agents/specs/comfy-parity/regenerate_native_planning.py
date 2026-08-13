@@ -9630,6 +9630,40 @@ def native_frame_interpolation_resource_foundation_task(dependency: str) -> dict
     )
 
 
+def native_frame_interpolation_invocation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolation-invocation-foundation",
+        "Plan bounded FILM and RIFE interpolation invocations",
+        [34, 35, 36, 41],
+        [25, 28, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and the attempt-local multi-to-single plus persistent batch-halving OOM state. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy/ldm/common_dit.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/invocation",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove N<2 and multiplier<2 bypass; multiplier 2..16; `(N-1)*multiplier+1` endpoint ordering and `(N-1)*(multiplier-1)` work count; exact `j/multiplier` timesteps; FILM alignment one; RIFE reflection padding to 64 and unrepresentable small-extent rejection; overflow and cancellation; multi-path disable on OOM; persistent floor-halving single batches and terminal batch-one OOM; and absence of model math, cache, handle, or publication ownership.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11826,8 +11860,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     frame_interpolation_resource_foundation = native_frame_interpolation_resource_foundation_task(
         str(frame_interpolation_model_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    frame_interpolation_invocation_foundation = native_frame_interpolation_invocation_foundation_task(
         str(frame_interpolation_resource_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(frame_interpolation_invocation_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11926,6 +11963,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             video_output_projection_foundation,
             frame_interpolation_model_foundation,
             frame_interpolation_resource_foundation,
+            frame_interpolation_invocation_foundation,
             video_foundation,
             detection_foundation,
         ]

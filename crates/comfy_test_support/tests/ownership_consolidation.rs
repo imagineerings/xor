@@ -13714,6 +13714,39 @@ fn val_ownership_frame_interpolation_resource_foundation_001()
 }
 
 #[test]
+fn val_ownership_frame_interpolation_invocation_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub struct FrameInterpolationInvocationPlan",
+        "pub struct FrameInterpolationFallbackState",
+        "pub fn record_multi_timestep_oom(",
+        "pub fn record_single_timestep_oom(",
+        "multiplier exceeds the source schema maximum",
+        "reflection padding is not representable",
+    ] {
+        assert!(
+            model.contains(required),
+            "frame interpolation planning lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_frame_interpolation_model_execution_planning")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
