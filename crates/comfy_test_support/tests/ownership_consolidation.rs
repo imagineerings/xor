@@ -13747,6 +13747,54 @@ fn val_ownership_frame_interpolation_invocation_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_tensor_grid_sample_foundation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let source = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs"),
+    )?;
+    for required in [
+        "pub fn grid_sample_tensor_with_context_exact_native(",
+        "tensor_to_f32_workspace",
+        "GridGeometry::new(",
+        "geometry.sample(",
+        "backend.allocate(",
+    ] {
+        assert!(
+            source.contains(required),
+            "tensor grid sample lacks {required}"
+        );
+    }
+    let tests = fs::read_to_string(
+        root.join("crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs"),
+    )?;
+    assert!(tests.contains("grid_sample_tensor_is_bounded_dtype_preserving_and_failure_atomic"));
+    assert!(tests.contains("WorkspaceAuthorizationExceeded"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("tensor_checked_bilinear_sampling")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some("comfy-parity-native-tensor-grid-sample-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

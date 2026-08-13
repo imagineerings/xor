@@ -17514,7 +17514,8 @@
         "deform_conv2d selects the ZeroPadding boundary policy and retains offset, mask, and convolution reduction",
         "NativeBilinearWeight and NativeLinearWeight are immutable checked sample DTOs with coordinate derivatives",
         "Task 89 grid_sample owns normalized-grid projection and reflection folding then delegates zero/border linear and bilinear bounds, weights, and derivatives here",
-        "Task 89 interpolate owns the PyTorch functional size/scale/rank contract and focused separable 1D/3D extension; its linear and bilinear axes delegate checked bounds and weights here rather than creating a second boundary validator"
+        "Task 89 interpolate owns the PyTorch functional size/scale/rank contract and focused separable 1D/3D extension; its linear and bilinear axes delegate checked bounds and weights here rather than creating a second boundary validator",
+        "The native tensor grid-sample foundation projects retained F16/BF16/F32 Tensor input and F32 grid storage through Task 89 GridGeometry, caller-authorized CPU workspace, and one fresh backend allocation; future RIFE execution consumes that adapter without owning another warp equation"
       ],
       "definitions": [
         {
@@ -17556,17 +17557,29 @@
           "name": "task89-sampling-adapters-prove-grid-boundaries-and-interpolation-ranks",
           "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
           "pattern": "grid_sample_modes_boundaries_and_derivatives_are_native[\\s\\S]*GridPaddingMode::Zeros[\\s\\S]*GridPaddingMode::Border[\\s\\S]*GridPaddingMode::Reflection[\\s\\S]*interpolate_supports_all_spatial_ranks_modes_and_analytic_maps"
+        },
+        {
+          "name": "tensor-grid-sample-delegates-existing-geometry-and-bounded-storage-owners",
+          "path": "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+          "pattern": "pub fn grid_sample_tensor_with_context_exact_native[\\s\\S]*tensor_to_f32_workspace[\\s\\S]*GridGeometry::new[\\s\\S]*geometry\\.sample[\\s\\S]*backend\\.allocate"
+        },
+        {
+          "name": "tensor-grid-sample-proves-low-precision-failure-atomic-publication",
+          "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+          "pattern": "grid_sample_tensor_is_bounded_dtype_preserving_and_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*WorkspaceAuthorizationExceeded[\\s\\S]*SpatialFunctionalKernelError::Cancelled"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439",
         "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4",
-        "comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331"
+        "comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331",
+        "comfy-parity-native-tensor-grid-sample-foundation"
       ],
       "production_consumers": [
         "native ROI Align",
-        "native deformable convolution"
+        "native deformable convolution",
+        "native RIFE frame interpolation execution"
       ],
       "requirements": [
         "Requirement 7",

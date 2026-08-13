@@ -19,6 +19,8 @@ use crate::{
         max_pool_2d_with_context_exact_native as canonical_max_pool_2d,
     },
 };
+#[cfg(feature = "cpu")]
+use crate::{CpuBackend, DType, DecodedScalar, NumericClass, Scalar, TensorDescriptor};
 use thiserror::Error;
 
 pub const AVG_POOL_1D_OPERATION_ID: &str = "COMFY-TENSOR-OP-5F86004D9BDA";
@@ -607,6 +609,174 @@ pub fn grid_sample_with_context_exact_native(
         values: output,
         shape: geometry.output_shape(),
     })
+}
+
+#[cfg(feature = "cpu")]
+pub fn grid_sample_tensor_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    grid: &Tensor,
+    configuration: GridSampleConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    validate_grid_sample_tensor(backend, input, "input", context)?;
+    validate_grid_sample_tensor(backend, grid, "grid", context)?;
+    if grid.descriptor().dtype() != DType::F32 {
+        return Err(TensorError::DTypeMismatch {
+            expected: DType::F32,
+            actual: grid.descriptor().dtype(),
+        }
+        .into());
+    }
+
+    let input_shape = tensor_shape_to_usize(input, "input shape")?;
+    let grid_shape = tensor_shape_to_usize(grid, "grid shape")?;
+    let input_values = tensor_to_f32_workspace(backend, input, context)?;
+    let grid_values = tensor_to_f32_workspace(backend, grid, context)?;
+    let geometry = GridGeometry::new(
+        &input_values,
+        &input_shape,
+        &grid_values,
+        &grid_shape,
+        configuration,
+    )?;
+    let output_shape = geometry
+        .output_shape()
+        .into_iter()
+        .map(|value| {
+            u64::try_from(value)
+                .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "output shape"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let descriptor = TensorDescriptor::contiguous(
+        output_shape,
+        input.descriptor().dtype(),
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let (mut output, allocation_event) = backend.allocate(descriptor, context)?;
+    backend.wait_event(allocation_event, context)?;
+    let dtype = output.descriptor().dtype();
+    let byte_width = usize::try_from(dtype.byte_width())
+        .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "output dtype width"))?;
+    {
+        let mut write = output.write()?;
+        let output_bytes = write.bytes_mut()?;
+        geometry.for_each_output(
+            context,
+            |output_index, batch, channel, y, x, _, _| {
+                let value = geometry.sample(&input_values, batch, channel, y, x)?;
+                let start = output_index
+                    .checked_mul(byte_width)
+                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte index"))?;
+                let end = start
+                    .checked_add(byte_width)
+                    .ok_or_else(|| overflow(GRID_SAMPLE_OPERATION_ID, "output byte range"))?;
+                let destination = output_bytes.get_mut(start..end).ok_or_else(|| {
+                    overflow(GRID_SAMPLE_OPERATION_ID, "output byte destination")
+                })?;
+                let encoded = dtype.encode_scalar(
+                    Scalar::Float(f64::from(value)),
+                    GRID_SAMPLE_OPERATION_ID,
+                    DeviceId::CPU,
+                )?;
+                destination.copy_from_slice(&encoded);
+                Ok(())
+            },
+        )?;
+    }
+    let event = backend.record_event(context)?;
+    backend.wait_event(event, context)?;
+    context.check()?;
+    Ok(output)
+}
+
+#[cfg(feature = "cpu")]
+fn validate_grid_sample_tensor(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    name: &'static str,
+    context: &ExecutionContext<'_>,
+) -> Result<(), SpatialFunctionalKernelError> {
+    if tensor.descriptor().device() != backend.device() {
+        return Err(TensorError::DeviceMismatch {
+            expected: backend.device(),
+            actual: tensor.descriptor().device(),
+        }
+        .into());
+    }
+    if tensor.descriptor().stream() != context.stream {
+        return Err(TensorError::StreamMismatch {
+            expected: context.stream,
+            actual: tensor.descriptor().stream(),
+        }
+        .into());
+    }
+    if tensor.descriptor().dtype().class() != NumericClass::FloatingPoint {
+        return invalid(
+            GRID_SAMPLE_OPERATION_ID,
+            format!("{name} must have a floating-point dtype"),
+        );
+    }
+    if !matches!(
+        tensor.descriptor().dtype(),
+        DType::F16 | DType::Bf16 | DType::F32
+    ) {
+        return invalid(
+            GRID_SAMPLE_OPERATION_ID,
+            format!("{name} dtype must be F16, BF16, or F32"),
+        );
+    }
+    Ok(())
+}
+
+#[cfg(feature = "cpu")]
+fn tensor_shape_to_usize(
+    tensor: &Tensor,
+    subject: &'static str,
+) -> Result<Vec<usize>, SpatialFunctionalKernelError> {
+    tensor
+        .descriptor()
+        .shape()
+        .iter()
+        .map(|value| {
+            usize::try_from(*value).map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, subject))
+        })
+        .collect()
+}
+
+#[cfg(feature = "cpu")]
+fn tensor_to_f32_workspace(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<crate::CpuWorkspaceVec<f32>, SpatialFunctionalKernelError> {
+    let element_count = usize::try_from(tensor.descriptor().element_count()?)
+        .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "tensor element count"))?;
+    let mut values = backend.workspace_vec(context, element_count)?;
+    for linear in 0..element_count {
+        if linear.is_multiple_of(64) {
+            context.check()?;
+        }
+        let linear = u64::try_from(linear)
+            .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "tensor linear index"))?;
+        let value = match tensor
+            .descriptor()
+            .dtype()
+            .decode_scalar(tensor.linear_element_bytes(linear)?)?
+        {
+            DecodedScalar::Real(value) => value as f32,
+            _ => {
+                return invalid(
+                    GRID_SAMPLE_OPERATION_ID,
+                    "grid sampling requires real tensor values",
+                );
+            }
+        };
+        values.try_push(value)?;
+    }
+    Ok(values)
 }
 
 #[allow(clippy::too_many_arguments)]

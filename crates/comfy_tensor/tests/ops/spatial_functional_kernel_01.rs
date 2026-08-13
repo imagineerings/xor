@@ -1,6 +1,6 @@
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
-    StreamId, TensorDescriptor,
+    Scalar, StreamId, TensorDescriptor,
     generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native,
     generated_spatial_functional_kernel_01::{
         AVG_POOL_1D_OPERATION_ID, AveragePoolConfiguration, ConvolutionConfiguration,
@@ -15,11 +15,11 @@ use comfy_tensor::{
         conv_transpose_2d_tensor_with_context_exact_native,
         conv_transpose_2d_with_context_exact_native, conv_transpose_3d_with_context_exact_native,
         convolution_jvp_with_context_exact_native, convolution_vjp_with_context_exact_native,
-        grid_sample_jvp_with_context_exact_native, grid_sample_vjp_with_context_exact_native,
-        grid_sample_with_context_exact_native, interpolate_jvp_with_context_exact_native,
-        interpolate_vjp_with_context_exact_native, interpolate_with_context_exact_native,
-        max_pool_2d_jvp_with_context_exact_native, max_pool_2d_vjp_with_context_exact_native,
-        max_pool_2d_with_context_exact_native,
+        grid_sample_jvp_with_context_exact_native, grid_sample_tensor_with_context_exact_native,
+        grid_sample_vjp_with_context_exact_native, grid_sample_with_context_exact_native,
+        interpolate_jvp_with_context_exact_native, interpolate_vjp_with_context_exact_native,
+        interpolate_with_context_exact_native, max_pool_2d_jvp_with_context_exact_native,
+        max_pool_2d_vjp_with_context_exact_native, max_pool_2d_with_context_exact_native,
     },
 };
 use sha2::{Digest, Sha256};
@@ -403,6 +403,124 @@ fn grid_sample_modes_boundaries_and_derivatives_are_native()
         )?;
         close(&output.values, &[expected], 1.0e-5);
     }
+    Ok(())
+}
+
+#[test]
+fn grid_sample_tensor_is_bounded_dtype_preserving_and_failure_atomic()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let upload = |shape: Vec<u64>, dtype: DType, values: &[f64]| {
+        let bytes = values
+            .iter()
+            .map(|value| {
+                dtype.encode_scalar(
+                    Scalar::Float(*value),
+                    "grid-sample-tensor-test",
+                    DeviceId::CPU,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let descriptor = TensorDescriptor::contiguous(shape, dtype, DeviceId::CPU, context.stream)?;
+        Ok::<_, Box<dyn std::error::Error>>(backend.upload_bytes(descriptor, &bytes, &context)?.0)
+    };
+    let grid = upload(vec![1, 1, 1, 2], DType::F32, &[0.0, 0.0])?;
+    let configuration = GridSampleConfiguration {
+        mode: GridSampleMode::Bilinear,
+        padding_mode: GridPaddingMode::Border,
+        align_corners: true,
+    };
+
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let input = upload(vec![1, 1, 2, 2], dtype, &[1.0, 2.0, 3.0, 4.0])?;
+        let input_bytes = input.contiguous_bytes()?.to_vec();
+        let output = grid_sample_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &grid,
+            configuration,
+            &context,
+        )?;
+        assert_eq!(output.descriptor().shape(), [1, 1, 1, 1]);
+        assert_eq!(output.descriptor().dtype(), dtype);
+        assert_eq!(output.descriptor().device(), DeviceId::CPU);
+        assert_eq!(output.descriptor().stream(), StreamId::DEFAULT);
+        assert_ne!(output.storage_id(), input.storage_id());
+        let values = tensor_to_f32_with_context_exact_native(&backend, &output, &context)?;
+        close(&values, &[2.5], 0.0);
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+    }
+
+    let input = upload(vec![1, 1, 2, 2], DType::F32, &[1.0, 2.0, 3.0, 4.0])?;
+    let half_grid = upload(vec![1, 1, 1, 2], DType::F16, &[0.0, 0.0])?;
+    assert!(matches!(
+        grid_sample_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &half_grid,
+            configuration,
+            &context,
+        ),
+        Err(SpatialFunctionalKernelError::Tensor(
+            comfy_tensor::TensorError::DTypeMismatch {
+                expected: DType::F32,
+                actual: DType::F16,
+            }
+        ))
+    ));
+    let before_failure = backend.memory_snapshot();
+    let limited_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(23)?,
+        &cancellation,
+    );
+    let workspace_error = grid_sample_tensor_with_context_exact_native(
+        &backend,
+        &input,
+        &grid,
+        configuration,
+        &limited_context,
+    );
+    assert!(matches!(
+        workspace_error,
+        Err(SpatialFunctionalKernelError::Tensor(
+            comfy_tensor::TensorError::WorkspaceAuthorizationExceeded { .. }
+        ))
+    ));
+    assert_eq!(limited_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(backend.limit)?,
+        &cancelled,
+    );
+    assert!(matches!(
+        grid_sample_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &grid,
+            configuration,
+            &cancelled_context,
+        ),
+        Err(SpatialFunctionalKernelError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
     Ok(())
 }
 
