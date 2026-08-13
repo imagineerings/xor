@@ -13562,6 +13562,46 @@ fn val_ownership_video_component_foundation_001() -> Result<(), Box<dyn std::err
 }
 
 #[test]
+fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    for required in [
+        "pub enum NativeOutputMediaKind",
+        "pub fn checked_media(",
+        "sim.comfy.native-output-effect.v2",
+        "NativeOutputMediaKind::Video, \"video/webm\"",
+        "valid_output_media_type(&extension, &media_type, media_kind)",
+    ] {
+        assert!(
+            execution.contains(required),
+            "output media request lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("final_output_commit")
+            })
+        })
+        .ok_or("missing final output ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-output-media-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

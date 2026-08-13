@@ -9485,6 +9485,39 @@ def native_video_component_foundation_task(dependency: str) -> dict[str, object]
     )
 
 
+def native_video_output_media_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-output-media-foundation",
+        "Bind typed media identity into native video output effects",
+        [18, 34, 36, 38, 41],
+        [18, 25, 28, 34, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The portable NativeOutputEffectRequest carries a checked media kind and canonical media type in its semantic identity, so VIDEO output bytes cannot be projected as image/png while the runtime output service and OutputCommitter retain effect and publication ownership.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove canonical video/webm and video/mp4 typing, reject extension/media-kind/media-type collisions, bind media identity into the request digest, preserve legacy image preview construction, and add no output service, filesystem, codec, cache, recovery, or publication owner.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.2", "34.4", "34.6", "36.4", "38.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11669,8 +11702,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_component_foundation = native_video_component_foundation_task(
         str(video_output_prefix_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_output_media_foundation = native_video_output_media_foundation_task(
         str(video_component_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_output_media_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11765,6 +11801,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             sdpose_foundation,
             video_output_prefix_foundation,
             video_component_foundation,
+            video_output_media_foundation,
             video_foundation,
             detection_foundation,
         ]

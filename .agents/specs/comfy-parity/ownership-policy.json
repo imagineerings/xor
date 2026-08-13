@@ -3244,6 +3244,7 @@
       "owner_symbols": [
         "OutputCommitter",
         "NativeOutputEffectRequest",
+        "NativeOutputMediaKind",
         "NativePreparedEffectKind",
         "NativePreparedEffectRequest",
         "NativePreparedEffectService",
@@ -3256,6 +3257,7 @@
         "PluginOutputPublicationAdapter maps checked invocation-local PluginOutputProposal DTOs once into attempt-scoped OutputProposal values and delegates one batch to OutputCommitter",
         "NativePreparedEffectService creates sealed attempt-and-node-scoped tickets from typed NativeOutputEffectRequest values; ExecutionEngine validates and rolls back those tickets before EffectCoordinator may delegate a final batch to OutputCommitter",
         "NativeOutputEffectRequest admits only bounded slash-separated relative prefix segments; OutputCommitter revalidates the prefix and remains the sole owner of path normalization, containment, collision, journaling, and publication",
+        "NativeOutputEffectRequest binds checked media kind and canonical media type into the portable effect identity; runtime output projection maps that DTO later without creating a second publication owner",
         "AssetService registration runs as the final rollback-safe hook inside OutputCommitter's publication transaction",
         "OutputCommitter receipts retain bounded opaque projection metadata so the native controller can durably reconstruct a missing canonical output event without a second receipt journal",
         "NativeExecutionController holds ExecutionPresentationOwner's mutation lease across precommit validation, publication, asset registration, and durable output projection, then reconciles committed-but-unprojected receipts exactly once at startup",
@@ -3276,6 +3278,12 @@
           "qualified": "comfy_nodes::NativeOutputEffectRequest",
           "role": "boundary_dto",
           "symbol": "NativeOutputEffectRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeOutputMediaKind",
+          "role": "boundary_dto",
+          "symbol": "NativeOutputMediaKind"
         },
         {
           "path": "crates/comfy_nodes/src/execution.rs",
@@ -3381,6 +3389,7 @@
         "NativeImageWorkerPlan",
         "NativeImageWorkerResult",
         "NativeOutputEffectRequest",
+        "NativeOutputMediaKind",
         "NativePreparedEffectKind",
         "NativePreparedEffectRequest",
         "NativePreparedEffectService",
@@ -3438,6 +3447,11 @@
           "pattern": "is_safe_output_filename_prefix[\\s\\S]*split\\('/'\\)[\\s\\S]*segment, \\\".\\\" \\| \\\"..\\\""
         },
         {
+          "name": "native-output-effects-bind-checked-media-identity",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "pub enum NativeOutputMediaKind[\\s\\S]*pub fn checked_media[\\s\\S]*valid_output_media_type[\\s\\S]*sim\\.comfy\\.native-output-effect\\.v2"
+        },
+        {
           "name": "output-committer-revalidates-relative-prefix-containment",
           "path": "crates/comfy_runtime/src/output_committer.rs",
           "pattern": "normalize_output_prefix[\\s\\S]*normalize_optional_relative_path"
@@ -3479,10 +3493,12 @@
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
         ,"comfy-parity-native-node-asset-effect-foundation",
-        "comfy-parity-native-video-output-prefix-foundation"
+        "comfy-parity-native-video-output-prefix-foundation",
+        "comfy-parity-native-video-output-media-foundation"
       ],
       "production_consumers": [
         "native image execution controller",
+        "native video output-effect adapters",
         "native worker output proposals",
         "Comfy plugin output capability",
         "recovery reconciliation"

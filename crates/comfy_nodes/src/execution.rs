@@ -1353,6 +1353,19 @@ pub enum NativeOutputShape {
     Image { width: u32, height: u32 },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeOutputMediaKind {
+    Image,
+    Animation,
+    Video,
+    Audio,
+    ThreeD,
+    Text,
+    Json,
+    Binary,
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeOutputEffectRequest {
     namespace: NativeOutputNamespace,
@@ -1360,6 +1373,8 @@ pub struct NativeOutputEffectRequest {
     extension: String,
     batch_index: u32,
     shape: NativeOutputShape,
+    media_kind: NativeOutputMediaKind,
+    media_type: String,
     content: Arc<[u8]>,
     request_digest_sha256: String,
 }
@@ -1374,14 +1389,42 @@ impl NativeOutputEffectRequest {
         content: Arc<[u8]>,
         maximum_bytes: u64,
     ) -> Result<Self, NativeEffectServiceError> {
+        let extension = extension.into();
+        let (media_kind, media_type) = default_output_media(&extension);
+        Self::checked_media(
+            namespace,
+            filename_prefix,
+            extension,
+            media_type,
+            media_kind,
+            batch_index,
+            shape,
+            content,
+            maximum_bytes,
+        )
+    }
+
+    pub fn checked_media(
+        namespace: NativeOutputNamespace,
+        filename_prefix: impl Into<String>,
+        extension: impl Into<String>,
+        media_type: impl Into<String>,
+        media_kind: NativeOutputMediaKind,
+        batch_index: u32,
+        shape: NativeOutputShape,
+        content: Arc<[u8]>,
+        maximum_bytes: u64,
+    ) -> Result<Self, NativeEffectServiceError> {
         let filename_prefix = filename_prefix.into();
         let extension = extension.into();
+        let media_type = media_type.into();
         if !is_safe_output_filename_prefix(&filename_prefix)
             || extension.is_empty()
             || extension.len() > 32
             || !extension
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+            || !valid_output_media_type(&extension, &media_type, media_kind)
             || content.is_empty()
             || u64::try_from(content.len()).map_or(true, |length| {
                 length > maximum_bytes || length > 2 * 1024 * 1024 * 1024
@@ -1397,6 +1440,8 @@ impl NativeOutputEffectRequest {
             &extension,
             batch_index,
             shape,
+            media_kind,
+            &media_type,
             &content,
         );
         Ok(Self {
@@ -1405,6 +1450,8 @@ impl NativeOutputEffectRequest {
             extension,
             batch_index,
             shape,
+            media_kind,
+            media_type,
             content,
             request_digest_sha256,
         })
@@ -1430,6 +1477,14 @@ impl NativeOutputEffectRequest {
         self.shape
     }
 
+    pub const fn media_kind(&self) -> NativeOutputMediaKind {
+        self.media_kind
+    }
+
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
     pub fn content(&self) -> &Arc<[u8]> {
         &self.content
     }
@@ -1437,6 +1492,48 @@ impl NativeOutputEffectRequest {
     pub fn request_digest_sha256(&self) -> &str {
         &self.request_digest_sha256
     }
+}
+
+fn default_output_media(extension: &str) -> (NativeOutputMediaKind, String) {
+    let (kind, media_type) = match extension {
+        "png" => (NativeOutputMediaKind::Image, "image/png"),
+        "jpg" | "jpeg" => (NativeOutputMediaKind::Image, "image/jpeg"),
+        "webp" => (NativeOutputMediaKind::Image, "image/webp"),
+        "gif" => (NativeOutputMediaKind::Animation, "image/gif"),
+        "webm" => (NativeOutputMediaKind::Video, "video/webm"),
+        "mp4" => (NativeOutputMediaKind::Video, "video/mp4"),
+        "wav" => (NativeOutputMediaKind::Audio, "audio/wav"),
+        "mp3" => (NativeOutputMediaKind::Audio, "audio/mpeg"),
+        "glb" => (NativeOutputMediaKind::ThreeD, "model/gltf-binary"),
+        "gltf" => (NativeOutputMediaKind::ThreeD, "model/gltf+json"),
+        "json" => (NativeOutputMediaKind::Json, "application/json"),
+        "txt" => (NativeOutputMediaKind::Text, "text/plain"),
+        _ => (NativeOutputMediaKind::Binary, "application/octet-stream"),
+    };
+    (kind, media_type.to_owned())
+}
+
+fn valid_output_media_type(
+    extension: &str,
+    media_type: &str,
+    media_kind: NativeOutputMediaKind,
+) -> bool {
+    matches!(
+        (media_kind, extension, media_type),
+        (NativeOutputMediaKind::Image, "png", "image/png")
+            | (NativeOutputMediaKind::Image, "jpg" | "jpeg", "image/jpeg")
+            | (NativeOutputMediaKind::Image, "webp", "image/webp")
+            | (NativeOutputMediaKind::Animation, "gif", "image/gif")
+            | (NativeOutputMediaKind::Video, "webm", "video/webm")
+            | (NativeOutputMediaKind::Video, "mp4", "video/mp4")
+            | (NativeOutputMediaKind::Audio, "wav", "audio/wav")
+            | (NativeOutputMediaKind::Audio, "mp3", "audio/mpeg")
+            | (NativeOutputMediaKind::ThreeD, "glb", "model/gltf-binary")
+            | (NativeOutputMediaKind::ThreeD, "gltf", "model/gltf+json")
+            | (NativeOutputMediaKind::Text, "txt", "text/plain")
+            | (NativeOutputMediaKind::Json, "json", "application/json")
+            | (NativeOutputMediaKind::Binary, _, "application/octet-stream")
+    )
 }
 
 fn is_safe_output_filename_prefix(filename_prefix: &str) -> bool {
@@ -2526,10 +2623,12 @@ fn output_request_digest(
     extension: &str,
     batch_index: u32,
     shape: NativeOutputShape,
+    media_kind: NativeOutputMediaKind,
+    media_type: &str,
     content: &[u8],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.native-output-effect.v1");
+    hasher.update(b"sim.comfy.native-output-effect.v2");
     hasher.update([match namespace {
         NativeOutputNamespace::Output => 0,
         NativeOutputNamespace::Temporary => 1,
@@ -2547,6 +2646,18 @@ fn output_request_digest(
             hasher.update(height.to_le_bytes());
         }
     }
+    hasher.update([match media_kind {
+        NativeOutputMediaKind::Image => 0,
+        NativeOutputMediaKind::Animation => 1,
+        NativeOutputMediaKind::Video => 2,
+        NativeOutputMediaKind::Audio => 3,
+        NativeOutputMediaKind::ThreeD => 4,
+        NativeOutputMediaKind::Text => 5,
+        NativeOutputMediaKind::Json => 6,
+        NativeOutputMediaKind::Binary => 7,
+    }]);
+    hasher.update((media_type.len() as u64).to_le_bytes());
+    hasher.update(media_type.as_bytes());
     hasher.update((content.len() as u64).to_le_bytes());
     hasher.update(content);
     format!("{:x}", hasher.finalize())
@@ -2598,9 +2709,39 @@ mod tests {
         };
         let nested = request("video/ComfyUI")?;
         assert_eq!(nested.filename_prefix(), "video/ComfyUI");
+        assert_eq!(nested.media_kind(), NativeOutputMediaKind::Video);
+        assert_eq!(nested.media_type(), "video/webm");
+        let mp4 = NativeOutputEffectRequest::checked_media(
+            NativeOutputNamespace::Output,
+            "video/ComfyUI",
+            "mp4",
+            "video/mp4",
+            NativeOutputMediaKind::Video,
+            0,
+            NativeOutputShape::File,
+            Arc::from([1_u8, 2, 3]),
+            1024,
+        )?;
+        assert_eq!(mp4.media_kind(), NativeOutputMediaKind::Video);
+        assert_eq!(mp4.media_type(), "video/mp4");
+        assert_ne!(mp4.request_digest_sha256(), nested.request_digest_sha256());
         assert_ne!(
             nested.request_digest_sha256(),
             request("video/Other")?.request_digest_sha256()
+        );
+        assert!(
+            NativeOutputEffectRequest::checked_media(
+                NativeOutputNamespace::Output,
+                "video/ComfyUI",
+                "webm",
+                "image/png",
+                NativeOutputMediaKind::Video,
+                0,
+                NativeOutputShape::File,
+                Arc::from([1_u8, 2, 3]),
+                1024,
+            )
+            .is_err()
         );
         for invalid in [
             "/video/ComfyUI",

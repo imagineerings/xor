@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 561)
+        self.assertEqual(len(tasks), 562)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -421,6 +421,7 @@ class ValidationGenerationTests(unittest.TestCase):
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
         video_output_prefix_foundation_id = "comfy-parity-native-video-output-prefix-foundation"
         video_component_foundation_id = "comfy-parity-native-video-component-foundation"
+        video_output_media_foundation_id = "comfy-parity-native-video-output-media-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
         shader_foundation_id = "comfy-parity-native-shader-execution-foundation"
@@ -474,6 +475,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_component_foundation_id,
+            tasks_by_id[video_output_media_foundation_id]["dependencies"],
+        )
+        self.assertIn(
+            video_output_media_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertEqual(
@@ -501,6 +506,18 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_component_foundation_id]["writes"],
         )
         self.assertTrue(tasks_by_id[video_component_foundation_id]["locked"])
+        self.assertEqual(
+            tasks_by_id[video_output_media_foundation_id]["writes"],
+            [
+                "crates/comfy_nodes/src/execution.rs",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+                "crates/comfy_nodes/src/comfy_nodes.rs",
+            ],
+        )
+        self.assertTrue(tasks_by_id[video_output_media_foundation_id]["locked"])
         self.assertIn(text_regex_foundation_id, dependencies[text_regex_id])
         self.assertIn(
             "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
@@ -988,7 +1005,11 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_output_prefix_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id], waves[video_component_foundation_id] + 1
+            waves[video_output_media_foundation_id],
+            waves[video_component_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id], waves[video_output_media_foundation_id] + 1
         )
         self.assertEqual(
             waves[image_source_foundation_id], waves[text_transform_foundation_id] + 1
