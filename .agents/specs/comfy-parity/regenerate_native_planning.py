@@ -9592,6 +9592,44 @@ def native_frame_interpolation_model_foundation_task(dependency: str) -> dict[st
     )
 
 
+def native_frame_interpolation_resource_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolation-resource-foundation",
+        "Seal retained FILM and RIFE resources behind INTERP_MODEL handles",
+        [31, 34, 35, 36, 41, 44],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "NativeModelPayload is the sole sealed INTERP_MODEL resource adapter for NativeFrameInterpolationModel. NativeStoredModelPayload admits that role only through the concrete accessor while preserving exact artifact/execution identity, backing/tensor residency, and every existing non-interpolation role boundary.",
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/resource",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove FILM/RIFE role, identifier, format, artifact and execution digests; concrete accessor closure; legacy model/clip/VAE negative accessors; exact owned/backing/tensor accounting with StorageId alias deduplication; cancellation-safe validation; stored INTERP_MODEL admission; and rejection of metadata-only, cross-role, malformed, or forged resources without cache, execution, or publication state.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.5", "35.6", "36.3", "36.4", "41.2", "44.3"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11785,8 +11823,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     frame_interpolation_model_foundation = native_frame_interpolation_model_foundation_task(
         str(video_output_projection_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    frame_interpolation_resource_foundation = native_frame_interpolation_resource_foundation_task(
         str(frame_interpolation_model_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(frame_interpolation_resource_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11884,6 +11925,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             video_output_media_foundation,
             video_output_projection_foundation,
             frame_interpolation_model_foundation,
+            frame_interpolation_resource_foundation,
             video_foundation,
             detection_foundation,
         ]

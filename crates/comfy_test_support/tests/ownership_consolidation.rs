@@ -13672,7 +13672,42 @@ fn val_ownership_frame_interpolation_model_foundation_001() -> Result<(), Box<dy
             .and_then(serde_json::Value::as_array)
             .is_some_and(|concerns| concerns.iter().any(|concern| {
                 concern.get("concern").and_then(serde_json::Value::as_str)
-                    == Some("native_frame_interpolation_model_state")
+                    == Some("native_frame_interpolation_model_admission_state")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_frame_interpolation_resource_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    for required in [
+        "pub fn frame_interpolation(",
+        "NativeModelResourceRole::FrameInterpolation",
+        "NativeModelResource::FrameInterpolation",
+        "NativeModelBackingKind::NativeFrameInterpolationModel",
+        "pub fn frame_interpolation_resource(",
+    ] {
+        assert!(
+            model.contains(required),
+            "frame interpolation resource lacks {required}"
+        );
+    }
+    let stored = fs::read_to_string(root.join("crates/comfy_nodes/src/stored_payload.rs"))?;
+    assert!(stored.contains("NativeModelResourceRole::FrameInterpolation"));
+    assert!(stored.contains("resource.frame_interpolation_resource().is_some()"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_frame_interpolation_model_resource")
             }))
     );
     Ok(())

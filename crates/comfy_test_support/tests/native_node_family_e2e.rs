@@ -1,8 +1,8 @@
 use comfy_media::{PngLimits, encode_png_frame};
 use comfy_model::{
-    NativeModelPayload, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
-    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, sdpose_heatmap_head_weight_manifest,
-    sdpose_sd2_weight_manifest,
+    NativeFrameInterpolationModel, NativeModelPayload, NativeSdPoseHeatmapHead, NativeSdPoseModel,
+    NativeSdPoseSd2Denoiser, SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration,
+    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
 };
 use comfy_nodes::{
     NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
@@ -103,6 +103,24 @@ fn reduced_sdpose_stored_payload() -> Result<NativeStoredPayload, Box<dyn Error>
         &cancellation,
     )?);
     let model = Arc::new(NativeModelPayload::sdpose_model_test_fixture(resource)?);
+    Ok(NativeStoredPayload::Model(Arc::new(
+        NativeStoredModelPayload::model_resource(model)?,
+    )))
+}
+
+fn reduced_frame_interpolation_stored_payload() -> Result<NativeStoredPayload, Box<dyn Error>> {
+    let workspace_bytes = 16 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let resource = Arc::new(NativeFrameInterpolationModel::reduced_rife_test_fixture(
+        &backend, &context,
+    )?);
+    let model = Arc::new(NativeModelPayload::frame_interpolation(resource)?);
     Ok(NativeStoredPayload::Model(Arc::new(
         NativeStoredModelPayload::model_resource(model)?,
     )))
@@ -495,6 +513,67 @@ fn sdpose_model_resource_handle_is_sealed_alias_aware_and_restart_safe()
     ));
     assert_eq!(generation.len(), before_len);
     assert_eq!(generation.resident_bytes(), before_bytes);
+    assert_ne!(first.identifier(), second.identifier());
+    Ok(())
+}
+
+#[test]
+fn frame_interpolation_resource_handle_is_concrete_alias_aware_and_restart_safe()
+-> Result<(), Box<dyn Error>> {
+    let payload = reduced_frame_interpolation_stored_payload()?;
+    payload.validate()?;
+    let handle_type = payload.handle_type()?;
+    assert_eq!(handle_type.kind, NativeHandleKind::Model);
+    assert_eq!(handle_type.type_id, "INTERP_MODEL");
+    let byte_capacity = payload.resident_bytes()?;
+    let generation = NativeHandleStoreGeneration::with_capacities(3, byte_capacity)?;
+    let attempt_id = AttemptId(Uuid::from_u128(0x4080));
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let cancellation = CancellationToken::default();
+    let first = store.publish(payload.clone(), &cancellation)?;
+    let first_bytes = generation.resident_bytes();
+    let second = store.publish(payload, &cancellation)?;
+    assert_eq!(generation.len(), 2);
+    assert_eq!(generation.resident_bytes(), first_bytes);
+
+    let resolved = store.resolve(&first, &handle_type, &cancellation)?;
+    let NativeStoredPayload::Model(model) = resolved.as_ref() else {
+        return Err("INTERP_MODEL handle resolved to another stored payload kind".into());
+    };
+    assert!(
+        model
+            .model_payload()
+            .frame_interpolation_resource()
+            .is_some()
+    );
+    assert_eq!(Some(model.digest_sha256()), first.digest_sha256());
+
+    let distinct = reduced_frame_interpolation_stored_payload()?;
+    assert_eq!(distinct.digest_sha256(), model.digest_sha256());
+    assert!(matches!(
+        store.publish(distinct, &cancellation),
+        Err(NativeHandleStoreError::Rejected(message)) if message.contains("capacity is exhausted")
+    ));
+    assert_eq!(generation.len(), 2);
+    assert_eq!(generation.resident_bytes(), first_bytes);
+
+    let forged = NativeOpaqueHandle::new(
+        handle_type.clone(),
+        first.store_identity(),
+        first.identifier(),
+        first.generation(),
+        Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
+    )?;
+    assert!(matches!(
+        store.resolve(&forged, &handle_type, &cancellation),
+        Err(NativeHandleStoreError::DigestMismatch)
+    ));
+    let restarted = NativeHandleStoreGeneration::with_capacities(2, byte_capacity)?
+        .handle_store_for_attempt(attempt_id);
+    assert!(matches!(
+        restarted.resolve(&first, &handle_type, &cancellation),
+        Err(NativeHandleStoreError::WrongStore | NativeHandleStoreError::WrongGeneration)
+    ));
     assert_ne!(first.identifier(), second.identifier());
     Ok(())
 }

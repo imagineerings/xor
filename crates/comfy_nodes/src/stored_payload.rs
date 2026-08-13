@@ -259,6 +259,7 @@ fn require_model_resource_role(
             | NativeModelResourceRole::OpticalFlow
             | NativeModelResourceRole::ClipVision
             | NativeModelResourceRole::Clip
+            | NativeModelResourceRole::FrameInterpolation
     ) {
         Ok(())
     } else {
@@ -275,6 +276,9 @@ fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
             resource.decoder_clip_resource().is_some()
                 || resource.qwen_multimodal_resource().is_some()
                 || resource.gemma_multimodal_resource().is_some()
+        }
+        NativeModelResourceRole::FrameInterpolation => {
+            resource.frame_interpolation_resource().is_some()
         }
         _ => false,
     }
@@ -1514,6 +1518,7 @@ mod tests {
         require_model_resource_role(NativeModelResourceRole::OpticalFlow)?;
         require_model_resource_role(NativeModelResourceRole::ClipVision)?;
         require_model_resource_role(NativeModelResourceRole::Clip)?;
+        require_model_resource_role(NativeModelResourceRole::FrameInterpolation)?;
 
         let raft = loaded_zero_raft()?;
         let optical_flow = Arc::new(NativeModelPayload::optical_flow(raft)?);

@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 564)
+        self.assertEqual(len(tasks), 565)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -424,6 +424,7 @@ class ValidationGenerationTests(unittest.TestCase):
         video_output_media_foundation_id = "comfy-parity-native-video-output-media-foundation"
         video_output_projection_foundation_id = "comfy-parity-native-video-output-projection-foundation"
         frame_interpolation_model_foundation_id = "comfy-parity-native-frame-interpolation-model-foundation"
+        frame_interpolation_resource_foundation_id = "comfy-parity-native-frame-interpolation-resource-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
         shader_foundation_id = "comfy-parity-native-shader-execution-foundation"
@@ -489,6 +490,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             frame_interpolation_model_foundation_id,
+            tasks_by_id[frame_interpolation_resource_foundation_id]["dependencies"],
+        )
+        self.assertIn(
+            frame_interpolation_resource_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertEqual(
@@ -549,6 +554,15 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[frame_interpolation_model_foundation_id]["writes"],
         )
         self.assertTrue(tasks_by_id[frame_interpolation_model_foundation_id]["locked"])
+        self.assertIn(
+            "crates/comfy_model/src/native_node_payload.rs",
+            tasks_by_id[frame_interpolation_resource_foundation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_nodes/src/stored_payload.rs",
+            tasks_by_id[frame_interpolation_resource_foundation_id]["writes"],
+        )
+        self.assertTrue(tasks_by_id[frame_interpolation_resource_foundation_id]["locked"])
         self.assertIn(text_regex_foundation_id, dependencies[text_regex_id])
         self.assertIn(
             "projects/comfy/ComfyUI/comfy_extras/nodes_string.py",
@@ -1048,7 +1062,11 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_output_projection_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id], waves[frame_interpolation_model_foundation_id] + 1
+            waves[frame_interpolation_resource_foundation_id],
+            waves[frame_interpolation_model_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id], waves[frame_interpolation_resource_foundation_id] + 1
         )
         self.assertEqual(
             waves[image_source_foundation_id], waves[text_transform_foundation_id] + 1

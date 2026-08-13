@@ -26,6 +26,13 @@ impl FrameInterpolationProfile {
             Self::Rife { .. } => 64,
         }
     }
+
+    pub const fn identifier(&self) -> &'static str {
+        match self {
+            Self::Film => "film",
+            Self::Rife { .. } => "rife",
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -54,6 +61,9 @@ pub enum FrameInterpolationError {
     Tensor(#[from] TensorError),
     #[error("frame interpolation operation was cancelled")]
     Cancelled,
+    #[cfg(any(test, feature = "test-support"))]
+    #[error("frame interpolation test fixture failed: {0}")]
+    TestFixture(String),
 }
 
 impl From<CancellationError> for FrameInterpolationError {
@@ -73,6 +83,41 @@ pub struct NativeFrameInterpolationModel {
 }
 
 impl NativeFrameInterpolationModel {
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn reduced_rife_test_fixture(
+        backend: &comfy_tensor::CpuBackend,
+        context: &comfy_tensor::ExecutionContext<'_>,
+    ) -> Result<Self, FrameInterpolationError> {
+        let manifest = rife_manifest(2, [2; 5])?;
+        let mut weights = BTreeMap::new();
+        let mut tensors_by_shape: BTreeMap<Vec<u64>, Tensor> = BTreeMap::new();
+        for (key, shape) in manifest {
+            context.cancellation.check()?;
+            let tensor = if let Some(tensor) = tensors_by_shape.get(&shape) {
+                tensor.clone()
+            } else {
+                let count = shape.iter().try_fold(1_usize, |total, dimension| {
+                    total.checked_mul(usize::try_from(*dimension).ok()?)
+                });
+                let count = count.ok_or(FrameInterpolationError::Overflow)?;
+                let tensor = crate::native_ops::tensor_from_f32(
+                    backend,
+                    &shape,
+                    &vec![0.25; count],
+                    DType::F32,
+                    DeviceId::CPU,
+                    context,
+                )
+                .map_err(|error| FrameInterpolationError::TestFixture(error.to_string()))?;
+                tensors_by_shape.insert(shape.clone(), tensor.clone());
+                tensor
+            };
+            weights.insert(key, tensor);
+        }
+        Self::from_checkpoint("f".repeat(64), weights, context.cancellation)
+    }
+
     pub fn from_checkpoint(
         artifact_sha256: impl Into<String>,
         weights: BTreeMap<String, Tensor>,
@@ -146,6 +191,54 @@ impl NativeFrameInterpolationModel {
     }
     pub fn weight_count(&self) -> usize {
         self.weights.len()
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<(), FrameInterpolationError> {
+        cancellation.check()?;
+        if !valid_sha256(&self.artifact_sha256) {
+            return Err(FrameInterpolationError::ArtifactDigest);
+        }
+        if !matches!(self.dtype, DType::F16 | DType::Bf16 | DType::F32) {
+            return Err(FrameInterpolationError::Placement);
+        }
+        let manifest = weight_manifest(&self.profile)?;
+        if manifest.len() != self.weights.len() {
+            return Err(FrameInterpolationError::StateMismatch);
+        }
+        for (key, expected) in manifest {
+            cancellation.check()?;
+            let tensor = self
+                .weights
+                .get(&key)
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            if tensor.descriptor().shape() != expected {
+                return Err(FrameInterpolationError::Shape {
+                    key,
+                    expected,
+                    actual: tensor.descriptor().shape().to_vec(),
+                });
+            }
+            if tensor.descriptor().dtype() != self.dtype
+                || tensor.descriptor().device() != DeviceId::CPU
+                || tensor.descriptor().stream() != self.stream
+                || !tensor.descriptor().is_contiguous()?
+            {
+                return Err(FrameInterpolationError::Placement);
+            }
+        }
+        if semantic_digest(
+            &self.profile,
+            &self.artifact_sha256,
+            &self.weights,
+            cancellation,
+        )? != self.semantic_state_digest_sha256
+        {
+            return Err(FrameInterpolationError::StateMismatch);
+        }
+        Ok(())
     }
 
     pub fn resident_tensor_allocations(
@@ -625,6 +718,34 @@ mod tests {
                 > std::mem::size_of::<NativeFrameInterpolationModel>() as u64
         );
         assert!(model.resident_bytes()? > model.resident_owned_bytes()?);
+        let payload =
+            crate::NativeModelPayload::frame_interpolation(std::sync::Arc::new(model.clone()))
+                .map_err(|_| FrameInterpolationError::StateMismatch)?;
+        assert_eq!(
+            payload.identity().role(),
+            crate::NativeModelResourceRole::FrameInterpolation
+        );
+        assert_eq!(
+            payload.identity().identifier(),
+            "native-frame-interpolation-rife"
+        );
+        assert_eq!(
+            payload.identity().format(),
+            "sim-native-frame-interpolation-v1"
+        );
+        assert!(payload.frame_interpolation_resource().is_some());
+        assert!(payload.model().is_none());
+        assert!(payload.clip().is_none());
+        assert!(payload.vae().is_none());
+        let parts = payload
+            .resident_parts()
+            .map_err(|_| FrameInterpolationError::StateMismatch)?;
+        assert!(parts.backing_allocations().iter().any(|allocation| {
+            allocation.kind() == crate::NativeModelBackingKind::NativeFrameInterpolationModel
+        }));
+        payload
+            .validate()
+            .map_err(|_| FrameInterpolationError::StateMismatch)?;
 
         let mut missing = state.clone();
         missing.remove("encode.cnn0.weight");

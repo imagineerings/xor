@@ -8758,7 +8758,7 @@
       "decision_reason": "comfy_backend_xpu is the sole focused owner of reviewed Level Zero and oneDNN declarations, discovery observations, retained-handle symbol resolution, unsafe vendor calls, and opaque execution resources. comfy_runtime::XpuPackageVerificationKey reuses the canonical NativePackageVerificationAuthority under a backend-specific domain; ArtifactRoot and the canonical native-package admission owner perform filesystem and coverage validation; the canonical native-library owner captures, digests, seals or snapshots, and retains exact images; native_ffi_xpu is only the strict signed DTO, target, contract, registry, discovery, and handle-projection adapter. NativeFfiRegistry alone certifies exact images, NativeBackendBindingStatus alone carries binding state, and comfy_tensor remains the semantic capability, storage, workspace, memory, event, and TensorBackend owner."
     },
     {
-      "concern": "native_frame_interpolation_model_state",
+      "concern": "native_frame_interpolation_model_admission_state",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel",
       "owner_files": [
         "crates/comfy_model/src/frame_interpolation.rs"
@@ -8830,6 +8830,92 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "The retained checkpoint owner implements source-order FILM/RIFE detection, exact complete state manifests, collision-safe RIFE normalization, artifact/content identity, and tensor residency. Actual interpolation, handle storage, invocation-local feature caches, output effects, and publication remain separate later owners."
+    },
+    {
+      "concern": "native_frame_interpolation_model_resource",
+      "canonical_owner": "comfy_model::native_node_payload::NativeModelPayload::frame_interpolation",
+      "owner_files": [
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeModelPayload::frame_interpolation",
+        "NativeModelBackingKind::NativeFrameInterpolationModel"
+      ],
+      "allowed_adapters": [
+        "NativeFrameInterpolationModel supplies immutable state identity and residency",
+        "NativeStoredModelPayload admits the concrete INTERP_MODEL role and projects existing handle lifecycle semantics"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "qualified": "comfy_model::native_node_payload::NativeModelPayload::frame_interpolation",
+          "role": "canonical",
+          "symbol": "frame_interpolation",
+          "pattern": "pub fn frame_interpolation\\("
+        }
+      ],
+      "call_symbols": [
+        "frame_interpolation_resource"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-resource-seals-exact-role-and-identity",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "NativeModelResourceRole::FrameInterpolation[\\s\\S]*sim-native-frame-interpolation-v1[\\s\\S]*NativeModelResource::FrameInterpolation"
+        },
+        {
+          "name": "frame-interpolation-resource-projects-owner-and-tensor-residency",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "NativeModelBackingKind::NativeFrameInterpolationModel[\\s\\S]*resident_tensor_allocations[\\s\\S]*resident_owned_bytes"
+        },
+        {
+          "name": "stored-model-admits-only-concrete-frame-interpolation-resource",
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "pattern": "NativeModelResourceRole::FrameInterpolation[\\s\\S]*frame_interpolation_resource"
+        },
+        {
+          "name": "frame-interpolation-resource-fixture-binds-prerequisite-and-sealed-contract",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/resource/manifest.json",
+          "pattern": "admission_manifest_sha256[\\s\\S]*INTERP_MODEL[\\s\\S]*sim-native-frame-interpolation-v1"
+        },
+        {
+          "name": "frame-interpolation-resource-handle-lifecycle-is-focused-and-concrete",
+          "path": "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+          "pattern": "frame_interpolation_resource_handle_is_concrete_alias_aware_and_restart_safe[\\s\\S]*INTERP_MODEL[\\s\\S]*frame_interpolation_resource"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-resource-foundation"
+      ],
+      "production_consumers": [
+        "future native frame interpolation execution and node foundations"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeModelPayload is the sole sealed INTERP_MODEL adapter. NativeStoredModelPayload only projects that concrete accessor into the existing handle store; neither layer owns interpolation equations, pair caches, execution, or publication."
     },
     {
       "concern": "native_image_to_tensor_conversion",

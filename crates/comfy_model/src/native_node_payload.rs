@@ -13,9 +13,10 @@ use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder,
-    NativeGemmaMultimodal, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
-    NativeSdPoseModel, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256,
-    QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
+    NativeFrameInterpolationModel, NativeGemmaMultimodal, NativePromptTokenizer,
+    NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeVae,
+    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
+    QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -284,6 +285,9 @@ enum NativeModelResource {
     SdPoseModel {
         resource: Arc<NativeSdPoseModel>,
     },
+    FrameInterpolation {
+        resource: Arc<NativeFrameInterpolationModel>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -303,6 +307,7 @@ pub enum NativeModelBackingKind {
     NativeGemma4VisionEncoder,
     NativeGemma4AudioEncoder,
     NativeSdPoseModel,
+    NativeFrameInterpolationModel,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -733,6 +738,34 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn frame_interpolation(
+        resource: Arc<NativeFrameInterpolationModel>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identifier = format!(
+            "native-frame-interpolation-{}",
+            resource.profile().identifier()
+        );
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::FrameInterpolation,
+            identifier,
+            "sim-native-frame-interpolation-v1",
+            resource.artifact_sha256(),
+            resource.semantic_state_digest_sha256(),
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::FrameInterpolation { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -970,6 +1003,29 @@ impl NativeModelPayload {
                     })?,
                 }]
             }
+            NativeModelResource::FrameInterpolation { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeFrameInterpolationModel,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -994,7 +1050,8 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
-            | NativeModelResource::SdPoseModel { .. } => None,
+            | NativeModelResource::SdPoseModel { .. }
+            | NativeModelResource::FrameInterpolation { .. } => None,
         }
     }
 
@@ -1010,7 +1067,8 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
-            | NativeModelResource::SdPoseModel { .. } => None,
+            | NativeModelResource::SdPoseModel { .. }
+            | NativeModelResource::FrameInterpolation { .. } => None,
         }
     }
 
@@ -1024,7 +1082,8 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
-            | NativeModelResource::SdPoseModel { .. } => None,
+            | NativeModelResource::SdPoseModel { .. }
+            | NativeModelResource::FrameInterpolation { .. } => None,
         }
     }
 
@@ -1038,7 +1097,8 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
-            | NativeModelResource::SdPoseModel { .. } => None,
+            | NativeModelResource::SdPoseModel { .. }
+            | NativeModelResource::FrameInterpolation { .. } => None,
         }
     }
 
@@ -1052,7 +1112,8 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
-            | NativeModelResource::SdPoseModel { .. } => None,
+            | NativeModelResource::SdPoseModel { .. }
+            | NativeModelResource::FrameInterpolation { .. } => None,
         }
     }
 
@@ -1082,6 +1143,13 @@ impl NativeModelPayload {
     pub fn sdpose_model_resource(&self) -> Option<&Arc<NativeSdPoseModel>> {
         match &self.resource {
             NativeModelResource::SdPoseModel { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn frame_interpolation_resource(&self) -> Option<&Arc<NativeFrameInterpolationModel>> {
+        match &self.resource {
+            NativeModelResource::FrameInterpolation { resource } => Some(resource),
             _ => None,
         }
     }
@@ -1121,6 +1189,9 @@ impl NativeModelPayload {
                         ));
                     }
                 }
+            }
+            NativeModelResource::FrameInterpolation { resource } => {
+                Self::frame_interpolation(resource.clone())?
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes
