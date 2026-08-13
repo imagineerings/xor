@@ -8211,6 +8211,67 @@ pub fn format_qwen3vl_prompt(text: &str, image_count: usize, thinking: bool) -> 
     prompt
 }
 
+pub fn format_qwen_multimodal_prompt(
+    family: QwenVisionFamily,
+    text: &str,
+    image_count: usize,
+    thinking: bool,
+    _use_default_template: bool,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<String, MultimodalTextError> {
+    cancellation.check()?;
+    if text.starts_with("<|im_start|>") {
+        return Ok(text.to_owned());
+    }
+    const PREFIX: &str = "<|im_start|>user\n";
+    const IMAGE_MARKER: &str = "<|vision_start|><|image_pad|><|vision_end|>";
+    const SUFFIX: &str = "<|im_end|>\n<|im_start|>assistant\n";
+    let thinking_suffix = if thinking {
+        ""
+    } else {
+        match family {
+            QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B => "<think>\n\n</think>\n\n",
+            QwenVisionFamily::Qwen35_08B
+            | QwenVisionFamily::Qwen35_2B
+            | QwenVisionFamily::Qwen35_4B
+            | QwenVisionFamily::Qwen35_9B
+            | QwenVisionFamily::Qwen35_27B => "<think>\n</think>\n",
+        }
+    };
+    let marker_bytes = IMAGE_MARKER
+        .len()
+        .checked_mul(image_count)
+        .ok_or(MultimodalTextError::Overflow("Qwen image prompt markers"))?;
+    let capacity = PREFIX
+        .len()
+        .checked_add(marker_bytes)
+        .and_then(|value| value.checked_add(text.len()))
+        .and_then(|value| value.checked_add(SUFFIX.len()))
+        .and_then(|value| value.checked_add(thinking_suffix.len()))
+        .ok_or(MultimodalTextError::Overflow("Qwen prompt template"))?;
+    if capacity > crate::MAX_NATIVE_PROMPT_BYTES {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen prompt template exceeds the native bounded prompt size",
+        ));
+    }
+    let mut prompt = String::new();
+    prompt
+        .try_reserve_exact(capacity)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen prompt template"))?;
+    prompt.push_str(PREFIX);
+    for index in 0..image_count {
+        if index.is_multiple_of(16) {
+            cancellation.check()?;
+        }
+        prompt.push_str(IMAGE_MARKER);
+    }
+    prompt.push_str(text);
+    prompt.push_str(SUFFIX);
+    prompt.push_str(thinking_suffix);
+    cancellation.check()?;
+    Ok(prompt)
+}
+
 fn parse_sam3_prompt_part(part: &str) -> Result<(&str, usize), MultimodalTextError> {
     let Some((text, raw_limit)) = part.rsplit_once(':') else {
         return Ok((part, 1));

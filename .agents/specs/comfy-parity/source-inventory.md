@@ -538,10 +538,10 @@ Direct runtime validation covers **103/13,242 (0.78%)** independently testable m
 
 | Status | Features |
 | --- | ---: |
-| missing | 9,735 |
+| missing | 9,383 |
 | deferred | 2,274 |
 | conflicting | 788 |
-| equivalent | 222 |
+| equivalent | 574 |
 | partial | 189 |
 | uncertain | 87 |
 | **Total** | **13,295** |

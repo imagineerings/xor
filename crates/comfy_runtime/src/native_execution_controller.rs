@@ -22,12 +22,15 @@ use chrono::{Local, Utc};
 #[cfg(test)]
 use comfy_media::encode_png_frame;
 use comfy_media::{
-    MetadataWritePolicy, PngError, PngLimits, decode_png, encode_png_frame_with_policy_and_context,
+    MetadataWritePolicy, NativeAudioPayload, PngError, PngLimits, decode_png,
+    encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
-    AttentionError, ClipTextError, LatentFormatError, ModelStoreError, NativeDecoderTextEncoder,
-    NativeModelPayload, NativeOpsError, NativePromptTokenizer, NativeTextGenerationRequest,
-    NativeTextGenerationResult, NativeVae, PatchGraph, QuantizationError, VaeArchitectureError,
+    AttentionError, ClipTextError, GemmaMultimodalFamily, GemmaMultimodalGenerationRequest,
+    LatentFormatError, ModelStoreError, MultimodalTextError, NativeDecoderTextEncoder,
+    NativeGemmaMultimodal, NativeModelPayload, NativeOpsError, NativePromptTokenizer,
+    NativeQwenMultimodal, NativeTextGenerationRequest, NativeTextGenerationResult, NativeVae,
+    PatchGraph, QuantizationError, QwenMultimodalGenerationRequest, VaeArchitectureError,
     VaeBoundaryKind, VaeError, VaeKernelProfile,
     clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
@@ -35,10 +38,12 @@ use comfy_model::{
         ConditioningSet, ConditioningValue,
     },
     controlnet::{ControlChain, ControlModelExecutor, ControlNetError},
+    format_qwen_multimodal_prompt,
     generated_native_diffusion::{
         NativeDiffusionModelError, Sd1Tokenizer, Sd15TinyModel, empty_sd15_latent,
         sd15_latent_format_identity, sd15_model_family_identity,
     },
+    prepare_gemma3_image, prepare_gemma4_audio, prepare_gemma4_visuals, prepare_qwen_images,
 };
 use comfy_nodes::{
     CatalogNodeDescriptor, CatalogNodeStatus, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
@@ -2381,6 +2386,302 @@ pub fn execute_native_decoder_text_generation(
     Ok(result)
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeMultimodalTextGenerationRequest<'a> {
+    pub text: NativeTextGenerationRequest<'a>,
+    pub use_default_template: bool,
+    pub thinking: bool,
+}
+
+#[derive(Clone)]
+enum NativeMultimodalClipOwner {
+    Qwen(Arc<NativeQwenMultimodal>),
+    Gemma(Arc<NativeGemmaMultimodal>),
+}
+
+#[derive(Clone)]
+pub struct NativeMultimodalClipResource {
+    owner: NativeMultimodalClipOwner,
+    _resolved_payload: NativeResolvedPayload,
+}
+
+impl NativeMultimodalClipResource {
+    pub fn qwen(&self) -> Option<&Arc<NativeQwenMultimodal>> {
+        match &self.owner {
+            NativeMultimodalClipOwner::Qwen(resource) => Some(resource),
+            NativeMultimodalClipOwner::Gemma(_) => None,
+        }
+    }
+
+    pub fn gemma(&self) -> Option<&Arc<NativeGemmaMultimodal>> {
+        match &self.owner {
+            NativeMultimodalClipOwner::Gemma(resource) => Some(resource),
+            NativeMultimodalClipOwner::Qwen(_) => None,
+        }
+    }
+}
+
+pub fn resolve_native_multimodal_clip(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<NativeMultimodalClipResource, NodeFailure> {
+    let expected_type = NativeHandleType::new(NativeHandleKind::Clip, "CLIP")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Model(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native multimodal CLIP handle stored the wrong object type",
+        ));
+    };
+    if payload.diffusion().is_some() {
+        return Err(invalid_diffusion_input(
+            "native multimodal CLIP handle stored a diffusion CLIP resource",
+        ));
+    }
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let model = payload.model_payload();
+    let resolved = match (
+        model.qwen_multimodal_resource(),
+        model.gemma_multimodal_resource(),
+    ) {
+        (Some(resource), None) => NativeMultimodalClipResource {
+            owner: NativeMultimodalClipOwner::Qwen(resource.clone()),
+            _resolved_payload: stored,
+        },
+        (None, Some(resource)) => NativeMultimodalClipResource {
+            owner: NativeMultimodalClipOwner::Gemma(resource.clone()),
+            _resolved_payload: stored,
+        },
+        _ => {
+            return Err(invalid_diffusion_input(
+                "native multimodal CLIP handle lacks one concrete Qwen or Gemma resource",
+            ));
+        }
+    };
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(resolved)
+}
+
+pub fn execute_native_multimodal_text_generation(
+    context: &NodeContext,
+    clip_handle: &NativeOpaqueHandle,
+    image_handle: Option<&NativeOpaqueHandle>,
+    video_handle: Option<&NativeOpaqueHandle>,
+    audio_handle: Option<&NativeOpaqueHandle>,
+    seed: u64,
+    request: NativeMultimodalTextGenerationRequest<'_>,
+) -> Result<NativeTextGenerationResult, NodeFailure> {
+    context.cancellation.check().map_err(cancellation_failure)?;
+    let resource = resolve_native_multimodal_clip(context, clip_handle)?;
+    let compute = context
+        .compute_session()
+        .map_err(classified_diffusion_failure)?;
+    let execution = compute
+        .execution_context(context)
+        .map_err(classified_diffusion_failure)?;
+
+    let result = match &resource.owner {
+        NativeMultimodalClipOwner::Qwen(resource) => {
+            if video_handle.is_some() || audio_handle.is_some() {
+                return Err(invalid_diffusion_input(
+                    "Qwen multimodal generation admits IMAGE input but not VIDEO or AUDIO",
+                ));
+            }
+            let image = image_handle
+                .map(|handle| resolve_image_handle(context, handle))
+                .transpose()?;
+            let prepared = image
+                .as_ref()
+                .map_or_else(
+                    || Ok(Vec::new()),
+                    |image| {
+                        prepare_qwen_images(compute.backend(), image, resource.family(), &execution)
+                    },
+                )
+                .map_err(classified_diffusion_failure)?;
+            let formatted_prompt = format_qwen_multimodal_prompt(
+                resource.family(),
+                request.text.formatted_prompt,
+                prepared.len(),
+                request.thinking,
+                request.use_default_template,
+                &context.cancellation,
+            )
+            .map_err(classified_diffusion_failure)?;
+            let text = reborrow_text_generation_request(&request.text, &formatted_prompt);
+            let transaction = native_text_generation_transaction(context, seed)
+                .map_err(classified_diffusion_failure)?;
+            resource
+                .generate(
+                    compute.backend(),
+                    QwenMultimodalGenerationRequest {
+                        text,
+                        prepared_images: &prepared,
+                        transaction: &transaction,
+                    },
+                    &execution,
+                )
+                .map_err(classified_diffusion_failure)?
+        }
+        NativeMultimodalClipOwner::Gemma(resource) => {
+            let family = resource.family();
+            let gemma3 = matches!(
+                family,
+                GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB
+            );
+            if gemma3 && (video_handle.is_some() || audio_handle.is_some()) {
+                return Err(invalid_diffusion_input(
+                    "Gemma3 multimodal generation admits one IMAGE and no VIDEO or AUDIO",
+                ));
+            }
+            if family == GemmaMultimodalFamily::Gemma4ThirtyOneB && audio_handle.is_some() {
+                return Err(invalid_diffusion_input(
+                    "Gemma4 31B multimodal generation does not admit AUDIO",
+                ));
+            }
+            let selected_visual = if gemma3 {
+                image_handle
+            } else {
+                video_handle.or(image_handle)
+            };
+            let visual = selected_visual
+                .map(|handle| resolve_image_handle(context, handle))
+                .transpose()?;
+            let prepared_visuals = if gemma3 {
+                visual
+                    .as_ref()
+                    .map(|image| prepare_gemma3_image(compute.backend(), image, &execution))
+                    .transpose()
+                    .map_err(classified_diffusion_failure)?
+                    .into_iter()
+                    .collect()
+            } else {
+                prepare_gemma4_visuals(
+                    compute.backend(),
+                    video_handle
+                        .is_none()
+                        .then_some(visual.as_ref().map(|image| image.value.as_ref()))
+                        .flatten(),
+                    video_handle
+                        .is_some()
+                        .then_some(visual.as_ref().map(|image| image.value.as_ref()))
+                        .flatten(),
+                    &execution,
+                )
+                .map_err(classified_diffusion_failure)?
+            };
+            let audio = audio_handle
+                .map(|handle| resolve_audio_handle(context, handle))
+                .transpose()?;
+            let prepared_audio = audio
+                .as_ref()
+                .map(|audio| {
+                    prepare_gemma4_audio(
+                        compute.backend(),
+                        audio.waveform(),
+                        audio.sample_rate(),
+                        &execution,
+                    )
+                })
+                .transpose()
+                .map_err(classified_diffusion_failure)?;
+            let transaction = native_text_generation_transaction(context, seed)
+                .map_err(classified_diffusion_failure)?;
+            resource
+                .generate(
+                    compute.backend(),
+                    GemmaMultimodalGenerationRequest {
+                        text: request.text,
+                        prepared_visuals: &prepared_visuals,
+                        prepared_audio: prepared_audio.as_ref(),
+                        use_default_template: request.use_default_template,
+                        thinking: request.thinking,
+                        transaction: &transaction,
+                    },
+                    &execution,
+                )
+                .map_err(classified_diffusion_failure)?
+        }
+    };
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(result)
+}
+
+fn reborrow_text_generation_request<'a>(
+    request: &NativeTextGenerationRequest<'_>,
+    formatted_prompt: &'a str,
+) -> NativeTextGenerationRequest<'a> {
+    NativeTextGenerationRequest {
+        formatted_prompt,
+        maximum_new_tokens: request.maximum_new_tokens,
+        do_sample: request.do_sample,
+        temperature_bits: request.temperature_bits,
+        top_k: request.top_k,
+        top_p_bits: request.top_p_bits,
+        minimum_p_bits: request.minimum_p_bits,
+        repetition_penalty_bits: request.repetition_penalty_bits,
+        presence_penalty_bits: request.presence_penalty_bits,
+    }
+}
+
+fn resolve_image_handle(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<ResolvedNative<Arc<ImageTensor>>, NodeFailure> {
+    let expected_type =
+        native_tensor_handle_type(NativeTensorKind::Image).map_err(runtime_failure)?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Tensor(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native IMAGE handle stored a non-tensor payload",
+        ));
+    };
+    if payload.role() != NativeTensorRole::Image {
+        return Err(invalid_diffusion_input(
+            "native IMAGE handle stored a tensor with the wrong role",
+        ));
+    }
+    let image = payload
+        .image()
+        .ok_or_else(|| invalid_diffusion_input("native IMAGE handle stored a non-image tensor"))?;
+    Ok(ResolvedNative {
+        value: Arc::new(image.clone()),
+        _resolved_payload: stored,
+    })
+}
+
+fn resolve_audio_handle(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<ResolvedNative<Arc<NativeAudioPayload>>, NodeFailure> {
+    let expected_type = NativeHandleType::new(NativeHandleKind::Audio, "AUDIO")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected_type, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Audio(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native AUDIO handle stored a non-audio payload",
+        ));
+    };
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    Ok(ResolvedNative {
+        value: payload.clone(),
+        _resolved_payload: stored,
+    })
+}
+
 impl<Value> Deref for ResolvedNative<Value> {
     type Target = Value;
 
@@ -4286,6 +4587,12 @@ fn typed_failure_class(error: &(dyn std::error::Error + 'static)) -> Option<Type
         if matches!(
             error.downcast_ref::<NativeOpsError>(),
             Some(NativeOpsError::Cancelled)
+        ) {
+            return Some(TypedFailureClass::Cancelled);
+        }
+        if matches!(
+            error.downcast_ref::<MultimodalTextError>(),
+            Some(MultimodalTextError::Cancelled)
         ) {
             return Some(TypedFailureClass::Cancelled);
         }
@@ -6526,6 +6833,110 @@ mod tests {
                 value,
             },
         }
+    }
+
+    #[test]
+    fn multimodal_text_generation_rejects_wrong_and_stale_handles_without_publication()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(1 << 20)?;
+        let cancellation = CancellationToken::default();
+        let scratch = workspace_authority.authorize_workspace(1 << 20)?;
+        let tensor_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: scratch.clone(),
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let image = ImageTensor::from_f32(&backend, &tensor_context, 1, 1, 1, 3, &[0.0, 0.5, 1.0])?;
+        drop(tensor_context);
+        let attempt_id = AttemptId(Uuid::from_u128(0x3991));
+        let generation = NativeHandleStoreGeneration::new()?;
+        let store = generation.handle_store_for_attempt(attempt_id);
+        let context = NodeContext::new(
+            PromptId(Uuid::from_u128(0x3990)),
+            attempt_id,
+            NodeId("multimodal-text".to_owned()),
+            cancellation.clone(),
+            scratch,
+            store.clone(),
+        )?;
+        let payload = NativeTensorPayload::from_image(NativeTensorRole::Image, image)?;
+        let wrong_clip = store.publish(
+            NativeStoredPayload::Tensor(Arc::new(payload)),
+            &cancellation,
+        )?;
+        let request = NativeMultimodalTextGenerationRequest {
+            text: NativeTextGenerationRequest {
+                formatted_prompt: "test",
+                maximum_new_tokens: 1,
+                do_sample: false,
+                temperature_bits: 1.0_f32.to_bits(),
+                top_k: 50,
+                top_p_bits: 1.0_f32.to_bits(),
+                minimum_p_bits: 0.0_f32.to_bits(),
+                repetition_penalty_bits: 1.0_f32.to_bits(),
+                presence_penalty_bits: 0.0_f32.to_bits(),
+            },
+            use_default_template: true,
+            thinking: false,
+        };
+        let resident_bytes = generation.resident_bytes();
+        let error = execute_native_multimodal_text_generation(
+            &context,
+            &wrong_clip,
+            None,
+            None,
+            None,
+            7,
+            request.clone(),
+        )
+        .err()
+        .ok_or("IMAGE handle unexpectedly resolved as a multimodal CLIP")?;
+        assert_eq!(error.kind, NodeFailureKind::Failure);
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), resident_bytes);
+
+        let restarted = NativeHandleStoreGeneration::new()?;
+        let restarted_store = restarted.handle_store_for_attempt(attempt_id);
+        let restarted_context = NodeContext::new(
+            context.prompt_id,
+            attempt_id,
+            context.node_id.clone(),
+            cancellation.clone(),
+            workspace_authority.authorize_workspace(1 << 20)?,
+            restarted_store,
+        )?;
+        let stale_error = execute_native_multimodal_text_generation(
+            &restarted_context,
+            &wrong_clip,
+            None,
+            None,
+            None,
+            7,
+            request.clone(),
+        )
+        .err()
+        .ok_or("old-generation handle unexpectedly resolved after restart")?;
+        assert_eq!(stale_error.kind, NodeFailureKind::Failure);
+        assert!(restarted.is_empty());
+        assert_eq!(restarted.resident_bytes(), 0);
+
+        cancellation.cancel();
+        let cancelled = execute_native_multimodal_text_generation(
+            &context,
+            &wrong_clip,
+            None,
+            None,
+            None,
+            7,
+            request,
+        )
+        .err()
+        .ok_or("pre-cancelled generation unexpectedly succeeded")?;
+        assert_eq!(cancelled.kind, NodeFailureKind::Interrupted);
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), resident_bytes);
+        Ok(())
     }
 
     #[test]

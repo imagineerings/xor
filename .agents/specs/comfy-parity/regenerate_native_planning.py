@@ -9990,6 +9990,7 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
             "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_nodes/src/comfy_nodes.rs",

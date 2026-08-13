@@ -346,8 +346,8 @@
     "current_sim_status": {
       "conflicting": 788,
       "deferred": 2274,
-      "equivalent": 222,
-      "missing": 9735,
+      "equivalent": 574,
+      "missing": 9383,
       "partial": 189,
       "uncertain": 87
     },

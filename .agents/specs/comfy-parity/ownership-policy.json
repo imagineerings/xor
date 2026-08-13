@@ -12932,6 +12932,118 @@
       "decision_reason": "NativeGemmaMultimodal::generate is the sole model-domain Gemma media-generation adapter. It owns exact family templates and marker planning, composes canonical prepared media and retained projection owners, supplies Gemma3 empty history versus Gemma4 expanded zero-filled history and per-layer input IDs, delegates once to the canonical prepared decoder with a borrowed transaction, and delegates final cleanup to the canonical tokenizer. Runtime handles, RNG opening, cache, restart, persistence, and scalar publication remain outside this owner."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_runtime_generation_adapter",
+      "canonical_owner": "comfy_runtime::native_execution_controller::execute_native_multimodal_text_generation",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_execution_controller.rs"
+      ],
+      "owner_symbols": [
+        "execute_native_multimodal_text_generation",
+        "resolve_native_multimodal_clip",
+        "NativeMultimodalTextGenerationRequest",
+        "NativeMultimodalClipResource"
+      ],
+      "allowed_adapters": [
+        "NativeStoredModelPayload and the handle store remain the sole sealed CLIP, IMAGE, and AUDIO handle validation, lease, residency, wrong-store, wrong-generation, type, and digest owners",
+        "Canonical Qwen and Gemma preparation functions remain the sole bounded image, video-frame, timestamp, audio-resample, feature, marker-plan, mask, position, and deepstack owners",
+        "NativeQwenMultimodal::generate and NativeGemmaMultimodal::generate remain the sole retained family projection, marker replacement, prepared-decoder delegation, stop, and generated-text cleanup owners",
+        "comfy_nodes::native_text_generation_transaction remains the sole prompt-attempt-node-addressed Philox replay transaction opener",
+        "The executor remains the sole demanded-input cache identity, handle checkpoint, output publication, rollback, restart eviction, and persistence owner",
+        "Later TextGenerate node leaves may project workflow sampling and optional inputs into this adapter but cannot resolve resources, preprocess media, open RNG, generate, cache, or publish independently"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "^pub struct NativeMultimodalTextGenerationRequest<'a> \\{",
+          "qualified": "comfy_runtime::native_execution_controller::NativeMultimodalTextGenerationRequest",
+          "role": "adapter",
+          "symbol": "NativeMultimodalTextGenerationRequest"
+        }
+      ],
+      "call_symbols": [
+        "resolve_native_multimodal_clip",
+        "prepare_qwen_images",
+        "format_qwen_multimodal_prompt",
+        "prepare_gemma3_image",
+        "prepare_gemma4_visuals",
+        "prepare_gemma4_audio",
+        "native_text_generation_transaction",
+        "NativeQwenMultimodal::generate",
+        "NativeGemmaMultimodal::generate"
+      ],
+      "required_mappings": [
+        {
+          "name": "multimodal-runtime-resolves-one-sealed-family-resource",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "resolve_native_multimodal_clip[\\s\\S]*NativeStoredPayload::Model[\\s\\S]*qwen_multimodal_resource[\\s\\S]*gemma_multimodal_resource"
+        },
+        {
+          "name": "multimodal-runtime-validates-and-prepares-before-rng-open",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "execute_native_multimodal_text_generation[\\s\\S]*prepare_qwen_images[\\s\\S]*native_text_generation_transaction[\\s\\S]*resource[\\s\\S]*\\.generate"
+        },
+        {
+          "name": "multimodal-runtime-projects-qwen-capability-and-family-template",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "Qwen multimodal generation admits IMAGE input but not VIDEO or AUDIO[\\s\\S]*format_qwen_multimodal_prompt[\\s\\S]*QwenMultimodalGenerationRequest"
+        },
+        {
+          "name": "multimodal-runtime-projects-gemma-capability-video-precedence-and-audio",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "Gemma3 multimodal generation admits one IMAGE[\\s\\S]*video_handle.or\\(image_handle\\)[\\s\\S]*prepare_gemma4_visuals[\\s\\S]*prepare_gemma4_audio[\\s\\S]*GemmaMultimodalGenerationRequest"
+        },
+        {
+          "name": "multimodal-runtime-returns-only-after-final-cancellation",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "resource[\\s\\S]*generate\\([\\s\\S]*context.cancellation.check\\(\\)[\\s\\S]*Ok\\(result\\)"
+        },
+        {
+          "name": "multimodal-runtime-fixture-pins-source-dependencies-and-atomic-boundary",
+          "path": "crates/comfy_test_support/fixtures/text_generation/multimodal/manifest.json",
+          "pattern": "comfy-parity-native-text-generation-foundation[\\s\\S]*VIDEO takes precedence over IMAGE[\\s\\S]*transaction opens after handle validation and media preparation[\\s\\S]*never publishes handles, cache state, KV, prepared media, or partial text"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-text-generation-foundation"
+      ],
+      "production_consumers": [
+        "TextGenerate and TextGenerateLTX2Prompt native node leaves",
+        "native execution controller scalar adapters"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D34",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-RNG-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "execute_native_multimodal_text_generation is the sole runtime adapter that retains one sealed Qwen or Gemma CLIP lease, resolves only family-demanded media, applies Qwen rejection and Gemma4 video-over-image capability rules, completes canonical preparation before opening one addressed replay transaction, delegates once to the retained family generator, and returns only after final cancellation. It owns no tokenizer, projection graph, decoder loop, KV state, cache, persistence, output handle, or publication transaction."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

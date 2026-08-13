@@ -28,14 +28,14 @@ use comfy_model::{
     QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
     SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
     format_gemma_multimodal_prompt, format_ideogram4_prompt, format_ovis_prompt,
-    format_qwen3vl_prompt, gemma3_target_dimensions, gemma4_audio_marker_tokens,
-    gemma4_target_dimensions, ideogram4_project_taps, join_multimodal_embeddings,
-    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
-    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
-    prepare_gemma3_image, prepare_gemma4_audio, prepare_gemma4_visuals, prepare_qwen_images,
-    prepare_qwen3vl_images, qwen_multimodal_decoder_configuration,
-    qwen_multimodal_tokenizer_profile, qwen2vl_mrope_position_ids, qwen3vl_target_dimensions,
-    trim_ovis_conditioning,
+    format_qwen_multimodal_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
+    gemma4_audio_marker_tokens, gemma4_target_dimensions, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
+    plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
+    prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
+    qwen_multimodal_decoder_configuration, qwen_multimodal_tokenizer_profile,
+    qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
@@ -2911,6 +2911,28 @@ fn ovis_sam3_and_prompt_adapters_preserve_source_semantics() -> Result<(), Box<d
     );
     assert_eq!(
         format_qwen3vl_prompt("<|im_start|>raw", 3, false),
+        "<|im_start|>raw"
+    );
+    assert_eq!(
+        format_qwen_multimodal_prompt(
+            QwenVisionFamily::Qwen35_4B,
+            "cat",
+            1,
+            false,
+            false,
+            &cancellation,
+        )?,
+        "<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>cat<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n"
+    );
+    assert_eq!(
+        format_qwen_multimodal_prompt(
+            QwenVisionFamily::Qwen3Vl4B,
+            "<|im_start|>raw",
+            2,
+            false,
+            true,
+            &cancellation,
+        )?,
         "<|im_start|>raw"
     );
     Ok(())

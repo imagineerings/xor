@@ -1100,6 +1100,9 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
     let model_clip_text_encoder_multimodal =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_multimodal.rs"))?;
+    let task399_multimodal_generation_fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/text_generation/multimodal/manifest.json"),
+    )?;
     let model_native_node_payload =
         fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
     let nodes_stored_payload =
@@ -3486,6 +3489,110 @@ fn run_ownership_validation(
         .is_some_and(|line| {
             line.contains("comfy-parity-native-gemma-multimodal-generation-foundation")
                 && line.contains("VAL-RNG-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
+    let task399_runtime_adapter = runtime_controller_production
+        .split_once("pub fn execute_native_multimodal_text_generation(")
+        .and_then(|(_, suffix)| suffix.split_once("fn reborrow_text_generation_request"))
+        .map(|(adapter, _)| adapter)
+        .unwrap_or_default();
+    let task399_multimodal_runtime_has_one_checked_adapter = production_source_occurrences(
+        &sources,
+        "pub struct NativeMultimodalTextGenerationRequest<'a> {",
+    )
+    .len()
+        == 1
+        && production_source_occurrences(
+            &sources,
+            "pub fn execute_native_multimodal_text_generation(",
+        )
+        .len()
+            == 1
+        && runtime_controller_production.contains("pub fn resolve_native_multimodal_clip(")
+        && runtime_controller_production.contains("qwen_multimodal_resource()")
+        && runtime_controller_production.contains("gemma_multimodal_resource()")
+        && runtime_controller_production.contains("_resolved_payload: NativeResolvedPayload");
+    let task399_multimodal_runtime_prepares_before_rng_and_delegates_once = task399_runtime_adapter
+        .contains("prepare_qwen_images(")
+        && task399_runtime_adapter.contains("format_qwen_multimodal_prompt(")
+        && task399_runtime_adapter.contains("prepare_gemma3_image(")
+        && task399_runtime_adapter.contains("video_handle.or(image_handle)")
+        && task399_runtime_adapter.contains("prepare_gemma4_visuals(")
+        && task399_runtime_adapter.contains("prepare_gemma4_audio(")
+        && task399_runtime_adapter
+            .find("prepare_qwen_images(")
+            .zip(task399_runtime_adapter.find("native_text_generation_transaction("))
+            .is_some_and(|(prepare, rng)| prepare < rng)
+        && task399_runtime_adapter.contains("QwenMultimodalGenerationRequest")
+        && task399_runtime_adapter.contains("GemmaMultimodalGenerationRequest")
+        && task399_runtime_adapter.contains("context.cancellation.check()")
+        && task399_runtime_adapter.contains("Ok(result)");
+    let task399_multimodal_fixture_pins_source_and_atomic_boundary = [
+        "comfy-parity-native-text-generation-foundation",
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+        "b328e8a2dc89cfd3a93ab49c1be880a3e89ec4521eef506823753617c86c99e9",
+        "0197c3bdfa8e021aae0b63fbf0b9711dcb1dbe672f3a3a9269a062e8d6020462",
+        "2cf556417f4f9f8465ea8848176be2fdaf42444681dc4a8113d8479d3ebe17f1",
+        "VIDEO takes precedence over IMAGE",
+        "transaction opens after handle validation and media preparation",
+        "never publishes handles, cache state, KV, prepared media, or partial text",
+    ]
+    .iter()
+    .all(|value| task399_multimodal_generation_fixture.contains(value));
+    let task399_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_runtime_generation_adapter")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some(
+                    "comfy_runtime::native_execution_controller::execute_native_multimodal_text_generation",
+                )
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str() == Some("comfy-parity-native-text-generation-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "multimodal-runtime-resolves-one-sealed-family-resource",
+                            "multimodal-runtime-validates-and-prepares-before-rng-open",
+                            "multimodal-runtime-projects-qwen-capability-and-family-template",
+                            "multimodal-runtime-projects-gemma-capability-video-precedence-and-audio",
+                            "multimodal-runtime-returns-only-after-final-cancellation",
+                            "multimodal-runtime-fixture-pins-source-dependencies-and-atomic-boundary",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task399_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_vision_text_transformer_text_media_runtime_generation_adapter,",
+            )
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-text-generation-foundation")
+                && line.contains("VAL-RNG-001")
+                && line.contains("VAL-NATIVE-E2E-001")
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
@@ -9866,6 +9973,22 @@ fn run_ownership_validation(
             task398_gemma_generation_preserves_source_routes_and_atomicity,
         ),
         (
+            "task399_policy_and_catalog_trace_multimodal_runtime_generation",
+            task399_policy_trace && task399_catalog_trace,
+        ),
+        (
+            "task399_multimodal_runtime_has_one_checked_adapter",
+            task399_multimodal_runtime_has_one_checked_adapter,
+        ),
+        (
+            "task399_multimodal_runtime_prepares_before_rng_and_delegates_once",
+            task399_multimodal_runtime_prepares_before_rng_and_delegates_once,
+        ),
+        (
+            "task399_multimodal_fixture_pins_source_and_atomic_boundary",
+            task399_multimodal_fixture_pins_source_and_atomic_boundary,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -10558,6 +10681,18 @@ fn val_ownership_task398_gemma_multimodal_generation_001() -> Result<(), Box<dyn
         "val-ownership-task398-gemma-multimodal-generation-001.json",
         "val_ownership_task398_gemma_multimodal_generation_001",
         Some("task398_"),
+    )
+}
+
+#[test]
+fn val_ownership_task399_multimodal_runtime_generation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task399-multimodal-runtime-generation-ownership",
+        "val-ownership-task399-multimodal-runtime-generation-001.json",
+        "val_ownership_task399_multimodal_runtime_generation_001",
+        Some("task399_"),
     )
 }
 
