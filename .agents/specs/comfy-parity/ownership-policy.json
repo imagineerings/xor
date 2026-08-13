@@ -62,7 +62,8 @@
         "Task 46 torch.relu projects canonical Tensor values into this owner's ReLU forward/VJP/JVP and owns no second threshold or NaN equation",
         "Task 61 torch.log_softmax maps canonical Tensor storage into this owner's stable log-softmax forward/VJP/JVP and owns no reduction or derivative equation",
         "Task 63 Tensor.softmax maps canonical Tensor storage into this owner's stable softmax forward/VJP/JVP and owns no reduction or derivative equation",
-        "comfy_model::vae_image maps generic backend storage through the public scalar GELU helper and owns no approximation coefficients or second GELU equation"
+        "comfy_model::vae_image maps generic backend storage through the public scalar GELU helper and owns no approximation coefficients or second GELU equation",
+        "the bounded RIFE arithmetic foundation adds a Tensor-returning LeakyReLU adapter that reuses this owner's scalar equation; NativeModule only routes immutable execution"
       ],
       "definitions": [
         {
@@ -183,11 +184,17 @@
           "name": "task404-tensor-silu-reuses-canonical-scalar-and-fresh-tensor-output",
           "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
           "pattern": "pub fn silu_tensor_with_context_exact_native[\\s\\S]*allocate_tensor_output[\\s\\S]*silu_scalar[\\s\\S]*finish_tensor_output"
+        },
+        {
+          "name": "rife-tensor-leaky-relu-reuses-canonical-scalar-and-fresh-output",
+          "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+          "pattern": "fn leaky_relu_scalar[\\s\\S]*pub fn leaky_relu_tensor_with_context_exact_native[\\s\\S]*allocate_tensor_output[\\s\\S]*leaky_relu_scalar[\\s\\S]*finish_tensor_output"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-bounded-dense-spatial-inference-foundation",
+        "comfy-parity-native-rife-tensor-arithmetic-foundation",
         "comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
@@ -9377,7 +9384,8 @@
         "Task 63 extends NativeModuleSpec with an empty Container initialized through module_init_exact_native; NativeAliasFreeActivation1d embeds that canonical base and remains a focused audio component rather than a second generic module lifecycle",
         "Task 77 extends NativeModuleSpec with Buffer, Sequential, pooling, activation, loss, and upsample configurations; comfy_tensor owns only numerical kernels and checked source adapters, never module state, child publication, parameters, or generations",
         "Task 78 extends the same NativeModuleSpec with running normalization state, embedding weights, focused padding and loss configurations, and four named attention projection children; no tensor adapter owns parameters, running statistics, children, generations, or commit transitions",
-        "Task 401 adds an immutable &self forward for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules; it delegates equations to the established tensor kernels and cannot change generation, prefetch, semantic state, parameters, or lifecycle visibility"
+        "Task 401 adds an immutable &self forward for loaded Linear, ordinary Conv2d, LayerNorm, GroupNorm, SiLU, and GELU modules; it delegates equations to the established tensor kernels and cannot change generation, prefetch, semantic state, parameters, or lifecycle visibility",
+        "the bounded RIFE arithmetic foundation routes LeakyReLU through the same immutable forward and canonical functional Tensor adapter without changing retained module state"
       ],
       "definitions": [
         {
@@ -9613,12 +9621,18 @@
           "name": "task404-bounded-dense-spatial-forward-preserves-low-precision-state",
           "path": "crates/comfy_model/tests/native_ops.rs",
           "pattern": "immutable_dense_inference_preserves_module_state_and_tensor_placement[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*typed_transpose"
+        },
+        {
+          "name": "rife-immutable-leaky-relu-delegates-functional-tensor-owner",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "NativeModuleSpec::LeakyRelu \\{ negative_slope \\}[\\s\\S]*leaky_relu_tensor_with_context_exact_native"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-bounded-dense-spatial-inference-foundation",
         "comfy-parity-native-immutable-dense-inference-attention-foundation",
+        "comfy-parity-native-rife-tensor-arithmetic-foundation",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-2881abe3d797",
@@ -19498,6 +19512,121 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "TensorPrintOptions alone owns the bounded presentation configuration and pure reset/update mapping. Native callers carry the value explicitly, so the compatibility adapter cannot introduce the Python runtime's process-global print state, persistence, or an independent renderer."
+    },
+    {
+      "concern": "tensor_real_model_arithmetic",
+      "canonical_owner": "comfy_tensor bounded real elementwise and activation adapters",
+      "owner_files": [
+        "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+        "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs"
+      ],
+      "owner_symbols": [
+        "real_add_with_context_exact_native",
+        "real_multiply_with_context_exact_native",
+        "real_lerp_tensor_weight_with_context_exact_native",
+        "leaky_relu_tensor_with_context_exact_native"
+      ],
+      "allowed_adapters": [
+        "DType owns decoding and output encoding for F16, BF16, and F32 values; the elementwise adapter owns only checked broadcasting, f32 operation order, caller-workspace staging, and fresh Tensor publication",
+        "the activation functional owner retains the sole LeakyReLU scalar equation and projects it into fresh Tensor storage",
+        "NativeModule routes immutable LeakyReLU inference through the activation Tensor adapter and cannot mutate parameters, prefetch, generation, or semantic identity",
+        "future RIFE execution composes these adapters with canonical convolution, interpolation, grid-sample, concatenate, sigmoid, and pixel-shuffle owners without copying their equations"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+          "qualified": "comfy_tensor::generated_elementwise_or_runtime_operation_03::real_add_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "real_add_with_context_exact_native",
+          "pattern": "^pub fn real_add_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+          "qualified": "comfy_tensor::generated_elementwise_or_runtime_operation_03::real_multiply_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "real_multiply_with_context_exact_native",
+          "pattern": "^pub fn real_multiply_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+          "qualified": "comfy_tensor::generated_elementwise_or_runtime_operation_03::real_lerp_tensor_weight_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "real_lerp_tensor_weight_with_context_exact_native",
+          "pattern": "^pub fn real_lerp_tensor_weight_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+          "qualified": "comfy_tensor::generated_activation_normalization_functional_01::leaky_relu_tensor_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "leaky_relu_tensor_with_context_exact_native",
+          "pattern": "^pub fn leaky_relu_tensor_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "qualified": "comfy_model::NativeModule::forward_dense_inference_with_context",
+          "role": "allowed_adapter",
+          "symbol": "forward_dense_inference_with_context"
+        }
+      ],
+      "call_symbols": [
+        "real_add_with_context_exact_native",
+        "real_multiply_with_context_exact_native",
+        "real_lerp_tensor_weight_with_context_exact_native",
+        "leaky_relu_tensor_with_context_exact_native"
+      ],
+      "required_mappings": [
+        {
+          "name": "rife-real-arithmetic-delegates-broadcast-dtype-and-workspace-owners",
+          "path": "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+          "pattern": "pub fn real_add_with_context_exact_native[\\s\\S]*pub fn real_multiply_with_context_exact_native[\\s\\S]*pub fn real_lerp_tensor_weight_with_context_exact_native[\\s\\S]*binary_broadcast_shape[\\s\\S]*dtype\\.encode_decoded_scalar[\\s\\S]*backend\\.upload_bytes"
+        },
+        {
+          "name": "rife-leaky-relu-tensor-reuses-canonical-scalar-equation",
+          "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+          "pattern": "fn leaky_relu_scalar[\\s\\S]*pub fn leaky_relu_tensor_with_context_exact_native[\\s\\S]*leaky_relu_scalar\\(value, negative_slope\\)[\\s\\S]*finish_tensor_output"
+        },
+        {
+          "name": "native-module-routes-immutable-leaky-relu-without-state-publication",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "pub fn forward_dense_inference_with_context[\\s\\S]*NativeModuleSpec::LeakyRelu \\{ negative_slope \\}[\\s\\S]*leaky_relu_tensor_with_context_exact_native"
+        },
+        {
+          "name": "rife-real-arithmetic-proves-low-precision-failure-atomicity",
+          "path": "crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs",
+          "pattern": "bounded_real_arithmetic_preserves_dtype_broadcasting_and_failure_atomicity[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*authorize_workspace\\(required - 1\\)[\\s\\S]*ElementwiseRuntimePartThreeError::Cancelled"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-rife-tensor-arithmetic-foundation"
+      ],
+      "production_consumers": [
+        "native RIFE frame interpolation execution",
+        "immutable low-precision retained model execution"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D27",
+        "D28",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "RIFE needs dtype-preserving residual arithmetic and tensor-weighted blending, while DType, the functional activation slice, NativeModule, and ExecutionContext already own encoding, activation equations, retained lifecycle, and bounded memory. These focused adapters close that execution seam without creating a RIFE-local elementwise implementation."
     },
     {
       "concern": "tensor_rearrangement_traversal",

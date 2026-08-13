@@ -509,6 +509,22 @@ fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
         assert!((values[1] - 0.731_058_6).abs() < 0.003);
         assert_ne!(output.storage_id(), input.storage_id());
 
+        let leaky = leaky_relu_module_exact_native("typed_leaky", 0.2, false, &cancellation)?;
+        let leaky_generation = leaky.generation();
+        let leaky_digest = leaky.semantic_state_digest(&cancellation)?;
+        let leaky_output = leaky.forward_dense_inference_with_context(
+            &backend,
+            &input,
+            &context(&backend, &cancellation)?,
+        )?;
+        assert_eq!(leaky_output.descriptor().dtype(), dtype);
+        let leaky_values = tensor_values(&backend, &leaky_output, &cancellation)?;
+        assert!((leaky_values[0] - -0.2).abs() < 0.004);
+        assert!((leaky_values[1] - 1.0).abs() < 0.004);
+        assert_ne!(leaky_output.storage_id(), input.storage_id());
+        assert_eq!(leaky.generation(), leaky_generation);
+        assert_eq!(leaky.semantic_state_digest(&cancellation)?, leaky_digest);
+
         let geometry =
             ConvolutionGeometry::new(2, vec![1, 1], vec![0, 0], vec![1, 1], 1, false, vec![0, 0])?;
         let mut convolution = disable_weight_init_convolution_exact_native(

@@ -13843,6 +13843,65 @@ fn val_ownership_native_tensor_interpolate_foundation_001() -> Result<(), Box<dy
 }
 
 #[test]
+fn val_ownership_native_rife_tensor_arithmetic_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let elementwise = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs"),
+    )?;
+    for required in [
+        "pub fn real_add_with_context_exact_native(",
+        "pub fn real_multiply_with_context_exact_native(",
+        "pub fn real_lerp_tensor_weight_with_context_exact_native(",
+        "real_binary_preserving_dtype(",
+        "dtype.encode_decoded_scalar",
+        "backend.upload_bytes(",
+    ] {
+        assert!(
+            elementwise.contains(required),
+            "bounded RIFE arithmetic lacks {required}"
+        );
+    }
+    let activation = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs"),
+    )?;
+    assert!(activation.contains("pub fn leaky_relu_tensor_with_context_exact_native("));
+    assert!(activation.contains("leaky_relu_scalar(value, negative_slope)"));
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/native_ops.rs"))?;
+    assert!(model.contains("NativeModuleSpec::LeakyRelu { negative_slope }"));
+    assert!(model.contains("leaky_relu_tensor_with_context_exact_native("));
+    let elementwise_tests = fs::read_to_string(
+        root.join("crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs"),
+    )?;
+    assert!(
+        elementwise_tests
+            .contains("bounded_real_arithmetic_preserves_dtype_broadcasting_and_failure_atomicity")
+    );
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("tensor_real_model_arithmetic")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some("comfy-parity-native-rife-tensor-arithmetic-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

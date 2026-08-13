@@ -9740,6 +9740,51 @@ def native_tensor_interpolate_foundation_task(dependency: str) -> dict[str, obje
     )
 
 
+def native_rife_tensor_arithmetic_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-rife-tensor-arithmetic-foundation",
+        "Publish bounded low-precision tensor arithmetic for RIFE execution",
+        [34, 35, 36, 41],
+        [25, 27, 28, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FAMILY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical elementwise and activation owners expose bounded F16/BF16/F32 broadcast add, multiply, tensor-weighted lerp, and LeakyReLU Tensor adapters needed by RIFE. NativeModule routes immutable LeakyReLU through that activation owner without changing parameters, generation, prefetch, or semantic identity; no model-local equation, host-result Vec, allocator, workspace, cache, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/dtypes.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/tests/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_model/tests/native_ops.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/tests/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/tests/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_model/tests/native_ops.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove exact broadcast channel/scalar residual arithmetic and tensor-weighted lerp; F16/BF16/F32 output rounding; dtype/device/stream/shape preservation; fresh nonaliasing storage; immutable input and NativeModule state; pre-cancellation; one-byte-short caller-workspace failure before publication; backend-memory convergence; and delegation to DType encoding plus the sole LeakyReLU scalar equation.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11945,8 +11990,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     tensor_interpolate_foundation = native_tensor_interpolate_foundation_task(
         str(tensor_grid_sample_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    rife_tensor_arithmetic_foundation = native_rife_tensor_arithmetic_foundation_task(
         str(tensor_interpolate_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(rife_tensor_arithmetic_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12048,6 +12096,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             frame_interpolation_invocation_foundation,
             tensor_grid_sample_foundation,
             tensor_interpolate_foundation,
+            rife_tensor_arithmetic_foundation,
             video_foundation,
             detection_foundation,
         ]

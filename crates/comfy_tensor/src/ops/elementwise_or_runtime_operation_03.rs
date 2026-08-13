@@ -23,6 +23,9 @@ pub const TORCH_SAVE_OPERATION_ID: &str = "COMFY-TENSOR-OP-2464198E16CB";
 pub const SIGMOID_OPERATION_ID: &str = "COMFY-TENSOR-OP-1917B7227A5C";
 pub const EXPM1_OPERATION_ID: &str = "COMFY-TENSOR-OP-263D166C9D1F";
 pub const XPU_DEVICE_COUNT_OPERATION_ID: &str = "COMFY-TENSOR-OP-2255F11A43BA";
+pub const REAL_ADD_OPERATION_ID: &str = "SIM-TENSOR-REAL-ADD-V1";
+pub const REAL_MULTIPLY_OPERATION_ID: &str = "SIM-TENSOR-REAL-MULTIPLY-V1";
+pub const REAL_LERP_OPERATION_ID: &str = "SIM-TENSOR-REAL-LERP-V1";
 
 const MAXIMUM_ARCHIVE_DEPTH: usize = 64;
 const MAXIMUM_ARCHIVE_NODES: usize = 1_000_000;
@@ -377,6 +380,91 @@ pub fn sigmoid_with_context_exact_native(
         SIGMOID_OPERATION_ID,
         false,
         |value| f64::from(apply_unary_scalar(UnaryOperation::Sigmoid, value as f32)),
+        context,
+    )
+}
+
+pub fn real_add_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    other: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ElementwiseRuntimePartThreeError> {
+    real_binary_preserving_dtype(
+        backend,
+        input,
+        ElementwiseOperand::Tensor(other),
+        REAL_ADD_OPERATION_ID,
+        |left, right| left + right,
+        context,
+    )
+}
+
+pub fn real_multiply_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    other: ElementwiseOperand<'_>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ElementwiseRuntimePartThreeError> {
+    real_binary_preserving_dtype(
+        backend,
+        input,
+        other,
+        REAL_MULTIPLY_OPERATION_ID,
+        |left, right| left * right,
+        context,
+    )
+}
+
+pub fn real_lerp_tensor_weight_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    end: &Tensor,
+    weight: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ElementwiseRuntimePartThreeError> {
+    context.cancellation.check()?;
+    context.check()?;
+    require_supported_real(input, REAL_LERP_OPERATION_ID)?;
+    let end = checked_operand(
+        input,
+        ElementwiseOperand::Tensor(end),
+        REAL_LERP_OPERATION_ID,
+    )?;
+    let weight = checked_operand(
+        input,
+        ElementwiseOperand::Tensor(weight),
+        REAL_LERP_OPERATION_ID,
+    )?;
+    let output_shape = end.broadcast_shape(input.descriptor().shape())?;
+    let output_shape = weight.broadcast_shape(&output_shape)?;
+    let dtype = input.descriptor().dtype();
+    let element_count = checked_element_count(&output_shape, "real lerp output")?;
+    let byte_len = encoded_byte_len(dtype, element_count, "real lerp output")?;
+    let mut bytes = temporary_vec(backend, context, byte_len, "real lerp output")?;
+    for linear_index in 0..element_count {
+        check_periodically(linear_index, context.cancellation)?;
+        let output_indices = unravel_index(linear_index, &output_shape)?;
+        let input_indices = broadcast_indices(&output_indices, input.descriptor().shape())?;
+        let start = read_real_f32(input, &input_indices, REAL_LERP_OPERATION_ID)?;
+        let end = decoded_real_f32(end.value(&output_indices)?, REAL_LERP_OPERATION_ID, dtype)?;
+        let weight =
+            decoded_real_f32(weight.value(&output_indices)?, REAL_LERP_OPERATION_ID, dtype)?;
+        temporary_extend(
+            &mut bytes,
+            &encode_decoded(
+                dtype,
+                DecodedScalar::Real(f64::from(start + weight * (end - start))),
+                REAL_LERP_OPERATION_ID,
+            )?,
+        )?;
+    }
+    upload_bytes(
+        backend,
+        &output_shape,
+        dtype,
+        input.descriptor().stream(),
+        &bytes,
         context,
     )
 }
@@ -759,6 +847,101 @@ fn map_real_preserving_dtype(
         &bytes,
         context,
     )
+}
+
+fn real_binary_preserving_dtype(
+    backend: &CpuBackend,
+    input: &Tensor,
+    other: ElementwiseOperand<'_>,
+    operation: &'static str,
+    function: impl Fn(f32, f32) -> f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ElementwiseRuntimePartThreeError> {
+    context.cancellation.check()?;
+    context.check()?;
+    require_supported_real(input, operation)?;
+    let other = checked_operand(input, other, operation)?;
+    let output_shape = other.broadcast_shape(input.descriptor().shape())?;
+    let dtype = input.descriptor().dtype();
+    let element_count = checked_element_count(&output_shape, "real binary output")?;
+    let byte_len = encoded_byte_len(dtype, element_count, "real binary output")?;
+    let mut bytes = temporary_vec(backend, context, byte_len, "real binary output")?;
+    for linear_index in 0..element_count {
+        check_periodically(linear_index, context.cancellation)?;
+        let output_indices = unravel_index(linear_index, &output_shape)?;
+        let input_indices = broadcast_indices(&output_indices, input.descriptor().shape())?;
+        let left = read_real_f32(input, &input_indices, operation)?;
+        let right = decoded_real_f32(other.value(&output_indices)?, operation, dtype)?;
+        temporary_extend(
+            &mut bytes,
+            &encode_decoded(
+                dtype,
+                DecodedScalar::Real(f64::from(function(left, right))),
+                operation,
+            )?,
+        )?;
+    }
+    upload_bytes(
+        backend,
+        &output_shape,
+        dtype,
+        input.descriptor().stream(),
+        &bytes,
+        context,
+    )
+}
+
+fn require_supported_real(
+    input: &Tensor,
+    operation: &'static str,
+) -> Result<(), ElementwiseRuntimePartThreeError> {
+    require_cpu(input, operation)?;
+    if matches!(input.descriptor().dtype(), DType::F16 | DType::Bf16 | DType::F32) {
+        Ok(())
+    } else {
+        Err(ElementwiseRuntimePartThreeError::UnsupportedDType {
+            operation,
+            dtype: input.descriptor().dtype(),
+        })
+    }
+}
+
+fn read_real_f32(
+    input: &Tensor,
+    indices: &[u64],
+    operation: &'static str,
+) -> Result<f32, ElementwiseRuntimePartThreeError> {
+    decoded_real_f32(
+        input
+            .descriptor()
+            .dtype()
+            .decode_scalar(input.element_bytes(indices)?)?,
+        operation,
+        input.descriptor().dtype(),
+    )
+}
+
+fn decoded_real_f32(
+    value: DecodedScalar,
+    operation: &'static str,
+    dtype: DType,
+) -> Result<f32, ElementwiseRuntimePartThreeError> {
+    match value {
+        DecodedScalar::Real(value) => Ok(value as f32),
+        _ => Err(ElementwiseRuntimePartThreeError::UnsupportedDType { operation, dtype }),
+    }
+}
+
+fn encoded_byte_len(
+    dtype: DType,
+    element_count: usize,
+    context: &'static str,
+) -> Result<usize, ElementwiseRuntimePartThreeError> {
+    let width = usize::try_from(dtype.byte_width())
+        .map_err(|_| ElementwiseRuntimePartThreeError::Overflow(context))?;
+    element_count
+        .checked_mul(width)
+        .ok_or(ElementwiseRuntimePartThreeError::Overflow(context))
 }
 
 fn f32_binary_map(

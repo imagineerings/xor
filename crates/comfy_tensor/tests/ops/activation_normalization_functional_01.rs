@@ -15,18 +15,18 @@ use comfy_tensor::{
         group_norm_tensor_with_context_exact_native, group_norm_vjp_with_context_exact_native,
         group_norm_with_context_exact_native, layer_norm_jvp_with_context_exact_native,
         layer_norm_vjp_with_context_exact_native, layer_norm_with_context_exact_native,
-        leaky_relu_jvp_with_context_exact_native, leaky_relu_vjp_with_context_exact_native,
-        leaky_relu_with_context_exact_native, leaky_relu_with_context_exact_native_in_place,
-        normalize_jvp_with_context_exact_native, normalize_vjp_with_context_exact_native,
-        normalize_with_context_exact_native, relu_jvp_with_context_exact_native,
-        relu_vjp_with_context_exact_native, relu_with_context_exact_native,
-        relu_with_context_exact_native_in_place, rms_norm_jvp_with_context_exact_native,
-        rms_norm_vjp_with_context_exact_native, rms_norm_with_context_exact_native,
-        silu_jvp_with_context_exact_native, silu_tensor_with_context_exact_native,
-        silu_vjp_with_context_exact_native, silu_with_context_exact_native,
-        silu_with_context_exact_native_in_place, softmax_jvp_with_context_exact_native,
-        softmax_tensor_with_context_exact_native, softmax_vjp_with_context_exact_native,
-        softmax_with_context_exact_native,
+        leaky_relu_jvp_with_context_exact_native, leaky_relu_tensor_with_context_exact_native,
+        leaky_relu_vjp_with_context_exact_native, leaky_relu_with_context_exact_native,
+        leaky_relu_with_context_exact_native_in_place, normalize_jvp_with_context_exact_native,
+        normalize_vjp_with_context_exact_native, normalize_with_context_exact_native,
+        relu_jvp_with_context_exact_native, relu_vjp_with_context_exact_native,
+        relu_with_context_exact_native, relu_with_context_exact_native_in_place,
+        rms_norm_jvp_with_context_exact_native, rms_norm_vjp_with_context_exact_native,
+        rms_norm_with_context_exact_native, silu_jvp_with_context_exact_native,
+        silu_tensor_with_context_exact_native, silu_vjp_with_context_exact_native,
+        silu_with_context_exact_native, silu_with_context_exact_native_in_place,
+        softmax_jvp_with_context_exact_native, softmax_tensor_with_context_exact_native,
+        softmax_vjp_with_context_exact_native, softmax_with_context_exact_native,
     },
 };
 use comfy_types::DeviceKind;
@@ -71,6 +71,55 @@ fn tensor_f32_values(tensor: &Tensor) -> Result<Vec<f32>, Box<dyn std::error::Er
         .chunks_exact(4)
         .map(|bytes| f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
         .collect())
+}
+
+#[test]
+fn leaky_relu_tensor_preserves_low_precision_descriptor_and_storage_independence()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let memory_before = backend.memory_snapshot().current_bytes;
+        let descriptor =
+            TensorDescriptor::contiguous(vec![5], dtype, DeviceId::CPU, StreamId::DEFAULT)?;
+        let mut bytes = Vec::new();
+        for value in [-4.0_f32, -1.0, 0.0, 1.0, 4.0] {
+            bytes.extend(dtype.encode_scalar(
+                Scalar::Float(f64::from(value)),
+                "leaky-relu-tensor-test",
+                DeviceId::CPU,
+            )?);
+        }
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancellation,
+        );
+        let input = backend.upload_bytes(descriptor, &bytes, &context)?.0;
+        let output = leaky_relu_tensor_with_context_exact_native(&backend, &input, 0.2, &context)?;
+        assert_eq!(output.descriptor().dtype(), dtype);
+        assert_eq!(output.descriptor().shape(), [5]);
+        assert_eq!(output.descriptor().stream(), StreamId::DEFAULT);
+        assert_ne!(output.storage_id(), input.storage_id());
+        assert_eq!(input.contiguous_bytes()?, bytes);
+        let width = usize::try_from(dtype.byte_width())?;
+        let values = output
+            .contiguous_bytes()?
+            .chunks_exact(width)
+            .map(|bytes| match dtype.decode_scalar(bytes)? {
+                comfy_tensor::DecodedScalar::Real(value) => Ok(value as f32),
+                _ => Err::<f32, Box<dyn std::error::Error>>("expected real output".into()),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        for (actual, expected) in values.iter().zip([-0.8, -0.2, 0.0, 1.0, 4.0]) {
+            assert!((actual - expected).abs() <= 0.004);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        drop(output);
+        drop(input);
+        assert_eq!(backend.memory_snapshot().current_bytes, memory_before);
+    }
+    Ok(())
 }
 
 #[test]

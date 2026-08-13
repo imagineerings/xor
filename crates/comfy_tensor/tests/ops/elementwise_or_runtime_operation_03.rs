@@ -13,8 +13,10 @@ use comfy_tensor::{
         expm1_with_context_exact_native, floor_jvp_with_context_exact_native,
         floor_vjp_with_context_exact_native, floor_with_context_exact_native,
         greater_with_context_exact_native, no_grad_exact_native,
-        sigmoid_jvp_with_context_exact_native, sigmoid_vjp_with_context_exact_native,
-        sigmoid_with_context_exact_native, torch_save_exact_native,
+        real_add_with_context_exact_native, real_lerp_tensor_weight_with_context_exact_native,
+        real_multiply_with_context_exact_native, sigmoid_jvp_with_context_exact_native,
+        sigmoid_vjp_with_context_exact_native, sigmoid_with_context_exact_native,
+        torch_save_exact_native,
     },
 };
 use sha2::{Digest, Sha256};
@@ -113,6 +115,171 @@ fn upload_f32(
         cancellation,
     );
     Ok(backend.upload_f32(descriptor, values, &context)?.0)
+}
+
+fn upload_real(
+    backend: &CpuBackend,
+    authority: &CpuWorkspaceAuthority,
+    shape: &[u64],
+    values: &[f32],
+    dtype: DType,
+    cancellation: &CancellationToken,
+) -> Result<Tensor, Box<dyn std::error::Error>> {
+    let descriptor =
+        TensorDescriptor::contiguous(shape.to_vec(), dtype, DeviceId::CPU, StreamId::DEFAULT)?;
+    let mut bytes = Vec::new();
+    for value in values {
+        bytes.extend(dtype.encode_scalar(
+            Scalar::Float(f64::from(*value)),
+            "real-arithmetic-test",
+            DeviceId::CPU,
+        )?);
+    }
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(0)?,
+        cancellation,
+    );
+    Ok(backend.upload_bytes(descriptor, &bytes, &context)?.0)
+}
+
+fn real_values(input: &Tensor) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+    let dtype = input.descriptor().dtype();
+    let width = usize::try_from(dtype.byte_width())?;
+    input
+        .contiguous_bytes()?
+        .chunks_exact(width)
+        .map(|bytes| match dtype.decode_scalar(bytes)? {
+            comfy_tensor::DecodedScalar::Real(value) => Ok(value as f32),
+            _ => Err("expected a real tensor".into()),
+        })
+        .collect()
+}
+
+#[test]
+fn bounded_real_arithmetic_preserves_dtype_broadcasting_and_failure_atomicity()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let memory_before = backend.memory_snapshot().current_bytes;
+        let input = upload_real(
+            &backend,
+            &authority,
+            &[1, 2, 1, 2],
+            &[-2.0, 4.0, 3.0, -5.0],
+            dtype,
+            &cancellation,
+        )?;
+        let input_bytes = input.contiguous_bytes()?.to_vec();
+        let channel_scale = upload_real(
+            &backend,
+            &authority,
+            &[1, 2, 1, 1],
+            &[0.5, -2.0],
+            dtype,
+            &cancellation,
+        )?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(64)?,
+            &cancellation,
+        );
+        let multiplied = real_multiply_with_context_exact_native(
+            &backend,
+            &input,
+            ElementwiseOperand::Tensor(&channel_scale),
+            &context,
+        )?;
+        assert_eq!(real_values(&multiplied)?, [-1.0, 2.0, -6.0, 10.0]);
+        let added = real_add_with_context_exact_native(&backend, &input, &multiplied, &context)?;
+        assert_eq!(real_values(&added)?, [-3.0, 6.0, -3.0, 5.0]);
+        let scaled = real_multiply_with_context_exact_native(
+            &backend,
+            &input,
+            ElementwiseOperand::Scalar(Scalar::Float(0.25)),
+            &context,
+        )?;
+        assert_eq!(real_values(&scaled)?, [-0.5, 1.0, 0.75, -1.25]);
+
+        let start = upload_real(
+            &backend,
+            &authority,
+            &[1, 3, 1, 2],
+            &[0.0, 10.0, 10.0, 20.0, 20.0, 30.0],
+            dtype,
+            &cancellation,
+        )?;
+        let end = upload_real(
+            &backend,
+            &authority,
+            &[1, 3, 1, 2],
+            &[10.0, 20.0, 20.0, 30.0, 30.0, 40.0],
+            dtype,
+            &cancellation,
+        )?;
+        let weight = upload_real(
+            &backend,
+            &authority,
+            &[1, 1, 1, 2],
+            &[0.25, 0.75],
+            dtype,
+            &cancellation,
+        )?;
+        let lerped = real_lerp_tensor_weight_with_context_exact_native(
+            &backend, &start, &end, &weight, &context,
+        )?;
+        assert_eq!(real_values(&lerped)?, [2.5, 17.5, 12.5, 27.5, 22.5, 37.5]);
+        assert_eq!(lerped.descriptor().dtype(), dtype);
+        assert_eq!(lerped.descriptor().stream(), StreamId::DEFAULT);
+        assert_ne!(lerped.storage_id(), start.storage_id());
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let required = dtype
+            .byte_width()
+            .checked_mul(4)
+            .ok_or("workspace size overflow")?;
+        let insufficient = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(required - 1)?,
+            &cancellation,
+        );
+        assert!(
+            real_add_with_context_exact_native(&backend, &input, &multiplied, &insufficient,)
+                .is_err()
+        );
+        assert_eq!(insufficient.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(0)?,
+            &cancelled,
+        );
+        assert!(matches!(
+            real_multiply_with_context_exact_native(
+                &backend,
+                &input,
+                ElementwiseOperand::Tensor(&channel_scale),
+                &cancelled_context,
+            ),
+            Err(ElementwiseRuntimePartThreeError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        drop(lerped);
+        drop(weight);
+        drop(end);
+        drop(start);
+        drop(scaled);
+        drop(added);
+        drop(multiplied);
+        drop(channel_scale);
+        drop(input);
+        assert_eq!(backend.memory_snapshot().current_bytes, memory_before);
+    }
+    Ok(())
 }
 
 fn values(

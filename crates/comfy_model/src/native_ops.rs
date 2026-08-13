@@ -13,7 +13,8 @@ use comfy_tensor::{
     TensorError, UnaryOperation,
     generated_activation_normalization_functional_01::{
         FunctionalError, group_norm_with_context_exact_native,
-        layer_norm_with_context_exact_native, silu_tensor_with_context_exact_native,
+        layer_norm_with_context_exact_native, leaky_relu_tensor_with_context_exact_native,
+        silu_tensor_with_context_exact_native,
     },
     generated_comfy_operator_indirection_01::{
         ConvolutionGeometry, ConvolutionPaddingMode, OperatorIndirectionError, TensorValues,
@@ -2703,6 +2704,17 @@ impl NativeModule {
             NativeModuleSpec::Silu => {
                 self.validate_parameter_presence()?;
                 let output = silu_tensor_with_context_exact_native(backend, input, context)?;
+                context.check()?;
+                return Ok(output);
+            }
+            NativeModuleSpec::LeakyRelu { negative_slope } => {
+                self.validate_parameter_presence()?;
+                let output = leaky_relu_tensor_with_context_exact_native(
+                    backend,
+                    input,
+                    *negative_slope,
+                    context,
+                )?;
                 context.check()?;
                 return Ok(output);
             }

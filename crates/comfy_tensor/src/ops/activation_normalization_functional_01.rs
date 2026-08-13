@@ -146,12 +146,16 @@ fn leaky_relu_exact_native(
 ) -> Result<Vec<f32>, FunctionalError> {
     validate_negative_slope(negative_slope)?;
     elementwise_forward(input, device, cancellation, |value| {
-        if value >= 0.0 {
-            value
-        } else {
-            value * negative_slope
-        }
+        leaky_relu_scalar(value, negative_slope)
     })
+}
+
+fn leaky_relu_scalar(value: f32, negative_slope: f32) -> f32 {
+    if value >= 0.0 {
+        value
+    } else {
+        value * negative_slope
+    }
 }
 
 pub fn leaky_relu_with_context_exact_native_in_place(
@@ -1330,6 +1334,35 @@ pub fn leaky_relu_with_context_exact_native(
 ) -> Result<Vec<f32>, FunctionalError> {
     context.check()?;
     leaky_relu_exact_native(input, negative_slope, device, context.cancellation)
+}
+
+pub fn leaky_relu_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    negative_slope: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FunctionalError> {
+    validate_negative_slope(negative_slope)?;
+    validate_tensor_input(backend, input, LEAKY_RELU_OPERATION_ID, context)?;
+    let mut output = allocate_tensor_output(backend, input, context)?;
+    {
+        let mut write = output.write()?;
+        let element_count = input.descriptor().element_count()?;
+        for linear in 0..element_count {
+            context.check()?;
+            let value = read_tensor_real_linear(input, linear)? as f32;
+            let activated = leaky_relu_scalar(value, negative_slope);
+            write_tensor_real_linear(
+                &mut write,
+                input.descriptor().dtype(),
+                input.descriptor().device(),
+                linear,
+                f64::from(activated),
+                LEAKY_RELU_OPERATION_ID,
+            )?;
+        }
+    }
+    finish_tensor_output(backend, output, context)
 }
 
 #[allow(clippy::too_many_arguments)]
