@@ -281,6 +281,7 @@ fn reduced_qwen3_decoder(
         query_key_norm: true,
         qwen35_linear: None,
         gemma3: None,
+        gemma4: None,
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 5_000_000.0,
@@ -318,6 +319,7 @@ fn reduced_qwen3_decoder(
             post_attention_norm_weight: None,
             post_feed_forward_norm_weight: None,
             attention_sink: None,
+            gemma4_layer_input: None,
         });
     }
     Ok(Arc::new(NativeDecoderTextEncoder::new(
@@ -327,6 +329,7 @@ fn reduced_qwen3_decoder(
             layers,
             final_norm_weight: filled_tensor(backend, &[4], 1.0, context)?,
             output_head_weight: None,
+            gemma4_per_layer: None,
         },
     )?))
 }

@@ -1043,9 +1043,28 @@ pub enum Gemma3DecoderProfile {
     TwelveB,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gemma4DecoderProfile {
+    E2B,
+    E4B,
+    ThirtyOneB,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Gemma3DecoderConfiguration {
     pub local_rope: DecoderRopeConfiguration,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Gemma4DecoderConfiguration {
+    pub source_profile: Option<Gemma4DecoderProfile>,
+    pub local_rope: DecoderRopeConfiguration,
+    pub global_head_dimension: usize,
+    pub global_rotary_pairs: usize,
+    pub sliding_layers_per_cycle: usize,
+    pub hidden_size_per_layer_input: usize,
+    pub shared_key_value_layers: usize,
+    pub double_wide_mlp: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1064,6 +1083,7 @@ pub struct DecoderTextConfiguration {
     pub query_key_norm: bool,
     pub qwen35_linear: Option<Qwen35LinearConfiguration>,
     pub gemma3: Option<Gemma3DecoderConfiguration>,
+    pub gemma4: Option<Gemma4DecoderConfiguration>,
     pub normalization_epsilon_bits: u32,
     pub rope: DecoderRopeConfiguration,
     pub sliding_window: Option<usize>,
@@ -1272,6 +1292,63 @@ impl DecoderTextConfiguration {
                 ));
             }
         }
+        if let Some(gemma4) = &self.gemma4 {
+            gemma4
+                .local_rope
+                .validate_for_head_dimension(self.head_dimension)?;
+            let global_rotary_dimension = gemma4
+                .global_rotary_pairs
+                .checked_mul(2)
+                .ok_or(DecoderTextError::Overflow("Gemma4 global rotary width"))?;
+            if self.architecture != DecoderArchitecture::Gemma
+                || self.gemma3.is_some()
+                || self.qwen35_linear.is_some()
+                || !self.query_key_norm
+                || gemma4.global_head_dimension < self.head_dimension
+                || !gemma4.global_head_dimension.is_multiple_of(2)
+                || gemma4.global_rotary_pairs == 0
+                || gemma4.global_rotary_pairs > gemma4.global_head_dimension / 2
+                || self.rope.rotary_dimension != global_rotary_dimension
+                || self.rope.theta != 1_000_000.0
+                || self.rope.scaling != RopeScaling::None
+                || !self.rope.interleaved_sections.is_empty()
+                || gemma4.local_rope.rotary_dimension != self.head_dimension
+                || gemma4.local_rope.theta != 10_000.0
+                || gemma4.local_rope.scaling != RopeScaling::None
+                || gemma4.sliding_layers_per_cycle == 0
+                || self.sliding_window.is_none()
+                || self.activation != DecoderActivation::GeluTanh
+                || self.norm_weight_offset() != 0.0
+                || self.residual_scale() != 1.0
+                || self.embedding_scale() != (self.hidden_size as f32).sqrt()
+                || self.logits_soft_cap() != Some(30.0)
+                || !self.tied_output_head
+                || self.stop_tokens != [1, 50, 106]
+                || gemma4.shared_key_value_layers > self.layer_kinds.len()
+                || gemma4.double_wide_mlp && gemma4.shared_key_value_layers == 0
+                || self.layer_kinds.iter().enumerate().any(|(index, kind)| {
+                    let cycle = gemma4.sliding_layers_per_cycle + 1;
+                    *kind
+                        != if (index + 1).is_multiple_of(cycle) {
+                            DecoderLayerKind::FullAttention
+                        } else {
+                            DecoderLayerKind::SlidingAttention
+                        }
+                })
+            {
+                return Err(DecoderTextError::InvalidConfiguration(
+                    "Gemma4 requires exact local/global attention, partial RoPE, per-layer input, shared-KV, scaling, soft-cap, and stop-token semantics",
+                ));
+            }
+            if let Some(profile) = gemma4.source_profile {
+                let exact = gemma4_decoder_configuration(profile);
+                if self != &exact {
+                    return Err(DecoderTextError::InvalidConfiguration(
+                        "Gemma4 source-profile dimensions do not match the selected E2B, E4B, or 31B configuration",
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1280,8 +1357,40 @@ impl DecoderTextConfiguration {
             && let Some(gemma3) = &self.gemma3
         {
             &gemma3.local_rope
+        } else if kind == DecoderLayerKind::SlidingAttention
+            && let Some(gemma4) = &self.gemma4
+        {
+            &gemma4.local_rope
         } else {
             &self.rope
+        }
+    }
+
+    fn head_dimension_for_layer(&self, kind: DecoderLayerKind) -> usize {
+        if kind == DecoderLayerKind::FullAttention
+            && let Some(gemma4) = &self.gemma4
+        {
+            gemma4.global_head_dimension
+        } else {
+            self.head_dimension
+        }
+    }
+
+    fn feed_forward_size_for_layer(&self, index: usize) -> Result<usize, DecoderTextError> {
+        let Some(gemma4) = &self.gemma4 else {
+            return Ok(self.feed_forward_size);
+        };
+        let first_shared = self
+            .layer_kinds
+            .len()
+            .checked_sub(gemma4.shared_key_value_layers)
+            .ok_or(DecoderTextError::Overflow("Gemma4 shared-KV boundary"))?;
+        if gemma4.double_wide_mlp && index >= first_shared {
+            self.feed_forward_size
+                .checked_mul(2)
+                .ok_or(DecoderTextError::Overflow("Gemma4 double-wide MLP"))
+        } else {
+            Ok(self.feed_forward_size)
         }
     }
 }
@@ -1346,6 +1455,7 @@ pub fn gemma3_decoder_configuration(profile: Gemma3DecoderProfile) -> DecoderTex
                 scaling: RopeScaling::None,
             },
         }),
+        gemma4: None,
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 1_000_000.0,
@@ -1361,6 +1471,82 @@ pub fn gemma3_decoder_configuration(profile: Gemma3DecoderProfile) -> DecoderTex
         logits_soft_cap_bits: None,
         tied_output_head: true,
         stop_tokens: vec![1, 106],
+    }
+}
+
+pub fn gemma4_decoder_configuration(profile: Gemma4DecoderProfile) -> DecoderTextConfiguration {
+    let (
+        hidden_size,
+        feed_forward_size,
+        hidden_layers,
+        attention_heads,
+        key_value_heads,
+        sliding_layers_per_cycle,
+        sliding_window,
+        hidden_size_per_layer_input,
+        shared_key_value_layers,
+        double_wide_mlp,
+    ) = match profile {
+        Gemma4DecoderProfile::E2B => (1536, 6144, 35, 8, 1, 4, 512, 256, 20, true),
+        Gemma4DecoderProfile::E4B => (2560, 10_240, 42, 8, 2, 5, 512, 256, 18, false),
+        Gemma4DecoderProfile::ThirtyOneB => (5376, 21_504, 60, 32, 16, 5, 1024, 0, 0, false),
+    };
+    let hidden_layers: usize = hidden_layers;
+    let sliding_layers_per_cycle: usize = sliding_layers_per_cycle;
+    let cycle: usize = sliding_layers_per_cycle + 1;
+    DecoderTextConfiguration {
+        architecture: DecoderArchitecture::Gemma,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        vocabulary_size: 262_144,
+        maximum_tokens: 131_072,
+        hidden_size,
+        feed_forward_size,
+        layer_kinds: (0..hidden_layers)
+            .map(|index| {
+                if (index + 1).is_multiple_of(cycle) {
+                    DecoderLayerKind::FullAttention
+                } else {
+                    DecoderLayerKind::SlidingAttention
+                }
+            })
+            .collect(),
+        attention_heads,
+        key_value_heads,
+        head_dimension: 256,
+        query_key_norm: true,
+        qwen35_linear: None,
+        gemma3: None,
+        gemma4: Some(Gemma4DecoderConfiguration {
+            source_profile: Some(profile),
+            local_rope: DecoderRopeConfiguration {
+                theta: 10_000.0,
+                rotary_dimension: 256,
+                interleaved_sections: Vec::new(),
+                scaling: RopeScaling::None,
+            },
+            global_head_dimension: 512,
+            global_rotary_pairs: 64,
+            sliding_layers_per_cycle,
+            hidden_size_per_layer_input,
+            shared_key_value_layers,
+            double_wide_mlp,
+        }),
+        normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+        rope: DecoderRopeConfiguration {
+            theta: 1_000_000.0,
+            rotary_dimension: 128,
+            interleaved_sections: Vec::new(),
+            scaling: RopeScaling::None,
+        },
+        sliding_window: Some(sliding_window),
+        activation: DecoderActivation::GeluTanh,
+        embedding_scale_bits: (hidden_size as f32).sqrt().to_bits(),
+        residual_scale_bits: 1.0_f32.to_bits(),
+        norm_weight_offset_bits: 0.0_f32.to_bits(),
+        logits_soft_cap_bits: Some(30.0_f32.to_bits()),
+        tied_output_head: true,
+        stop_tokens: vec![1, 50, 106],
     }
 }
 
@@ -1401,6 +1587,22 @@ pub struct DecoderLayerWeights {
     pub post_attention_norm_weight: Option<Tensor>,
     pub post_feed_forward_norm_weight: Option<Tensor>,
     pub attention_sink: Option<Tensor>,
+    pub gemma4_layer_input: Option<Gemma4LayerInputWeights>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4LayerInputWeights {
+    pub gate_weight: Tensor,
+    pub projection_weight: Tensor,
+    pub post_norm_weight: Tensor,
+    pub layer_scalar: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4PerLayerWeights {
+    pub token_embedding: Tensor,
+    pub model_projection_weight: Tensor,
+    pub projection_norm_weight: Tensor,
 }
 
 #[derive(Clone, Debug)]
@@ -1409,6 +1611,7 @@ pub struct DecoderTextWeights {
     pub layers: Vec<DecoderLayerWeights>,
     pub final_norm_weight: Tensor,
     pub output_head_weight: Option<Tensor>,
+    pub gemma4_per_layer: Option<Gemma4PerLayerWeights>,
 }
 
 #[derive(Clone, Debug)]
@@ -1432,6 +1635,10 @@ impl DecoderAttentionCache {
 
     pub fn values(&self) -> &Tensor {
         &self.values
+    }
+
+    pub fn head_dimension(&self) -> usize {
+        self.head_dimension
     }
 }
 
@@ -1492,6 +1699,7 @@ pub struct DecoderPreparedTextRequest<'a> {
     pub cache: Option<&'a DecoderKvState>,
     pub capture_layer: Option<isize>,
     pub deepstack: Option<DecoderPreparedDeepstack<'a>>,
+    pub initial_input_ids: Option<&'a [i64]>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1508,6 +1716,7 @@ pub struct DecoderPreparedGenerationPrompt<'a> {
     pub rope_positions: DecoderRopePositions<'a>,
     pub causal_positions: &'a [usize],
     pub deepstack: Option<DecoderPreparedDeepstack<'a>>,
+    pub initial_input_ids: Option<&'a [i64]>,
 }
 
 struct ValidatedPreparedDeepstack {
@@ -1648,6 +1857,22 @@ struct NativeDecoderLayer {
     post_attention_norm_weight: Option<Tensor>,
     post_feed_forward_norm_weight: Option<Tensor>,
     attention_sink: Option<Tensor>,
+    gemma4_layer_input: Option<NativeGemma4LayerInput>,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4LayerInput {
+    gate: NativeModule,
+    projection: NativeModule,
+    post_norm_weight: Tensor,
+    layer_scalar: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4PerLayerInput {
+    token_embedding: NativeModule,
+    model_projection: NativeModule,
+    projection_norm_weight: Tensor,
 }
 
 #[derive(Clone, Debug)]
@@ -1681,6 +1906,7 @@ pub struct NativeDecoderTextEncoder {
     layers: Vec<NativeDecoderLayer>,
     final_norm_weight: Tensor,
     output_head: NativeModule,
+    gemma4_per_layer: Option<NativeGemma4PerLayerInput>,
     stream: StreamId,
 }
 
@@ -1777,6 +2003,56 @@ impl NativeDecoderTextEncoder {
         )?;
         token_embedding.load_dense_parameters(weights.token_embedding.clone(), None)?;
 
+        let gemma4_per_layer = match (
+            configuration
+                .gemma4
+                .as_ref()
+                .map(|gemma4| gemma4.hidden_size_per_layer_input)
+                .unwrap_or(0),
+            weights.gemma4_per_layer,
+        ) {
+            (0, None) => None,
+            (hidden_per_layer, Some(weights)) if hidden_per_layer > 0 => {
+                let total_hidden = hidden_per_layer
+                    .checked_mul(configuration.layer_kinds.len())
+                    .ok_or(DecoderTextError::Overflow("Gemma4 per-layer hidden width"))?;
+                require_tensor_shape(
+                    &weights.token_embedding,
+                    &[configuration.vocabulary_size, total_hidden],
+                    stream,
+                )?;
+                require_vector_parameter(
+                    &weights.projection_norm_weight,
+                    hidden_per_layer,
+                    stream,
+                )?;
+                let mut token_embedding = NativeModule::embedding(
+                    "decoder.gemma4_per_layer.token_embedding",
+                    configuration.vocabulary_size,
+                    total_hidden,
+                    EmbeddingOptions::default(),
+                    false,
+                )?;
+                token_embedding.load_dense_parameters(weights.token_embedding, None)?;
+                Some(NativeGemma4PerLayerInput {
+                    token_embedding,
+                    model_projection: linear_module(
+                        "decoder.gemma4_per_layer.model_projection".to_owned(),
+                        configuration.hidden_size,
+                        total_hidden,
+                        weights.model_projection_weight,
+                        stream,
+                    )?,
+                    projection_norm_weight: weights.projection_norm_weight,
+                })
+            }
+            _ => {
+                return Err(DecoderTextError::InvalidConfiguration(
+                    "Gemma4 per-layer global weights must exactly match its hidden-input profile",
+                ));
+            }
+        };
+
         let mut layers = Vec::new();
         layers
             .try_reserve_exact(weights.layers.len())
@@ -1819,6 +2095,7 @@ impl NativeDecoderTextEncoder {
             layers,
             final_norm_weight: weights.final_norm_weight,
             output_head,
+            gemma4_per_layer,
             stream,
         })
     }
@@ -1930,6 +2207,16 @@ impl NativeDecoderTextEncoder {
             ("token_embedding".to_owned(), &self.token_embedding),
             ("output_head".to_owned(), &self.output_head),
         ];
+        if let Some(per_layer) = &self.gemma4_per_layer {
+            modules.push((
+                "gemma4_per_layer.token_embedding".to_owned(),
+                &per_layer.token_embedding,
+            ));
+            modules.push((
+                "gemma4_per_layer.model_projection".to_owned(),
+                &per_layer.model_projection,
+            ));
+        }
         for (index, layer) in self.layers.iter().enumerate() {
             let attention_modules: Vec<(&str, &NativeModule)> = match &layer.attention {
                 NativeDecoderAttention::DotProduct {
@@ -1967,12 +2254,28 @@ impl NativeDecoderTextEncoder {
             ]) {
                 modules.push((format!("layers.{index}.{name}"), module));
             }
+            if let Some(per_layer) = &layer.gemma4_layer_input {
+                modules.push((
+                    format!("layers.{index}.per_layer_input_gate"),
+                    &per_layer.gate,
+                ));
+                modules.push((
+                    format!("layers.{index}.per_layer_projection"),
+                    &per_layer.projection,
+                ));
+            }
         }
         modules
     }
 
     fn normalization_tensors(&self) -> Vec<(String, &Tensor)> {
         let mut tensors = vec![("final_norm_weight".to_owned(), &self.final_norm_weight)];
+        if let Some(per_layer) = &self.gemma4_per_layer {
+            tensors.push((
+                "gemma4_per_layer.projection_norm_weight".to_owned(),
+                &per_layer.projection_norm_weight,
+            ));
+        }
         for (index, layer) in self.layers.iter().enumerate() {
             tensors.push((
                 format!("layers.{index}.attention_norm_weight"),
@@ -1993,6 +2296,16 @@ impl NativeDecoderTextEncoder {
             }
             if let Some(tensor) = &layer.attention_sink {
                 tensors.push((format!("layers.{index}.attention_sink"), tensor));
+            }
+            if let Some(per_layer) = &layer.gemma4_layer_input {
+                tensors.push((
+                    format!("layers.{index}.post_per_layer_input_norm_weight"),
+                    &per_layer.post_norm_weight,
+                ));
+                tensors.push((
+                    format!("layers.{index}.layer_scalar"),
+                    &per_layer.layer_scalar,
+                ));
             }
             match &layer.attention {
                 NativeDecoderAttention::DotProduct {
@@ -2038,6 +2351,20 @@ impl NativeDecoderTextEncoder {
                 .iter(),
         );
         requirements.extend(self.output_head.execution_requirements(DType::F32).iter());
+        if let Some(per_layer) = &self.gemma4_per_layer {
+            requirements.extend(
+                per_layer
+                    .token_embedding
+                    .execution_requirements(DType::F32)
+                    .iter(),
+            );
+            requirements.extend(
+                per_layer
+                    .model_projection
+                    .execution_requirements(DType::F32)
+                    .iter(),
+            );
+        }
         for layer in &self.layers {
             let attention_modules: Vec<&NativeModule> = match &layer.attention {
                 NativeDecoderAttention::DotProduct {
@@ -2065,6 +2392,15 @@ impl NativeDecoderTextEncoder {
                 &layer.feed_forward_down,
             ]) {
                 requirements.extend(module.execution_requirements(DType::F32).iter());
+            }
+            if let Some(per_layer) = &layer.gemma4_layer_input {
+                requirements.extend(per_layer.gate.execution_requirements(DType::F32).iter());
+                requirements.extend(
+                    per_layer
+                        .projection
+                        .execution_requirements(DType::F32)
+                        .iter(),
+                );
             }
         }
         requirements.extend([
@@ -2143,6 +2479,11 @@ impl NativeDecoderTextEncoder {
             request.cache,
         )?);
         let hidden = self.embed_validated_tokens(backend, request.tokens, context)?;
+        let input_ids = if self.configuration.gemma4.is_some() {
+            Some(read_i64_tensor(backend, request.tokens, context)?)
+        } else {
+            None
+        };
         self.forward_hidden(
             backend,
             hidden,
@@ -2151,6 +2492,7 @@ impl NativeDecoderTextEncoder {
             request.cache,
             request.capture_layer,
             None,
+            input_ids.as_deref(),
             batch,
             query_tokens,
             context,
@@ -2260,6 +2602,7 @@ impl NativeDecoderTextEncoder {
             request.cache,
             request.capture_layer,
             deepstack.as_ref(),
+            request.initial_input_ids,
             batch,
             query_tokens,
             context,
@@ -2295,6 +2638,7 @@ impl NativeDecoderTextEncoder {
         cache: Option<&DecoderKvState>,
         capture_layer: Option<isize>,
         deepstack: Option<&ValidatedPreparedDeepstack>,
+        initial_input_ids: Option<&[i64]>,
         batch: usize,
         query_tokens: usize,
         context: &ExecutionContext<'_>,
@@ -2307,8 +2651,39 @@ impl NativeDecoderTextEncoder {
             .map(|layer| resolve_layer(layer, self.layers.len()))
             .transpose()?;
         let mut intermediate = None;
+        let per_layer_inputs = self.prepare_gemma4_layer_inputs(
+            backend,
+            &hidden,
+            initial_input_ids,
+            batch,
+            query_tokens,
+            context,
+        )?;
+        let shared_boundary = self
+            .configuration
+            .gemma4
+            .as_ref()
+            .map(|gemma4| {
+                self.layers
+                    .len()
+                    .checked_sub(gemma4.shared_key_value_layers)
+                    .ok_or(DecoderTextError::Overflow("Gemma4 shared-KV boundary"))
+            })
+            .transpose()?
+            .unwrap_or(self.layers.len());
+        let mut shared_sliding = None;
+        let mut shared_global = None;
         for (layer_index, layer) in self.layers.iter().enumerate() {
             context.check()?;
+            let shared = if layer_index >= shared_boundary {
+                match layer.kind {
+                    DecoderLayerKind::SlidingAttention => shared_sliding.as_ref(),
+                    DecoderLayerKind::FullAttention => shared_global.as_ref(),
+                    DecoderLayerKind::LinearAttention => None,
+                }
+            } else {
+                None
+            };
             hidden = layer.forward(
                 backend,
                 &hidden,
@@ -2321,8 +2696,24 @@ impl NativeDecoderTextEncoder {
                     .layers
                     .get_mut(layer_index)
                     .ok_or(DecoderTextError::InvalidInput("cache layer is missing"))?,
+                shared,
+                per_layer_inputs
+                    .as_ref()
+                    .and_then(|inputs| inputs.get(layer_index)),
                 context,
             )?;
+            if layer_index < shared_boundary
+                && let Some(DecoderLayerCache::Attention(cache)) = staged_cache
+                    .layers
+                    .get(layer_index)
+                    .and_then(Option::as_ref)
+            {
+                match layer.kind {
+                    DecoderLayerKind::SlidingAttention => shared_sliding = Some(cache.clone()),
+                    DecoderLayerKind::FullAttention => shared_global = Some(cache.clone()),
+                    DecoderLayerKind::LinearAttention => {}
+                }
+            }
             if let Some(deepstack) = deepstack
                 && let Some(layer) = deepstack.layers.get(layer_index)
             {
@@ -2364,6 +2755,134 @@ impl NativeDecoderTextEncoder {
             logits,
             cache: staged_cache,
         })
+    }
+
+    fn prepare_gemma4_layer_inputs(
+        &self,
+        backend: &CpuBackend,
+        hidden: &Tensor,
+        initial_input_ids: Option<&[i64]>,
+        batch: usize,
+        query_tokens: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Option<Vec<Tensor>>, DecoderTextError> {
+        let Some(configuration) = self.configuration.gemma4.as_ref() else {
+            if initial_input_ids.is_some() {
+                return Err(DecoderTextError::InvalidInput(
+                    "initial input IDs are owned only by Gemma4 prepared execution",
+                ));
+            }
+            return Ok(None);
+        };
+        let hidden_per_layer = configuration.hidden_size_per_layer_input;
+        if hidden_per_layer == 0 {
+            if initial_input_ids.is_some() {
+                return Err(DecoderTextError::InvalidInput(
+                    "Gemma4 31B does not admit per-layer initial input IDs",
+                ));
+            }
+            return Ok(None);
+        }
+        let per_layer =
+            self.gemma4_per_layer
+                .as_ref()
+                .ok_or(DecoderTextError::InvalidConfiguration(
+                    "Gemma4 per-layer owner is missing",
+                ))?;
+        if initial_input_ids.is_some_and(|ids| {
+            ids.len() != batch.saturating_mul(query_tokens)
+                || ids
+                    .iter()
+                    .any(|id| *id < 0 || *id as usize >= self.configuration.vocabulary_size)
+        }) {
+            return Err(DecoderTextError::InvalidInput(
+                "Gemma4 initial input IDs must match the prepared sequence and vocabulary",
+            ));
+        }
+        let total_hidden = hidden_per_layer
+            .checked_mul(self.layers.len())
+            .ok_or(DecoderTextError::Overflow("Gemma4 per-layer hidden width"))?;
+        let mut projection = per_layer.model_projection.clone();
+        let projected = projection.forward_with_context(backend, hidden, context)?;
+        let mut projected_values = tensor_to_f32(backend, &projected, context)?;
+        let projection_scale = (self.configuration.hidden_size as f32).sqrt().recip();
+        for value in projected_values.iter_mut() {
+            *value *= projection_scale;
+        }
+        let norm_weight = tensor_to_f32(backend, &per_layer.projection_norm_weight, context)?;
+        let mut combined = rms_norm_with_context_exact_native(
+            backend,
+            &projected_values,
+            &[batch, query_tokens, self.layers.len(), hidden_per_layer],
+            &[hidden_per_layer],
+            Some(&norm_weight),
+            Some(self.configuration.normalization_epsilon()),
+            DeviceId::CPU,
+            context,
+        )?;
+        if let Some(input_ids) = initial_input_ids {
+            let ids = tensor_from_i64(
+                backend,
+                &[
+                    usize_to_u64(batch, "Gemma4 input-ID batch")?,
+                    usize_to_u64(query_tokens, "Gemma4 input-ID tokens")?,
+                ],
+                input_ids,
+                context,
+            )?;
+            let mut embedding = per_layer.token_embedding.clone();
+            let embedded = embedding.forward_with_context(backend, &ids, context)?;
+            let embedded = tensor_to_f32(backend, &embedded, context)?;
+            if embedded.len() != combined.len() {
+                return Err(DecoderTextError::InvalidInput(
+                    "Gemma4 per-layer embedding projection is incomplete",
+                ));
+            }
+            for (combined, embedded) in combined.iter_mut().zip(embedded.iter().copied()) {
+                *combined =
+                    (*combined + embedded * (hidden_per_layer as f32).sqrt()) * 0.5_f32.sqrt();
+                if !combined.is_finite() {
+                    return Err(DecoderTextError::InvalidInput(
+                        "Gemma4 per-layer input is nonfinite",
+                    ));
+                }
+            }
+        }
+        let mut outputs = Vec::new();
+        outputs
+            .try_reserve_exact(self.layers.len())
+            .map_err(|_| DecoderTextError::Allocation("Gemma4 per-layer inputs"))?;
+        for layer in 0..self.layers.len() {
+            context.check()?;
+            let mut values = Vec::new();
+            values
+                .try_reserve_exact(
+                    batch
+                        .saturating_mul(query_tokens)
+                        .saturating_mul(hidden_per_layer),
+                )
+                .map_err(|_| DecoderTextError::Allocation("Gemma4 layer input"))?;
+            for token in 0..batch.saturating_mul(query_tokens) {
+                let start = token
+                    .checked_mul(total_hidden)
+                    .and_then(|offset| offset.checked_add(layer.saturating_mul(hidden_per_layer)))
+                    .ok_or(DecoderTextError::Overflow("Gemma4 layer input offset"))?;
+                values.extend_from_slice(combined.get(start..start + hidden_per_layer).ok_or(
+                    DecoderTextError::InvalidInput("Gemma4 layer input slice is missing"),
+                )?);
+            }
+            outputs.push(tensor_from_f32(
+                backend,
+                &[
+                    usize_to_u64(batch, "Gemma4 layer-input batch")?,
+                    usize_to_u64(query_tokens, "Gemma4 layer-input tokens")?,
+                    usize_to_u64(hidden_per_layer, "Gemma4 layer-input width")?,
+                ],
+                &values,
+                context,
+            )?);
+        }
+        Ok(Some(outputs))
     }
 
     fn validate_prepared_deepstack(
@@ -2609,6 +3128,7 @@ impl NativeDecoderTextEncoder {
             cache: None,
             capture_layer: None,
             deepstack: prompt.deepstack,
+            initial_input_ids: prompt.initial_input_ids,
         };
         let continuation_attention = prompt
             .attention_mask
@@ -2846,6 +3366,8 @@ impl NativeDecoderLayer {
         query_tokens: usize,
         configuration: &DecoderTextConfiguration,
         cache: &mut Option<DecoderLayerCache>,
+        shared_key_value: Option<&DecoderAttentionCache>,
+        per_layer_input: Option<&Tensor>,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, DecoderTextError> {
         let attention_input = rms_norm_tensor(
@@ -2877,6 +3399,7 @@ impl NativeDecoderLayer {
                     query_tokens,
                     configuration,
                     cache,
+                    shared_key_value,
                     context,
                 )?,
         };
@@ -2931,13 +3454,59 @@ impl NativeDecoderLayer {
         } else {
             feed_forward
         };
-        add_scaled(
+        let mut output = add_scaled(
             backend,
             &residual,
             &feed_forward,
             configuration.residual_scale(),
             context,
-        )
+        )?;
+        match (&self.gemma4_layer_input, per_layer_input) {
+            (Some(layer_input), Some(per_layer_input)) => {
+                let residual = output.clone();
+                let mut gate = layer_input.gate.clone();
+                let gate = gate.forward_with_context(backend, &output, context)?;
+                let mut activation = NativeModule::gelu(
+                    "decoder.gemma4_per_layer.activation",
+                    crate::GeluApproximation::Tanh,
+                )?;
+                let gate = activation.forward_with_context(backend, &gate, context)?;
+                let mixed = multiply_tensor(backend, &gate, per_layer_input, context)?;
+                let mut projection = layer_input.projection.clone();
+                let projected = projection.forward_with_context(backend, &mixed, context)?;
+                let projected = rms_norm_tensor(
+                    backend,
+                    &projected,
+                    &layer_input.post_norm_weight,
+                    configuration.hidden_size,
+                    configuration.normalization_epsilon(),
+                    configuration.norm_weight_offset(),
+                    context,
+                )?;
+                output = add_scaled(backend, &residual, &projected, 1.0, context)?;
+            }
+            (None, None) => {}
+            _ => {
+                return Err(DecoderTextError::InvalidInput(
+                    "Gemma4 per-layer input does not match the admitted layer",
+                ));
+            }
+        }
+        if let Some(layer_input) = &self.gemma4_layer_input {
+            let scalar = tensor_to_f32(backend, &layer_input.layer_scalar, context)?;
+            let scalar = *scalar
+                .first()
+                .ok_or(DecoderTextError::InvalidConfiguration(
+                    "Gemma4 layer scalar is missing",
+                ))?;
+            if !scalar.is_finite() {
+                return Err(DecoderTextError::InvalidConfiguration(
+                    "Gemma4 layer scalar must be finite",
+                ));
+            }
+            output = scale_tensor(backend, &output, scalar, context)?;
+        }
+        Ok(output)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2951,6 +3520,7 @@ impl NativeDecoderLayer {
         query_tokens: usize,
         configuration: &DecoderTextConfiguration,
         cache: &mut Option<DecoderLayerCache>,
+        shared_key_value: Option<&DecoderAttentionCache>,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, DecoderTextError> {
         let NativeDecoderAttention::DotProduct {
@@ -2967,12 +3537,9 @@ impl NativeDecoderLayer {
                 "dot-product execution requires dot-product weights",
             ));
         };
+        let head_dimension = configuration.head_dimension_for_layer(self.kind);
         let mut query_module = query_module.clone();
-        let mut key_module = key_module.clone();
-        let mut value_module = value_module.clone();
         let query = query_module.forward_with_context(backend, input, context)?;
-        let key = key_module.forward_with_context(backend, input, context)?;
-        let value = value_module.forward_with_context(backend, input, context)?;
         let query = tensor_to_f32(backend, &query, context)?;
         let (query, gate) = if *gated_output {
             split_qwen35_query_gate(
@@ -2980,14 +3547,12 @@ impl NativeDecoderLayer {
                 batch,
                 query_tokens,
                 configuration.attention_heads,
-                configuration.head_dimension,
+                head_dimension,
                 context.cancellation,
             )?
         } else {
             (query.iter().copied().collect(), None)
         };
-        let key = tensor_to_f32(backend, &key, context)?;
-        let value = tensor_to_f32(backend, &value, context)?;
         let query = normalize_attention_heads(
             backend,
             &query,
@@ -2995,59 +3560,107 @@ impl NativeDecoderLayer {
             batch,
             query_tokens,
             configuration.attention_heads,
-            configuration,
-            context,
-        )?;
-        let key = normalize_attention_heads(
-            backend,
-            &key,
-            key_norm_weight.as_ref(),
-            batch,
-            query_tokens,
-            configuration.key_value_heads,
+            head_dimension,
             configuration,
             context,
         )?;
         let layer_rope = configuration.rope_for_layer(self.kind);
-        let query = apply_decoder_rope(
+        let query = apply_decoder_layer_rope(
             &query,
             batch,
             query_tokens,
             configuration.attention_heads,
-            configuration.head_dimension,
+            head_dimension,
             positions.rope(),
             layer_rope,
+            configuration
+                .gemma4
+                .as_ref()
+                .filter(|_| self.kind == DecoderLayerKind::FullAttention),
             context.cancellation,
         )?;
-        let key = apply_decoder_rope(
-            &key,
-            batch,
-            query_tokens,
-            configuration.key_value_heads,
-            configuration.head_dimension,
-            positions.rope(),
-            layer_rope,
-            context.cancellation,
-        )?;
-        let (keys, values, key_tokens) = stage_attention_cache(
-            backend,
-            cache,
-            batch,
-            configuration.key_value_heads,
-            configuration.head_dimension,
-            &key,
-            &value,
-            query_tokens,
-            configuration.maximum_tokens,
-            context,
-        )?;
+        let (keys, values, key_tokens) = if let Some(shared) = shared_key_value {
+            if shared.batch != batch
+                || shared.key_value_heads != configuration.key_value_heads
+                || shared.head_dimension != head_dimension
+            {
+                return Err(DecoderTextError::InvalidInput(
+                    "Gemma4 shared key/value geometry does not match the consuming layer",
+                ));
+            }
+            *cache = None;
+            (
+                tensor_to_f32(backend, &shared.keys, context)?.to_vec(),
+                tensor_to_f32(backend, &shared.values, context)?.to_vec(),
+                shared.tokens,
+            )
+        } else {
+            let mut key_module = key_module.clone();
+            let mut value_module = value_module.clone();
+            let key = key_module.forward_with_context(backend, input, context)?;
+            let value = value_module.forward_with_context(backend, input, context)?;
+            let key = tensor_to_f32(backend, &key, context)?;
+            let value = tensor_to_f32(backend, &value, context)?;
+            let key = normalize_attention_heads(
+                backend,
+                &key,
+                key_norm_weight.as_ref(),
+                batch,
+                query_tokens,
+                configuration.key_value_heads,
+                head_dimension,
+                configuration,
+                context,
+            )?;
+            let value = if configuration.gemma4.is_some() {
+                normalize_attention_heads(
+                    backend,
+                    &value,
+                    None,
+                    batch,
+                    query_tokens,
+                    configuration.key_value_heads,
+                    head_dimension,
+                    configuration,
+                    context,
+                )?
+            } else {
+                value.to_vec()
+            };
+            let key = apply_decoder_layer_rope(
+                &key,
+                batch,
+                query_tokens,
+                configuration.key_value_heads,
+                head_dimension,
+                positions.rope(),
+                layer_rope,
+                configuration
+                    .gemma4
+                    .as_ref()
+                    .filter(|_| self.kind == DecoderLayerKind::FullAttention),
+                context.cancellation,
+            )?;
+            stage_attention_cache(
+                backend,
+                cache,
+                batch,
+                configuration.key_value_heads,
+                head_dimension,
+                &key,
+                &value,
+                query_tokens,
+                configuration.maximum_tokens,
+                context,
+            )?
+        };
         let keys = expand_grouped_query(
             &keys,
             batch,
             key_tokens,
             configuration.key_value_heads,
             configuration.attention_heads,
-            configuration.head_dimension,
+            head_dimension,
             context.cancellation,
         )?;
         let values = expand_grouped_query(
@@ -3056,7 +3669,7 @@ impl NativeDecoderLayer {
             key_tokens,
             configuration.key_value_heads,
             configuration.attention_heads,
-            configuration.head_dimension,
+            head_dimension,
             context.cancellation,
         )?;
         let sink_values = self
@@ -3070,7 +3683,7 @@ impl NativeDecoderLayer {
             batch,
             key_tokens,
             configuration.attention_heads,
-            configuration.head_dimension,
+            head_dimension,
             sink_values.as_deref(),
             context.cancellation,
         )?;
@@ -3097,9 +3710,9 @@ impl NativeDecoderLayer {
                 query_tokens,
                 key_tokens: attention_key_tokens,
                 heads: configuration.attention_heads,
-                head_dimension: configuration.head_dimension,
-                value_dimension: configuration.head_dimension,
-                scale: None,
+                head_dimension,
+                value_dimension: head_dimension,
+                scale: configuration.gemma4.as_ref().map(|_| 1.0),
                 workspace_limit_bytes: attention_key_tokens
                     .checked_mul(std::mem::size_of::<f32>())
                     .ok_or(DecoderTextError::Overflow("attention workspace"))?,
@@ -3126,7 +3739,13 @@ impl NativeDecoderLayer {
             &[
                 usize_to_u64(batch, "attention batch")?,
                 usize_to_u64(query_tokens, "attention tokens")?,
-                usize_to_u64(configuration.hidden_size, "attention hidden")?,
+                usize_to_u64(
+                    configuration
+                        .attention_heads
+                        .checked_mul(head_dimension)
+                        .ok_or(DecoderTextError::Overflow("attention output width"))?,
+                    "attention hidden",
+                )?,
             ],
             &attention_values,
             context,
@@ -3616,6 +4235,83 @@ fn apply_decoder_rope(
         configuration,
         cancellation,
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_decoder_layer_rope(
+    values: &[f32],
+    batch: usize,
+    tokens: usize,
+    heads: usize,
+    head_dimension: usize,
+    positions: DecoderRopePositions<'_>,
+    configuration: &DecoderRopeConfiguration,
+    gemma4_global: Option<&Gemma4DecoderConfiguration>,
+    cancellation: &CancellationToken,
+) -> Result<Vec<f32>, DecoderTextError> {
+    let Some(gemma4) = gemma4_global else {
+        return apply_decoder_rope(
+            values,
+            batch,
+            tokens,
+            heads,
+            head_dimension,
+            positions,
+            configuration,
+            cancellation,
+        );
+    };
+    let DecoderRopePositions::Scalar(positions) = positions else {
+        return Err(DecoderTextError::InvalidInput(
+            "Gemma4 global RoPE requires scalar positions",
+        ));
+    };
+    if positions.len() != tokens
+        || head_dimension != gemma4.global_head_dimension
+        || gemma4.global_rotary_pairs > head_dimension / 2
+    {
+        return Err(DecoderTextError::InvalidInput(
+            "Gemma4 global RoPE geometry is invalid",
+        ));
+    }
+    let expected = batch
+        .checked_mul(tokens)
+        .and_then(|value| value.checked_mul(heads))
+        .and_then(|value| value.checked_mul(head_dimension))
+        .ok_or(DecoderTextError::Overflow("Gemma4 global RoPE input"))?;
+    if values.len() != expected {
+        return Err(DecoderTextError::InvalidInput(
+            "Gemma4 global RoPE input length is invalid",
+        ));
+    }
+    let mut output = values.to_vec();
+    let pair_stride = head_dimension / 2;
+    for batch_index in 0..batch {
+        for (token, position) in positions.iter().copied().enumerate() {
+            for head in 0..heads {
+                for pair in 0..gemma4.global_rotary_pairs {
+                    let work = (((batch_index * tokens + token) * heads + head)
+                        * gemma4.global_rotary_pairs)
+                        + pair;
+                    if work.is_multiple_of(256) {
+                        cancellation.check()?;
+                    }
+                    let exponent = 2.0 * pair as f32 / head_dimension as f32;
+                    let angle = position as f32 * configuration.theta.powf(-exponent);
+                    let cosine = angle.cos();
+                    let sine = angle.sin();
+                    let base = ((batch_index * tokens + token) * heads + head) * head_dimension;
+                    let left_index = base + pair;
+                    let right_index = base + pair_stride + pair;
+                    let left = values[left_index];
+                    let right = values[right_index];
+                    output[left_index] = left * cosine - right * sine;
+                    output[right_index] = right * cosine + left * sine;
+                }
+            }
+        }
+    }
+    Ok(output)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4735,12 +5431,12 @@ fn build_layer(
     {
         require_vector_parameter(weight, configuration.hidden_size, stream)?;
     }
-    if configuration.gemma3.is_some()
+    if (configuration.gemma3.is_some() || configuration.gemma4.is_some())
         && (weights.post_attention_norm_weight.is_none()
             || weights.post_feed_forward_norm_weight.is_none())
     {
         return Err(DecoderTextError::InvalidConfiguration(
-            "Gemma3 layers require post-attention and post-feed-forward normalization weights",
+            "Gemma layers require post-attention and post-feed-forward normalization weights",
         ));
     }
     match (&weights.attention_sink, configuration.architecture) {
@@ -4759,13 +5455,14 @@ fn build_layer(
             ));
         }
     }
+    let head_dimension = configuration.head_dimension_for_layer(kind);
     let query_width = configuration
         .attention_heads
-        .checked_mul(configuration.head_dimension)
+        .checked_mul(head_dimension)
         .ok_or(DecoderTextError::Overflow("query width"))?;
     let key_value_width = configuration
         .key_value_heads
-        .checked_mul(configuration.head_dimension)
+        .checked_mul(head_dimension)
         .ok_or(DecoderTextError::Overflow("key/value width"))?;
     let attention = match (kind, weights.attention) {
         (
@@ -4785,8 +5482,8 @@ fn build_layer(
                 configuration.query_key_norm,
             ) {
                 (Some(query_norm), Some(key_norm), true) => {
-                    require_vector_parameter(query_norm, configuration.head_dimension, stream)?;
-                    require_vector_parameter(key_norm, configuration.head_dimension, stream)?;
+                    require_vector_parameter(query_norm, head_dimension, stream)?;
+                    require_vector_parameter(key_norm, head_dimension, stream)?;
                 }
                 (None, None, false) => {}
                 _ => {
@@ -4918,23 +5615,24 @@ fn build_layer(
             ));
         }
     };
+    let feed_forward_size = configuration.feed_forward_size_for_layer(index)?;
     let feed_forward_gate = linear_module(
         format!("{prefix}.feed_forward_gate"),
         configuration.hidden_size,
-        configuration.feed_forward_size,
+        feed_forward_size,
         weights.feed_forward_gate_weight,
         stream,
     )?;
     let feed_forward_up = linear_module(
         format!("{prefix}.feed_forward_up"),
         configuration.hidden_size,
-        configuration.feed_forward_size,
+        feed_forward_size,
         weights.feed_forward_up_weight,
         stream,
     )?;
     let feed_forward_down = linear_module(
         format!("{prefix}.feed_forward_down"),
-        configuration.feed_forward_size,
+        feed_forward_size,
         configuration.hidden_size,
         weights.feed_forward_down_weight,
         stream,
@@ -4945,6 +5643,43 @@ fn build_layer(
             format!("{prefix}.activation"),
             crate::GeluApproximation::Tanh,
         )?,
+    };
+    let gemma4_layer_input = match (
+        configuration
+            .gemma4
+            .as_ref()
+            .map(|gemma4| gemma4.hidden_size_per_layer_input)
+            .unwrap_or(0),
+        weights.gemma4_layer_input,
+    ) {
+        (0, None) => None,
+        (hidden_per_layer, Some(weights)) if hidden_per_layer > 0 => {
+            require_vector_parameter(&weights.post_norm_weight, configuration.hidden_size, stream)?;
+            require_tensor_shape(&weights.layer_scalar, &[1], stream)?;
+            Some(NativeGemma4LayerInput {
+                gate: linear_module(
+                    format!("{prefix}.per_layer_input_gate"),
+                    configuration.hidden_size,
+                    hidden_per_layer,
+                    weights.gate_weight,
+                    stream,
+                )?,
+                projection: linear_module(
+                    format!("{prefix}.per_layer_projection"),
+                    hidden_per_layer,
+                    configuration.hidden_size,
+                    weights.projection_weight,
+                    stream,
+                )?,
+                post_norm_weight: weights.post_norm_weight,
+                layer_scalar: weights.layer_scalar,
+            })
+        }
+        _ => {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "Gemma4 layer-input weights must exactly match its hidden-input profile",
+            ));
+        }
     };
     Ok(NativeDecoderLayer {
         kind,
@@ -4958,6 +5693,7 @@ fn build_layer(
         post_attention_norm_weight: weights.post_attention_norm_weight,
         post_feed_forward_norm_weight: weights.post_feed_forward_norm_weight,
         attention_sink: weights.attention_sink,
+        gemma4_layer_input,
     })
 }
 
@@ -5153,7 +5889,12 @@ fn validate_cache(
         ));
     }
     let mut token_count = None;
-    for (kind, cache) in configuration.layer_kinds.iter().zip(&cache.layers) {
+    for (layer_index, (kind, cache)) in configuration
+        .layer_kinds
+        .iter()
+        .zip(&cache.layers)
+        .enumerate()
+    {
         match (kind, cache) {
             (_, None) => {}
             (DecoderLayerKind::LinearAttention, Some(DecoderLayerCache::Linear(cache))) => {
@@ -5221,7 +5962,7 @@ fn validate_cache(
             ) => {
                 if cache.batch != batch
                     || cache.key_value_heads != configuration.key_value_heads
-                    || cache.head_dimension != configuration.head_dimension
+                    || cache.head_dimension != configuration.head_dimension_for_layer(*kind)
                     || cache.tokens > configuration.maximum_tokens
                 {
                     return Err(DecoderTextError::InvalidInput(
@@ -5259,6 +6000,18 @@ fn validate_cache(
                     "decoder cache kind does not match its layer",
                 ));
             }
+        }
+        if configuration.gemma4.as_ref().is_some_and(|gemma4| {
+            layer_index
+                >= configuration
+                    .layer_kinds
+                    .len()
+                    .saturating_sub(gemma4.shared_key_value_layers)
+        }) && cache.is_some()
+        {
+            return Err(DecoderTextError::InvalidInput(
+                "Gemma4 shared key/value layers must not retain independent cache entries",
+            ));
         }
     }
     Ok(cache.clone())
@@ -5636,24 +6389,28 @@ fn normalize_attention_heads(
     batch: usize,
     tokens: usize,
     heads: usize,
+    head_dimension: usize,
     configuration: &DecoderTextConfiguration,
     context: &ExecutionContext<'_>,
 ) -> Result<Vec<f32>, DecoderTextError> {
-    let Some(weight) = weight else {
+    if weight.is_none() && configuration.gemma4.is_none() {
         return Ok(values.to_vec());
-    };
+    }
     context.check()?;
     let expected = batch
         .checked_mul(tokens)
         .and_then(|value| value.checked_mul(heads))
-        .and_then(|value| value.checked_mul(configuration.head_dimension))
+        .and_then(|value| value.checked_mul(head_dimension))
         .ok_or(DecoderTextError::Overflow("query/key normalization shape"))?;
     if values.len() != expected {
         return Err(DecoderTextError::InvalidInput(
             "query/key projection length does not match its head geometry",
         ));
     }
-    let mut weight_values = tensor_to_f32(backend, weight, context)?;
+    let mut weight_values = match weight {
+        Some(weight) => tensor_to_f32(backend, weight, context)?.to_vec(),
+        None => vec![1.0; head_dimension],
+    };
     if configuration.norm_weight_offset() != 0.0 {
         for value in weight_values.iter_mut() {
             *value += configuration.norm_weight_offset();
@@ -5662,8 +6419,8 @@ fn normalize_attention_heads(
     rms_norm_with_context_exact_native(
         backend,
         values,
-        &[batch, tokens, heads, configuration.head_dimension],
-        &[configuration.head_dimension],
+        &[batch, tokens, heads, head_dimension],
+        &[head_dimension],
         Some(&weight_values),
         Some(configuration.normalization_epsilon()),
         DeviceId::CPU,

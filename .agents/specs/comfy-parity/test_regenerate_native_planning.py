@@ -180,6 +180,32 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma4_decoder_id]["dependencies"],
             [gemma3_decoder_id],
         )
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            tasks_by_id[gemma4_decoder_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            tasks_by_id[gemma4_decoder_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            tasks_by_id[gemma4_decoder_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_decoder",
+            tasks_by_id[gemma4_decoder_id]["writes"],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma4_decoder_id]["validations"],
+            [
+                "VAL-CLIP-001",
+                "VAL-RNG-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+        )
         self.assertEqual(
             tasks_by_id[gemma3_vision_id]["dependencies"],
             [gemma4_decoder_id],

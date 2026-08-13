@@ -6,17 +6,19 @@ use comfy_model::{
     DecoderRopeConfiguration, DecoderRopePositions, DecoderSymbolBehavior,
     DecoderTextConfiguration, DecoderTextError, DecoderTextRequest, DecoderTextWeights,
     GEMMA4_SOURCE_PATH, GEMMA4_SOURCE_SHA256, GPT_OSS_SOURCE_PATH, GPT_OSS_SOURCE_SHA256,
-    Gemma3DecoderConfiguration, Gemma3DecoderProfile, LLAMA_SOURCE_PATH, LLAMA_SOURCE_SHA256,
-    ModelTokenizerDescriptor, NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer,
-    NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH, QWEN35_SOURCE_SHA256,
-    Qwen35LinearConfiguration, Qwen35LinearWeights, RopeScaling, TEXT_GENERATION_SOURCE_PATH,
-    TEXT_GENERATION_SOURCE_SHA256, TokenizerConfiguration, apply_rope, decoder_profile_fact,
-    decoder_symbol_behavior, gemma3_decoder_configuration, gemma4_audio_conv2d_subsample,
-    gemma4_audio_relative_positions, gemma4_clipped_linear, gemma4_vision_patch_embed,
-    gemma4_vision_rope, gpt_oss_moe, gpt_oss_top_k_route, precompute_multidimensional_rope,
-    precompute_rope, qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact,
-    qwen35_chunk_gated_delta_rule, qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed,
-    qwen35_vision_patch_merge, tokenize_decoder_prompt,
+    Gemma3DecoderConfiguration, Gemma3DecoderProfile, Gemma4DecoderConfiguration,
+    Gemma4DecoderProfile, Gemma4LayerInputWeights, Gemma4PerLayerWeights, LLAMA_SOURCE_PATH,
+    LLAMA_SOURCE_SHA256, ModelTokenizerDescriptor, NativeDecoderTextEncoder, NativeModelPayload,
+    NativePromptTokenizer, NativeTextGenerationRequest, NativeTokenizerFamily, QWEN35_SOURCE_PATH,
+    QWEN35_SOURCE_SHA256, Qwen35LinearConfiguration, Qwen35LinearWeights, RopeScaling,
+    TEXT_GENERATION_SOURCE_PATH, TEXT_GENERATION_SOURCE_SHA256, TokenizerConfiguration, apply_rope,
+    decoder_profile_fact, decoder_symbol_behavior, gemma3_decoder_configuration,
+    gemma4_audio_conv2d_subsample, gemma4_audio_relative_positions, gemma4_clipped_linear,
+    gemma4_decoder_configuration, gemma4_vision_patch_embed, gemma4_vision_rope, gpt_oss_moe,
+    gpt_oss_top_k_route, precompute_multidimensional_rope, precompute_rope,
+    qwen35_causal_conv1d_update, qwen35_causal_conv1d_update_exact, qwen35_chunk_gated_delta_rule,
+    qwen35_chunk_gated_delta_rule_exact, qwen35_vision_patch_embed, qwen35_vision_patch_merge,
+    tokenize_decoder_prompt,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
@@ -160,6 +162,7 @@ fn configuration(architecture: DecoderArchitecture) -> DecoderTextConfiguration 
             convolution_kernel_size: 3,
         }),
         gemma3: None,
+        gemma4: None,
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 10_000.0,
@@ -229,6 +232,127 @@ fn reduced_gemma3_configuration() -> DecoderTextConfiguration {
     configuration.logits_soft_cap_bits = None;
     configuration.stop_tokens = vec![1, 106];
     configuration
+}
+
+fn reduced_gemma4_configuration() -> DecoderTextConfiguration {
+    let mut configuration = configuration(DecoderArchitecture::Gemma);
+    configuration.layer_kinds = (0_usize..10)
+        .map(|index| {
+            if (index + 1).is_multiple_of(5) {
+                DecoderLayerKind::FullAttention
+            } else {
+                DecoderLayerKind::SlidingAttention
+            }
+        })
+        .collect();
+    configuration.query_key_norm = true;
+    configuration.gemma3 = None;
+    configuration.gemma4 = Some(Gemma4DecoderConfiguration {
+        source_profile: None,
+        local_rope: DecoderRopeConfiguration {
+            theta: 10_000.0,
+            rotary_dimension: 2,
+            interleaved_sections: Vec::new(),
+            scaling: RopeScaling::None,
+        },
+        global_head_dimension: 4,
+        global_rotary_pairs: 1,
+        sliding_layers_per_cycle: 4,
+        hidden_size_per_layer_input: 2,
+        shared_key_value_layers: 5,
+        double_wide_mlp: true,
+    });
+    configuration.rope = DecoderRopeConfiguration {
+        theta: 1_000_000.0,
+        rotary_dimension: 2,
+        interleaved_sections: Vec::new(),
+        scaling: RopeScaling::None,
+    };
+    configuration.sliding_window = Some(512);
+    configuration.activation = DecoderActivation::GeluTanh;
+    configuration.norm_weight_offset_bits = 0.0_f32.to_bits();
+    configuration.logits_soft_cap_bits = Some(30.0_f32.to_bits());
+    configuration.stop_tokens = vec![1, 50, 106];
+    configuration
+}
+
+fn gemma4_weights(
+    backend: &CpuBackend,
+    configuration: &DecoderTextConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<DecoderTextWeights, Box<dyn Error>> {
+    let gemma4 = configuration.gemma4.as_ref().ok_or("Gemma4 config")?;
+    let token_embedding = tensor(
+        backend,
+        &[8, 4],
+        &(0..32)
+            .map(|index| ((index * 11 % 23) as f32 - 11.0) / 17.0)
+            .collect::<Vec<_>>(),
+        context,
+    )?;
+    let first_shared = configuration.layer_kinds.len() - gemma4.shared_key_value_layers;
+    let mut layers = Vec::new();
+    for (index, kind) in configuration.layer_kinds.iter().copied().enumerate() {
+        let head_dimension = if kind == DecoderLayerKind::FullAttention {
+            gemma4.global_head_dimension
+        } else {
+            configuration.head_dimension
+        };
+        let query_width = configuration.attention_heads * head_dimension;
+        let key_value_width = configuration.key_value_heads * head_dimension;
+        let feed_forward = if gemma4.double_wide_mlp && index >= first_shared {
+            configuration.feed_forward_size * 2
+        } else {
+            configuration.feed_forward_size
+        };
+        let scale = 0.09 + index as f32 * 0.007;
+        layers.push(DecoderLayerWeights {
+            attention_norm_weight: filled(backend, &[4], 0.3, context)?,
+            attention: DecoderAttentionWeights::DotProduct {
+                query_weight: matrix(backend, query_width, 4, scale, context)?,
+                key_weight: matrix(backend, key_value_width, 4, scale + 0.03, context)?,
+                value_weight: matrix(backend, key_value_width, 4, scale + 0.05, context)?,
+                query_norm_weight: Some(filled(
+                    backend,
+                    &[u64::try_from(head_dimension)?],
+                    0.8,
+                    context,
+                )?),
+                key_norm_weight: Some(filled(
+                    backend,
+                    &[u64::try_from(head_dimension)?],
+                    1.1,
+                    context,
+                )?),
+                output_weight: matrix(backend, 4, query_width, scale + 0.07, context)?,
+            },
+            feed_forward_norm_weight: filled(backend, &[4], 0.25, context)?,
+            feed_forward_gate_weight: matrix(backend, feed_forward, 4, scale + 0.11, context)?,
+            feed_forward_up_weight: matrix(backend, feed_forward, 4, scale + 0.13, context)?,
+            feed_forward_down_weight: matrix(backend, 4, feed_forward, scale + 0.17, context)?,
+            post_attention_norm_weight: Some(filled(backend, &[4], 0.2, context)?),
+            post_feed_forward_norm_weight: Some(filled(backend, &[4], 0.22, context)?),
+            attention_sink: None,
+            gemma4_layer_input: Some(Gemma4LayerInputWeights {
+                gate_weight: matrix(backend, 2, 4, scale + 0.19, context)?,
+                projection_weight: matrix(backend, 4, 2, scale + 0.23, context)?,
+                post_norm_weight: filled(backend, &[4], 0.4, context)?,
+                layer_scalar: tensor(backend, &[1], &[0.97 + index as f32 * 0.001], context)?,
+            }),
+        });
+    }
+    let total_per_layer = configuration.layer_kinds.len() * gemma4.hidden_size_per_layer_input;
+    Ok(DecoderTextWeights {
+        token_embedding,
+        layers,
+        final_norm_weight: filled(backend, &[4], 0.35, context)?,
+        output_head_weight: None,
+        gemma4_per_layer: Some(Gemma4PerLayerWeights {
+            token_embedding: matrix(backend, 8, total_per_layer, 0.31, context)?,
+            model_projection_weight: matrix(backend, total_per_layer, 4, 0.37, context)?,
+            projection_norm_weight: tensor(backend, &[2], &[0.9, 1.1], context)?,
+        }),
+    })
 }
 
 fn weights(
@@ -328,6 +452,7 @@ fn weights(
             attention_sink: (configuration.architecture == DecoderArchitecture::GptOss)
                 .then(|| tensor(backend, &[2], &[0.2, -0.1], context))
                 .transpose()?,
+            gemma4_layer_input: None,
         });
     }
     Ok(DecoderTextWeights {
@@ -335,6 +460,7 @@ fn weights(
         layers,
         final_norm_weight: filled(backend, &[4], 0.3, context)?,
         output_head_weight: None,
+        gemma4_per_layer: None,
     })
 }
 
@@ -746,9 +872,284 @@ fn gemma3_alternating_rope_norm_scaling_cache_and_generation_are_exact()
     assert!(matches!(
         NativeDecoderTextEncoder::new(reduced, missing_post_norm),
         Err(DecoderTextError::InvalidConfiguration(
-            "Gemma3 layers require post-attention and post-feed-forward normalization weights"
+            "Gemma layers require post-attention and post-feed-forward normalization weights"
         ))
     ));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 64 * 1024 * 1024)?;
+    assert!(
+        model
+            .forward(
+                &backend,
+                DecoderTextRequest {
+                    tokens: &tokens,
+                    attention_mask: None,
+                    positions: Some(&[0, 1, 2]),
+                    cache: None,
+                    capture_layer: None,
+                },
+                &cancelled_context,
+            )
+            .is_err()
+    );
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    let constrained_context = context(&authority, &cancellation, 4)?;
+    assert!(
+        model
+            .forward(
+                &backend,
+                DecoderTextRequest {
+                    tokens: &tokens,
+                    attention_mask: None,
+                    positions: Some(&[0, 1, 2]),
+                    cache: None,
+                    capture_layer: None,
+                },
+                &constrained_context,
+            )
+            .is_err()
+    );
+    assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+    assert_eq!(execution_context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma4_global_shared_per_layer_cache_and_generation_are_exact() -> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_decoder/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["task_id"],
+        "comfy-parity-native-gemma4-decoder-exactness-foundation"
+    );
+    assert_eq!(manifest["source"]["sha256"], GEMMA4_SOURCE_SHA256);
+    assert_eq!(manifest["source_snapshot"]["version"], "0.27.1");
+    assert_eq!(manifest["source_snapshot"]["file_count"], 949);
+    assert_eq!(manifest["claims"]["licensed_checkpoint_included"], false);
+    assert_eq!(manifest["claims"]["runtime_oracle_observed"], false);
+
+    let e2b = gemma4_decoder_configuration(Gemma4DecoderProfile::E2B);
+    e2b.validate()?;
+    assert_eq!(e2b.hidden_size, 1536);
+    assert_eq!(e2b.feed_forward_size, 6144);
+    assert_eq!(e2b.layer_kinds.len(), 35);
+    let e2b_profile = e2b.gemma4.as_ref().ok_or("E2B Gemma4 profile")?;
+    assert_eq!(e2b_profile.global_head_dimension, 512);
+    assert_eq!(e2b_profile.hidden_size_per_layer_input, 256);
+    assert_eq!(e2b_profile.shared_key_value_layers, 20);
+    assert!(e2b_profile.double_wide_mlp);
+    assert_eq!(e2b.layer_kinds[4], DecoderLayerKind::FullAttention);
+    let e4b = gemma4_decoder_configuration(Gemma4DecoderProfile::E4B);
+    e4b.validate()?;
+    assert_eq!(e4b.hidden_size, 2560);
+    assert_eq!(e4b.layer_kinds.len(), 42);
+    assert_eq!(
+        e4b.gemma4
+            .as_ref()
+            .ok_or("E4B Gemma4 profile")?
+            .shared_key_value_layers,
+        18
+    );
+    let thirty_one_b = gemma4_decoder_configuration(Gemma4DecoderProfile::ThirtyOneB);
+    thirty_one_b.validate()?;
+    assert_eq!(thirty_one_b.hidden_size, 5376);
+    assert_eq!(thirty_one_b.feed_forward_size, 21_504);
+    assert_eq!(thirty_one_b.layer_kinds.len(), 60);
+    let thirty_one_b_profile = thirty_one_b.gemma4.as_ref().ok_or("31B Gemma4 profile")?;
+    assert_eq!(thirty_one_b_profile.hidden_size_per_layer_input, 0);
+    assert_eq!(thirty_one_b_profile.shared_key_value_layers, 0);
+
+    let cancellation = CancellationToken::default();
+    let (backend, authority) = backend()?;
+    let execution_context = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let reduced = reduced_gemma4_configuration();
+    reduced.validate()?;
+    let admitted_weights = gemma4_weights(&backend, &reduced, &execution_context)?;
+    let model = NativeDecoderTextEncoder::new(reduced.clone(), admitted_weights)?;
+    let tokens = i64_tensor(&backend, &[1, 3], &[1, 2, 3], &execution_context)?;
+    let full = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &tokens,
+            attention_mask: None,
+            positions: Some(&[0, 1, 2]),
+            cache: None,
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let first_token = i64_tensor(&backend, &[1, 1], &[1], &execution_context)?;
+    let first = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &first_token,
+            attention_mask: None,
+            positions: Some(&[0]),
+            cache: None,
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let second_token = i64_tensor(&backend, &[1, 1], &[2], &execution_context)?;
+    let second = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &second_token,
+            attention_mask: None,
+            positions: Some(&[1]),
+            cache: Some(first.cache()),
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let third_token = i64_tensor(&backend, &[1, 1], &[3], &execution_context)?;
+    let third = model.forward(
+        &backend,
+        DecoderTextRequest {
+            tokens: &third_token,
+            attention_mask: None,
+            positions: Some(&[2]),
+            cache: Some(second.cache()),
+            capture_layer: None,
+        },
+        &execution_context,
+    )?;
+    let full_logits = tensor_to_f32(&backend, full.logits(), &execution_context)?;
+    let third_logits = tensor_to_f32(&backend, third.logits(), &execution_context)?;
+    for (expected, actual) in full_logits[16..].iter().zip(third_logits.iter()) {
+        assert!((expected - actual).abs() < 1.0e-5, "{expected} != {actual}");
+    }
+    assert!(full_logits.iter().all(|value| value.abs() <= 30.0));
+    let full_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            full_logits
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(
+        full_digest,
+        "10080fb49e529b5b7f341c47c112dba564b067c6f908d7604c200c3b78d02e16"
+    );
+    drop(full_logits);
+    drop(third_logits);
+    let comfy_model::DecoderLayerCache::Attention(sliding_cache) = third.cache().layers()[0]
+        .as_ref()
+        .ok_or("Gemma4 sliding cache")?
+    else {
+        return Err("Gemma4 sliding layer has wrong cache kind".into());
+    };
+    assert_eq!(sliding_cache.head_dimension(), 2);
+    let comfy_model::DecoderLayerCache::Attention(global_cache) = third.cache().layers()[4]
+        .as_ref()
+        .ok_or("Gemma4 global cache")?
+    else {
+        return Err("Gemma4 global layer has wrong cache kind".into());
+    };
+    assert_eq!(global_cache.head_dimension(), 4);
+    assert!(third.cache().layers()[5..].iter().all(Option::is_none));
+
+    let embeddings = model.embed_tokens(&backend, &tokens, &execution_context)?;
+    let prepared_with_ids = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            initial_input_ids: Some(&[1, 2, 3]),
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&[0, 1, 2]),
+            causal_positions: &[0, 1, 2],
+            cache: None,
+            capture_layer: None,
+            deepstack: None,
+        },
+        &execution_context,
+    )?;
+    let prepared_without_ids = model.forward_prepared(
+        &backend,
+        DecoderPreparedTextRequest {
+            initial_input_ids: None,
+            embeddings: &embeddings,
+            attention_mask: None,
+            rope_positions: DecoderRopePositions::Scalar(&[0, 1, 2]),
+            causal_positions: &[0, 1, 2],
+            cache: None,
+            capture_layer: None,
+            deepstack: None,
+        },
+        &execution_context,
+    )?;
+    assert_ne!(
+        tensor_to_f32(&backend, prepared_with_ids.logits(), &execution_context)?.as_ref(),
+        tensor_to_f32(&backend, prepared_without_ids.logits(), &execution_context)?.as_ref()
+    );
+
+    let transaction = generation_transaction()?;
+    let checkpoint = transaction.checkpoint();
+    let generation_configuration = DecoderGenerationConfiguration {
+        maximum_new_tokens: 2,
+        temperature_bits: 0.8_f32.to_bits(),
+        top_k: Some(4),
+        top_p_bits: Some(0.9_f32.to_bits()),
+        minimum_p_bits: Some(0.05_f32.to_bits()),
+        repetition_penalty_bits: 1.0_f32.to_bits(),
+        presence_penalty_bits: 0.0_f32.to_bits(),
+    };
+    let prompt = DecoderPreparedGenerationPrompt {
+        initial_input_ids: Some(&[1, 2, 3]),
+        embeddings: &embeddings,
+        sampling_history: &[1, 2, 3],
+        attention_mask: None,
+        rope_positions: DecoderRopePositions::Scalar(&[0, 1, 2]),
+        causal_positions: &[0, 1, 2],
+        deepstack: None,
+    };
+    let generated = model.generate_prepared(
+        &backend,
+        prompt,
+        &generation_configuration,
+        &transaction,
+        &execution_context,
+    )?;
+    let replayed = model.generate_prepared(
+        &backend,
+        prompt,
+        &generation_configuration,
+        &transaction,
+        &execution_context,
+    )?;
+    assert_eq!(generated.generated_tokens, replayed.generated_tokens);
+    assert_eq!(
+        generated.transaction.checkpoint(),
+        replayed.transaction.checkpoint()
+    );
+    assert_eq!(transaction.checkpoint(), checkpoint);
+
+    let mut changed_weights = gemma4_weights(&backend, &reduced, &execution_context)?;
+    changed_weights.layers[0]
+        .gemma4_layer_input
+        .as_mut()
+        .ok_or("Gemma4 layer input")?
+        .layer_scalar = tensor(&backend, &[1], &[0.91], &execution_context)?;
+    let changed = NativeDecoderTextEncoder::new(reduced.clone(), changed_weights)?;
+    assert_ne!(
+        model.semantic_state_digest(&cancellation)?,
+        changed.semantic_state_digest(&cancellation)?
+    );
+    let mut invalid_profile = reduced.clone();
+    invalid_profile
+        .gemma4
+        .as_mut()
+        .ok_or("Gemma4 profile")?
+        .source_profile = Some(Gemma4DecoderProfile::E2B);
+    assert!(invalid_profile.validate().is_err());
+    let mut missing_per_layer = gemma4_weights(&backend, &reduced, &execution_context)?;
+    missing_per_layer.gemma4_per_layer = None;
+    assert!(NativeDecoderTextEncoder::new(reduced, missing_per_layer).is_err());
 
     let cancelled = CancellationToken::default();
     cancelled.cancel();
@@ -1394,6 +1795,7 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
     let prepared = model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&scalar_positions),
@@ -1431,6 +1833,7 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
     let generation = model.generate_prepared(
         &backend,
         DecoderPreparedGenerationPrompt {
+            initial_input_ids: None,
             embeddings: &embeddings,
             sampling_history: &[1, 2],
             attention_mask: Some(&attention_mask),
@@ -1465,6 +1868,7 @@ fn prepared_prefill_shares_generation_rng_cache_and_multidimensional_rope()
     let qwen_output = qwen_model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &qwen_embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Multidimensional(&axes),
@@ -1497,6 +1901,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let baseline = model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1517,6 +1922,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let injected = model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1550,6 +1956,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let before_second = model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1563,6 +1970,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let after_second = model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1616,6 +2024,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let before_third = three_layer_model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &three_layer_embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1632,6 +2041,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let after_third = three_layer_model.forward_prepared(
         &backend,
         DecoderPreparedTextRequest {
+            initial_input_ids: None,
             embeddings: &three_layer_embeddings,
             attention_mask: None,
             rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1670,6 +2080,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
     let generated = model.generate_prepared(
         &backend,
         DecoderPreparedGenerationPrompt {
+            initial_input_ids: None,
             embeddings: &embeddings,
             sampling_history: &[],
             attention_mask: None,
@@ -1697,6 +2108,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1715,6 +2127,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1737,6 +2150,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1758,6 +2172,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1780,6 +2195,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1802,6 +2218,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1830,6 +2247,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1858,6 +2276,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .generate_prepared(
                 &backend,
                 DecoderPreparedGenerationPrompt {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     sampling_history: &[],
                     attention_mask: None,
@@ -1893,6 +2312,7 @@ fn prepared_deepstack_is_exact_post_layer_prefill_only_and_transactional()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1958,6 +2378,7 @@ fn prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &embeddings,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),
@@ -1976,6 +2397,7 @@ fn prepared_prefill_rejects_shape_cache_and_cancellation_without_rng_mutation()
             .forward_prepared(
                 &backend,
                 DecoderPreparedTextRequest {
+                    initial_input_ids: None,
                     embeddings: &malformed,
                     attention_mask: None,
                     rope_positions: DecoderRopePositions::Scalar(&positions),

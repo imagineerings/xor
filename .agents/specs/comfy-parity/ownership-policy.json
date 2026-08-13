@@ -12430,6 +12430,10 @@
         "DecoderAttentionWeights",
         "Gemma3DecoderConfiguration",
         "Gemma3DecoderProfile",
+        "Gemma4DecoderConfiguration",
+        "Gemma4DecoderProfile",
+        "Gemma4LayerInputWeights",
+        "Gemma4PerLayerWeights",
         "Qwen35LinearConfiguration",
         "Qwen35LinearWeights"
       ],
@@ -12479,6 +12483,10 @@
         "DecoderAttentionWeights",
         "Gemma3DecoderConfiguration",
         "Gemma3DecoderProfile",
+        "Gemma4DecoderConfiguration",
+        "Gemma4DecoderProfile",
+        "Gemma4LayerInputWeights",
+        "Gemma4PerLayerWeights",
         "Qwen35LinearConfiguration",
         "Qwen35LinearWeights"
       ],
@@ -12561,12 +12569,32 @@
         {
           "name": "gemma3-executes-four-stage-rms-residual-and-checkpoint-backed-query-key-normalization",
           "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
-          "pattern": "post_attention_norm_weight[\\s\\S]*feed_forward_norm_weight[\\s\\S]*post_feed_forward_norm_weight[\\s\\S]*Gemma3 layers require post-attention and post-feed-forward normalization weights[\\s\\S]*normalize_attention_heads\\("
+          "pattern": "post_attention_norm_weight[\\s\\S]*feed_forward_norm_weight[\\s\\S]*post_feed_forward_norm_weight[\\s\\S]*Gemma layers require post-attention and post-feed-forward normalization weights[\\s\\S]*normalize_attention_heads\\("
         },
         {
           "name": "gemma3-fixture-proves-profile-rope-cache-generation-and-failure-atomicity",
           "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
           "pattern": "gemma3_alternating_rope_norm_scaling_cache_and_generation_are_exact[\\s\\S]*30447eeb298bdaa2edcf48e1b2407903f2da625da3e2bdf0313acc0bc1b046a8[\\s\\S]*transaction\\.checkpoint[\\s\\S]*scratch\\.in_use_bytes"
+        },
+        {
+          "name": "gemma4-source-profiles-are-closed-executable-decoder-configurations",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub enum Gemma4DecoderProfile[\\s\\S]*pub struct Gemma4DecoderConfiguration[\\s\\S]*pub fn gemma4_decoder_configuration[\\s\\S]*Gemma4DecoderProfile::E2B[\\s\\S]*Gemma4DecoderProfile::E4B[\\s\\S]*Gemma4DecoderProfile::ThirtyOneB"
+        },
+        {
+          "name": "gemma4-executes-global-partial-rope-shared-kv-and-double-wide-mlp-in-one-decoder",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "fn head_dimension_for_layer[\\s\\S]*fn feed_forward_size_for_layer[\\s\\S]*double_wide_mlp[\\s\\S]*shared_sliding[\\s\\S]*shared_global[\\s\\S]*apply_decoder_layer_rope"
+        },
+        {
+          "name": "gemma4-expanded-initial-ids-drive-checkpoint-backed-per-layer-inputs",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub struct Gemma4LayerInputWeights[\\s\\S]*pub struct Gemma4PerLayerWeights[\\s\\S]*initial_input_ids: Option<&'a \\[i64\\]>[\\s\\S]*per_layer_input_gate[\\s\\S]*post_per_layer_input_norm_weight[\\s\\S]*prepare_gemma4_layer_inputs"
+        },
+        {
+          "name": "gemma4-fixture-proves-profile-cache-generation-identity-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+          "pattern": "gemma4_global_shared_per_layer_cache_and_generation_are_exact[\\s\\S]*10080fb49e529b5b7f341c47c112dba564b067c6f908d7604c200c3b78d02e16[\\s\\S]*transaction\\.checkpoint[\\s\\S]*scratch\\.in_use_bytes"
         },
         {
           "name": "qwen35-hybrid-attention-is-closed-and-checkpoint-backed",
@@ -12649,7 +12677,8 @@
         "comfy-parity-native-prepared-decoder-deepstack-foundation",
         "comfy-parity-native-qwen3-decoder-exactness-foundation",
         "comfy-parity-native-qwen35-decoder-exactness-foundation",
-        "comfy-parity-native-gemma3-decoder-exactness-foundation"
+        "comfy-parity-native-gemma3-decoder-exactness-foundation",
+        "comfy-parity-native-gemma4-decoder-exactness-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",
@@ -12657,6 +12686,7 @@
         "native Qwen3.5 checkpoint-backed hybrid decoder text conditioning",
         "native Qwen3 and Qwen3-VL grouped-query decoder attention",
         "native Gemma3 alternating local/global decoder text conditioning and generation",
+        "native Gemma4 global/shared multimodal decoder text conditioning and generation",
         "dependent native multimodal and composite text adapters"
       ],
       "requirements": [

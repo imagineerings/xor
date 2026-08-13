@@ -2452,6 +2452,7 @@ pub fn qwen_multimodal_decoder_configuration(
         query_key_norm: profile.query_key_norm,
         qwen35_linear,
         gemma3: None,
+        gemma4: None,
         normalization_epsilon_bits: profile.normalization_epsilon_bits,
         rope: crate::DecoderRopeConfiguration {
             theta,
@@ -2837,6 +2838,7 @@ impl NativeQwenMultimodal {
                 rope_positions,
                 causal_positions: &causal_positions,
                 deepstack,
+                initial_input_ids: None,
             },
             &configuration,
             request.transaction,
