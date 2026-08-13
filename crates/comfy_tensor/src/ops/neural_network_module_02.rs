@@ -9,6 +9,7 @@ use crate::{
         batch_norm_vjp_with_context_exact_native as canonical_batch_norm_vjp,
         batch_norm_with_context_exact_native as canonical_batch_norm,
         group_norm_jvp_with_context_exact_native as canonical_group_norm_jvp,
+        group_norm_tensor_with_context_exact_native as canonical_group_norm_tensor,
         group_norm_vjp_with_context_exact_native as canonical_group_norm_vjp,
         group_norm_with_context_exact_native as canonical_group_norm,
         leaky_relu_jvp_with_context_exact_native as canonical_leaky_relu_jvp,
@@ -622,6 +623,37 @@ pub fn instance_norm_2d_with_context_exact_native(
     let channels = channel_count(shape, INSTANCE_NORM_2D_OPERATION_ID)?;
     Ok(canonical_group_norm(
         backend, input, shape, channels, weight, bias, epsilon, device, context,
+    )?)
+}
+
+pub fn instance_norm_2d_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    epsilon: f64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NeuralNetworkModulePartTwoError> {
+    context.check()?;
+    let shape = input.descriptor().shape();
+    if shape.len() != 4 {
+        return Err(NeuralNetworkModulePartTwoError::Invalid {
+            operation: INSTANCE_NORM_2D_OPERATION_ID,
+            reason: format!("expected rank 4, got {}", shape.len()),
+        });
+    }
+    let channels = shape.get(1).copied().ok_or(
+        NeuralNetworkModulePartTwoError::Invalid {
+            operation: INSTANCE_NORM_2D_OPERATION_ID,
+            reason: "missing channel dimension".to_owned(),
+        },
+    )?;
+    Ok(canonical_group_norm_tensor(
+        backend,
+        input,
+        channels,
+        None,
+        None,
+        epsilon,
+        context,
     )?)
 }
 

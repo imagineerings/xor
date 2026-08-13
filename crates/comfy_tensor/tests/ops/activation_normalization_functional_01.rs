@@ -22,10 +22,11 @@ use comfy_tensor::{
         relu_vjp_with_context_exact_native, relu_with_context_exact_native,
         relu_with_context_exact_native_in_place, rms_norm_jvp_with_context_exact_native,
         rms_norm_vjp_with_context_exact_native, rms_norm_with_context_exact_native,
-        silu_jvp_with_context_exact_native, silu_vjp_with_context_exact_native,
-        silu_with_context_exact_native, silu_with_context_exact_native_in_place,
-        softmax_jvp_with_context_exact_native, softmax_tensor_with_context_exact_native,
-        softmax_vjp_with_context_exact_native, softmax_with_context_exact_native,
+        silu_jvp_with_context_exact_native, silu_tensor_with_context_exact_native,
+        silu_vjp_with_context_exact_native, silu_with_context_exact_native,
+        silu_with_context_exact_native_in_place, softmax_jvp_with_context_exact_native,
+        softmax_tensor_with_context_exact_native, softmax_vjp_with_context_exact_native,
+        softmax_with_context_exact_native,
     },
 };
 use comfy_types::DeviceKind;
@@ -87,6 +88,13 @@ fn tensor_adapters_preserve_canonical_normalization_equations_and_context()
     let bias = upload_tensor(&backend, &[2], &[1.0, -1.0], &context)?;
 
     let softmax = softmax_tensor_with_context_exact_native(&backend, &input, -1, &context)?;
+    let silu = silu_tensor_with_context_exact_native(&backend, &input, &context)?;
+    assert_close(
+        &tensor_f32_values(&silu)?,
+        &[0.731_058_6, 2.857_722_3, 4.966_536, 6.993_622_6],
+        1.0e-6,
+    );
+    assert_ne!(silu.storage_id(), input.storage_id());
     let softmax_values = tensor_f32_values(&softmax)?;
     assert_close(
         &softmax_values,
@@ -200,6 +208,10 @@ fn tensor_adapters_preserve_canonical_normalization_equations_and_context()
             &input,
             &cancelled_context,
         ),
+        Err(FunctionalError::Cancelled)
+    ));
+    assert!(matches!(
+        silu_tensor_with_context_exact_native(&backend, &input, &cancelled_context),
         Err(FunctionalError::Cancelled)
     ));
     Ok(())

@@ -1,5 +1,5 @@
 use crate::{
-    CancellationToken, CpuBackend, DType, DecodedScalar, DeviceId,
+    CancellationToken, ConvolutionSpec, CpuBackend, DType, DecodedScalar, DeviceId,
     ExecutionContext, Tensor, TensorBackend, TensorDescriptor, TensorError,
     generated_accelerated_attention_kernel_01::{
         AttentionKernelError, AttentionKernelRequest, AttentionMask, AttentionVjp,
@@ -487,6 +487,72 @@ impl ConvolutionGeometry {
             _ => CONV2D_OPERATION_ID,
         }
     }
+}
+
+pub fn convolution_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    geometry: &ConvolutionGeometry,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, OperatorIndirectionError> {
+    context.check()?;
+    if geometry.padding_mode() != ConvolutionPaddingMode::Zeros {
+        return Err(OperatorIndirectionError::Invalid(
+            "tensor convolution requires zero padding",
+        ));
+    }
+    let output_shape = geometry.checked_output_shape(
+        input.descriptor().shape(),
+        weight.descriptor().shape(),
+        bias.map(|tensor| tensor.descriptor().shape()),
+    )?;
+    let descriptor = TensorDescriptor::contiguous(
+        output_shape,
+        input.descriptor().dtype(),
+        input.descriptor().device(),
+        context.stream,
+    )?;
+    let specification = ConvolutionSpec {
+        stride: convolution_dimensions_to_u64(geometry.stride())?,
+        padding: convolution_dimensions_to_u64(geometry.padding())?,
+        dilation: convolution_dimensions_to_u64(geometry.dilation())?,
+        groups: u64::try_from(geometry.groups())
+            .map_err(|_| OperatorIndirectionError::ShapeOverflow("convolution groups"))?,
+        transposed: geometry.transposed(),
+        output_padding: convolution_dimensions_to_u64(geometry.output_padding())?,
+    };
+    let (output, event) = if let Some(bias) = bias {
+        backend.convolution(
+            &specification,
+            &[input.clone(), weight.clone(), bias.clone()],
+            descriptor,
+            context,
+        )?
+    } else {
+        backend.convolution(
+            &specification,
+            &[input.clone(), weight.clone()],
+            descriptor,
+            context,
+        )?
+    };
+    backend.wait_event(event, context)?;
+    context.check()?;
+    Ok(output)
+}
+
+fn convolution_dimensions_to_u64(
+    dimensions: &[usize],
+) -> Result<Vec<u64>, OperatorIndirectionError> {
+    dimensions
+        .iter()
+        .map(|dimension| {
+            u64::try_from(*dimension)
+                .map_err(|_| OperatorIndirectionError::ShapeOverflow("convolution dimensions"))
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq)]

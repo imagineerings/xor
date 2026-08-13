@@ -1,8 +1,9 @@
 use crate::{
-    DeviceId, ExecutionContext,
+    DeviceId, ExecutionContext, Tensor, TensorBackend, TensorError,
     generated_comfy_operator_indirection_01::{
         ConvolutionGeometry, ConvolutionPaddingMode, ConvolutionVjp, OperatorIndirectionError,
         TensorValues, convolution_jvp_with_context_exact_native as canonical_convolution_jvp,
+        convolution_tensor_with_context_exact_native as canonical_convolution_tensor,
         convolution_vjp_with_context_exact_native as canonical_convolution_vjp,
         convolution_with_context_exact_native as canonical_convolution,
     },
@@ -33,8 +34,10 @@ pub const GRID_SAMPLE_OPERATION_ID: &str = "COMFY-TENSOR-OP-A90AB43A3320";
 pub const INTERPOLATE_OPERATION_ID: &str = "COMFY-TENSOR-OP-B0F801006375";
 pub const MAX_POOL_2D_OPERATION_ID: &str = "COMFY-TENSOR-OP-1F9D23F3B331";
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum SpatialFunctionalKernelError {
+    #[error(transparent)]
+    Tensor(TensorError),
     #[error("spatial functional kernel execution was cancelled")]
     Cancelled,
     #[error("operation {operation} is unavailable for device {device:?}")]
@@ -58,6 +61,15 @@ pub enum SpatialFunctionalKernelError {
         owner: &'static str,
         reason: String,
     },
+}
+
+impl From<TensorError> for SpatialFunctionalKernelError {
+    fn from(error: TensorError) -> Self {
+        match error {
+            TensorError::Cancelled => Self::Cancelled,
+            error => Self::Tensor(error),
+        }
+    }
 }
 
 impl From<comfy_types::CancellationError> for SpatialFunctionalKernelError {
@@ -368,6 +380,65 @@ convolution_forward_adapter!(
     3,
     true
 );
+
+#[allow(clippy::too_many_arguments)]
+pub fn conv_2d_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    configuration: &ConvolutionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    convolution_tensor_forward(
+        backend,
+        CONV_2D_OPERATION_ID,
+        false,
+        input,
+        weight,
+        bias,
+        configuration,
+        context,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn conv_transpose_2d_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    configuration: &ConvolutionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    convolution_tensor_forward(
+        backend,
+        CONV_TRANSPOSE_2D_OPERATION_ID,
+        true,
+        input,
+        weight,
+        bias,
+        configuration,
+        context,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn convolution_tensor_forward(
+    backend: &dyn TensorBackend,
+    operation: &'static str,
+    transposed: bool,
+    input: &Tensor,
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    configuration: &ConvolutionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    let geometry = convolution_geometry(operation, 2, transposed, configuration)?;
+    canonical_convolution_tensor(backend, input, weight, bias, &geometry, context)
+        .map_err(|error| convolution_error(operation, error))
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn convolution_vjp_with_context_exact_native(
@@ -1895,6 +1966,7 @@ fn convolution_error(
 ) -> SpatialFunctionalKernelError {
     match error {
         OperatorIndirectionError::Cancelled => SpatialFunctionalKernelError::Cancelled,
+        OperatorIndirectionError::Tensor(error) => error.into(),
         error => SpatialFunctionalKernelError::CanonicalOwner {
             operation,
             owner: "ConvolutionGeometry",

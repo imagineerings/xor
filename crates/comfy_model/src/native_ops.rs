@@ -12,7 +12,8 @@ use comfy_tensor::{
     OperationSupport, ReductionOperation, ResizeMode, StorageId, StreamId, Tensor, TensorBackend,
     TensorError, UnaryOperation,
     generated_activation_normalization_functional_01::{
-        FunctionalError, group_norm_with_context_exact_native, layer_norm_with_context_exact_native,
+        FunctionalError, group_norm_with_context_exact_native,
+        layer_norm_with_context_exact_native, silu_tensor_with_context_exact_native,
     },
     generated_comfy_operator_indirection_01::{
         ConvolutionGeometry, ConvolutionPaddingMode, OperatorIndirectionError, TensorValues,
@@ -31,8 +32,8 @@ use comfy_tensor::{
         adaptive_average_pool_2d_module_with_context_exact_native,
         average_pool_3d_module_with_context_exact_native,
         batch_norm_module_with_context_exact_native, embedding_module_with_context_exact_native,
-        huber_loss_with_context_exact_native, instance_norm_2d_with_context_exact_native,
-        leaky_relu_module_with_context_exact_native,
+        huber_loss_with_context_exact_native, instance_norm_2d_tensor_with_context_exact_native,
+        instance_norm_2d_with_context_exact_native, leaky_relu_module_with_context_exact_native,
         multihead_attention_projected_with_context_exact_native,
         replication_pad_2d_with_context_exact_native,
     },
@@ -48,6 +49,11 @@ use comfy_tensor::{
         dropout_with_context_exact_native, elu_module_with_context_exact_native,
         identity_with_context_exact_native, mse_loss_with_context_exact_native,
         sigmoid_module_with_context_exact_native,
+    },
+    generated_spatial_functional_kernel_01::{
+        ConvolutionConfiguration, SpatialFunctionalKernelError,
+        conv_2d_tensor_with_context_exact_native,
+        conv_transpose_2d_tensor_with_context_exact_native,
     },
     rng::RngTransaction,
 };
@@ -119,6 +125,15 @@ pub enum NativeOpsError {
     },
     #[error("native module operation was cancelled")]
     Cancelled,
+}
+
+impl From<SpatialFunctionalKernelError> for NativeOpsError {
+    fn from(error: SpatialFunctionalKernelError) -> Self {
+        match error {
+            SpatialFunctionalKernelError::Cancelled => Self::Cancelled,
+            error => Self::InvalidOwned(error.to_string()),
+        }
+    }
 }
 
 impl From<NeuralNetworkModulePartThreeError> for NativeOpsError {
@@ -2574,6 +2589,125 @@ impl NativeModule {
         input: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, NativeOpsError> {
+        context.cancellation.check()?;
+        if !matches!(
+            input.descriptor().dtype(),
+            DType::F16 | DType::Bf16 | DType::F32
+        ) {
+            return Err(NativeOpsError::Invalid(
+                "immutable dense inference requires a supported floating-point dtype",
+            ));
+        }
+        if input.descriptor().device() != backend.device() {
+            return Err(NativeOpsError::BackendTargetMismatch {
+                requested: input.descriptor().device(),
+                backend: backend.device(),
+            });
+        }
+        if input.descriptor().stream() != context.stream {
+            return Err(NativeOpsError::ExecutionStreamMismatch {
+                requested: input.descriptor().stream(),
+                context: context.stream,
+            });
+        }
+        if !input.descriptor().is_contiguous()? {
+            return Err(NativeOpsError::Invalid(
+                "immutable dense inference requires contiguous input",
+            ));
+        }
+        let output_dtype = input.descriptor().dtype();
+        let output_device = input.descriptor().device();
+        let input_shape = shape_to_usize(input.descriptor().shape())?;
+        match &self.spec {
+            NativeModuleSpec::Convolution {
+                input_channels,
+                kernel_shape,
+                geometry,
+                ..
+            } => {
+                if geometry.spatial_dimensions() != 2 {
+                    return Err(NativeOpsError::Invalid(
+                        "immutable dense spatial inference supports only Conv2d modules",
+                    ));
+                }
+                if geometry.padding_mode() != ConvolutionPaddingMode::Zeros {
+                    return Err(NativeOpsError::Invalid(
+                        "immutable dense spatial inference requires zero padding",
+                    ));
+                }
+                if input_shape.len() != 4 || input_shape.get(1) != Some(input_channels) {
+                    return Err(NativeOpsError::Invalid(
+                        "convolution input shape does not match the module",
+                    ));
+                }
+                if kernel_shape.len() != 2 {
+                    return Err(NativeOpsError::Invalid(
+                        "convolution kernel rank does not match Conv2d",
+                    ));
+                }
+                let (weight, bias) = self.dense_inference_parameters(input)?;
+                let configuration = ConvolutionConfiguration {
+                    stride: geometry.stride().to_vec(),
+                    padding: geometry.padding().to_vec(),
+                    dilation: geometry.dilation().to_vec(),
+                    groups: geometry.groups(),
+                    output_padding: geometry.output_padding().to_vec(),
+                };
+                let output = if geometry.transposed() {
+                    conv_transpose_2d_tensor_with_context_exact_native(
+                        backend,
+                        input,
+                        weight,
+                        bias,
+                        &configuration,
+                        context,
+                    )?
+                } else {
+                    conv_2d_tensor_with_context_exact_native(
+                        backend,
+                        input,
+                        weight,
+                        bias,
+                        &configuration,
+                        context,
+                    )?
+                };
+                context.check()?;
+                return Ok(output);
+            }
+            NativeModuleSpec::InstanceNorm2d {
+                features,
+                epsilon,
+                affine,
+            } => {
+                if *affine {
+                    return Err(NativeOpsError::Invalid(
+                        "immutable dense inference supports only parameterless InstanceNorm2d",
+                    ));
+                }
+                if input_shape.len() != 4 || input_shape.get(1) != Some(features) {
+                    return Err(NativeOpsError::Invalid(
+                        "instance-normalization input rank or channels do not match the module",
+                    ));
+                }
+                self.validate_parameter_presence()?;
+                let output = instance_norm_2d_tensor_with_context_exact_native(
+                    backend,
+                    input,
+                    f64::from(*epsilon),
+                    context,
+                )?;
+                context.check()?;
+                return Ok(output);
+            }
+            NativeModuleSpec::Silu => {
+                self.validate_parameter_presence()?;
+                let output = silu_tensor_with_context_exact_native(backend, input, context)?;
+                context.check()?;
+                return Ok(output);
+            }
+            _ => {}
+        }
         self.execution_requirements(DType::F32)
             .admit_backend_target(
                 backend,
@@ -2583,10 +2717,7 @@ impl NativeModule {
                 input.descriptor().stream(),
                 context,
             )?;
-        let output_dtype = input.descriptor().dtype();
-        let output_device = input.descriptor().device();
         let input_values = tensor_to_f32(backend, input, context)?;
-        let input_shape = shape_to_usize(input.descriptor().shape())?;
         let result = match &self.spec {
             NativeModuleSpec::Linear {
                 input_features,
@@ -2604,36 +2735,6 @@ impl NativeModule {
                     &weight_values,
                     &[*output_features, *input_features],
                     bias_values.as_deref(),
-                    output_device,
-                    context,
-                )?
-            }
-            NativeModuleSpec::Convolution {
-                input_channels,
-                output_channels,
-                kernel_shape,
-                geometry,
-                ..
-            } => {
-                if geometry.spatial_dimensions() != 2 || geometry.transposed() {
-                    return Err(NativeOpsError::Invalid(
-                        "immutable dense inference supports only ordinary Conv2d modules",
-                    ));
-                }
-                let (weight, bias) = self.dense_inference_parameters(input)?;
-                let weight_values = tensor_to_f32(backend, weight, context)?;
-                let bias_values = bias
-                    .map(|bias| tensor_to_f32(backend, bias, context))
-                    .transpose()?;
-                let mut weight_shape = vec![*output_channels, input_channels / geometry.groups()];
-                weight_shape.extend_from_slice(kernel_shape);
-                convolution_with_context_exact_native(
-                    &input_values,
-                    &input_shape,
-                    &weight_values,
-                    &weight_shape,
-                    bias_values.as_deref(),
-                    geometry,
                     output_device,
                     context,
                 )?
@@ -2707,15 +2808,6 @@ impl NativeModule {
                     shape: input_shape,
                 }
             }
-            NativeModuleSpec::Silu => TensorValues {
-                values: silu_module_with_context_exact_native(
-                    backend,
-                    &input_values,
-                    output_device,
-                    context,
-                )?,
-                shape: input_shape,
-            },
             NativeModuleSpec::Gelu { approximation } => TensorValues {
                 values: gelu_module_with_context_exact_native(
                     backend,
@@ -2726,6 +2818,13 @@ impl NativeModule {
                 )?,
                 shape: input_shape,
             },
+            NativeModuleSpec::Convolution { .. }
+            | NativeModuleSpec::InstanceNorm2d { .. }
+            | NativeModuleSpec::Silu => {
+                return Err(NativeOpsError::Invalid(
+                    "bounded dense spatial module dispatch was not handled",
+                ));
+            }
             _ => {
                 return Err(NativeOpsError::Invalid(
                     "module does not support immutable dense inference",

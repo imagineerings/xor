@@ -78,6 +78,23 @@ fn tensor(
     Ok(backend.upload_f32(descriptor, values, &context)?.0)
 }
 
+fn tensor_with_dtype(
+    backend: &TestBackend,
+    shape: &[u64],
+    values: &[f32],
+    dtype: DType,
+    cancellation: &CancellationToken,
+) -> Result<comfy_tensor::Tensor, Box<dyn std::error::Error>> {
+    Ok(comfy_tensor::generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native(
+        backend,
+        shape,
+        values,
+        dtype,
+        DeviceId::CPU,
+        &context(backend, cancellation)?,
+    )?)
+}
+
 fn integer_tensor(
     backend: &TestBackend,
     shape: &[u64],
@@ -367,6 +384,27 @@ fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
         &cancellation,
     )?;
 
+    let transposed_geometry =
+        ConvolutionGeometry::new(2, vec![1, 1], vec![0, 0], vec![1, 1], 1, true, vec![0, 0])?;
+    let mut transposed = disable_weight_init_convolution_exact_native(
+        "conv_transpose",
+        1,
+        1,
+        vec![2, 2],
+        false,
+        transposed_geometry,
+    )?;
+    transposed.load_dense_parameters(
+        tensor(
+            &backend,
+            &[1, 1, 2, 2],
+            &[1.0, 2.0, 3.0, 4.0],
+            &cancellation,
+        )?,
+        None,
+    )?;
+    let transposed_input = tensor(&backend, &[1, 1, 1, 1], &[2.0], &cancellation)?;
+
     let mut layer_norm =
         layer_norm_module_exact_native("layer_norm", vec![2], 1.0e-5, true, true, &cancellation)?;
     layer_norm.load_dense_parameters(
@@ -389,12 +427,22 @@ fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
 
     let silu = silu_module_exact_native("silu", false, &cancellation)?;
     let gelu = gelu_module_exact_native("gelu", GeluApproximation::Tanh, &cancellation)?;
+    let instance_norm =
+        instance_norm_2d_module_exact_native("instance_norm", 1, 1.0e-5, false, &cancellation)?;
+    let instance_input = tensor(
+        &backend,
+        &[1, 1, 2, 2],
+        &[1.0, 2.0, 3.0, 4.0],
+        &cancellation,
+    )?;
 
     for (module, module_input) in [
         (&linear, &input),
         (&convolution, &convolution_input),
+        (&transposed, &transposed_input),
         (&layer_norm, &input),
         (&group_norm, &group_input),
+        (&instance_norm, &instance_input),
         (&silu, &input),
         (&gelu, &input),
     ] {
@@ -413,7 +461,12 @@ fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
             &context(&backend, &cancellation)?,
         )?;
 
-        assert_eq!(immutable.contiguous_bytes()?, ordinary.contiguous_bytes()?);
+        let immutable_values = tensor_values(&backend, &immutable, &cancellation)?;
+        let ordinary_values = tensor_values(&backend, &ordinary, &cancellation)?;
+        assert_eq!(immutable_values.len(), ordinary_values.len());
+        for (immutable, ordinary) in immutable_values.iter().zip(&ordinary_values) {
+            assert!((immutable - ordinary).abs() <= 1.0e-6);
+        }
         assert_eq!(
             immutable.descriptor().dtype(),
             module_input.descriptor().dtype()
@@ -429,6 +482,167 @@ fn immutable_dense_inference_preserves_module_state_and_tensor_placement()
         assert_eq!(module.generation(), generation);
         assert_eq!(module.prefetched_dtype_device(), prefetched);
         assert_eq!(module.semantic_state_digest(&cancellation)?, digest);
+    }
+
+    assert_eq!(
+        tensor_values(
+            &backend,
+            &transposed.forward_dense_inference_with_context(
+                &backend,
+                &transposed_input,
+                &context(&backend, &cancellation)?,
+            )?,
+            &cancellation,
+        )?,
+        [2.0, 4.0, 6.0, 8.0]
+    );
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let input = tensor_with_dtype(&backend, &[1, 2], &[-1.0, 1.0], dtype, &cancellation)?;
+        let output = silu.forward_dense_inference_with_context(
+            &backend,
+            &input,
+            &context(&backend, &cancellation)?,
+        )?;
+        assert_eq!(output.descriptor().dtype(), dtype);
+        let values = tensor_values(&backend, &output, &cancellation)?;
+        assert!((values[0] - -0.268_941_43).abs() < 0.003);
+        assert!((values[1] - 0.731_058_6).abs() < 0.003);
+        assert_ne!(output.storage_id(), input.storage_id());
+
+        let geometry =
+            ConvolutionGeometry::new(2, vec![1, 1], vec![0, 0], vec![1, 1], 1, false, vec![0, 0])?;
+        let mut convolution = disable_weight_init_convolution_exact_native(
+            "typed_conv",
+            1,
+            1,
+            vec![2, 2],
+            true,
+            geometry,
+        )?;
+        convolution.load_dense_parameters(
+            tensor_with_dtype(&backend, &[1, 1, 2, 2], &[1.0; 4], dtype, &cancellation)?,
+            Some(tensor_with_dtype(
+                &backend,
+                &[1],
+                &[0.5],
+                dtype,
+                &cancellation,
+            )?),
+        )?;
+        let convolution_input = tensor_with_dtype(
+            &backend,
+            &[1, 1, 2, 2],
+            &[1.0, 2.0, 3.0, 4.0],
+            dtype,
+            &cancellation,
+        )?;
+        let convolution_generation = convolution.generation();
+        let convolution_prefetch = convolution.prefetched_dtype_device();
+        let convolution_digest = convolution.semantic_state_digest(&cancellation)?;
+        let convolution_allocations = convolution.resident_tensor_allocations();
+        let convolution_context = context(&backend, &cancellation)?;
+        let convolution_output = convolution.forward_dense_inference_with_context(
+            &backend,
+            &convolution_input,
+            &convolution_context,
+        )?;
+        assert_eq!(convolution_output.descriptor().dtype(), dtype);
+        assert!(
+            (tensor_values(&backend, &convolution_output, &cancellation)?[0] - 10.5).abs() < 0.01
+        );
+        assert_ne!(
+            convolution_output.storage_id(),
+            convolution_input.storage_id()
+        );
+        assert!(
+            convolution_allocations
+                .iter()
+                .all(|(storage_id, _)| *storage_id != convolution_output.storage_id())
+        );
+        assert_eq!(convolution_context.scratch.in_use_bytes(), 0);
+        assert_eq!(convolution.generation(), convolution_generation);
+        assert_eq!(convolution.prefetched_dtype_device(), convolution_prefetch);
+        assert_eq!(
+            convolution.semantic_state_digest(&cancellation)?,
+            convolution_digest
+        );
+
+        let transposed_geometry =
+            ConvolutionGeometry::new(2, vec![1, 1], vec![0, 0], vec![1, 1], 1, true, vec![0, 0])?;
+        let mut transposed = disable_weight_init_convolution_exact_native(
+            "typed_transpose",
+            1,
+            1,
+            vec![2, 2],
+            false,
+            transposed_geometry,
+        )?;
+        transposed.load_dense_parameters(
+            tensor_with_dtype(
+                &backend,
+                &[1, 1, 2, 2],
+                &[1.0, 2.0, 3.0, 4.0],
+                dtype,
+                &cancellation,
+            )?,
+            None,
+        )?;
+        let transposed_input =
+            tensor_with_dtype(&backend, &[1, 1, 1, 1], &[2.0], dtype, &cancellation)?;
+        let transposed_generation = transposed.generation();
+        let transposed_prefetch = transposed.prefetched_dtype_device();
+        let transposed_digest = transposed.semantic_state_digest(&cancellation)?;
+        let transposed_allocations = transposed.resident_tensor_allocations();
+        let transposed_context = context(&backend, &cancellation)?;
+        let transposed_output = transposed.forward_dense_inference_with_context(
+            &backend,
+            &transposed_input,
+            &transposed_context,
+        )?;
+        assert_eq!(transposed_output.descriptor().dtype(), dtype);
+        let values = tensor_values(&backend, &transposed_output, &cancellation)?;
+        for (actual, expected) in values.iter().zip([2.0, 4.0, 6.0, 8.0]) {
+            assert!((actual - expected).abs() < 0.01);
+        }
+        assert_ne!(
+            transposed_output.storage_id(),
+            transposed_input.storage_id()
+        );
+        assert!(
+            transposed_allocations
+                .iter()
+                .all(|(storage_id, _)| *storage_id != transposed_output.storage_id())
+        );
+        assert_eq!(transposed_context.scratch.in_use_bytes(), 0);
+        assert_eq!(transposed.generation(), transposed_generation);
+        assert_eq!(transposed.prefetched_dtype_device(), transposed_prefetch);
+        assert_eq!(
+            transposed.semantic_state_digest(&cancellation)?,
+            transposed_digest
+        );
+
+        let instance_input = tensor_with_dtype(
+            &backend,
+            &[1, 1, 2, 2],
+            &[1.0, 2.0, 3.0, 4.0],
+            dtype,
+            &cancellation,
+        )?;
+        let instance_output = instance_norm.forward_dense_inference_with_context(
+            &backend,
+            &instance_input,
+            &context(&backend, &cancellation)?,
+        )?;
+        assert_eq!(instance_output.descriptor().dtype(), dtype);
+        assert_ne!(instance_output.storage_id(), instance_input.storage_id());
+        let values = tensor_values(&backend, &instance_output, &cancellation)?;
+        for (actual, expected) in
+            values
+                .iter()
+                .zip([-1.341_635_5, -0.447_211_8, 0.447_211_8, 1.341_635_5])
+        {
+            assert!((actual - expected).abs() < 0.01);
+        }
     }
     Ok(())
 }
@@ -488,7 +702,7 @@ fn immutable_dense_inference_rejects_unsupported_state_and_rolls_back_cancellati
             &context(&backend, &cancellation)?,
         ),
         Err(NativeOpsError::Invalid(
-            "immutable dense inference supports only ordinary Conv2d modules"
+            "immutable dense spatial inference supports only Conv2d modules"
         ))
     ));
     Ok(())

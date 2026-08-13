@@ -1,5 +1,7 @@
 use comfy_tensor::{
-    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DeviceId, ExecutionContext, StreamId,
+    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
+    StreamId, TensorDescriptor,
+    generated_comfy_operator_indirection_01::tensor_to_f32_with_context_exact_native,
     generated_spatial_functional_kernel_01::{
         AVG_POOL_1D_OPERATION_ID, AveragePoolConfiguration, ConvolutionConfiguration,
         GRID_SAMPLE_OPERATION_ID, GridPaddingMode, GridSampleConfiguration, GridSampleMode,
@@ -7,8 +9,10 @@ use comfy_tensor::{
         SpatialFunctionalKernelError, average_pool_1d_with_context_exact_native,
         average_pool_2d_with_context_exact_native, average_pool_3d_with_context_exact_native,
         average_pool_jvp_with_context_exact_native, average_pool_vjp_with_context_exact_native,
-        conv_1d_with_context_exact_native, conv_2d_with_context_exact_native,
-        conv_3d_with_context_exact_native, conv_transpose_1d_with_context_exact_native,
+        conv_1d_with_context_exact_native, conv_2d_tensor_with_context_exact_native,
+        conv_2d_with_context_exact_native, conv_3d_with_context_exact_native,
+        conv_transpose_1d_with_context_exact_native,
+        conv_transpose_2d_tensor_with_context_exact_native,
         conv_transpose_2d_with_context_exact_native, conv_transpose_3d_with_context_exact_native,
         convolution_jvp_with_context_exact_native, convolution_vjp_with_context_exact_native,
         grid_sample_jvp_with_context_exact_native, grid_sample_vjp_with_context_exact_native,
@@ -74,6 +78,64 @@ fn dot(left: &[f32], right: &[f32]) -> f32 {
         .zip(right)
         .map(|(left, right)| left * right)
         .sum()
+}
+
+#[test]
+fn tensor_convolution_adapters_are_bounded_fresh_and_transpose_exact()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let upload = |shape: Vec<u64>, values: &[f32]| {
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, context.stream)?;
+        Ok::<_, Box<dyn std::error::Error>>(backend.upload_f32(descriptor, values, &context)?.0)
+    };
+    let input = upload(
+        vec![1, 1, 3, 3],
+        &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    )?;
+    let weight = upload(vec![1, 1, 2, 2], &[1.0, 2.0, 3.0, 4.0])?;
+    let bias = upload(vec![1], &[0.5])?;
+    let configuration = ConvolutionConfiguration {
+        stride: vec![1, 1],
+        padding: vec![0, 0],
+        dilation: vec![1, 1],
+        groups: 1,
+        output_padding: vec![0, 0],
+    };
+    let output = conv_2d_tensor_with_context_exact_native(
+        &*backend,
+        &input,
+        &weight,
+        Some(&bias),
+        &configuration,
+        &context,
+    )?;
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &output, &context)?,
+        &[37.5, 47.5, 67.5, 77.5],
+        0.0,
+    );
+    assert_ne!(output.storage_id(), input.storage_id());
+
+    let transpose_input = upload(vec![1, 1, 1, 1], &[2.0])?;
+    let transpose_weight = upload(vec![1, 1, 2, 2], &[1.0, 2.0, 3.0, 4.0])?;
+    let transpose = conv_transpose_2d_tensor_with_context_exact_native(
+        &*backend,
+        &transpose_input,
+        &transpose_weight,
+        None,
+        &configuration,
+        &context,
+    )?;
+    close(
+        &tensor_to_f32_with_context_exact_native(&backend, &transpose, &context)?,
+        &[2.0, 4.0, 6.0, 8.0],
+        0.0,
+    );
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
 }
 
 #[test]

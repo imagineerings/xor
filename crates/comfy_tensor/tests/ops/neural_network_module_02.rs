@@ -21,6 +21,7 @@ use comfy_tensor::{
         embedding_module_with_context_exact_native, huber_loss_jvp_with_context_exact_native,
         huber_loss_vjp_with_context_exact_native, huber_loss_with_context_exact_native,
         instance_norm_2d_jvp_with_context_exact_native,
+        instance_norm_2d_tensor_with_context_exact_native,
         instance_norm_2d_vjp_with_context_exact_native,
         instance_norm_2d_with_context_exact_native,
         leaky_relu_module_jvp_with_context_exact_native,
@@ -307,6 +308,24 @@ fn normalization_activation_and_huber_delegate_existing_math() -> Result<(), Box
         &context,
     )?;
     close(&instance, &[-0.99998, 0.99998, -0.99998, 0.99998], 1.0e-4);
+    let instance_input = upload_f32(
+        &backend,
+        &[1, 2, 1, 2],
+        &[1.0, 2.0, 3.0, 4.0],
+        &cancellation,
+    )?;
+    let instance_tensor = instance_norm_2d_tensor_with_context_exact_native(
+        &*backend,
+        &instance_input,
+        1.0e-5,
+        &context,
+    )?;
+    close(
+        &f32_values(&instance_tensor)?,
+        &[-0.99998, 0.99998, -0.99998, 0.99998],
+        1.0e-4,
+    );
+    assert_ne!(instance_tensor.storage_id(), instance_input.storage_id());
     assert_eq!(
         instance_norm_2d_vjp_with_context_exact_native(
             &backend,

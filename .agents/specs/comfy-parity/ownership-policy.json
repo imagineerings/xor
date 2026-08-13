@@ -178,10 +178,16 @@
           "name": "vae-image-gelu-delegates-canonical-scalar-owner",
           "path": "crates/comfy_model/src/vae_image.rs",
           "pattern": "gelu_scalar_exact_native[\\s\\S]*GeluApproximation::None"
+        },
+        {
+          "name": "task404-tensor-silu-reuses-canonical-scalar-and-fresh-tensor-output",
+          "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+          "pattern": "pub fn silu_tensor_with_context_exact_native[\\s\\S]*allocate_tensor_output[\\s\\S]*silu_scalar[\\s\\S]*finish_tensor_output"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-bounded-dense-spatial-inference-foundation",
         "comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
@@ -4414,10 +4420,21 @@
           "name": "cpu-backend-convolution-delegates-canonical-geometry-and-equation",
           "path": "crates/comfy_tensor/src/cpu_backend.rs",
           "pattern": "fn convolution\\([\\s\\S]*ConvolutionGeometry::new\\([\\s\\S]*convolution_into_with_context_exact_native"
+        },
+        {
+          "name": "task404-tensor-convolution-delegates-backend-and-canonical-geometry",
+          "path": "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+          "pattern": "pub fn convolution_tensor_with_context_exact_native[\\s\\S]*checked_output_shape[\\s\\S]*backend\\.convolution"
+        },
+        {
+          "name": "task404-spatial-convolution-wrappers-delegate-tensor-owner",
+          "path": "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+          "pattern": "pub fn conv_2d_tensor_with_context_exact_native[\\s\\S]*pub fn conv_transpose_2d_tensor_with_context_exact_native[\\s\\S]*canonical_convolution_tensor"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-bounded-dense-spatial-inference-foundation",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
@@ -9314,10 +9331,21 @@
           "name": "task401-immutable-dense-forward-preserves-state-and-rolls-back",
           "path": "crates/comfy_model/tests/native_ops.rs",
           "pattern": "immutable_dense_inference_preserves_module_state_and_tensor_placement[\\s\\S]*immutable_dense_inference_rejects_unsupported_state_and_rolls_back_cancellation"
+        },
+        {
+          "name": "task404-bounded-dense-spatial-forward-delegates-canonical-tensor-owners",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "pub fn forward_dense_inference_with_context[\\s\\S]*conv_transpose_2d_tensor_with_context_exact_native[\\s\\S]*instance_norm_2d_tensor_with_context_exact_native[\\s\\S]*silu_tensor_with_context_exact_native"
+        },
+        {
+          "name": "task404-bounded-dense-spatial-forward-preserves-low-precision-state",
+          "path": "crates/comfy_model/tests/native_ops.rs",
+          "pattern": "immutable_dense_inference_preserves_module_state_and_tensor_placement[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*typed_transpose"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-bounded-dense-spatial-inference-foundation",
         "comfy-parity-native-immutable-dense-inference-attention-foundation",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
         "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-a0bd98dda517",
@@ -20448,10 +20476,16 @@
           "name": "task78-tensor-numerics-derivatives-cancellation-and-resolution-tests",
           "path": "crates/comfy_tensor/tests/ops/neural_network_module_02.rs",
           "pattern": "pooling_and_replication_padding_share_canonical_geometry[\\s\\S]*normalization_activation_and_huber_delegate_existing_math[\\s\\S]*convolution_linear_embedding_and_attention_preserve_derivatives[\\s\\S]*cancellation_precedes_part_two_validation[\\s\\S]*all_twelve_part_two_resolutions_are_unique_and_runtime_hash_sealed"
+        },
+        {
+          "name": "task404-parameterless-instance-norm-delegates-tensor-group-norm",
+          "path": "crates/comfy_tensor/src/ops/neural_network_module_02.rs",
+          "pattern": "pub fn instance_norm_2d_tensor_with_context_exact_native[\\s\\S]*canonical_group_norm_tensor"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
+        "comfy-parity-native-bounded-dense-spatial-inference-foundation",
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811",
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4",
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14"

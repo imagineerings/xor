@@ -13396,3 +13396,61 @@ fn val_ownership_task403_sdpose_model_resource_001() -> Result<(), Box<dyn std::
     assert_eq!(mappings.len(), 8);
     Ok(())
 }
+
+#[test]
+fn val_ownership_task404_bounded_dense_spatial_inference_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/native_ops.rs"))?;
+    for required in [
+        "conv_2d_tensor_with_context_exact_native",
+        "conv_transpose_2d_tensor_with_context_exact_native",
+        "instance_norm_2d_tensor_with_context_exact_native",
+        "silu_tensor_with_context_exact_native",
+    ] {
+        assert!(
+            model.contains(required),
+            "bounded model path lacks {required}"
+        );
+    }
+    let convolution = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs"),
+    )?;
+    assert!(convolution.contains("pub fn convolution_tensor_with_context_exact_native("));
+    assert!(convolution.contains("backend.convolution("));
+    let normalization = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs"),
+    )?;
+    assert!(normalization.contains("pub fn silu_tensor_with_context_exact_native("));
+    assert!(normalization.contains("silu_scalar(value)"));
+    let module =
+        fs::read_to_string(root.join("crates/comfy_tensor/src/ops/neural_network_module_02.rs"))?;
+    assert!(module.contains("pub fn instance_norm_2d_tensor_with_context_exact_native("));
+    assert!(module.contains("canonical_group_norm_tensor("));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task = "comfy-parity-native-bounded-dense-spatial-inference-foundation";
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    let count = concerns
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks
+                        .iter()
+                        .any(|candidate| candidate.as_str() == Some(task))
+                })
+        })
+        .count();
+    assert!(
+        count >= 4,
+        "Task404 must reconcile every existing numerical owner"
+    );
+    Ok(())
+}

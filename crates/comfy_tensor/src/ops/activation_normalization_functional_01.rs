@@ -1416,6 +1416,33 @@ pub fn silu_with_context_exact_native(
     silu_exact_native(input, device, context.cancellation)
 }
 
+pub fn silu_tensor_with_context_exact_native(
+    backend: &dyn TensorBackend,
+    input: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FunctionalError> {
+    validate_tensor_input(backend, input, SILU_OPERATION_ID, context)?;
+    let mut output = allocate_tensor_output(backend, input, context)?;
+    {
+        let mut write = output.write()?;
+        let element_count = input.descriptor().element_count()?;
+        for linear in 0..element_count {
+            context.check()?;
+            let value = read_tensor_real_linear(input, linear)? as f32;
+            let activated = f64::from(silu_scalar(value));
+            write_tensor_real_linear(
+                &mut write,
+                input.descriptor().dtype(),
+                input.descriptor().device(),
+                linear,
+                activated,
+                SILU_OPERATION_ID,
+            )?;
+        }
+    }
+    finish_tensor_output(backend, output, context)
+}
+
 pub fn silu_vjp_with_context_exact_native(
     _backend: &CpuBackend,
     input: &[f32],
