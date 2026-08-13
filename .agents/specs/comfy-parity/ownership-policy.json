@@ -11216,7 +11216,7 @@
         "NativeModule owns immutable convolution and LeakyReLU execution",
         "comfy_tensor canonical interpolation, grid-sample, concatenation, pixel-shuffle, indexing, layout, and real arithmetic owners",
         "ExecutionContext owns caller cancellation, scratch, and backend allocation authority",
-        "later video execution may plan pair order, reuse attempt-local features, clamp results, and publish VIDEO outputs"
+        "the sibling RIFE sequence method may plan pair order, reuse attempt-local features, crop, and clamp; later video execution may only resolve handles and publish VIDEO outputs"
       ],
       "definitions": [
         {
@@ -11263,6 +11263,89 @@
         "comfy-parity-native-rife-execution-foundation"
       ],
       "production_consumers": [
+        "native RIFE sequence execution",
+        "future native video frame-interpolation nodes"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
+    },
+    {
+      "concern": "native_rife_frame_interpolation_sequence_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_rife_sequence"
+      ],
+      "allowed_adapters": [
+        "NativeFrameInterpolationModel::interpolate_rife_pair_with_features owns one prepared midpoint graph over borrowed attempt-local head features and grid",
+        "FrameInterpolationInvocationPlan owns bounded source timestep and reflection-padding geometry",
+        "comfy_tensor canonical padding, indexing, concatenation, permutation, contiguous-layout, and clamp owners",
+        "later video runtime may resolve handles and publish the returned VIDEO value but cannot retain sequence features, grids, or outputs"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
+          "role": "canonical",
+          "symbol": "interpolate_rife_sequence",
+          "pattern": "pub fn interpolate_rife_sequence\\("
+        }
+      ],
+      "call_symbols": [
+        "interpolate_rife_sequence"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "rife-sequence-plans-reflects-reuses-orders-crops-and-clamps",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "interpolate_rife_sequence[\\s\\S]*FrameInterpolationInvocationPlan::checked[\\s\\S]*pad_rife_sequence_frame[\\s\\S]*interpolate_rife_pair_with_features[\\s\\S]*crop_rife_sequence_frame[\\s\\S]*first_features = second_features[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*clamp_with_context_exact_native"
+        },
+        {
+          "name": "rife-sequence-reflection-padding-delegates-canonical-functional-pad-owner",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn pad_rife_sequence_frame[\\s\\S]*functional_pad_with_context_exact_native[\\s\\S]*FunctionalPadMode::Reflect"
+        },
+        {
+          "name": "rife-sequence-reduced-oracle-proves-padding-order-and-owner-immutability",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "reduced_rife_sequence_preserves_endpoints_padding_order_and_owner_state[\\s\\S]*\\[2, 64, 63, 3\\][\\s\\S]*\\[0.0_f32, 0.5, 1.0\\][\\s\\S]*resident_tensor_allocations[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "rife-sequence-fixture-bounds-model-only-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-sequence/manifest.json",
+          "pattern": "(?=[\\s\\S]*reflection_padding)(?=[\\s\\S]*adjacent_head_feature_reuse)(?=[\\s\\S]*codec_execution)(?=[\\s\\S]*output_publication)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-rife-sequence-execution-foundation"
+      ],
+      "production_consumers": [
         "future native video frame-interpolation execution and nodes"
       ],
       "requirements": [
@@ -11288,7 +11371,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; feature reuse, sequence planning, handle resolution, caching, output effects, and publication remain later owners."
+      "decision_reason": "NativeFrameInterpolationModel owns the only RIFE sequence composition. It reuses immutable retained weights and attempt-local adjacent head projections, delegates the exact pair graph and all padding/layout/clamp operations, and returns one ordered BHWC tensor without acquiring codec, handle, cache, or publication authority."
     },
     {
       "concern": "native_rmsprop_optimizer_state",

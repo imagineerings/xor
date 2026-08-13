@@ -12,10 +12,13 @@ use comfy_tensor::{
         real_lerp_tensor_weight_with_context_exact_native, real_multiply_with_context_exact_native,
         sigmoid_with_context_exact_native,
     },
+    generated_elementwise_or_runtime_operation_09::clamp_with_context_exact_native,
     generated_indexing_masking_01::narrow_method_exact_native,
     generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
     generated_shape_layout_transform_02::torch_cat_with_context_exact_native,
-    generated_shape_layout_transform_03::tensor_permute_exact_native,
+    generated_shape_layout_transform_03::{
+        FunctionalPadMode, functional_pad_with_context_exact_native, tensor_permute_exact_native,
+    },
     generated_spatial_functional_kernel_01::{
         GridPaddingMode, GridSampleConfiguration, GridSampleMode, InterpolateConfiguration,
         InterpolateMode, grid_sample_tensor_with_context_exact_native,
@@ -521,6 +524,163 @@ impl NativeFrameInterpolationModel {
             ));
         }
         let base_grid = rife_base_grid(backend, height, width, context)?;
+        let first_features = self.rife_head(backend, first, head_channels, context)?;
+        let second_features = self.rife_head(backend, second, head_channels, context)?;
+        self.interpolate_rife_pair_with_features(
+            backend,
+            first,
+            second,
+            &first_features,
+            &second_features,
+            &base_grid,
+            timestep,
+            batch,
+            height,
+            width,
+            context,
+        )
+    }
+
+    pub fn interpolate_rife_sequence(
+        &self,
+        backend: &CpuBackend,
+        images: &Tensor,
+        multiplier: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        let FrameInterpolationProfile::Rife { head_channels, .. } = self.profile else {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE sequence execution requires a RIFE checkpoint",
+            ));
+        };
+        let descriptor = images.descriptor();
+        let shape = descriptor.shape();
+        if shape.len() != 4
+            || shape.get(1) == Some(&0)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) != Some(&3)
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE sequence input must be BHWC RGB",
+            ));
+        }
+        if descriptor.dtype() != self.dtype
+            || descriptor.device() != DeviceId::CPU
+            || descriptor.stream() != self.stream
+            || descriptor.stream() != context.stream
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        let frame_count = *shape.first().ok_or(FrameInterpolationError::Overflow)?;
+        let height = *shape.get(1).ok_or(FrameInterpolationError::Overflow)?;
+        let width = *shape.get(2).ok_or(FrameInterpolationError::Overflow)?;
+        let plan = FrameInterpolationInvocationPlan::checked(
+            &self.profile,
+            frame_count,
+            multiplier,
+            height,
+            width,
+            context.cancellation,
+        )?;
+        if plan.is_bypass() {
+            context.cancellation.check()?;
+            return Ok(images.clone());
+        }
+
+        let output_capacity = usize::try_from(plan.output_frame_count())
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let mut output_frames = Vec::new();
+        output_frames
+            .try_reserve_exact(output_capacity)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+
+        let first_unpadded = rife_sequence_frame(backend, images, 0, context)?;
+        output_frames.push(first_unpadded.clone());
+        let mut first = pad_rife_sequence_frame(backend, &first_unpadded, &plan, context)?;
+        let base_grid =
+            rife_base_grid(backend, plan.padded_height(), plan.padded_width(), context)?;
+        let mut first_features = self.rife_head(backend, &first, head_channels, context)?;
+
+        for pair in 0..frame_count.saturating_sub(1) {
+            context.cancellation.check()?;
+            let second_unpadded = rife_sequence_frame(backend, images, pair + 1, context)?;
+            let second = pad_rife_sequence_frame(backend, &second_unpadded, &plan, context)?;
+            let second_features = self.rife_head(backend, &second, head_channels, context)?;
+            for &timestep in plan.timesteps() {
+                context.cancellation.check()?;
+                let midpoint = self.interpolate_rife_pair_with_features(
+                    backend,
+                    &first,
+                    &second,
+                    &first_features,
+                    &second_features,
+                    &base_grid,
+                    timestep,
+                    1,
+                    plan.padded_height(),
+                    plan.padded_width(),
+                    context,
+                )?;
+                output_frames.push(crop_rife_sequence_frame(
+                    backend, &midpoint, height, width, context,
+                )?);
+            }
+            output_frames.push(second_unpadded);
+            first = second;
+            first_features = second_features;
+        }
+
+        if output_frames.len() != output_capacity {
+            return Err(FrameInterpolationError::StateMismatch);
+        }
+        let output = execution_result(
+            torch_cat_with_context_exact_native(backend, &output_frames, 0, context),
+            context,
+        )?;
+        let output = execution_result(
+            tensor_permute_exact_native(&output, &[0, 2, 3, 1], context.cancellation),
+            context,
+        )?;
+        let output = execution_result(
+            contiguous_with_context_exact_native(
+                backend,
+                &output,
+                MemoryFormatReference::Layout(Layout::Contiguous),
+                context,
+            ),
+            context,
+        )?;
+        let output = execution_result(
+            clamp_with_context_exact_native(
+                backend,
+                &output,
+                Some(Scalar::Float(0.0)),
+                Some(Scalar::Float(1.0)),
+                context,
+            ),
+            context,
+        )?;
+        context.cancellation.check()?;
+        Ok(output)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn interpolate_rife_pair_with_features(
+        &self,
+        backend: &CpuBackend,
+        first: &Tensor,
+        second: &Tensor,
+        first_features: &Tensor,
+        second_features: &Tensor,
+        base_grid: &Tensor,
+        timestep: f32,
+        batch: u64,
+        height: u64,
+        width: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
         let timestep_tensor = constant_tensor(
             backend,
             &[batch, 1, height, width],
@@ -528,8 +688,6 @@ impl NativeFrameInterpolationModel {
             self.dtype,
             context,
         )?;
-        let first_features = self.rife_head(backend, first, head_channels, context)?;
-        let second_features = self.rife_head(backend, second, head_channels, context)?;
         let mut flow: Option<Tensor> = None;
         let mut mask: Option<Tensor> = None;
         let mut features: Option<Tensor> = None;
@@ -544,16 +702,16 @@ impl NativeFrameInterpolationModel {
                 let second_feature_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
                 let warped_first_features = warp_rife(
                     backend,
-                    &first_features,
+                    first_features,
                     &first_feature_flow,
-                    &base_grid,
+                    base_grid,
                     context,
                 )?;
                 let warped_second_features = warp_rife(
                     backend,
-                    &second_features,
+                    second_features,
                     &second_feature_flow,
-                    &base_grid,
+                    base_grid,
                     context,
                 )?;
                 execution_result(
@@ -614,8 +772,8 @@ impl NativeFrameInterpolationModel {
                 .ok_or(FrameInterpolationError::StateMismatch)?;
             let first_flow = contiguous_narrow(backend, flow, 1, 0, 2, context)?;
             let second_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
-            warped_first = warp_rife(backend, first, &first_flow, &base_grid, context)?;
-            warped_second = warp_rife(backend, second, &second_flow, &base_grid, context)?;
+            warped_first = warp_rife(backend, first, &first_flow, base_grid, context)?;
+            warped_second = warp_rife(backend, second, &second_flow, base_grid, context)?;
         }
         let mask = mask.ok_or(FrameInterpolationError::StateMismatch)?;
         let weight = execution_result(
@@ -977,6 +1135,85 @@ fn contiguous_narrow(
         contiguous_with_context_exact_native(
             backend,
             &view,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )
+}
+
+fn rife_sequence_frame(
+    backend: &CpuBackend,
+    images: &Tensor,
+    index: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let index = i64::try_from(index).map_err(|_| FrameInterpolationError::Overflow)?;
+    let frame = execution_result(
+        narrow_method_exact_native(images, 0, index, 1, context.cancellation),
+        context,
+    )?;
+    let frame = execution_result(
+        tensor_permute_exact_native(&frame, &[0, 3, 1, 2], context.cancellation),
+        context,
+    )?;
+    execution_result(
+        contiguous_with_context_exact_native(
+            backend,
+            &frame,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )
+}
+
+fn pad_rife_sequence_frame(
+    backend: &CpuBackend,
+    frame: &Tensor,
+    plan: &FrameInterpolationInvocationPlan,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    if plan.padding_bottom() == 0 && plan.padding_right() == 0 {
+        context.cancellation.check()?;
+        return Ok(frame.clone());
+    }
+    let padding_right =
+        i64::try_from(plan.padding_right()).map_err(|_| FrameInterpolationError::Overflow)?;
+    let padding_bottom =
+        i64::try_from(plan.padding_bottom()).map_err(|_| FrameInterpolationError::Overflow)?;
+    execution_result(
+        functional_pad_with_context_exact_native(
+            backend,
+            frame,
+            &[0, padding_right, 0, padding_bottom],
+            FunctionalPadMode::Reflect,
+            None,
+            context,
+        ),
+        context,
+    )
+}
+
+fn crop_rife_sequence_frame(
+    backend: &CpuBackend,
+    frame: &Tensor,
+    height: u64,
+    width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let frame = execution_result(
+        narrow_method_exact_native(frame, 2, 0, height, context.cancellation),
+        context,
+    )?;
+    let frame = execution_result(
+        narrow_method_exact_native(&frame, 3, 0, width, context.cancellation),
+        context,
+    )?;
+    execution_result(
+        contiguous_with_context_exact_native(
+            backend,
+            &frame,
             MemoryFormatReference::Layout(Layout::Contiguous),
             context,
         ),
@@ -1866,6 +2103,91 @@ mod tests {
         assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
         assert_eq!(model.semantic_state_digest_sha256(), digest);
         assert_eq!(model.resident_tensor_allocations()?, allocations);
+        Ok(())
+    }
+
+    #[test]
+    fn reduced_rife_sequence_preserves_endpoints_padding_order_and_owner_state()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(512 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(256 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let model = NativeFrameInterpolationModel::reduced_rife_test_fixture(&backend, &context)?;
+        let frame_elements = 64 * 63 * 3;
+        let mut values = vec![0.0; frame_elements];
+        values.extend(std::iter::repeat_n(1.0, frame_elements));
+        let images = tensor_from_f32(
+            &backend,
+            &[2, 64, 63, 3],
+            &values,
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let digest = model.semantic_state_digest_sha256().to_owned();
+        let allocations = model.resident_tensor_allocations()?;
+        let output = model.interpolate_rife_sequence(&backend, &images, 2, &context)?;
+        assert_eq!(output.descriptor().shape(), &[3, 64, 63, 3]);
+        assert_eq!(output.descriptor().dtype(), DType::F32);
+        assert_ne!(output.storage_id(), images.storage_id());
+        let bytes = output.contiguous_bytes()?;
+        for (frame, expected) in [0.0_f32, 0.5, 1.0].into_iter().enumerate() {
+            let start = frame
+                .checked_mul(frame_elements)
+                .and_then(|offset| offset.checked_mul(4))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let end = start
+                .checked_add(
+                    frame_elements
+                        .checked_mul(4)
+                        .ok_or(FrameInterpolationError::Overflow)?,
+                )
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let frame_bytes = bytes
+                .get(start..end)
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            for encoded in frame_bytes.chunks_exact(4) {
+                let encoded: [u8; 4] = encoded
+                    .try_into()
+                    .map_err(|_| FrameInterpolationError::StateMismatch)?;
+                assert_eq!(f32::from_ne_bytes(encoded), expected);
+            }
+        }
+        assert_eq!(model.semantic_state_digest_sha256(), digest);
+        assert_eq!(model.resident_tensor_allocations()?, allocations);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        let expected_input_bytes = values
+            .iter()
+            .flat_map(|value| value.to_ne_bytes())
+            .collect::<Vec<_>>();
+        assert_eq!(images.contiguous_bytes()?, expected_input_bytes);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(256 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            model.interpolate_rife_sequence(&backend, &images, 2, &cancelled_context),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
         Ok(())
     }
 

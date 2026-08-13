@@ -9831,6 +9831,48 @@ def native_rife_execution_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_rife_sequence_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-rife-sequence-execution-foundation",
+        "Execute bounded RIFE frame sequences",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "NativeFrameInterpolationModel remains the sole retained RIFE owner while one sequence method plans BHWC endpoints and source timesteps, applies canonical reflection padding, reuses each adjacent frame head projection attempt-locally, delegates every midpoint to the retained pair graph, crops and clamps through canonical Tensor owners, and returns one fresh ordered BHWC sequence without retaining features, grids, outputs, cache, handles, codec state, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "projects/comfy/ComfyUI/comfy/ldm/common_dit.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_09.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/storage_dtype_device_01.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-sequence",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight oracle executes a two-frame 64x63 BHWC sequence at multiplier two. It proves reflection padding to 64x64 and exact crop-back, endpoint/midpoint ordering and values, final BHWC clamp, fresh output storage, immutable source and retained digest/residency, adjacent head-feature carry within the attempt, pre-cancellation, caller-workspace cleanup, and explicit absence of FILM, codecs, handles, cache, output effects, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12042,8 +12084,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     rife_execution_foundation = native_rife_execution_foundation_task(
         str(rife_tensor_arithmetic_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    rife_sequence_execution_foundation = native_rife_sequence_execution_foundation_task(
         str(rife_execution_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(rife_sequence_execution_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12147,6 +12192,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             tensor_interpolate_foundation,
             rife_tensor_arithmetic_foundation,
             rife_execution_foundation,
+            rife_sequence_execution_foundation,
             video_foundation,
             detection_foundation,
         ]
