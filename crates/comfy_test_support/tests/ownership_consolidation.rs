@@ -2654,6 +2654,79 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task392_gemma3_profiles_have_one_canonical_decoder_owner =
+        production_source_occurrences(&sources, "pub enum Gemma3DecoderProfile {").len() == 1
+            && production_source_occurrences(&sources, "pub struct Gemma3DecoderConfiguration {")
+                .len()
+                == 1
+            && production_source_occurrences(&sources, "fn rope_for_layer(").len() == 1
+            && !model_clip_text_encoder_multimodal.contains("struct Gemma3DecoderConfiguration");
+    let task392_gemma3_delegates_rope_norm_attention_cache_and_rng = model_clip_text_encoder_decoder
+        .contains("pub fn gemma3_decoder_configuration(")
+        && model_clip_text_encoder_decoder.contains("gemma3.local_rope")
+        && model_clip_text_encoder_decoder
+            .contains("let layer_rope = configuration.rope_for_layer(self.kind)")
+        && model_clip_text_encoder_decoder.contains("normalize_attention_heads(")
+        && model_clip_text_encoder_decoder.contains("rms_norm_with_context_exact_native(")
+        && model_clip_text_encoder_decoder.contains("stage_attention_cache(")
+        && model_clip_text_encoder_decoder.contains("transaction: &RngTransaction")
+        && model_clip_text_encoder_decoder
+            .contains("let mut staged_transaction = transaction.clone()");
+    let task392_gemma3_fixture_is_exact_and_failure_atomic = model_clip_text_encoder_decoder_tests
+        .contains("gemma3_alternating_rope_norm_scaling_cache_and_generation_are_exact")
+        && model_clip_text_encoder_decoder_tests
+            .contains("30447eeb298bdaa2edcf48e1b2407903f2da625da3e2bdf0313acc0bc1b046a8")
+        && model_clip_text_encoder_decoder_tests.contains(
+            "Gemma3 layers require post-attention and post-feed-forward normalization weights",
+        )
+        && model_clip_text_encoder_decoder_tests.contains("transaction.checkpoint()")
+        && model_clip_text_encoder_decoder_tests.contains("scratch.in_use_bytes()");
+    let task392_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_unidirectional_decoder_execution")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str()
+                            == Some("comfy-parity-native-gemma3-decoder-exactness-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma3-source-profiles-are-closed-executable-decoder-configurations",
+                            "gemma3-selects-local-and-global-rope-inside-one-canonical-decoder",
+                            "gemma3-executes-four-stage-rms-residual-and-checkpoint-backed-query-key-normalization",
+                            "gemma3-fixture-proves-profile-rope-cache-generation-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task392_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_unidirectional_decoder_execution,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma3-decoder-exactness-foundation")
+                && line.contains("VAL-RNG-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner =
         production_source_occurrences(&sources, "pub struct Qwen35LinearWeights {").len() == 1
             && production_source_occurrences(&sources, "fn forward_linear_attention(").len() == 1
@@ -9158,6 +9231,22 @@ fn run_ownership_validation(
             task384_qwen3_fixture_is_exact_and_failure_atomic,
         ),
         (
+            "task392_policy_and_catalog_trace_gemma3_decoder",
+            task392_policy_trace && task392_catalog_trace,
+        ),
+        (
+            "task392_gemma3_profiles_have_one_canonical_decoder_owner",
+            task392_gemma3_profiles_have_one_canonical_decoder_owner,
+        ),
+        (
+            "task392_gemma3_delegates_rope_norm_attention_cache_and_rng",
+            task392_gemma3_delegates_rope_norm_attention_cache_and_rng,
+        ),
+        (
+            "task392_gemma3_fixture_is_exact_and_failure_atomic",
+            task392_gemma3_fixture_is_exact_and_failure_atomic,
+        ),
+        (
             "task385_policy_and_catalog_trace_qwen35_hybrid_decoder",
             task385_policy_trace && task385_catalog_trace,
         ),
@@ -9776,6 +9865,17 @@ fn val_ownership_task391_gemma_tokenizer_001() -> Result<(), Box<dyn std::error:
         "val-ownership-task391-gemma-tokenizer-001.json",
         "val_ownership_task391_gemma_tokenizer_001",
         Some("task391_"),
+    )
+}
+
+#[test]
+fn val_ownership_task392_gemma3_decoder_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task392-gemma3-alternating-rope-and-canonical-decoder-ownership",
+        "val-ownership-task392-gemma3-decoder-001.json",
+        "val_ownership_task392_gemma3_decoder_001",
+        Some("task392_"),
     )
 }
 

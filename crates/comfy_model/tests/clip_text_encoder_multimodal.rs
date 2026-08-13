@@ -280,6 +280,7 @@ fn reduced_qwen3_decoder(
         head_dimension: 2,
         query_key_norm: true,
         qwen35_linear: None,
+        gemma3: None,
         normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
         rope: DecoderRopeConfiguration {
             theta: 5_000_000.0,

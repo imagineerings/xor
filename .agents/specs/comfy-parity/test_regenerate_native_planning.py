@@ -160,6 +160,22 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma3_decoder_id]["dependencies"],
             [gemma_tokenizer_id],
         )
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            tasks_by_id[gemma3_decoder_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            tasks_by_id[gemma3_decoder_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            tasks_by_id[gemma3_decoder_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_decoder",
+            tasks_by_id[gemma3_decoder_id]["writes"],
+        )
         self.assertEqual(
             tasks_by_id[gemma4_decoder_id]["dependencies"],
             [gemma3_decoder_id],

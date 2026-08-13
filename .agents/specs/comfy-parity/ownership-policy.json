@@ -12428,6 +12428,8 @@
         "DecoderPreparedDeepstack",
         "DecoderLayerWeights",
         "DecoderAttentionWeights",
+        "Gemma3DecoderConfiguration",
+        "Gemma3DecoderProfile",
         "Qwen35LinearConfiguration",
         "Qwen35LinearWeights"
       ],
@@ -12475,6 +12477,8 @@
         "DecoderPreparedDeepstack",
         "DecoderLayerWeights",
         "DecoderAttentionWeights",
+        "Gemma3DecoderConfiguration",
+        "Gemma3DecoderProfile",
         "Qwen35LinearConfiguration",
         "Qwen35LinearWeights"
       ],
@@ -12543,6 +12547,26 @@
           "name": "qwen3-query-key-norm-fixture-proves-cache-equivalence-admission-and-rollback",
           "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
           "pattern": "qwen3_query_key_norm_is_per_head_pre_rope_checkpoint_backed_and_cache_exact[\\s\\S]*e2f7a9dc822b118de4e2b20f5db96609c9d4bb0ab1d7c557fef3ba3b76f3d0f1[\\s\\S]*query/key normalization weights must exactly match the decoder profile[\\s\\S]*scratch\\.in_use_bytes"
+        },
+        {
+          "name": "gemma3-source-profiles-are-closed-executable-decoder-configurations",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "pub enum Gemma3DecoderProfile[\\s\\S]*pub struct Gemma3DecoderConfiguration[\\s\\S]*pub fn gemma3_decoder_configuration[\\s\\S]*Gemma3DecoderProfile::FourBVision[\\s\\S]*Gemma3DecoderProfile::TwelveB"
+        },
+        {
+          "name": "gemma3-selects-local-and-global-rope-inside-one-canonical-decoder",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "fn rope_for_layer[\\s\\S]*DecoderLayerKind::SlidingAttention[\\s\\S]*gemma3\\.local_rope[\\s\\S]*let layer_rope = configuration\\.rope_for_layer\\(self\\.kind\\)[\\s\\S]*apply_decoder_rope"
+        },
+        {
+          "name": "gemma3-executes-four-stage-rms-residual-and-checkpoint-backed-query-key-normalization",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "post_attention_norm_weight[\\s\\S]*feed_forward_norm_weight[\\s\\S]*post_feed_forward_norm_weight[\\s\\S]*Gemma3 layers require post-attention and post-feed-forward normalization weights[\\s\\S]*normalize_attention_heads\\("
+        },
+        {
+          "name": "gemma3-fixture-proves-profile-rope-cache-generation-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_decoder.rs",
+          "pattern": "gemma3_alternating_rope_norm_scaling_cache_and_generation_are_exact[\\s\\S]*30447eeb298bdaa2edcf48e1b2407903f2da625da3e2bdf0313acc0bc1b046a8[\\s\\S]*transaction\\.checkpoint[\\s\\S]*scratch\\.in_use_bytes"
         },
         {
           "name": "qwen35-hybrid-attention-is-closed-and-checkpoint-backed",
@@ -12624,13 +12648,15 @@
         "comfy-parity-native-prepared-decoder-generation-foundation",
         "comfy-parity-native-prepared-decoder-deepstack-foundation",
         "comfy-parity-native-qwen3-decoder-exactness-foundation",
-        "comfy-parity-native-qwen35-decoder-exactness-foundation"
+        "comfy-parity-native-qwen35-decoder-exactness-foundation",
+        "comfy-parity-native-gemma3-decoder-exactness-foundation"
       ],
       "production_consumers": [
         "native Llama and Gemma decoder text conditioning",
         "native GPT-OSS decoder text conditioning and generation",
         "native Qwen3.5 checkpoint-backed hybrid decoder text conditioning",
         "native Qwen3 and Qwen3-VL grouped-query decoder attention",
+        "native Gemma3 alternating local/global decoder text conditioning and generation",
         "dependent native multimodal and composite text adapters"
       ],
       "requirements": [
@@ -12659,7 +12685,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, Qwen3/Qwen3-VL, GPT-OSS, and Qwen3.5 graph owner, including checkpoint-backed per-head Q/K normalization before RoPE, Qwen3.5 combined query/output gating, real DeltaNet projections and decay parameters, depthwise causal-convolution state, gated RMSNorm, recurrent state and exact cache steps, checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, one shared generation loop, and failure-atomic invocation-local KV transitions. Every admitted attention tensor participates in the same semantic digest and StorageId residency projection. Prepared media state is borrowed, checked, and attempt-local. The owner delegates tokenization, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners."
+      "decision_reason": "The full-repository definition and call-site audit found no existing general decoder graph or decoder-KV-state service. NativeDecoderTextEncoder is therefore the sole Llama, Gemma, Qwen3/Qwen3-VL, GPT-OSS, and Qwen3.5 graph owner, including closed executable Gemma3 4B-vision and 12B profiles with five local layers before each global layer, per-layer 10k/1m RoPE and 1/8 scaling, four-stage add-one RMS normalization, embedding scaling, grouped-query Q/K normalization, checkpoint-backed per-head Q/K normalization before RoPE, Qwen3.5 combined query/output gating, real DeltaNet projections and decay parameters, depthwise causal-convolution state, gated RMSNorm, recurrent state and exact cache steps, checked scalar and multidimensional RoPE, numeric-token and prepared-embedding prefill, borrowed prefill-only deepstack additions after decoder layers and before capture, causal and sliding masks, grouped-query expansion, residual and gated-MLP order, one shared generation loop, and failure-atomic invocation-local KV transitions. Every admitted attention tensor participates in the same semantic digest and StorageId residency projection. Prepared media state is borrowed, checked, and attempt-local. The owner delegates tokenization, parsing, module lifecycle, exact tensor kernels and indexing, attention execution, backend admission, workspace, cancellation, caller-addressed RNG state, durable caching, persistence, and publication to existing canonical owners."
     },
     {
       "concern": "native_vision_transformer_architecture_execution",

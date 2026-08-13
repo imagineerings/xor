@@ -1037,6 +1037,17 @@ pub struct DecoderRopeConfiguration {
     pub scaling: RopeScaling,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gemma3DecoderProfile {
+    FourBVision,
+    TwelveB,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Gemma3DecoderConfiguration {
+    pub local_rope: DecoderRopeConfiguration,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecoderTextConfiguration {
     pub architecture: DecoderArchitecture,
@@ -1052,6 +1063,7 @@ pub struct DecoderTextConfiguration {
     pub head_dimension: usize,
     pub query_key_norm: bool,
     pub qwen35_linear: Option<Qwen35LinearConfiguration>,
+    pub gemma3: Option<Gemma3DecoderConfiguration>,
     pub normalization_epsilon_bits: u32,
     pub rope: DecoderRopeConfiguration,
     pub sliding_window: Option<usize>,
@@ -1218,7 +1230,137 @@ impl DecoderTextConfiguration {
                 ));
             }
         }
+        if let Some(gemma3) = &self.gemma3 {
+            gemma3
+                .local_rope
+                .validate_for_head_dimension(self.head_dimension)?;
+            let expected_pattern = [
+                DecoderLayerKind::SlidingAttention,
+                DecoderLayerKind::SlidingAttention,
+                DecoderLayerKind::SlidingAttention,
+                DecoderLayerKind::SlidingAttention,
+                DecoderLayerKind::SlidingAttention,
+                DecoderLayerKind::FullAttention,
+            ];
+            if self.architecture != DecoderArchitecture::Gemma
+                || !self.query_key_norm
+                || self.qwen35_linear.is_some()
+                || self.sliding_window != Some(1024)
+                || self.activation != DecoderActivation::GeluTanh
+                || self.norm_weight_offset() != 1.0
+                || self.residual_scale() != 1.0
+                || self.embedding_scale() != (self.hidden_size as f32).sqrt()
+                || self.logits_soft_cap().is_some()
+                || !self.tied_output_head
+                || self.stop_tokens != [1, 106]
+                || self.rope.theta != 1_000_000.0
+                || self.rope.rotary_dimension != self.head_dimension
+                || !self.rope.interleaved_sections.is_empty()
+                || self.rope.scaling != (RopeScaling::Linear { factor: 8.0 })
+                || gemma3.local_rope.theta != 10_000.0
+                || gemma3.local_rope.rotary_dimension != self.head_dimension
+                || !gemma3.local_rope.interleaved_sections.is_empty()
+                || gemma3.local_rope.scaling != RopeScaling::None
+                || self
+                    .layer_kinds
+                    .iter()
+                    .enumerate()
+                    .any(|(index, kind)| *kind != expected_pattern[index % expected_pattern.len()])
+            {
+                return Err(DecoderTextError::InvalidConfiguration(
+                    "Gemma3 requires the exact alternating local/global attention, RoPE, normalization, scaling, tied-head, and stop-token profile",
+                ));
+            }
+        }
         Ok(())
+    }
+
+    fn rope_for_layer(&self, kind: DecoderLayerKind) -> &DecoderRopeConfiguration {
+        if kind == DecoderLayerKind::SlidingAttention
+            && let Some(gemma3) = &self.gemma3
+        {
+            &gemma3.local_rope
+        } else {
+            &self.rope
+        }
+    }
+}
+
+impl DecoderRopeConfiguration {
+    fn validate_for_head_dimension(&self, head_dimension: usize) -> Result<(), DecoderTextError> {
+        if self.rotary_dimension == 0
+            || self.rotary_dimension > head_dimension
+            || !self.rotary_dimension.is_multiple_of(2)
+            || !self.theta.is_finite()
+            || self.theta <= 0.0
+            || !self.interleaved_sections.is_empty()
+        {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "Gemma3 local RoPE dimensions are invalid",
+            ));
+        }
+        match self.scaling {
+            RopeScaling::None => Ok(()),
+            _ => Err(DecoderTextError::InvalidConfiguration(
+                "Gemma3 local RoPE scaling is invalid",
+            )),
+        }
+    }
+}
+
+pub fn gemma3_decoder_configuration(profile: Gemma3DecoderProfile) -> DecoderTextConfiguration {
+    let (hidden_size, feed_forward_size, hidden_layers, attention_heads, key_value_heads) =
+        match profile {
+            Gemma3DecoderProfile::FourBVision => (2560, 10_240, 34, 8, 4),
+            Gemma3DecoderProfile::TwelveB => (3840, 15_360, 48, 16, 8),
+        };
+    let pattern = [
+        DecoderLayerKind::SlidingAttention,
+        DecoderLayerKind::SlidingAttention,
+        DecoderLayerKind::SlidingAttention,
+        DecoderLayerKind::SlidingAttention,
+        DecoderLayerKind::SlidingAttention,
+        DecoderLayerKind::FullAttention,
+    ];
+    DecoderTextConfiguration {
+        architecture: DecoderArchitecture::Gemma,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        vocabulary_size: 262_208,
+        maximum_tokens: 131_072,
+        hidden_size,
+        feed_forward_size,
+        layer_kinds: (0..hidden_layers)
+            .map(|index| pattern[index % pattern.len()])
+            .collect(),
+        attention_heads,
+        key_value_heads,
+        head_dimension: 256,
+        query_key_norm: true,
+        qwen35_linear: None,
+        gemma3: Some(Gemma3DecoderConfiguration {
+            local_rope: DecoderRopeConfiguration {
+                theta: 10_000.0,
+                rotary_dimension: 256,
+                interleaved_sections: Vec::new(),
+                scaling: RopeScaling::None,
+            },
+        }),
+        normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+        rope: DecoderRopeConfiguration {
+            theta: 1_000_000.0,
+            rotary_dimension: 256,
+            interleaved_sections: Vec::new(),
+            scaling: RopeScaling::Linear { factor: 8.0 },
+        },
+        sliding_window: Some(1024),
+        activation: DecoderActivation::GeluTanh,
+        embedding_scale_bits: (hidden_size as f32).sqrt().to_bits(),
+        residual_scale_bits: 1.0_f32.to_bits(),
+        norm_weight_offset_bits: 1.0_f32.to_bits(),
+        logits_soft_cap_bits: None,
+        tied_output_head: true,
+        stop_tokens: vec![1, 106],
     }
 }
 
@@ -2866,6 +3008,7 @@ impl NativeDecoderLayer {
             configuration,
             context,
         )?;
+        let layer_rope = configuration.rope_for_layer(self.kind);
         let query = apply_decoder_rope(
             &query,
             batch,
@@ -2873,7 +3016,7 @@ impl NativeDecoderLayer {
             configuration.attention_heads,
             configuration.head_dimension,
             positions.rope(),
-            &configuration.rope,
+            layer_rope,
             context.cancellation,
         )?;
         let key = apply_decoder_rope(
@@ -2883,7 +3026,7 @@ impl NativeDecoderLayer {
             configuration.key_value_heads,
             configuration.head_dimension,
             positions.rope(),
-            &configuration.rope,
+            layer_rope,
             context.cancellation,
         )?;
         let (keys, values, key_tokens) = stage_attention_cache(
@@ -4591,6 +4734,14 @@ fn build_layer(
     .flatten()
     {
         require_vector_parameter(weight, configuration.hidden_size, stream)?;
+    }
+    if configuration.gemma3.is_some()
+        && (weights.post_attention_norm_weight.is_none()
+            || weights.post_feed_forward_norm_weight.is_none())
+    {
+        return Err(DecoderTextError::InvalidConfiguration(
+            "Gemma3 layers require post-attention and post-feed-forward normalization weights",
+        ));
     }
     match (&weights.attention_sink, configuration.architecture) {
         (Some(sink), DecoderArchitecture::GptOss) => {

@@ -2451,6 +2451,7 @@ pub fn qwen_multimodal_decoder_configuration(
         head_dimension: profile.head_dimension,
         query_key_norm: profile.query_key_norm,
         qwen35_linear,
+        gemma3: None,
         normalization_epsilon_bits: profile.normalization_epsilon_bits,
         rope: crate::DecoderRopeConfiguration {
             theta,
