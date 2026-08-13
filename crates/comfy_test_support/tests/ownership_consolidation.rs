@@ -13902,6 +13902,66 @@ fn val_ownership_native_rife_tensor_arithmetic_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_rife_execution_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn interpolate_rife_pair(",
+        "let first_features = self.rife_head(",
+        "[16_usize, 8, 4, 2, 1]",
+        "self.rife_block(",
+        "grid_sample_tensor_with_context_exact_native(",
+        "pixel_shuffle_tensor_with_context_exact_native(",
+        "real_lerp_tensor_weight_with_context_exact_native(",
+        "reduced_rife_forward_executes_the_retained_graph_and_is_failure_atomic",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained RIFE execution lacks {required}"
+        );
+    }
+    for forbidden in [
+        "NativeCache",
+        "NativeHandleStoreGeneration",
+        "Command::new",
+        "std::process",
+    ] {
+        assert!(
+            !model.contains(forbidden),
+            "retained RIFE execution must not own {forbidden}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json",
+    ))?;
+    assert!(fixture.contains("zero_flow_midpoint"));
+    assert!(fixture.contains("\"licensed_checkpoint_included\": false"));
+    assert!(fixture.contains("\"full_production_numeric_parity\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some("comfy-parity-native-rife-execution-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

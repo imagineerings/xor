@@ -1,4 +1,28 @@
-use comfy_tensor::{CancellationToken, DType, DeviceId, StorageId, StreamId, Tensor, TensorError};
+use crate::native_ops::{
+    NativeModule, disable_weight_init_convolution_exact_native, tensor_from_f32,
+};
+use comfy_tensor::{
+    CancellationToken, CpuBackend, DType, DeviceId, ExecutionContext, Layout,
+    MemoryFormatReference, Scalar, StorageId, StreamId, Tensor, TensorError,
+    generated_comfy_operator_indirection_01::{
+        ConvolutionGeometry, ConvolutionPaddingMode, cast_to_with_context_exact_native,
+    },
+    generated_elementwise_or_runtime_operation_03::{
+        ElementwiseOperand, real_add_with_context_exact_native,
+        real_lerp_tensor_weight_with_context_exact_native, real_multiply_with_context_exact_native,
+        sigmoid_with_context_exact_native,
+    },
+    generated_indexing_masking_01::narrow_method_exact_native,
+    generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
+    generated_shape_layout_transform_02::torch_cat_with_context_exact_native,
+    generated_shape_layout_transform_03::tensor_permute_exact_native,
+    generated_spatial_functional_kernel_01::{
+        GridPaddingMode, GridSampleConfiguration, GridSampleMode, InterpolateConfiguration,
+        InterpolateMode, grid_sample_tensor_with_context_exact_native,
+        interpolate_tensor_with_context_exact_native,
+    },
+    generated_storage_dtype_device_01::contiguous_with_context_exact_native,
+};
 use comfy_types::CancellationError;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
@@ -64,6 +88,8 @@ pub enum FrameInterpolationError {
     Tensor(#[from] TensorError),
     #[error("frame interpolation operation was cancelled")]
     Cancelled,
+    #[error("frame interpolation execution failed: {0}")]
+    Execution(String),
     #[cfg(any(test, feature = "test-support"))]
     #[error("frame interpolation test fixture failed: {0}")]
     TestFixture(String),
@@ -261,33 +287,27 @@ impl NativeFrameInterpolationModel {
     #[cfg(any(test, feature = "test-support"))]
     #[doc(hidden)]
     pub fn reduced_rife_test_fixture(
-        backend: &comfy_tensor::CpuBackend,
-        context: &comfy_tensor::ExecutionContext<'_>,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
     ) -> Result<Self, FrameInterpolationError> {
         let manifest = rife_manifest(2, [2; 5])?;
         let mut weights = BTreeMap::new();
-        let mut tensors_by_shape: BTreeMap<Vec<u64>, Tensor> = BTreeMap::new();
         for (key, shape) in manifest {
             context.cancellation.check()?;
-            let tensor = if let Some(tensor) = tensors_by_shape.get(&shape) {
-                tensor.clone()
-            } else {
-                let count = shape.iter().try_fold(1_usize, |total, dimension| {
-                    total.checked_mul(usize::try_from(*dimension).ok()?)
-                });
-                let count = count.ok_or(FrameInterpolationError::Overflow)?;
-                let tensor = crate::native_ops::tensor_from_f32(
-                    backend,
-                    &shape,
-                    &vec![0.25; count],
-                    DType::F32,
-                    DeviceId::CPU,
-                    context,
-                )
-                .map_err(|error| FrameInterpolationError::TestFixture(error.to_string()))?;
-                tensors_by_shape.insert(shape.clone(), tensor.clone());
-                tensor
-            };
+            let count = shape.iter().try_fold(1_usize, |total, dimension| {
+                total.checked_mul(usize::try_from(*dimension).ok()?)
+            });
+            let count = count.ok_or(FrameInterpolationError::Overflow)?;
+            let value = if key.ends_with(".beta") { 1.0 } else { 0.0 };
+            let tensor = tensor_from_f32(
+                backend,
+                &shape,
+                &vec![value; count],
+                DType::F32,
+                DeviceId::CPU,
+                context,
+            )
+            .map_err(|error| FrameInterpolationError::TestFixture(error.to_string()))?;
             weights.insert(key, tensor);
         }
         Self::from_checkpoint("f".repeat(64), weights, context.cancellation)
@@ -464,6 +484,711 @@ impl NativeFrameInterpolationModel {
             },
         )
     }
+
+    pub fn interpolate_rife_pair(
+        &self,
+        backend: &CpuBackend,
+        first: &Tensor,
+        second: &Tensor,
+        timestep: f32,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        let FrameInterpolationProfile::Rife { head_channels, .. } = self.profile else {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE execution requires a RIFE checkpoint",
+            ));
+        };
+        if !timestep.is_finite() || !(0.0..=1.0).contains(&timestep) {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE timestep must be finite and between zero and one",
+            ));
+        }
+        validate_rife_image(first, self.dtype, self.stream, context)?;
+        validate_rife_image(second, self.dtype, self.stream, context)?;
+        if first.descriptor().shape() != second.descriptor().shape() {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE input frame shapes do not match",
+            ));
+        }
+        let shape = first.descriptor().shape();
+        let batch = *shape.first().ok_or(FrameInterpolationError::Overflow)?;
+        let height = *shape.get(2).ok_or(FrameInterpolationError::Overflow)?;
+        let width = *shape.get(3).ok_or(FrameInterpolationError::Overflow)?;
+        if !height.is_multiple_of(64) || !width.is_multiple_of(64) {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE pair execution requires dimensions padded to multiples of 64",
+            ));
+        }
+        let base_grid = rife_base_grid(backend, height, width, context)?;
+        let timestep_tensor = constant_tensor(
+            backend,
+            &[batch, 1, height, width],
+            timestep,
+            self.dtype,
+            context,
+        )?;
+        let first_features = self.rife_head(backend, first, head_channels, context)?;
+        let second_features = self.rife_head(backend, second, head_channels, context)?;
+        let mut flow: Option<Tensor> = None;
+        let mut mask: Option<Tensor> = None;
+        let mut features: Option<Tensor> = None;
+        let mut warped_first = first.clone();
+        let mut warped_second = second.clone();
+        for (block, scale) in [16_usize, 8, 4, 2, 1].into_iter().enumerate() {
+            context.cancellation.check()?;
+            let block_input = if let (Some(flow), Some(mask), Some(features)) =
+                (flow.as_ref(), mask.as_ref(), features.as_ref())
+            {
+                let first_feature_flow = contiguous_narrow(backend, flow, 1, 0, 2, context)?;
+                let second_feature_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
+                let warped_first_features = warp_rife(
+                    backend,
+                    &first_features,
+                    &first_feature_flow,
+                    &base_grid,
+                    context,
+                )?;
+                let warped_second_features = warp_rife(
+                    backend,
+                    &second_features,
+                    &second_feature_flow,
+                    &base_grid,
+                    context,
+                )?;
+                execution_result(
+                    torch_cat_with_context_exact_native(
+                        backend,
+                        &[
+                            warped_first.clone(),
+                            warped_second.clone(),
+                            warped_first_features,
+                            warped_second_features,
+                            timestep_tensor.clone(),
+                            mask.clone(),
+                            features.clone(),
+                        ],
+                        1,
+                        context,
+                    ),
+                    context,
+                )?
+            } else {
+                execution_result(
+                    torch_cat_with_context_exact_native(
+                        backend,
+                        &[
+                            first.clone(),
+                            second.clone(),
+                            first_features.clone(),
+                            second_features.clone(),
+                            timestep_tensor.clone(),
+                        ],
+                        1,
+                        context,
+                    ),
+                    context,
+                )?
+            };
+            let (flow_delta, next_mask, next_features) = self.rife_block(
+                backend,
+                block,
+                scale,
+                &block_input,
+                flow.as_ref(),
+                height,
+                width,
+                context,
+            )?;
+            flow = Some(match flow {
+                Some(ref current) => execution_result(
+                    real_add_with_context_exact_native(backend, current, &flow_delta, context),
+                    context,
+                )?,
+                None => flow_delta,
+            });
+            mask = Some(next_mask);
+            features = Some(next_features);
+            let flow = flow
+                .as_ref()
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            let first_flow = contiguous_narrow(backend, flow, 1, 0, 2, context)?;
+            let second_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
+            warped_first = warp_rife(backend, first, &first_flow, &base_grid, context)?;
+            warped_second = warp_rife(backend, second, &second_flow, &base_grid, context)?;
+        }
+        let mask = mask.ok_or(FrameInterpolationError::StateMismatch)?;
+        let weight = execution_result(
+            sigmoid_with_context_exact_native(backend, &mask, context),
+            context,
+        )?;
+        let output = execution_result(
+            real_lerp_tensor_weight_with_context_exact_native(
+                backend,
+                &warped_second,
+                &warped_first,
+                &weight,
+                context,
+            ),
+            context,
+        )?;
+        context.cancellation.check()?;
+        Ok(output)
+    }
+
+    fn rife_head(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        head_channels: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        let mut output = self.convolution(
+            backend,
+            "encode.cnn0",
+            input,
+            3,
+            16,
+            3,
+            2,
+            1,
+            false,
+            context,
+        )?;
+        output = leaky_relu(backend, &output, context)?;
+        output = self.convolution(
+            backend,
+            "encode.cnn1",
+            &output,
+            16,
+            16,
+            3,
+            1,
+            1,
+            false,
+            context,
+        )?;
+        output = leaky_relu(backend, &output, context)?;
+        output = self.convolution(
+            backend,
+            "encode.cnn2",
+            &output,
+            16,
+            16,
+            3,
+            1,
+            1,
+            false,
+            context,
+        )?;
+        output = leaky_relu(backend, &output, context)?;
+        self.convolution(
+            backend,
+            "encode.cnn3",
+            &output,
+            16,
+            usize::try_from(head_channels).map_err(|_| FrameInterpolationError::Overflow)?,
+            4,
+            2,
+            1,
+            true,
+            context,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn rife_block(
+        &self,
+        backend: &CpuBackend,
+        block: usize,
+        scale: usize,
+        input: &Tensor,
+        flow: Option<&Tensor>,
+        output_height: u64,
+        output_width: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<(Tensor, Tensor, Tensor), FrameInterpolationError> {
+        let profile_channels = match &self.profile {
+            FrameInterpolationProfile::Rife { block_channels, .. } => block_channels,
+            FrameInterpolationProfile::Film => return Err(FrameInterpolationError::StateMismatch),
+        };
+        let channels = usize::try_from(
+            *profile_channels
+                .get(block)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+        )
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+        let down_height =
+            usize::try_from(output_height).map_err(|_| FrameInterpolationError::Overflow)? / scale;
+        let down_width =
+            usize::try_from(output_width).map_err(|_| FrameInterpolationError::Overflow)? / scale;
+        let mut output = interpolate_bilinear(backend, input, down_height, down_width, context)?;
+        if let Some(flow) = flow {
+            let down_flow = interpolate_bilinear(backend, flow, down_height, down_width, context)?;
+            let down_flow = execution_result(
+                real_multiply_with_context_exact_native(
+                    backend,
+                    &down_flow,
+                    ElementwiseOperand::Scalar(Scalar::Float(1.0 / scale as f64)),
+                    context,
+                ),
+                context,
+            )?;
+            output = execution_result(
+                torch_cat_with_context_exact_native(backend, &[output, down_flow], 1, context),
+                context,
+            )?;
+        }
+        output = self.convolution(
+            backend,
+            &format!("blocks.{block}.conv0.0.0"),
+            &output,
+            usize::try_from(output.descriptor().shape()[1])
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            channels / 2,
+            3,
+            2,
+            1,
+            false,
+            context,
+        )?;
+        output = leaky_relu(backend, &output, context)?;
+        output = self.convolution(
+            backend,
+            &format!("blocks.{block}.conv0.1.0"),
+            &output,
+            channels / 2,
+            channels,
+            3,
+            2,
+            1,
+            false,
+            context,
+        )?;
+        output = leaky_relu(backend, &output, context)?;
+        for residual in 0..8 {
+            context.cancellation.check()?;
+            let prefix = format!("blocks.{block}.convblock.{residual}");
+            let convolved = self.convolution(
+                backend,
+                &format!("{prefix}.conv"),
+                &output,
+                channels,
+                channels,
+                3,
+                1,
+                1,
+                false,
+                context,
+            )?;
+            let beta = self
+                .weights
+                .get(&format!("{prefix}.beta"))
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            let residual = execution_result(
+                real_multiply_with_context_exact_native(
+                    backend,
+                    &convolved,
+                    ElementwiseOperand::Tensor(beta),
+                    context,
+                ),
+                context,
+            )?;
+            output = execution_result(
+                real_add_with_context_exact_native(backend, &output, &residual, context),
+                context,
+            )?;
+            output = leaky_relu(backend, &output, context)?;
+        }
+        output = self.convolution(
+            backend,
+            &format!("blocks.{block}.lastconv.0"),
+            &output,
+            channels,
+            52,
+            4,
+            2,
+            1,
+            true,
+            context,
+        )?;
+        output = execution_result(
+            pixel_shuffle_tensor_with_context_exact_native(backend, &output, 2, context),
+            context,
+        )?;
+        output = interpolate_bilinear(
+            backend,
+            &output,
+            usize::try_from(output_height).map_err(|_| FrameInterpolationError::Overflow)?,
+            usize::try_from(output_width).map_err(|_| FrameInterpolationError::Overflow)?,
+            context,
+        )?;
+        let flow = contiguous_narrow(backend, &output, 1, 0, 4, context)?;
+        let flow = execution_result(
+            real_multiply_with_context_exact_native(
+                backend,
+                &flow,
+                ElementwiseOperand::Scalar(Scalar::Float(scale as f64)),
+                context,
+            ),
+            context,
+        )?;
+        let mask = contiguous_narrow(backend, &output, 1, 4, 1, context)?;
+        let features = contiguous_narrow(backend, &output, 1, 5, 8, context)?;
+        Ok((flow, mask, features))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn convolution(
+        &self,
+        backend: &CpuBackend,
+        prefix: &str,
+        input: &Tensor,
+        input_channels: usize,
+        output_channels: usize,
+        kernel: usize,
+        stride: usize,
+        padding: usize,
+        transposed: bool,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        let geometry = execution_result(
+            ConvolutionGeometry::new_with_padding_mode(
+                2,
+                vec![stride; 2],
+                vec![padding; 2],
+                vec![1; 2],
+                1,
+                transposed,
+                vec![0; 2],
+                ConvolutionPaddingMode::Zeros,
+            ),
+            context,
+        )?;
+        let mut module = execution_result(
+            disable_weight_init_convolution_exact_native(
+                prefix,
+                input_channels,
+                output_channels,
+                vec![kernel; 2],
+                true,
+                geometry,
+            ),
+            context,
+        )?;
+        let weight = self
+            .weights
+            .get(&format!("{prefix}.weight"))
+            .ok_or(FrameInterpolationError::StateMismatch)?
+            .clone();
+        let bias = self
+            .weights
+            .get(&format!("{prefix}.bias"))
+            .ok_or(FrameInterpolationError::StateMismatch)?
+            .clone();
+        execution_result(module.load_dense_parameters(weight, Some(bias)), context)?;
+        execution_result(
+            module.forward_dense_inference_with_context(backend, input, context),
+            context,
+        )
+    }
+}
+
+fn execution_result<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+    context: &ExecutionContext<'_>,
+) -> Result<T, FrameInterpolationError> {
+    result.map_err(|error| {
+        if context.cancellation.is_cancelled() {
+            FrameInterpolationError::Cancelled
+        } else {
+            FrameInterpolationError::Execution(error.to_string())
+        }
+    })
+}
+
+fn validate_rife_image(
+    image: &Tensor,
+    dtype: DType,
+    stream: StreamId,
+    context: &ExecutionContext<'_>,
+) -> Result<(), FrameInterpolationError> {
+    context.cancellation.check()?;
+    let descriptor = image.descriptor();
+    let shape = descriptor.shape();
+    if shape.len() != 4
+        || shape.first() == Some(&0)
+        || shape.get(1) != Some(&3)
+        || shape.get(2) == Some(&0)
+        || shape.get(3) == Some(&0)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE inputs must be nonempty NCHW RGB tensors",
+        ));
+    }
+    if descriptor.dtype() != dtype
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != stream
+        || descriptor.stream() != context.stream
+        || !descriptor.is_contiguous()?
+    {
+        return Err(FrameInterpolationError::Placement);
+    }
+    Ok(())
+}
+
+fn constant_tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    value: f32,
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let count = shape.iter().try_fold(1_usize, |total, dimension| {
+        total.checked_mul(usize::try_from(*dimension).ok()?)
+    });
+    let count = count.ok_or(FrameInterpolationError::Overflow)?;
+    let mut values = execution_result(backend.workspace_vec(context, count), context)?;
+    for index in 0..count {
+        if index.is_multiple_of(64) {
+            context.cancellation.check()?;
+        }
+        execution_result(values.try_push(value), context)?;
+    }
+    execution_result(
+        tensor_from_f32(backend, shape, &values, dtype, DeviceId::CPU, context),
+        context,
+    )
+}
+
+fn contiguous_narrow(
+    backend: &CpuBackend,
+    input: &Tensor,
+    dimension: i64,
+    start: i64,
+    length: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let view = execution_result(
+        narrow_method_exact_native(input, dimension, start, length, context.cancellation),
+        context,
+    )?;
+    execution_result(
+        contiguous_with_context_exact_native(
+            backend,
+            &view,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )
+}
+
+fn leaky_relu(
+    backend: &CpuBackend,
+    input: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let module = execution_result(NativeModule::leaky_relu("rife.leaky_relu", 0.2), context)?;
+    execution_result(
+        module.forward_dense_inference_with_context(backend, input, context),
+        context,
+    )
+}
+
+fn interpolate_bilinear(
+    backend: &CpuBackend,
+    input: &Tensor,
+    height: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    if height == 0 || width == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE interpolation extent is zero",
+        ));
+    }
+    execution_result(
+        interpolate_tensor_with_context_exact_native(
+            backend,
+            input,
+            &InterpolateConfiguration {
+                output_size: Some(vec![height, width]),
+                scale_factor: None,
+                mode: InterpolateMode::Bilinear,
+                align_corners: Some(false),
+                recompute_scale_factor: None,
+                antialias: false,
+            },
+            context,
+        ),
+        context,
+    )
+}
+
+fn warp_rife(
+    backend: &CpuBackend,
+    input: &Tensor,
+    flow: &Tensor,
+    base_grid: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if flow.descriptor().shape().len() != 4
+        || flow.descriptor().shape().first() != input.descriptor().shape().first()
+        || flow.descriptor().shape().get(1) != Some(&2)
+        || flow.descriptor().shape().get(2) != input.descriptor().shape().get(2)
+        || flow.descriptor().shape().get(3) != input.descriptor().shape().get(3)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE flow shape does not match the warped tensor",
+        ));
+    }
+    let height = *input
+        .descriptor()
+        .shape()
+        .get(2)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let width = *input
+        .descriptor()
+        .shape()
+        .get(3)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    if height <= 1 || width <= 1 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE warp dimensions must exceed one",
+        ));
+    }
+    let flow = execution_result(
+        cast_to_with_context_exact_native(
+            backend,
+            flow,
+            DType::F32,
+            DeviceId::CPU,
+            false,
+            false,
+            context,
+        ),
+        context,
+    )?;
+    let horizontal = contiguous_narrow(backend, &flow, 1, 0, 1, context)?;
+    let horizontal = execution_result(
+        real_multiply_with_context_exact_native(
+            backend,
+            &horizontal,
+            ElementwiseOperand::Scalar(Scalar::Float(2.0 / (width - 1) as f64)),
+            context,
+        ),
+        context,
+    )?;
+    let vertical = contiguous_narrow(backend, &flow, 1, 1, 1, context)?;
+    let vertical = execution_result(
+        real_multiply_with_context_exact_native(
+            backend,
+            &vertical,
+            ElementwiseOperand::Scalar(Scalar::Float(2.0 / (height - 1) as f64)),
+            context,
+        ),
+        context,
+    )?;
+    let normalized_flow = execution_result(
+        torch_cat_with_context_exact_native(backend, &[horizontal, vertical], 1, context),
+        context,
+    )?;
+    let grid = execution_result(
+        real_add_with_context_exact_native(backend, base_grid, &normalized_flow, context),
+        context,
+    )?;
+    let grid = execution_result(
+        tensor_permute_exact_native(&grid, &[0, 2, 3, 1], context.cancellation),
+        context,
+    )?;
+    let grid = execution_result(
+        contiguous_with_context_exact_native(
+            backend,
+            &grid,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )?;
+    execution_result(
+        grid_sample_tensor_with_context_exact_native(
+            backend,
+            input,
+            &grid,
+            GridSampleConfiguration {
+                mode: GridSampleMode::Bilinear,
+                padding_mode: GridPaddingMode::Border,
+                align_corners: true,
+            },
+            context,
+        ),
+        context,
+    )
+}
+
+fn rife_base_grid(
+    backend: &CpuBackend,
+    height: u64,
+    width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let height_usize = usize::try_from(height).map_err(|_| FrameInterpolationError::Overflow)?;
+    let width_usize = usize::try_from(width).map_err(|_| FrameInterpolationError::Overflow)?;
+    let plane = height_usize
+        .checked_mul(width_usize)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let mut values = execution_result(
+        backend.workspace_vec(
+            context,
+            plane
+                .checked_mul(2)
+                .ok_or(FrameInterpolationError::Overflow)?,
+        ),
+        context,
+    )?;
+    for y in 0..height_usize {
+        for x in 0..width_usize {
+            let index = y
+                .checked_mul(width_usize)
+                .and_then(|value| value.checked_add(x))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            if index.is_multiple_of(64) {
+                context.cancellation.check()?;
+            }
+            execution_result(
+                values.try_push(-1.0 + 2.0 * x as f32 / (width_usize - 1) as f32),
+                context,
+            )?;
+        }
+    }
+    for y in 0..height_usize {
+        for x in 0..width_usize {
+            let index = y
+                .checked_mul(width_usize)
+                .and_then(|value| value.checked_add(x))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            if index.is_multiple_of(64) {
+                context.cancellation.check()?;
+            }
+            execution_result(
+                values.try_push(-1.0 + 2.0 * y as f32 / (height_usize - 1) as f32),
+                context,
+            )?;
+        }
+    }
+    execution_result(
+        tensor_from_f32(
+            backend,
+            &[1, 2, height, width],
+            &values,
+            DType::F32,
+            DeviceId::CPU,
+            context,
+        ),
+        context,
+    )
 }
 
 fn normalize_and_detect(
@@ -1047,6 +1772,100 @@ mod tests {
             ),
             Err(FrameInterpolationError::Cancelled)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn reduced_rife_forward_executes_the_retained_graph_and_is_failure_atomic()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(512 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(256 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let model = NativeFrameInterpolationModel::reduced_rife_test_fixture(&backend, &context)?;
+        let element_count = 3 * 64 * 64;
+        let first = tensor_from_f32(
+            &backend,
+            &[1, 3, 64, 64],
+            &vec![0.0; element_count],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let second = tensor_from_f32(
+            &backend,
+            &[1, 3, 64, 64],
+            &vec![1.0; element_count],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let digest = model.semantic_state_digest_sha256().to_owned();
+        let allocations = model.resident_tensor_allocations()?;
+        let output = model.interpolate_rife_pair(&backend, &first, &second, 0.5, &context)?;
+        assert_eq!(output.descriptor().shape(), &[1, 3, 64, 64]);
+        assert_eq!(output.descriptor().dtype(), DType::F32);
+        assert_ne!(output.storage_id(), first.storage_id());
+        assert_ne!(output.storage_id(), second.storage_id());
+        for encoded in output.contiguous_bytes()?.chunks_exact(4) {
+            let encoded: [u8; 4] = encoded
+                .try_into()
+                .map_err(|_| FrameInterpolationError::StateMismatch)?;
+            assert_eq!(f32::from_ne_bytes(encoded), 0.5);
+        }
+        assert_eq!(model.semantic_state_digest_sha256(), digest);
+        assert_eq!(model.resident_tensor_allocations()?, allocations);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let constrained_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1024)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            model.interpolate_rife_pair(&backend, &first, &second, 0.5, &constrained_context),
+            Err(FrameInterpolationError::Execution(_))
+        ));
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+        assert_eq!(model.semantic_state_digest_sha256(), digest);
+        assert_eq!(model.resident_tensor_allocations()?, allocations);
+        assert!(matches!(
+            model.interpolate_rife_pair(&backend, &first, &second, f32::NAN, &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(256 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            model.interpolate_rife_pair(&backend, &first, &second, 0.5, &cancelled_context),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        assert_eq!(model.semantic_state_digest_sha256(), digest);
+        assert_eq!(model.resident_tensor_allocations()?, allocations);
         Ok(())
     }
 

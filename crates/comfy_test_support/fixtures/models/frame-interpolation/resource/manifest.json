@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "provenance": "code-inferred synthetic reduced sealed-resource contract",
-  "admission_manifest_sha256": "f4dbdf046dced636250b4982ec98708d7341bddf60b77a3f37f621d84f2ab3b1",
+  "admission_manifest_sha256": "69f8f1e407917a41b7db6f52a95ec149624cdd956b1b3d762c4260838e6bf6e1",
   "resource": {
     "role": "INTERP_MODEL",
     "format": "sim-native-frame-interpolation-v1",

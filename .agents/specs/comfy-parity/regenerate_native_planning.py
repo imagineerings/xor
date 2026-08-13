@@ -9785,6 +9785,52 @@ def native_rife_tensor_arithmetic_foundation_task(dependency: str) -> dict[str, 
     )
 
 
+def native_rife_execution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-rife-execution-foundation",
+        "Execute retained RIFE interpolation pairs",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "NativeFrameInterpolationModel is the sole retained RIFE execution owner. It composes the admitted head and five IFBlocks from immutable checkpoint tensors, delegates convolution, interpolation, grid sampling, concatenation, pixel shuffle, residual arithmetic, sigmoid, and lerp to their canonical Tensor owners, and returns only a fresh attempt-local interpolated pair without retaining features, flows, grids, output, cache, handles, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_functional_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/storage_dtype_device_01.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/admission/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/resource/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight oracle runs both head branches and all five scale-16/8/4/2/1 IFBlocks at padded 64x64 geometry. It proves exact zero-flow border warp identity, beta residual order, channel splits, flow refinement, mask sigmoid and midpoint lerp; fresh output storage; unchanged retained digest/residency and inputs; typed profile/timestep/shape/placement rejection; pre-cancellation and caller-workspace failure with zero scratch residue; and explicitly makes no licensed-checkpoint, full-production-numeric, FILM, pair-cache, handle, output-effect, or publication claim.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11993,8 +12039,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     rife_tensor_arithmetic_foundation = native_rife_tensor_arithmetic_foundation_task(
         str(tensor_interpolate_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    rife_execution_foundation = native_rife_execution_foundation_task(
         str(rife_tensor_arithmetic_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(rife_execution_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12097,6 +12146,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             tensor_grid_sample_foundation,
             tensor_interpolate_foundation,
             rife_tensor_arithmetic_foundation,
+            rife_execution_foundation,
             video_foundation,
             detection_foundation,
         ]

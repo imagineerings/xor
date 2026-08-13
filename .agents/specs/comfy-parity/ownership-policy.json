@@ -11204,6 +11204,93 @@
       "decision_reason": "ImageTensor owns canonical storage while its source-compatible crop method owns the exact temporary u8 roundtrip. NumpyRandomState owns legacy MT19937 bounded-integer sampling. comfy_media alone owns adaptive palette construction and the NONE, Floyd-Steinberg, and Bayer mapping algorithms. NativeNodeContext alone prepares bounded temporary PNG effects and their UI projection; the runtime PreviewImage node only delegates and returns those checked results. Generated leaves cannot repeat these algorithms or stage output effects directly."
     },
     {
+      "concern": "native_rife_frame_interpolation_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_pair",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_rife_pair"
+      ],
+      "allowed_adapters": [
+        "NativeModule owns immutable convolution and LeakyReLU execution",
+        "comfy_tensor canonical interpolation, grid-sample, concatenation, pixel-shuffle, indexing, layout, and real arithmetic owners",
+        "ExecutionContext owns caller cancellation, scratch, and backend allocation authority",
+        "later video execution may plan pair order, reuse attempt-local features, clamp results, and publish VIDEO outputs"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_pair",
+          "role": "canonical",
+          "symbol": "interpolate_rife_pair",
+          "pattern": "pub fn interpolate_rife_pair\\("
+        }
+      ],
+      "call_symbols": [
+        "interpolate_rife_pair"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "rife-retained-owner-executes-head-five-blocks-and-final-lerp",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "interpolate_rife_pair[\\s\\S]*rife_head[\\s\\S]*\\[16_usize, 8, 4, 2, 1\\][\\s\\S]*rife_block[\\s\\S]*sigmoid_with_context_exact_native[\\s\\S]*real_lerp_tensor_weight_with_context_exact_native"
+        },
+        {
+          "name": "rife-execution-delegates-canonical-spatial-layout-and-arithmetic-owners",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "(?=[\\s\\S]*forward_dense_inference_with_context)(?=[\\s\\S]*interpolate_tensor_with_context_exact_native)(?=[\\s\\S]*grid_sample_tensor_with_context_exact_native)(?=[\\s\\S]*torch_cat_with_context_exact_native)(?=[\\s\\S]*pixel_shuffle_tensor_with_context_exact_native)(?=[\\s\\S]*real_add_with_context_exact_native)(?=[\\s\\S]*real_multiply_with_context_exact_native)"
+        },
+        {
+          "name": "rife-warp-is-source-axis-ordered-normalized-border-bilinear",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn warp_rife[\\s\\S]*2.0 / \\(width - 1\\)[\\s\\S]*2.0 / \\(height - 1\\)[\\s\\S]*tensor_permute_exact_native[\\s\\S]*GridPaddingMode::Border[\\s\\S]*align_corners: true"
+        },
+        {
+          "name": "rife-reduced-execution-is-analytic-and-failure-atomic",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "reduced_rife_forward_executes_the_retained_graph_and_is_failure_atomic[\\s\\S]*assert_eq!\\(f32::from_ne_bytes\\(encoded\\), 0.5\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0[\\s\\S]*resident_tensor_allocations"
+        },
+        {
+          "name": "rife-execution-fixture-bounds-truthful-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json",
+          "pattern": "(?=[\\s\\S]*zero_flow_midpoint)(?=[\\s\\S]*all_five_ifblocks)(?=[\\s\\S]*licensed_checkpoint_included)(?=[\\s\\S]*full_production_numeric_parity)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-rife-execution-foundation"
+      ],
+      "production_consumers": [
+        "future native video frame-interpolation execution and nodes"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; feature reuse, sequence planning, handle resolution, caching, output effects, and publication remain later owners."
+    },
+    {
       "concern": "native_rmsprop_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_23::NativeRmsprop",
       "owner_files": [

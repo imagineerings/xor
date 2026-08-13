@@ -27,7 +27,9 @@
       "tensor_count": 158,
       "head_channels": 2,
       "block_channels": [2, 2, 2, 2, 2],
-      "fill": 0.25
+      "weight_fill": 0.0,
+      "bias_fill": 0.0,
+      "residual_beta_fill": 1.0
     }
   },
   "claims": {
