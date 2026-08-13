@@ -9912,6 +9912,47 @@ def native_film_tensor_average_pool_foundation_task(dependency: str) -> dict[str
     )
 
 
+def native_film_warp_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-warp-foundation",
+        "Execute bounded FILM pixel-center warps",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The frame-interpolation owner constructs FILM's F32 pixel-center base grid and source flow normalization in caller-authorized workspace, then delegates bilinear border sampling with align_corners false to the canonical tensor grid-sample owner. It preserves F16, BF16, or F32 input dtype and publishes one fresh attempt-local tensor without adding a second sampler, retained graph, allocator, workspace, codec, cache, handle, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/storage_dtype_device_01.rs",
+            "crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-warp",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted analytic two-by-two oracle proves FILM pixel-center coordinates, two-over-width and two-over-height flow normalization, bilinear border sampling with align_corners false, a half-pixel horizontal displacement, F16/BF16/F32 output dtype preservation, fresh nonaliasing storage, immutable image and flow inputs, pre-cancellation, caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM pyramid/fusion graph, RIFE grid semantics, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12129,8 +12170,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_tensor_average_pool_foundation = native_film_tensor_average_pool_foundation_task(
         str(rife_sequence_execution_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_warp_foundation = native_film_warp_foundation_task(
         str(film_tensor_average_pool_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_warp_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12236,6 +12280,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             rife_execution_foundation,
             rife_sequence_execution_foundation,
             film_tensor_average_pool_foundation,
+            film_warp_foundation,
             video_foundation,
             detection_foundation,
         ]

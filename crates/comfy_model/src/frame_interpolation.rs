@@ -1365,6 +1365,189 @@ fn warp_rife(
     )
 }
 
+pub fn film_warp_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    flow: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let input_descriptor = input.descriptor();
+    let flow_descriptor = flow.descriptor();
+    let input_shape = input_descriptor.shape();
+    let flow_shape = flow_descriptor.shape();
+    if input_shape.len() != 4
+        || input_shape.first() == Some(&0)
+        || input_shape.get(1) == Some(&0)
+        || input_shape.get(2) == Some(&0)
+        || input_shape.get(3) == Some(&0)
+        || flow_shape.len() != 4
+        || flow_shape.first() != input_shape.first()
+        || flow_shape.get(1) != Some(&2)
+        || flow_shape.get(2) != input_shape.get(2)
+        || flow_shape.get(3) != input_shape.get(3)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM flow shape does not match the warped tensor",
+        ));
+    }
+    if !matches!(
+        input_descriptor.dtype(),
+        DType::F16 | DType::Bf16 | DType::F32
+    ) || flow_descriptor.dtype() != input_descriptor.dtype()
+        || input_descriptor.device() != DeviceId::CPU
+        || flow_descriptor.device() != DeviceId::CPU
+        || input_descriptor.stream() != context.stream
+        || flow_descriptor.stream() != context.stream
+        || !input_descriptor.is_contiguous()?
+        || !flow_descriptor.is_contiguous()?
+    {
+        return Err(FrameInterpolationError::Placement);
+    }
+    let height = *input_shape
+        .get(2)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let width = *input_shape
+        .get(3)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let flow = execution_result(
+        cast_to_with_context_exact_native(
+            backend,
+            flow,
+            DType::F32,
+            DeviceId::CPU,
+            false,
+            false,
+            context,
+        ),
+        context,
+    )?;
+    let horizontal = contiguous_narrow(backend, &flow, 1, 0, 1, context)?;
+    let horizontal = execution_result(
+        real_multiply_with_context_exact_native(
+            backend,
+            &horizontal,
+            ElementwiseOperand::Scalar(Scalar::Float(2.0 / width as f64)),
+            context,
+        ),
+        context,
+    )?;
+    let vertical = contiguous_narrow(backend, &flow, 1, 1, 1, context)?;
+    let vertical = execution_result(
+        real_multiply_with_context_exact_native(
+            backend,
+            &vertical,
+            ElementwiseOperand::Scalar(Scalar::Float(2.0 / height as f64)),
+            context,
+        ),
+        context,
+    )?;
+    let normalized_flow = execution_result(
+        torch_cat_with_context_exact_native(backend, &[horizontal, vertical], 1, context),
+        context,
+    )?;
+    let base_grid = film_base_grid(backend, height, width, context)?;
+    let grid = execution_result(
+        real_add_with_context_exact_native(backend, &base_grid, &normalized_flow, context),
+        context,
+    )?;
+    let grid = execution_result(
+        tensor_permute_exact_native(&grid, &[0, 2, 3, 1], context.cancellation),
+        context,
+    )?;
+    let grid = execution_result(
+        contiguous_with_context_exact_native(
+            backend,
+            &grid,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )?;
+    execution_result(
+        grid_sample_tensor_with_context_exact_native(
+            backend,
+            input,
+            &grid,
+            GridSampleConfiguration {
+                mode: GridSampleMode::Bilinear,
+                padding_mode: GridPaddingMode::Border,
+                align_corners: false,
+            },
+            context,
+        ),
+        context,
+    )
+}
+
+fn film_base_grid(
+    backend: &CpuBackend,
+    height: u64,
+    width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let height_usize = usize::try_from(height).map_err(|_| FrameInterpolationError::Overflow)?;
+    let width_usize = usize::try_from(width).map_err(|_| FrameInterpolationError::Overflow)?;
+    if height_usize == 0 || width_usize == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM warp dimensions must be nonzero",
+        ));
+    }
+    let plane = height_usize
+        .checked_mul(width_usize)
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let mut values = execution_result(
+        backend.workspace_vec(
+            context,
+            plane
+                .checked_mul(2)
+                .ok_or(FrameInterpolationError::Overflow)?,
+        ),
+        context,
+    )?;
+    for y in 0..height_usize {
+        for x in 0..width_usize {
+            let index = y
+                .checked_mul(width_usize)
+                .and_then(|value| value.checked_add(x))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            if index.is_multiple_of(64) {
+                context.cancellation.check()?;
+            }
+            execution_result(
+                values.try_push(-1.0 + (2.0 * x as f32 + 1.0) / width_usize as f32),
+                context,
+            )?;
+        }
+    }
+    for y in 0..height_usize {
+        for x in 0..width_usize {
+            let index = y
+                .checked_mul(width_usize)
+                .and_then(|value| value.checked_add(x))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            if index.is_multiple_of(64) {
+                context.cancellation.check()?;
+            }
+            execution_result(
+                values.try_push(-1.0 + (2.0 * y as f32 + 1.0) / height_usize as f32),
+                context,
+            )?;
+        }
+    }
+    execution_result(
+        tensor_from_f32(
+            backend,
+            &[1, 2, height, width],
+            &values,
+            DType::F32,
+            DeviceId::CPU,
+            context,
+        ),
+        context,
+    )
+}
+
 fn rife_base_grid(
     backend: &CpuBackend,
     height: u64,
@@ -1722,6 +1905,114 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_warp_uses_pixel_centers_and_is_failure_atomic() -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for dtype in [DType::F16, DType::Bf16, DType::F32] {
+            let input = tensor_from_f32(
+                &backend,
+                &[1, 1, 2, 2],
+                &[1.0, 3.0, 5.0, 7.0],
+                dtype,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let flow = tensor_from_f32(
+                &backend,
+                &[1, 2, 2, 2],
+                &[0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0],
+                dtype,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+            let input_bytes = input.contiguous_bytes()?;
+            let flow_bytes = flow.contiguous_bytes()?;
+            let output = film_warp_with_context_exact_native(&backend, &input, &flow, &context)?;
+            assert_eq!(output.descriptor().shape(), &[1, 1, 2, 2]);
+            assert_eq!(output.descriptor().dtype(), dtype);
+            assert_eq!(output.descriptor().device(), DeviceId::CPU);
+            assert_eq!(output.descriptor().stream(), StreamId::DEFAULT);
+            assert_ne!(output.storage_id(), input.storage_id());
+            assert_ne!(output.storage_id(), flow.storage_id());
+            for (index, expected) in [2.0_f32, 3.0, 6.0, 7.0].into_iter().enumerate() {
+                let index = u64::try_from(index).map_err(|_| FrameInterpolationError::Overflow)?;
+                let actual = match dtype.decode_scalar(output.linear_element_bytes(index)?)? {
+                    DecodedScalar::Real(value) => value as f32,
+                    _ => return Err(FrameInterpolationError::StateMismatch),
+                };
+                assert!((actual - expected).abs() <= 0.01);
+            }
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+            assert_eq!(flow.contiguous_bytes()?, flow_bytes);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+
+            let constrained_context = ExecutionContext {
+                stream: StreamId::DEFAULT,
+                scratch: authority
+                    .authorize_workspace(47)
+                    .map_err(|_| FrameInterpolationError::Overflow)?,
+                rng_phase: None,
+                cancellation: &cancellation,
+            };
+            assert!(matches!(
+                film_warp_with_context_exact_native(&backend, &input, &flow, &constrained_context),
+                Err(FrameInterpolationError::Execution(_))
+            ));
+            assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+            assert_eq!(input.contiguous_bytes()?, input_bytes);
+            assert_eq!(flow.contiguous_bytes()?, flow_bytes);
+        }
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        let input = tensor_from_f32(
+            &backend,
+            &[1, 1, 1, 1],
+            &[1.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let flow = tensor_from_f32(
+            &backend,
+            &[1, 2, 1, 1],
+            &[0.0, 0.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        assert!(matches!(
+            film_warp_with_context_exact_native(&backend, &input, &flow, &cancelled_context),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn invocation_plans_order_midpoints_align_rife_and_persist_oom_downgrades()

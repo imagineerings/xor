@@ -11292,6 +11292,96 @@
       "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_pixel_center_warp_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::film_warp_with_context_exact_native",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "film_warp_with_context_exact_native",
+        "film_base_grid"
+      ],
+      "allowed_adapters": [
+        "comfy_tensor elementwise, narrow, concatenation, permutation, contiguous-layout, cast, and grid-sample owners retain their equations, allocation, workspace, storage, stream, and cancellation authority",
+        "future retained FILM pyramid and fusion execution may call warp_film with borrowed attempt-local image and flow tensors but cannot retain grids, warped tensors, cache, codec state, handles, effects, or publication state",
+        "RIFE base-grid and warp execution remain a distinct align-corners owner and cannot stand in for FILM pixel-center coordinates"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_warp_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "film_warp_with_context_exact_native",
+          "pattern": "^pub fn film_warp_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_base_grid",
+          "role": "canonical_implementation",
+          "symbol": "film_base_grid",
+          "pattern": "^fn film_base_grid\\("
+        }
+      ],
+      "call_symbols": [
+        "film_warp_with_context_exact_native",
+        "film_base_grid"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-warp-builds-pixel-center-grid-and-source-flow-normalization",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_warp_with_context_exact_native[\\s\\S]*Scalar::Float\\(2\\.0 / width as f64\\)[\\s\\S]*Scalar::Float\\(2\\.0 / height as f64\\)[\\s\\S]*fn film_base_grid[\\s\\S]*-1\\.0 \\+ \\(2\\.0 \\* x as f32 \\+ 1\\.0\\) / width_usize as f32"
+        },
+        {
+          "name": "film-warp-delegates-bilinear-border-align-corners-false-grid-sample",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_warp_with_context_exact_native[\\s\\S]*grid_sample_tensor_with_context_exact_native[\\s\\S]*GridSampleMode::Bilinear[\\s\\S]*GridPaddingMode::Border[\\s\\S]*align_corners: false"
+        },
+        {
+          "name": "film-warp-oracle-proves-low-precision-storage-and-failure-atomicity",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_warp_uses_pixel_centers_and_is_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*\\[2\\.0_f32, 3\\.0, 6\\.0, 7\\.0\\][\\s\\S]*authorize_workspace\\(47\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-warp-fixture-bounds-equation-only-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-warp/manifest.json",
+          "pattern": "(?=[\\s\\S]*film_net.py)(?=[\\s\\S]*two_by_two_half_pixel_horizontal_flow)(?=[\\s\\S]*rife_grid_semantics)(?=[\\s\\S]*codec_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-warp-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM pyramid, flow, and fusion execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation owner constructs only FILM's source pixel-center grid and normalized attempt-local flow before delegating interpolation, storage, workspace, and cancellation to canonical tensor owners. It cannot retain invocation state or duplicate the distinct RIFE grid contract."
+    },
+    {
       "concern": "native_rife_frame_interpolation_sequence_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
       "owner_files": [
