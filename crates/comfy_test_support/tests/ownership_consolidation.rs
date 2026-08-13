@@ -13398,6 +13398,77 @@ fn val_ownership_task403_sdpose_model_resource_001() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn val_ownership_task407_sdpose_execution_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let controller =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    for required in [
+        "pub fn execute_native_sdpose_keypoint_extraction(",
+        "resolve_native_sdpose_model(",
+        "resolve_native_sdpose_vae(",
+        "sample_lotus_sdpose_one_step_euler(",
+        "project_sdpose_heatmap_tensor(",
+        "NativeStoredPayload::PoseKeypoint",
+    ] {
+        assert!(
+            controller.contains(required),
+            "SDPose controller lacks {required}"
+        );
+    }
+    let sdpose = controller
+        .split("pub fn execute_native_sdpose_keypoint_extraction(")
+        .nth(1)
+        .and_then(|body| body.split("fn compose_native_sdpose_keypoints(").next())
+        .ok_or("missing SDPose execution body")?;
+    for forbidden in [
+        "NativeCache::new",
+        "NativeHandleStoreGeneration::new",
+        "RngTransaction::begin",
+        "Sd15TinyModel::new",
+    ] {
+        assert!(
+            !sdpose.contains(forbidden),
+            "SDPose controller duplicates {forbidden}"
+        );
+    }
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/sdpose/execution/manifest.json"),
+    )?;
+    for required in [
+        "code-inferred-reduced-composition",
+        "\"rng_draws\": 0",
+        "\"final_publication_type\": \"POSE_KEYPOINT\"",
+        "\"licensed_checkpoint\": null",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "SDPose execution fixture lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_sdpose_execution_composition")
+            })
+        })
+        .ok_or("missing SDPose execution ownership concern")?;
+    assert_eq!(
+        concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len),
+        Some(5)
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

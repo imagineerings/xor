@@ -586,6 +586,18 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[sdpose_foundation_id]["writes"],
         )
         self.assertIn(
+            "crates/comfy_model/src/sdpose.rs",
+            tasks_by_id[sdpose_foundation_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_tensor/src/image_ops.rs",
+            tasks_by_id[sdpose_foundation_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/sdpose/execution",
+            tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertIn(
             "crates/comfy_media/src/native_node_payload.rs",
             tasks_by_id[sdpose_projection_id]["writes"],
         )

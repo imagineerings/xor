@@ -22,16 +22,18 @@ use chrono::{Local, Utc};
 #[cfg(test)]
 use comfy_media::encode_png_frame;
 use comfy_media::{
-    MetadataWritePolicy, NativeAudioPayload, PngError, PngLimits, decode_png,
-    encode_png_frame_with_policy_and_context,
+    MetadataWritePolicy, NativeAudioPayload, NativeBoundingBoxPayload, NativePoseFrame,
+    NativePoseKeypoint, NativePoseKeypointPayload, NativePosePerson, PngError, PngLimits,
+    decode_png, encode_png_frame_with_policy_and_context,
 };
 use comfy_model::{
     AttentionError, ClipTextError, GemmaMultimodalFamily, GemmaMultimodalGenerationRequest,
     LatentFormatError, ModelStoreError, MultimodalTextError, NativeDecoderTextEncoder,
     NativeGemmaMultimodal, NativeModelPayload, NativeOpsError, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeTextGenerationRequest, NativeTextGenerationResult, NativeVae,
-    PatchGraph, QuantizationError, QwenMultimodalGenerationRequest, VaeArchitectureError,
-    VaeBoundaryKind, VaeError, VaeKernelProfile,
+    NativeQwenMultimodal, NativeSdPoseModel, NativeTextGenerationRequest,
+    NativeTextGenerationResult, NativeVae, PatchGraph, QuantizationError,
+    QwenMultimodalGenerationRequest, VaeArchitectureError, VaeBoundaryKind, VaeError,
+    VaeKernelProfile,
     clip::{ClipError, LoadedSd1Clip, NativeTokenizer, WeightedText},
     conditioning::{
         ConditioningEntry, ConditioningEntryOptions, ConditioningError, ConditioningIdentity,
@@ -44,6 +46,7 @@ use comfy_model::{
         sd15_latent_format_identity, sd15_model_family_identity,
     },
     prepare_gemma3_image, prepare_gemma4_audio, prepare_gemma4_visuals, prepare_qwen_images,
+    sdpose::{SdPoseModelError, prepare_lotus_sdpose_conditioning, project_sdpose_heatmap_tensor},
 };
 use comfy_nodes::{
     CatalogNodeDescriptor, CatalogNodeStatus, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
@@ -69,22 +72,23 @@ use comfy_sampler::{
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
     NativeConditioningPayload as PortableConditioningPayload,
     NativeControlExecution as PortableControlExecution, NativeDiffusionPayload, NoiseError,
-    NoiseRequest, SamplingError, SamplingPlan, SamplingProfileError, SchedulerError,
-    execute_guidance,
+    NoiseRequest, SamplingError, SamplingPlan, SamplingProfile, SamplingProfileError,
+    SchedulerError, execute_guidance,
+    generated_native_diffusion::{LotusSdPoseSamplingError, sample_lotus_sdpose_one_step_euler},
     generated_native_diffusion::{
         NativeDiffusionSamplerError, checked_native_diffusion_plan, normal_noise, normal_sigmas,
         sample_euler, scale_initial_noise, scale_model_input, sd15_interpret_prediction,
         sd15_model_time,
     },
 };
-use comfy_tensor::{
-    BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType,
-    ExecutionContext, ImageTensor, NativeShaderExecutor, NativeTensorPayload, NativeTensorRole,
-    ResizeCrop, ResizeMode, RngCompatibilityError, RngError, ScratchReservation, StreamId,
-    TensorError, WgpuNativeShaderExecutor,
-};
 #[cfg(test)]
-use comfy_tensor::{DeviceId, TensorDescriptor};
+use comfy_tensor::TensorDescriptor;
+use comfy_tensor::{
+    BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId,
+    ExecutionContext, ImageTensor, Layout, MemoryFormatReference, NativeShaderExecutor,
+    NativeTensorPayload, NativeTensorRole, ResizeCrop, ResizeMode, RngCompatibilityError, RngError,
+    ScratchReservation, StreamId, TensorError, WgpuNativeShaderExecutor,
+};
 use comfy_tensor::{
     Tensor,
     generated_activation_normalization_functional_01::FunctionalError,
@@ -94,6 +98,12 @@ use comfy_tensor::{
     generated_neural_network_module_02::NeuralNetworkModulePartTwoError,
     generated_shape_layout_transform_01::ShapeLayoutTransformPartOneError,
     generated_shape_layout_transform_02::ShapeLayoutTransformPartTwoError,
+};
+use comfy_tensor::{
+    generated_comfy_operator_indirection_01::cast_to_with_context_exact_native,
+    generated_indexing_masking_01::narrow_method_exact_native,
+    generated_shape_layout_transform_03::tensor_permute_exact_native,
+    generated_storage_dtype_device_01::contiguous_with_context_exact_native,
 };
 use comfy_tensor::{
     generated_elementwise_or_runtime_operation_16::ElementwiseRuntimePartSixteenError,
@@ -2610,6 +2620,529 @@ pub fn execute_native_multimodal_text_generation(
     };
     context.cancellation.check().map_err(cancellation_failure)?;
     Ok(result)
+}
+
+#[derive(Clone)]
+struct NativeSdPoseResource {
+    model: Arc<NativeSdPoseModel>,
+    _resolved_payload: NativeResolvedPayload,
+}
+
+#[derive(Clone)]
+struct NativeSdPoseVaeResource {
+    vae: Arc<NativeVae>,
+    _resolved_payload: NativeResolvedPayload,
+}
+
+fn resolve_native_sdpose_model(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<NativeSdPoseResource, NodeFailure> {
+    let expected = NativeHandleType::new(NativeHandleKind::Model, "MODEL")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Model(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native SDPose MODEL handle stored the wrong object type",
+        ));
+    };
+    if payload.diffusion().is_some() {
+        return Err(invalid_diffusion_input(
+            "native SDPose MODEL handle stored a legacy diffusion resource",
+        ));
+    }
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let model = payload
+        .model_payload()
+        .sdpose_model_resource()
+        .ok_or_else(|| invalid_diffusion_input("MODEL handle lacks a sealed SDPose resource"))?
+        .clone();
+    model
+        .validate(&context.cancellation)
+        .map_err(classified_diffusion_failure)?;
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(NativeSdPoseResource {
+        model,
+        _resolved_payload: stored,
+    })
+}
+
+fn resolve_native_sdpose_vae(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<NativeSdPoseVaeResource, NodeFailure> {
+    let expected =
+        native_diffusion_handle_type(NativeDiffusionRole::Vae).map_err(runtime_failure)?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::Model(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native SDPose VAE handle stored the wrong object type",
+        ));
+    };
+    let diffusion = payload
+        .diffusion()
+        .ok_or_else(|| invalid_diffusion_input("native SDPose VAE handle is not a VAE wrapper"))?;
+    let vae = diffusion
+        .model_payload()
+        .vae()
+        .ok_or_else(|| invalid_diffusion_input("native SDPose VAE handle lacks a concrete VAE"))?
+        .clone();
+    diffusion
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    if vae.descriptor().boundary().kind() != VaeBoundaryKind::Image {
+        return Err(invalid_diffusion_input(
+            "native SDPose requires an image VAE boundary",
+        ));
+    }
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(NativeSdPoseVaeResource {
+        vae,
+        _resolved_payload: stored,
+    })
+}
+
+fn resolve_native_sdpose_bounding_boxes(
+    context: &NodeContext,
+    handle: &NativeOpaqueHandle,
+) -> Result<ResolvedNative<Arc<NativeBoundingBoxPayload>>, NodeFailure> {
+    let expected = NativeHandleType::new(NativeHandleKind::StructuredCompute, "BOUNDING_BOX")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    let stored = context
+        .handle_store()
+        .resolve(handle, &expected, &context.cancellation)
+        .map_err(|error| runtime_failure(error.into()))?;
+    let NativeStoredPayload::BoundingBox(payload) = stored.as_ref() else {
+        return Err(invalid_diffusion_input(
+            "native SDPose BOUNDING_BOX handle stored the wrong object type",
+        ));
+    };
+    payload
+        .validate()
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    context.cancellation.check().map_err(cancellation_failure)?;
+    Ok(ResolvedNative {
+        value: payload.clone(),
+        _resolved_payload: stored,
+    })
+}
+
+pub fn execute_native_sdpose_keypoint_extraction(
+    context: &NodeContext,
+    model_handle: &NativeOpaqueHandle,
+    vae_handle: &NativeOpaqueHandle,
+    image_handle: &NativeOpaqueHandle,
+    batch_size: usize,
+    bounding_boxes_handle: Option<&NativeOpaqueHandle>,
+) -> Result<NativeValue, NodeFailure> {
+    context.cancellation.check().map_err(cancellation_failure)?;
+    if batch_size == 0 {
+        return Err(invalid_diffusion_input(
+            "native SDPose batch_size must be positive",
+        ));
+    }
+    let model = resolve_native_sdpose_model(context, model_handle)?;
+    let vae = resolve_native_sdpose_vae(context, vae_handle)?;
+    let image = resolve_image_handle(context, image_handle)?;
+    let bounding_boxes = bounding_boxes_handle
+        .map(|handle| resolve_native_sdpose_bounding_boxes(context, handle))
+        .transpose()?;
+    let compute = context
+        .compute_session()
+        .map_err(classified_diffusion_failure)?;
+    let execution = compute
+        .execution_context(context)
+        .map_err(classified_diffusion_failure)?;
+    let payload = compose_native_sdpose_keypoints(
+        compute.backend(),
+        model.model.as_ref(),
+        vae.vae.as_ref(),
+        image.value.as_ref(),
+        batch_size,
+        bounding_boxes.as_deref().map(Arc::as_ref),
+        &execution,
+    )?;
+    context.cancellation.check().map_err(cancellation_failure)?;
+    let handle = context
+        .handle_store()
+        .publish(
+            NativeStoredPayload::PoseKeypoint(Arc::new(payload)),
+            &context.cancellation,
+        )
+        .map_err(|error| runtime_failure(error.into()))?;
+    Ok(NativeValue::Handle { value: handle })
+}
+
+fn compose_native_sdpose_keypoints(
+    backend: &CpuBackend,
+    model: &NativeSdPoseModel,
+    vae: &NativeVae,
+    image: &ImageTensor,
+    batch_size: usize,
+    bounding_boxes: Option<&NativeBoundingBoxPayload>,
+    context: &ExecutionContext<'_>,
+) -> Result<NativePoseKeypointPayload, NodeFailure> {
+    context.check().map_err(classified_diffusion_failure)?;
+    let (frame_count, canvas_height, canvas_width, _) =
+        image.dimensions().map_err(classified_diffusion_failure)?;
+    let frame_count = usize::try_from(frame_count)
+        .map_err(|_| invalid_diffusion_input("native SDPose frame count exceeds usize"))?;
+    let canvas_width_u32 = u32::try_from(canvas_width)
+        .map_err(|_| invalid_diffusion_input("native SDPose canvas width exceeds u32"))?;
+    let canvas_height_u32 = u32::try_from(canvas_height)
+        .map_err(|_| invalid_diffusion_input("native SDPose canvas height exceeds u32"))?;
+    let mut frames = Vec::new();
+    frames
+        .try_reserve_exact(frame_count)
+        .map_err(|error| resource_diffusion_failure(error.to_string()))?;
+    if frame_count == 0 {
+        return NativePoseKeypointPayload::checked(frames).map_err(classified_diffusion_failure);
+    }
+
+    if bounding_boxes.is_none() || bounding_boxes.is_some_and(|payload| payload.frames().is_empty())
+    {
+        for start in (0..frame_count).step_by(batch_size) {
+            context.check().map_err(classified_diffusion_failure)?;
+            let count = (frame_count - start).min(batch_size);
+            let batch = sdpose_image_region(
+                image,
+                start,
+                count,
+                0,
+                0,
+                canvas_width,
+                canvas_height,
+                backend,
+                context,
+            )?;
+            let people = execute_sdpose_image_batch(backend, model, vae, &batch, context)?;
+            if people.len() != count {
+                return Err(invalid_diffusion_input(
+                    "native SDPose model returned the wrong batch cardinality",
+                ));
+            }
+            for person in people {
+                frames.push(
+                    NativePoseFrame::checked(
+                        canvas_width_u32,
+                        canvas_height_u32,
+                        vec![remap_sdpose_person(
+                            &person,
+                            canvas_width as f64 / 768.0,
+                            canvas_height as f64 / 1024.0,
+                            0.0,
+                            0.0,
+                        )?],
+                    )
+                    .map_err(classified_diffusion_failure)?,
+                );
+            }
+        }
+    } else {
+        let bounding_boxes = bounding_boxes.ok_or_else(|| {
+            invalid_diffusion_input("native SDPose bounding-box projection disappeared")
+        })?;
+        for frame_index in 0..frame_count {
+            context.check().map_err(classified_diffusion_failure)?;
+            let boxes = bounding_boxes
+                .frames()
+                .get(frame_index)
+                .or_else(|| bounding_boxes.frames().last())
+                .ok_or_else(|| invalid_diffusion_input("native SDPose bounding boxes are empty"))?;
+            let mut people = Vec::new();
+            if boxes.is_empty() {
+                let frame = sdpose_image_region(
+                    image,
+                    frame_index,
+                    1,
+                    0,
+                    0,
+                    canvas_width,
+                    canvas_height,
+                    backend,
+                    context,
+                )?;
+                let mut whole = execute_sdpose_image_batch(backend, model, vae, &frame, context)?;
+                let person = whole.pop().ok_or_else(|| {
+                    invalid_diffusion_input("native SDPose model returned no full-frame person")
+                })?;
+                people.push(remap_sdpose_person(
+                    &person,
+                    canvas_width as f64 / 768.0,
+                    canvas_height as f64 / 1024.0,
+                    0.0,
+                    0.0,
+                )?);
+            } else {
+                people
+                    .try_reserve_exact(boxes.len())
+                    .map_err(|error| resource_diffusion_failure(error.to_string()))?;
+                for bounding_box in boxes.iter() {
+                    context.check().map_err(classified_diffusion_failure)?;
+                    let Some((left, top, width, height)) = checked_sdpose_box(
+                        bounding_box.x(),
+                        bounding_box.y(),
+                        bounding_box.width(),
+                        bounding_box.height(),
+                        canvas_width,
+                        canvas_height,
+                    )?
+                    else {
+                        continue;
+                    };
+                    let crop = sdpose_image_region(
+                        image,
+                        frame_index,
+                        1,
+                        left,
+                        top,
+                        width,
+                        height,
+                        backend,
+                        context,
+                    )?;
+                    let mut projected =
+                        execute_sdpose_image_batch(backend, model, vae, &crop, context)?;
+                    let person = projected.pop().ok_or_else(|| {
+                        invalid_diffusion_input("native SDPose model returned no crop person")
+                    })?;
+                    people.push(remap_sdpose_person(
+                        &person,
+                        width as f64 / 768.0,
+                        height as f64 / 1024.0,
+                        left as f64,
+                        top as f64,
+                    )?);
+                }
+            }
+            frames.push(
+                NativePoseFrame::checked(canvas_width_u32, canvas_height_u32, people)
+                    .map_err(classified_diffusion_failure)?,
+            );
+        }
+    }
+    context.check().map_err(classified_diffusion_failure)?;
+    NativePoseKeypointPayload::checked(frames).map_err(classified_diffusion_failure)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sdpose_image_region(
+    image: &ImageTensor,
+    batch_start: usize,
+    batch_length: usize,
+    left: u64,
+    top: u64,
+    width: u64,
+    height: u64,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<ImageTensor, NodeFailure> {
+    let batch_start = i64::try_from(batch_start)
+        .map_err(|_| invalid_diffusion_input("native SDPose batch start exceeds i64"))?;
+    let batch_length = u64::try_from(batch_length)
+        .map_err(|_| invalid_diffusion_input("native SDPose batch length exceeds u64"))?;
+    let top = i64::try_from(top)
+        .map_err(|_| invalid_diffusion_input("native SDPose crop top exceeds i64"))?;
+    let left = i64::try_from(left)
+        .map_err(|_| invalid_diffusion_input("native SDPose crop left exceeds i64"))?;
+    let batch = narrow_method_exact_native(
+        image.tensor(),
+        0,
+        batch_start,
+        batch_length,
+        context.cancellation,
+    )
+    .map_err(classified_diffusion_failure)?;
+    let rows = narrow_method_exact_native(&batch, 1, top, height, context.cancellation)
+        .map_err(classified_diffusion_failure)?;
+    let region = narrow_method_exact_native(&rows, 2, left, width, context.cancellation)
+        .map_err(classified_diffusion_failure)?;
+    let contiguous = contiguous_with_context_exact_native(
+        backend,
+        &region,
+        MemoryFormatReference::Layout(Layout::Contiguous),
+        context,
+    )
+    .map_err(classified_diffusion_failure)?;
+    ImageTensor::from_tensor(contiguous).map_err(classified_diffusion_failure)
+}
+
+fn execute_sdpose_image_batch(
+    backend: &CpuBackend,
+    model: &NativeSdPoseModel,
+    vae: &NativeVae,
+    image: &ImageTensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<NativePosePerson>, NodeFailure> {
+    context.check().map_err(classified_diffusion_failure)?;
+    let (batch, input_height, input_width, _) =
+        image.dimensions().map_err(classified_diffusion_failure)?;
+    let mode = if input_height >= 1024 && input_width >= 768 {
+        ResizeMode::Area
+    } else {
+        ResizeMode::Bilinear
+    };
+    let resized = image
+        .resize(768, 1024, mode, ResizeCrop::Disabled, backend, context)
+        .map_err(classified_diffusion_failure)?;
+    let nchw = tensor_permute_exact_native(resized.tensor(), &[0, 3, 1, 2], context.cancellation)
+        .map_err(classified_diffusion_failure)?;
+    let nchw = contiguous_with_context_exact_native(
+        backend,
+        &nchw,
+        MemoryFormatReference::Layout(Layout::Contiguous),
+        context,
+    )
+    .map_err(classified_diffusion_failure)?;
+    let latent = vae
+        .encode(backend, &nchw, context)
+        .map_err(classified_diffusion_failure)?;
+    if latent.descriptor().shape() != [batch, 4, 128, 96]
+        || latent.descriptor().device() != DeviceId::CPU
+        || latent.descriptor().stream() != context.stream
+    {
+        return Err(invalid_diffusion_input(
+            "native SDPose VAE returned an incompatible latent",
+        ));
+    }
+    let dtype = model.denoiser().execution_dtype();
+    let latent = cast_to_with_context_exact_native(
+        backend,
+        &latent,
+        dtype,
+        DeviceId::CPU,
+        false,
+        false,
+        context,
+    )
+    .map_err(classified_diffusion_failure)?;
+    let batch_size = usize::try_from(batch)
+        .map_err(|_| invalid_diffusion_input("native SDPose batch exceeds usize"))?;
+    let (conditioning, adm) =
+        prepare_lotus_sdpose_conditioning(backend, batch_size, dtype, context)
+            .map_err(classified_diffusion_failure)?;
+    let profile = DiscreteSamplingProfile::lotus_sdpose().map_err(classified_diffusion_failure)?;
+    let mut capture = None;
+    sample_lotus_sdpose_one_step_euler(
+        backend,
+        latent,
+        context,
+        |input, sigma, _step| -> Result<Tensor, SdPoseModelError> {
+            let timestep = profile
+                .model_time_for_sigma(sigma)
+                .map_err(|_| SdPoseModelError::InvalidConfiguration)?;
+            let output = model
+                .denoiser()
+                .forward(backend, input, &[timestep], &conditioning, &adm, context)
+                .map_err(SdPoseModelError::from)?;
+            capture = Some(output.feature_640().clone());
+            Ok(output.denoised().clone())
+        },
+    )
+    .map_err(classified_sdpose_sampling_failure)?;
+    let capture = capture.ok_or_else(|| {
+        invalid_diffusion_input("native SDPose sampler returned without a feature capture")
+    })?;
+    let heatmaps = model
+        .heatmap_head()
+        .forward(backend, &capture, context)
+        .map_err(classified_diffusion_failure)?;
+    let people = project_sdpose_heatmap_tensor(&heatmaps, backend, context)
+        .map_err(classified_diffusion_failure)?;
+    if people.len() != batch_size {
+        return Err(invalid_diffusion_input(
+            "native SDPose heatmap projection returned the wrong batch cardinality",
+        ));
+    }
+    context.check().map_err(classified_diffusion_failure)?;
+    Ok(people)
+}
+
+fn classified_sdpose_sampling_failure(
+    error: LotusSdPoseSamplingError<SdPoseModelError>,
+) -> NodeFailure {
+    match error {
+        LotusSdPoseSamplingError::Denoiser(error) => classified_diffusion_failure(error),
+        LotusSdPoseSamplingError::MissingDenoiserError => {
+            diffusion_failure("native SDPose sampler lost its typed denoiser failure")
+        }
+        LotusSdPoseSamplingError::Sampler(error) => classified_diffusion_failure(error),
+    }
+}
+
+fn checked_sdpose_box(
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    canvas_width: u64,
+    canvas_height: u64,
+) -> Result<Option<(u64, u64, u64, u64)>, NodeFailure> {
+    if !x.is_finite() || !y.is_finite() || !width.is_finite() || !height.is_finite() {
+        return Err(invalid_diffusion_input(
+            "native SDPose bounding box contains a non-finite value",
+        ));
+    }
+    let left = x.trunc().max(0.0).min(canvas_width as f64) as u64;
+    let top = y.trunc().max(0.0).min(canvas_height as f64) as u64;
+    let right = (x + width).trunc().max(0.0).min(canvas_width as f64) as u64;
+    let bottom = (y + height).trunc().max(0.0).min(canvas_height as f64) as u64;
+    if right <= left || bottom <= top {
+        return Ok(None);
+    }
+    Ok(Some((left, top, right - left, bottom - top)))
+}
+
+fn remap_sdpose_person(
+    person: &NativePosePerson,
+    scale_x: f64,
+    scale_y: f64,
+    offset_x: f64,
+    offset_y: f64,
+) -> Result<NativePosePerson, NodeFailure> {
+    fn remap(
+        points: &[NativePoseKeypoint],
+        scale_x: f64,
+        scale_y: f64,
+        offset_x: f64,
+        offset_y: f64,
+    ) -> Result<Vec<NativePoseKeypoint>, NodeFailure> {
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(points.len())
+            .map_err(|error| resource_diffusion_failure(error.to_string()))?;
+        for point in points {
+            let (x, y) = if point.x() < 0.0 {
+                (-1.0, -1.0)
+            } else {
+                (
+                    point.x() * scale_x + offset_x,
+                    point.y() * scale_y + offset_y,
+                )
+            };
+            output.push(
+                NativePoseKeypoint::checked(x, y, point.score())
+                    .map_err(classified_diffusion_failure)?,
+            );
+        }
+        Ok(output)
+    }
+    NativePosePerson::checked(
+        remap(person.pose(), scale_x, scale_y, offset_x, offset_y)?,
+        remap(person.foot(), scale_x, scale_y, offset_x, offset_y)?,
+        remap(person.face(), scale_x, scale_y, offset_x, offset_y)?,
+        remap(person.hand_right(), scale_x, scale_y, offset_x, offset_y)?,
+        remap(person.hand_left(), scale_x, scale_y, offset_x, offset_y)?,
+    )
+    .map_err(classified_diffusion_failure)
 }
 
 fn reborrow_text_generation_request<'a>(
@@ -6776,6 +7309,52 @@ mod tests {
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use tempfile::TempDir;
+
+    #[test]
+    fn sdpose_bounding_boxes_follow_source_truncation_clamping_and_empty_rules() {
+        assert_eq!(
+            checked_sdpose_box(-1.75, 2.9, 6.5, 5.2, 8, 8).expect("checked box"),
+            Some((0, 2, 4, 6))
+        );
+        assert_eq!(
+            checked_sdpose_box(7.9, 7.9, 4.0, 4.0, 8, 8).expect("checked box"),
+            Some((7, 7, 1, 1))
+        );
+        assert_eq!(
+            checked_sdpose_box(8.0, 0.0, 1.0, 1.0, 8, 8).expect("checked box"),
+            None
+        );
+        assert!(checked_sdpose_box(f64::NAN, 0.0, 1.0, 1.0, 8, 8).is_err());
+    }
+
+    #[test]
+    fn sdpose_remap_preserves_invalid_points_and_raw_scores() {
+        let valid = NativePoseKeypoint::checked(8.0, 4.0, 2.5).expect("valid point");
+        let invalid = NativePoseKeypoint::checked(-1.0, 91.0, -0.25).expect("invalid point");
+        let points = |count: usize| {
+            (0..count)
+                .map(|index| if index == 0 { invalid } else { valid })
+                .collect::<Vec<_>>()
+        };
+        let person =
+            NativePosePerson::checked(points(18), points(6), points(70), points(21), points(21))
+                .expect("pose person");
+        let remapped = remap_sdpose_person(&person, 0.5, 2.0, 3.0, 5.0).expect("remapped pose");
+        let expected_invalid =
+            NativePoseKeypoint::checked(-1.0, -1.0, -0.25).expect("expected invalid point");
+        let expected_valid =
+            NativePoseKeypoint::checked(7.0, 13.0, 2.5).expect("expected valid point");
+        for group in [
+            remapped.pose(),
+            remapped.foot(),
+            remapped.face(),
+            remapped.hand_right(),
+            remapped.hand_left(),
+        ] {
+            assert_eq!(group.first(), Some(&expected_invalid));
+            assert_eq!(group.get(1), Some(&expected_valid));
+        }
+    }
 
     #[derive(Debug)]
     struct IdentityShaderExecutor(&'static str);

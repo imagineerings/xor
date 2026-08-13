@@ -11653,6 +11653,98 @@
       "decision_reason": "NativeSdPoseModel is the sole immutable retained owner joining the exact LotusD denoiser with the complete five-tensor heatmap head. NativeModelPayload and NativeStoredModelPayload provide a narrow sealed MODEL projection while the legacy SD15 diffusion accessor remains unchanged. Content identity is independent of physical placement, residency is a size-checked StorageId union, and invocation, sampler, RNG, cache, persistence, and output state remain outside the resource."
     },
     {
+      "concern": "native_sdpose_execution_composition",
+      "canonical_owner": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_execution_controller.rs"
+      ],
+      "owner_symbols": [
+        "execute_native_sdpose_keypoint_extraction"
+      ],
+      "allowed_adapters": [
+        "NativeSdPoseModel retains exact denoiser, capture, heatmap-head, identity, and residency ownership",
+        "NativeVae retains canonical image encoding and latent-format ownership",
+        "ImageTensor and comfy_tensor retain resize, crop, layout, cast, allocation, workspace, and cancellation ownership",
+        "sample_lotus_sdpose_one_step_euler retains the canonical no-RNG simple-schedule Euler transition",
+        "NativeHandleStoreGeneration retains handle resolution, leases, capacity, forgery, and final publication ownership"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "^pub fn execute_native_sdpose_keypoint_extraction",
+          "qualified": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
+          "role": "canonical",
+          "symbol": "execute_native_sdpose_keypoint_extraction"
+        }
+      ],
+      "call_symbols": [
+        "execute_native_sdpose_keypoint_extraction",
+        "compose_native_sdpose_keypoints"
+      ],
+      "required_mappings": [
+        {
+          "name": "task407-resolves-and-retains-sealed-input-resources",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "resolve_native_sdpose_model[\\s\\S]*resolve_native_sdpose_vae[\\s\\S]*resolve_image_handle[\\s\\S]*resolve_native_sdpose_bounding_boxes"
+        },
+        {
+          "name": "task407-delegates-canonical-vae-lotus-head-and-projection",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "execute_sdpose_image_batch[\\s\\S]*vae\\.encode[\\s\\S]*sample_lotus_sdpose_one_step_euler[\\s\\S]*heatmap_head\\(\\)\\.forward[\\s\\S]*project_sdpose_heatmap_tensor"
+        },
+        {
+          "name": "task407-bbox-rules-are-checked-and-attempt-local",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "checked_sdpose_box[\\s\\S]*remap_sdpose_person"
+        },
+        {
+          "name": "task407-publishes-only-the-final-pose-payload",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "compose_native_sdpose_keypoints[\\s\\S]*context\\.cancellation\\.check[\\s\\S]*NativeStoredPayload::PoseKeypoint"
+        },
+        {
+          "name": "task407-fixture-pins-composition-without-checkpoint-overclaim",
+          "path": "crates/comfy_test_support/fixtures/sdpose/execution/manifest.json",
+          "pattern": "code-inferred-reduced-composition[\\s\\S]*rng_draws[\\s\\S]*licensed_checkpoint"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-sdpose-execution-foundation"
+      ],
+      "production_consumers": [
+        "native SDPoseKeypointExtractor node binding"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-SAMPLER-001",
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The runtime controller is the sole attempt-local SDPose composition owner. It retains resolved leases through exact image and bbox staging, VAE encode, deterministic Lotus sampling, feature capture, heatmap execution, DARK/OpenPose projection, and one final pose publication while model, tensor, sampler, media, handle-store, cache, and persistence ownership remain canonical and separate."
+    },
+    {
       "concern": "native_sgd_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_07::NativeSgd",
       "owner_files": [
