@@ -12066,6 +12066,98 @@
       "decision_reason": "GemmaPreparedVisual and its canonical functions are the sole model-domain owners of source-specific Gemma3 area preparation and Gemma4 IMAGE/VIDEO frame selection, byte projection, bicubic-antialiased resize, RGB projection, soft-token budgets, and timestamp facts. The preparation is attempt-local, weightless, bounded, and RNG-free; it delegates storage and resize mechanics to comfy_tensor and cannot own tokenizer, decoder, retained weights, handles, cache, persistence, or publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_preparation_source_gemma_audio",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::GemmaPreparedAudio",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "GemmaPreparedAudio",
+        "prepare_gemma4_audio",
+        "gemma4_audio_marker_tokens"
+      ],
+      "allowed_adapters": [
+        "comfy_media remains the sole AUDIO payload, sample-rate, handle, and workflow serialization owner; the later controller maps its checked tensor and rate into this model-domain adapter",
+        "comfy_tensor remains the sole tensor storage, canonical FFT, workspace, memory, stream, and cancellation owner",
+        "The dependent Gemma4 audio encoder consumes checked attempt-local log-mel and mask tensors and alone retains or executes encoder and projector weights",
+        "NativePromptTokenizer and NativeDecoderTextEncoder remain the sole tokenizer, decoder, KV, sampler, stopping, and borrowed RNG transaction owners",
+        "Runtime controller, executor, NativeCache, persistence, and output transactions remain the sole handle-resolution, caching, restart, and publication owners"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct GemmaPreparedAudio \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::GemmaPreparedAudio",
+          "role": "canonical_state",
+          "symbol": "GemmaPreparedAudio"
+        }
+      ],
+      "call_symbols": [
+        "prepare_gemma4_audio",
+        "gemma4_audio_marker_tokens"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma-audio-preparation-mixes-and-resamples-source-exactly",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn prepare_gemma4_audio[\\s\\S]*sum / channels as f64[\\s\\S]*gemma4_resample_polyphase[\\s\\S]*0\\.96 / ratio_limit as f64[\\s\\S]*GEMMA4_AUDIO_KAISER_BETA"
+        },
+        {
+          "name": "gemma-audio-preparation-owns-semicausal-log-mel-and-mask-projection",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "fn gemma4_log_mel[\\s\\S]*GEMMA4_AUDIO_FRAME_STEP[\\s\\S]*GEMMA4_AUDIO_FRAME_LENGTH[\\s\\S]*fftn_with_context_exact_native[\\s\\S]*gemma4_mel_filterbank[\\s\\S]*DType::Bool"
+        },
+        {
+          "name": "gemma-audio-preparation-bounds-post-subsample-marker-count",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn gemma4_audio_marker_tokens[\\s\\S]*div_ceil\\(2\\)[\\s\\S]*GEMMA4_AUDIO_MAXIMUM_TOKENS"
+        },
+        {
+          "name": "gemma-audio-preparation-is-attempt-local-cancellable-and-memory-authorized",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct GemmaPreparedAudio[\\s\\S]*pub fn prepare_gemma4_audio[\\s\\S]*context.cancellation.check\\(\\)[\\s\\S]*backend.workspace_vec[\\s\\S]*GEMMA4_AUDIO_MAXIMUM_RESAMPLE_MULTIPLY_ADDS"
+        },
+        {
+          "name": "gemma-audio-preparation-tests-source-fixtures-and-rollback",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma_audio_preparation_is_source_exact_bounded_and_transactional[\\s\\S]*native_log_mel_sha256[\\s\\S]*frame_mask[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma-audio-preparation-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma4 audio encoder and projector owner",
+        "native Gemma multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "GemmaPreparedAudio and its canonical functions are the sole model-domain owners of source-specific Gemma4 mono projection, bounded Kaiser polyphase resampling, semicausal framing, periodic-Hann FFT magnitude, HTK log-mel features, frame masks, and post-subsample audio marker count. The preparation is attempt-local, weightless, bounded, and RNG-free; it delegates payload ownership to comfy_media and tensor storage, FFT, workspace, stream, memory, and cancellation to comfy_tensor, and cannot own tokenizer, decoder, retained encoder weights, handles, cache, persistence, or publication."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_projection_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
       "owner_files": [

@@ -12,8 +12,8 @@ use crate::{
     SD1_CLIP_SOURCE_SHA256, decoder_profile_fact, scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
-    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop, ResizeMode,
-    RngTransaction, StreamId, Tensor, TensorDescriptor, TensorError,
+    CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop,
+    ResizeMode, RngTransaction, StreamId, Tensor, TensorDescriptor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
     generated_native_diffusion::{
         NativeDiffusionTensorError, add as native_tensor_add, tensor_from_f32, tensor_to_f32,
@@ -29,6 +29,7 @@ use comfy_tensor::{
         InterpolateConfiguration, InterpolateMode, SpatialFunctionalKernelError,
         interpolate_with_context_exact_native,
     },
+    generated_spectral_transform_01::{SpectralTransformError, fftn_with_context_exact_native},
 };
 use sha2::{Digest, Sha256};
 use std::{mem, sync::Arc};
@@ -77,6 +78,20 @@ pub const GEMMA4_IMAGE_POOLING_SIZE: u64 = 3;
 pub const GEMMA4_IMAGE_SOFT_TOKENS: usize = 280;
 pub const GEMMA4_VIDEO_SOFT_TOKENS: usize = 70;
 pub const GEMMA4_VIDEO_SOURCE_FPS: usize = 24;
+pub const GEMMA4_AUDIO_SAMPLE_RATE: u32 = 16_000;
+pub const GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE: u32 = 8_000;
+pub const GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE: u32 = 384_000;
+pub const GEMMA4_AUDIO_FRAME_LENGTH: usize = 320;
+pub const GEMMA4_AUDIO_FRAME_STEP: usize = 160;
+pub const GEMMA4_AUDIO_FFT_LENGTH: usize = 512;
+pub const GEMMA4_AUDIO_MEL_BINS: usize = 128;
+pub const GEMMA4_AUDIO_MAXIMUM_TOKENS: usize = 750;
+
+const GEMMA4_AUDIO_PADDING_MULTIPLE: usize = 128;
+const GEMMA4_AUDIO_KAISER_BETA: f64 = 6.5;
+const GEMMA4_AUDIO_FILTER_HALF_WIDTH: usize = 80;
+const GEMMA4_AUDIO_MAXIMUM_FILTER_TAPS: usize = 2_000_001;
+const GEMMA4_AUDIO_MAXIMUM_RESAMPLE_MULTIPLY_ADDS: usize = 250_000_000;
 
 pub const MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS: [&str; 53] = [
     "Qwen3VLTokenizer",
@@ -476,6 +491,42 @@ pub struct GemmaPreparedVisual {
     timestamp_seconds: Option<usize>,
 }
 
+#[derive(Clone, Debug)]
+pub struct GemmaPreparedAudio {
+    log_mel: Tensor,
+    frame_mask: Tensor,
+    marker_tokens: usize,
+    original_sample_rate: u32,
+    original_samples: usize,
+    resampled_samples: usize,
+}
+
+impl GemmaPreparedAudio {
+    pub fn log_mel(&self) -> &Tensor {
+        &self.log_mel
+    }
+
+    pub fn frame_mask(&self) -> &Tensor {
+        &self.frame_mask
+    }
+
+    pub const fn marker_tokens(&self) -> usize {
+        self.marker_tokens
+    }
+
+    pub const fn original_sample_rate(&self) -> u32 {
+        self.original_sample_rate
+    }
+
+    pub const fn original_samples(&self) -> usize {
+        self.original_samples
+    }
+
+    pub const fn resampled_samples(&self) -> usize {
+        self.resampled_samples
+    }
+}
+
 impl GemmaPreparedVisual {
     pub fn image(&self) -> &ImageTensor {
         &self.image
@@ -795,6 +846,8 @@ pub enum MultimodalTextError {
     NativeTensor(#[from] NativeDiffusionTensorError),
     #[error(transparent)]
     Spatial(#[from] SpatialFunctionalKernelError),
+    #[error(transparent)]
+    Spectral(#[from] SpectralTransformError),
     #[error("multimodal text input is invalid: {0}")]
     InvalidInput(&'static str),
     #[error("multimodal text arithmetic overflowed while computing {0}")]
@@ -1197,6 +1250,493 @@ pub fn prepare_gemma4_visuals(
     }
     context.cancellation.check()?;
     Ok(prepared)
+}
+
+pub fn prepare_gemma4_audio(
+    backend: &CpuBackend,
+    waveform: &Tensor,
+    sample_rate: u32,
+    context: &ExecutionContext<'_>,
+) -> Result<GemmaPreparedAudio, MultimodalTextError> {
+    context.cancellation.check()?;
+    if !(GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE..=GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE).contains(&sample_rate)
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio sample rate is outside the checked AUDIO range",
+        ));
+    }
+    let descriptor = waveform.descriptor();
+    let shape = descriptor.shape();
+    if shape.len() != 3 || shape[0] != 1 || shape[1] == 0 || shape[2] == 0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio requires contiguous [1, channels, samples] AUDIO",
+        ));
+    }
+    if descriptor.dtype() != DType::F32
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != context.stream
+        || !descriptor.is_contiguous()?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio must be contiguous CPU F32 on the execution stream",
+        ));
+    }
+    let channels = u64_to_usize(shape[1], "Gemma4 audio channels")?;
+    let original_samples = u64_to_usize(shape[2], "Gemma4 audio samples")?;
+    let source = tensor_to_f32(backend, waveform, context)?;
+    let expected_source_values = channels
+        .checked_mul(original_samples)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 audio source values"))?;
+    if source.len() != expected_source_values {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio storage does not match its descriptor",
+        ));
+    }
+    let mut mono = backend.workspace_vec(context, original_samples)?;
+    for sample in 0..original_samples {
+        check_gemma_audio_periodically(sample, context)?;
+        let mut sum = 0.0_f64;
+        for channel in 0..channels {
+            let index = channel
+                .checked_mul(original_samples)
+                .and_then(|value| value.checked_add(sample))
+                .ok_or(MultimodalTextError::Overflow("Gemma4 mono sample index"))?;
+            let value = *source.get(index).ok_or(MultimodalTextError::InvalidInput(
+                "Gemma4 audio channel storage is incomplete",
+            ))?;
+            if !value.is_finite() {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma4 audio samples must be finite",
+                ));
+            }
+            sum += f64::from(value);
+        }
+        mono.try_push((sum / channels as f64) as f32)?;
+    }
+    let resampled = gemma4_resample_polyphase(backend, &mono, sample_rate, context)?;
+    let resampled_samples = resampled.len();
+    let marker_tokens = gemma4_audio_marker_tokens(original_samples, sample_rate)?;
+    let padded_samples = resampled_samples
+        .checked_add(GEMMA4_AUDIO_PADDING_MULTIPLE - 1)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 padded audio samples"))?
+        / GEMMA4_AUDIO_PADDING_MULTIPLE
+        * GEMMA4_AUDIO_PADDING_MULTIPLE;
+    let semicausal_samples = padded_samples.checked_add(GEMMA4_AUDIO_FRAME_STEP).ok_or(
+        MultimodalTextError::Overflow("Gemma4 semicausal audio samples"),
+    )?;
+    let required_frame_samples = GEMMA4_AUDIO_FRAME_LENGTH
+        .checked_add(1)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 frame samples"))?;
+    let frame_count = if semicausal_samples < required_frame_samples {
+        0
+    } else {
+        (semicausal_samples - required_frame_samples) / GEMMA4_AUDIO_FRAME_STEP + 1
+    };
+    let (log_mel, frame_mask) =
+        gemma4_log_mel(backend, &resampled, resampled_samples, frame_count, context)?;
+    context.cancellation.check()?;
+    Ok(GemmaPreparedAudio {
+        log_mel,
+        frame_mask,
+        marker_tokens,
+        original_sample_rate: sample_rate,
+        original_samples,
+        resampled_samples,
+    })
+}
+
+pub fn gemma4_audio_marker_tokens(
+    original_samples: usize,
+    sample_rate: u32,
+) -> Result<usize, MultimodalTextError> {
+    if !(GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE..=GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE).contains(&sample_rate)
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio sample rate is outside the checked AUDIO range",
+        ));
+    }
+    let projected_samples = if sample_rate == GEMMA4_AUDIO_SAMPLE_RATE {
+        original_samples
+    } else {
+        original_samples
+            .checked_mul(GEMMA4_AUDIO_SAMPLE_RATE as usize)
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 projected audio samples",
+            ))?
+            / sample_rate as usize
+    };
+    let projected_with_padding = projected_samples
+        .checked_add(GEMMA4_AUDIO_FRAME_STEP)
+        .ok_or(MultimodalTextError::Overflow(
+            "Gemma4 projected audio frame count",
+        ))?;
+    let frame_count = if projected_with_padding < GEMMA4_AUDIO_FRAME_LENGTH + 1 {
+        0
+    } else {
+        (projected_with_padding - (GEMMA4_AUDIO_FRAME_LENGTH + 1)) / GEMMA4_AUDIO_FRAME_STEP + 1
+    };
+    let once = frame_count.div_ceil(2);
+    Ok(once.div_ceil(2).min(GEMMA4_AUDIO_MAXIMUM_TOKENS))
+}
+
+fn gemma4_resample_polyphase(
+    backend: &CpuBackend,
+    mono: &[f32],
+    sample_rate: u32,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<f32>, MultimodalTextError> {
+    if sample_rate == GEMMA4_AUDIO_SAMPLE_RATE {
+        let mut output = backend.workspace_vec(context, mono.len())?;
+        for (index, value) in mono.iter().copied().enumerate() {
+            check_gemma_audio_periodically(index, context)?;
+            output.try_push(value)?;
+        }
+        return Ok(output);
+    }
+    let divisor = greatest_common_divisor(sample_rate, GEMMA4_AUDIO_SAMPLE_RATE);
+    let up = usize::try_from(GEMMA4_AUDIO_SAMPLE_RATE / divisor)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample up factor"))?;
+    let down = usize::try_from(sample_rate / divisor)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample down factor"))?;
+    let ratio_limit = up.max(down);
+    let half_length = GEMMA4_AUDIO_FILTER_HALF_WIDTH
+        .checked_mul(ratio_limit)
+        .ok_or(MultimodalTextError::Overflow(
+            "Gemma4 resample filter half length",
+        ))?;
+    let filter_length = half_length
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(1))
+        .ok_or(MultimodalTextError::Overflow(
+            "Gemma4 resample filter length",
+        ))?;
+    if filter_length > GEMMA4_AUDIO_MAXIMUM_FILTER_TAPS {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 resample ratio exceeds the native bounded filter limit",
+        ));
+    }
+    let output_length = mono
+        .len()
+        .checked_mul(up)
+        .and_then(|value| value.checked_add(down - 1))
+        .ok_or(MultimodalTextError::Overflow("Gemma4 resampled length"))?
+        / down;
+    let taps_per_output = filter_length
+        .checked_add(up - 1)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 resample work"))?
+        / up;
+    let multiply_adds = output_length
+        .checked_mul(taps_per_output)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 resample work"))?;
+    if multiply_adds > GEMMA4_AUDIO_MAXIMUM_RESAMPLE_MULTIPLY_ADDS {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio exceeds the native bounded resample work limit",
+        ));
+    }
+    let cutoff = 0.96 / ratio_limit as f64;
+    let kaiser_denominator = gemma4_bessel_i0(GEMMA4_AUDIO_KAISER_BETA);
+    let mut normalization = 0.0_f64;
+    for index in 0..filter_length {
+        check_gemma_audio_periodically(index, context)?;
+        normalization += gemma4_firwin_value(index, half_length, cutoff, kaiser_denominator);
+    }
+    if !normalization.is_finite() || normalization <= 0.0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 resample filter normalization is invalid",
+        ));
+    }
+    let pre_padding = down - half_length % down;
+    let pre_remove = (half_length + pre_padding) / down;
+    let mut output = backend.workspace_vec(context, output_length)?;
+    let up_i128 = i128::try_from(up)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample up factor"))?;
+    let down_i128 = i128::try_from(down)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample down factor"))?;
+    let pre_padding_i128 = i128::try_from(pre_padding)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample pre-padding"))?;
+    let filter_last_i128 = i128::try_from(filter_length - 1)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample filter length"))?;
+    for output_index in 0..output_length {
+        check_gemma_audio_periodically(output_index, context)?;
+        let projected_output_index =
+            output_index
+                .checked_add(pre_remove)
+                .ok_or(MultimodalTextError::Overflow(
+                    "Gemma4 resample output index",
+                ))?;
+        let raw_index = i128::try_from(projected_output_index)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample output index"))?
+            .checked_mul(down_i128)
+            .and_then(|value| value.checked_sub(pre_padding_i128))
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 resample convolution index",
+            ))?;
+        let first_input = div_ceil_i128(raw_index - filter_last_i128, up_i128).max(0);
+        let last_input = raw_index.div_euclid(up_i128).min(
+            i128::try_from(mono.len() - 1)
+                .map_err(|_| MultimodalTextError::Overflow("Gemma4 audio samples"))?,
+        );
+        let mut sum = 0.0_f64;
+        if first_input <= last_input {
+            for input_index in first_input..=last_input {
+                let filter_index = raw_index
+                    .checked_sub(input_index.checked_mul(up_i128).ok_or(
+                        MultimodalTextError::Overflow("Gemma4 resample filter index"),
+                    )?)
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Gemma4 resample filter index",
+                    ))?;
+                let filter_index = usize::try_from(filter_index)
+                    .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample filter index"))?;
+                let input_index = usize::try_from(input_index)
+                    .map_err(|_| MultimodalTextError::Overflow("Gemma4 resample input index"))?;
+                let input = f64::from(*mono.get(input_index).ok_or(
+                    MultimodalTextError::InvalidInput("Gemma4 resample input is incomplete"),
+                )?);
+                let coefficient =
+                    gemma4_firwin_value(filter_index, half_length, cutoff, kaiser_denominator)
+                        / normalization
+                        * up as f64;
+                sum += input * coefficient;
+            }
+        }
+        output.try_push(sum as f32)?;
+    }
+    Ok(output)
+}
+
+fn gemma4_log_mel(
+    backend: &CpuBackend,
+    audio: &[f32],
+    real_samples: usize,
+    frame_count: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<(Tensor, Tensor), MultimodalTextError> {
+    let frame_values = frame_count
+        .checked_mul(GEMMA4_AUDIO_FFT_LENGTH)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 FFT frame values"))?;
+    let mut framed = backend.workspace_vec(context, frame_values)?;
+    let mut mask = backend.workspace_vec::<u8>(context, frame_count)?;
+    for frame in 0..frame_count {
+        check_gemma_audio_periodically(frame, context)?;
+        let frame_start = frame
+            .checked_mul(GEMMA4_AUDIO_FRAME_STEP)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 frame start"))?;
+        let mask_index = frame_start
+            .checked_add(GEMMA4_AUDIO_FRAME_LENGTH)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 frame mask index"))?;
+        let source_mask_index = mask_index.checked_sub(GEMMA4_AUDIO_FRAME_STEP);
+        mask.try_push(u8::from(
+            source_mask_index.is_some_and(|index| index < real_samples),
+        ))?;
+        for offset in 0..GEMMA4_AUDIO_FFT_LENGTH {
+            let value = if offset < GEMMA4_AUDIO_FRAME_LENGTH {
+                let padded_index = frame_start
+                    .checked_add(offset)
+                    .ok_or(MultimodalTextError::Overflow("Gemma4 frame sample"))?;
+                let source_index = padded_index.checked_sub(GEMMA4_AUDIO_FRAME_STEP);
+                let sample = source_index
+                    .and_then(|index| audio.get(index))
+                    .copied()
+                    .unwrap_or(0.0);
+                let phase =
+                    std::f64::consts::TAU * offset as f64 / GEMMA4_AUDIO_FRAME_LENGTH as f64;
+                sample * (0.5 - 0.5 * phase.cos()) as f32
+            } else {
+                0.0
+            };
+            framed.try_push(value)?;
+        }
+    }
+    let mut features = backend.workspace_vec(
+        context,
+        frame_count
+            .checked_mul(GEMMA4_AUDIO_MEL_BINS)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 log-mel values"))?,
+    )?;
+    if frame_count > 0 {
+        let framed = tensor_from_f32(
+            backend,
+            &[usize_to_u64(frame_count, "Gemma4 audio frames")?, 512],
+            &framed,
+            context,
+        )?;
+        let spectrum = fftn_with_context_exact_native(backend, &framed, &[1], context)?;
+        let spectrum_bytes = spectrum.contiguous_bytes()?;
+        let expected_complex = frame_count
+            .checked_mul(GEMMA4_AUDIO_FFT_LENGTH)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 spectrum values"))?;
+        if spectrum_bytes.len()
+            != expected_complex
+                .checked_mul(8)
+                .ok_or(MultimodalTextError::Overflow("Gemma4 spectrum bytes"))?
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 spectrum storage is malformed",
+            ));
+        }
+        let filterbank = gemma4_mel_filterbank(backend, context)?;
+        let mut magnitudes = [0.0_f64; 257];
+        for frame in 0..frame_count {
+            check_gemma_audio_periodically(frame, context)?;
+            if *mask.get(frame).ok_or(MultimodalTextError::InvalidInput(
+                "Gemma4 frame mask is incomplete",
+            ))? == 0
+            {
+                for _ in 0..GEMMA4_AUDIO_MEL_BINS {
+                    features.try_push(0.0)?;
+                }
+                continue;
+            }
+            for (frequency, magnitude) in magnitudes.iter_mut().enumerate() {
+                let complex_index = frame
+                    .checked_mul(GEMMA4_AUDIO_FFT_LENGTH)
+                    .and_then(|value| value.checked_add(frequency))
+                    .ok_or(MultimodalTextError::Overflow("Gemma4 spectrum index"))?;
+                let byte_index = complex_index
+                    .checked_mul(8)
+                    .ok_or(MultimodalTextError::Overflow("Gemma4 spectrum byte index"))?;
+                let bytes = spectrum_bytes.get(byte_index..byte_index + 8).ok_or(
+                    MultimodalTextError::InvalidInput("Gemma4 spectrum storage is incomplete"),
+                )?;
+                let real = f32::from_ne_bytes(bytes[0..4].try_into().map_err(|_| {
+                    MultimodalTextError::InvalidInput("Gemma4 spectrum real value is malformed")
+                })?);
+                let imaginary = f32::from_ne_bytes(bytes[4..8].try_into().map_err(|_| {
+                    MultimodalTextError::InvalidInput(
+                        "Gemma4 spectrum imaginary value is malformed",
+                    )
+                })?);
+                *magnitude = f64::from(real).hypot(f64::from(imaginary));
+            }
+            for mel in 0..GEMMA4_AUDIO_MEL_BINS {
+                let mut sum = 0.0_f64;
+                for (frequency, magnitude) in magnitudes.iter().copied().enumerate() {
+                    let filter_index = frequency
+                        .checked_mul(GEMMA4_AUDIO_MEL_BINS)
+                        .and_then(|value| value.checked_add(mel))
+                        .ok_or(MultimodalTextError::Overflow("Gemma4 mel filter index"))?;
+                    sum += magnitude
+                        * *filterbank.get(filter_index).ok_or(
+                            MultimodalTextError::InvalidInput(
+                                "Gemma4 mel filterbank is incomplete",
+                            ),
+                        )?;
+                }
+                features.try_push((sum + 0.001).ln() as f32)?;
+            }
+        }
+    }
+    let log_mel = tensor_from_f32(
+        backend,
+        &[
+            1,
+            usize_to_u64(frame_count, "Gemma4 audio frames")?,
+            GEMMA4_AUDIO_MEL_BINS as u64,
+        ],
+        &features,
+        context,
+    )?;
+    let mask_descriptor = TensorDescriptor::contiguous(
+        vec![1, usize_to_u64(frame_count, "Gemma4 audio frames")?],
+        DType::Bool,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let (frame_mask, _) = backend.upload_bytes(mask_descriptor, &mask, context)?;
+    Ok((log_mel, frame_mask))
+}
+
+fn gemma4_mel_filterbank(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<f64>, MultimodalTextError> {
+    let mut filter_frequencies = [0.0_f64; GEMMA4_AUDIO_MEL_BINS + 2];
+    let maximum_mel = 2595.0 * (1.0_f64 + 8000.0 / 700.0).log10();
+    for (index, value) in filter_frequencies.iter_mut().enumerate() {
+        let mel = maximum_mel * index as f64 / (GEMMA4_AUDIO_MEL_BINS + 1) as f64;
+        *value = 700.0 * (10.0_f64.powf(mel / 2595.0) - 1.0);
+    }
+    let mut filterbank = backend.workspace_vec(
+        context,
+        257_usize
+            .checked_mul(GEMMA4_AUDIO_MEL_BINS)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 mel filterbank"))?,
+    )?;
+    for frequency in 0..257 {
+        check_gemma_audio_periodically(frequency, context)?;
+        let hertz = 8000.0 * frequency as f64 / 256.0;
+        for mel in 0..GEMMA4_AUDIO_MEL_BINS {
+            let lower = filter_frequencies[mel];
+            let center = filter_frequencies[mel + 1];
+            let upper = filter_frequencies[mel + 2];
+            let rising = (hertz - lower) / (center - lower);
+            let falling = (upper - hertz) / (upper - center);
+            filterbank.try_push(rising.min(falling).max(0.0))?;
+        }
+    }
+    Ok(filterbank)
+}
+
+fn gemma4_firwin_value(
+    index: usize,
+    half_length: usize,
+    cutoff: f64,
+    kaiser_denominator: f64,
+) -> f64 {
+    let distance = index as f64 - half_length as f64;
+    let scaled = cutoff * distance;
+    let sinc = if scaled == 0.0 {
+        1.0
+    } else {
+        (std::f64::consts::PI * scaled).sin() / (std::f64::consts::PI * scaled)
+    };
+    let ratio = distance / half_length as f64;
+    let window = gemma4_bessel_i0(GEMMA4_AUDIO_KAISER_BETA * (1.0 - ratio * ratio).max(0.0).sqrt())
+        / kaiser_denominator;
+    cutoff * sinc * window
+}
+
+fn gemma4_bessel_i0(value: f64) -> f64 {
+    let argument = value * value / 4.0;
+    let mut term = 1.0_f64;
+    let mut sum = 1.0_f64;
+    for order in 1..=64 {
+        term *= argument / ((order * order) as f64);
+        sum += term;
+        if term <= sum * f64::EPSILON {
+            break;
+        }
+    }
+    sum
+}
+
+const fn greatest_common_divisor(mut left: u32, mut right: u32) -> u32 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
+fn div_ceil_i128(value: i128, divisor: i128) -> i128 {
+    let quotient = value.div_euclid(divisor);
+    if value.rem_euclid(divisor) == 0 {
+        quotient
+    } else {
+        quotient + 1
+    }
+}
+
+fn check_gemma_audio_periodically(
+    index: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<(), MultimodalTextError> {
+    if index.is_multiple_of(1_024) {
+        context.cancellation.check()?;
+    }
+    Ok(())
 }
 
 fn project_rgb_channels(

@@ -9642,6 +9642,8 @@ def native_gemma_audio_preparation_foundation_task(dependency: str) -> dict[str,
             "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
             "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/spectral_transform_01.rs",
+            "crates/comfy_tensor/src/ops/native_diffusion.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
         ],
         [

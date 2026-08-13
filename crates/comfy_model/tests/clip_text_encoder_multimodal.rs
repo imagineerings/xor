@@ -1,24 +1,27 @@
 use comfy_model::{
     DecoderActivation, DecoderArchitecture, DecoderAttentionWeights, DecoderLayerKind,
     DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration, DecoderTextWeights,
-    GEMMA3_IMAGE_AREA_PIXELS, GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_VIDEO_SOFT_TOKENS,
-    GEMMA4_VIDEO_SOURCE_FPS, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
-    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
-    JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
-    MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
-    NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
-    NativeQwenVisionEncoder, NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH,
-    OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN,
-    QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
-    QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
-    QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
-    QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
-    SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
-    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
-    gemma4_target_dimensions, ideogram4_project_taps, join_multimodal_embeddings,
-    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
-    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
-    prepare_gemma3_image, prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
+    GEMMA3_IMAGE_AREA_PIXELS, GEMMA4_AUDIO_FFT_LENGTH, GEMMA4_AUDIO_FRAME_LENGTH,
+    GEMMA4_AUDIO_FRAME_STEP, GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE, GEMMA4_AUDIO_MAXIMUM_TOKENS,
+    GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, GEMMA4_AUDIO_SAMPLE_RATE,
+    GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS,
+    GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS,
+    JINA_CLIP2_SOURCE_PATH, JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS,
+    MultimodalFamily, MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior,
+    MultimodalTextError, NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer,
+    NativeQwenMultimodal, NativeQwenVisionEncoder, NativeTextGenerationRequest,
+    NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
+    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
+    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer,
+    Qwen2PretokenizerProfile, QwenMultimodalGenerationRequest, QwenVisionBlockWeights,
+    QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights,
+    RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
+    TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt,
+    gemma3_target_dimensions, gemma4_audio_marker_tokens, gemma4_target_dimensions,
+    ideogram4_project_taps, join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
+    plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
+    prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
     qwen_multimodal_decoder_configuration, qwen_multimodal_tokenizer_profile,
     qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
 };
@@ -708,6 +711,133 @@ fn gemma_image_video_preparation_is_source_exact_bounded_and_transactional()
 
     let constrained = context(&authority, &cancellation, 4)?;
     assert!(prepare_gemma4_visuals(&backend, Some(&image), None, &constrained).is_err());
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma_audio_preparation_is_source_exact_bounded_and_transactional() -> Result<(), Box<dyn Error>>
+{
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(
+        manifest["sources"][0]["sha256"],
+        "c6ffbb2fbecd8f97e781a654a06ccf3910dc670867d38c0ce30542312f00cde6"
+    );
+    assert_eq!(GEMMA4_AUDIO_SAMPLE_RATE, 16_000);
+    assert_eq!(GEMMA4_AUDIO_FRAME_LENGTH, 320);
+    assert_eq!(GEMMA4_AUDIO_FRAME_STEP, 160);
+    assert_eq!(GEMMA4_AUDIO_FFT_LENGTH, 512);
+    assert_eq!(GEMMA4_AUDIO_MEL_BINS, 128);
+    assert_eq!(GEMMA4_AUDIO_MAXIMUM_TOKENS, 750);
+    assert_eq!(GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, 8_000);
+    assert_eq!(GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE, 384_000);
+    assert_eq!(gemma4_audio_marker_tokens(640, 16_000)?, 1);
+    assert_eq!(gemma4_audio_marker_tokens(320, 8_000)?, 1);
+    assert_eq!(gemma4_audio_marker_tokens(1, 16_000)?, 0);
+    assert_eq!(gemma4_audio_marker_tokens(4_000_000, 16_000)?, 750);
+    assert!(gemma4_audio_marker_tokens(usize::MAX, 8_000).is_err());
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let stereo = tensor(
+        &backend,
+        &[1, 2, 640],
+        &[vec![1.0; 640], vec![-1.0; 640]].concat(),
+        &setup,
+    )?;
+    let prepared = prepare_gemma4_audio(&backend, &stereo, 16_000, &setup)?;
+    assert_eq!(prepared.original_sample_rate(), 16_000);
+    assert_eq!(prepared.original_samples(), 640);
+    assert_eq!(prepared.resampled_samples(), 640);
+    assert_eq!(prepared.marker_tokens(), 1);
+    assert_eq!(prepared.log_mel().descriptor().shape(), [1, 3, 128]);
+    assert_eq!(prepared.frame_mask().descriptor().shape(), [1, 3]);
+    assert_eq!(prepared.frame_mask().descriptor().dtype(), DType::Bool);
+    assert_eq!(prepared.frame_mask().contiguous_bytes()?, [1, 1, 1]);
+    let silence = tensor_to_f32(&backend, prepared.log_mel(), &setup)?;
+    assert_eq!(silence.len(), 3 * 128);
+    for value in silence.iter().copied() {
+        assert!((value - 0.001_f32.ln()).abs() <= 1.0e-6);
+    }
+    drop(silence);
+    drop(prepared);
+
+    let mut resample_values = Vec::new();
+    resample_values.try_reserve_exact(2_205)?;
+    for sample in 0..2_205 {
+        let phase = std::f32::consts::TAU * 440.0 * sample as f32 / 44_100.0;
+        resample_values.push(phase.sin());
+    }
+    let resample_input = tensor(&backend, &[1, 1, 2_205], &resample_values, &setup)?;
+    let resampled = prepare_gemma4_audio(&backend, &resample_input, 44_100, &setup)?;
+    assert_eq!(resampled.resampled_samples(), 800);
+    assert_eq!(resampled.marker_tokens(), 1);
+    assert_eq!(resampled.log_mel().descriptor().shape(), [1, 5, 128]);
+    assert_eq!(resampled.frame_mask().contiguous_bytes()?, [1, 1, 1, 1, 0]);
+    let resampled_features = tensor_to_f32(&backend, resampled.log_mel(), &setup)?;
+    assert!(resampled_features.iter().all(|value| value.is_finite()));
+    let expected_first = [
+        -6.9077554, 1.503931, 0.31853235, 1.3154463, 0.8074848, 1.2384311, 0.96338606, 1.3288747,
+        0.9583913, 1.535566, 0.7444314, 1.7973692,
+    ];
+    for (actual, expected) in resampled_features.iter().zip(expected_first) {
+        assert!((actual - expected).abs() <= 2.0e-6);
+    }
+    let feature_bytes = resampled.log_mel().contiguous_bytes()?;
+    assert_eq!(
+        format!("{:x}", Sha256::digest(feature_bytes)),
+        manifest["vectors"]["resampled_44k1_sine"]["native_log_mel_sha256"]
+    );
+    drop(resampled_features);
+    drop(resampled);
+
+    let short = tensor(&backend, &[1, 1, 1], &[0.25], &setup)?;
+    let short_prepared = prepare_gemma4_audio(&backend, &short, 16_000, &setup)?;
+    assert_eq!(short_prepared.log_mel().descriptor().shape(), [1, 0, 128]);
+    assert_eq!(short_prepared.frame_mask().descriptor().shape(), [1, 0]);
+    assert_eq!(short_prepared.marker_tokens(), 0);
+    drop(short_prepared);
+    let empty = tensor(&backend, &[1, 1, 0], &[], &setup)?;
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &empty, 16_000, &setup),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+    let invalid = tensor(&backend, &[1, 1, 1], &[f32::NAN], &setup)?;
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &invalid, 16_000, &setup),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &short, 0, &setup),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &short, 7_999, &setup),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &short, 384_001, &setup),
+        Err(MultimodalTextError::InvalidInput(_))
+    ));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 48 * 1024 * 1024)?;
+    assert!(matches!(
+        prepare_gemma4_audio(&backend, &stereo, 16_000, &cancelled_context),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    let constrained = context(&authority, &cancellation, 4)?;
+    assert!(prepare_gemma4_audio(&backend, &stereo, 16_000, &constrained).is_err());
     assert_eq!(constrained.scratch.in_use_bytes(), 0);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())

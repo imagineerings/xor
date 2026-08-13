@@ -3024,6 +3024,83 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task390p_gemma_audio_has_one_attempt_local_owner =
+        production_source_occurrences(&sources, "pub struct GemmaPreparedAudio {").len() == 1
+            && production_source_occurrences(&sources, "pub fn prepare_gemma4_audio(").len() == 1
+            && production_source_occurrences(&sources, "pub fn gemma4_audio_marker_tokens(").len()
+                == 1
+            && !model_clip_text_encoder_multimodal.contains("NativeAudioEncoder")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache")
+            && !model_clip_text_encoder_multimodal.contains("OutputTransaction");
+    let task390p_gemma_audio_is_exact_bounded_and_executable = model_clip_text_encoder_multimodal
+        .contains("GEMMA4_AUDIO_SAMPLE_RATE")
+        && model_clip_text_encoder_multimodal.contains("GEMMA4_AUDIO_KAISER_BETA")
+        && model_clip_text_encoder_multimodal.contains("GEMMA4_AUDIO_FRAME_LENGTH")
+        && model_clip_text_encoder_multimodal.contains("fftn_with_context_exact_native")
+        && model_clip_text_encoder_multimodal.contains("gemma4_mel_filterbank")
+        && model_clip_text_encoder_multimodal_tests
+            .contains("gemma_audio_preparation_is_source_exact_bounded_and_transactional")
+        && model_clip_text_encoder_multimodal_tests.contains("resampled_44k1_sine")
+        && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task390p_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some(
+                    "native_vision_text_transformer_text_media_preparation_source_gemma_audio",
+                )
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::GemmaPreparedAudio")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some(
+                                    "comfy-parity-native-gemma-audio-preparation-foundation",
+                                )
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma-audio-preparation-mixes-and-resamples-source-exactly",
+                            "gemma-audio-preparation-owns-semicausal-log-mel-and-mask-projection",
+                            "gemma-audio-preparation-bounds-post-subsample-marker-count",
+                            "gemma-audio-preparation-is-attempt-local-cancellable-and-memory-authorized",
+                            "gemma-audio-preparation-tests-source-fixtures-and-rollback",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task390p_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_vision_text_transformer_text_media_preparation_source_gemma_audio,",
+            )
+        })
+        .is_some_and(|line| {
+            line.contains("comfy_model::clip_text_encoder_multimodal::GemmaPreparedAudio")
+                && line.contains("comfy-parity-native-gemma-audio-preparation-foundation")
+                && line.contains("VAL-TENSOR-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task343_policy_trace = policy_concerns
         .iter()
         .find(|entry| {
@@ -9077,6 +9154,18 @@ fn run_ownership_validation(
             task389p_gemma_preparation_is_exact_bounded_and_executable,
         ),
         (
+            "task390p_policy_and_catalog_trace_gemma_audio_preparation",
+            task390p_policy_trace && task390p_catalog_trace,
+        ),
+        (
+            "task390p_gemma_audio_has_one_attempt_local_owner",
+            task390p_gemma_audio_has_one_attempt_local_owner,
+        ),
+        (
+            "task390p_gemma_audio_is_exact_bounded_and_executable",
+            task390p_gemma_audio_is_exact_bounded_and_executable,
+        ),
+        (
             "task340_policy_and_catalog_trace_the_canonical_clip_vision_owner",
             task_340_policy_trace && task_340_catalog_trace,
         ),
@@ -9666,6 +9755,17 @@ fn val_ownership_task389p_gemma_preparation_001() -> Result<(), Box<dyn std::err
         "val-ownership-task389p-gemma-preparation-001.json",
         "val_ownership_task389p_gemma_preparation_001",
         Some("task389p_"),
+    )
+}
+
+#[test]
+fn val_ownership_task390p_gemma_audio_preparation_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task390p-gemma-audio-preparation-and-attempt-local-state-ownership",
+        "val-ownership-task390p-gemma-audio-preparation-001.json",
+        "val_ownership_task390p_gemma_audio_preparation_001",
+        Some("task390p_"),
     )
 }
 

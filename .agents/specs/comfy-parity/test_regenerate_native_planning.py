@@ -136,6 +136,14 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma_audio_preparation_id]["dependencies"],
             [gemma_image_video_id],
         )
+        self.assertIn(
+            "crates/comfy_tensor/src/ops/spectral_transform_01.rs",
+            tasks_by_id[gemma_audio_preparation_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation",
+            tasks_by_id[gemma_audio_preparation_id]["writes"],
+        )
         self.assertEqual(
             tasks_by_id[gemma_tokenizer_id]["dependencies"],
             [gemma_audio_preparation_id],
