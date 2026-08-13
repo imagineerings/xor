@@ -707,6 +707,24 @@ fn skill_issue_file_label(path: &std::path::Path) -> String {
     }
 }
 
+pub(super) fn context_loading_issue_path_label(issue: &SkillLoadingIssue) -> String {
+    if issue.kind == SkillLoadingIssueKind::ProjectInstructionLoadFailed {
+        match (&issue.source_label, &issue.relative_path) {
+            (Some(source), Some(relative_path)) => {
+                format!("{source}/{}", relative_path.display())
+            }
+            _ => issue
+                .relative_path
+                .as_deref()
+                .unwrap_or(issue.path.as_path())
+                .display()
+                .to_string(),
+        }
+    } else {
+        issue.path.display().to_string()
+    }
+}
+
 pub fn open_markdown_in_workspace(
     title: String,
     markdown: String,
@@ -907,20 +925,7 @@ impl ThreadView {
                     if event.project_id != project_id {
                         return;
                     }
-                    // Drop dismissals for issues that no longer appear in the emitted
-                    // list — the underlying file must have been fixed or removed, so a
-                    // future regression should re-show.
-                    this.dismissed_skill_loading_issues
-                        .retain(|dismissed| event.issues.contains(dismissed));
-
-                    // Show only issues that haven't been dismissed.
-                    this.skill_loading_issues = event
-                        .issues
-                        .iter()
-                        .filter(|issue| !this.dismissed_skill_loading_issues.contains(issue))
-                        .cloned()
-                        .collect();
-                    cx.notify();
+                    this.update_context_loading_issues(&event.issues, cx);
                 },
             ));
 
@@ -1500,14 +1505,23 @@ impl ThreadView {
             }
         }
 
-        // A built-in command (e.g. `/compact`): run the bare command without
-        // echoing it as a user message, and queue any trailing text the user
-        // typed so it isn't silently dropped.
+        // Native commands are submitted without echoing a user message.
+        // Argument-bearing commands consume the resolved editor contents;
+        // argumentless commands retain the existing queued-remainder behavior.
         let native_command =
             leading_native_command(text, self.session_capabilities.read().available_commands());
-        if let Some(command_name) = native_command {
+        if let Some(native_command) = native_command {
             cx.emit(AcpThreadViewEvent::Interacted);
-            self.send_command_queueing_remainder(message_editor, command_name, window, cx);
+            if native_command.accepts_arguments {
+                self.send_argument_native_command(message_editor, window, cx);
+            } else {
+                self.send_command_queueing_remainder(
+                    message_editor,
+                    native_command.name,
+                    window,
+                    cx,
+                );
+            }
             return;
         }
 
@@ -1616,6 +1630,33 @@ impl ThreadView {
         });
 
         self.send_content(contents_task, false, window, cx);
+    }
+
+    fn send_argument_native_command(
+        &mut self,
+        message_editor: Entity<MessageEditor>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let contents = self.resolve_message_contents(&message_editor, cx);
+        self.thread_error.take();
+        self.thread_feedback.clear();
+        self.editing_message.take();
+
+        let contents_task = cx.spawn_in(window, async move |_this, cx| {
+            let (contents, tracked_buffers) = contents.await?;
+            if contents.is_empty() {
+                return Ok(None);
+            }
+            cx.update(|window, cx| {
+                message_editor.update(cx, |message_editor, cx| {
+                    message_editor.clear(window, cx);
+                });
+            })?;
+            Ok(Some((contents, tracked_buffers)))
+        });
+
+        self.send_content(contents_task, true, window, cx);
     }
 
     pub fn send_content(
@@ -11047,7 +11088,7 @@ impl ThreadView {
             .map(|(index, issue)| {
                 let abs_path = issue.path.clone();
                 let workspace = self.workspace.clone();
-                let path_label = issue.path.display().to_string();
+                let path_label = context_loading_issue_path_label(issue);
                 let target = issue.clone();
 
                 let title = match issue.kind {
@@ -11056,7 +11097,16 @@ impl ThreadView {
                     SkillLoadingIssueKind::CatalogBudgetExceeded => {
                         "Skill Omitted from Model Catalog"
                     }
+                    SkillLoadingIssueKind::ProjectInstructionLoadFailed => {
+                        "Project Instructions Failed to Load"
+                    }
                 };
+                let open_label =
+                    if issue.kind == SkillLoadingIssueKind::ProjectInstructionLoadFailed {
+                        "Open Instructions"
+                    } else {
+                        "Open Skill"
+                    };
 
                 Callout::new()
                     .icon(IconName::Warning)
@@ -11064,7 +11114,7 @@ impl ThreadView {
                     .title(title)
                     .description(format!("{}\n{path_label}", issue.message))
                     .actions_slot(
-                        Button::new(("open-skill-file", index), "Open Skill")
+                        Button::new(("open-context-file", index), open_label)
                             .style(ButtonStyle::Outlined)
                             .label_size(LabelSize::Small)
                             .on_click(cx.listener(move |_, _, window, cx| {
@@ -11101,6 +11151,28 @@ impl ThreadView {
             .chain(other_warnings)
             .map(|callout| callout.border_position(border_position))
             .collect()
+    }
+
+    pub(super) fn update_context_loading_issues(
+        &mut self,
+        issues: &[SkillLoadingIssue],
+        cx: &mut Context<Self>,
+    ) {
+        self.dismissed_skill_loading_issues
+            .retain(|dismissed| issues.contains(dismissed));
+        self.skill_loading_issues = issues
+            .iter()
+            .filter(|issue| !self.dismissed_skill_loading_issues.contains(issue))
+            .cloned()
+            .collect();
+        cx.notify();
+    }
+
+    #[cfg(test)]
+    pub(super) fn dismiss_context_loading_issue_for_test(&mut self, issue: SkillLoadingIssue) {
+        self.skill_loading_issues
+            .retain(|current| current != &issue);
+        self.dismissed_skill_loading_issues.insert(issue);
     }
 
     fn render_skill_description_warnings(
@@ -12093,29 +12165,36 @@ pub(crate) fn open_link(
     }
 }
 
-/// Returns the name of the leading built-in (native-category) slash command —
-/// e.g. `compact` for `/compact` or `/compact summarize the API work` — whether
-/// or not the user typed any trailing text after it. Built-in commands ignore
-/// trailing arguments, so the caller sends the bare command and queues any
-/// remainder rather than discarding it. Commands from MCP servers and ACP
-/// agents are excluded: their trailing text is a real argument the agent
-/// consumes.
+#[derive(Debug, PartialEq, Eq)]
+struct LeadingNativeCommand {
+    name: String,
+    accepts_arguments: bool,
+}
+
+/// Returns the leading built-in (native-category) slash command —
+/// e.g. `compact` for `/compact` or `/compact summarize the API work` — and
+/// whether its advertised input metadata says it consumes arguments. Commands
+/// from MCP servers and ACP agents are excluded because their submission
+/// behavior is owned by their connection.
 ///
 /// Native commands run a turn that produces its own thread entry, so the typed
 /// command is never echoed as a user message (see `send_command_queueing_remainder`).
 fn leading_native_command(
     text: &str,
     available_commands: &[acp::AvailableCommand],
-) -> Option<String> {
+) -> Option<LeadingNativeCommand> {
     let rest = text.trim_start().strip_prefix('/')?;
     let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
     let name = &rest[..name_end];
-    let is_native = available_commands.iter().any(|command| {
+    let command = available_commands.iter().find(|command| {
         command.name == name
             && acp_thread::command_category_from_meta(&command.meta)
                 == Some(acp_thread::CommandCategory::Native)
-    });
-    is_native.then(|| name.to_string())
+    })?;
+    Some(LeadingNativeCommand {
+        name: name.to_string(),
+        accepts_arguments: command.input.is_some(),
+    })
 }
 
 /// Removes a leading `/command_name` token from `text`, returning the trimmed
@@ -12144,6 +12223,12 @@ mod tests {
         ))
     }
 
+    fn argument_native_command(name: &str) -> acp::AvailableCommand {
+        native_command(name).input(acp::AvailableCommandInput::Unstructured(
+            acp::UnstructuredCommandInput::new("arguments"),
+        ))
+    }
+
     fn mcp_command(name: &str) -> acp::AvailableCommand {
         acp::AvailableCommand::new(name, "").meta(acp_thread::meta_with_command_category(
             acp_thread::CommandCategory::Mcp,
@@ -12152,17 +12237,27 @@ mod tests {
 
     #[test]
     fn test_leading_native_command_matches_bare_and_with_remainder() {
-        let commands = [native_command("compact"), mcp_command("deploy")];
+        let commands = [
+            native_command("compact"),
+            argument_native_command("goal"),
+            mcp_command("deploy"),
+        ];
 
         // Native command with trailing text.
         assert_eq!(
             leading_native_command("/compact summarize the API work", &commands),
-            Some("compact".to_string())
+            Some(LeadingNativeCommand {
+                name: "compact".to_string(),
+                accepts_arguments: false,
+            })
         );
         // Leading/trailing whitespace is tolerated.
         assert_eq!(
             leading_native_command("  /compact   do x  ", &commands),
-            Some("compact".to_string())
+            Some(LeadingNativeCommand {
+                name: "compact".to_string(),
+                accepts_arguments: false,
+            })
         );
 
         // Bare native command (no remainder) is still recognized, so it runs as
@@ -12170,11 +12265,25 @@ mod tests {
         // to the model as a normal prompt.
         assert_eq!(
             leading_native_command("/compact", &commands),
-            Some("compact".to_string())
+            Some(LeadingNativeCommand {
+                name: "compact".to_string(),
+                accepts_arguments: false,
+            })
         );
         assert_eq!(
             leading_native_command("/compact   ", &commands),
-            Some("compact".to_string())
+            Some(LeadingNativeCommand {
+                name: "compact".to_string(),
+                accepts_arguments: false,
+            })
+        );
+
+        assert_eq!(
+            leading_native_command("/goal ship the feature", &commands),
+            Some(LeadingNativeCommand {
+                name: "goal".to_string(),
+                accepts_arguments: true,
+            })
         );
 
         // MCP/ACP commands are not native: their trailing text is a real

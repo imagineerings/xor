@@ -68,6 +68,19 @@ struct TelemetryState {
     subscribers: Vec<mpsc::UnboundedSender<EventWrapper>>,
 }
 
+impl TelemetryState {
+    fn update_settings(&mut self, settings: TelemetrySettings) {
+        self.settings = settings;
+        if !settings.metrics {
+            self.events_queue.clear();
+            self.flush_events_task.take();
+            self.first_event_date_time = None;
+            self.metrics_id = None;
+            self.is_staff = None;
+        }
+    }
+}
+
 #[cfg(debug_assertions)]
 const MAX_QUEUE_LEN: usize = 5;
 
@@ -221,7 +234,7 @@ impl Telemetry {
 
             move |cx| {
                 let mut state = state.lock();
-                state.settings = *TelemetrySettings::get_global(cx);
+                state.update_settings(*TelemetrySettings::get_global(cx));
             }
         })
         .detach();
@@ -653,6 +666,12 @@ impl Telemetry {
     pub async fn flush_events_inner(self: &Arc<Self>) -> Result<()> {
         let (json_bytes, request_body) = {
             let mut state = self.state.lock();
+            if !state.settings.metrics {
+                state.events_queue.clear();
+                state.flush_events_task.take();
+                state.first_event_date_time = None;
+                return Ok(());
+            }
             state.first_event_date_time = None;
             let events = mem::take(&mut state.events_queue);
             state.flush_events_task.take();
@@ -733,6 +752,7 @@ mod tests {
     use gpui::TestAppContext;
     use http_client::FakeHttpClient;
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use telemetry_events::FlexibleEvent;
     use util::rel_path::RelPath;
     use worktree::{PathChange, ProjectEntryId, WorktreeId};
@@ -742,7 +762,7 @@ mod tests {
         executor: BackgroundExecutor,
         cx: &mut TestAppContext,
     ) {
-        init_test(cx);
+        init_test_with_metrics(cx);
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
         let system_id = Some("system_id".to_string());
@@ -819,7 +839,7 @@ mod tests {
         executor: BackgroundExecutor,
         cx: &mut TestAppContext,
     ) {
-        init_test(cx);
+        init_test_with_metrics(cx);
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
         let system_id = Some("system_id".to_string());
@@ -868,7 +888,7 @@ mod tests {
 
     #[gpui::test]
     async fn test_report_remote_event_tags_origin(cx: &mut TestAppContext) {
-        init_test(cx);
+        init_test_with_metrics(cx);
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
 
@@ -941,7 +961,7 @@ mod tests {
 
     #[gpui::test]
     fn test_project_discovery_does_not_double_report(cx: &mut gpui::TestAppContext) {
-        init_test(cx);
+        init_test_with_metrics(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
@@ -965,7 +985,7 @@ mod tests {
 
     #[gpui::test]
     fn test_pnpm_project_discovery(cx: &mut gpui::TestAppContext) {
-        init_test(cx);
+        init_test_with_metrics(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
@@ -981,7 +1001,7 @@ mod tests {
 
     #[gpui::test]
     fn test_yarn_project_discovery(cx: &mut gpui::TestAppContext) {
-        init_test(cx);
+        init_test_with_metrics(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
@@ -997,7 +1017,7 @@ mod tests {
 
     #[gpui::test]
     fn test_dotnet_project_discovery(cx: &mut gpui::TestAppContext) {
-        init_test(cx);
+        init_test_with_metrics(cx);
 
         let clock = Arc::new(FakeSystemClock::new());
         let http = FakeHttpClient::with_200_response();
@@ -1048,15 +1068,164 @@ mod tests {
         );
     }
 
-    // TODO:
-    // Test settings
-    // Update FakeHTTPClient to keep track of the number of requests and assert on it
+    #[gpui::test]
+    fn test_telemetry_disabled_by_default(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        cx.update(|cx| {
+            let settings = TelemetrySettings::get_global(cx);
+            assert!(!settings.metrics);
+            assert!(!settings.diagnostics);
+        });
+    }
+
+    #[gpui::test]
+    fn test_telemetry_explicit_opt_in(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        cx.update(|cx| {
+            SettingsStore::update(cx, |store, cx| {
+                store.update_user_settings(cx, |content| {
+                    let telemetry = content.telemetry.get_or_insert_default();
+                    telemetry.metrics = Some(true);
+                    telemetry.diagnostics = Some(true);
+                });
+            });
+
+            let settings = TelemetrySettings::get_global(cx);
+            assert!(settings.metrics);
+            assert!(settings.diagnostics);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_telemetry_disabled_does_not_attempt_request(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (http, request_count) = request_counting_http_client();
+        let clock = Arc::new(FakeSystemClock::new());
+
+        let telemetry = cx.update(|cx| {
+            let telemetry = Telemetry::new(clock, http, cx);
+            telemetry.start(
+                Some("system_id".to_string()),
+                Some("installation_id".to_string()),
+                "session_id".to_string(),
+                cx,
+            );
+            telemetry.report_event(Event::Flexible(test_event()));
+            telemetry
+        });
+
+        assert!(is_empty_state(&telemetry));
+        telemetry.flush_events_inner().await.unwrap();
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+        assert!(is_empty_state(&telemetry));
+    }
+
+    #[gpui::test]
+    async fn test_telemetry_explicit_opt_in_attempts_request(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (http, request_count) = request_counting_http_client();
+        let clock = Arc::new(FakeSystemClock::new());
+        let telemetry = cx.update(|cx| Telemetry::new(clock, http, cx));
+
+        set_metrics_enabled(cx, true);
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            telemetry.start(
+                Some("system_id".to_string()),
+                Some("installation_id".to_string()),
+                "session_id".to_string(),
+                cx,
+            );
+            telemetry.report_event(Event::Flexible(test_event()));
+        });
+        telemetry.flush_events_inner().await.unwrap();
+
+        assert_eq!(request_count.load(Ordering::SeqCst), 1);
+        assert!(is_empty_state(&telemetry));
+    }
+
+    #[gpui::test]
+    async fn test_telemetry_disabled_discards_queued_events_without_request(
+        cx: &mut TestAppContext,
+    ) {
+        init_test_with_metrics(cx);
+        let (http, request_count) = request_counting_http_client();
+        let clock = Arc::new(FakeSystemClock::new());
+        let telemetry = cx.update(|cx| {
+            let telemetry = Telemetry::new(clock, http, cx);
+            telemetry.start(
+                Some("system_id".to_string()),
+                Some("installation_id".to_string()),
+                "session_id".to_string(),
+                cx,
+            );
+            telemetry.set_authenticated_user_info(Some("metrics_id".to_string()), true);
+            telemetry.report_event(Event::Flexible(test_event()));
+            telemetry
+        });
+
+        assert_eq!(telemetry.state.lock().events_queue.len(), 1);
+        assert!(telemetry.state.lock().flush_events_task.is_some());
+
+        set_metrics_enabled(cx, false);
+        cx.run_until_parked();
+
+        assert!(!telemetry.metrics_enabled());
+        assert!(telemetry.metrics_id().is_none());
+        assert!(telemetry.is_staff().is_none());
+        assert!(is_empty_state(&telemetry));
+
+        telemetry.flush_events_inner().await.unwrap();
+        assert_eq!(request_count.load(Ordering::SeqCst), 0);
+    }
 
     fn init_test(cx: &mut TestAppContext) {
         cx.update(|cx| {
             let settings_store = SettingsStore::test(cx);
             cx.set_global(settings_store);
         });
+    }
+
+    fn init_test_with_metrics(cx: &mut TestAppContext) {
+        init_test(cx);
+        set_metrics_enabled(cx, true);
+    }
+
+    fn set_metrics_enabled(cx: &mut TestAppContext, enabled: bool) {
+        cx.update(|cx| {
+            SettingsStore::update(cx, |store, cx| {
+                store.update_user_settings(cx, |content| {
+                    content.telemetry.get_or_insert_default().metrics = Some(enabled);
+                });
+            });
+        });
+    }
+
+    fn test_event() -> FlexibleEvent {
+        FlexibleEvent {
+            event_type: "test".to_string(),
+            event_properties: HashMap::new(),
+        }
+    }
+
+    fn request_counting_http_client() -> (Arc<HttpClientWithUrl>, Arc<AtomicUsize>) {
+        let request_count = Arc::new(AtomicUsize::new(0));
+        let http = FakeHttpClient::create({
+            let request_count = request_count.clone();
+            move |_| {
+                request_count.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    Ok(http_client::Response::builder()
+                        .status(200)
+                        .body(Default::default())
+                        .unwrap())
+                }
+            }
+        });
+        (http, request_count)
     }
 
     fn is_empty_state(telemetry: &Telemetry) -> bool {

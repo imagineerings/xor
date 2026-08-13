@@ -3,7 +3,7 @@
 [![Sim](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/simtropolis/sim/main/assets/badge/v0.json)](https://sim.dev)
 [![CI](https://github.com/simtropolis/sim/actions/workflows/run_tests.yml/badge.svg)](https://github.com/simtropolis/sim/actions/workflows/run_tests.yml)
 
-Welcome to Sim, a high-performance, multiplayer code editor from the creators of [Atom](https://github.com/atom/atom) and [Tree-sitter](https://github.com/tree-sitter/tree-sitter).
+Welcome to Sim, an open platform for agentic software development. A set of high-performance, multiplayer code editors designed specifically for your main programming language and related technology stack.
 
 ---
 

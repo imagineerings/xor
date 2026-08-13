@@ -1,0 +1,275 @@
+# Requirements: Collaborative Workspace and Buzz Consolidation
+
+## Problem
+
+Sim has mature native editor, project, Git, agent, ACP, remote-development and collaboration primitives. Buzz has a broader signed-event collaboration product and operational stack, but it is nested as a separate Rust/React/Tauri/mobile/web system. Shipping both unchanged would split identity, projects, conversations, agents, diffs and operational ownership. The product needs a native GPUI collaborative presentation and complete Buzz capability parity while converging each responsibility on one canonical Sim owner.
+
+## Scope
+
+### In scope
+
+- Every capability identified as CAP-001 through CAP-045 in `source-inventory.md`.
+- A first-shippable native vertical slice using existing Sim projects, ACP threads and diffs, with `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png` as its canonical visual references.
+- Complete protocol, service, data, client, operational and source-retirement migration.
+- Compatibility with existing signed events, identities, deployments, CLI scripts, mobile/web clients and stored data unless an approval gate explicitly authorizes a break.
+- Completing documented Buzz stubs or defects before declaring parity.
+
+### Out of scope
+
+- Product capabilities not present in Buzz or required to consolidate it with Sim.
+- Replacing Sim's editor, language tooling, local project/worktree model or Git implementation with Buzz equivalents.
+- Embedding the Buzz React/Tauri desktop in Sim.
+- Executing production deployment, deletion or irreversible cutover operations while creating or implementing this specification.
+
+## Glossary
+
+- **Canonical owner**: the only component permitted to author authoritative state for an aggregate after cutover.
+- **Compatibility adapter**: a boundary that preserves an external wire, file or process contract while translating to/from canonical state.
+- **Community**: the tenant/workspace boundary selected from trusted request context before authentication or data access.
+- **Collaborative Workspace**: Sim's native GPUI collaboration-oriented workspace presentation; it does not create a second project or data model.
+- **Parity**: all inventoried behavior passes reuse evidence or implementation/conformance tests, including security and failure semantics.
+- **Signed event log**: the immutable interoperable record for Nostr-authored collaboration events; relational projections derived from it are not independent authorities.
+
+## Requirements
+
+### Requirement 1: Exhaustive coverage governance
+
+**User story:** As a migration owner, I want every Buzz component tracked, so that parity cannot be claimed by overlooking difficult infrastructure or client behavior.
+
+#### Acceptance criteria
+
+1. **1.1** THE migration SHALL maintain stable capability IDs for every meaningful Buzz crate, service, migration, protocol extension, client feature area, deployment component, operational tool, example, benchmark and conformance artifact.
+2. **1.2** WHEN the Buzz source inventory changes, THEN CI SHALL fail until each new component maps to a canonical owner, disposition, requirement and leaf task or an approved evidence-backed not-applicable decision.
+3. **1.3** THE migration SHALL record known incomplete Buzz behavior as required completion work and SHALL NOT use an existing defect to omit the capability.
+4. **1.4** WHEN parity is reported, THEN THE report SHALL enumerate all capability IDs with passing reuse evidence, compatibility evidence or implementation validation and no unexplained state.
+
+### Requirement 2: Single canonical ownership
+
+**User story:** As a maintainer, I want one owner for each aggregate, so that users and services never reconcile permanent competing truths.
+
+#### Acceptance criteria
+
+1. **2.1** THE target architecture SHALL assign exactly one canonical authoring owner to projects, Git working state, messages, agent transcripts, identities, presence, workflows, media metadata and every other persisted aggregate.
+2. **2.2** IF a compatibility representation or derived projection exists, THEN THE system SHALL identify its canonical source, version, rebuild/reconciliation rule and drift signal.
+3. **2.3** WHERE temporary dual reads or writes are required, THE migration SHALL bound them by phase, reconcile deterministically, expose divergence, support rollback and include removal criteria.
+4. **2.4** THE final system SHALL run no hidden Buzz desktop, parallel agent runtime or second authoritative project, Git, message, transcript, identity, presence, workflow or session store.
+
+### Requirement 3: Reversible workspace presentation
+
+**User story:** As a Sim user, I want to choose the editor or collaborative presentation without forking my data, so that I can work in the mode appropriate to my task.
+
+#### Acceptance criteria
+
+1. **3.1** WHEN onboarding is shown, THEN Sim SHALL present “Editor Workspace” and “Collaborative Workspace” as clear choices and explain that both use the same underlying projects and data.
+2. **3.2** WHEN a choice is made, THEN Sim SHALL persist the presentation preference and open the selected presentation on subsequent launches.
+3. **3.3** WHEN the user switches presentation later, THEN Sim SHALL preserve project, worktree, Git, identity, credentials, agent session and collaboration state without copying or forking it.
+4. **3.4** IF an existing user has not selected Collaborative Workspace, THEN current Editor Workspace behavior SHALL remain unchanged.
+
+### Requirement 4: Native collaborative composition and accessibility
+
+**User story:** As a collaborator, I want a dense native workspace matching the reference images, so that conversation, activity and review form one coherent work surface.
+
+#### Acceptance criteria
+
+1. **4.1** WHILE Collaborative Workspace is active, THE GPUI layout SHALL provide a left navigation rail, participant/task top bar, central timeline/composer, optional resizable review pane and bottom/status surface with the hierarchy shown in `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png`.
+2. **4.2** WHEN the review pane is collapsed or the window narrows, THEN the timeline SHALL expand into the reference full-width composition without losing review state or navigation context.
+3. **4.3** THE workspace SHALL persist pane visibility/widths, active community/project/task, navigation history and relevant filters across restart.
+4. **4.4** THE workspace SHALL support keyboard navigation, visible focus, screen-reader labels, logical focus order, zoom, theme tokens, reduced motion and usable narrow-window behavior without hardcoded light-theme colors.
+5. **4.5** WHEN compared with the checked-in baselines at their native 1930×1262 and 1928×1298 viewports, THEN approved visual tests SHALL verify major geometry, typography, density, feed spacing, participant/state indicators and expanded/collapsed review compositions; replacement of either baseline SHALL require explicit visual-review approval.
+
+### Requirement 5: Protocol and signed-event interoperability
+
+**User story:** As an existing Buzz client or operator, I want established wire contracts preserved, so that migration does not strand clients or signed history.
+
+#### Acceptance criteria
+
+1. **5.1** THE system SHALL preserve verification and encoding semantics for all registered standard and Buzz event kinds, including replaceable/addressable head selection, exact tag grammars, privacy gates and ephemeral non-persistence.
+2. **5.2** WHEN a Nostr client uses supported NIP-01, NIP-11, NIP-29, NIP-42, NIP-45, NIP-50 or NIP-98 behavior, THEN the compatibility adapter SHALL produce protocol-equivalent results and failure frames.
+3. **5.3** WHEN a client uses NIP-AA, AE, AM, AO, AP, CW, DV, ER, GS, IA, MP, OA, PL, PMA, RS or WP, THEN the system SHALL preserve the documented security, ordering, encryption, visibility, version and degradation contracts.
+4. **5.4** IF a protocol version or event is unsupported or malformed, THEN the system SHALL reject or degrade exactly as its contract specifies, without fabricating canonical state.
+
+### Requirement 6: Communities, authentication and tenant isolation
+
+**User story:** As a community member or operator, I want all access scoped before it reaches storage, so that one community cannot observe or mutate another.
+
+#### Acceptance criteria
+
+1. **6.1** WHEN any WebSocket, HTTP, RPC, media, Git, search, workflow, push, pub/sub, mesh or administrative request arrives, THEN the system SHALL derive a typed community boundary from trusted connection/request context before authentication, authorization or data access.
+2. **6.2** WHEN a human, agent, token or service authenticates, THEN one authorization policy SHALL enforce community membership, roles, scopes, owner attestations, channel membership and resource permissions consistently across transports.
+3. **6.3** IF tenant context is missing, unknown, conflicting or derived from an untrusted payload, THEN the request SHALL fail closed without revealing existence, counts, timing-sensitive result sets or private metadata.
+4. **6.4** THE system SHALL preserve invite redemption, join-policy evidence, membership revocation, virtual agent membership, archival and administrative role semantics across mixed-version clients.
+
+### Requirement 7: Identity, profiles, credentials and signing
+
+**User story:** As a human or agent, I want a durable verifiable identity with safe key custody, so that my contributions remain attributable without exposing secrets.
+
+#### Acceptance criteria
+
+1. **7.1** THE system SHALL support human and agent Nostr identities, profiles, status, owner attestations, social lists and relay-scoped archival while retaining explicit bindings to Sim service accounts where required.
+2. **7.2** WHEN a signing key is imported, generated, paired, rotated, backed up or restored, THEN Sim's canonical credentials provider SHALL use protected storage, verify round trips, redact outputs and avoid deleting the prior source before successful verification.
+3. **7.3** IF protected key storage is unavailable or corrupt, THEN the system SHALL fail safely or use an explicitly documented owner-only fallback without silently generating a replacement identity.
+4. **7.4** WHEN an identity is archived, revoked or rotated, THEN historical authorship SHALL remain intact while active access, autocomplete, agent authorization and future signatures reflect the new state.
+
+### Requirement 8: Relay, realtime synchronization and recovery
+
+**User story:** As a collaborator, I want reliable realtime updates with visible recovery, so that temporary network or replica failures do not corrupt the workspace.
+
+#### Acceptance criteria
+
+1. **8.1** THE service SHALL support bounded authenticated connections, subscriptions, historical queries, live fan-out, counts, backpressure and cross-replica delivery without duplicate local echoes.
+2. **8.2** WHEN a client disconnects and reconnects, THEN it SHALL reauthenticate, refetch the authoritative head/window, rearm live subscriptions and reconcile optimistic/local items deterministically.
+3. **8.3** IF delivery, persistence, projection, pub/sub or replica freshness is partial or unavailable, THEN the UI and operator surfaces SHALL expose the affected scope, retry/recovery action and last trustworthy state.
+4. **8.4** THE system SHALL bound frames, queries, subscriptions, queues, retries and retained realtime state, and SHALL clean up connection, process and subscription resources on cancellation or shutdown.
+
+### Requirement 9: Communication, awareness, search and notification parity
+
+**User story:** As a team member, I want complete collaborative communication, so that humans and agents can coordinate without leaving the workspace.
+
+#### Acceptance criteria
+
+1. **9.1** THE system SHALL support Buzz channel types, membership/roles/invites, DMs, messages, replies, edits, deletions, reactions, pins, bookmarks, schedules, canvases, forum posts, custom emoji and entity links with equivalent visibility rules.
+2. **9.2** WHEN timelines or threads are paged, THEN rows, replies, aux events, summaries and bounds SHALL retain stable order and exact continuation under same-second events, deletions and concurrent live updates.
+3. **9.3** THE system SHALL synchronize read/unread/manual-unread state, drafts, reminders, presence and typing with documented privacy, expiry, cross-device and offline behavior.
+4. **9.4** WHEN search or discovery runs, THEN authorization and privacy exclusions SHALL be applied before limit/ranking, and results MAY compose with existing Sim file/project search without exposing private event content.
+5. **9.5** WHEN a native or push notification is emitted, THEN it SHALL be deduplicated, permission-aware and privacy-preserving; push payloads SHALL be wake-only and authoritative data SHALL be fetched after reconnect.
+
+### Requirement 10: Projects, Git forge and review parity
+
+**User story:** As a developer, I want project conversation and code review connected to canonical Git state, so that work and its rationale remain traceable.
+
+#### Acceptance criteria
+
+1. **10.1** THE system SHALL support cross-owner multi-repository projects and channel binding without granting project signers authority over member repositories.
+2. **10.2** THE system SHALL preserve NIP-34 repository, ref, patch, pull-request, issue and status interoperability plus NIP-98 Git authentication and Nostr commit/tag signing.
+3. **10.3** WHEN a branch, patch, review comment, CI result, approval or merge event changes, THEN the canonical collaboration timeline SHALL link that event to the relevant repository, commit, branch and native diff state.
+4. **10.4** WHEN reviewing agent or human changes, THEN the review surface SHALL reuse native unified/split diffs, file navigation, additions/deletions, keep/reject, stage and review actions where semantically valid and expose conflicts/staleness.
+
+### Requirement 11: Agent platform parity
+
+**User story:** As a human supervising agents, I want identities, runtimes and delegated work to compose with Sim's native ACP platform, so that agents are first-class collaborators without duplicate execution engines.
+
+#### Acceptance criteria
+
+1. **11.1** THE system SHALL accept supported ACP agents and MCP servers while using Sim's agent, ACP thread, tool-permission and process-lifecycle owners for native execution.
+2. **11.2** THE system SHALL support agent identities, owner attestations, managed agents, personas, teams, catalogs, runtime/model/provider/environment configuration and share/private projection rules.
+3. **11.3** THE system SHALL preserve encrypted engrams, private managed-agent state, snapshots, local archive and per-turn usage metrics with explicit ownership, retention, import/export and privacy semantics.
+4. **11.4** WHEN jobs or delegated tasks are requested, accepted, progressed, completed, cancelled or failed, THEN one idempotent state machine SHALL authorize the transition and expose it to humans and participating agents.
+5. **11.5** WHEN agents run locally, remotely or through a provider, THEN identity, permissions, cancellation, bounded liveness, presence, cleanup and result delivery SHALL remain equivalent apart from explicitly surfaced substrate capabilities.
+
+### Requirement 12: Semantic activity and supervision
+
+**User story:** As an agent supervisor, I want a legible semantic activity feed, so that I can understand progress, confidence and required intervention at a glance.
+
+#### Acceptance criteria
+
+1. **12.1** WHEN activity is received from ACP, NIP-AO, Git, workflow, CI, moderation or system sources, THEN every event SHALL map exactly once to a semantic presentation or truthful generic fallback.
+2. **12.2** THE feed SHALL lead with verb, object and outcome for messages, thoughts, plans, reads, searches, edits, shell commands, tests, permissions, errors and lifecycle changes, with detail and raw data behind progressive disclosure.
+3. **12.3** WHEN a running action changes state, THEN its existing feed item SHALL update in place from pending through terminal outcome without duplicate status rows.
+4. **12.4** IF an agent is idle, waiting, silent, timed out, cancelled, disconnected or failed, THEN the feed SHALL show that state and any required intervention rather than going blank.
+
+### Requirement 13: Workflows, approvals, audit and usage
+
+**User story:** As a team or auditor, I want automation and decisions to be durable and attributable, so that work can be reproduced and reviewed.
+
+#### Acceptance criteria
+
+1. **13.1** THE system SHALL support versioned workflow definitions, schedules, webhooks, event triggers, conditions, step actions and durable run state scoped to a community/project.
+2. **13.2** WHEN a workflow requires approval, THEN it SHALL suspend durably, expose the request, accept exactly one authorized grant/deny outcome and resume or terminate deterministically.
+3. **13.3** IF workflow evaluation, webhook delivery or an action fails, THEN the run SHALL record a bounded/redacted error, retry only under explicit policy and never bypass a permission or approval gate.
+4. **13.4** THE system SHALL maintain a per-community tamper-evident audit chain and privacy-preserving usage records for security-relevant, administrative, workflow and agent operations.
+
+### Requirement 14: Media, voice and huddles
+
+**User story:** As a collaborator, I want rich media and synchronous conversation integrated with project context, so that all relevant work remains in one workspace.
+
+#### Acceptance criteria
+
+1. **14.1** WHEN media is uploaded or downloaded, THEN the system SHALL authenticate, tenant-scope, validate type/size/content, store and render it without exposing object-store credentials or cross-community paths.
+2. **14.2** THE system SHALL preserve Blossom compatibility, attachment metadata, thumbnails, images, video and link-preview behavior through native Sim media renderers where possible.
+3. **14.3** WHEN a huddle starts, joins, leaves or ends, THEN lifecycle, participant, reaction, audio-control and transcript events SHALL remain consistent across the native transport and supported Buzz compatibility transport.
+4. **14.4** IF microphone, speaker, network, local voice model, transcription or TTS fails, THEN the UI SHALL expose the failed function, retain the huddle/conversation state and offer a safe retry or fallback.
+
+### Requirement 15: Moderation, retention, deletion and administration
+
+**User story:** As a community operator, I want enforceable lifecycle and safety controls, so that I can administer a community without violating privacy or losing recovery options.
+
+#### Acceptance criteria
+
+1. **15.1** THE system SHALL support reports, personal mutes, bans, timeouts, resolution, identity archive, community archive and role-gated administration with complete audit attribution.
+2. **15.2** WHEN retention or ephemeral expiry applies, THEN storage, search, caches, push queues and projections SHALL converge on the same deletion/visibility result under mixed versions and retries.
+3. **15.3** WHEN whole-community deletion is requested, THEN a durable state machine SHALL verify authority, expose progress, support recovery before irreversible work and prevent partial tenant reuse.
+4. **15.4** IF an administrative operation is unauthorized, stale, ambiguous or partially failed, THEN it SHALL fail closed and expose a redacted operator-safe diagnostic without weakening tenant isolation.
+
+### Requirement 16: Pairing, remote agents, shared compute and client surfaces
+
+**User story:** As a user across devices and compute locations, I want secure interoperable access, so that the same community and agents can work locally, remotely and from companion clients.
+
+#### Acceptance criteria
+
+1. **16.1** THE system SHALL preserve NIP-AB device pairing, QR/session expiry, replay protection and verified import into Sim's canonical credential store.
+2. **16.2** THE remote-agent provider boundary SHALL preserve discovery, hostile-output validation, secret/config separation, identity fail-closed, presence-as-status, bounded cleanup and at-most-one-instance semantics.
+3. **16.3** WHERE shared compute or relay mesh is enabled, THE system SHALL authenticate community membership, enforce approved resource/trust policy, fence stale peers and expose availability/failure without silently falling back to an unapproved provider.
+4. **16.4** THE agent-first CLI, web repository/invite client, mobile client and administration surfaces SHALL remain interoperable throughout migration and retain documented commands, URLs, deep links and exit/error contracts or an approved versioned replacement.
+
+### Requirement 17: Data migration, import and rollback
+
+**User story:** As an existing user or operator, I want all Buzz and Sim state migrated safely, so that upgrading does not lose work or identities.
+
+#### Acceptance criteria
+
+1. **17.1** BEFORE changing canonical ownership, THE migration SHALL inventory and version existing Buzz Postgres, Redis-derived, object-store, keyring/fallback, desktop archive/config, agent snapshot, event-sync and Sim persistence data.
+2. **17.2** WHEN an importer or schema migration runs, THEN it SHALL be resumable, idempotent, integrity-checked, tenant-scoped and observable, and SHALL preserve the original until verification passes.
+3. **17.3** IF migration verification or compatibility health fails before the point of no return, THEN operators SHALL be able to restore the prior binary/configuration and authoritative data without accepting divergent writes.
+4. **17.4** WHEN a temporary bridge, dual read or dual write is introduced, THEN the migration SHALL define precedence, reconciliation, divergence alerts, rollback and a dated removal gate.
+
+### Requirement 18: Compatibility, versioning and source retirement
+
+**User story:** As a client or automation owner, I want a predictable compatibility period, so that I can upgrade without coordinated downtime.
+
+#### Acceptance criteria
+
+1. **18.1** THE migration SHALL publish a compatibility matrix for Sim desktop versions, Buzz desktop/mobile/web/CLI versions, relay/service versions, protocol features and stored-schema versions.
+2. **18.2** WHEN a compatibility boundary changes, THEN clients SHALL negotiate or receive a clear minimum-version error before performing an incompatible write.
+3. **18.3** BEFORE retiring any Buzz component, THE system SHALL meet its parity, migration, traffic/usage, rollback-window, documentation and ownership exit criteria.
+4. **18.4** WHEN retirement completes, THEN `projects/buzz` SHALL be reference-only or removed according to approved licensing/history policy, and builds/releases SHALL no longer depend on its retired desktop or duplicate runtime implementations.
+
+### Requirement 19: Security, operations and release readiness
+
+**User story:** As an operator, I want the consolidated platform observable, bounded and deployable, so that expanded capability does not reduce security or reliability.
+
+#### Acceptance criteria
+
+1. **19.1** THE design SHALL threat-model signing keys, identity binding, untrusted events/content, provider binaries, MCP tools, webhooks, media, search, push, mesh, database access and cross-tenant timing/metadata leaks.
+2. **19.2** THE implementation SHALL preserve or strengthen frame/body/output limits, SSRF and redirect policy, secret redaction, sandbox/permission gates, TLS configuration, process cleanup, retention and least privilege.
+3. **19.3** THE consolidated services SHALL provide health/readiness, metrics, structured redacted logs, migration status, projection drift, queue/backpressure, replica freshness and compatibility-version observability.
+4. **19.4** WHEN deployed through local, Compose, Helm or release pipelines, THEN configuration/schema validation, signed artifacts, migration jobs, rollback inputs and platform packages SHALL follow Sim's canonical release conventions.
+5. **19.5** WHILE telemetry is disabled by Sim settings, THE collaborative workspace SHALL not re-enable client telemetry through Buzz-derived code; local operational logging and server observability SHALL remain available under their documented policies.
+
+### Requirement 20: Verification and final parity
+
+**User story:** As a reviewer, I want independent evidence for equivalence and native quality, so that the migration can be accepted without trusting implementation similarity.
+
+#### Acceptance criteria
+
+1. **20.1** THE verification program SHALL include focused unit, GPUI, integration, end-to-end, migration, compatibility, security, fault-injection, load and visual tests appropriate to each capability.
+2. **20.2** THE multitenant conformance checker and protocol fixtures SHALL remain independent of production reducers and SHALL run against both compatibility and consolidated service paths during migration.
+3. **20.3** WHEN behavior is reused unchanged from Sim, THEN parity SHALL require semantic evidence covering security, persistence, failure and user-visible behavior, not a matching component name.
+4. **20.4** THE migration SHALL NOT declare complete until every CAP ID and acceptance criterion has passing evidence, all approved migration/removal gates are satisfied, documented known Buzz gaps are completed or explicitly accepted, and no prohibited duplicate owner remains.
+
+## Constraints
+
+- The primary desktop implementation is native Rust/GPUI.
+- Lower-level domain, persistence and protocol modules must not depend on GPUI.
+- Use `./script/clippy`, repository Rust conventions and GPUI executor timers in GPUI tests.
+- Preserve Apache-2.0 notices and attribution for imported Buzz code within the GPL-3.0-or-later Sim repository.
+- Security and tenant boundaries fail closed; compatibility never weakens authorization.
+- Production mutations and source retirement require separate authorization.
+
+## Open questions requiring approval
+
+- ADR-001: final service/database consolidation topology.
+- ADR-002: Sim-account to Nostr-identity binding, recovery and organization policy.
+- ADR-003: hosted NIP-34 Git authority relative to external hosting providers.
+- ADR-004: native huddle transport and duration of Buzz audio compatibility.
+- ADR-005: required push platform set at first mobile cutover.
+- ADR-006: shared-compute trust, eligibility, resource and deployment policy.
