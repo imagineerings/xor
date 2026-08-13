@@ -7,7 +7,7 @@ use std::{
 use comfy_media::{
     NativeArtifactKind, NativeArtifactPayload, NativeAudioPayload, NativeCameraPayload,
     NativeCameraProjection, NativeCameraRole, NativeFile3DFormat, NativeFile3DPayload,
-    NativeFile3DRole, NativeVideoPayload,
+    NativeFile3DRole, NativeVideoBitDepth, NativeVideoPayload,
 };
 use comfy_nodes::{NativeHandleKind, NativeHandleType, NativeNodeContext, NativeStoredPayload};
 use comfy_plugin_sdk::{CanonicalTypeId, ProviderResultReceiptSet, ValueFamily};
@@ -195,8 +195,10 @@ enum ProviderNativePayload {
     },
     Video {
         frames: ProviderTensorData,
-        frame_rate_numerator: u32,
-        frame_rate_denominator: u32,
+        frame_rate_numerator: u64,
+        frame_rate_denominator: u64,
+        #[serde(default = "default_video_bit_depth")]
+        bit_depth: u8,
         audio: Option<ProviderAudioData>,
         alpha: Option<ProviderTensorData>,
         metadata: BTreeMap<String, String>,
@@ -225,6 +227,10 @@ enum ProviderNativePayload {
         semantic_digest_sha256: String,
         abi_bytes: Vec<u8>,
     },
+}
+
+const fn default_video_bit_depth() -> u8 {
+    NativeVideoBitDepth::Eight.bits()
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -268,6 +274,7 @@ impl ProviderNativePayload {
                 frames: ProviderTensorData::from_tensor(payload.frames())?,
                 frame_rate_numerator: payload.frame_rate().0,
                 frame_rate_denominator: payload.frame_rate().1,
+                bit_depth: payload.bit_depth().bits(),
                 audio: payload
                     .audio()
                     .map(|audio| {
@@ -362,6 +369,7 @@ impl ProviderNativePayload {
                 frames,
                 frame_rate_numerator,
                 frame_rate_denominator,
+                bit_depth,
                 audio,
                 alpha,
                 metadata,
@@ -371,6 +379,7 @@ impl ProviderNativePayload {
                     || !matches!(frames.shape.get(3), Some(1 | 3 | 4))
                     || *frame_rate_numerator == 0
                     || *frame_rate_denominator == 0
+                    || NativeVideoBitDepth::try_from(*bit_depth).is_err()
                     || metadata.len() > 128
                 {
                     return Err(ProviderMaterializationError::InvalidNativePayload);
@@ -481,6 +490,7 @@ impl ProviderNativePayload {
                 frames,
                 frame_rate_numerator,
                 frame_rate_denominator,
+                bit_depth,
                 audio,
                 alpha,
                 metadata,
@@ -491,6 +501,8 @@ impl ProviderNativePayload {
                         frames.materialize(context)?,
                         *frame_rate_numerator,
                         *frame_rate_denominator,
+                        NativeVideoBitDepth::try_from(*bit_depth)
+                            .map_err(|_| ProviderMaterializationError::InvalidNativePayload)?,
                         audio
                             .as_ref()
                             .map(|audio| materialize_audio(audio, context))
@@ -1424,7 +1436,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_native_image_round_trips_through_the_canonical_lower_owner()
+    fn provider_native_image_and_video_round_trip_through_the_canonical_lower_owners()
     -> Result<(), Box<dyn std::error::Error>> {
         let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
         let backend = Arc::new(backend);
@@ -1492,6 +1504,34 @@ mod tests {
             return Err("provider image changed stored payload variant".into());
         };
         assert_eq!(materialized.tensor().descriptor().shape(), [1, 1, 2, 3]);
+        let video = NativeStoredPayload::Video(Arc::new(NativeVideoPayload::checked(
+            materialized.tensor().clone(),
+            1_054_475_631_502_295,
+            35_184_372_088_832,
+            NativeVideoBitDepth::Ten,
+            None,
+            None,
+            BTreeMap::from([("source".to_owned(), "provider".to_owned())]),
+        )?));
+        let value = ProviderTransportValue::from_native_payload(
+            "comfy:video@1",
+            ValueFamily::Tensor,
+            &video,
+        )?;
+        let round_trip = value.materialize_native_payload(
+            &NativeHandleType::new(NativeHandleKind::Video, "VIDEO")?,
+            "plugin.fixture",
+            &context,
+        )?;
+        assert_eq!(video.digest_sha256(), round_trip.digest_sha256());
+        let NativeStoredPayload::Video(round_trip) = round_trip else {
+            return Err("provider video changed stored payload variant".into());
+        };
+        assert_eq!(round_trip.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            round_trip.frame_rate(),
+            (1_054_475_631_502_295, 35_184_372_088_832)
+        );
         Ok(())
     }
 

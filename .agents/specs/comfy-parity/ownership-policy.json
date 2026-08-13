@@ -9659,6 +9659,91 @@
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
     },
     {
+      "concern": "native_video_component_domain",
+      "canonical_owner": "comfy_media::NativeVideoPayload",
+      "owner_files": [
+        "crates/comfy_media/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoPayload",
+        "NativeVideoBitDepth"
+      ],
+      "allowed_adapters": [
+        "comfy_runtime::provider_materialization transports the canonical VIDEO component value without changing its frame rate, bit depth, tensors, audio, alpha, metadata, or digest",
+        "comfy_nodes::NativeStoredPayload projects the canonical VIDEO value into the existing sealed handle, digest, and residency boundary"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVideoPayload",
+          "role": "canonical",
+          "symbol": "NativeVideoPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVideoBitDepth",
+          "role": "canonical",
+          "symbol": "NativeVideoBitDepth"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoPayload",
+        "NativeVideoBitDepth"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-component-owner-retains-typed-depth-and-exact-rational-rate",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "pub enum NativeVideoBitDepth[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*greatest_common_divisor"
+        },
+        {
+          "name": "video-component-digest-binds-depth-rate-and-components",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "sim\\.comfy\\.media\\.video\\.v2[\\s\\S]*frame_rate_numerator\\.to_le_bytes[\\s\\S]*frame_rate_denominator\\.to_le_bytes[\\s\\S]*bit_depth\\.bits[\\s\\S]*hash_tensor\\(b\"frames\""
+        },
+        {
+          "name": "provider-transport-preserves-video-component-identity",
+          "path": "crates/comfy_runtime/src/provider_materialization.rs",
+          "pattern": "Video \\{[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*bit_depth: u8[\\s\\S]*bit_depth: payload\\.bit_depth\\(\\)\\.bits\\(\\)[\\s\\S]*NativeVideoBitDepth::try_from"
+        },
+        {
+          "name": "video-component-fixture-is-source-fingerprinted-and-codec-free",
+          "path": "crates/comfy_test_support/fixtures/video/components/manifest.json",
+          "pattern": "code-inferred-component-contract[\\s\\S]*exact_float_frame_rates[\\s\\S]*intentional_native_narrowing[\\s\\S]*codec_numeric_oracle"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-component-foundation"
+      ],
+      "production_consumers": [
+        "native VIDEO handles",
+        "provider-native VIDEO transport",
+        "future native video codec and frame-interpolation adapters"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeVideoPayload is the sole in-memory VIDEO component value. It owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, duration, dimensions, content identity, and alias-aware residency. Provider and stored-payload layers only transport or seal that value. Codec/container execution, filesystem paths, interpolation state, cache, persistence, and publication remain outside this concern."
+    },
+    {
       "concern": "native_node_registry",
       "canonical_owner": "comfy_runtime::NativeNodeRegistry for executable, provider-required, and unavailable binding state; comfy_runtime::NativeHandleStoreGeneration for canonical attempt sessions, staged objects, active-execution claims, handle leases, resolved-payload retention, generations, and unique resident allocation accounting; comfy_nodes::NodeRegistry for built-in catalog metadata; comfy_nodes::source_type and comfy_nodes::NativeStoredPayload for the exhaustive sealed value boundary; comfy_tensor for tensor payloads and the injected bounded shader executor; comfy_model for model and model-derived output payloads; comfy_sampler for control, diffusion, noise, guider, and sampler payloads; comfy_media for spatial and temporal annotation payloads; signature-verified comfy_plugin_sdk::PluginNode for component metadata",
       "owner_files": [

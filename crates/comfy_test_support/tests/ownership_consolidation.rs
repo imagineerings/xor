@@ -13503,6 +13503,65 @@ fn val_ownership_video_output_prefix_foundation_001() -> Result<(), Box<dyn std:
 }
 
 #[test]
+fn val_ownership_video_component_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+    for required in [
+        "pub enum NativeVideoBitDepth",
+        "frame_rate_numerator: u64",
+        "frame_rate_denominator: u64",
+        "sim.comfy.media.video.v2",
+        "greatest_common_divisor(frame_rate_numerator, frame_rate_denominator)",
+    ] {
+        assert!(
+            media.contains(required),
+            "VIDEO component owner lacks {required}"
+        );
+    }
+    let provider =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/provider_materialization.rs"))?;
+    assert!(provider.contains("bit_depth: payload.bit_depth().bits()"));
+    assert!(provider.contains("NativeVideoBitDepth::try_from(*bit_depth)"));
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/components/manifest.json"),
+    )?;
+    for required in [
+        "code-inferred-component-contract",
+        "1054475631502295",
+        "35184372088832",
+        "\"bit_depths\": [8, 10]",
+        "\"empty_component_video\": \"rejected\"",
+        "\"codec_numeric_oracle\": null",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VIDEO component fixture lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_component_domain")
+            })
+        })
+        .ok_or("missing VIDEO component ownership concern")?;
+    assert_eq!(
+        concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len),
+        Some(4)
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

@@ -1075,8 +1075,9 @@ impl NativeAudioPayload {
 #[derive(Clone, Debug)]
 pub struct NativeVideoPayload {
     frames: Tensor,
-    frame_rate_numerator: u32,
-    frame_rate_denominator: u32,
+    frame_rate_numerator: u64,
+    frame_rate_denominator: u64,
+    bit_depth: NativeVideoBitDepth,
     audio: Option<NativeAudioPayload>,
     alpha: Option<Tensor>,
     metadata: BTreeMap<String, String>,
@@ -1084,13 +1085,41 @@ pub struct NativeVideoPayload {
     resident_bytes: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeVideoBitDepth {
+    Eight,
+    Ten,
+}
+
+impl NativeVideoBitDepth {
+    pub const fn bits(self) -> u8 {
+        match self {
+            Self::Eight => 8,
+            Self::Ten => 10,
+        }
+    }
+}
+
+impl TryFrom<u8> for NativeVideoBitDepth {
+    type Error = NativeMediaPayloadError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            8 => Ok(Self::Eight),
+            10 => Ok(Self::Ten),
+            _ => Err(NativeMediaPayloadError::InvalidVideo),
+        }
+    }
+}
+
 impl NativeVideoPayload {
     pub const SOURCE_TYPE_ID: &'static str = "VIDEO";
 
     pub fn checked(
         frames: Tensor,
-        frame_rate_numerator: u32,
-        frame_rate_denominator: u32,
+        frame_rate_numerator: u64,
+        frame_rate_denominator: u64,
+        bit_depth: NativeVideoBitDepth,
         audio: Option<NativeAudioPayload>,
         alpha: Option<Tensor>,
         metadata: BTreeMap<String, String>,
@@ -1099,6 +1128,7 @@ impl NativeVideoPayload {
             &frames,
             frame_rate_numerator,
             frame_rate_denominator,
+            bit_depth,
             audio.as_ref(),
             alpha.as_ref(),
             &metadata,
@@ -1107,6 +1137,7 @@ impl NativeVideoPayload {
             &frames,
             frame_rate_numerator,
             frame_rate_denominator,
+            bit_depth,
             audio.as_ref(),
             alpha.as_ref(),
             &metadata,
@@ -1115,6 +1146,7 @@ impl NativeVideoPayload {
             frames,
             frame_rate_numerator,
             frame_rate_denominator,
+            bit_depth,
             audio,
             alpha,
             metadata,
@@ -1127,8 +1159,22 @@ impl NativeVideoPayload {
         &self.frames
     }
 
-    pub const fn frame_rate(&self) -> (u32, u32) {
+    pub const fn frame_rate(&self) -> (u64, u64) {
         (self.frame_rate_numerator, self.frame_rate_denominator)
+    }
+
+    pub const fn bit_depth(&self) -> NativeVideoBitDepth {
+        self.bit_depth
+    }
+
+    pub fn duration_seconds(&self) -> f64 {
+        let frames = self.frames.descriptor().shape()[0] as f64;
+        frames * self.frame_rate_denominator as f64 / self.frame_rate_numerator as f64
+    }
+
+    pub fn dimensions(&self) -> (u64, u64) {
+        let shape = self.frames.descriptor().shape();
+        (shape[2], shape[1])
     }
 
     pub const fn audio(&self) -> Option<&NativeAudioPayload> {
@@ -1179,6 +1225,7 @@ impl NativeVideoPayload {
             &self.frames,
             self.frame_rate_numerator,
             self.frame_rate_denominator,
+            self.bit_depth,
             self.audio.as_ref(),
             self.alpha.as_ref(),
             &self.metadata,
@@ -1187,6 +1234,7 @@ impl NativeVideoPayload {
             &self.frames,
             self.frame_rate_numerator,
             self.frame_rate_denominator,
+            self.bit_depth,
             self.audio.as_ref(),
             self.alpha.as_ref(),
             &self.metadata,
@@ -2439,8 +2487,9 @@ fn project_audio(
 
 fn validate_video(
     frames: &Tensor,
-    frame_rate_numerator: u32,
-    frame_rate_denominator: u32,
+    frame_rate_numerator: u64,
+    frame_rate_denominator: u64,
+    _bit_depth: NativeVideoBitDepth,
     audio: Option<&NativeAudioPayload>,
     alpha: Option<&Tensor>,
     metadata: &BTreeMap<String, String>,
@@ -2453,8 +2502,7 @@ fn validate_video(
         || !matches!(shape[3], 1 | 3 | 4)
         || frame_rate_numerator == 0
         || frame_rate_denominator == 0
-        || frame_rate_numerator > 1_000_000
-        || frame_rate_denominator > 1_000_000
+        || greatest_common_divisor(frame_rate_numerator, frame_rate_denominator) != 1
         || alpha.is_some_and(|alpha| {
             alpha.descriptor().dtype() != DType::F32
                 || alpha.descriptor().shape() != [shape[0], shape[1], shape[2], 1]
@@ -2489,19 +2537,30 @@ fn validate_video(
     Ok(())
 }
 
+fn greatest_common_divisor(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
 fn project_video(
     frames: &Tensor,
-    frame_rate_numerator: u32,
-    frame_rate_denominator: u32,
+    frame_rate_numerator: u64,
+    frame_rate_denominator: u64,
+    bit_depth: NativeVideoBitDepth,
     audio: Option<&NativeAudioPayload>,
     alpha: Option<&Tensor>,
     metadata: &BTreeMap<String, String>,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.v1")?;
+    let mut projection = Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.v2")?;
     projection.hasher.update(frame_rate_numerator.to_le_bytes());
     projection
         .hasher
         .update(frame_rate_denominator.to_le_bytes());
+    projection.hasher.update([bit_depth.bits()]);
     projection.hash_tensor(b"frames", frames)?;
     let mut storages = vec![frames];
     match audio {
@@ -3788,15 +3847,65 @@ mod tests {
             tensor(vec![2, 2, 2, 3], DType::U8, vec![17; 24])?,
             30_000,
             1_001,
+            NativeVideoBitDepth::Eight,
             None,
             None,
             BTreeMap::from([("codec".to_owned(), "fixture".to_owned())]),
         )?;
         video.validate()?;
         assert_eq!(video.frame_rate(), (30_000, 1_001));
+        assert_eq!(video.bit_depth(), NativeVideoBitDepth::Eight);
+        assert_eq!(video.dimensions(), (2, 2));
+        assert!((video.duration_seconds() - (2.0 * 1_001.0 / 30_000.0)).abs() < f64::EPSILON);
         assert_eq!(
             video.resident_parts()?.resident_bytes()?,
             video.resident_bytes()
+        );
+        let alpha = tensor(
+            vec![2, 2, 2, 1],
+            DType::F32,
+            f32_bytes(&[0.0, 0.25, 0.5, 1.0, 1.0, 0.5, 0.25, 0.0]),
+        )?;
+        let ten_bit = NativeVideoPayload::checked(
+            video.frames().clone(),
+            1_054_475_631_502_295,
+            35_184_372_088_832,
+            NativeVideoBitDepth::Ten,
+            Some(audio.clone()),
+            Some(alpha),
+            video.metadata().clone(),
+        )?;
+        assert_eq!(ten_bit.bit_depth().bits(), 10);
+        assert!(ten_bit.audio().is_some());
+        assert!(ten_bit.alpha().is_some());
+        assert_ne!(
+            video.semantic_digest_sha256(),
+            ten_bit.semantic_digest_sha256()
+        );
+        assert!(NativeVideoBitDepth::try_from(9).is_err());
+        assert!(
+            NativeVideoPayload::checked(
+                video.frames().clone(),
+                60,
+                2,
+                NativeVideoBitDepth::Eight,
+                None,
+                None,
+                BTreeMap::new(),
+            )
+            .is_err()
+        );
+        assert!(
+            NativeVideoPayload::checked(
+                video.frames().clone(),
+                30_000,
+                1_001,
+                NativeVideoBitDepth::Eight,
+                None,
+                Some(tensor(vec![1, 2, 2, 1], DType::F32, vec![0; 16])?),
+                BTreeMap::new(),
+            )
+            .is_err()
         );
 
         let svg = NativeArtifactPayload::checked(
