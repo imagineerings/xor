@@ -2879,6 +2879,84 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task395_gemma4_vision_has_one_retained_projection_owner =
+        production_source_occurrences(&sources, "pub struct NativeGemma4VisionEncoder {").len()
+            == 1
+            && production_source_occurrences(&sources, "fn gemma4_vision_attention(").len() == 1
+            && model_clip_text_encoder_multimodal.contains("patch_projection: NativeModule")
+            && model_clip_text_encoder_multimodal.contains("blocks: Vec<NativeGemma4VisionBlock>")
+            && model_clip_text_encoder_multimodal.contains("projector: NativeModule");
+    let task395_gemma4_vision_delegates_preparation_projection_and_residency =
+        model_clip_text_encoder_multimodal.contains("pub fn prepare_gemma4_visuals(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_patchify(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_add_positions(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_vision_attention(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_pool(")
+            && model_clip_text_encoder_multimodal.contains("resident_tensor_allocations(")
+            && model_clip_text_encoder_multimodal.contains("insert_gemma4_resident_allocation(")
+            && !model_clip_text_encoder_multimodal.contains("struct NativeGemma4Decoder")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task395_gemma4_vision_fixture_proves_exactness_aliasing_and_rollback =
+        model_clip_text_encoder_multimodal_tests
+            .contains("gemma4_retained_vision_projector_is_exact_alias_aware_and_transactional")
+            && model_clip_text_encoder_multimodal_tests.contains("gemma4_vision/manifest.json")
+            && model_clip_text_encoder_multimodal_tests.contains("storage_ids")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task395_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_projection_gemma4")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some(
+                    "comfy_model::clip_text_encoder_multimodal::NativeGemma4VisionEncoder",
+                )
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some(
+                                    "comfy-parity-native-gemma4-vision-projection-foundation",
+                                )
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma4-vision-retains-complete-closed-three-profile-graph",
+                            "gemma4-vision-executes-clipped-rope-attention-pooling-and-projector-order",
+                            "gemma4-vision-consumes-canonical-image-video-soft-budgets",
+                            "gemma4-vision-binds-source-semantic-state-and-size-checked-storage-residency",
+                            "gemma4-vision-tests-reduced-exactness-aliasing-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task395_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_text_media_projection_gemma4,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma4-vision-projection-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner =
         production_source_occurrences(&sources, "pub struct Qwen35LinearWeights {").len() == 1
             && production_source_occurrences(&sources, "fn forward_linear_attention(").len() == 1
@@ -9431,6 +9509,22 @@ fn run_ownership_validation(
             task394_gemma3_vision_fixture_proves_exactness_aliasing_and_rollback,
         ),
         (
+            "task395_policy_and_catalog_trace_gemma4_vision",
+            task395_policy_trace && task395_catalog_trace,
+        ),
+        (
+            "task395_gemma4_vision_has_one_retained_projection_owner",
+            task395_gemma4_vision_has_one_retained_projection_owner,
+        ),
+        (
+            "task395_gemma4_vision_delegates_preparation_projection_and_residency",
+            task395_gemma4_vision_delegates_preparation_projection_and_residency,
+        ),
+        (
+            "task395_gemma4_vision_fixture_proves_exactness_aliasing_and_rollback",
+            task395_gemma4_vision_fixture_proves_exactness_aliasing_and_rollback,
+        ),
+        (
             "task385_policy_and_catalog_trace_qwen35_hybrid_decoder",
             task385_policy_trace && task385_catalog_trace,
         ),
@@ -10082,6 +10176,17 @@ fn val_ownership_task394_gemma3_vision_001() -> Result<(), Box<dyn std::error::E
         "val-ownership-task394-gemma3-vision-001.json",
         "val_ownership_task394_gemma3_vision_001",
         Some("task394_"),
+    )
+}
+
+#[test]
+fn val_ownership_task395_gemma4_vision_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task395-gemma4-retained-vision-projection-ownership",
+        "val-ownership-task395-gemma4-vision-001.json",
+        "val_ownership_task395_gemma4_vision_001",
+        Some("task395_"),
     )
 }
 

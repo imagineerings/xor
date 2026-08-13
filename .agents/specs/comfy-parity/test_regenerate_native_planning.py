@@ -215,6 +215,29 @@ class ValidationGenerationTests(unittest.TestCase):
             [gemma3_vision_id],
         )
         self.assertEqual(
+            tasks_by_id[gemma4_vision_id]["validations"],
+            [
+                "VAL-CLIP-001",
+                "VAL-TENSOR-001",
+                "VAL-MODEL-FAMILY-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+        )
+        self.assertIn(
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            tasks_by_id[gemma4_vision_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/attention.rs",
+            tasks_by_id[gemma4_vision_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_vision",
+            tasks_by_id[gemma4_vision_id]["writes"],
+        )
+        self.assertEqual(
             tasks_by_id[gemma4_audio_id]["dependencies"],
             [gemma4_vision_id],
         )

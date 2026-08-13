@@ -9800,8 +9800,11 @@ def native_gemma4_vision_projection_foundation_task(dependency: str) -> dict[str
         "A retained Gemma4 vision owner admits and executes exact patch projection, learned positions, two-axis RoPE, attention, pooling, and multimodal projector tensors for E2B, E4B, and 31B while consuming canonical image/video preparation and exposing content identity and alias-aware residency.",
         [
             "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/llama.py",
+            "crates/comfy_model/src/attention.rs",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/image_video/manifest.json",
         ],
         [
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",

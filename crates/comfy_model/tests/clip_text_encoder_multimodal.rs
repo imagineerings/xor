@@ -6,16 +6,18 @@ use comfy_model::{
     GEMMA3_MULTIMODAL_SOURCE_SHA256, GEMMA4_AUDIO_FFT_LENGTH, GEMMA4_AUDIO_FRAME_LENGTH,
     GEMMA4_AUDIO_FRAME_STEP, GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE, GEMMA4_AUDIO_MAXIMUM_TOKENS,
     GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, GEMMA4_AUDIO_SAMPLE_RATE,
-    GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS,
-    Gemma3VisionConfiguration, Gemma3VisionProfile, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
-    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
+    GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_MULTIMODAL_SOURCE_PATH, GEMMA4_MULTIMODAL_SOURCE_SHA256,
+    GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS, Gemma3VisionConfiguration,
+    Gemma3VisionProfile, Gemma4ClippedLinearWeights, Gemma4VisionBlockWeights,
+    Gemma4VisionConfiguration, Gemma4VisionProfile, Gemma4VisionWeights, GemmaPreparedVisualKind,
+    IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
-    NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector, NativeModelPayload,
-    NativePromptTokenizer, NativeQwenMultimodal, NativeQwenVisionEncoder,
-    NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
-    QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH,
-    QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
+    NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector,
+    NativeGemma4VisionEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
+    NativeQwenVisionEncoder, NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH,
+    OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN,
+    QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
     QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
     QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
     QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
@@ -269,6 +271,192 @@ fn reduced_qwen_vision_weights(
         blocks,
         merger,
         deepstack_mergers,
+    })
+}
+
+fn reduced_gemma4_clipped_linear(
+    backend: &CpuBackend,
+    input: usize,
+    output: usize,
+    scale: f32,
+    minimum: &Tensor,
+    maximum: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Gemma4ClippedLinearWeights, Box<dyn Error>> {
+    let mut values = vec![0.0_f32; input * output];
+    for row in 0..output {
+        for column in 0..input {
+            values[row * input + column] =
+                scale * (1.0 + ((row * input + column) % 7) as f32 * 0.125);
+        }
+    }
+    Ok(Gemma4ClippedLinearWeights {
+        weight: tensor(
+            backend,
+            &[u64::try_from(output)?, u64::try_from(input)?],
+            &values,
+            context,
+        )?,
+        input_minimum: minimum.clone(),
+        input_maximum: maximum.clone(),
+        output_minimum: minimum.clone(),
+        output_maximum: maximum.clone(),
+    })
+}
+
+fn reduced_gemma4_vision_weights(
+    backend: &CpuBackend,
+    configuration: &Gemma4VisionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Gemma4VisionWeights, Box<dyn Error>> {
+    let hidden = configuration.hidden_size;
+    let intermediate = configuration.intermediate_size;
+    let patch_width = 3 * configuration.patch_size * configuration.patch_size;
+    let minimum = filled_tensor(backend, &[1], -8.0, context)?;
+    let maximum = filled_tensor(backend, &[1], 8.0, context)?;
+    let mut patch_values = vec![0.0_f32; hidden * patch_width];
+    for output in 0..hidden {
+        for source in 0..patch_width {
+            patch_values[output * patch_width + source] =
+                0.0005 * (1.0 + ((source + output * 3) % 11) as f32);
+        }
+    }
+    let mut position_values = vec![0.0_f32; 2 * configuration.position_embeddings * hidden];
+    for axis in 0..2 {
+        for position in 0..configuration.position_embeddings {
+            for feature in 0..hidden {
+                position_values
+                    [(axis * configuration.position_embeddings + position) * hidden + feature] =
+                    axis as f32 * 0.003 + position as f32 * 0.0002 + feature as f32 * 0.0001;
+            }
+        }
+    }
+    let mut blocks = Vec::new();
+    for layer in 0..configuration.layer_count {
+        let scale = 0.01 + layer as f32 * 0.001;
+        blocks.push(Gemma4VisionBlockWeights {
+            input_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            query: reduced_gemma4_clipped_linear(
+                backend, hidden, hidden, scale, &minimum, &maximum, context,
+            )?,
+            key: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 1.1,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            value: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 1.2,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            query_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(configuration.head_dimension)?],
+                1.0,
+                context,
+            )?,
+            key_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(configuration.head_dimension)?],
+                1.0,
+                context,
+            )?,
+            attention_output: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 0.7,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            post_attention_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            pre_feed_forward_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            feed_forward_gate: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                intermediate,
+                scale * 0.6,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            feed_forward_up: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                intermediate,
+                scale * 0.5,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            feed_forward_down: reduced_gemma4_clipped_linear(
+                backend,
+                intermediate,
+                hidden,
+                scale * 0.4,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            post_feed_forward_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+        });
+    }
+    Ok(Gemma4VisionWeights {
+        patch_projection_weight: tensor(
+            backend,
+            &[u64::try_from(hidden)?, u64::try_from(patch_width)?],
+            &patch_values,
+            context,
+        )?,
+        position_embedding: tensor(
+            backend,
+            &[
+                2,
+                u64::try_from(configuration.position_embeddings)?,
+                u64::try_from(hidden)?,
+            ],
+            &position_values,
+            context,
+        )?,
+        blocks,
+        projector_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(configuration.output_hidden_size)?,
+                u64::try_from(hidden)?,
+            ],
+            0.075,
+            context,
+        )?,
     })
 }
 
@@ -926,6 +1114,153 @@ fn gemma3_retained_vision_projector_is_exact_alias_aware_and_transactional()
     assert!(owner.project(&backend, &prepared, &constrained).is_err());
     assert_eq!(constrained.scratch.in_use_bytes(), 0);
     drop(prepared);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma4_retained_vision_projector_is_exact_alias_aware_and_transactional()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_vision/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("workspace root is unavailable")?;
+    assert_eq!(
+        format!(
+            "{:x}",
+            Sha256::digest(fs::read(workspace.join(GEMMA4_MULTIMODAL_SOURCE_PATH))?)
+        ),
+        GEMMA4_MULTIMODAL_SOURCE_SHA256
+    );
+    assert_eq!(
+        Gemma4VisionConfiguration::source(Gemma4VisionProfile::E2B).output_hidden_size,
+        1_536
+    );
+    assert_eq!(
+        Gemma4VisionConfiguration::source(Gemma4VisionProfile::E4B).output_hidden_size,
+        2_560
+    );
+    let thirty_one = Gemma4VisionConfiguration::source(Gemma4VisionProfile::ThirtyOneB);
+    assert_eq!(thirty_one.hidden_size, 1_152);
+    assert_eq!(thirty_one.output_hidden_size, 5_376);
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 60 * 1024 * 1024)?;
+    let configuration = Gemma4VisionConfiguration::reduced_fixture(
+        Gemma4VisionProfile::E4B,
+        4,
+        6,
+        1,
+        1,
+        4,
+        16,
+        64,
+        3,
+        3,
+    );
+    let owner = NativeGemma4VisionEncoder::new(
+        configuration.clone(),
+        reduced_gemma4_vision_weights(&backend, &configuration, &setup)?,
+    )?;
+    let source = ImageTensor::from_f32(&backend, &setup, 1, 1, 1, 3, &[0.2, 0.5, 0.9])?;
+    let prepared_video = prepare_gemma4_visuals(&backend, None, Some(&source), &setup)?;
+    assert_eq!(prepared_video[0].image().dimensions()?, (1, 384, 384, 3));
+    assert_eq!(
+        prepared_video[0].image().as_f32_slice()?.len(),
+        384 * 384 * 3
+    );
+    let video = owner.project(&backend, &prepared_video[0], &setup)?;
+    assert_eq!(video.kind, GemmaPreparedVisualKind::Gemma4VideoFrame);
+    assert_eq!(video.tokens, 64);
+    assert_eq!(video.embedding.descriptor().shape(), &[64, 3]);
+    let video_values = tensor_to_f32(&backend, &video.embedding, &setup)?;
+    let output_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            video_values
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(
+        output_digest,
+        manifest["reduced_fixture"]["video_output_f32le_sha256"]
+            .as_str()
+            .ok_or("Gemma4 video fixture digest is missing")?
+    );
+    drop(video_values);
+
+    let prepared_image = prepare_gemma4_visuals(&backend, Some(&source), None, &setup)?;
+    let image = owner.project(&backend, &prepared_image[0], &setup)?;
+    assert_eq!(image.kind, GemmaPreparedVisualKind::Gemma4Image);
+    assert_eq!(image.tokens, 256);
+    assert_eq!(image.embedding.descriptor().shape(), &[256, 3]);
+
+    let allocations = owner.resident_tensor_allocations()?;
+    let storage_ids = allocations
+        .iter()
+        .map(|(storage_id, _)| *storage_id)
+        .collect::<Vec<_>>();
+    assert!(storage_ids.iter().enumerate().all(|(index, storage_id)| {
+        !storage_ids[..index].iter().any(|prior| prior == storage_id)
+    }));
+    assert_eq!(
+        owner.semantic_state_digest_sha256(),
+        owner.clone().semantic_state_digest_sha256()
+    );
+    let mut changed_weights = reduced_gemma4_vision_weights(&backend, &configuration, &setup)?;
+    changed_weights.projector_weight = filled_tensor(&backend, &[3, 4], 0.076, &setup)?;
+    let changed = NativeGemma4VisionEncoder::new(configuration.clone(), changed_weights)?;
+    assert_ne!(
+        owner.semantic_state_digest_sha256(),
+        changed.semantic_state_digest_sha256()
+    );
+    let mut forged = Gemma4VisionConfiguration::source(Gemma4VisionProfile::E4B);
+    forged.rotary_theta_bits = 10_000.0_f32.to_bits();
+    assert!(
+        NativeGemma4VisionEncoder::new(
+            forged,
+            reduced_gemma4_vision_weights(&backend, &configuration, &setup)?,
+        )
+        .is_err()
+    );
+
+    let gemma3 = prepare_gemma3_image(&backend, &source, &setup)?;
+    assert!(owner.project(&backend, &gemma3, &setup).is_err());
+    drop(video);
+    drop(image);
+    drop(prepared_video);
+    drop(prepared_image);
+    drop(gemma3);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 60 * 1024 * 1024)?;
+    let prepared_video = prepare_gemma4_visuals(&backend, None, Some(&source), &setup)?;
+    assert!(
+        owner
+            .project(&backend, &prepared_video[0], &cancelled_context)
+            .is_err()
+    );
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    let constrained = context(&authority, &cancellation, 16)?;
+    assert!(
+        owner
+            .project(&backend, &prepared_video[0], &constrained)
+            .is_err()
+    );
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    drop(prepared_video);
+    drop(source);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }

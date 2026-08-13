@@ -1,7 +1,7 @@
 use crate::{
-    AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
-    BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest, ClipTextError,
-    ClipTextOutput, ClipTextRequest, ClipVisionActivation, ClipVisionConfiguration,
+    AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
+    AttentionRequest, BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest,
+    ClipTextError, ClipTextOutput, ClipTextRequest, ClipVisionActivation, ClipVisionConfiguration,
     ClipVisionError, ClipVisionIntermediate, ClipVisionModelType, ClipVisionOutput,
     DecoderArchitecture, DecoderLayerKind, DecoderPreparedDeepstack,
     DecoderPreparedGenerationPrompt, DecoderRopePositions, DecoderTextConfiguration,
@@ -79,6 +79,10 @@ pub const GEMMA3_IMAGE_SOFT_TOKENS: usize = 256;
 pub const GEMMA3_MULTIMODAL_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/lt.py";
 pub const GEMMA3_MULTIMODAL_SOURCE_SHA256: &str =
     "9ddf9e68c4afd1cf848f881b7489abb49d37ac8ad6d5d2893eba4f98c9c37ca2";
+pub const GEMMA4_MULTIMODAL_SOURCE_PATH: &str =
+    "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py";
+pub const GEMMA4_MULTIMODAL_SOURCE_SHA256: &str =
+    "c6ffbb2fbecd8f97e781a654a06ccf3910dc670867d38c0ce30542312f00cde6";
 pub const GEMMA4_IMAGE_PATCH_SIZE: u64 = 16;
 pub const GEMMA4_IMAGE_POOLING_SIZE: u64 = 3;
 pub const GEMMA4_IMAGE_SOFT_TOKENS: usize = 280;
@@ -595,6 +599,201 @@ pub struct NativeGemma3VisionProjector {
 pub struct Gemma3VisionProjection {
     pub embedding: Tensor,
     pub tokens_per_image: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gemma4VisionProfile {
+    E2B,
+    E4B,
+    ThirtyOneB,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Gemma4VisionConfiguration {
+    pub profile: Gemma4VisionProfile,
+    pub hidden_size: usize,
+    pub intermediate_size: usize,
+    pub layer_count: usize,
+    pub attention_heads: usize,
+    pub head_dimension: usize,
+    pub patch_size: usize,
+    pub position_embeddings: usize,
+    pub pooling_kernel_size: usize,
+    pub output_hidden_size: usize,
+    pub normalization_epsilon_bits: u32,
+    pub rotary_theta_bits: u32,
+    pub source_exact_profile: bool,
+}
+
+impl Gemma4VisionConfiguration {
+    pub fn source(profile: Gemma4VisionProfile) -> Self {
+        let (hidden_size, intermediate_size, layer_count, attention_heads, head_dimension) =
+            match profile {
+                Gemma4VisionProfile::E2B | Gemma4VisionProfile::E4B => (768, 3072, 16, 12, 64),
+                Gemma4VisionProfile::ThirtyOneB => (1152, 4304, 27, 16, 72),
+            };
+        Self {
+            profile,
+            hidden_size,
+            intermediate_size,
+            layer_count,
+            attention_heads,
+            head_dimension,
+            patch_size: 16,
+            position_embeddings: 10_240,
+            pooling_kernel_size: 3,
+            output_hidden_size: match profile {
+                Gemma4VisionProfile::E2B => 1536,
+                Gemma4VisionProfile::E4B => 2560,
+                Gemma4VisionProfile::ThirtyOneB => 5376,
+            },
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            rotary_theta_bits: 100.0_f32.to_bits(),
+            source_exact_profile: true,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn reduced_fixture(
+        profile: Gemma4VisionProfile,
+        hidden_size: usize,
+        intermediate_size: usize,
+        layer_count: usize,
+        attention_heads: usize,
+        head_dimension: usize,
+        patch_size: usize,
+        position_embeddings: usize,
+        pooling_kernel_size: usize,
+        output_hidden_size: usize,
+    ) -> Self {
+        Self {
+            profile,
+            hidden_size,
+            intermediate_size,
+            layer_count,
+            attention_heads,
+            head_dimension,
+            patch_size,
+            position_embeddings,
+            pooling_kernel_size,
+            output_hidden_size,
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            rotary_theta_bits: 100.0_f32.to_bits(),
+            source_exact_profile: false,
+        }
+    }
+
+    fn validate(&self) -> Result<(), MultimodalTextError> {
+        if self.hidden_size == 0
+            || self.intermediate_size == 0
+            || self.layer_count == 0
+            || self.attention_heads == 0
+            || self.head_dimension == 0
+            || self.patch_size == 0
+            || self.position_embeddings == 0
+            || self.pooling_kernel_size == 0
+            || self.output_hidden_size == 0
+            || !self.head_dimension.is_multiple_of(4)
+            || self.hidden_size
+                != self
+                    .attention_heads
+                    .checked_mul(self.head_dimension)
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Gemma4 vision attention width",
+                    ))?
+            || !f32::from_bits(self.normalization_epsilon_bits).is_finite()
+            || f32::from_bits(self.normalization_epsilon_bits) <= 0.0
+            || !f32::from_bits(self.rotary_theta_bits).is_finite()
+            || f32::from_bits(self.rotary_theta_bits) <= 0.0
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision configuration dimensions are invalid",
+            ));
+        }
+        if self.source_exact_profile && self != &Self::source(self.profile) {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 production vision configuration does not match its closed source profile",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4ClippedLinearWeights {
+    pub weight: Tensor,
+    pub input_minimum: Tensor,
+    pub input_maximum: Tensor,
+    pub output_minimum: Tensor,
+    pub output_maximum: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4VisionBlockWeights {
+    pub input_normalization_weight: Tensor,
+    pub query: Gemma4ClippedLinearWeights,
+    pub key: Gemma4ClippedLinearWeights,
+    pub value: Gemma4ClippedLinearWeights,
+    pub query_normalization_weight: Tensor,
+    pub key_normalization_weight: Tensor,
+    pub attention_output: Gemma4ClippedLinearWeights,
+    pub post_attention_normalization_weight: Tensor,
+    pub pre_feed_forward_normalization_weight: Tensor,
+    pub feed_forward_gate: Gemma4ClippedLinearWeights,
+    pub feed_forward_up: Gemma4ClippedLinearWeights,
+    pub feed_forward_down: Gemma4ClippedLinearWeights,
+    pub post_feed_forward_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4VisionWeights {
+    pub patch_projection_weight: Tensor,
+    pub position_embedding: Tensor,
+    pub blocks: Vec<Gemma4VisionBlockWeights>,
+    pub projector_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4ClippedLinear {
+    linear: NativeModule,
+    input_minimum: Tensor,
+    input_maximum: Tensor,
+    output_minimum: Tensor,
+    output_maximum: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4VisionBlock {
+    input_normalization_weight: Tensor,
+    query: NativeGemma4ClippedLinear,
+    key: NativeGemma4ClippedLinear,
+    value: NativeGemma4ClippedLinear,
+    query_normalization_weight: Tensor,
+    key_normalization_weight: Tensor,
+    attention_output: NativeGemma4ClippedLinear,
+    post_attention_normalization_weight: Tensor,
+    pre_feed_forward_normalization_weight: Tensor,
+    feed_forward_gate: NativeGemma4ClippedLinear,
+    feed_forward_up: NativeGemma4ClippedLinear,
+    feed_forward_down: NativeGemma4ClippedLinear,
+    post_feed_forward_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeGemma4VisionEncoder {
+    configuration: Gemma4VisionConfiguration,
+    patch_projection: NativeModule,
+    position_embedding: Tensor,
+    blocks: Vec<NativeGemma4VisionBlock>,
+    projector: NativeModule,
+    semantic_state_digest_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4VisionProjection {
+    pub embedding: Tensor,
+    pub tokens: usize,
+    pub kind: GemmaPreparedVisualKind,
 }
 
 impl GemmaPreparedAudio {
@@ -2583,6 +2782,384 @@ pub fn plan_qwen_markers(
     })
 }
 
+impl NativeGemma4VisionEncoder {
+    pub fn new(
+        configuration: Gemma4VisionConfiguration,
+        weights: Gemma4VisionWeights,
+    ) -> Result<Self, MultimodalTextError> {
+        configuration.validate()?;
+        if weights.blocks.len() != configuration.layer_count {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision block count does not match the closed profile",
+            ));
+        }
+        let stream = weights.patch_projection_weight.descriptor().stream();
+        let patch_width = 3_usize
+            .checked_mul(configuration.patch_size)
+            .and_then(|value| value.checked_mul(configuration.patch_size))
+            .ok_or(MultimodalTextError::Overflow("Gemma4 patch width"))?;
+        let patch_projection = gemma4_linear_module(
+            "gemma4_vision.patch_projection",
+            patch_width,
+            configuration.hidden_size,
+            weights.patch_projection_weight,
+            stream,
+        )?;
+        gemma4_require_parameter_shape(
+            &weights.position_embedding,
+            &[
+                2,
+                configuration.position_embeddings,
+                configuration.hidden_size,
+            ],
+            stream,
+        )?;
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(configuration.layer_count)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 vision blocks"))?;
+        for (index, weights) in weights.blocks.into_iter().enumerate() {
+            blocks.push(gemma4_vision_block(index, &configuration, weights, stream)?);
+        }
+        let projector = gemma4_linear_module(
+            "gemma4_vision.projector",
+            configuration.hidden_size,
+            configuration.output_hidden_size,
+            weights.projector_weight,
+            stream,
+        )?;
+        let mut owner = Self {
+            configuration,
+            patch_projection,
+            position_embedding: weights.position_embedding,
+            blocks,
+            projector,
+            semantic_state_digest_sha256: String::new(),
+        };
+        owner.semantic_state_digest_sha256 =
+            owner.project_semantic_state_digest(&comfy_types::CancellationToken::default())?;
+        owner.validate(&comfy_types::CancellationToken::default())?;
+        Ok(owner)
+    }
+
+    pub fn configuration(&self) -> &Gemma4VisionConfiguration {
+        &self.configuration
+    }
+
+    pub fn execution_stream(&self) -> StreamId {
+        self.position_embedding.descriptor().stream()
+    }
+
+    pub fn semantic_state_digest_sha256(&self) -> &str {
+        &self.semantic_state_digest_sha256
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        self.configuration.validate()?;
+        if self.blocks.len() != self.configuration.layer_count {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 retained vision block count changed after admission",
+            ));
+        }
+        if self.semantic_state_digest_sha256 != self.project_semantic_state_digest(cancellation)? {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision semantic identity changed after admission",
+            ));
+        }
+        self.resident_bytes()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = Vec::new();
+        insert_gemma4_resident_allocation(
+            &mut allocations,
+            self.position_embedding.storage_id(),
+            self.position_embedding.storage_byte_len(),
+        )?;
+        for (_, module) in self.named_modules() {
+            for (storage_id, bytes) in module.resident_tensor_allocations() {
+                insert_gemma4_resident_allocation(&mut allocations, storage_id, bytes)?;
+            }
+        }
+        for tensor in self.named_tensors() {
+            insert_gemma4_resident_allocation(
+                &mut allocations,
+                tensor.storage_id(),
+                tensor.storage_byte_len(),
+            )?;
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let block_bytes = self
+            .blocks
+            .capacity()
+            .checked_mul(mem::size_of::<NativeGemma4VisionBlock>())
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 vision block residency",
+            ))?;
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .ok()
+            .and_then(|bytes| {
+                u64::try_from(block_bytes)
+                    .ok()
+                    .and_then(|part| bytes.checked_add(part))
+            })
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(self.semantic_state_digest_sha256.capacity()).ok()?)
+            })
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 vision owned residency",
+            ))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, allocation)| {
+                    total
+                        .checked_add(allocation)
+                        .ok_or(MultimodalTextError::Overflow(
+                            "Gemma4 vision module tensor residency",
+                        ))
+                },
+            )?;
+            bytes = bytes
+                .checked_add(
+                    module
+                        .resident_storage_bytes()?
+                        .checked_sub(tensor_bytes)
+                        .ok_or(MultimodalTextError::Overflow(
+                            "Gemma4 vision module residency projection",
+                        ))?,
+                )
+                .ok_or(MultimodalTextError::Overflow(
+                    "Gemma4 vision module residency",
+                ))?;
+        }
+        Ok(bytes)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |total, (_, bytes)| {
+                total
+                    .checked_add(bytes)
+                    .ok_or(MultimodalTextError::Overflow("Gemma4 vision residency"))
+            },
+        )
+    }
+
+    pub fn project(
+        &self,
+        backend: &CpuBackend,
+        prepared: &GemmaPreparedVisual,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Gemma4VisionProjection, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let expected_soft_tokens = match prepared.kind() {
+            GemmaPreparedVisualKind::Gemma4Image => GEMMA4_IMAGE_SOFT_TOKENS,
+            GemmaPreparedVisualKind::Gemma4VideoFrame => GEMMA4_VIDEO_SOFT_TOKENS,
+            GemmaPreparedVisualKind::Gemma3Image => {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma4 vision cannot consume Gemma3 image preparation",
+                ));
+            }
+        };
+        if prepared.maximum_soft_tokens() != expected_soft_tokens {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 prepared visual carries the wrong soft-token budget",
+            ));
+        }
+        let (batch, height, width, channels) = prepared.image().dimensions()?;
+        if batch != 1
+            || channels != 3
+            || height == 0
+            || width == 0
+            || !height.is_multiple_of(usize_to_u64(
+                self.configuration.patch_size,
+                "Gemma4 patch size",
+            )?)
+            || !width.is_multiple_of(usize_to_u64(
+                self.configuration.patch_size,
+                "Gemma4 patch size",
+            )?)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision requires one canonically prepared RGB visual",
+            ));
+        }
+        let height = u64_to_usize(height, "Gemma4 prepared height")?;
+        let width = u64_to_usize(width, "Gemma4 prepared width")?;
+        let patches_high = height / self.configuration.patch_size;
+        let patches_wide = width / self.configuration.patch_size;
+        if patches_high > self.configuration.position_embeddings
+            || patches_wide > self.configuration.position_embeddings
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 prepared position exceeds the learned position table",
+            ));
+        }
+        let patch_count = patches_high
+            .checked_mul(patches_wide)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 patch count"))?;
+        let padded_patch_count = expected_soft_tokens
+            .checked_mul(self.configuration.pooling_kernel_size)
+            .and_then(|value| value.checked_mul(self.configuration.pooling_kernel_size))
+            .ok_or(MultimodalTextError::Overflow("Gemma4 padded patches"))?;
+        if patch_count > padded_patch_count {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 prepared visual exceeds its soft-token budget",
+            ));
+        }
+        let patch_width = 3_usize
+            .checked_mul(self.configuration.patch_size)
+            .and_then(|value| value.checked_mul(self.configuration.patch_size))
+            .ok_or(MultimodalTextError::Overflow("Gemma4 patch width"))?;
+        let patch_storage = padded_patch_count
+            .checked_mul(patch_width)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 patch storage"))?;
+        let mut patches = backend.workspace_vec(context, patch_storage)?;
+        for _ in 0..patch_storage {
+            patches.try_push(0.0)?;
+        }
+        gemma4_patchify(
+            prepared.image().as_f32_slice()?,
+            height,
+            width,
+            self.configuration.patch_size,
+            &mut patches,
+            context.cancellation,
+        )?;
+        for value in patches.iter_mut() {
+            *value = 2.0 * (*value - 0.5);
+        }
+        let patch_tensor = qwen_tensor(
+            backend,
+            &[padded_patch_count, patch_width],
+            &patches,
+            context,
+        )?;
+        let mut patch_projection = self.patch_projection.clone();
+        let projected = patch_projection.forward_with_context(backend, &patch_tensor, context)?;
+        let mut hidden = tensor_to_f32(backend, &projected, context)?;
+        gemma4_add_positions(
+            &mut hidden,
+            &tensor_to_f32(backend, &self.position_embedding, context)?,
+            patches_high,
+            patches_wide,
+            padded_patch_count,
+            self.configuration.hidden_size,
+            self.configuration.position_embeddings,
+            context.cancellation,
+        )?;
+        let mut hidden = qwen_tensor(
+            backend,
+            &[padded_patch_count, self.configuration.hidden_size],
+            &hidden,
+            context,
+        )?;
+        for block in &self.blocks {
+            context.cancellation.check()?;
+            hidden = block.forward(
+                backend,
+                &hidden,
+                patches_high,
+                patches_wide,
+                patch_count,
+                &self.configuration,
+                context,
+            )?;
+        }
+        let hidden_values = tensor_to_f32(backend, &hidden, context)?;
+        let pooled = gemma4_pool(
+            backend,
+            &hidden_values,
+            patches_high,
+            patches_wide,
+            self.configuration.hidden_size,
+            self.configuration.pooling_kernel_size,
+            context,
+        )?;
+        let tokens = (patches_high / self.configuration.pooling_kernel_size)
+            .checked_mul(patches_wide / self.configuration.pooling_kernel_size)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 pooled tokens"))?;
+        let normalized = gemma4_parameterless_rms_norm(
+            backend,
+            &pooled,
+            tokens,
+            self.configuration.hidden_size,
+            context,
+        )?;
+        let normalized = qwen_tensor(
+            backend,
+            &[tokens, self.configuration.hidden_size],
+            &normalized,
+            context,
+        )?;
+        let mut projector = self.projector.clone();
+        let embedding = projector.forward_with_context(backend, &normalized, context)?;
+        context.check()?;
+        Ok(Gemma4VisionProjection {
+            embedding,
+            tokens,
+            kind: prepared.kind(),
+        })
+    }
+
+    fn project_semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.gemma4-vision.v1");
+        hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(self.position_embedding.contiguous_bytes()?);
+        for (name, module) in self.named_modules() {
+            cancellation.check()?;
+            hasher.update(name.as_bytes());
+            hasher.update(module.semantic_state_digest(cancellation)?.as_bytes());
+        }
+        for tensor in self.named_tensors() {
+            cancellation.check()?;
+            hasher.update(tensor.contiguous_bytes()?);
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![
+            ("patch_projection".to_owned(), &self.patch_projection),
+            ("projector".to_owned(), &self.projector),
+        ];
+        for (index, block) in self.blocks.iter().enumerate() {
+            for (name, module) in block.named_modules() {
+                modules.push((format!("blocks.{index}.{name}"), module));
+            }
+        }
+        modules
+    }
+
+    fn named_tensors(&self) -> Vec<&Tensor> {
+        let mut tensors = Vec::new();
+        for block in &self.blocks {
+            tensors.extend(block.named_tensors());
+        }
+        tensors
+    }
+}
+
 impl NativeQwenVisionEncoder {
     pub fn new(
         configuration: QwenVisionConfiguration,
@@ -3441,6 +4018,861 @@ fn qwen_reduced_decoder_is_compatible(
                 .all(|kind| *kind == DecoderLayerKind::FullAttention)
             && configuration.layer_kinds.len() >= family.deepstack_layers().len()
     }
+}
+
+impl NativeGemma4ClippedLinear {
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        context.cancellation.check()?;
+        let input_minimum = gemma4_scalar(&self.input_minimum)?;
+        let input_maximum = gemma4_scalar(&self.input_maximum)?;
+        let output_minimum = gemma4_scalar(&self.output_minimum)?;
+        let output_maximum = gemma4_scalar(&self.output_maximum)?;
+        if input_minimum > input_maximum || output_minimum > output_maximum {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 clipped-linear bounds are inverted",
+            ));
+        }
+        let mut input_values = tensor_to_f32(backend, input, context)?;
+        for value in input_values.iter_mut() {
+            *value = value.clamp(input_minimum, input_maximum);
+        }
+        let input = tensor_from_f32(backend, input.descriptor().shape(), &input_values, context)?;
+        let mut linear = self.linear.clone();
+        let output = linear.forward_with_context(backend, &input, context)?;
+        let mut output_values = tensor_to_f32(backend, &output, context)?;
+        for value in output_values.iter_mut() {
+            *value = value.clamp(output_minimum, output_maximum);
+        }
+        context.cancellation.check()?;
+        Ok(tensor_from_f32(
+            backend,
+            output.descriptor().shape(),
+            &output_values,
+            context,
+        )?)
+    }
+
+    fn named_tensors(&self) -> [&Tensor; 4] {
+        [
+            &self.input_minimum,
+            &self.input_maximum,
+            &self.output_minimum,
+            &self.output_maximum,
+        ]
+    }
+}
+
+impl NativeGemma4VisionBlock {
+    fn named_modules(&self) -> [(&'static str, &NativeModule); 7] {
+        [
+            ("query", &self.query.linear),
+            ("key", &self.key.linear),
+            ("value", &self.value.linear),
+            ("attention_output", &self.attention_output.linear),
+            ("feed_forward_gate", &self.feed_forward_gate.linear),
+            ("feed_forward_up", &self.feed_forward_up.linear),
+            ("feed_forward_down", &self.feed_forward_down.linear),
+        ]
+    }
+
+    fn named_tensors(&self) -> Vec<&Tensor> {
+        let mut tensors = vec![
+            &self.input_normalization_weight,
+            &self.query_normalization_weight,
+            &self.key_normalization_weight,
+            &self.post_attention_normalization_weight,
+            &self.pre_feed_forward_normalization_weight,
+            &self.post_feed_forward_normalization_weight,
+        ];
+        for linear in [
+            &self.query,
+            &self.key,
+            &self.value,
+            &self.attention_output,
+            &self.feed_forward_gate,
+            &self.feed_forward_up,
+            &self.feed_forward_down,
+        ] {
+            tensors.extend(linear.named_tensors());
+        }
+        tensors
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        patches_high: usize,
+        patches_wide: usize,
+        valid_patches: usize,
+        configuration: &Gemma4VisionConfiguration,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let tokens = input
+            .descriptor()
+            .shape()
+            .first()
+            .copied()
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Gemma4 vision block token count is invalid",
+            ))?;
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            input,
+            &self.input_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let query = self.query.forward(backend, &normalized, context)?;
+        let key = self.key.forward(backend, &normalized, context)?;
+        let value = self.value.forward(backend, &normalized, context)?;
+        let attention = gemma4_vision_attention(
+            backend,
+            &query,
+            &key,
+            &value,
+            &self.query_normalization_weight,
+            &self.key_normalization_weight,
+            patches_high,
+            patches_wide,
+            valid_patches,
+            configuration,
+            context,
+        )?;
+        let attention = self
+            .attention_output
+            .forward(backend, &attention, context)?;
+        let attention = gemma4_weighted_rms_norm(
+            backend,
+            &attention,
+            &self.post_attention_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let residual = qwen_add_tensors(backend, input, &attention, context)?;
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            &residual,
+            &self.pre_feed_forward_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let gate = self
+            .feed_forward_gate
+            .forward(backend, &normalized, context)?;
+        let up = self
+            .feed_forward_up
+            .forward(backend, &normalized, context)?;
+        let gate_values = tensor_to_f32(backend, &gate, context)?;
+        let up_values = tensor_to_f32(backend, &up, context)?;
+        if gate_values.len() != up_values.len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 feed-forward projections have inconsistent storage",
+            ));
+        }
+        let mut activated = backend.workspace_vec(context, gate_values.len())?;
+        for (gate, up) in gate_values.iter().zip(up_values.iter()) {
+            context.cancellation.check()?;
+            activated.try_push(gemma4_gelu_tanh(*gate) * *up)?;
+        }
+        let activated = qwen_tensor(
+            backend,
+            &[tokens, configuration.intermediate_size],
+            &activated,
+            context,
+        )?;
+        let down = self
+            .feed_forward_down
+            .forward(backend, &activated, context)?;
+        let down = gemma4_weighted_rms_norm(
+            backend,
+            &down,
+            &self.post_feed_forward_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        qwen_add_tensors(backend, &residual, &down, context)
+    }
+}
+
+fn gemma4_linear_module(
+    name: &str,
+    input_features: usize,
+    output_features: usize,
+    weight: Tensor,
+    stream: StreamId,
+) -> Result<NativeModule, MultimodalTextError> {
+    gemma4_require_parameter_shape(&weight, &[output_features, input_features], stream)?;
+    let mut module = NativeModule::linear(name, input_features, output_features, false, false)?;
+    module.load_dense_parameters(weight, None)?;
+    Ok(module)
+}
+
+fn gemma4_clipped_linear(
+    name: &str,
+    input_features: usize,
+    output_features: usize,
+    weights: Gemma4ClippedLinearWeights,
+    stream: StreamId,
+) -> Result<NativeGemma4ClippedLinear, MultimodalTextError> {
+    for bound in [
+        &weights.input_minimum,
+        &weights.input_maximum,
+        &weights.output_minimum,
+        &weights.output_maximum,
+    ] {
+        gemma4_require_scalar(bound, stream)?;
+    }
+    if gemma4_scalar(&weights.input_minimum)? > gemma4_scalar(&weights.input_maximum)?
+        || gemma4_scalar(&weights.output_minimum)? > gemma4_scalar(&weights.output_maximum)?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 clipped-linear bounds are inverted",
+        ));
+    }
+    Ok(NativeGemma4ClippedLinear {
+        linear: gemma4_linear_module(
+            name,
+            input_features,
+            output_features,
+            weights.weight,
+            stream,
+        )?,
+        input_minimum: weights.input_minimum,
+        input_maximum: weights.input_maximum,
+        output_minimum: weights.output_minimum,
+        output_maximum: weights.output_maximum,
+    })
+}
+
+fn gemma4_vision_block(
+    index: usize,
+    configuration: &Gemma4VisionConfiguration,
+    weights: Gemma4VisionBlockWeights,
+    stream: StreamId,
+) -> Result<NativeGemma4VisionBlock, MultimodalTextError> {
+    for (tensor, width) in [
+        (
+            &weights.input_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.query_normalization_weight,
+            configuration.head_dimension,
+        ),
+        (
+            &weights.key_normalization_weight,
+            configuration.head_dimension,
+        ),
+        (
+            &weights.post_attention_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.pre_feed_forward_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.post_feed_forward_normalization_weight,
+            configuration.hidden_size,
+        ),
+    ] {
+        gemma4_require_parameter_shape(tensor, &[width], stream)?;
+    }
+    let prefix = format!("gemma4_vision.blocks.{index}");
+    let attention_width = configuration
+        .attention_heads
+        .checked_mul(configuration.head_dimension)
+        .ok_or(MultimodalTextError::Overflow(
+            "Gemma4 vision attention width",
+        ))?;
+    Ok(NativeGemma4VisionBlock {
+        input_normalization_weight: weights.input_normalization_weight,
+        query: gemma4_clipped_linear(
+            &format!("{prefix}.query"),
+            configuration.hidden_size,
+            attention_width,
+            weights.query,
+            stream,
+        )?,
+        key: gemma4_clipped_linear(
+            &format!("{prefix}.key"),
+            configuration.hidden_size,
+            attention_width,
+            weights.key,
+            stream,
+        )?,
+        value: gemma4_clipped_linear(
+            &format!("{prefix}.value"),
+            configuration.hidden_size,
+            attention_width,
+            weights.value,
+            stream,
+        )?,
+        query_normalization_weight: weights.query_normalization_weight,
+        key_normalization_weight: weights.key_normalization_weight,
+        attention_output: gemma4_clipped_linear(
+            &format!("{prefix}.attention_output"),
+            attention_width,
+            configuration.hidden_size,
+            weights.attention_output,
+            stream,
+        )?,
+        post_attention_normalization_weight: weights.post_attention_normalization_weight,
+        pre_feed_forward_normalization_weight: weights.pre_feed_forward_normalization_weight,
+        feed_forward_gate: gemma4_clipped_linear(
+            &format!("{prefix}.feed_forward_gate"),
+            configuration.hidden_size,
+            configuration.intermediate_size,
+            weights.feed_forward_gate,
+            stream,
+        )?,
+        feed_forward_up: gemma4_clipped_linear(
+            &format!("{prefix}.feed_forward_up"),
+            configuration.hidden_size,
+            configuration.intermediate_size,
+            weights.feed_forward_up,
+            stream,
+        )?,
+        feed_forward_down: gemma4_clipped_linear(
+            &format!("{prefix}.feed_forward_down"),
+            configuration.intermediate_size,
+            configuration.hidden_size,
+            weights.feed_forward_down,
+            stream,
+        )?,
+        post_feed_forward_normalization_weight: weights.post_feed_forward_normalization_weight,
+    })
+}
+
+fn gemma4_require_parameter_shape(
+    tensor: &Tensor,
+    expected: &[usize],
+    stream: StreamId,
+) -> Result<(), MultimodalTextError> {
+    let mut expected_shape = Vec::new();
+    expected_shape
+        .try_reserve_exact(expected.len())
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 parameter shape"))?;
+    for dimension in expected {
+        expected_shape.push(usize_to_u64(*dimension, "Gemma4 parameter shape")?);
+    }
+    let descriptor = tensor.descriptor();
+    if descriptor.shape() != expected_shape
+        || descriptor.dtype() != DType::F32
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != stream
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 vision parameter shape or execution target is invalid",
+        ));
+    }
+    for chunk in tensor
+        .contiguous_bytes()?
+        .chunks_exact(std::mem::size_of::<f32>())
+    {
+        let bytes: [u8; 4] = chunk.try_into().map_err(|_| {
+            MultimodalTextError::InvalidInput("Gemma4 parameter storage is malformed")
+        })?;
+        if !f32::from_ne_bytes(bytes).is_finite() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 learned parameters must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn gemma4_require_scalar(tensor: &Tensor, stream: StreamId) -> Result<(), MultimodalTextError> {
+    let descriptor = tensor.descriptor();
+    if !(descriptor.shape().is_empty() || descriptor.shape() == [1])
+        || descriptor.dtype() != DType::F32
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != stream
+        || gemma4_scalar(tensor)?.is_nan()
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 clipped-linear bound must be one non-NaN CPU F32 scalar",
+        ));
+    }
+    Ok(())
+}
+
+fn gemma4_scalar(tensor: &Tensor) -> Result<f32, MultimodalTextError> {
+    let bytes = tensor.contiguous_bytes()?;
+    let bytes: [u8; 4] = bytes.try_into().map_err(|_| {
+        MultimodalTextError::InvalidInput("Gemma4 clipped-linear scalar storage is malformed")
+    })?;
+    Ok(f32::from_ne_bytes(bytes))
+}
+
+fn insert_gemma4_resident_allocation(
+    allocations: &mut Vec<(comfy_tensor::StorageId, u64)>,
+    storage_id: comfy_tensor::StorageId,
+    bytes: u64,
+) -> Result<(), MultimodalTextError> {
+    if let Some((_, existing_bytes)) = allocations
+        .iter()
+        .find(|(existing, _)| *existing == storage_id)
+    {
+        if *existing_bytes != bytes {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 aliased tensor storage has inconsistent residency",
+            ));
+        }
+    } else {
+        allocations
+            .try_reserve(1)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 resident allocations"))?;
+        allocations.push((storage_id, bytes));
+    }
+    Ok(())
+}
+
+fn gemma4_patchify(
+    pixels: &[f32],
+    height: usize,
+    width: usize,
+    patch_size: usize,
+    output: &mut [f32],
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<(), MultimodalTextError> {
+    let patch_width = 3_usize
+        .checked_mul(patch_size)
+        .and_then(|value| value.checked_mul(patch_size))
+        .ok_or(MultimodalTextError::Overflow("Gemma4 patch width"))?;
+    let patch_count = (height / patch_size)
+        .checked_mul(width / patch_size)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 patch count"))?;
+    if pixels.len()
+        != height
+            .checked_mul(width)
+            .and_then(|value| value.checked_mul(3))
+            .ok_or(MultimodalTextError::Overflow("Gemma4 input pixels"))?
+        || output.len()
+            < patch_count
+                .checked_mul(patch_width)
+                .ok_or(MultimodalTextError::Overflow("Gemma4 patch storage"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 patch input storage is malformed",
+        ));
+    }
+    let mut output_index = 0_usize;
+    for patch_y in 0..height / patch_size {
+        for patch_x in 0..width / patch_size {
+            cancellation.check()?;
+            for pixel_y in 0..patch_size {
+                for pixel_x in 0..patch_size {
+                    let source_pixel = (patch_y * patch_size + pixel_y)
+                        .checked_mul(width)
+                        .and_then(|value| value.checked_add(patch_x * patch_size + pixel_x))
+                        .and_then(|value| value.checked_mul(3))
+                        .ok_or(MultimodalTextError::Overflow("Gemma4 patch source"))?;
+                    for channel in 0..3 {
+                        *output.get_mut(output_index).ok_or(
+                            MultimodalTextError::InvalidInput(
+                                "Gemma4 patch output storage is incomplete",
+                            ),
+                        )? = *pixels.get(source_pixel + channel).ok_or(
+                            MultimodalTextError::InvalidInput("Gemma4 pixel storage is incomplete"),
+                        )?;
+                        output_index += 1;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gemma4_add_positions(
+    hidden: &mut [f32],
+    positions: &[f32],
+    patches_high: usize,
+    patches_wide: usize,
+    padded_patches: usize,
+    hidden_size: usize,
+    position_embeddings: usize,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<(), MultimodalTextError> {
+    let patch_count = patches_high
+        .checked_mul(patches_wide)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 position patches"))?;
+    if hidden.len()
+        != padded_patches
+            .checked_mul(hidden_size)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 hidden positions"))?
+        || positions.len()
+            != 2_usize
+                .checked_mul(position_embeddings)
+                .and_then(|value| value.checked_mul(hidden_size))
+                .ok_or(MultimodalTextError::Overflow("Gemma4 position table"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 position storage is malformed",
+        ));
+    }
+    for token in 0..patch_count {
+        cancellation.check()?;
+        let y = token / patches_wide;
+        let x = token % patches_wide;
+        for feature in 0..hidden_size {
+            let output = token * hidden_size + feature;
+            let x_index = x * hidden_size + feature;
+            let y_index = (position_embeddings + y) * hidden_size + feature;
+            hidden[output] += positions[x_index] + positions[y_index];
+        }
+    }
+    Ok(())
+}
+
+fn gemma4_weighted_rms_norm(
+    backend: &CpuBackend,
+    input: &Tensor,
+    weight: &Tensor,
+    rows: usize,
+    width: usize,
+    epsilon: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let values = tensor_to_f32(backend, input, context)?;
+    let weights = tensor_to_f32(backend, weight, context)?;
+    if values.len()
+        != rows
+            .checked_mul(width)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 RMS values"))?
+        || weights.len() != width
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 RMS normalization storage is malformed",
+        ));
+    }
+    let mut output = backend.workspace_vec(context, values.len())?;
+    for row in 0..rows {
+        context.cancellation.check()?;
+        let start = row * width;
+        let slice = &values[start..start + width];
+        let mean_square =
+            slice.iter().fold(0.0_f32, |sum, value| sum + value * value) / width as f32;
+        let inverse = (mean_square + epsilon).sqrt().recip();
+        for feature in 0..width {
+            output.try_push(slice[feature] * inverse * weights[feature])?;
+        }
+    }
+    Ok(tensor_from_f32(
+        backend,
+        input.descriptor().shape(),
+        &output,
+        context,
+    )?)
+}
+
+fn gemma4_parameterless_rms_norm(
+    backend: &CpuBackend,
+    values: &[f32],
+    rows: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<f32>, MultimodalTextError> {
+    if values.len()
+        != rows
+            .checked_mul(width)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 projector RMS values"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 parameterless RMS storage is malformed",
+        ));
+    }
+    let mut output = backend.workspace_vec(context, values.len())?;
+    for row in 0..rows {
+        context.cancellation.check()?;
+        let start = row * width;
+        let slice = &values[start..start + width];
+        let mean_square =
+            slice.iter().fold(0.0_f32, |sum, value| sum + value * value) / width as f32;
+        let inverse = (mean_square + 1.0e-6).sqrt().recip();
+        for feature in 0..width {
+            output.try_push(slice[feature] * inverse)?;
+        }
+    }
+    Ok(output)
+}
+
+fn gemma4_gelu_tanh(value: f32) -> f32 {
+    0.5 * value
+        * (1.0
+            + (std::f32::consts::FRAC_2_SQRT_PI * (value + 0.044_715 * value * value * value))
+                .tanh())
+}
+
+fn gemma4_pool(
+    backend: &CpuBackend,
+    hidden: &[f32],
+    patches_high: usize,
+    patches_wide: usize,
+    hidden_size: usize,
+    kernel: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<f32>, MultimodalTextError> {
+    if kernel == 0
+        || !patches_high.is_multiple_of(kernel)
+        || !patches_wide.is_multiple_of(kernel)
+        || hidden.len()
+            < patches_high
+                .checked_mul(patches_wide)
+                .and_then(|value| value.checked_mul(hidden_size))
+                .ok_or(MultimodalTextError::Overflow("Gemma4 pool input"))?
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 pooling geometry is invalid",
+        ));
+    }
+    let pooled_high = patches_high / kernel;
+    let pooled_wide = patches_wide / kernel;
+    let tokens = pooled_high
+        .checked_mul(pooled_wide)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 pooled tokens"))?;
+    let mut output = backend.workspace_vec(
+        context,
+        tokens
+            .checked_mul(hidden_size)
+            .ok_or(MultimodalTextError::Overflow("Gemma4 pool output"))?,
+    )?;
+    for _ in 0..tokens
+        .checked_mul(hidden_size)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 pool output"))?
+    {
+        output.try_push(0.0)?;
+    }
+    let scale = (hidden_size as f32).sqrt() / (kernel * kernel) as f32;
+    for pooled_y in 0..pooled_high {
+        for pooled_x in 0..pooled_wide {
+            context.cancellation.check()?;
+            let token = pooled_y * pooled_wide + pooled_x;
+            for kernel_y in 0..kernel {
+                for kernel_x in 0..kernel {
+                    let source_token = (pooled_y * kernel + kernel_y) * patches_wide
+                        + pooled_x * kernel
+                        + kernel_x;
+                    for feature in 0..hidden_size {
+                        output[token * hidden_size + feature] +=
+                            hidden[source_token * hidden_size + feature] * scale;
+                    }
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gemma4_vision_attention(
+    backend: &CpuBackend,
+    query: &Tensor,
+    key: &Tensor,
+    value: &Tensor,
+    query_weight: &Tensor,
+    key_weight: &Tensor,
+    patches_high: usize,
+    patches_wide: usize,
+    valid_patches: usize,
+    configuration: &Gemma4VisionConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let tokens = query
+        .descriptor()
+        .shape()
+        .first()
+        .copied()
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(MultimodalTextError::InvalidInput(
+            "Gemma4 attention token count is invalid",
+        ))?;
+    let width = configuration
+        .attention_heads
+        .checked_mul(configuration.head_dimension)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 attention width"))?;
+    let expected_shape = [
+        usize_to_u64(tokens, "Gemma4 attention tokens")?,
+        usize_to_u64(width, "Gemma4 attention width")?,
+    ];
+    if query.descriptor().shape() != expected_shape
+        || key.descriptor().shape() != expected_shape
+        || value.descriptor().shape() != expected_shape
+        || valid_patches
+            != patches_high
+                .checked_mul(patches_wide)
+                .ok_or(MultimodalTextError::Overflow("Gemma4 valid patches"))?
+        || valid_patches > tokens
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 attention geometry is invalid",
+        ));
+    }
+    let query_values = tensor_to_f32(backend, query, context)?;
+    let key_values = tensor_to_f32(backend, key, context)?;
+    let value_values = tensor_to_f32(backend, value, context)?;
+    let query_weight = tensor_to_f32(backend, query_weight, context)?;
+    let key_weight = tensor_to_f32(backend, key_weight, context)?;
+    let vector_values = tokens
+        .checked_mul(width)
+        .ok_or(MultimodalTextError::Overflow("Gemma4 attention vectors"))?;
+    let mut normalized_query = backend.workspace_vec(context, vector_values)?;
+    let mut normalized_key = backend.workspace_vec(context, vector_values)?;
+    let mut normalized_value = backend.workspace_vec(context, vector_values)?;
+    for _ in 0..vector_values {
+        normalized_query.try_push(0.0)?;
+        normalized_key.try_push(0.0)?;
+        normalized_value.try_push(0.0)?;
+    }
+    let epsilon = f32::from_bits(configuration.normalization_epsilon_bits);
+    for token in 0..tokens {
+        context.cancellation.check()?;
+        let coordinate = if token < valid_patches {
+            Some((token % patches_wide, token / patches_wide))
+        } else {
+            None
+        };
+        for head in 0..configuration.attention_heads {
+            let start = token * width + head * configuration.head_dimension;
+            let end = start + configuration.head_dimension;
+            gemma4_normalize_head(
+                &query_values[start..end],
+                Some(&query_weight),
+                epsilon,
+                &mut normalized_query[start..end],
+            )?;
+            gemma4_normalize_head(
+                &key_values[start..end],
+                Some(&key_weight),
+                epsilon,
+                &mut normalized_key[start..end],
+            )?;
+            gemma4_normalize_head(
+                &value_values[start..end],
+                None,
+                epsilon,
+                &mut normalized_value[start..end],
+            )?;
+            let (x, y) = coordinate
+                .map(|(x, y)| (x as i64, y as i64))
+                .unwrap_or((-1, -1));
+            gemma4_apply_vision_rope(
+                &mut normalized_query[start..end],
+                x,
+                y,
+                f32::from_bits(configuration.rotary_theta_bits),
+            )?;
+            gemma4_apply_vision_rope(
+                &mut normalized_key[start..end],
+                x,
+                y,
+                f32::from_bits(configuration.rotary_theta_bits),
+            )?;
+        }
+    }
+    let mut mask = backend.workspace_vec(context, tokens)?;
+    for key_token in 0..tokens {
+        mask.try_push(key_token < valid_patches)?;
+    }
+    let workspace_limit_bytes = tokens
+        .checked_mul(std::mem::size_of::<f32>())
+        .ok_or(MultimodalTextError::Overflow("Gemma4 attention workspace"))?;
+    let outcome = scaled_dot_product_attention_with_context(
+        backend,
+        AttentionRequest {
+            backend: AttentionBackend::PytorchSdp,
+            fallback: AttentionFallbackPolicy::AllowExactNative,
+            batch: 1,
+            query_tokens: tokens,
+            key_tokens: tokens,
+            heads: configuration.attention_heads,
+            head_dimension: configuration.head_dimension,
+            value_dimension: configuration.head_dimension,
+            scale: Some(1.0),
+            workspace_limit_bytes,
+        },
+        &normalized_query,
+        &normalized_key,
+        &normalized_value,
+        Some(AttentionMask::Boolean {
+            values: &mask,
+            shape: AttentionMaskShape::KeyTokens,
+        }),
+        context,
+    )?;
+    qwen_tensor(backend, &[tokens, width], &outcome.values, context)
+}
+
+fn gemma4_normalize_head(
+    input: &[f32],
+    weight: Option<&[f32]>,
+    epsilon: f32,
+    output: &mut [f32],
+) -> Result<(), MultimodalTextError> {
+    if input.is_empty()
+        || input.len() != output.len()
+        || weight.is_some_and(|weight| weight.len() != input.len())
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 attention head normalization is malformed",
+        ));
+    }
+    let mean_square =
+        input.iter().fold(0.0_f32, |sum, value| sum + value * value) / input.len() as f32;
+    let inverse = (mean_square + epsilon).sqrt().recip();
+    for index in 0..input.len() {
+        output[index] = input[index] * inverse * weight.map_or(1.0, |weight| weight[index]);
+    }
+    Ok(())
+}
+
+fn gemma4_apply_vision_rope(
+    values: &mut [f32],
+    x: i64,
+    y: i64,
+    theta: f32,
+) -> Result<(), MultimodalTextError> {
+    if values.is_empty() || !values.len().is_multiple_of(4) || !theta.is_finite() || theta <= 0.0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 vision rotary geometry is invalid",
+        ));
+    }
+    let axis_width = values.len() / 2;
+    let pair_width = axis_width / 2;
+    for (axis, coordinate) in [(0_usize, x), (1_usize, y)] {
+        let axis_start = axis * axis_width;
+        for frequency in 0..pair_width {
+            let exponent = (frequency * 2) as f32 / axis_width as f32;
+            let angle = coordinate as f32 / theta.powf(exponent);
+            let cosine = angle.cos();
+            let sine = angle.sin();
+            let first_index = axis_start + frequency;
+            let second_index = first_index + pair_width;
+            let first = values[first_index];
+            let second = values[second_index];
+            values[first_index] = first * cosine - second * sine;
+            values[second_index] = second * cosine + first * sine;
+        }
+    }
+    Ok(())
 }
 
 impl NativeQwenVisionBlock {

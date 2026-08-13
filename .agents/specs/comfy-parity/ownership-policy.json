@@ -12290,6 +12290,110 @@
       "decision_reason": "NativeGemma3VisionProjector is the sole retained Gemma3 visual projection owner. It admits the exact source SigLIP graph and closed 4B-Vision or 12B projection profile, delegates image preprocessing and transformer execution to NativeClipVision, owns the source-exact 64-to-16 spatial pooling, add-one RMS normalization, and checkpoint projection, and binds content identity and StorageId-aware residency without retaining invocation state."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_projection_gemma4",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeGemma4VisionEncoder",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeGemma4VisionEncoder",
+        "Gemma4VisionConfiguration",
+        "Gemma4VisionProfile",
+        "Gemma4VisionWeights",
+        "Gemma4VisionProjection"
+      ],
+      "allowed_adapters": [
+        "The canonical Gemma IMAGE and VIDEO preparation owner supplies bounded source-shaped pixels and remains the sole resize, frame-selection, and soft-token-budget owner",
+        "NativeModule, canonical attention, and comfy_tensor owners supply linear algebra, tensor storage, workspace, stream, memory, and cancellation primitives",
+        "The dependent Gemma multimodal resource may retain this owner and include its semantic digest and StorageId projection but cannot duplicate its graph",
+        "NativeDecoderTextEncoder, runtime controller, executor, NativeCache, persistence, RNG, KV, and output transactions remain outside this projection owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeGemma4VisionEncoder \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeGemma4VisionEncoder",
+          "role": "canonical_state",
+          "symbol": "NativeGemma4VisionEncoder"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct Gemma4VisionConfiguration \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::Gemma4VisionConfiguration",
+          "role": "canonical_state",
+          "symbol": "Gemma4VisionConfiguration"
+        }
+      ],
+      "call_symbols": [
+        "NativeGemma4VisionEncoder::new",
+        "NativeGemma4VisionEncoder::project",
+        "NativeGemma4VisionEncoder::semantic_state_digest_sha256",
+        "NativeGemma4VisionEncoder::resident_tensor_allocations"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma4-vision-retains-complete-closed-three-profile-graph",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeGemma4VisionEncoder[\\s\\S]*patch_projection: NativeModule[\\s\\S]*position_embedding: Tensor[\\s\\S]*blocks: Vec<NativeGemma4VisionBlock>[\\s\\S]*projector: NativeModule"
+        },
+        {
+          "name": "gemma4-vision-executes-clipped-rope-attention-pooling-and-projector-order",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn project[\\s\\S]*gemma4_patchify[\\s\\S]*gemma4_add_positions[\\s\\S]*block.forward[\\s\\S]*gemma4_pool[\\s\\S]*gemma4_parameterless_rms_norm"
+        },
+        {
+          "name": "gemma4-vision-consumes-canonical-image-video-soft-budgets",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "GemmaPreparedVisualKind::Gemma4Image => GEMMA4_IMAGE_SOFT_TOKENS[\\s\\S]*GemmaPreparedVisualKind::Gemma4VideoFrame => GEMMA4_VIDEO_SOFT_TOKENS"
+        },
+        {
+          "name": "gemma4-vision-binds-source-semantic-state-and-size-checked-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "project_semantic_state_digest[\\s\\S]*GEMMA4_MULTIMODAL_SOURCE_SHA256[\\s\\S]*pub fn resident_tensor_allocations[\\s\\S]*insert_gemma4_resident_allocation"
+        },
+        {
+          "name": "gemma4-vision-tests-reduced-exactness-aliasing-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma4_retained_vision_projector_is_exact_alias_aware_and_transactional[\\s\\S]*gemma4_vision/manifest.json[\\s\\S]*storage_id[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma4-vision-projection-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma multimodal CLIP resource",
+        "retained native Gemma multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGemma4VisionEncoder is the sole retained Gemma4 visual projection owner. It admits the closed E2B, E4B, and 31B graphs, executes checkpoint clipping, learned x/y positions, theta-100 two-axis RoPE, key-masked attention, four normalization boundaries, GELU-tanh gating, spatial pooling, root scaling, and the parameterless-RMS projector, and binds all content and size-checked StorageId residency without retaining invocation state."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_projection_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
       "owner_files": [
