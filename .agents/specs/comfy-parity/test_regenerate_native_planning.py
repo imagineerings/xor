@@ -562,6 +562,18 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[sdpose_head_projection_id]["writes"],
         )
         self.assertIn(
+            "crates/comfy_test_support/fixtures/sdpose/head_projection",
+            tasks_by_id[sdpose_head_projection_id]["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/comfy_model.rs",
+            tasks_by_id[sdpose_head_projection_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/sdpose/projection/manifest.json",
+            tasks_by_id[sdpose_head_projection_id]["reads"],
+        )
+        self.assertIn(
             sdpose_head_projection_id,
             tasks_by_id[sdpose_foundation_id]["dependencies"],
         )

@@ -11306,6 +11306,9 @@
       ],
       "owner_symbols": [
         "decode_sdpose_heatmaps",
+        "decode_sdpose_heatmap_tensor",
+        "project_sdpose_heatmap_tensor",
+        "prepare_lotus_sdpose_conditioning",
         "project_sdpose_openpose_person",
         "SdPoseRawKeypoint",
         "NativePoseKeypoint"
@@ -11330,10 +11333,34 @@
           "qualified": "comfy_model::sdpose::project_sdpose_openpose_person",
           "role": "canonical",
           "symbol": "project_sdpose_openpose_person"
+        },
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub fn decode_sdpose_heatmap_tensor\\(",
+          "qualified": "comfy_model::sdpose::decode_sdpose_heatmap_tensor",
+          "role": "canonical",
+          "symbol": "decode_sdpose_heatmap_tensor"
+        },
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub fn project_sdpose_heatmap_tensor\\(",
+          "qualified": "comfy_model::sdpose::project_sdpose_heatmap_tensor",
+          "role": "canonical",
+          "symbol": "project_sdpose_heatmap_tensor"
+        },
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub fn prepare_lotus_sdpose_conditioning\\(",
+          "qualified": "comfy_model::sdpose::prepare_lotus_sdpose_conditioning",
+          "role": "canonical",
+          "symbol": "prepare_lotus_sdpose_conditioning"
         }
       ],
       "call_symbols": [
         "decode_sdpose_heatmaps",
+        "decode_sdpose_heatmap_tensor",
+        "project_sdpose_heatmap_tensor",
+        "prepare_lotus_sdpose_conditioning",
         "project_sdpose_openpose_person",
         "NativePoseKeypoint::checked"
       ],
@@ -11357,10 +11384,26 @@
           "name": "sdpose-projection-fixture-pins-source-and-atomic-boundary",
           "path": "crates/comfy_test_support/fixtures/sdpose/projection/manifest.json",
           "pattern": "comfy-parity-native-sdpose-heatmap-projection-foundation"
+        },
+        {
+          "name": "task406-conditioning-is-source-pinned-broadcast-and-attempt-local",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "LOTUS_CONDITIONING_F16_BITS[\\s\\S]*pub fn prepare_lotus_sdpose_conditioning[\\s\\S]*tensor_from_values"
+        },
+        {
+          "name": "task406-tensor-projection-streams-one-plane-through-canonical-dark-openpose",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub fn decode_sdpose_heatmap_tensor[\\s\\S]*workspace_vec\\(context, plane_length\\)[\\s\\S]*decode_plane[\\s\\S]*pub fn project_sdpose_heatmap_tensor"
+        },
+        {
+          "name": "task406-source-fixture-pins-conditioning-head-and-projection-provenance",
+          "path": "crates/comfy_test_support/fixtures/sdpose/head_projection/manifest.json",
+          "pattern": "code-inferred-reduced-exact-weights[\\s\\S]*f16le_sha256[\\s\\S]*plane_streaming_projection"
         }
       ],
       "consolidation_tasks": [
-        "comfy-parity-native-sdpose-heatmap-projection-foundation"
+        "comfy-parity-native-sdpose-heatmap-projection-foundation",
+        "comfy-parity-native-sdpose-head-projection-foundation"
       ],
       "production_consumers": [
         "retained native SDPose heatmap-head execution",
@@ -11490,6 +11533,7 @@
       "owner_symbols": [
         "NativeSdPoseModel",
         "NativeSdPoseHeatmapHead",
+        "NativeSdPoseHeatmapHead::forward",
         "NativeModelPayload::sdpose_model"
       ],
       "allowed_adapters": [
@@ -11497,7 +11541,8 @@
         "NativeSdPoseSd2Denoiser retains exact U-Net execution and attempt-local capture ownership",
         "NativeModelPayload and NativeStoredModelPayload seal the specialized MODEL identity and residency without broadening the legacy SD15 diffusion accessor",
         "NativeHandleStoreGeneration retains lease, capacity, forgery, and generation-staleness ownership",
-        "Task404 retains VAE, image, bounding-box, sampler, runtime composition, cache, and final publication ownership"
+        "Task406 executes the retained head and prepares attempt-local conditioning without adding another retained owner",
+        "Task407 retains VAE, image, bounding-box, sampler, runtime composition, cache, and final publication ownership"
       ],
       "definitions": [
         {
@@ -11517,6 +11562,7 @@
       ],
       "call_symbols": [
         "NativeSdPoseModel::from_mapped_weights",
+        "NativeSdPoseHeatmapHead::forward",
         "NativeModelPayload::sdpose_model",
         "sdpose_model_resource"
       ],
@@ -11560,11 +11606,22 @@
           "name": "task403-resource-retains-no-invocation-or-sampler-state",
           "path": "crates/comfy_model/src/sdpose.rs",
           "pattern": "pub struct NativeSdPoseModel \\{[\\s\\S]*artifact_sha256[\\s\\S]*denoiser[\\s\\S]*heatmap_head[\\s\\S]*semantic_state_digest_sha256"
+        },
+        {
+          "name": "task406-retained-head-executes-exact-seven-stage-order-via-immutable-modules",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "impl NativeSdPoseHeatmapHead[\\s\\S]*pub fn forward[\\s\\S]*deconvolution-normalization[\\s\\S]*deconvolution-activation[\\s\\S]*convolution-normalization[\\s\\S]*convolution-activation[\\s\\S]*heatmap-head.final"
+        },
+        {
+          "name": "task406-tests-cover-three-dtypes-source-conditioning-streaming-and-rollback",
+          "path": "crates/comfy_model/tests/sdpose.rs",
+          "pattern": "sdpose_heatmap_head_executes_retained_transpose_norm_activation_and_projection[\\s\\S]*lotus_conditioning_is_exact_broadcast_and_attempt_local[\\s\\S]*sdpose_tensor_heatmap_projection_streams_one_plane_and_matches_slice_oracle"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-sdpose-model-resource-foundation"
+        "comfy-parity-native-sdpose-model-resource-foundation",
+        "comfy-parity-native-sdpose-head-projection-foundation"
       ],
       "production_consumers": [
         "native SDPose execution composition"

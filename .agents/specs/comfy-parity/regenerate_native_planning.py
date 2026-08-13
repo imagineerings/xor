@@ -9339,7 +9339,7 @@ def native_sdpose_head_projection_foundation_task(dependency: str) -> dict[str, 
             "crates/comfy_model/src/sdpose.rs",
             "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/tests/sdpose.rs",
-            "crates/comfy_test_support/fixtures/sdpose/projection/oracle-provenance.json",
+            "crates/comfy_test_support/fixtures/sdpose/projection/manifest.json",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [

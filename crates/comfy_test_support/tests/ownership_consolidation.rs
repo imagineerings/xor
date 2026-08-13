@@ -13528,3 +13528,80 @@ fn val_ownership_task405_lotusd_sampling_001() -> Result<(), Box<dyn std::error:
     );
     Ok(())
 }
+
+#[test]
+fn val_ownership_task406_sdpose_head_projection_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let source = fs::read_to_string(root.join("crates/comfy_model/src/sdpose.rs"))?;
+    for required in [
+        "pub fn prepare_lotus_sdpose_conditioning",
+        "pub fn decode_sdpose_heatmap_tensor",
+        "pub fn project_sdpose_heatmap_tensor",
+        "pub fn forward(\n        &self,\n        backend: &CpuBackend,\n        captured_feature: &Tensor",
+        "LOTUS_CONDITIONING_F16_BITS",
+    ] {
+        assert!(source.contains(required), "Task406 source lacks {required}");
+    }
+    assert_eq!(
+        source.matches("pub struct NativeSdPoseHeatmapHead").count(),
+        1
+    );
+    let tensor_projection = source
+        .split_once("pub fn decode_sdpose_heatmap_tensor")
+        .and_then(|(_, implementation)| {
+            implementation.split_once("pub fn project_sdpose_heatmap_tensor")
+        })
+        .map(|(implementation, _)| implementation)
+        .ok_or("Task406 tensor projection boundary is missing")?;
+    assert!(tensor_projection.contains("workspace_vec(context, plane_length)"));
+    assert!(tensor_projection.contains("decode_plane(&plane"));
+    assert!(!tensor_projection.contains("tensor_to_values"));
+
+    let tests = fs::read_to_string(root.join("crates/comfy_model/tests/sdpose.rs"))?;
+    for required in [
+        "lotus_conditioning_is_exact_broadcast_and_attempt_local",
+        "sdpose_tensor_heatmap_projection_streams_one_plane_and_matches_slice_oracle",
+        "for dtype in [DType::F16, DType::Bf16]",
+    ] {
+        assert!(tests.contains(required), "Task406 tests lack {required}");
+    }
+    let manifest = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/sdpose/head_projection/manifest.json"),
+    )?;
+    for required in [
+        "168b6113df66f4f1006e36bcd143aa46215a28ff60d0e769cc8a412c16c0b951",
+        "a7ba15b03c89931a7764a7d4b398201b322e00524d03efaac172b48dc637397d",
+        "plane_streaming_projection",
+    ] {
+        assert!(
+            manifest.contains(required),
+            "Task406 fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task = "comfy-parity-native-sdpose-head-projection-foundation";
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    assert!(
+        concerns
+            .iter()
+            .filter(|concern| {
+                concern
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks
+                            .iter()
+                            .any(|candidate| candidate.as_str() == Some(task))
+                    })
+            })
+            .count()
+            >= 2
+    );
+    Ok(())
+}

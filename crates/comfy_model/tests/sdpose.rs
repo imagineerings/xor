@@ -4,14 +4,19 @@ use comfy_model::{
     SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH,
     SdPoseHeatmapHeadConfiguration, SdPoseModelError, SdPoseProjectionError, SdPoseRawKeypoint,
     SdPoseSd2Configuration, SdPoseSd2Error, decode_sdpose_heatmaps, project_sdpose_openpose_person,
+    sdpose::{
+        LOTUS_CONDITIONING_F16_SHA256, LOTUS_CONDITIONING_F32_SHA256, decode_sdpose_heatmap_tensor,
+        prepare_lotus_sdpose_conditioning, project_sdpose_heatmap_tensor,
+    },
     sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
 };
 use comfy_tensor::{
-    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, StreamId,
-    Tensor, TensorBackend,
+    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DecodedScalar, ExecutionContext,
+    StreamId, Tensor, TensorBackend,
     generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
 };
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, error::Error, fs, path::Path};
 
 const WORKSPACE_BYTES: u64 = 4 * 1024 * 1024;
@@ -65,6 +70,12 @@ fn resource_fixture(path: &str) -> std::path::PathBuf {
         .join(path)
 }
 
+fn head_projection_fixture(path: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../comfy_test_support/fixtures/sdpose/head_projection")
+        .join(path)
+}
+
 fn tensor(
     backend: &CpuBackend,
     shape: &[u64],
@@ -89,6 +100,29 @@ fn tensor_with_dtype(
         backend.device(),
         context,
     )?)
+}
+
+fn tensor_value(tensor: &Tensor, index: usize) -> Result<f32, Box<dyn Error>> {
+    let index = u64::try_from(index)?;
+    Ok(
+        match tensor
+            .descriptor()
+            .dtype()
+            .decode_scalar(tensor.linear_element_bytes(index)?)?
+        {
+            DecodedScalar::Boolean(value) => f32::from(u8::from(value)),
+            DecodedScalar::Signed(value) => value as f32,
+            DecodedScalar::Unsigned(value) => value as f32,
+            DecodedScalar::Real(value) => value as f32,
+            DecodedScalar::Complex { .. } => {
+                return Err(std::io::Error::other("unexpected complex fixture tensor").into());
+            }
+        },
+    )
+}
+
+fn tensor_sha256(tensor: &Tensor) -> Result<String, Box<dyn Error>> {
+    Ok(format!("{:x}", Sha256::digest(tensor.contiguous_bytes()?)))
 }
 
 fn reduced_sd2_weights(
@@ -263,6 +297,114 @@ fn sdpose_heatmap_decode_is_bounded_cancellable_and_first_index_stable()
         decode_sdpose_heatmaps(&heatmaps, 1, &backend, &context),
         Err(SdPoseProjectionError::Tensor(_))
     ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn lotus_conditioning_is_exact_broadcast_and_attempt_local() -> Result<(), Box<dyn Error>> {
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(head_projection_fixture("manifest.json"))?)?;
+    assert_eq!(
+        manifest["comfyui"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(
+        manifest["lotus_conditioning"]["f16le_sha256"],
+        LOTUS_CONDITIONING_F16_SHA256
+    );
+    assert_eq!(
+        manifest["lotus_conditioning"]["f32le_sha256"],
+        LOTUS_CONDITIONING_F32_SHA256
+    );
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let (conditioning_f16, adm_f16) =
+        prepare_lotus_sdpose_conditioning(&backend, 1, DType::F16, &context)?;
+    assert_eq!(conditioning_f16.descriptor().shape(), &[1, 2, 1024]);
+    assert_eq!(adm_f16.descriptor().shape(), &[1, 4]);
+    assert_eq!(
+        tensor_sha256(&conditioning_f16)?,
+        LOTUS_CONDITIONING_F16_SHA256
+    );
+    assert_eq!(tensor_value(&conditioning_f16, 0)?, -0.31347656);
+    assert_eq!(tensor_value(&conditioning_f16, 2047)?, 1.5009766);
+    assert!((tensor_value(&adm_f16, 0)? - 1.0_f32.sin()).abs() < 5.0e-4);
+    assert_eq!(tensor_value(&adm_f16, 1)?, 0.0);
+    assert!((tensor_value(&adm_f16, 2)? - 1.0_f32.cos()).abs() < 5.0e-4);
+    assert_eq!(tensor_value(&adm_f16, 3)?, 1.0);
+
+    let (conditioning_f32, adm_f32) =
+        prepare_lotus_sdpose_conditioning(&backend, 3, DType::F32, &context)?;
+    assert_eq!(conditioning_f32.descriptor().shape(), &[3, 2, 1024]);
+    assert_eq!(adm_f32.descriptor().shape(), &[3, 4]);
+    let single_bytes = conditioning_f32
+        .contiguous_bytes()?
+        .get(..2048 * std::mem::size_of::<f32>())
+        .ok_or_else(|| std::io::Error::other("missing first conditioning batch"))?;
+    assert_eq!(
+        format!("{:x}", Sha256::digest(single_bytes)),
+        LOTUS_CONDITIONING_F32_SHA256
+    );
+    for batch_index in 1..3 {
+        assert_eq!(
+            tensor_value(&conditioning_f32, batch_index * 2048)?,
+            -0.31347656
+        );
+        assert_eq!(
+            tensor_value(&conditioning_f32, batch_index * 2048 + 2047)?,
+            1.5009766
+        );
+        assert!((tensor_value(&adm_f32, batch_index * 4)? - 1.0_f32.sin()).abs() < 1.0e-7);
+    }
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_tensor_heatmap_projection_streams_one_plane_and_matches_slice_oracle()
+-> Result<(), Box<dyn Error>> {
+    let plane_length = SDPOSE_HEATMAP_HEIGHT * SDPOSE_HEATMAP_WIDTH;
+    let mut values = vec![0.0; SDPOSE_HEATMAP_CHANNELS * plane_length];
+    for channel in 0..SDPOSE_HEATMAP_CHANNELS {
+        let offset = channel * plane_length;
+        let channel_value = f32::from(u16::try_from(channel)?);
+        values[offset + (channel % SDPOSE_HEATMAP_HEIGHT) * SDPOSE_HEATMAP_WIDTH] =
+            1.0 + channel_value / 100.0;
+    }
+    let backend_bytes = 128 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(backend_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let heatmaps = tensor(
+        &backend,
+        &[
+            1,
+            u64::try_from(SDPOSE_HEATMAP_CHANNELS)?,
+            u64::try_from(SDPOSE_HEATMAP_HEIGHT)?,
+            u64::try_from(SDPOSE_HEATMAP_WIDTH)?,
+        ],
+        &values,
+        &context,
+    )?;
+    let slice = decode_sdpose_heatmaps(&values, 1, &backend, &context)?;
+    let streamed = decode_sdpose_heatmap_tensor(&heatmaps, &backend, &context)?;
+    assert_eq!(streamed, slice);
+    assert_eq!(
+        project_sdpose_heatmap_tensor(&heatmaps, &backend, &context)?,
+        vec![project_sdpose_openpose_person(&slice[0])?]
+    );
     assert_eq!(context.scratch.in_use_bytes(), 0);
     Ok(())
 }
@@ -476,6 +618,81 @@ fn sdpose_heatmap_head_rejects_missing_and_nonfinite_state() -> Result<(), Box<d
         Err(SdPoseModelError::NonFinite)
     ));
     assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_heatmap_head_executes_retained_transpose_norm_activation_and_projection()
+-> Result<(), Box<dyn Error>> {
+    let configuration = SdPoseHeatmapHeadConfiguration::reduced_fixture(2, 2, 3)?;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let head = NativeSdPoseHeatmapHead::from_reduced_fixture(
+        configuration,
+        reduced_head_weights(
+            &backend,
+            &SdPoseHeatmapHeadConfiguration::reduced_fixture(2, 2, 3)?,
+            DType::F32,
+            &context,
+        )?,
+        &cancellation,
+    )?;
+    let feature = tensor(
+        &backend,
+        &[1, 2, 2, 2],
+        &[1.0, 2.0, 3.0, 4.0, -1.0, -2.0, -3.0, -4.0],
+        &context,
+    )?;
+    let heatmaps = head.forward(&backend, &feature, &context)?;
+    assert_eq!(heatmaps.descriptor().shape(), &[1, 3, 4, 4]);
+    assert_eq!(heatmaps.descriptor().dtype(), DType::F32);
+    assert_ne!(heatmaps.storage_id(), feature.storage_id());
+    assert!(heatmaps.contiguous_bytes()?.iter().all(|value| *value == 0));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+
+    for dtype in [DType::F16, DType::Bf16] {
+        let configuration = SdPoseHeatmapHeadConfiguration::reduced_fixture(2, 2, 3)?;
+        let head = NativeSdPoseHeatmapHead::from_reduced_fixture(
+            configuration.clone(),
+            reduced_head_weights(&backend, &configuration, dtype, &context)?,
+            &cancellation,
+        )?;
+        let feature = tensor_with_dtype(
+            &backend,
+            &[1, 2, 2, 2],
+            &[1.0, 2.0, 3.0, 4.0, -1.0, -2.0, -3.0, -4.0],
+            dtype,
+            &context,
+        )?;
+        let heatmaps = head.forward(&backend, &feature, &context)?;
+        assert_eq!(heatmaps.descriptor().shape(), &[1, 3, 4, 4]);
+        assert_eq!(heatmaps.descriptor().dtype(), dtype);
+        assert_ne!(heatmaps.storage_id(), feature.storage_id());
+        assert!(heatmaps.contiguous_bytes()?.iter().all(|value| *value == 0));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+    }
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancelled,
+    };
+    assert!(matches!(
+        head.forward(&backend, &feature, &cancelled_context),
+        Err(SdPoseModelError::Cancellation(_))
+            | Err(SdPoseModelError::Module(_))
+            | Err(SdPoseModelError::Tensor(_))
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 
