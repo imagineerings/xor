@@ -11544,6 +11544,97 @@
       "decision_reason": "The frame-interpolation owner constructs only FILM's source pixel-center grid and normalized attempt-local flow before delegating interpolation, storage, workspace, and cancellation to canonical tensor owners. It cannot retain invocation state or duplicate the distinct RIFE grid contract."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_subtree_feature_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_subtree_features",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::film_subtree_features",
+        "film_subtree_features_from_weights"
+      ],
+      "allowed_adapters": [
+        "film_subtree_features_from_weights is the private shared graph used by the source-closed reduced oracle and the retained production method",
+        "FILM padded convolution and canonical tensor AvgPool2d owners retain numerical, allocation, storage, stream, workspace, and cancellation mechanics",
+        "future FILM feature-diagonal composition may consume returned attempt-local levels but cannot copy checkpoint tensors or retain features in the resource, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_subtree_features",
+          "role": "canonical",
+          "symbol": "film_subtree_features",
+          "pattern": "pub fn film_subtree_features\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_subtree_features_from_weights",
+          "role": "canonical_implementation",
+          "symbol": "film_subtree_features_from_weights",
+          "pattern": "^fn film_subtree_features_from_weights\\("
+        }
+      ],
+      "call_symbols": [
+        "film_subtree_features",
+        "film_subtree_features_from_weights"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-subtree-production-method-binds-sole-retained-film-weight-owner",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn film_subtree_features[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*self\\.dtype[\\s\\S]*film_subtree_features_from_weights[\\s\\S]*&self\\.weights"
+        },
+        {
+          "name": "film-subtree-executes-two-convolutions-and-conditional-pooling-per-level",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn film_subtree_features_from_weights[\\s\\S]*for level in 0\\.\\.sublevels[\\s\\S]*\\.0\\.conv\\.weight[\\s\\S]*film_conv_2d_with_context_exact_native[\\s\\S]*\\.1\\.conv\\.weight[\\s\\S]*film_conv_2d_with_context_exact_native[\\s\\S]*level < pooling_levels\\.saturating_sub\\(1\\)[\\s\\S]*average_pool_2d_tensor_with_context_exact_native"
+        },
+        {
+          "name": "film-subtree-reduced-oracle-proves-order-values-immutability-and-failure-atomicity",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_subtree_executes_two_convolutions_and_conditional_pooling[\\s\\S]*\\[6\\.0_f32, 126\\.0, 1836\\.0, 11016\\.0\\][\\s\\S]*weight_bytes[\\s\\S]*authorize_workspace\\(63\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-subtree-fixture-separates-reduced-graph-from-production-parity",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree/manifest.json",
+          "pattern": "(?=[\\s\\S]*SubTreeExtractor.forward)(?=[\\s\\S]*four_level_two_convolution_subtree)(?=[\\s\\S]*production_dense_numeric_parity)(?=[\\s\\S]*film_feature_diagonal_concatenation)(?=[\\s\\S]*codec_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-subtree-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM feature extraction, flow, fusion, and sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The existing retained interpolation model remains the sole FILM checkpoint owner and executes the exact subtree schedule over borrowed tensors. Reduced weights exist only inside the source-fingerprinted oracle and do not form a publishable model or second graph owner."
+    },
+    {
       "concern": "native_rife_frame_interpolation_sequence_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
       "owner_files": [

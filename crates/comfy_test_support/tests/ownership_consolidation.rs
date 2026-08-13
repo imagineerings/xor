@@ -14152,6 +14152,55 @@ fn val_ownership_native_film_warp_foundation_001() -> Result<(), Box<dyn std::er
 }
 
 #[test]
+fn val_ownership_native_film_subtree_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_subtree_features(",
+        "fn film_subtree_features_from_weights(",
+        "self.profile != FrameInterpolationProfile::Film",
+        ".0.conv.weight",
+        ".1.conv.weight",
+        "level < pooling_levels.saturating_sub(1)",
+        "film_subtree_executes_two_convolutions_and_conditional_pooling",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained FILM subtree lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree/manifest.json",
+    ))?;
+    assert!(fixture.contains("SubTreeExtractor.forward"));
+    assert!(fixture.contains("four_level_two_convolution_subtree"));
+    assert!(fixture.contains("\"first_value_f32\": 11016.0"));
+    assert!(fixture.contains("\"production_dense_numeric_parity\": false"));
+    assert!(fixture.contains("\"film_feature_diagonal_concatenation\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_subtree_feature_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str() == Some("comfy-parity-native-film-subtree-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_image_pyramid_foundation_001() -> Result<(), Box<dyn std::error::Error>>
 {
     let root = repository_root()?;

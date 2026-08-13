@@ -10028,6 +10028,42 @@ def native_film_image_pyramid_foundation_task(dependency: str) -> dict[str, obje
     )
 
 
+def native_film_subtree_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-subtree-foundation",
+        "Execute retained FILM subtree features",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model executes FILM SubTreeExtractor features from its admitted checkpoint tensors. Each of four levels applies the source's two padded three-by-three convolutions with LeakyReLU, doubles channels from the closed base width, and conditionally delegates two-by-two average pooling through the requested subtree depth without copying weights or retaining features, workspace, cache, handles, codecs, effects, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-image-pyramid/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight graph proves four ordered subtree outputs, two distinct convolution scales per level, channel widths 1/2/4/8, pooling through only the first three levels, exact first values 6/126/1836/11016, fresh output storage, immutable input and weights, pre-cancellation, one-byte-short caller-workspace failure with zero scratch residue, and production API rejection of non-FILM profiles or placement. The fixture explicitly separates this homomorph from absent licensed production-weight numeric parity, feature-diagonal concatenation, flow, fusion, codecs, handles, cache, effects, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12254,8 +12290,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_image_pyramid_foundation = native_film_image_pyramid_foundation_task(
         str(film_padded_convolution_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_subtree_foundation = native_film_subtree_foundation_task(
         str(film_image_pyramid_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_subtree_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12364,6 +12403,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             film_warp_foundation,
             film_padded_convolution_foundation,
             film_image_pyramid_foundation,
+            film_subtree_foundation,
             video_foundation,
             detection_foundation,
         ]

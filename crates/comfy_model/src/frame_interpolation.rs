@@ -489,6 +489,50 @@ impl NativeFrameInterpolationModel {
         )
     }
 
+    pub fn film_subtree_features(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        pooling_levels: usize,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM subtree execution requires a FILM checkpoint",
+            ));
+        }
+        let descriptor = input.descriptor();
+        let shape = descriptor.shape();
+        if shape.len() != 4
+            || shape.first() == Some(&0)
+            || shape.get(1) != Some(&3)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) == Some(&0)
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM subtree input must be nonempty NCHW RGB",
+            ));
+        }
+        if descriptor.dtype() != self.dtype
+            || descriptor.device() != DeviceId::CPU
+            || descriptor.stream() != self.stream
+            || descriptor.stream() != context.stream
+            || !descriptor.is_contiguous()?
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        film_subtree_features_from_weights(
+            backend,
+            input,
+            pooling_levels,
+            64,
+            4,
+            &self.weights,
+            context,
+        )
+    }
+
     pub fn interpolate_rife_pair(
         &self,
         backend: &CpuBackend,
@@ -1514,14 +1558,7 @@ pub fn film_image_pyramid_with_context_exact_native(
         ));
     }
 
-    let configuration = AveragePoolConfiguration {
-        kernel_size: vec![2, 2],
-        stride: Some(vec![2, 2]),
-        padding: vec![0, 0],
-        ceil_mode: false,
-        count_include_pad: true,
-        divisor_override: None,
-    };
+    let configuration = film_average_pool_configuration();
     let mut pyramid = Vec::new();
     pyramid
         .try_reserve_exact(levels)
@@ -1540,6 +1577,97 @@ pub fn film_image_pyramid_with_context_exact_native(
             context,
         )?;
         pyramid.push(image.clone());
+    }
+    context.cancellation.check()?;
+    Ok(pyramid)
+}
+
+fn film_average_pool_configuration() -> AveragePoolConfiguration {
+    AveragePoolConfiguration {
+        kernel_size: vec![2, 2],
+        stride: Some(vec![2, 2]),
+        padding: vec![0, 0],
+        ceil_mode: false,
+        count_include_pad: true,
+        divisor_override: None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn film_subtree_features_from_weights(
+    backend: &CpuBackend,
+    input: &Tensor,
+    pooling_levels: usize,
+    base_channels: usize,
+    sublevels: usize,
+    weights: &BTreeMap<String, Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if base_channels == 0
+        || !(1..=4).contains(&sublevels)
+        || !(1..=sublevels).contains(&pooling_levels)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM subtree configuration is invalid",
+        ));
+    }
+    let mut pyramid = Vec::new();
+    pyramid
+        .try_reserve_exact(sublevels)
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    let mut head = input.clone();
+    for level in 0..sublevels {
+        context.cancellation.check()?;
+        let prefix = format!("extract.extract_sublevels.convs.{level}");
+        let first_weight = weights
+            .get(&format!("{prefix}.0.conv.weight"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        let first_bias = weights
+            .get(&format!("{prefix}.0.conv.bias"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        head = film_conv_2d_with_context_exact_native(
+            backend,
+            &head,
+            first_weight,
+            first_bias,
+            true,
+            context,
+        )?;
+        let second_weight = weights
+            .get(&format!("{prefix}.1.conv.weight"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        let second_bias = weights
+            .get(&format!("{prefix}.1.conv.bias"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        head = film_conv_2d_with_context_exact_native(
+            backend,
+            &head,
+            second_weight,
+            second_bias,
+            true,
+            context,
+        )?;
+        let output_channels = base_channels
+            .checked_shl(u32::try_from(level).map_err(|_| FrameInterpolationError::Overflow)?)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        if head.descriptor().shape().get(1)
+            != Some(&u64::try_from(output_channels).map_err(|_| FrameInterpolationError::Overflow)?)
+        {
+            return Err(FrameInterpolationError::StateMismatch);
+        }
+        pyramid.push(head.clone());
+        if level < pooling_levels.saturating_sub(1) {
+            head = execution_result(
+                average_pool_2d_tensor_with_context_exact_native(
+                    backend,
+                    &head,
+                    &film_average_pool_configuration(),
+                    context,
+                ),
+                context,
+            )?;
+        }
     }
     context.cancellation.check()?;
     Ok(pyramid)
@@ -2078,6 +2206,180 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_subtree_executes_two_convolutions_and_conditional_pooling()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let mut weights = BTreeMap::new();
+        let mut input_channels = 1_usize;
+        for level in 0..4 {
+            let output_channels = 1_usize
+                .checked_shl(u32::try_from(level).map_err(|_| FrameInterpolationError::Overflow)?)
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let prefix = format!("extract.extract_sublevels.convs.{level}");
+            for (convolution, channels, scale) in [
+                (0_usize, input_channels, 2.0_f32),
+                (1_usize, output_channels, 3.0_f32),
+            ] {
+                let count = output_channels
+                    .checked_mul(channels)
+                    .and_then(|value| value.checked_mul(9))
+                    .ok_or(FrameInterpolationError::Overflow)?;
+                let mut values = vec![0.0_f32; count];
+                for output_channel in 0..output_channels {
+                    let index = output_channel
+                        .checked_mul(channels)
+                        .and_then(|value| value.checked_mul(9))
+                        .and_then(|value| value.checked_add(4))
+                        .ok_or(FrameInterpolationError::Overflow)?;
+                    let value = values
+                        .get_mut(index)
+                        .ok_or(FrameInterpolationError::StateMismatch)?;
+                    *value = scale;
+                }
+                weights.insert(
+                    format!("{prefix}.{convolution}.conv.weight"),
+                    tensor_from_f32(
+                        &backend,
+                        &[
+                            u64::try_from(output_channels)
+                                .map_err(|_| FrameInterpolationError::Overflow)?,
+                            u64::try_from(channels)
+                                .map_err(|_| FrameInterpolationError::Overflow)?,
+                            3,
+                            3,
+                        ],
+                        &values,
+                        DType::F32,
+                        DeviceId::CPU,
+                        &context,
+                    )
+                    .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?,
+                );
+                weights.insert(
+                    format!("{prefix}.{convolution}.conv.bias"),
+                    tensor_from_f32(
+                        &backend,
+                        &[u64::try_from(output_channels)
+                            .map_err(|_| FrameInterpolationError::Overflow)?],
+                        &vec![0.0; output_channels],
+                        DType::F32,
+                        DeviceId::CPU,
+                        &context,
+                    )
+                    .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?,
+                );
+            }
+            input_channels = output_channels;
+        }
+        let input = tensor_from_f32(
+            &backend,
+            &[1, 1, 4, 4],
+            &(1_u8..=16).map(f32::from).collect::<Vec<_>>(),
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let input_bytes = input.contiguous_bytes()?;
+        let weight_bytes = weights
+            .iter()
+            .map(|(key, tensor)| Ok((key.clone(), tensor.contiguous_bytes()?)))
+            .collect::<Result<BTreeMap<_, _>, FrameInterpolationError>>()?;
+        let pyramid =
+            film_subtree_features_from_weights(&backend, &input, 3, 1, 4, &weights, &context)?;
+        assert_eq!(pyramid.len(), 4);
+        assert_eq!(pyramid[0].descriptor().shape(), &[1, 1, 4, 4]);
+        assert_eq!(pyramid[1].descriptor().shape(), &[1, 2, 2, 2]);
+        assert_eq!(pyramid[2].descriptor().shape(), &[1, 4, 1, 1]);
+        assert_eq!(pyramid[3].descriptor().shape(), &[1, 8, 1, 1]);
+        for (level, expected) in [6.0_f32, 126.0, 1836.0, 11016.0].into_iter().enumerate() {
+            let actual = match DType::F32.decode_scalar(pyramid[level].linear_element_bytes(0)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert!((actual - expected).abs() <= 1.0e-4);
+            assert_ne!(pyramid[level].storage_id(), input.storage_id());
+        }
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+        for (key, expected) in &weight_bytes {
+            assert_eq!(
+                weights
+                    .get(key)
+                    .ok_or(FrameInterpolationError::StateMismatch)?
+                    .contiguous_bytes()?,
+                *expected
+            );
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let constrained_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(63)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            film_subtree_features_from_weights(
+                &backend,
+                &input,
+                3,
+                1,
+                4,
+                &weights,
+                &constrained_context,
+            ),
+            Err(FrameInterpolationError::Execution(_))
+        ));
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+
+        let rife = NativeFrameInterpolationModel::reduced_rife_test_fixture(&backend, &context)?;
+        assert!(matches!(
+            rife.film_subtree_features(&backend, &input, 3, &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_subtree_features_from_weights(
+                &backend,
+                &input,
+                3,
+                1,
+                4,
+                &weights,
+                &cancelled_context,
+            ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_image_pyramid_repeats_exact_pooling_and_is_failure_atomic()
