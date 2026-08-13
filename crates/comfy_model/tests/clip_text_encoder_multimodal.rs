@@ -1,24 +1,28 @@
 use comfy_model::{
-    DecoderActivation, DecoderArchitecture, DecoderAttentionWeights, DecoderLayerKind,
-    DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration, DecoderTextWeights,
-    GEMMA3_IMAGE_AREA_PIXELS, GEMMA4_AUDIO_FFT_LENGTH, GEMMA4_AUDIO_FRAME_LENGTH,
+    ClipVisionActivation, ClipVisionConfiguration, ClipVisionLayerWeights, ClipVisionModelType,
+    ClipVisionWeights, DecoderActivation, DecoderArchitecture, DecoderAttentionWeights,
+    DecoderLayerKind, DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration,
+    DecoderTextWeights, GEMMA3_IMAGE_AREA_PIXELS, GEMMA3_MULTIMODAL_SOURCE_PATH,
+    GEMMA3_MULTIMODAL_SOURCE_SHA256, GEMMA4_AUDIO_FFT_LENGTH, GEMMA4_AUDIO_FRAME_LENGTH,
     GEMMA4_AUDIO_FRAME_STEP, GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE, GEMMA4_AUDIO_MAXIMUM_TOKENS,
     GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, GEMMA4_AUDIO_SAMPLE_RATE,
     GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS,
-    GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS,
-    JINA_CLIP2_SOURCE_PATH, JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS,
-    MultimodalFamily, MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior,
-    MultimodalTextError, NativeDecoderTextEncoder, NativeModelPayload, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeQwenVisionEncoder, NativeTextGenerationRequest,
-    NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
-    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
-    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer,
-    Qwen2PretokenizerProfile, QwenMultimodalGenerationRequest, QwenVisionBlockWeights,
-    QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights,
-    RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
-    TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt,
-    gemma3_target_dimensions, gemma4_audio_marker_tokens, gemma4_target_dimensions,
-    ideogram4_project_taps, join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    Gemma3VisionConfiguration, Gemma3VisionProfile, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
+    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
+    JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
+    MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
+    NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector, NativeModelPayload,
+    NativePromptTokenizer, NativeQwenMultimodal, NativeQwenVisionEncoder,
+    NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
+    QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH,
+    QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
+    QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
+    QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
+    QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
+    SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
+    gemma4_audio_marker_tokens, gemma4_target_dimensions, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
     multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
     plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
     prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
@@ -28,7 +32,7 @@ use comfy_model::{
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
     ImageTensor, RetryRngPolicy, RngAlgorithm, RngProfileVersion, RngStream, RngStreamAddress,
-    StreamId, Tensor, TensorDescriptor, generated_native_diffusion::tensor_to_f32,
+    StreamId, Tensor, TensorDescriptor, TensorError, generated_native_diffusion::tensor_to_f32,
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -106,6 +110,79 @@ fn filled_tensor(
         &vec![value; elements.ok_or("fixture tensor shape overflowed")?],
         context,
     )
+}
+
+fn reduced_gemma3_clip_vision(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<(Arc<NativeClipVision>, Tensor), Box<dyn Error>> {
+    let configuration = ClipVisionConfiguration {
+        model_type: ClipVisionModelType::Siglip,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        hidden_size: 4,
+        intermediate_size: 8,
+        attention_heads: 2,
+        layer_count: 1,
+        image_size: 4,
+        patch_size: 1,
+        num_channels: 3,
+        max_num_patches: 0,
+        activation: ClipVisionActivation::GeluTanh,
+        projection_dimension: None,
+        llava_projection_dimension: None,
+    };
+    let mut patch_values = vec![0.0_f32; 4 * 3];
+    patch_values[0] = 1.0;
+    patch_values[4] = 1.0;
+    patch_values[8] = 1.0;
+    patch_values[9] = 0.5;
+    patch_values[10] = 0.25;
+    patch_values[11] = 0.125;
+    let position_values = (0..16)
+        .flat_map(|position| {
+            (0..4).map(move |channel| position as f32 * 0.01 + channel as f32 * 0.001)
+        })
+        .collect::<Vec<_>>();
+    let post_norm_weight = filled_tensor(backend, &[4], 1.0, context)?;
+    let layer = ClipVisionLayerWeights {
+        layer_norm_1_weight: filled_tensor(backend, &[4], 1.0, context)?,
+        layer_norm_1_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        query_weight: filled_tensor(backend, &[4, 4], 0.0, context)?,
+        query_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        key_weight: filled_tensor(backend, &[4, 4], 0.0, context)?,
+        key_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        value_weight: filled_tensor(backend, &[4, 4], 0.0, context)?,
+        value_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        output_weight: filled_tensor(backend, &[4, 4], 0.0, context)?,
+        output_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        layer_norm_2_weight: filled_tensor(backend, &[4], 1.0, context)?,
+        layer_norm_2_bias: filled_tensor(backend, &[4], 0.0, context)?,
+        feed_forward_1_weight: filled_tensor(backend, &[8, 4], 0.0, context)?,
+        feed_forward_1_bias: filled_tensor(backend, &[8], 0.0, context)?,
+        feed_forward_2_weight: filled_tensor(backend, &[4, 8], 0.0, context)?,
+        feed_forward_2_bias: filled_tensor(backend, &[4], 0.0, context)?,
+    };
+    let vision = NativeClipVision::new(
+        configuration,
+        ClipVisionWeights {
+            patch_embedding_weight: tensor(backend, &[4, 3, 1, 1], &patch_values, context)?,
+            patch_embedding_bias: Some(filled_tensor(backend, &[4], 0.0, context)?),
+            class_embedding: None,
+            position_embedding: tensor(backend, &[16, 4], &position_values, context)?,
+            pre_layer_norm_weight: None,
+            pre_layer_norm_bias: None,
+            layers: vec![layer],
+            post_layer_norm_weight: post_norm_weight.clone(),
+            post_layer_norm_bias: filled_tensor(backend, &[4], 0.0, context)?,
+            visual_projection_weight: None,
+            llava_linear_1_weight: None,
+            llava_linear_1_bias: None,
+            llava_linear_2_weight: None,
+            llava_linear_2_bias: None,
+        },
+    )?;
+    Ok((Arc::new(vision), post_norm_weight))
 }
 
 fn reduced_qwen_vision_weights(
@@ -716,6 +793,139 @@ fn gemma_image_video_preparation_is_source_exact_bounded_and_transactional()
     let constrained = context(&authority, &cancellation, 4)?;
     assert!(prepare_gemma4_visuals(&backend, Some(&image), None, &constrained).is_err());
     assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma3_retained_vision_projector_is_exact_alias_aware_and_transactional()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma3_vision/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("workspace root is unavailable")?;
+    let source = fs::read(workspace.join(GEMMA3_MULTIMODAL_SOURCE_PATH))?;
+    assert_eq!(
+        format!("{:x}", Sha256::digest(source)),
+        GEMMA3_MULTIMODAL_SOURCE_SHA256
+    );
+    assert_eq!(
+        Gemma3VisionConfiguration::source(Gemma3VisionProfile::FourBVision).output_hidden_size,
+        2_560
+    );
+    assert_eq!(
+        Gemma3VisionConfiguration::source(Gemma3VisionProfile::TwelveB).output_hidden_size,
+        3_840
+    );
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let (vision, shared_norm) = reduced_gemma3_clip_vision(&backend, &setup)?;
+    let projection_weight = tensor(
+        &backend,
+        &[4, 3],
+        &[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.25, 0.5, 0.75],
+        &setup,
+    )?;
+    let configuration = Gemma3VisionConfiguration::reduced_fixture(4, 3, 4, 2);
+    let owner = NativeGemma3VisionProjector::new(
+        configuration.clone(),
+        vision.clone(),
+        shared_norm.clone(),
+        projection_weight,
+    )?;
+    let input = ImageTensor::from_f32(&backend, &setup, 1, 1, 1, 4, &[1.0, 0.25, 0.0, 1.0])?;
+    let prepared = prepare_gemma3_image(&backend, &input, &setup)?;
+    let output = owner.project(&backend, &prepared, &setup)?;
+    assert_eq!(output.tokens_per_image, 4);
+    assert_eq!(output.embedding.descriptor().shape(), &[1, 4, 3]);
+    let output_values = tensor_to_f32(&backend, &output.embedding, &setup)?;
+    assert!(output_values.iter().all(|value| value.is_finite()));
+    let output_digest = format!(
+        "{:x}",
+        Sha256::digest(
+            output_values
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(
+        output_digest,
+        manifest["reduced_fixture"]["output_f32le_sha256"]
+            .as_str()
+            .ok_or("Gemma3 projection fixture digest is missing")?
+    );
+    drop(output_values);
+
+    let allocations = owner.resident_tensor_allocations()?;
+    assert_eq!(
+        allocations
+            .iter()
+            .filter(|(storage_id, _)| *storage_id == shared_norm.storage_id())
+            .count(),
+        1
+    );
+    let storage_ids = allocations
+        .iter()
+        .map(|(storage_id, _)| *storage_id)
+        .collect::<Vec<_>>();
+    assert!(storage_ids.iter().enumerate().all(|(index, storage_id)| {
+        !storage_ids[..index].iter().any(|prior| prior == storage_id)
+    }));
+
+    let changed_projection = filled_tensor(&backend, &[4, 3], 0.125, &setup)?;
+    let changed = NativeGemma3VisionProjector::new(
+        configuration.clone(),
+        vision.clone(),
+        shared_norm.clone(),
+        changed_projection,
+    )?;
+    assert_ne!(
+        owner.semantic_state_digest_sha256(),
+        changed.semantic_state_digest_sha256()
+    );
+    assert_eq!(
+        owner.semantic_state_digest_sha256(),
+        owner.clone().semantic_state_digest_sha256()
+    );
+
+    let mut training_vision = (*vision).clone();
+    training_vision.train();
+    assert!(
+        NativeGemma3VisionProjector::new(
+            configuration,
+            Arc::new(training_vision),
+            shared_norm,
+            filled_tensor(&backend, &[4, 3], 0.0, &setup)?,
+        )
+        .is_err()
+    );
+    let wrong_prepared = prepare_gemma4_visuals(&backend, Some(&input), None, &setup)?;
+    assert!(owner.project(&backend, &wrong_prepared[0], &setup).is_err());
+    drop(output);
+    drop(wrong_prepared);
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 48 * 1024 * 1024)?;
+    assert!(matches!(
+        owner.project(&backend, &prepared, &cancelled_context),
+        Err(MultimodalTextError::Tensor(TensorError::Cancelled))
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    let constrained = context(&authority, &cancellation, 16)?;
+    assert!(owner.project(&backend, &prepared, &constrained).is_err());
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    drop(prepared);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }

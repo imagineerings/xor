@@ -1,12 +1,13 @@
 use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionRequest,
     BidirectionalTextError, BidirectionalTextOutput, BidirectionalTextRequest, ClipTextError,
-    ClipTextOutput, ClipTextRequest, ClipVisionError, ClipVisionIntermediate, ClipVisionOutput,
+    ClipTextOutput, ClipTextRequest, ClipVisionActivation, ClipVisionConfiguration,
+    ClipVisionError, ClipVisionIntermediate, ClipVisionModelType, ClipVisionOutput,
     DecoderArchitecture, DecoderLayerKind, DecoderPreparedDeepstack,
     DecoderPreparedGenerationPrompt, DecoderRopePositions, DecoderTextConfiguration,
-    DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation, NativeClipText,
-    NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError,
-    NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
+    DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation,
+    LLAMA_SOURCE_SHA256, NativeClipText, NativeClipVision, NativeDecoderTextEncoder, NativeModule,
+    NativeOpsError, NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
     NativeTextGenerationResult, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
     QWEN35_SOURCE_SHA256, QWEN35_TOKENIZER_ARTIFACT_DIGEST, Qwen2PretokenizerProfile,
     SD1_CLIP_SOURCE_SHA256, decoder_profile_fact, scaled_dot_product_attention_with_context,
@@ -15,6 +16,7 @@ use comfy_tensor::{
     CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop,
     ResizeMode, RngTransaction, StreamId, Tensor, TensorDescriptor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
+    generated_linear_algebra_01::{LinearAlgebraPartOneError, matmul_with_context_exact_native},
     generated_native_diffusion::{
         NativeDiffusionTensorError, add as native_tensor_add, tensor_from_f32, tensor_to_f32,
     },
@@ -73,6 +75,10 @@ pub const QWEN3VL_IMAGE_TEMPORAL_PATCH_SIZE: usize = 2;
 pub const QWEN3VL_IMAGE_SPATIAL_MERGE_SIZE: usize = 2;
 pub const GEMMA3_IMAGE_AREA_PIXELS: u64 = 896 * 896;
 pub const GEMMA3_MAXIMUM_PREPARED_PIXELS: u64 = GEMMA3_IMAGE_AREA_PIXELS * 4;
+pub const GEMMA3_IMAGE_SOFT_TOKENS: usize = 256;
+pub const GEMMA3_MULTIMODAL_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/lt.py";
+pub const GEMMA3_MULTIMODAL_SOURCE_SHA256: &str =
+    "9ddf9e68c4afd1cf848f881b7489abb49d37ac8ad6d5d2893eba4f98c9c37ca2";
 pub const GEMMA4_IMAGE_PATCH_SIZE: u64 = 16;
 pub const GEMMA4_IMAGE_POOLING_SIZE: u64 = 3;
 pub const GEMMA4_IMAGE_SOFT_TOKENS: usize = 280;
@@ -501,6 +507,96 @@ pub struct GemmaPreparedAudio {
     resampled_samples: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gemma3VisionProfile {
+    FourBVision,
+    TwelveB,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Gemma3VisionConfiguration {
+    pub source_profile: Option<Gemma3VisionProfile>,
+    pub vision_hidden_size: usize,
+    pub output_hidden_size: usize,
+    pub patches_per_side: usize,
+    pub tokens_per_side: usize,
+    pub normalization_epsilon_bits: u32,
+    pub normalization_weight_offset_bits: u32,
+}
+
+impl Gemma3VisionConfiguration {
+    pub fn source(profile: Gemma3VisionProfile) -> Self {
+        Self {
+            source_profile: Some(profile),
+            vision_hidden_size: 1152,
+            output_hidden_size: match profile {
+                Gemma3VisionProfile::FourBVision => 2560,
+                Gemma3VisionProfile::TwelveB => 3840,
+            },
+            patches_per_side: 64,
+            tokens_per_side: 16,
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            normalization_weight_offset_bits: 1.0_f32.to_bits(),
+        }
+    }
+
+    pub fn reduced_fixture(
+        vision_hidden_size: usize,
+        output_hidden_size: usize,
+        patches_per_side: usize,
+        tokens_per_side: usize,
+    ) -> Self {
+        Self {
+            source_profile: None,
+            vision_hidden_size,
+            output_hidden_size,
+            patches_per_side,
+            tokens_per_side,
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            normalization_weight_offset_bits: 1.0_f32.to_bits(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), MultimodalTextError> {
+        if self.vision_hidden_size == 0
+            || self.output_hidden_size == 0
+            || self.patches_per_side == 0
+            || self.tokens_per_side == 0
+            || !self.patches_per_side.is_multiple_of(self.tokens_per_side)
+            || !f32::from_bits(self.normalization_epsilon_bits).is_finite()
+            || f32::from_bits(self.normalization_epsilon_bits) <= 0.0
+            || !f32::from_bits(self.normalization_weight_offset_bits).is_finite()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 vision projection dimensions or normalization are invalid",
+            ));
+        }
+        if let Some(profile) = self.source_profile
+            && self != &Self::source(profile)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 production vision configuration does not match its closed source profile",
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeGemma3VisionProjector {
+    configuration: Gemma3VisionConfiguration,
+    vision: Arc<NativeClipVision>,
+    normalization_weight: Tensor,
+    input_projection_weight: Tensor,
+    semantic_state_digest_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma3VisionProjection {
+    pub embedding: Tensor,
+    pub tokens_per_image: usize,
+}
+
 impl GemmaPreparedAudio {
     pub fn log_mel(&self) -> &Tensor {
         &self.log_mel
@@ -848,6 +944,8 @@ pub enum MultimodalTextError {
     Spatial(#[from] SpatialFunctionalKernelError),
     #[error(transparent)]
     Spectral(#[from] SpectralTransformError),
+    #[error(transparent)]
+    LinearAlgebra(#[from] LinearAlgebraPartOneError),
     #[error("multimodal text input is invalid: {0}")]
     InvalidInput(&'static str),
     #[error("multimodal text arithmetic overflowed while computing {0}")]
@@ -1109,10 +1207,430 @@ pub fn prepare_gemma3_image(
     Ok(GemmaPreparedVisual {
         image,
         kind: GemmaPreparedVisualKind::Gemma3Image,
-        maximum_soft_tokens: 256,
+        maximum_soft_tokens: GEMMA3_IMAGE_SOFT_TOKENS,
         source_frame_index: 0,
         timestamp_seconds: None,
     })
+}
+
+impl NativeGemma3VisionProjector {
+    pub fn new(
+        configuration: Gemma3VisionConfiguration,
+        vision: Arc<NativeClipVision>,
+        normalization_weight: Tensor,
+        input_projection_weight: Tensor,
+    ) -> Result<Self, MultimodalTextError> {
+        configuration.validate()?;
+        validate_gemma3_vision_owner(&configuration, &vision)?;
+        let stream = normalization_weight.descriptor().stream();
+        gemma3_require_parameter_shape(
+            &normalization_weight,
+            &[configuration.vision_hidden_size],
+            stream,
+        )?;
+        gemma3_require_parameter_shape(
+            &input_projection_weight,
+            &[
+                configuration.vision_hidden_size,
+                configuration.output_hidden_size,
+            ],
+            stream,
+        )?;
+        let mut owner = Self {
+            configuration,
+            vision,
+            normalization_weight,
+            input_projection_weight,
+            semantic_state_digest_sha256: String::new(),
+        };
+        owner.semantic_state_digest_sha256 =
+            owner.project_semantic_state_digest(&comfy_types::CancellationToken::default())?;
+        owner.validate(&comfy_types::CancellationToken::default())?;
+        Ok(owner)
+    }
+
+    pub fn configuration(&self) -> &Gemma3VisionConfiguration {
+        &self.configuration
+    }
+
+    pub fn vision(&self) -> &Arc<NativeClipVision> {
+        &self.vision
+    }
+
+    pub fn semantic_state_digest_sha256(&self) -> &str {
+        &self.semantic_state_digest_sha256
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        self.configuration.validate()?;
+        validate_gemma3_vision_owner(&self.configuration, &self.vision)?;
+        self.vision.validate(cancellation)?;
+        let stream = self.normalization_weight.descriptor().stream();
+        gemma3_require_parameter_shape(
+            &self.normalization_weight,
+            &[self.configuration.vision_hidden_size],
+            stream,
+        )?;
+        gemma3_require_parameter_shape(
+            &self.input_projection_weight,
+            &[
+                self.configuration.vision_hidden_size,
+                self.configuration.output_hidden_size,
+            ],
+            stream,
+        )?;
+        if self.semantic_state_digest_sha256 != self.project_semantic_state_digest(cancellation)? {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 vision semantic identity changed after admission",
+            ));
+        }
+        self.resident_bytes()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = Vec::new();
+        for allocation in self.vision.resident_parts()?.tensor_allocations() {
+            insert_gemma3_resident_allocation(
+                &mut allocations,
+                allocation.storage_id(),
+                allocation.resident_bytes(),
+            )?;
+        }
+        for tensor in [&self.normalization_weight, &self.input_projection_weight] {
+            insert_gemma3_resident_allocation(
+                &mut allocations,
+                tensor.storage_id(),
+                tensor.storage_byte_len(),
+            )?;
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let vision_owned = self.vision.resident_parts()?.owned_bytes();
+        u64::try_from(mem::size_of::<Self>())
+            .ok()
+            .and_then(|bytes| bytes.checked_add(vision_owned))
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(self.semantic_state_digest_sha256.capacity()).ok()?)
+            })
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma3 vision owned residency",
+            ))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |bytes, (_, allocation)| {
+                bytes
+                    .checked_add(allocation)
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Gemma3 vision total residency",
+                    ))
+            },
+        )
+    }
+
+    pub fn project(
+        &self,
+        backend: &CpuBackend,
+        prepared: &GemmaPreparedVisual,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Gemma3VisionProjection, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        if prepared.kind() != GemmaPreparedVisualKind::Gemma3Image
+            || prepared.maximum_soft_tokens() != GEMMA3_IMAGE_SOFT_TOKENS
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 vision requires canonical image preparation and token count",
+            ));
+        }
+        let mut session = self.vision.execution_session(context.cancellation)?;
+        let pixels = self
+            .vision
+            .preprocess(backend, prepared.image().tensor(), true, context)?;
+        let output = session.forward(backend, &pixels, ClipVisionIntermediate::None, context)?;
+        let hidden = &output.last_hidden_state;
+        let shape = hidden.descriptor().shape();
+        let patch_count = self
+            .configuration
+            .patches_per_side
+            .checked_mul(self.configuration.patches_per_side)
+            .ok_or(MultimodalTextError::Overflow("Gemma3 vision patches"))?;
+        if shape.len() != 3
+            || shape[0] == 0
+            || shape[1] != usize_to_u64(patch_count, "Gemma3 patch count")?
+            || shape[2]
+                != usize_to_u64(
+                    self.configuration.vision_hidden_size,
+                    "Gemma3 vision hidden size",
+                )?
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 CLIP vision output has the wrong shape",
+            ));
+        }
+        let batch = u64_to_usize(shape[0], "Gemma3 vision batch")?;
+        let hidden_values = tensor_to_f32(backend, hidden, context)?;
+        let normalization_weight = tensor_to_f32(backend, &self.normalization_weight, context)?;
+        let pooled = gemma3_pool_and_normalize(
+            backend,
+            &hidden_values,
+            batch,
+            &self.configuration,
+            &normalization_weight,
+            context,
+        )?;
+        let tokens_per_image = self
+            .configuration
+            .tokens_per_side
+            .checked_mul(self.configuration.tokens_per_side)
+            .ok_or(MultimodalTextError::Overflow("Gemma3 vision tokens"))?;
+        let normalized_shape = [
+            usize_to_u64(batch, "Gemma3 vision batch")?,
+            usize_to_u64(tokens_per_image, "Gemma3 vision tokens")?,
+            usize_to_u64(
+                self.configuration.vision_hidden_size,
+                "Gemma3 vision hidden size",
+            )?,
+        ];
+        let normalized = tensor_from_f32(backend, &normalized_shape, &pooled, context)?;
+        let embedding = matmul_with_context_exact_native(
+            backend,
+            &normalized,
+            &self.input_projection_weight,
+            context,
+        )?;
+        context.check()?;
+        Ok(Gemma3VisionProjection {
+            embedding,
+            tokens_per_image,
+        })
+    }
+
+    fn project_semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.gemma3-vision-projector.v1");
+        hasher.update(LLAMA_SOURCE_SHA256.as_bytes());
+        hasher.update(GEMMA3_MULTIMODAL_SOURCE_SHA256.as_bytes());
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(self.vision.semantic_digest_sha256().as_bytes());
+        for tensor in [&self.normalization_weight, &self.input_projection_weight] {
+            cancellation.check()?;
+            hasher.update(tensor.contiguous_bytes()?);
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+}
+
+fn validate_gemma3_vision_owner(
+    configuration: &Gemma3VisionConfiguration,
+    vision: &NativeClipVision,
+) -> Result<(), MultimodalTextError> {
+    let vision_configuration = vision.configuration();
+    if vision.is_training()
+        || vision_configuration.dtype != DType::F32
+        || vision_configuration.device != DeviceId::CPU
+        || vision_configuration.model_type != ClipVisionModelType::Siglip
+        || vision_configuration.hidden_size != configuration.vision_hidden_size
+        || vision_configuration.image_size
+            != configuration
+                .patches_per_side
+                .checked_mul(vision_configuration.patch_size)
+                .ok_or(MultimodalTextError::Overflow("Gemma3 vision image size"))?
+        || vision_configuration.projection_dimension.is_some()
+        || vision_configuration.llava_projection_dimension.is_some()
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 projector requires an evaluation-only retained SigLIP vision owner",
+        ));
+    }
+    if configuration.source_profile.is_some()
+        && vision_configuration
+            != &(ClipVisionConfiguration {
+                model_type: ClipVisionModelType::Siglip,
+                dtype: DType::F32,
+                device: DeviceId::CPU,
+                hidden_size: 1152,
+                intermediate_size: 4304,
+                attention_heads: 16,
+                layer_count: 27,
+                image_size: 896,
+                patch_size: 14,
+                num_channels: 3,
+                max_num_patches: 0,
+                activation: ClipVisionActivation::GeluTanh,
+                projection_dimension: None,
+                llava_projection_dimension: None,
+            })
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 production projection requires the exact retained 896-square SigLIP graph",
+        ));
+    }
+    Ok(())
+}
+
+fn gemma3_pool_and_normalize(
+    backend: &CpuBackend,
+    hidden: &[f32],
+    batch: usize,
+    configuration: &Gemma3VisionConfiguration,
+    normalization_weight: &[f32],
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<f32>, MultimodalTextError> {
+    let hidden_size = configuration.vision_hidden_size;
+    let patches_per_side = configuration.patches_per_side;
+    let tokens_per_side = configuration.tokens_per_side;
+    let kernel = patches_per_side / tokens_per_side;
+    let patch_count = patches_per_side
+        .checked_mul(patches_per_side)
+        .ok_or(MultimodalTextError::Overflow("Gemma3 patch count"))?;
+    let tokens = tokens_per_side
+        .checked_mul(tokens_per_side)
+        .ok_or(MultimodalTextError::Overflow("Gemma3 token count"))?;
+    if hidden.len()
+        != batch
+            .checked_mul(patch_count)
+            .and_then(|value| value.checked_mul(hidden_size))
+            .ok_or(MultimodalTextError::Overflow("Gemma3 hidden values"))?
+        || normalization_weight.len() != hidden_size
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 vision projection input storage is malformed",
+        ));
+    }
+    let mut output = backend.workspace_vec(
+        context,
+        batch
+            .checked_mul(tokens)
+            .and_then(|value| value.checked_mul(hidden_size))
+            .ok_or(MultimodalTextError::Overflow("Gemma3 projected tokens"))?,
+    )?;
+    let divisor = (kernel * kernel) as f32;
+    let epsilon = f32::from_bits(configuration.normalization_epsilon_bits);
+    let weight_offset = f32::from_bits(configuration.normalization_weight_offset_bits);
+    for batch_index in 0..batch {
+        for token_y in 0..tokens_per_side {
+            for token_x in 0..tokens_per_side {
+                context.check()?;
+                let output_start = output.len();
+                for channel in 0..hidden_size {
+                    let mut sum = 0.0_f32;
+                    for kernel_y in 0..kernel {
+                        for kernel_x in 0..kernel {
+                            let patch_y = token_y * kernel + kernel_y;
+                            let patch_x = token_x * kernel + kernel_x;
+                            let index = ((batch_index * patch_count
+                                + patch_y * patches_per_side
+                                + patch_x)
+                                * hidden_size)
+                                + channel;
+                            sum += hidden.get(index).copied().ok_or(
+                                MultimodalTextError::InvalidInput(
+                                    "Gemma3 vision patch storage is incomplete",
+                                ),
+                            )?;
+                        }
+                    }
+                    output.try_push(sum / divisor)?;
+                }
+                let output_end = output_start
+                    .checked_add(hidden_size)
+                    .ok_or(MultimodalTextError::Overflow("Gemma3 pooled token storage"))?;
+                let token = output.get_mut(output_start..output_end).ok_or(
+                    MultimodalTextError::InvalidInput("Gemma3 pooled token storage is incomplete"),
+                )?;
+                let mean_square = token.iter().try_fold(0.0_f32, |sum, value| {
+                    let square = value * value;
+                    if square.is_finite() {
+                        Ok(sum + square)
+                    } else {
+                        Err(MultimodalTextError::InvalidInput(
+                            "Gemma3 pooled vision state is nonfinite",
+                        ))
+                    }
+                })? / hidden_size as f32;
+                let inverse = (mean_square + epsilon).sqrt().recip();
+                for (value, weight) in token.iter_mut().zip(normalization_weight) {
+                    *value *= inverse * (*weight + weight_offset);
+                    if !value.is_finite() {
+                        return Err(MultimodalTextError::InvalidInput(
+                            "Gemma3 normalized vision state is nonfinite",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn gemma3_require_parameter_shape(
+    tensor: &Tensor,
+    expected: &[usize],
+    stream: StreamId,
+) -> Result<(), MultimodalTextError> {
+    let expected = expected
+        .iter()
+        .map(|value| usize_to_u64(*value, "Gemma3 parameter shape"))
+        .collect::<Result<Vec<_>, _>>()?;
+    if tensor.descriptor().shape() != expected
+        || tensor.descriptor().dtype() != DType::F32
+        || tensor.descriptor().device() != DeviceId::CPU
+        || tensor.descriptor().stream() != stream
+        || tensor
+            .contiguous_bytes()?
+            .chunks_exact(mem::size_of::<f32>())
+            .any(|chunk| {
+                let Ok(bytes) = <[u8; 4]>::try_from(chunk) else {
+                    return true;
+                };
+                !f32::from_ne_bytes(bytes).is_finite()
+            })
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 vision parameter shape, target, or values are invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn insert_gemma3_resident_allocation(
+    allocations: &mut Vec<(comfy_tensor::StorageId, u64)>,
+    storage_id: comfy_tensor::StorageId,
+    resident_bytes: u64,
+) -> Result<(), MultimodalTextError> {
+    if let Some((_, existing_bytes)) = allocations
+        .iter()
+        .find(|(existing_id, _)| *existing_id == storage_id)
+    {
+        if *existing_bytes != resident_bytes {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma3 aliased tensor storage changed byte length",
+            ));
+        }
+    } else {
+        allocations
+            .try_reserve(1)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma3 residency allocations"))?;
+        allocations.push((storage_id, resident_bytes));
+    }
+    Ok(())
 }
 
 pub fn gemma4_target_dimensions(

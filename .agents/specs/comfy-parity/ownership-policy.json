@@ -12191,6 +12191,105 @@
       "decision_reason": "GemmaPreparedAudio and its canonical functions are the sole model-domain owners of source-specific Gemma4 mono projection, bounded Kaiser polyphase resampling, semicausal framing, periodic-Hann FFT magnitude, HTK log-mel features, frame masks, and post-subsample audio marker count. The preparation is attempt-local, weightless, bounded, and RNG-free; it delegates payload ownership to comfy_media and tensor storage, FFT, workspace, stream, memory, and cancellation to comfy_tensor, and cannot own tokenizer, decoder, retained encoder weights, handles, cache, persistence, or publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_projection_gemma3",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeGemma3VisionProjector",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeGemma3VisionProjector",
+        "Gemma3VisionConfiguration",
+        "Gemma3VisionProfile",
+        "Gemma3VisionProjection"
+      ],
+      "allowed_adapters": [
+        "The canonical Gemma IMAGE preparation owner supplies bounded source-shaped pixels and remains the sole resize and media owner",
+        "NativeClipVision remains the sole retained SigLIP transformer owner and supplies its exact execution session and preprocessing path",
+        "comfy_tensor matrix multiplication, tensor storage, workspace, memory, stream, and cancellation owners supply exact numerical primitives",
+        "The dependent Gemma multimodal resource may retain this owner and include its semantic digest and StorageId projection but cannot duplicate its graph",
+        "NativeDecoderTextEncoder, runtime controller, executor, NativeCache, persistence, RNG, KV, and output transactions remain outside this projection owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeGemma3VisionProjector \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeGemma3VisionProjector",
+          "role": "canonical_state",
+          "symbol": "NativeGemma3VisionProjector"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct Gemma3VisionConfiguration \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::Gemma3VisionConfiguration",
+          "role": "canonical_state",
+          "symbol": "Gemma3VisionConfiguration"
+        }
+      ],
+      "call_symbols": [
+        "NativeGemma3VisionProjector::new",
+        "NativeGemma3VisionProjector::project",
+        "NativeGemma3VisionProjector::semantic_state_digest_sha256",
+        "NativeGemma3VisionProjector::resident_tensor_allocations"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma3-vision-retains-exact-siglip-projector-graph",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeGemma3VisionProjector[\\s\\S]*vision: Arc<NativeClipVision>[\\s\\S]*normalization_weight: Tensor[\\s\\S]*input_projection_weight: Tensor"
+        },
+        {
+          "name": "gemma3-vision-delegates-preprocess-transformer-pooling-norm-and-projection",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn project[\\s\\S]*\\.preprocess[\\s\\S]*session.forward[\\s\\S]*gemma3_pool_and_normalize[\\s\\S]*matmul_with_context_exact_native"
+        },
+        {
+          "name": "gemma3-vision-binds-source-semantic-state-and-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "project_semantic_state_digest[\\s\\S]*LLAMA_SOURCE_SHA256[\\s\\S]*GEMMA3_MULTIMODAL_SOURCE_SHA256[\\s\\S]*pub fn resident_tensor_allocations"
+        },
+        {
+          "name": "gemma3-vision-tests-exact-projection-aliasing-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma3_retained_vision_projector_is_exact_alias_aware_and_transactional[\\s\\S]*gemma3_vision/manifest.json[\\s\\S]*storage_id[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma3-vision-projection-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma multimodal CLIP resource",
+        "retained native Gemma multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGemma3VisionProjector is the sole retained Gemma3 visual projection owner. It admits the exact source SigLIP graph and closed 4B-Vision or 12B projection profile, delegates image preprocessing and transformer execution to NativeClipVision, owns the source-exact 64-to-16 spatial pooling, add-one RMS normalization, and checkpoint projection, and binds content identity and StorageId-aware residency without retaining invocation state."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_projection_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
       "owner_files": [

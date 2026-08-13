@@ -2804,6 +2804,81 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task394_gemma3_vision_has_one_retained_projection_owner =
+        production_source_occurrences(&sources, "pub struct NativeGemma3VisionProjector {").len()
+            == 1
+            && production_source_occurrences(&sources, "fn gemma3_pool_and_normalize(").len() == 1
+            && model_clip_text_encoder_multimodal.contains("vision: Arc<NativeClipVision>")
+            && model_clip_text_encoder_multimodal.contains("input_projection_weight: Tensor");
+    let task394_gemma3_vision_delegates_preparation_clip_projection_and_residency =
+        model_clip_text_encoder_multimodal.contains("pub fn prepare_gemma3_image(")
+            && model_clip_text_encoder_multimodal.contains(".preprocess(")
+            && model_clip_text_encoder_multimodal.contains("session.forward(")
+            && model_clip_text_encoder_multimodal.contains("gemma3_pool_and_normalize(")
+            && model_clip_text_encoder_multimodal.contains("matmul_with_context_exact_native(")
+            && model_clip_text_encoder_multimodal.contains("resident_tensor_allocations(")
+            && !model_clip_text_encoder_multimodal.contains("struct NativeGemma3Decoder")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task394_gemma3_vision_fixture_proves_exactness_aliasing_and_rollback =
+        model_clip_text_encoder_multimodal_tests
+            .contains("gemma3_retained_vision_projector_is_exact_alias_aware_and_transactional")
+            && model_clip_text_encoder_multimodal_tests.contains("gemma3_vision/manifest.json")
+            && model_clip_text_encoder_multimodal_tests.contains("shared_norm.storage_id()")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task394_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_projection_gemma3")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some(
+                    "comfy_model::clip_text_encoder_multimodal::NativeGemma3VisionProjector",
+                )
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some(
+                                    "comfy-parity-native-gemma3-vision-projection-foundation",
+                                )
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma3-vision-retains-exact-siglip-projector-graph",
+                            "gemma3-vision-delegates-preprocess-transformer-pooling-norm-and-projection",
+                            "gemma3-vision-binds-source-semantic-state-and-storage-residency",
+                            "gemma3-vision-tests-exact-projection-aliasing-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task394_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_text_media_projection_gemma3,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma3-vision-projection-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner =
         production_source_occurrences(&sources, "pub struct Qwen35LinearWeights {").len() == 1
             && production_source_occurrences(&sources, "fn forward_linear_attention(").len() == 1
@@ -9340,6 +9415,22 @@ fn run_ownership_validation(
             task393_gemma4_fixture_is_exact_and_failure_atomic,
         ),
         (
+            "task394_policy_and_catalog_trace_gemma3_vision",
+            task394_policy_trace && task394_catalog_trace,
+        ),
+        (
+            "task394_gemma3_vision_has_one_retained_projection_owner",
+            task394_gemma3_vision_has_one_retained_projection_owner,
+        ),
+        (
+            "task394_gemma3_vision_delegates_preparation_clip_projection_and_residency",
+            task394_gemma3_vision_delegates_preparation_clip_projection_and_residency,
+        ),
+        (
+            "task394_gemma3_vision_fixture_proves_exactness_aliasing_and_rollback",
+            task394_gemma3_vision_fixture_proves_exactness_aliasing_and_rollback,
+        ),
+        (
             "task385_policy_and_catalog_trace_qwen35_hybrid_decoder",
             task385_policy_trace && task385_catalog_trace,
         ),
@@ -9980,6 +10071,17 @@ fn val_ownership_task393_gemma4_decoder_001() -> Result<(), Box<dyn std::error::
         "val-ownership-task393-gemma4-decoder-001.json",
         "val_ownership_task393_gemma4_decoder_001",
         Some("task393_"),
+    )
+}
+
+#[test]
+fn val_ownership_task394_gemma3_vision_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task394-gemma3-retained-vision-projection-ownership",
+        "val-ownership-task394-gemma3-vision-001.json",
+        "val_ownership_task394_gemma3_vision_001",
+        Some("task394_"),
     )
 }
 
