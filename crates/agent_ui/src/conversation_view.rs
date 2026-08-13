@@ -3630,7 +3630,10 @@ fn plan_label_markdown_style(
 pub(crate) mod tests {
     use acp_thread::StubAgentConnection;
     use action_log::ActionLog;
-    use agent::{AgentTool, EditFileTool, FetchTool, TerminalTool, ToolPermissionContext};
+    use agent::{
+        AgentTool, EditFileTool, FetchTool, SkillLoadingIssue, SkillLoadingIssueKind, TerminalTool,
+        ToolPermissionContext,
+    };
     use agent_servers::FakeAcpAgentServer;
     use editor::MultiBufferOffset;
     use editor::actions::Paste;
@@ -3644,8 +3647,16 @@ pub(crate) mod tests {
     use std::any::Any;
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
-    use std::sync::Arc;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
     use workspace::{Item, MultiWorkspace};
+
+    use language_model::{
+        ConfiguredModel, LanguageModelProviderId, LanguageModelProviderName, LanguageModelRegistry,
+        fake_provider::{FakeLanguageModel, FakeLanguageModelProvider},
+    };
 
     use crate::agent_panel;
     use crate::completion_provider::AgentContextSource;
@@ -5648,6 +5659,475 @@ pub(crate) mod tests {
         cx.run_until_parked();
 
         (conversation_view, cx)
+    }
+
+    async fn setup_native_conversation_view(
+        cx: &mut TestAppContext,
+    ) -> (
+        Entity<ConversationView>,
+        Arc<FakeLanguageModel>,
+        &mut VisualTestContext,
+    ) {
+        let model = Arc::new(FakeLanguageModel::with_id_and_thinking(
+            "task-four",
+            "task-four-model",
+            "Task Four Model",
+            false,
+        ));
+        cx.update(|cx| {
+            LanguageModelRegistry::test(cx);
+            let provider = Arc::new(
+                FakeLanguageModelProvider::new(
+                    LanguageModelProviderId::from("task-four".to_string()),
+                    LanguageModelProviderName::from("Task Four".to_string()),
+                )
+                .with_models(vec![model.clone()]),
+            );
+            LanguageModelRegistry::global(cx).update(cx, |registry, cx| {
+                registry.register_provider(provider.clone(), cx);
+                registry.set_default_model(
+                    Some(ConfiguredModel {
+                        provider,
+                        model: model.clone(),
+                    }),
+                    cx,
+                );
+            });
+        });
+
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree("/project", json!({ "src": { "main.rs": "fn main() {}" } }))
+            .await;
+        cx.update(|cx| <dyn fs::Fs>::set_global(fs.clone(), cx));
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = multi_workspace.read_with(cx, |mw, _| mw.workspace().clone());
+        let thread_store = cx.update(|_window, cx| cx.new(|cx| ThreadStore::new(cx)));
+        let connection_store =
+            cx.update(|_window, cx| cx.new(|cx| AgentConnectionStore::new(project.clone(), cx)));
+        let server = Rc::new(agent::NativeAgentServer::new(fs, thread_store.clone()));
+        let conversation_view = cx.update(|window, cx| {
+            cx.new(|cx| {
+                ConversationView::new(
+                    server,
+                    connection_store,
+                    Agent::NativeAgent,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    workspace.downgrade(),
+                    project,
+                    Some(thread_store),
+                    AgentThreadSource::AgentPanel,
+                    window,
+                    cx,
+                )
+            })
+        });
+        cx.run_until_parked();
+
+        (conversation_view, model, cx)
+    }
+
+    #[derive(Clone)]
+    struct RecordingNativeCommandConnection {
+        prompts: Arc<Mutex<Vec<acp::PromptRequest>>>,
+        fail_next_prompt: Arc<AtomicBool>,
+    }
+
+    impl RecordingNativeCommandConnection {
+        fn new(fail_next_prompt: bool) -> Self {
+            Self {
+                prompts: Arc::new(Mutex::new(Vec::new())),
+                fail_next_prompt: Arc::new(AtomicBool::new(fail_next_prompt)),
+            }
+        }
+
+        fn native_commands() -> Vec<acp::AvailableCommand> {
+            ["compact", "clear", "skills", "status", "goal", "grind"]
+                .into_iter()
+                .map(|name| {
+                    let command = acp::AvailableCommand::new(name, "native test command").meta(
+                        acp_thread::meta_with_command_category(acp_thread::CommandCategory::Native),
+                    );
+                    if matches!(name, "goal" | "grind") {
+                        command.input(acp::AvailableCommandInput::Unstructured(
+                            acp::UnstructuredCommandInput::new("arguments"),
+                        ))
+                    } else {
+                        command
+                    }
+                })
+                .collect()
+        }
+    }
+
+    impl AgentConnection for RecordingNativeCommandConnection {
+        fn agent_id(&self) -> AgentId {
+            AgentId::new("recording-native-commands")
+        }
+
+        fn telemetry_id(&self) -> SharedString {
+            "recording-native-commands".into()
+        }
+
+        fn new_session(
+            self: Rc<Self>,
+            project: Entity<Project>,
+            _work_dirs: PathList,
+            cx: &mut App,
+        ) -> Task<gpui::Result<Entity<AcpThread>>> {
+            let thread = build_test_thread(
+                self,
+                project,
+                "RecordingNativeCommandConnection",
+                acp::SessionId::new("recording-native-command-session"),
+                cx,
+            );
+            thread.update(cx, |thread, cx| {
+                thread
+                    .handle_session_update(
+                        acp::SessionUpdate::AvailableCommandsUpdate(
+                            acp::AvailableCommandsUpdate::new(Self::native_commands()),
+                        ),
+                        cx,
+                    )
+                    .expect("available commands update should succeed");
+            });
+            Task::ready(Ok(thread))
+        }
+
+        fn auth_methods(&self) -> &[acp::AuthMethod] {
+            &[]
+        }
+
+        fn authenticate(
+            &self,
+            _method_id: acp::AuthMethodId,
+            _cx: &mut App,
+        ) -> Task<gpui::Result<()>> {
+            Task::ready(Ok(()))
+        }
+
+        fn prompt(
+            &self,
+            params: acp::PromptRequest,
+            _cx: &mut App,
+        ) -> Task<gpui::Result<acp::PromptResponse>> {
+            self.prompts.lock().push(params);
+            if self.fail_next_prompt.swap(false, Ordering::SeqCst) {
+                Task::ready(Err(anyhow!("native command failed")))
+            } else {
+                Task::ready(Ok(acp::PromptResponse::new(acp::StopReason::EndTurn)))
+            }
+        }
+
+        fn cancel(&self, _session_id: &acp::SessionId, _cx: &mut App) {}
+
+        fn into_any(self: Rc<Self>) -> Rc<dyn Any> {
+            self
+        }
+    }
+
+    #[gpui::test]
+    async fn test_slash_command_native_command_catalog_and_unknown_submission(
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        let (conversation_view, model, cx) = setup_native_conversation_view(cx).await;
+        let thread_view = active_thread(&conversation_view, cx);
+        let editor = message_editor(&conversation_view, cx);
+
+        thread_view.read_with(cx, |view, _cx| {
+            let native_commands = view
+                .session_capabilities
+                .read()
+                .completion_commands()
+                .into_iter()
+                .filter(|command| command.category == Some(acp_thread::CommandCategory::Native))
+                .collect::<Vec<_>>();
+            let native_names = native_commands
+                .iter()
+                .map(|command| command.name.to_string())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                native_names,
+                ["compact", "clear", "skills", "status", "goal", "grind"]
+            );
+            assert!(!native_names.iter().any(|name| name == "help"));
+            for command in native_commands {
+                assert_eq!(
+                    command.requires_argument,
+                    matches!(command.name.as_ref(), "goal" | "grind")
+                );
+            }
+        });
+
+        editor.update_in(cx, |editor, window, cx| {
+            editor.set_message(
+                vec![
+                    acp::ContentBlock::from("/unknown keep this "),
+                    acp::ContentBlock::ResourceLink(acp::ResourceLink::new(
+                        "main.rs",
+                        "file:///project/src/main.rs",
+                    )),
+                ],
+                window,
+                cx,
+            );
+        });
+        let before = editor
+            .update(cx, |editor, cx| editor.draft_contents(cx))
+            .await
+            .unwrap();
+        thread_view.update_in(cx, |view, window, cx| view.send(window, cx));
+        cx.run_until_parked();
+
+        let after = editor
+            .update(cx, |editor, cx| editor.draft_contents(cx))
+            .await
+            .unwrap();
+        assert_eq!(
+            after, before,
+            "unknown command must preserve rich editor content"
+        );
+        assert_eq!(model.completion_count(), 0);
+        thread_view.read_with(cx, |view, _cx| {
+            let ThreadError::Other { message, .. } = view
+                .thread_error
+                .as_ref()
+                .expect("unknown command should use the existing error callout")
+            else {
+                panic!("expected the generic conversation error")
+            };
+            assert!(message.contains("/unknown is not a recognized command"));
+            for command in [
+                "/compact", "/clear", "/skills", "/status", "/goal", "/grind",
+            ] {
+                assert!(message.contains(command));
+            }
+        });
+
+        editor.update_in(cx, |editor, window, cx| {
+            editor.editor().update(cx, |editor, cx| {
+                editor.set_text("corrected ordinary prompt", window, cx)
+            });
+        });
+        thread_view.update_in(cx, |view, window, cx| view.send(window, cx));
+        cx.run_until_parked();
+        assert_eq!(model.completion_count(), 1);
+        model.send_last_completion_stream_text_chunk("done");
+        model.end_last_completion_stream();
+        cx.run_until_parked();
+    }
+
+    #[gpui::test]
+    async fn test_goal_grind_command_arguments_are_sent_as_single_native_prompt(
+        cx: &mut TestAppContext,
+    ) {
+        init_test(cx);
+        let connection = RecordingNativeCommandConnection::new(false);
+        let prompts = connection.prompts.clone();
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(connection), cx).await;
+        let editor = message_editor(&conversation_view, cx);
+        let thread = active_thread(&conversation_view, cx);
+
+        editor.update_in(cx, |editor, window, cx| {
+            editor.set_message(
+                vec![
+                    acp::ContentBlock::from("/goal ship the complete migration "),
+                    acp::ContentBlock::ResourceLink(acp::ResourceLink::new(
+                        "requirements.md",
+                        "file:///project/requirements.md",
+                    )),
+                ],
+                window,
+                cx,
+            );
+        });
+        thread.update_in(cx, |view, window, cx| view.send(window, cx));
+        cx.run_until_parked();
+
+        {
+            let prompts = prompts.lock();
+            assert_eq!(prompts.len(), 1, "goal arguments must not be queued");
+            assert!(matches!(
+                prompts[0].prompt.as_slice(),
+                [
+                    acp::ContentBlock::Text(_),
+                    acp::ContentBlock::ResourceLink(_)
+                ]
+            ));
+            let acp::ContentBlock::Text(text) = &prompts[0].prompt[0] else {
+                unreachable!()
+            };
+            assert_eq!(text.text, "/goal ship the complete migration ");
+        }
+        thread.read_with(cx, |view, _| assert!(view.message_queue.is_empty()));
+
+        editor.update_in(cx, |editor, window, cx| {
+            editor.set_text("/grind max_turns=7", window, cx);
+        });
+        thread.update_in(cx, |view, window, cx| view.send(window, cx));
+        cx.run_until_parked();
+
+        {
+            let prompts = prompts.lock();
+            assert_eq!(prompts.len(), 2, "grind limit must not be queued");
+            assert_eq!(
+                prompts[1].prompt,
+                vec![acp::ContentBlock::from("/grind max_turns=7")]
+            );
+        }
+        thread.read_with(cx, |view, _| assert!(view.message_queue.is_empty()));
+
+        thread.update_in(cx, |view, window, cx| {
+            view.add_to_queue(
+                vec![acp::ContentBlock::from("/goal queued goal text")],
+                Vec::new(),
+                window,
+                cx,
+            );
+            let id = view.message_queue.first_id().unwrap();
+            view.send_queued_message_now(id, window, cx);
+        });
+        cx.run_until_parked();
+        let prompts = prompts.lock();
+        assert_eq!(prompts.len(), 3);
+        assert_eq!(
+            prompts[2].prompt,
+            vec![acp::ContentBlock::from("/goal queued goal text")]
+        );
+        thread.read_with(cx, |view, _| assert!(view.message_queue.is_empty()));
+    }
+
+    #[gpui::test]
+    async fn test_native_command_queued_command_preserves_rich_remainder(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        for command_name in ["compact", "clear", "skills", "status"] {
+            let connection = RecordingNativeCommandConnection::new(false);
+            let prompts = connection.prompts.clone();
+            let (conversation_view, cx) =
+                setup_conversation_view(StubAgentServer::new(connection), cx).await;
+            let editor = message_editor(&conversation_view, cx);
+            editor.update_in(cx, |editor, window, cx| {
+                editor.set_message(
+                    vec![
+                        acp::ContentBlock::from(format!("/{command_name} follow up ")),
+                        acp::ContentBlock::ResourceLink(acp::ResourceLink::new(
+                            "main.rs",
+                            "file:///project/src/main.rs",
+                        )),
+                        acp::ContentBlock::Image(acp::ImageContent::new(
+                            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+                            "image/png",
+                        )),
+                    ],
+                    window,
+                    cx,
+                );
+            });
+            active_thread(&conversation_view, cx)
+                .update_in(cx, |view, window, cx| view.send(window, cx));
+            cx.run_until_parked();
+
+            let prompts = prompts.lock();
+            assert_eq!(
+                prompts.len(),
+                2,
+                "{command_name} should send command then remainder"
+            );
+            assert_eq!(prompts[0].prompt, vec![format!("/{command_name}").into()]);
+            assert!(matches!(
+                prompts[1].prompt.as_slice(),
+                [
+                    acp::ContentBlock::Text(_),
+                    acp::ContentBlock::ResourceLink(_),
+                    acp::ContentBlock::Image(_)
+                ]
+            ));
+            let acp::ContentBlock::Text(text) = &prompts[1].prompt[0] else {
+                unreachable!()
+            };
+            assert_eq!(text.text, "follow up ");
+        }
+    }
+
+    #[gpui::test]
+    async fn test_native_command_queued_failure_does_not_fast_track(cx: &mut TestAppContext) {
+        init_test(cx);
+        let connection = RecordingNativeCommandConnection::new(true);
+        let prompts = connection.prompts.clone();
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::new(connection), cx).await;
+        message_editor(&conversation_view, cx).update_in(cx, |editor, window, cx| {
+            editor.set_text("/clear do not send this yet", window, cx);
+        });
+        let thread = active_thread(&conversation_view, cx);
+        thread.update_in(cx, |view, window, cx| view.send(window, cx));
+        cx.run_until_parked();
+
+        assert_eq!(prompts.lock().len(), 1);
+        thread.read_with(cx, |view, _cx| {
+            assert_eq!(view.message_queue.len(), 1);
+            assert!(view.thread_error.is_some());
+        });
+    }
+
+    #[gpui::test]
+    async fn test_context_loading_issue_dismissal_recovery_and_recurrence(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (conversation_view, cx) =
+            setup_conversation_view(StubAgentServer::default_response(), cx).await;
+        let thread = active_thread(&conversation_view, cx);
+        let project_id =
+            thread.read_with(cx, |view, cx| view.thread.read(cx).project().entity_id());
+        let issue = SkillLoadingIssue {
+            project_id,
+            path: PathBuf::from("/private/workspace/project/AGENTS.md"),
+            source_label: Some("project".into()),
+            relative_path: Some(PathBuf::from("AGENTS.md")),
+            message: "The project instruction file could not be read.".into(),
+            kind: SkillLoadingIssueKind::ProjectInstructionLoadFailed,
+        };
+
+        assert_eq!(
+            thread_view::context_loading_issue_path_label(&issue),
+            "project/AGENTS.md"
+        );
+        assert!(
+            !thread_view::context_loading_issue_path_label(&issue).contains("/private/workspace")
+        );
+
+        thread.update(cx, |view, cx| {
+            view.update_context_loading_issues(std::slice::from_ref(&issue), cx)
+        });
+        thread.read_with(cx, |view, _cx| {
+            assert_eq!(view.skill_loading_issues, vec![issue.clone()]);
+        });
+
+        thread.update(cx, |view, _cx| {
+            view.dismiss_context_loading_issue_for_test(issue.clone())
+        });
+        thread.update(cx, |view, cx| {
+            view.update_context_loading_issues(std::slice::from_ref(&issue), cx)
+        });
+        thread.read_with(cx, |view, _cx| {
+            assert!(view.skill_loading_issues.is_empty())
+        });
+
+        thread.update(cx, |view, cx| view.update_context_loading_issues(&[], cx));
+        thread.update(cx, |view, cx| {
+            view.update_context_loading_issues(std::slice::from_ref(&issue), cx)
+        });
+        thread.read_with(cx, |view, _cx| {
+            assert_eq!(view.skill_loading_issues, vec![issue]);
+        });
     }
 
     fn add_to_workspace(conversation_view: Entity<ConversationView>, cx: &mut VisualTestContext) {

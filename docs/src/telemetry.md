@@ -5,7 +5,9 @@ description: "What data Sim collects and how to control telemetry settings."
 
 # Telemetry in Sim
 
-Sim collects anonymous telemetry to understand usage patterns and diagnose issues.
+Sim supports anonymous telemetry to understand usage patterns and diagnose issues.
+Client-side telemetry is temporarily disabled by default and is sent only after
+you explicitly enable it.
 
 Telemetry falls into two categories:
 
@@ -14,19 +16,27 @@ Telemetry falls into two categories:
 
 ## Configuring Telemetry Settings
 
-You have full control over what data is sent out by Sim.
-To enable or disable some or all telemetry types, open Settings ({#kb sim::OpenSettings}) and search for "telemetry", or add the following to your settings file:
+You have full control over what data is sent out by Sim. To explicitly enable or
+disable some or all client-side telemetry types, open Settings
+({#kb sim::OpenSettings}) and search for "telemetry", or set the existing keys in
+your settings file. For example, to opt in to both categories:
 
 ```json [settings]
 "telemetry": {
-    "diagnostics": false,
-    "metrics": false
+    "diagnostics": true,
+    "metrics": true
 },
 ```
 
+Both `telemetry.diagnostics` and `telemetry.metrics` currently default to
+`false`. These settings are the restoration point when client-side telemetry is
+re-enabled by policy; no separate feature flag or configuration system is used.
+
 ## Dataflow
 
-Telemetry is sent from the application to our servers every 5 minutes (or when 50 events accumulate), then routed to the appropriate service. We currently use:
+When enabled, telemetry is sent from the application to our servers every 5
+minutes (or when 50 events accumulate), then routed to the appropriate service.
+We currently use:
 
 - [Sentry](https://sentry.io): Crash-monitoring service - stores diagnostic events
 - [Snowflake](https://snowflake.com): Data warehouse - stores both diagnostic and metric events

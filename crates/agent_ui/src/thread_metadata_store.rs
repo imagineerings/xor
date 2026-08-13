@@ -1835,6 +1835,7 @@ mod tests {
 
     fn make_db_thread(title: &str, updated_at: DateTime<Utc>) -> DbThread {
         DbThread {
+            goal: None,
             title: title.to_string().into(),
             messages: Vec::new(),
             updated_at,

@@ -28,7 +28,10 @@ Create traceable planning artifacts under `.agents/specs/{feature-name}/`, where
      .agents/specs/{feature-name}
    ```
 
-6. Report the files created or updated, material assumptions, validation
+6. Before handoff, perform the mandatory manual decomposition audit in
+   [tasks.md](references/tasks.md). The validator cannot prove semantic task
+   size or implementation readiness.
+7. Report the files created or updated, material assumptions, validation
    results, and unresolved decisions. Do not implement the feature.
 
 ## Authorization and review
@@ -48,6 +51,8 @@ Create traceable planning artifacts under `.agents/specs/{feature-name}/`, where
 - Include only sections that help implement or review this feature.
 - Give every acceptance criterion a stable ID such as `1.1`.
 - Trace every criterion through the design and at least one leaf task.
+- Structure implementation plans as milestone headings, epic parent tasks, and
+  implementation leaves. Never present a capability epic as a leaf.
 - Prefer concrete observable behavior over implementation detail in
   requirements.
 - Prefer the smallest design that satisfies the approved requirements without

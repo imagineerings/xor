@@ -1520,10 +1520,11 @@
   "word_diff_enabled": true,
   // Control what info is collected by Sim.
   "telemetry": {
-    // Send debug info like crash reports.
-    "diagnostics": true,
-    // Send anonymized usage data like what languages you're using Sim with.
-    "metrics": true,
+    // Temporarily disabled by default. Set to true to send debug info like crash reports.
+    "diagnostics": false,
+    // Temporarily disabled by default. Set to true to send anonymized usage data
+    // like what languages you're using Sim with.
+    "metrics": false,
     // Allow sending requests to Anthropic models that cannot be offered with
     // Zero Data Retention
     "anthropic_retention": false,
