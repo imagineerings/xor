@@ -620,8 +620,20 @@ pub fn grid_sample_tensor_with_context_exact_native(
     context: &ExecutionContext<'_>,
 ) -> Result<Tensor, SpatialFunctionalKernelError> {
     context.check()?;
-    validate_grid_sample_tensor(backend, input, "input", context)?;
-    validate_grid_sample_tensor(backend, grid, "grid", context)?;
+    validate_real_tensor(
+        backend,
+        input,
+        "input",
+        GRID_SAMPLE_OPERATION_ID,
+        context,
+    )?;
+    validate_real_tensor(
+        backend,
+        grid,
+        "grid",
+        GRID_SAMPLE_OPERATION_ID,
+        context,
+    )?;
     if grid.descriptor().dtype() != DType::F32 {
         return Err(TensorError::DTypeMismatch {
             expected: DType::F32,
@@ -630,10 +642,11 @@ pub fn grid_sample_tensor_with_context_exact_native(
         .into());
     }
 
-    let input_shape = tensor_shape_to_usize(input, "input shape")?;
-    let grid_shape = tensor_shape_to_usize(grid, "grid shape")?;
-    let input_values = tensor_to_f32_workspace(backend, input, context)?;
-    let grid_values = tensor_to_f32_workspace(backend, grid, context)?;
+    let input_shape = tensor_shape_to_usize(input, GRID_SAMPLE_OPERATION_ID, "input shape")?;
+    let grid_shape = tensor_shape_to_usize(grid, GRID_SAMPLE_OPERATION_ID, "grid shape")?;
+    let input_values =
+        tensor_to_f32_workspace(backend, input, GRID_SAMPLE_OPERATION_ID, context)?;
+    let grid_values = tensor_to_f32_workspace(backend, grid, GRID_SAMPLE_OPERATION_ID, context)?;
     let geometry = GridGeometry::new(
         &input_values,
         &input_shape,
@@ -693,10 +706,11 @@ pub fn grid_sample_tensor_with_context_exact_native(
 }
 
 #[cfg(feature = "cpu")]
-fn validate_grid_sample_tensor(
+fn validate_real_tensor(
     backend: &CpuBackend,
     tensor: &Tensor,
     name: &'static str,
+    operation: &'static str,
     context: &ExecutionContext<'_>,
 ) -> Result<(), SpatialFunctionalKernelError> {
     if tensor.descriptor().device() != backend.device() {
@@ -715,7 +729,7 @@ fn validate_grid_sample_tensor(
     }
     if tensor.descriptor().dtype().class() != NumericClass::FloatingPoint {
         return invalid(
-            GRID_SAMPLE_OPERATION_ID,
+            operation,
             format!("{name} must have a floating-point dtype"),
         );
     }
@@ -724,7 +738,7 @@ fn validate_grid_sample_tensor(
         DType::F16 | DType::Bf16 | DType::F32
     ) {
         return invalid(
-            GRID_SAMPLE_OPERATION_ID,
+            operation,
             format!("{name} dtype must be F16, BF16, or F32"),
         );
     }
@@ -734,6 +748,7 @@ fn validate_grid_sample_tensor(
 #[cfg(feature = "cpu")]
 fn tensor_shape_to_usize(
     tensor: &Tensor,
+    operation: &'static str,
     subject: &'static str,
 ) -> Result<Vec<usize>, SpatialFunctionalKernelError> {
     tensor
@@ -741,7 +756,7 @@ fn tensor_shape_to_usize(
         .shape()
         .iter()
         .map(|value| {
-            usize::try_from(*value).map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, subject))
+            usize::try_from(*value).map_err(|_| overflow(operation, subject))
         })
         .collect()
 }
@@ -750,17 +765,18 @@ fn tensor_shape_to_usize(
 fn tensor_to_f32_workspace(
     backend: &CpuBackend,
     tensor: &Tensor,
+    operation: &'static str,
     context: &ExecutionContext<'_>,
 ) -> Result<crate::CpuWorkspaceVec<f32>, SpatialFunctionalKernelError> {
     let element_count = usize::try_from(tensor.descriptor().element_count()?)
-        .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "tensor element count"))?;
+        .map_err(|_| overflow(operation, "tensor element count"))?;
     let mut values = backend.workspace_vec(context, element_count)?;
     for linear in 0..element_count {
         if linear.is_multiple_of(64) {
             context.check()?;
         }
         let linear = u64::try_from(linear)
-            .map_err(|_| overflow(GRID_SAMPLE_OPERATION_ID, "tensor linear index"))?;
+            .map_err(|_| overflow(operation, "tensor linear index"))?;
         let value = match tensor
             .descriptor()
             .dtype()
@@ -769,8 +785,8 @@ fn tensor_to_f32_workspace(
             DecodedScalar::Real(value) => value as f32,
             _ => {
                 return invalid(
-                    GRID_SAMPLE_OPERATION_ID,
-                    "grid sampling requires real tensor values",
+                    operation,
+                    "tensor spatial execution requires real values",
                 );
             }
         };
@@ -1346,6 +1362,84 @@ pub fn interpolate_with_context_exact_native(
     plan.apply(input, context)
 }
 
+#[cfg(feature = "cpu")]
+pub fn interpolate_tensor_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    configuration: &InterpolateConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    validate_real_tensor(
+        backend,
+        input,
+        "input",
+        INTERPOLATE_OPERATION_ID,
+        context,
+    )?;
+    let input_shape =
+        tensor_shape_to_usize(input, INTERPOLATE_OPERATION_ID, "input shape")?;
+    let input_values =
+        tensor_to_f32_workspace(backend, input, INTERPOLATE_OPERATION_ID, context)?;
+    let plan = InterpolatePlan::new(&input_values, &input_shape, configuration)?;
+    let mut output_values = backend.workspace_vec(context, plan.output_count()?)?;
+    for index in 0..plan.output_count()? {
+        if index.is_multiple_of(64) {
+            context.check()?;
+        }
+        output_values.try_push(0.0)?;
+    }
+    plan.accumulate_into(&input_values, &mut output_values, context)?;
+
+    let output_shape = plan
+        .output_shape
+        .iter()
+        .map(|value| {
+            u64::try_from(*value)
+                .map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "output shape"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let descriptor = TensorDescriptor::contiguous(
+        output_shape,
+        input.descriptor().dtype(),
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let (mut output, allocation_event) = backend.allocate(descriptor, context)?;
+    backend.wait_event(allocation_event, context)?;
+    let dtype = output.descriptor().dtype();
+    let byte_width = usize::try_from(dtype.byte_width())
+        .map_err(|_| overflow(INTERPOLATE_OPERATION_ID, "output dtype width"))?;
+    {
+        let mut write = output.write()?;
+        let output_bytes = write.bytes_mut()?;
+        for (index, value) in output_values.iter().copied().enumerate() {
+            if index.is_multiple_of(64) {
+                context.check()?;
+            }
+            let start = index
+                .checked_mul(byte_width)
+                .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "output byte index"))?;
+            let end = start
+                .checked_add(byte_width)
+                .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "output byte range"))?;
+            let destination = output_bytes
+                .get_mut(start..end)
+                .ok_or_else(|| overflow(INTERPOLATE_OPERATION_ID, "output byte destination"))?;
+            let encoded = dtype.encode_scalar(
+                Scalar::Float(f64::from(value)),
+                INTERPOLATE_OPERATION_ID,
+                DeviceId::CPU,
+            )?;
+            destination.copy_from_slice(&encoded);
+        }
+    }
+    let event = backend.record_event(context)?;
+    backend.wait_event(event, context)?;
+    context.check()?;
+    Ok(output)
+}
+
 pub fn interpolate_vjp_with_context_exact_native(
     input: &[f32],
     input_shape: &[usize],
@@ -1521,6 +1615,26 @@ impl InterpolatePlan {
         context: &ExecutionContext<'_>,
     ) -> Result<TensorValues, SpatialFunctionalKernelError> {
         let mut output = vec![0.0_f32; self.output_count()?];
+        self.accumulate_into(input, &mut output, context)?;
+        context.cancellation.check()?;
+        Ok(TensorValues {
+            values: output,
+            shape: self.output_shape.clone(),
+        })
+    }
+
+    fn accumulate_into(
+        &self,
+        input: &[f32],
+        output: &mut [f32],
+        context: &ExecutionContext<'_>,
+    ) -> Result<(), SpatialFunctionalKernelError> {
+        require_length(
+            INTERPOLATE_OPERATION_ID,
+            "interpolate output",
+            output.len(),
+            self.output_count()?,
+        )?;
         self.for_each_connection(context, |input_index, output_index, weight| {
             let source = input.get(input_index).copied().ok_or_else(|| {
                 overflow(INTERPOLATE_OPERATION_ID, "interpolate input index")
@@ -1530,11 +1644,6 @@ impl InterpolatePlan {
             })?;
             *destination = source.mul_add(weight, *destination);
             Ok(())
-        })?;
-        context.cancellation.check()?;
-        Ok(TensorValues {
-            values: output,
-            shape: self.output_shape.clone(),
         })
     }
 

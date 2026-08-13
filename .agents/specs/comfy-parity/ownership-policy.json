@@ -17515,7 +17515,8 @@
         "NativeBilinearWeight and NativeLinearWeight are immutable checked sample DTOs with coordinate derivatives",
         "Task 89 grid_sample owns normalized-grid projection and reflection folding then delegates zero/border linear and bilinear bounds, weights, and derivatives here",
         "Task 89 interpolate owns the PyTorch functional size/scale/rank contract and focused separable 1D/3D extension; its linear and bilinear axes delegate checked bounds and weights here rather than creating a second boundary validator",
-        "The native tensor grid-sample foundation projects retained F16/BF16/F32 Tensor input and F32 grid storage through Task 89 GridGeometry, caller-authorized CPU workspace, and one fresh backend allocation; future RIFE execution consumes that adapter without owning another warp equation"
+        "The native tensor grid-sample foundation projects retained F16/BF16/F32 Tensor input and F32 grid storage through Task 89 GridGeometry, caller-authorized CPU workspace, and one fresh backend allocation; future RIFE execution consumes that adapter without owning another warp equation",
+        "The native tensor interpolation foundation projects retained F16/BF16/F32 Tensor input through Task 89 InterpolatePlan, caller-authorized F32 accumulation workspace, and one fresh backend allocation; future RIFE execution consumes that adapter without owning another resize equation"
       ],
       "definitions": [
         {
@@ -17567,6 +17568,16 @@
           "name": "tensor-grid-sample-proves-low-precision-failure-atomic-publication",
           "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
           "pattern": "grid_sample_tensor_is_bounded_dtype_preserving_and_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*WorkspaceAuthorizationExceeded[\\s\\S]*SpatialFunctionalKernelError::Cancelled"
+        },
+        {
+          "name": "tensor-interpolate-delegates-existing-plan-and-bounded-storage-owners",
+          "path": "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+          "pattern": "pub fn interpolate_tensor_with_context_exact_native[\\s\\S]*tensor_to_f32_workspace[\\s\\S]*InterpolatePlan::new[\\s\\S]*plan\\.accumulate_into[\\s\\S]*backend\\.allocate"
+        },
+        {
+          "name": "tensor-interpolate-proves-low-precision-failure-atomic-publication",
+          "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+          "pattern": "interpolate_tensor_is_bounded_dtype_preserving_and_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*WorkspaceAuthorizationExceeded[\\s\\S]*SpatialFunctionalKernelError::Cancelled"
         }
       ],
       "known_open_reasons": [],
@@ -17574,7 +17585,8 @@
         "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439",
         "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-4f9c05e204d4",
         "comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331",
-        "comfy-parity-native-tensor-grid-sample-foundation"
+        "comfy-parity-native-tensor-grid-sample-foundation",
+        "comfy-parity-native-tensor-interpolate-foundation"
       ],
       "production_consumers": [
         "native ROI Align",

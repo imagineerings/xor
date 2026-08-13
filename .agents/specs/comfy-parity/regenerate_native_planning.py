@@ -9702,6 +9702,44 @@ def native_tensor_grid_sample_foundation_task(dependency: str) -> dict[str, obje
     )
 
 
+def native_tensor_interpolate_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-tensor-interpolate-foundation",
+        "Publish bounded tensor interpolation for model execution",
+        [34, 35, 36, 41],
+        [25, 27, 28, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical spatial functional owner exposes one tensor-returning interpolation adapter over its existing size, scale, rank, coordinate, and separable-weight plan. The CPU path decodes F16/BF16/F32 input and accumulates output in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without a second interpolation equation, allocator, workspace, cancellation, model, cache, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/dtypes.rs",
+            "crates/comfy_tensor/src/ops/external_tensor_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove canonical bilinear interpolation for F16, BF16, and F32 input; F32 accumulation and output-dtype rounding; exact dtype/device/stream/shape preservation; fresh nonaliasing StorageId; unchanged input; pre-cancellation; caller-workspace exhaustion before publication; backend-memory convergence; and delegation to the existing InterpolatePlan and checked boundary-weight owners without an ordinary heap result vector.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11904,8 +11942,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     tensor_grid_sample_foundation = native_tensor_grid_sample_foundation_task(
         str(frame_interpolation_invocation_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    tensor_interpolate_foundation = native_tensor_interpolate_foundation_task(
         str(tensor_grid_sample_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(tensor_interpolate_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12006,6 +12047,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             frame_interpolation_resource_foundation,
             frame_interpolation_invocation_foundation,
             tensor_grid_sample_foundation,
+            tensor_interpolate_foundation,
             video_foundation,
             detection_foundation,
         ]

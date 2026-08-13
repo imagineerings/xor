@@ -17,9 +17,10 @@ use comfy_tensor::{
         convolution_jvp_with_context_exact_native, convolution_vjp_with_context_exact_native,
         grid_sample_jvp_with_context_exact_native, grid_sample_tensor_with_context_exact_native,
         grid_sample_vjp_with_context_exact_native, grid_sample_with_context_exact_native,
-        interpolate_jvp_with_context_exact_native, interpolate_vjp_with_context_exact_native,
-        interpolate_with_context_exact_native, max_pool_2d_jvp_with_context_exact_native,
-        max_pool_2d_vjp_with_context_exact_native, max_pool_2d_with_context_exact_native,
+        interpolate_jvp_with_context_exact_native, interpolate_tensor_with_context_exact_native,
+        interpolate_vjp_with_context_exact_native, interpolate_with_context_exact_native,
+        max_pool_2d_jvp_with_context_exact_native, max_pool_2d_vjp_with_context_exact_native,
+        max_pool_2d_with_context_exact_native,
     },
 };
 use sha2::{Digest, Sha256};
@@ -609,6 +610,108 @@ fn grid_sample_analytic_maps_match_finite_differences_and_adjoint_identity()
             close(&jvp.values, &finite_difference, 3.0e-3);
         }
     }
+    Ok(())
+}
+
+#[test]
+fn interpolate_tensor_is_bounded_dtype_preserving_and_failure_atomic()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let upload = |dtype: DType| {
+        let bytes = [1.0, 2.0, 3.0, 4.0]
+            .into_iter()
+            .map(|value| {
+                dtype.encode_scalar(
+                    Scalar::Float(value),
+                    "interpolate-tensor-test",
+                    DeviceId::CPU,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let descriptor =
+            TensorDescriptor::contiguous(vec![1, 1, 2, 2], dtype, DeviceId::CPU, context.stream)?;
+        Ok::<_, Box<dyn std::error::Error>>(backend.upload_bytes(descriptor, &bytes, &context)?.0)
+    };
+    let configuration = InterpolateConfiguration {
+        output_size: Some(vec![3, 3]),
+        scale_factor: None,
+        mode: InterpolateMode::Bilinear,
+        align_corners: Some(false),
+        recompute_scale_factor: None,
+        antialias: false,
+    };
+    let expected = [1.0, 1.5, 2.0, 2.0, 2.5, 3.0, 3.0, 3.5, 4.0];
+
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let input = upload(dtype)?;
+        let input_bytes = input.contiguous_bytes()?.to_vec();
+        let output = interpolate_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &context,
+        )?;
+        assert_eq!(output.descriptor().shape(), [1, 1, 3, 3]);
+        assert_eq!(output.descriptor().dtype(), dtype);
+        assert_eq!(output.descriptor().device(), DeviceId::CPU);
+        assert_eq!(output.descriptor().stream(), StreamId::DEFAULT);
+        assert_ne!(output.storage_id(), input.storage_id());
+        let values = tensor_to_f32_with_context_exact_native(&backend, &output, &context)?;
+        close(&values, &expected, 0.0);
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+    }
+
+    let input = upload(DType::F32)?;
+    let before_failure = backend.memory_snapshot();
+    let limited_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(51)?,
+        &cancellation,
+    );
+    assert!(matches!(
+        interpolate_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &limited_context,
+        ),
+        Err(SpatialFunctionalKernelError::Tensor(
+            comfy_tensor::TensorError::WorkspaceAuthorizationExceeded { .. }
+        ))
+    ));
+    assert_eq!(limited_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(backend.limit)?,
+        &cancelled,
+    );
+    assert!(matches!(
+        interpolate_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &cancelled_context,
+        ),
+        Err(SpatialFunctionalKernelError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
     Ok(())
 }
 
