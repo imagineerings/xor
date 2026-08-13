@@ -3449,7 +3449,7 @@
         {
           "name": "native-output-effects-bind-checked-media-identity",
           "path": "crates/comfy_nodes/src/execution.rs",
-          "pattern": "pub enum NativeOutputMediaKind[\\s\\S]*pub fn checked_media[\\s\\S]*valid_output_media_type[\\s\\S]*sim\\.comfy\\.native-output-effect\\.v2"
+          "pattern": "pub enum NativeOutputMediaKind[\\s\\S]*pub fn accepts[\\s\\S]*pub fn checked_media[\\s\\S]*media_kind\\.accepts[\\s\\S]*sim\\.comfy\\.native-output-effect\\.v2"
         },
         {
           "name": "output-committer-revalidates-relative-prefix-containment",
@@ -3465,6 +3465,11 @@
           "name": "native-worker-output-maps-to-canonical-output-proposal",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "NativeImageOutputProposal[\\s\\S]*from_worker_proposal[\\s\\S]*OutputProposal::new"
+        },
+        {
+          "name": "native-output-projection-preserves-typed-media-and-legacy-image-recovery",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "NativeImageOutputProposalMetadataV1[\\s\\S]*NativeOutputMediaKind[\\s\\S]*decode_output_proposal_metadata[\\s\\S]*output_media_kind"
         },
         {
           "name": "committed-output-receipt-retains-projection-metadata",
@@ -3491,10 +3496,11 @@
       "consolidation_tasks": [
         "comfy-parity-execution-output-owner-consolidation",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
-        "comfy-parity-wave39-vendor-execution-ownership-consolidation"
-        ,"comfy-parity-native-node-asset-effect-foundation",
+        "comfy-parity-wave39-vendor-execution-ownership-consolidation",
+        "comfy-parity-native-node-asset-effect-foundation",
         "comfy-parity-native-video-output-prefix-foundation",
-        "comfy-parity-native-video-output-media-foundation"
+        "comfy-parity-native-video-output-media-foundation",
+        "comfy-parity-native-video-output-projection-foundation"
       ],
       "production_consumers": [
         "native image execution controller",
@@ -6206,10 +6212,10 @@
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "impl GuidanceDenoiser for Sd15GuidanceDenoiser[\\s\\S]*execute_guidance\\("
         },
-    {
-      "name": "runtime-cache-binds-guidance-version",
-      "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-      "pattern": "sha256_tagged\\(\\s*\"sim\\.comfy\\.guidance-adapter\\.identity\\.v1\",\\s*\\[GUIDANCE_ADAPTER_ID\\.as_bytes\\(\\)\\]"
+        {
+          "name": "runtime-cache-binds-guidance-version",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "sha256_tagged\\(\\s*\"sim\\.comfy\\.guidance-adapter\\.identity\\.v1\",\\s*\\[GUIDANCE_ADAPTER_ID\\.as_bytes\\(\\)\\]"
         },
         {
           "name": "fixture-generator-uses-runtime-guidance-adapter",
@@ -6228,11 +6234,11 @@
         }
       ],
       "known_open_reasons": [],
-  "consolidation_tasks": [
-    "comfy-parity-conditioning-guidance-adapter",
-    "comfy-parity-native-guidance-owner-consolidation",
-    "comfy-parity-native-conditioning-patches"
-  ],
+      "consolidation_tasks": [
+        "comfy-parity-conditioning-guidance-adapter",
+        "comfy-parity-native-guidance-owner-consolidation",
+        "comfy-parity-native-conditioning-patches"
+      ],
       "production_consumers": [
         "native diffusion KSampler",
         "sampler guidance hooks",
@@ -6512,8 +6518,8 @@
       "production_consumers": [
         "native CLIP prompt tokenization",
         "native textual-inversion prompt expansion",
-        "native SentencePiece tokenizer-family adapters"
-        ,"native Qwen2 and Qwen3.5 byte-BPE prompt tokenization",
+        "native SentencePiece tokenizer-family adapters",
+        "native Qwen2 and Qwen3.5 byte-BPE prompt tokenization",
         "native Gemma3 SentencePiece and Gemma4 tokenizer-JSON prompt tokenization and generated-text cleanup"
       ],
       "requirements": [
@@ -8233,10 +8239,10 @@
         "AbiManifest, CANN version and symbol/layout rows, discovery candidates, and loader errors are focused boundary or observation DTOs that do not own trust, binding, device identity, or capabilities",
         "SignedPackageRoot is a discovery boundary only; RegistryCertifiedNpuImages is a non-cloneable opaque input that retains the caller's complete NativeFfiRegistry certification bundle and is the only raw-handle projection into the private unsafe owner; the private non-cloneable NativeNpuSymbols callable table exists only inside OwnedNpuCore beside those retained images",
         "comfy_types::NativeBackendBindingStatus remains the only binding DTO and NpuBackend always returns Unbound until the runtime registry maps the exact retained images",
-        "the package command rejects CANN payloads and checks only canonical structure and coverage; NativeFfiRegistry remains the cryptographic verification and certificate owner"
-        ,"comfy_runtime::NpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-npu-package-v1 domain; native_ffi_npu verifies the signed package before mapping strict DTOs once into one callable and one explicit dependency-only NativeFfiContract row"
-        ,"native_ffi_npu delegates recursive path security to ArtifactRoot, bounded two-pass package capture and coverage validation to comfy_runtime::trust, and exact native image capture, digesting, sealing, and retained-descriptor lifetime to the canonical Unix native-library owner"
-        ,"libruntime.so is an exact dependency-only image required_by ascendcl; it has no reviewed callable declaration, cannot satisfy required_symbols_for or callable authorize, and is opened only before the certified libascendcl.so callable surface"
+        "the package command rejects CANN payloads and checks only canonical structure and coverage; NativeFfiRegistry remains the cryptographic verification and certificate owner",
+        "comfy_runtime::NpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-npu-package-v1 domain; native_ffi_npu verifies the signed package before mapping strict DTOs once into one callable and one explicit dependency-only NativeFfiContract row",
+        "native_ffi_npu delegates recursive path security to ArtifactRoot, bounded two-pass package capture and coverage validation to comfy_runtime::trust, and exact native image capture, digesting, sealing, and retained-descriptor lifetime to the canonical Unix native-library owner",
+        "libruntime.so is an exact dependency-only image required_by ascendcl; it has no reviewed callable declaration, cannot satisfy required_symbols_for or callable authorize, and is opened only before the certified libascendcl.so callable surface"
       ],
       "definitions": [
         {
@@ -8691,11 +8697,11 @@
           "path": "crates/comfy_backend_xpu/src/loader.rs",
           "pattern": "RegistryCertifiedXpuImages[\\s\\S]*struct LevelZeroSymbols[\\s\\S]*struct OneDnnSymbols[\\s\\S]*pub\\(crate\\) struct OwnedXpuCore[\\s\\S]*impl Drop for OwnedXpuCore"
         },
-      {
-        "name": "task141-xpu-safe-session-serializes-the-owned-core",
-        "path": "crates/comfy_backend_xpu/src/execution.rs",
-        "pattern": "(?=[\\s\\S]*XpuExecutionSession)(?=[\\s\\S]*Mutex<RuntimeState>)(?=[\\s\\S]*CancellationToken)(?=[\\s\\S]*test-support)"
-      },
+        {
+          "name": "task141-xpu-safe-session-serializes-the-owned-core",
+          "path": "crates/comfy_backend_xpu/src/execution.rs",
+          "pattern": "(?=[\\s\\S]*XpuExecutionSession)(?=[\\s\\S]*Mutex<RuntimeState>)(?=[\\s\\S]*CancellationToken)(?=[\\s\\S]*test-support)"
+        },
         {
           "name": "task141-xpu-package-verifies-reviewed-execution-evidence",
           "path": "script/package-comfy-backend-xpu",
@@ -9673,91 +9679,6 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "comfy_model::vae is the single authoritative VAE domain: it owns profile compatibility, persisted identity admission, descriptors, model binding, generic and typed structured execution boundaries, cancellation, and publication. The pinned-source vae_architecture module only recognizes and normalizes source checkpoint forms, then maps them through the canonical ModelStore, latent registry, VAE profile, descriptor, and NativeModule contracts. vae_structured owns only Hunyuan3D and TripoSplat source topology, exact state manifests, and equations; it consumes canonical Tensor handles plus caller workspace, RNG, and cancellation and does not create a 3D media, asset, path, index, plan, retry, queue, cache, persistence, or transaction owner."
-    },
-    {
-      "concern": "native_video_component_domain",
-      "canonical_owner": "comfy_media::NativeVideoPayload",
-      "owner_files": [
-        "crates/comfy_media/src/native_node_payload.rs"
-      ],
-      "owner_symbols": [
-        "NativeVideoPayload",
-        "NativeVideoBitDepth"
-      ],
-      "allowed_adapters": [
-        "comfy_runtime::provider_materialization transports the canonical VIDEO component value without changing its frame rate, bit depth, tensors, audio, alpha, metadata, or digest",
-        "comfy_nodes::NativeStoredPayload projects the canonical VIDEO value into the existing sealed handle, digest, and residency boundary"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_media/src/native_node_payload.rs",
-          "qualified": "comfy_media::NativeVideoPayload",
-          "role": "canonical",
-          "symbol": "NativeVideoPayload"
-        },
-        {
-          "path": "crates/comfy_media/src/native_node_payload.rs",
-          "qualified": "comfy_media::NativeVideoBitDepth",
-          "role": "canonical",
-          "symbol": "NativeVideoBitDepth"
-        }
-      ],
-      "call_symbols": [
-        "NativeVideoPayload",
-        "NativeVideoBitDepth"
-      ],
-      "required_mappings": [
-        {
-          "name": "video-component-owner-retains-typed-depth-and-exact-rational-rate",
-          "path": "crates/comfy_media/src/native_node_payload.rs",
-          "pattern": "pub enum NativeVideoBitDepth[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*greatest_common_divisor"
-        },
-        {
-          "name": "video-component-digest-binds-depth-rate-and-components",
-          "path": "crates/comfy_media/src/native_node_payload.rs",
-          "pattern": "sim\\.comfy\\.media\\.video\\.v2[\\s\\S]*frame_rate_numerator\\.to_le_bytes[\\s\\S]*frame_rate_denominator\\.to_le_bytes[\\s\\S]*bit_depth\\.bits[\\s\\S]*hash_tensor\\(b\"frames\""
-        },
-        {
-          "name": "provider-transport-preserves-video-component-identity",
-          "path": "crates/comfy_runtime/src/provider_materialization.rs",
-          "pattern": "Video \\{[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*bit_depth: u8[\\s\\S]*bit_depth: payload\\.bit_depth\\(\\)\\.bits\\(\\)[\\s\\S]*NativeVideoBitDepth::try_from"
-        },
-        {
-          "name": "video-component-fixture-is-source-fingerprinted-and-codec-free",
-          "path": "crates/comfy_test_support/fixtures/video/components/manifest.json",
-          "pattern": "code-inferred-component-contract[\\s\\S]*exact_float_frame_rates[\\s\\S]*intentional_native_narrowing[\\s\\S]*codec_numeric_oracle"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-native-video-component-foundation"
-      ],
-      "production_consumers": [
-        "native VIDEO handles",
-        "provider-native VIDEO transport",
-        "future native video codec and frame-interpolation adapters"
-      ],
-      "requirements": [
-        "Requirement 34",
-        "Requirement 35",
-        "Requirement 36",
-        "Requirement 37",
-        "Requirement 41"
-      ],
-      "design": [
-        "D25",
-        "D28",
-        "D34",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-MEDIA-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "NativeVideoPayload is the sole in-memory VIDEO component value. It owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, duration, dimensions, content identity, and alias-aware residency. Provider and stored-payload layers only transport or seal that value. Codec/container execution, filesystem paths, interpolation state, cache, persistence, and publication remain outside this concern."
     },
     {
       "concern": "native_node_registry",
@@ -11411,6 +11332,98 @@
       "decision_reason": "roi_align_with_context_exact_native and its private RoiAlignPlan own the distinct ROI coordinate, adaptive-grid, boundary, and bilinear traversal. Its analytical maps reuse the same plan while Tensor and CpuBackend retain storage and allocation."
     },
     {
+      "concern": "native_sdpose_execution_composition",
+      "canonical_owner": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_execution_controller.rs"
+      ],
+      "owner_symbols": [
+        "execute_native_sdpose_keypoint_extraction"
+      ],
+      "allowed_adapters": [
+        "NativeSdPoseModel retains exact denoiser, capture, heatmap-head, identity, and residency ownership",
+        "NativeVae retains canonical image encoding and latent-format ownership",
+        "ImageTensor and comfy_tensor retain resize, crop, layout, cast, allocation, workspace, and cancellation ownership",
+        "sample_lotus_sdpose_one_step_euler retains the canonical no-RNG simple-schedule Euler transition",
+        "NativeHandleStoreGeneration retains handle resolution, leases, capacity, forgery, and final publication ownership"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "^pub fn execute_native_sdpose_keypoint_extraction",
+          "qualified": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
+          "role": "canonical",
+          "symbol": "execute_native_sdpose_keypoint_extraction"
+        }
+      ],
+      "call_symbols": [
+        "execute_native_sdpose_keypoint_extraction",
+        "compose_native_sdpose_keypoints"
+      ],
+      "required_mappings": [
+        {
+          "name": "task407-resolves-and-retains-sealed-input-resources",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "resolve_native_sdpose_model[\\s\\S]*resolve_native_sdpose_vae[\\s\\S]*resolve_image_handle[\\s\\S]*resolve_native_sdpose_bounding_boxes"
+        },
+        {
+          "name": "task407-delegates-canonical-vae-lotus-head-and-projection",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "execute_sdpose_image_batch[\\s\\S]*vae\\.encode[\\s\\S]*sample_lotus_sdpose_one_step_euler[\\s\\S]*heatmap_head\\(\\)\\.forward[\\s\\S]*project_sdpose_heatmap_tensor"
+        },
+        {
+          "name": "task407-bbox-rules-are-checked-and-attempt-local",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "checked_sdpose_box[\\s\\S]*remap_sdpose_person"
+        },
+        {
+          "name": "task407-publishes-only-the-final-pose-payload",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "compose_native_sdpose_keypoints[\\s\\S]*context\\.cancellation\\.check[\\s\\S]*NativeStoredPayload::PoseKeypoint"
+        },
+        {
+          "name": "task407-fixture-pins-composition-without-checkpoint-overclaim",
+          "path": "crates/comfy_test_support/fixtures/sdpose/execution/manifest.json",
+          "pattern": "code-inferred-reduced-composition[\\s\\S]*rng_draws[\\s\\S]*licensed_checkpoint"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-sdpose-execution-foundation"
+      ],
+      "production_consumers": [
+        "native SDPoseKeypointExtractor node binding"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D34",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-SAMPLER-001",
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The runtime controller is the sole attempt-local SDPose composition owner. It retains resolved leases through exact image and bbox staging, VAE encode, deterministic Lotus sampling, feature capture, heatmap execution, DARK/OpenPose projection, and one final pose publication while model, tensor, sampler, media, handle-store, cache, and persistence ownership remain canonical and separate."
+    },
+    {
       "concern": "native_sdpose_heatmap_and_openpose_projection",
       "canonical_owner": "comfy_model::sdpose",
       "owner_files": [
@@ -11766,98 +11779,6 @@
       "decision_reason": "NativeSdPoseModel is the sole immutable retained owner joining the exact LotusD denoiser with the complete five-tensor heatmap head. NativeModelPayload and NativeStoredModelPayload provide a narrow sealed MODEL projection while the legacy SD15 diffusion accessor remains unchanged. Content identity is independent of physical placement, residency is a size-checked StorageId union, and invocation, sampler, RNG, cache, persistence, and output state remain outside the resource."
     },
     {
-      "concern": "native_sdpose_execution_composition",
-      "canonical_owner": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
-      "owner_files": [
-        "crates/comfy_runtime/src/native_execution_controller.rs"
-      ],
-      "owner_symbols": [
-        "execute_native_sdpose_keypoint_extraction"
-      ],
-      "allowed_adapters": [
-        "NativeSdPoseModel retains exact denoiser, capture, heatmap-head, identity, and residency ownership",
-        "NativeVae retains canonical image encoding and latent-format ownership",
-        "ImageTensor and comfy_tensor retain resize, crop, layout, cast, allocation, workspace, and cancellation ownership",
-        "sample_lotus_sdpose_one_step_euler retains the canonical no-RNG simple-schedule Euler transition",
-        "NativeHandleStoreGeneration retains handle resolution, leases, capacity, forgery, and final publication ownership"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "^pub fn execute_native_sdpose_keypoint_extraction",
-          "qualified": "comfy_runtime::native_execution_controller::execute_native_sdpose_keypoint_extraction",
-          "role": "canonical",
-          "symbol": "execute_native_sdpose_keypoint_extraction"
-        }
-      ],
-      "call_symbols": [
-        "execute_native_sdpose_keypoint_extraction",
-        "compose_native_sdpose_keypoints"
-      ],
-      "required_mappings": [
-        {
-          "name": "task407-resolves-and-retains-sealed-input-resources",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "resolve_native_sdpose_model[\\s\\S]*resolve_native_sdpose_vae[\\s\\S]*resolve_image_handle[\\s\\S]*resolve_native_sdpose_bounding_boxes"
-        },
-        {
-          "name": "task407-delegates-canonical-vae-lotus-head-and-projection",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "execute_sdpose_image_batch[\\s\\S]*vae\\.encode[\\s\\S]*sample_lotus_sdpose_one_step_euler[\\s\\S]*heatmap_head\\(\\)\\.forward[\\s\\S]*project_sdpose_heatmap_tensor"
-        },
-        {
-          "name": "task407-bbox-rules-are-checked-and-attempt-local",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "checked_sdpose_box[\\s\\S]*remap_sdpose_person"
-        },
-        {
-          "name": "task407-publishes-only-the-final-pose-payload",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "compose_native_sdpose_keypoints[\\s\\S]*context\\.cancellation\\.check[\\s\\S]*NativeStoredPayload::PoseKeypoint"
-        },
-        {
-          "name": "task407-fixture-pins-composition-without-checkpoint-overclaim",
-          "path": "crates/comfy_test_support/fixtures/sdpose/execution/manifest.json",
-          "pattern": "code-inferred-reduced-composition[\\s\\S]*rng_draws[\\s\\S]*licensed_checkpoint"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-native-sdpose-execution-foundation"
-      ],
-      "production_consumers": [
-        "native SDPoseKeypointExtractor node binding"
-      ],
-      "requirements": [
-        "Requirement 34",
-        "Requirement 35",
-        "Requirement 36",
-        "Requirement 37",
-        "Requirement 38",
-        "Requirement 41",
-        "Requirement 44"
-      ],
-      "design": [
-        "D18",
-        "D25",
-        "D26",
-        "D28",
-        "D31",
-        "D34",
-        "D41"
-      ],
-      "validation": [
-        "VAL-MODEL-FAMILY-001",
-        "VAL-SAMPLER-001",
-        "VAL-TENSOR-001",
-        "VAL-MEDIA-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "The runtime controller is the sole attempt-local SDPose composition owner. It retains resolved leases through exact image and bbox staging, VAE encode, deterministic Lotus sampling, feature capture, heatmap execution, DARK/OpenPose projection, and one final pose publication while model, tensor, sampler, media, handle-store, cache, and persistence ownership remain canonical and separate."
-    },
-    {
       "concern": "native_sgd_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_07::NativeSgd",
       "owner_files": [
@@ -12105,6 +12026,91 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "TextEncoderArchitectureRegistry is the sole versioned mapping from each source path and symbol to one of the four established native text-encoder owners and the sole aggregate registry identity. It owns no tokenizer parser, model weights, tensor equation, backend admission, workspace, RNG state, cancellation state, cache storage, persistence, or publication transition; all 398 executions remain in their focused canonical owners."
+    },
+    {
+      "concern": "native_video_component_domain",
+      "canonical_owner": "comfy_media::NativeVideoPayload",
+      "owner_files": [
+        "crates/comfy_media/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoPayload",
+        "NativeVideoBitDepth"
+      ],
+      "allowed_adapters": [
+        "comfy_runtime::provider_materialization transports the canonical VIDEO component value without changing its frame rate, bit depth, tensors, audio, alpha, metadata, or digest",
+        "comfy_nodes::NativeStoredPayload projects the canonical VIDEO value into the existing sealed handle, digest, and residency boundary"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVideoPayload",
+          "role": "canonical",
+          "symbol": "NativeVideoPayload"
+        },
+        {
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "qualified": "comfy_media::NativeVideoBitDepth",
+          "role": "canonical",
+          "symbol": "NativeVideoBitDepth"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoPayload",
+        "NativeVideoBitDepth"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-component-owner-retains-typed-depth-and-exact-rational-rate",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "pub enum NativeVideoBitDepth[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*greatest_common_divisor"
+        },
+        {
+          "name": "video-component-digest-binds-depth-rate-and-components",
+          "path": "crates/comfy_media/src/native_node_payload.rs",
+          "pattern": "sim\\.comfy\\.media\\.video\\.v2[\\s\\S]*frame_rate_numerator\\.to_le_bytes[\\s\\S]*frame_rate_denominator\\.to_le_bytes[\\s\\S]*bit_depth\\.bits[\\s\\S]*hash_tensor\\(b\"frames\""
+        },
+        {
+          "name": "provider-transport-preserves-video-component-identity",
+          "path": "crates/comfy_runtime/src/provider_materialization.rs",
+          "pattern": "Video \\{[\\s\\S]*frame_rate_numerator: u64[\\s\\S]*frame_rate_denominator: u64[\\s\\S]*bit_depth: u8[\\s\\S]*bit_depth: payload\\.bit_depth\\(\\)\\.bits\\(\\)[\\s\\S]*NativeVideoBitDepth::try_from"
+        },
+        {
+          "name": "video-component-fixture-is-source-fingerprinted-and-codec-free",
+          "path": "crates/comfy_test_support/fixtures/video/components/manifest.json",
+          "pattern": "code-inferred-component-contract[\\s\\S]*exact_float_frame_rates[\\s\\S]*intentional_native_narrowing[\\s\\S]*codec_numeric_oracle"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-component-foundation"
+      ],
+      "production_consumers": [
+        "native VIDEO handles",
+        "provider-native VIDEO transport",
+        "future native video codec and frame-interpolation adapters"
+      ],
+      "requirements": [
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeVideoPayload is the sole in-memory VIDEO component value. It owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, duration, dimensions, content identity, and alias-aware residency. Provider and stored-payload layers only transport or seal that value. Codec/container execution, filesystem paths, interpolation state, cache, persistence, and publication remain outside this concern."
     },
     {
       "concern": "native_vision_model_architectures",
@@ -14634,7 +14640,7 @@
         {
           "name": "sim-production-composes-existing-service-owners",
           "path": "crates/sim/src/comfy_plugin_services.rs",
-        "pattern": "RealSystemClock[\\s\\S]*PluginCapabilityBroker::new_with_provider_cost_acceptance\\([\\s\\S]*ModelStore::new[\\s\\S]*SimProviderActuator[\\s\\S]*SimCredentialActuator[\\s\\S]*PrivateWorkerPluginExecutor::new_with_provider_authorities"
+          "pattern": "RealSystemClock[\\s\\S]*PluginCapabilityBroker::new_with_provider_cost_acceptance\\([\\s\\S]*ModelStore::new[\\s\\S]*SimProviderActuator[\\s\\S]*SimCredentialActuator[\\s\\S]*PrivateWorkerPluginExecutor::new_with_provider_authorities"
         }
       ],
       "known_open_reasons": [],
@@ -22600,10 +22606,10 @@
           "path": "crates/comfy_model/tests/latent_format_foundation.rs",
           "pattern": "identity_and_registry_are_checked_and_stable[\\s\\S]*register_latent_format[\\s\\S]*val_latent_001_authoritative_foundation[\\s\\S]*per_channel_and_custom_transforms_round_trip"
         },
-      {
-        "name": "native-diffusion-sd15-adapters-use-canonical-row-and-operations",
-        "path": "crates/comfy_model/src/slices/native_diffusion.rs",
-        "pattern": "empty_latent as canonical_empty_latent[\\s\\S]*generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT[\\s\\S]*project_latent_preview as canonical_project_latent_preview[\\s\\S]*canonical_empty_latent\\([\\s\\S]*canonical_project_latent_preview\\(&SD15_LATENT_FORMAT"
+        {
+          "name": "native-diffusion-sd15-adapters-use-canonical-row-and-operations",
+          "path": "crates/comfy_model/src/slices/native_diffusion.rs",
+          "pattern": "empty_latent as canonical_empty_latent[\\s\\S]*generated_sd15_comfy_model_0045::LATENT_FORMAT as SD15_LATENT_FORMAT[\\s\\S]*project_latent_preview as canonical_project_latent_preview[\\s\\S]*canonical_empty_latent\\([\\s\\S]*canonical_project_latent_preview\\(&SD15_LATENT_FORMAT"
         }
       ],
       "known_open_reasons": [],

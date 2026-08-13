@@ -9518,6 +9518,42 @@ def native_video_output_media_foundation_task(dependency: str) -> dict[str, obje
     )
 
 
+def native_video_output_projection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-output-projection-foundation",
+        "Project typed native video output commits and recovery",
+        [18, 34, 36, 38, 41],
+        [18, 25, 28, 34, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The native prepared-output boundary carries checked media kind and type through worker proposals, OutputCommitter projection metadata, preview/output events, and committed-receipt recovery. Versioned metadata upgrades legacy v1 PNG receipts without weakening the authoritative output transaction or path owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/recovery.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused tests prove video/webm worker round-trip, typed preview and output projection, v2 committed-receipt recovery, strict media/extension collision rejection, legacy v1 image/png recovery compatibility, cancellation-safe final-only publication, and no second filesystem, journal, cache, codec, or recovery owner.",
+        [dependency],
+        locked=True,
+        criterion_ids=["18.2", "34.4", "34.6", "36.4", "38.4", "38.5", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -11705,8 +11741,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_output_media_foundation = native_video_output_media_foundation_task(
         str(video_component_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_output_projection_foundation = native_video_output_projection_foundation_task(
         str(video_output_media_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_output_projection_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -11802,6 +11841,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             video_output_prefix_foundation,
             video_component_foundation,
             video_output_media_foundation,
+            video_output_projection_foundation,
             video_foundation,
             detection_foundation,
         ]

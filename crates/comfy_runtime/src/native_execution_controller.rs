@@ -63,8 +63,8 @@ use comfy_nodes::{
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
-    NativeOutputEffectRequest, NativeOutputNamespace, NativeOutputShape, NativePreparedEffectKind,
-    NativePreparedEffectService,
+    NativeOutputEffectRequest, NativeOutputMediaKind, NativeOutputNamespace, NativeOutputShape,
+    NativePreparedEffectKind, NativePreparedEffectService,
 };
 use comfy_plugin_sdk::ProviderResultReceiptSet;
 use comfy_sampler::{
@@ -1143,7 +1143,7 @@ const fn metadata_enabled_by_default() -> bool {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-struct NativeImageOutputProposalMetadata {
+struct NativeImageOutputProposalMetadataV1 {
     schema_version: u16,
     pub node_id: NodeId,
     pub batch_index: u32,
@@ -1154,16 +1154,49 @@ struct NativeImageOutputProposalMetadata {
     pub height: u32,
 }
 
-const NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION: u16 = 1;
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+struct NativeImageOutputProposalMetadata {
+    schema_version: u16,
+    pub node_id: NodeId,
+    pub batch_index: u32,
+    pub namespace: AssetNamespace,
+    pub filename_prefix: String,
+    pub extension: String,
+    pub width: u32,
+    pub height: u32,
+    pub media_kind: NativeOutputMediaKind,
+    pub media_type: String,
+}
+
+const NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION: u16 = 2;
+const NATIVE_IMAGE_OUTPUT_PROPOSAL_LEGACY_SCHEMA_VERSION: u16 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeImageOutputProposal {
     node_id: NodeId,
     output: OutputProposal,
+    media_kind: NativeOutputMediaKind,
+    media_type: String,
 }
 
 impl NativeImageOutputProposal {
+    #[cfg(test)]
     fn new(node_id: NodeId, output: OutputProposal) -> Result<Self, NativeImageRuntimeError> {
+        Self::new_media(node_id, output, NativeOutputMediaKind::Image, "image/png")
+    }
+
+    fn new_media(
+        node_id: NodeId,
+        output: OutputProposal,
+        media_kind: NativeOutputMediaKind,
+        media_type: impl Into<String>,
+    ) -> Result<Self, NativeImageRuntimeError> {
+        let media_type = media_type.into();
+        if !media_kind.accepts(output.extension(), &media_type) {
+            return Err(NativeImageRuntimeError::Encoding(
+                "native output media identity does not match its extension".to_owned(),
+            ));
+        }
         let metadata = NativeImageOutputProposalMetadata {
             schema_version: NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION,
             node_id: node_id.clone(),
@@ -1173,6 +1206,8 @@ impl NativeImageOutputProposal {
             extension: output.extension().to_owned(),
             width: output.width(),
             height: output.height(),
+            media_kind,
+            media_type: media_type.clone(),
         };
         let output = output
             .with_projection_metadata(
@@ -1180,7 +1215,12 @@ impl NativeImageOutputProposal {
                     .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?,
             )
             .map_err(|error| NativeImageRuntimeError::Encoding(error.to_string()))?;
-        Ok(Self { node_id, output })
+        Ok(Self {
+            node_id,
+            output,
+            media_kind,
+            media_type,
+        })
     }
 
     pub fn proposal_id(&self) -> Uuid {
@@ -1195,6 +1235,14 @@ impl NativeImageOutputProposal {
         &self.output
     }
 
+    pub const fn media_kind(&self) -> NativeOutputMediaKind {
+        self.media_kind
+    }
+
+    pub fn media_type(&self) -> &str {
+        &self.media_type
+    }
+
     pub fn to_worker_proposal(&self) -> Result<WorkerOutputProposal, NativeImageRuntimeError> {
         let metadata = NativeImageOutputProposalMetadata {
             schema_version: NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION,
@@ -1205,6 +1253,8 @@ impl NativeImageOutputProposal {
             extension: self.output.extension().to_owned(),
             width: self.output.width(),
             height: self.output.height(),
+            media_kind: self.media_kind,
+            media_type: self.media_type.clone(),
         };
         WorkerOutputProposal::new(
             self.output.proposal_id(),
@@ -1219,14 +1269,8 @@ impl NativeImageOutputProposal {
         proposal: WorkerOutputProposal,
     ) -> Result<Self, NativeImageRuntimeError> {
         let (proposal_id, metadata, content) = proposal.into_parts();
-        let metadata: NativeImageOutputProposalMetadata = postcard::from_bytes(&metadata)
-            .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
-        if metadata.schema_version != NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION {
-            return Err(NativeImageRuntimeError::WorkerEvent(format!(
-                "unsupported native image output proposal schema {}",
-                metadata.schema_version
-            )));
-        }
+        let metadata = decode_output_proposal_metadata(&metadata)
+            .map_err(NativeImageRuntimeError::WorkerEvent)?;
         let output = OutputProposal::new(
             proposal_id,
             metadata.namespace,
@@ -1238,8 +1282,56 @@ impl NativeImageOutputProposal {
             content,
         )
         .map_err(|error| NativeImageRuntimeError::WorkerEvent(error.to_string()))?;
-        Self::new(metadata.node_id, output)
+        Self::new_media(
+            metadata.node_id,
+            output,
+            metadata.media_kind,
+            metadata.media_type,
+        )
     }
+}
+
+fn decode_output_proposal_metadata(
+    encoded: &[u8],
+) -> Result<NativeImageOutputProposalMetadata, String> {
+    if let Ok(metadata) = postcard::from_bytes::<NativeImageOutputProposalMetadata>(encoded) {
+        if metadata.schema_version != NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION {
+            return Err(format!(
+                "unsupported native image output proposal schema {}",
+                metadata.schema_version
+            ));
+        }
+        if !metadata
+            .media_kind
+            .accepts(&metadata.extension, &metadata.media_type)
+        {
+            return Err("native output media identity does not match its extension".to_owned());
+        }
+        return Ok(metadata);
+    }
+    let legacy = postcard::from_bytes::<NativeImageOutputProposalMetadataV1>(encoded)
+        .map_err(|error| error.to_string())?;
+    if legacy.schema_version != NATIVE_IMAGE_OUTPUT_PROPOSAL_LEGACY_SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported native image output proposal schema {}",
+            legacy.schema_version
+        ));
+    }
+    if legacy.extension != "png" {
+        return Err("legacy native image output proposal is not PNG".to_owned());
+    }
+    Ok(NativeImageOutputProposalMetadata {
+        schema_version: NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION,
+        node_id: legacy.node_id,
+        batch_index: legacy.batch_index,
+        namespace: legacy.namespace,
+        filename_prefix: legacy.filename_prefix,
+        extension: legacy.extension,
+        width: legacy.width,
+        height: legacy.height,
+        media_kind: NativeOutputMediaKind::Image,
+        media_type: "image/png".to_owned(),
+    })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -4776,6 +4868,8 @@ impl NativePreparedEffectService for NativeImagePreparedEffectService {
             .map_err(|_| NativeEffectServiceError::Rejected)?;
         let transaction_id =
             native_output_transaction_id(&self.identity, ordinal, request.request_digest_sha256());
+        let media_kind = request.media_kind();
+        let media_type = request.media_type().to_owned();
         let (width, height) = match request.shape() {
             NativeOutputShape::File => (0, 0),
             NativeOutputShape::Image { width, height } => (width, height),
@@ -4813,8 +4907,13 @@ impl NativePreparedEffectService for NativeImagePreparedEffectService {
         };
         let prepared = PreparedNativeImage {
             effect: effect.clone(),
-            proposal: NativeImageOutputProposal::new(effect.node_id, output)
-                .map_err(|_| NativeEffectServiceError::Rejected)?,
+            proposal: NativeImageOutputProposal::new_media(
+                effect.node_id,
+                output,
+                media_kind,
+                media_type,
+            )
+            .map_err(|_| NativeEffectServiceError::Rejected)?,
         };
         {
             let mut state = self.state.lock();
@@ -7139,6 +7238,7 @@ fn committed_event_inputs(
     }
     let mut inputs = Vec::with_capacity(proposals.len().saturating_mul(2));
     for (proposal, prepared) in proposals.iter().zip(prepared) {
+        let media_kind = output_media_kind(proposal.media_kind());
         let reference = prepared
             .identity
             .to_reference()
@@ -7153,8 +7253,8 @@ fn committed_event_inputs(
                         revision: 1,
                         frame_index: Some(u64::from(proposal.output.batch_index())),
                         output_index: Some(0),
-                        media_kind: OutputMediaKind::Image,
-                        media_type: "image/png".to_owned(),
+                        media_kind,
+                        media_type: proposal.media_type().to_owned(),
                         width: Some(proposal.output.width()),
                         height: Some(proposal.output.height()),
                         encoded_bytes: proposal.output.content().to_vec(),
@@ -7180,8 +7280,8 @@ fn committed_event_inputs(
                         .filename()
                         .unwrap_or("native-image.png")
                         .to_owned(),
-                    media_kind: OutputMediaKind::Image,
-                    media_type: "image/png".to_owned(),
+                    media_kind,
+                    media_type: proposal.media_type().to_owned(),
                     subfolder: Some(prepared.identity.subfolder().to_string_lossy().into_owned()),
                     storage_type: Some(prepared.identity.namespace.locator_type().to_owned()),
                     metadata: BTreeMap::from([("sha256".to_owned(), json!(prepared.sha256))]),
@@ -7209,14 +7309,19 @@ fn recovered_committed_event_inputs(
         .iter()
         .map(|receipt| {
             let operation = receipt.operation();
-            let metadata: NativeImageOutputProposalMetadata =
-                postcard::from_bytes(&operation.projection_metadata).map_err(|error| {
+            let metadata = decode_output_proposal_metadata(&operation.projection_metadata)
+                .map_err(|error| {
                     NativeImageRuntimeError::Execution(format!(
                         "committed output projection metadata is invalid: {error}"
                     ))
                 })?;
-            if metadata.schema_version != NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION
-                || metadata.namespace != operation.identity.namespace
+            if metadata.namespace != operation.identity.namespace
+                || operation
+                    .identity
+                    .relative_path
+                    .extension()
+                    .and_then(|value| value.to_str())
+                    != Some(metadata.extension.as_str())
             {
                 return Err(NativeImageRuntimeError::Execution(
                     "committed output projection metadata does not match its journal operation"
@@ -7243,8 +7348,8 @@ fn recovered_committed_event_inputs(
                             .filename()
                             .unwrap_or("native-image.png")
                             .to_owned(),
-                        media_kind: OutputMediaKind::Image,
-                        media_type: "image/png".to_owned(),
+                        media_kind: output_media_kind(metadata.media_kind),
+                        media_type: metadata.media_type,
                         subfolder: Some(
                             operation
                                 .identity
@@ -7272,6 +7377,19 @@ fn recovered_committed_event_inputs(
             })
         })
         .collect()
+}
+
+const fn output_media_kind(media_kind: NativeOutputMediaKind) -> OutputMediaKind {
+    match media_kind {
+        NativeOutputMediaKind::Image => OutputMediaKind::Image,
+        NativeOutputMediaKind::Animation => OutputMediaKind::Animation,
+        NativeOutputMediaKind::Video => OutputMediaKind::Video,
+        NativeOutputMediaKind::Audio => OutputMediaKind::Audio,
+        NativeOutputMediaKind::ThreeD => OutputMediaKind::ThreeD,
+        NativeOutputMediaKind::Text => OutputMediaKind::Text,
+        NativeOutputMediaKind::Json => OutputMediaKind::Json,
+        NativeOutputMediaKind::Binary => OutputMediaKind::Binary,
+    }
 }
 
 fn terminal_event(state: AttemptState, error: Option<String>) -> AttemptEventKind {
@@ -7794,6 +7912,46 @@ mod tests {
         assert_eq!(recovered, native);
         assert_eq!(recovered.output().proposal_id(), Uuid::from_u128(0xabba));
 
+        let video = NativeImageOutputProposal::new_media(
+            NodeId("save-video".to_owned()),
+            OutputProposal::new(
+                Uuid::from_u128(0xabb8),
+                AssetNamespace::Temporary,
+                "adapter/video",
+                "webm",
+                4,
+                0,
+                0,
+                b"native video bytes".to_vec(),
+            )?,
+            NativeOutputMediaKind::Video,
+            "video/webm",
+        )?;
+        let recovered_video =
+            NativeImageOutputProposal::from_worker_proposal(video.to_worker_proposal()?)?;
+        assert_eq!(recovered_video, video);
+        assert_eq!(recovered_video.media_kind(), NativeOutputMediaKind::Video);
+        assert_eq!(recovered_video.media_type(), "video/webm");
+
+        let legacy_metadata = NativeImageOutputProposalMetadataV1 {
+            schema_version: NATIVE_IMAGE_OUTPUT_PROPOSAL_LEGACY_SCHEMA_VERSION,
+            node_id: NodeId("legacy-save".to_owned()),
+            batch_index: 0,
+            namespace: AssetNamespace::Output,
+            filename_prefix: "adapter/legacy".to_owned(),
+            extension: "png".to_owned(),
+            width: 1,
+            height: 1,
+        };
+        let legacy = WorkerOutputProposal::new(
+            Uuid::from_u128(0xabb7),
+            postcard::to_stdvec(&legacy_metadata)?,
+            vec![1],
+        )?;
+        let recovered_legacy = NativeImageOutputProposal::from_worker_proposal(legacy)?;
+        assert_eq!(recovered_legacy.media_kind(), NativeOutputMediaKind::Image);
+        assert_eq!(recovered_legacy.media_type(), "image/png");
+
         let invalid_metadata = NativeImageOutputProposalMetadata {
             schema_version: NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION + 1,
             node_id: NodeId("save".to_owned()),
@@ -7803,6 +7961,8 @@ mod tests {
             extension: "png".to_owned(),
             width: 1,
             height: 1,
+            media_kind: NativeOutputMediaKind::Image,
+            media_type: "image/png".to_owned(),
         };
         let invalid = WorkerOutputProposal::new(
             Uuid::from_u128(0xabb9),
@@ -7814,6 +7974,52 @@ mod tests {
             Err(NativeImageRuntimeError::WorkerEvent(message))
                 if message.contains("unsupported native image output proposal schema")
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn committed_video_output_projects_typed_preview_and_output_events()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let proposal = NativeImageOutputProposal::new_media(
+            NodeId("save-video".to_owned()),
+            OutputProposal::new(
+                Uuid::from_u128(0xabc1),
+                AssetNamespace::Temporary,
+                "video/preview",
+                "webm",
+                2,
+                0,
+                0,
+                b"webm bytes".to_vec(),
+            )?,
+            NativeOutputMediaKind::Video,
+            "video/webm",
+        )?;
+        let prepared = PreparedOutput {
+            operation_id: Uuid::from_u128(0xabc2),
+            identity: crate::AssetIdentity::new(
+                "profile",
+                AssetNamespace::Temporary,
+                "video/preview_00001_.webm",
+            )?,
+            sha256: "a".repeat(64),
+            byte_size: 10,
+            collision_counter: 1,
+        };
+
+        let events = committed_event_inputs(&[proposal], &[prepared], Utc::now())?;
+        assert_eq!(events.len(), 2);
+        let AttemptEventKind::Preview { preview } = &events[0].kind else {
+            return Err("temporary video did not project a preview event".into());
+        };
+        assert_eq!(preview.media_kind, OutputMediaKind::Video);
+        assert_eq!(preview.media_type, "video/webm");
+        let AttemptEventKind::OutputAvailable { output } = &events[1].kind else {
+            return Err("temporary video did not project an output event".into());
+        };
+        assert_eq!(output.media_kind, OutputMediaKind::Video);
+        assert_eq!(output.media_type, "video/webm");
+        assert_eq!(output.name, "preview_00001_.webm");
         Ok(())
     }
 
@@ -9324,18 +9530,20 @@ mod tests {
             );
             let assets = fixture_asset_service(&roots)?;
             let authorization = authorize_native_output_committer(&roots.profile_id)?;
-            let proposal = NativeImageOutputProposal::new(
+            let proposal = NativeImageOutputProposal::new_media(
                 NodeId("5".to_owned()),
                 OutputProposal::new(
                     Uuid::from_u128(0x1975),
                     AssetNamespace::Output,
                     "recovery/projected-output",
-                    "png",
+                    "webm",
                     0,
                     1,
                     1,
-                    b"committed output".to_vec(),
+                    b"committed video output".to_vec(),
                 )?,
+                NativeOutputMediaKind::Video,
+                "video/webm",
             )?;
             let scope = OutputExecutionScope {
                 profile_id,
@@ -9409,6 +9617,8 @@ mod tests {
                 .ok_or("recovered attempt disappeared")?;
             assert_eq!(attempt.state, AttemptState::Succeeded);
             assert_eq!(attempt.outputs.len(), 1);
+            assert_eq!(attempt.outputs[0].media_kind, OutputMediaKind::Video);
+            assert_eq!(attempt.outputs[0].media_type, "video/webm");
             let recovered_revision = recovered.revision;
             drop(recovered);
 

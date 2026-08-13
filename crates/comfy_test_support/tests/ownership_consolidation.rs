@@ -13570,7 +13570,7 @@ fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::
         "pub fn checked_media(",
         "sim.comfy.native-output-effect.v2",
         "NativeOutputMediaKind::Video, \"video/webm\"",
-        "valid_output_media_type(&extension, &media_type, media_kind)",
+        "media_kind.accepts(&extension, &media_type)",
     ] {
         assert!(
             execution.contains(required),
@@ -13596,6 +13596,48 @@ fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::
             .and_then(serde_json::Value::as_array)
             .is_some_and(|tasks| tasks.iter().any(|task| {
                 task.as_str() == Some("comfy-parity-native-video-output-media-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_video_output_projection_foundation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let runtime =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    for required in [
+        "struct NativeImageOutputProposalMetadataV1",
+        "const NATIVE_IMAGE_OUTPUT_PROPOSAL_SCHEMA_VERSION: u16 = 2",
+        "fn decode_output_proposal_metadata(",
+        "NativeOutputMediaKind::Video => OutputMediaKind::Video",
+        "committed_video_output_projects_typed_preview_and_output_events",
+    ] {
+        assert!(
+            runtime.contains(required),
+            "typed output projection lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("final_output_commit")
+            })
+        })
+        .ok_or("missing final output ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-output-projection-foundation")
             }))
     );
     Ok(())

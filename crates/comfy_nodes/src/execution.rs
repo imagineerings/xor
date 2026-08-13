@@ -1366,6 +1366,27 @@ pub enum NativeOutputMediaKind {
     Binary,
 }
 
+impl NativeOutputMediaKind {
+    pub fn accepts(self, extension: &str, media_type: &str) -> bool {
+        matches!(
+            (self, extension, media_type),
+            (Self::Image, "png", "image/png")
+                | (Self::Image, "jpg" | "jpeg", "image/jpeg")
+                | (Self::Image, "webp", "image/webp")
+                | (Self::Animation, "gif", "image/gif")
+                | (Self::Video, "webm", "video/webm")
+                | (Self::Video, "mp4", "video/mp4")
+                | (Self::Audio, "wav", "audio/wav")
+                | (Self::Audio, "mp3", "audio/mpeg")
+                | (Self::ThreeD, "glb", "model/gltf-binary")
+                | (Self::ThreeD, "gltf", "model/gltf+json")
+                | (Self::Text, "txt", "text/plain")
+                | (Self::Json, "json", "application/json")
+                | (Self::Binary, _, "application/octet-stream")
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeOutputEffectRequest {
     namespace: NativeOutputNamespace,
@@ -1424,7 +1445,7 @@ impl NativeOutputEffectRequest {
             || !extension
                 .bytes()
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-            || !valid_output_media_type(&extension, &media_type, media_kind)
+            || !media_kind.accepts(&extension, &media_type)
             || content.is_empty()
             || u64::try_from(content.len()).map_or(true, |length| {
                 length > maximum_bytes || length > 2 * 1024 * 1024 * 1024
@@ -1511,29 +1532,6 @@ fn default_output_media(extension: &str) -> (NativeOutputMediaKind, String) {
         _ => (NativeOutputMediaKind::Binary, "application/octet-stream"),
     };
     (kind, media_type.to_owned())
-}
-
-fn valid_output_media_type(
-    extension: &str,
-    media_type: &str,
-    media_kind: NativeOutputMediaKind,
-) -> bool {
-    matches!(
-        (media_kind, extension, media_type),
-        (NativeOutputMediaKind::Image, "png", "image/png")
-            | (NativeOutputMediaKind::Image, "jpg" | "jpeg", "image/jpeg")
-            | (NativeOutputMediaKind::Image, "webp", "image/webp")
-            | (NativeOutputMediaKind::Animation, "gif", "image/gif")
-            | (NativeOutputMediaKind::Video, "webm", "video/webm")
-            | (NativeOutputMediaKind::Video, "mp4", "video/mp4")
-            | (NativeOutputMediaKind::Audio, "wav", "audio/wav")
-            | (NativeOutputMediaKind::Audio, "mp3", "audio/mpeg")
-            | (NativeOutputMediaKind::ThreeD, "glb", "model/gltf-binary")
-            | (NativeOutputMediaKind::ThreeD, "gltf", "model/gltf+json")
-            | (NativeOutputMediaKind::Text, "txt", "text/plain")
-            | (NativeOutputMediaKind::Json, "json", "application/json")
-            | (NativeOutputMediaKind::Binary, _, "application/octet-stream")
-    )
 }
 
 fn is_safe_output_filename_prefix(filename_prefix: &str) -> bool {
