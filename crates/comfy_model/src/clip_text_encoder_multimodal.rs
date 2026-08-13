@@ -796,6 +796,246 @@ pub struct Gemma4VisionProjection {
     pub kind: GemmaPreparedVisualKind,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Gemma4AudioProfile {
+    E2B,
+    E4B,
+    ThirtyOneB,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Gemma4AudioConfiguration {
+    pub profile: Gemma4AudioProfile,
+    pub mel_bins: usize,
+    pub first_convolution_channels: usize,
+    pub second_convolution_channels: usize,
+    pub hidden_size: usize,
+    pub intermediate_size: usize,
+    pub layer_count: usize,
+    pub attention_heads: usize,
+    pub convolution_kernel_size: usize,
+    pub attention_chunk_size: usize,
+    pub attention_context_left: usize,
+    pub attention_context_right: usize,
+    pub encoder_output_size: usize,
+    pub output_hidden_size: usize,
+    pub normalization_epsilon_bits: u32,
+    pub residual_weight_bits: u32,
+    pub attention_logit_cap_bits: u32,
+    pub source_exact_profile: bool,
+}
+
+impl Gemma4AudioConfiguration {
+    pub fn source(profile: Gemma4AudioProfile) -> Result<Self, MultimodalTextError> {
+        if profile == Gemma4AudioProfile::ThirtyOneB {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 31B has no audio encoder",
+            ));
+        }
+        Ok(Self {
+            profile,
+            mel_bins: 128,
+            first_convolution_channels: 128,
+            second_convolution_channels: 32,
+            hidden_size: 1024,
+            intermediate_size: 4096,
+            layer_count: 12,
+            attention_heads: 8,
+            convolution_kernel_size: 5,
+            attention_chunk_size: 12,
+            attention_context_left: 13,
+            attention_context_right: 0,
+            encoder_output_size: 1536,
+            output_hidden_size: if profile == Gemma4AudioProfile::E2B {
+                1536
+            } else {
+                2560
+            },
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            residual_weight_bits: 0.5_f32.to_bits(),
+            attention_logit_cap_bits: 50.0_f32.to_bits(),
+            source_exact_profile: true,
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn reduced_fixture(
+        profile: Gemma4AudioProfile,
+        mel_bins: usize,
+        first_convolution_channels: usize,
+        second_convolution_channels: usize,
+        hidden_size: usize,
+        intermediate_size: usize,
+        layer_count: usize,
+        attention_heads: usize,
+        convolution_kernel_size: usize,
+        attention_chunk_size: usize,
+        attention_context_left: usize,
+        encoder_output_size: usize,
+        output_hidden_size: usize,
+    ) -> Result<Self, MultimodalTextError> {
+        let configuration = Self {
+            profile,
+            mel_bins,
+            first_convolution_channels,
+            second_convolution_channels,
+            hidden_size,
+            intermediate_size,
+            layer_count,
+            attention_heads,
+            convolution_kernel_size,
+            attention_chunk_size,
+            attention_context_left,
+            attention_context_right: 0,
+            encoder_output_size,
+            output_hidden_size,
+            normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+            residual_weight_bits: 0.5_f32.to_bits(),
+            attention_logit_cap_bits: 50.0_f32.to_bits(),
+            source_exact_profile: false,
+        };
+        configuration.validate()?;
+        Ok(configuration)
+    }
+
+    fn validate(&self) -> Result<(), MultimodalTextError> {
+        let after_first = self.mel_bins.div_ceil(2);
+        let after_second = after_first.div_ceil(2);
+        if self.profile == Gemma4AudioProfile::ThirtyOneB
+            || self.mel_bins == 0
+            || self.first_convolution_channels == 0
+            || self.second_convolution_channels == 0
+            || self.hidden_size == 0
+            || self.intermediate_size == 0
+            || self.layer_count == 0
+            || self.attention_heads == 0
+            || !self.hidden_size.is_multiple_of(self.attention_heads)
+            || self.convolution_kernel_size == 0
+            || self.attention_chunk_size == 0
+            || self.attention_context_left == 0
+            || self.encoder_output_size == 0
+            || self.output_hidden_size == 0
+            || after_second
+                .checked_mul(self.second_convolution_channels)
+                .is_none()
+            || !f32::from_bits(self.normalization_epsilon_bits).is_finite()
+            || f32::from_bits(self.normalization_epsilon_bits) <= 0.0
+            || !f32::from_bits(self.residual_weight_bits).is_finite()
+            || !f32::from_bits(self.attention_logit_cap_bits).is_finite()
+            || f32::from_bits(self.attention_logit_cap_bits) <= 0.0
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio configuration dimensions are invalid",
+            ));
+        }
+        if self.source_exact_profile && self != &Self::source(self.profile)? {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 production audio configuration does not match its closed source profile",
+            ));
+        }
+        Ok(())
+    }
+
+    fn subsampled_feature_width(&self) -> Result<usize, MultimodalTextError> {
+        self.mel_bins
+            .div_ceil(2)
+            .div_ceil(2)
+            .checked_mul(self.second_convolution_channels)
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 audio subsampled feature width",
+            ))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4AudioFeedForwardWeights {
+    pub pre_normalization_weight: Tensor,
+    pub first: Gemma4ClippedLinearWeights,
+    pub second: Gemma4ClippedLinearWeights,
+    pub post_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4AudioBlockWeights {
+    pub feed_forward_one: Gemma4AudioFeedForwardWeights,
+    pub query: Gemma4ClippedLinearWeights,
+    pub key: Gemma4ClippedLinearWeights,
+    pub value: Gemma4ClippedLinearWeights,
+    pub attention_output: Gemma4ClippedLinearWeights,
+    pub attention_scale: Tensor,
+    pub relative_key_projection_weight: Tensor,
+    pub pre_attention_normalization_weight: Tensor,
+    pub post_attention_normalization_weight: Tensor,
+    pub convolution_pre_normalization_weight: Tensor,
+    pub convolution_start: Gemma4ClippedLinearWeights,
+    pub depthwise_convolution_weight: Tensor,
+    pub convolution_normalization_weight: Tensor,
+    pub convolution_end: Gemma4ClippedLinearWeights,
+    pub feed_forward_two: Gemma4AudioFeedForwardWeights,
+    pub output_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4AudioWeights {
+    pub first_convolution_weight: Tensor,
+    pub first_convolution_normalization_weight: Tensor,
+    pub second_convolution_weight: Tensor,
+    pub second_convolution_normalization_weight: Tensor,
+    pub subsample_projection_weight: Tensor,
+    pub blocks: Vec<Gemma4AudioBlockWeights>,
+    pub encoder_output_weight: Tensor,
+    pub encoder_output_bias: Tensor,
+    pub projector_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4AudioFeedForward {
+    pre_normalization_weight: Tensor,
+    first: NativeGemma4ClippedLinear,
+    second: NativeGemma4ClippedLinear,
+    post_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeGemma4AudioBlock {
+    feed_forward_one: NativeGemma4AudioFeedForward,
+    query: NativeGemma4ClippedLinear,
+    key: NativeGemma4ClippedLinear,
+    value: NativeGemma4ClippedLinear,
+    attention_output: NativeGemma4ClippedLinear,
+    attention_scale: Tensor,
+    relative_key_projection: NativeModule,
+    pre_attention_normalization_weight: Tensor,
+    post_attention_normalization_weight: Tensor,
+    convolution_pre_normalization_weight: Tensor,
+    convolution_start: NativeGemma4ClippedLinear,
+    depthwise_convolution_weight: Tensor,
+    convolution_normalization_weight: Tensor,
+    convolution_end: NativeGemma4ClippedLinear,
+    feed_forward_two: NativeGemma4AudioFeedForward,
+    output_normalization_weight: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeGemma4AudioEncoder {
+    configuration: Gemma4AudioConfiguration,
+    first_convolution_weight: Tensor,
+    first_convolution_normalization_weight: Tensor,
+    second_convolution_weight: Tensor,
+    second_convolution_normalization_weight: Tensor,
+    subsample_projection: NativeModule,
+    blocks: Vec<NativeGemma4AudioBlock>,
+    encoder_output: NativeModule,
+    projector: NativeModule,
+    semantic_state_digest_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gemma4AudioProjection {
+    pub embedding: Tensor,
+    pub tokens: usize,
+}
+
 impl GemmaPreparedAudio {
     pub fn log_mel(&self) -> &Tensor {
         &self.log_mel
@@ -3160,6 +3400,527 @@ impl NativeGemma4VisionEncoder {
     }
 }
 
+impl NativeGemma4AudioEncoder {
+    pub fn new(
+        configuration: Gemma4AudioConfiguration,
+        weights: Gemma4AudioWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        configuration.validate()?;
+        if weights.blocks.len() != configuration.layer_count {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio block count does not match the configuration",
+            ));
+        }
+        let stream = weights.first_convolution_weight.descriptor().stream();
+        gemma4_require_parameter_shape(
+            &weights.first_convolution_weight,
+            &[configuration.first_convolution_channels, 1, 3, 3],
+            stream,
+        )?;
+        gemma4_require_parameter_shape(
+            &weights.first_convolution_normalization_weight,
+            &[configuration.first_convolution_channels],
+            stream,
+        )?;
+        gemma4_require_parameter_shape(
+            &weights.second_convolution_weight,
+            &[
+                configuration.second_convolution_channels,
+                configuration.first_convolution_channels,
+                3,
+                3,
+            ],
+            stream,
+        )?;
+        gemma4_require_parameter_shape(
+            &weights.second_convolution_normalization_weight,
+            &[configuration.second_convolution_channels],
+            stream,
+        )?;
+        let subsample_projection = gemma4_linear_module(
+            "gemma4_audio.subsample_projection",
+            configuration.subsampled_feature_width()?,
+            configuration.hidden_size,
+            weights.subsample_projection_weight,
+            stream,
+        )?;
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(configuration.layer_count)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 audio blocks"))?;
+        for (index, block) in weights.blocks.into_iter().enumerate() {
+            cancellation.check()?;
+            blocks.push(gemma4_audio_block(index, &configuration, block, stream)?);
+        }
+        gemma4_require_parameter_shape(
+            &weights.encoder_output_bias,
+            &[configuration.encoder_output_size],
+            stream,
+        )?;
+        let encoder_output = qwen_linear_module(
+            "gemma4_audio.encoder_output",
+            configuration.hidden_size,
+            configuration.encoder_output_size,
+            weights.encoder_output_weight,
+            Some(weights.encoder_output_bias),
+            stream,
+        )?;
+        let projector = gemma4_linear_module(
+            "gemma4_audio.projector",
+            configuration.encoder_output_size,
+            configuration.output_hidden_size,
+            weights.projector_weight,
+            stream,
+        )?;
+        let mut owner = Self {
+            configuration,
+            first_convolution_weight: weights.first_convolution_weight,
+            first_convolution_normalization_weight: weights.first_convolution_normalization_weight,
+            second_convolution_weight: weights.second_convolution_weight,
+            second_convolution_normalization_weight: weights
+                .second_convolution_normalization_weight,
+            subsample_projection,
+            blocks,
+            encoder_output,
+            projector,
+            semantic_state_digest_sha256: String::new(),
+        };
+        owner.semantic_state_digest_sha256 = owner.project_semantic_state_digest(cancellation)?;
+        owner.validate(cancellation)?;
+        Ok(owner)
+    }
+
+    pub fn configuration(&self) -> &Gemma4AudioConfiguration {
+        &self.configuration
+    }
+
+    pub fn execution_stream(&self) -> StreamId {
+        self.first_convolution_weight.descriptor().stream()
+    }
+
+    pub fn semantic_state_digest_sha256(&self) -> &str {
+        &self.semantic_state_digest_sha256
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        self.configuration.validate()?;
+        if self.blocks.len() != self.configuration.layer_count
+            || self.semantic_state_digest_sha256
+                != self.project_semantic_state_digest(cancellation)?
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio retained semantic state changed",
+            ));
+        }
+        self.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn project(
+        &self,
+        backend: &CpuBackend,
+        prepared: &GemmaPreparedAudio,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Gemma4AudioProjection, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let shape = prepared.log_mel().descriptor().shape();
+        if shape.len() != 3
+            || shape[0] != 1
+            || shape[2] != usize_to_u64(self.configuration.mel_bins, "Gemma4 mel bins")?
+            || prepared.log_mel().descriptor().dtype() != DType::F32
+            || prepared.log_mel().descriptor().device() != DeviceId::CPU
+            || prepared.log_mel().descriptor().stream() != context.stream
+            || prepared.frame_mask().descriptor().shape() != [shape[0], shape[1]]
+            || prepared.frame_mask().descriptor().dtype() != DType::Bool
+            || prepared.frame_mask().descriptor().stream() != context.stream
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio encoder requires canonical log-mel and frame-mask preparation",
+            ));
+        }
+        let frames = u64_to_usize(shape[1], "Gemma4 audio frames")?;
+        if frames == 0 {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio encoder requires at least one prepared frame",
+            ));
+        }
+        let mask_bytes = prepared.frame_mask().contiguous_bytes()?;
+        if mask_bytes.len() != frames {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio frame mask storage is malformed",
+            ));
+        }
+        let mut mask = Vec::new();
+        mask.try_reserve_exact(frames)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 audio frame mask"))?;
+        mask.extend_from_slice(mask_bytes);
+        let values = tensor_to_f32(backend, prepared.log_mel(), context)?;
+        let (values, first_frames, first_bins) = gemma4_audio_conv2d_layer(
+            backend,
+            &values,
+            1,
+            frames,
+            self.configuration.mel_bins,
+            &tensor_to_f32(backend, &self.first_convolution_weight, context)?,
+            self.configuration.first_convolution_channels,
+            &tensor_to_f32(
+                backend,
+                &self.first_convolution_normalization_weight,
+                context,
+            )?,
+            &mask,
+            f32::from_bits(self.configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        mask = gemma4_audio_subsample_mask(&mask)?;
+        let (values, second_frames, second_bins) = gemma4_audio_conv2d_layer(
+            backend,
+            &values,
+            self.configuration.first_convolution_channels,
+            first_frames,
+            first_bins,
+            &tensor_to_f32(backend, &self.second_convolution_weight, context)?,
+            self.configuration.second_convolution_channels,
+            &tensor_to_f32(
+                backend,
+                &self.second_convolution_normalization_weight,
+                context,
+            )?,
+            &mask,
+            f32::from_bits(self.configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        mask = gemma4_audio_subsample_mask(&mask)?;
+        if mask.len() != second_frames
+            || second_bins.checked_mul(self.configuration.second_convolution_channels)
+                != Some(self.configuration.subsampled_feature_width()?)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio subsampling produced an invalid geometry",
+            ));
+        }
+        let flattened = gemma4_audio_flatten_convolution(
+            backend,
+            &values,
+            second_frames,
+            second_bins,
+            self.configuration.second_convolution_channels,
+            context,
+        )?;
+        let mut subsample_projection = self.subsample_projection.clone();
+        let mut hidden = subsample_projection.forward_with_context(backend, &flattened, context)?;
+        for block in &self.blocks {
+            context.cancellation.check()?;
+            hidden = block.forward(backend, &hidden, &mask, &self.configuration, context)?;
+        }
+        let mut encoder_output = self.encoder_output.clone();
+        let encoded = encoder_output.forward_with_context(backend, &hidden, context)?;
+        let normalized = gemma4_parameterless_rms_norm(
+            backend,
+            &tensor_to_f32(backend, &encoded, context)?,
+            second_frames,
+            self.configuration.encoder_output_size,
+            context,
+        )?;
+        let normalized = qwen_tensor(
+            backend,
+            &[second_frames, self.configuration.encoder_output_size],
+            &normalized,
+            context,
+        )?;
+        let mut projector = self.projector.clone();
+        let embedding = projector.forward_with_context(backend, &normalized, context)?;
+        if prepared.marker_tokens() != second_frames.min(GEMMA4_AUDIO_MAXIMUM_TOKENS) {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio marker span does not match encoder subsampling",
+            ));
+        }
+        context.check()?;
+        Ok(Gemma4AudioProjection {
+            embedding,
+            tokens: second_frames,
+        })
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = Vec::new();
+        for tensor in self.named_tensors() {
+            insert_gemma4_resident_allocation(
+                &mut allocations,
+                tensor.storage_id(),
+                tensor.storage_byte_len(),
+            )?;
+        }
+        for (_, module) in self.named_modules() {
+            for (storage_id, bytes) in module.resident_tensor_allocations() {
+                insert_gemma4_resident_allocation(&mut allocations, storage_id, bytes)?;
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let block_bytes = self
+            .blocks
+            .capacity()
+            .checked_mul(mem::size_of::<NativeGemma4AudioBlock>())
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 audio block residency",
+            ))?;
+        let mut bytes = u64::try_from(mem::size_of::<Self>() + block_bytes)
+            .map_err(|_| MultimodalTextError::Overflow("Gemma4 audio owned residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, allocation)| {
+                    total
+                        .checked_add(allocation)
+                        .ok_or(MultimodalTextError::Overflow(
+                            "Gemma4 audio module tensor residency",
+                        ))
+                },
+            )?;
+            bytes = bytes
+                .checked_add(
+                    module
+                        .resident_storage_bytes()?
+                        .checked_sub(tensor_bytes)
+                        .ok_or(MultimodalTextError::Overflow(
+                            "Gemma4 audio module residency projection",
+                        ))?,
+                )
+                .ok_or(MultimodalTextError::Overflow(
+                    "Gemma4 audio module residency",
+                ))?;
+        }
+        Ok(bytes)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |total, (_, bytes)| {
+                total
+                    .checked_add(bytes)
+                    .ok_or(MultimodalTextError::Overflow("Gemma4 audio residency"))
+            },
+        )
+    }
+
+    fn project_semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.gemma4-audio.v1");
+        hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
+        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        for (name, module) in self.named_modules() {
+            cancellation.check()?;
+            hasher.update(name.as_bytes());
+            hasher.update(module.semantic_state_digest(cancellation)?.as_bytes());
+        }
+        for tensor in self.named_tensors() {
+            cancellation.check()?;
+            hasher.update(tensor.contiguous_bytes()?);
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![
+            (
+                "subsample_projection".to_owned(),
+                &self.subsample_projection,
+            ),
+            ("encoder_output".to_owned(), &self.encoder_output),
+            ("projector".to_owned(), &self.projector),
+        ];
+        for (index, block) in self.blocks.iter().enumerate() {
+            for (name, module) in block.named_modules() {
+                modules.push((format!("blocks.{index}.{name}"), module));
+            }
+        }
+        modules
+    }
+
+    fn named_tensors(&self) -> Vec<&Tensor> {
+        let mut tensors = vec![
+            &self.first_convolution_weight,
+            &self.first_convolution_normalization_weight,
+            &self.second_convolution_weight,
+            &self.second_convolution_normalization_weight,
+        ];
+        for block in &self.blocks {
+            tensors.extend(block.named_tensors());
+        }
+        tensors
+    }
+}
+
+impl NativeGemma4AudioBlock {
+    fn named_modules(&self) -> Vec<(&'static str, &NativeModule)> {
+        vec![
+            ("ff1.first", &self.feed_forward_one.first.linear),
+            ("ff1.second", &self.feed_forward_one.second.linear),
+            ("query", &self.query.linear),
+            ("key", &self.key.linear),
+            ("value", &self.value.linear),
+            ("attention_output", &self.attention_output.linear),
+            ("relative_key_projection", &self.relative_key_projection),
+            ("convolution_start", &self.convolution_start.linear),
+            ("convolution_end", &self.convolution_end.linear),
+            ("ff2.first", &self.feed_forward_two.first.linear),
+            ("ff2.second", &self.feed_forward_two.second.linear),
+        ]
+    }
+
+    fn named_tensors(&self) -> Vec<&Tensor> {
+        let mut tensors = vec![
+            &self.feed_forward_one.pre_normalization_weight,
+            &self.feed_forward_one.post_normalization_weight,
+            &self.attention_scale,
+            &self.pre_attention_normalization_weight,
+            &self.post_attention_normalization_weight,
+            &self.convolution_pre_normalization_weight,
+            &self.depthwise_convolution_weight,
+            &self.convolution_normalization_weight,
+            &self.feed_forward_two.pre_normalization_weight,
+            &self.feed_forward_two.post_normalization_weight,
+            &self.output_normalization_weight,
+        ];
+        for linear in [
+            &self.feed_forward_one.first,
+            &self.feed_forward_one.second,
+            &self.query,
+            &self.key,
+            &self.value,
+            &self.attention_output,
+            &self.convolution_start,
+            &self.convolution_end,
+            &self.feed_forward_two.first,
+            &self.feed_forward_two.second,
+        ] {
+            tensors.extend(linear.named_tensors());
+        }
+        tensors
+    }
+
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        mask: &[u8],
+        configuration: &Gemma4AudioConfiguration,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let tokens = mask.len();
+        let mut hidden =
+            self.feed_forward_one
+                .forward(backend, input, tokens, configuration, context)?;
+        let residual = hidden.clone();
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            &hidden,
+            &self.pre_attention_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let attention =
+            gemma4_audio_attention(backend, &normalized, mask, self, configuration, context)?;
+        let attention = gemma4_weighted_rms_norm(
+            backend,
+            &attention,
+            &self.post_attention_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        hidden = qwen_add_tensors(backend, &residual, &attention, context)?;
+        hidden = gemma4_audio_convolution(backend, &hidden, self, configuration, context)?;
+        hidden = self
+            .feed_forward_two
+            .forward(backend, &hidden, tokens, configuration, context)?;
+        gemma4_weighted_rms_norm(
+            backend,
+            &hidden,
+            &self.output_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )
+    }
+}
+
+impl NativeGemma4AudioFeedForward {
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        tokens: usize,
+        configuration: &Gemma4AudioConfiguration,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            input,
+            &self.pre_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let first = self.first.forward(backend, &normalized, context)?;
+        let mut values = tensor_to_f32(backend, &first, context)?;
+        for value in values.iter_mut() {
+            *value *= 1.0 / (1.0 + (-*value).exp());
+        }
+        let activated = qwen_tensor(
+            backend,
+            &[tokens, configuration.intermediate_size],
+            &values,
+            context,
+        )?;
+        let second = self.second.forward(backend, &activated, context)?;
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            &second,
+            &self.post_normalization_weight,
+            tokens,
+            configuration.hidden_size,
+            f32::from_bits(configuration.normalization_epsilon_bits),
+            context,
+        )?;
+        let mut values = tensor_to_f32(backend, &normalized, context)?;
+        let residual_weight = f32::from_bits(configuration.residual_weight_bits);
+        for value in values.iter_mut() {
+            *value *= residual_weight;
+        }
+        let scaled = qwen_tensor(
+            backend,
+            &[tokens, configuration.hidden_size],
+            &values,
+            context,
+        )?;
+        qwen_add_tensors(backend, input, &scaled, context)
+    }
+}
+
 impl NativeQwenVisionEncoder {
     pub fn new(
         configuration: QwenVisionConfiguration,
@@ -4208,6 +4969,549 @@ impl NativeGemma4VisionBlock {
         )?;
         qwen_add_tensors(backend, &residual, &down, context)
     }
+}
+
+fn gemma4_audio_feed_forward(
+    name: &str,
+    configuration: &Gemma4AudioConfiguration,
+    weights: Gemma4AudioFeedForwardWeights,
+    stream: StreamId,
+) -> Result<NativeGemma4AudioFeedForward, MultimodalTextError> {
+    gemma4_require_parameter_shape(
+        &weights.pre_normalization_weight,
+        &[configuration.hidden_size],
+        stream,
+    )?;
+    gemma4_require_parameter_shape(
+        &weights.post_normalization_weight,
+        &[configuration.hidden_size],
+        stream,
+    )?;
+    Ok(NativeGemma4AudioFeedForward {
+        pre_normalization_weight: weights.pre_normalization_weight,
+        first: gemma4_clipped_linear(
+            &format!("{name}.first"),
+            configuration.hidden_size,
+            configuration.intermediate_size,
+            weights.first,
+            stream,
+        )?,
+        second: gemma4_clipped_linear(
+            &format!("{name}.second"),
+            configuration.intermediate_size,
+            configuration.hidden_size,
+            weights.second,
+            stream,
+        )?,
+        post_normalization_weight: weights.post_normalization_weight,
+    })
+}
+
+fn gemma4_audio_block(
+    index: usize,
+    configuration: &Gemma4AudioConfiguration,
+    weights: Gemma4AudioBlockWeights,
+    stream: StreamId,
+) -> Result<NativeGemma4AudioBlock, MultimodalTextError> {
+    let head_dimension = configuration.hidden_size / configuration.attention_heads;
+    for (tensor, width) in [
+        (&weights.attention_scale, head_dimension),
+        (
+            &weights.pre_attention_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.post_attention_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.convolution_pre_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.convolution_normalization_weight,
+            configuration.hidden_size,
+        ),
+        (
+            &weights.output_normalization_weight,
+            configuration.hidden_size,
+        ),
+    ] {
+        gemma4_require_parameter_shape(tensor, &[width], stream)?;
+    }
+    gemma4_require_parameter_shape(
+        &weights.depthwise_convolution_weight,
+        &[
+            configuration.hidden_size,
+            1,
+            configuration.convolution_kernel_size,
+        ],
+        stream,
+    )?;
+    let prefix = format!("gemma4_audio.blocks.{index}");
+    Ok(NativeGemma4AudioBlock {
+        feed_forward_one: gemma4_audio_feed_forward(
+            &format!("{prefix}.feed_forward_one"),
+            configuration,
+            weights.feed_forward_one,
+            stream,
+        )?,
+        query: gemma4_clipped_linear(
+            &format!("{prefix}.query"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.query,
+            stream,
+        )?,
+        key: gemma4_clipped_linear(
+            &format!("{prefix}.key"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.key,
+            stream,
+        )?,
+        value: gemma4_clipped_linear(
+            &format!("{prefix}.value"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.value,
+            stream,
+        )?,
+        attention_output: gemma4_clipped_linear(
+            &format!("{prefix}.attention_output"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.attention_output,
+            stream,
+        )?,
+        attention_scale: weights.attention_scale,
+        relative_key_projection: gemma4_linear_module(
+            &format!("{prefix}.relative_key_projection"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.relative_key_projection_weight,
+            stream,
+        )?,
+        pre_attention_normalization_weight: weights.pre_attention_normalization_weight,
+        post_attention_normalization_weight: weights.post_attention_normalization_weight,
+        convolution_pre_normalization_weight: weights.convolution_pre_normalization_weight,
+        convolution_start: gemma4_clipped_linear(
+            &format!("{prefix}.convolution_start"),
+            configuration.hidden_size,
+            configuration
+                .hidden_size
+                .checked_mul(2)
+                .ok_or(MultimodalTextError::Overflow(
+                    "Gemma4 audio convolution gate width",
+                ))?,
+            weights.convolution_start,
+            stream,
+        )?,
+        depthwise_convolution_weight: weights.depthwise_convolution_weight,
+        convolution_normalization_weight: weights.convolution_normalization_weight,
+        convolution_end: gemma4_clipped_linear(
+            &format!("{prefix}.convolution_end"),
+            configuration.hidden_size,
+            configuration.hidden_size,
+            weights.convolution_end,
+            stream,
+        )?,
+        feed_forward_two: gemma4_audio_feed_forward(
+            &format!("{prefix}.feed_forward_two"),
+            configuration,
+            weights.feed_forward_two,
+            stream,
+        )?,
+        output_normalization_weight: weights.output_normalization_weight,
+    })
+}
+
+fn gemma4_audio_subsample_mask(mask: &[u8]) -> Result<Vec<u8>, MultimodalTextError> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(mask.len().div_ceil(2))
+        .map_err(|_| MultimodalTextError::Overflow("Gemma4 audio subsampled mask"))?;
+    output.extend(mask.iter().step_by(2).copied());
+    Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn gemma4_audio_conv2d_layer(
+    backend: &CpuBackend,
+    input: &[f32],
+    input_channels: usize,
+    input_frames: usize,
+    input_bins: usize,
+    weights: &[f32],
+    output_channels: usize,
+    normalization_weight: &[f32],
+    mask: &[u8],
+    epsilon: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<(CpuWorkspaceVec<f32>, usize, usize), MultimodalTextError> {
+    if input.len()
+        != input_channels
+            .checked_mul(input_frames)
+            .and_then(|value| value.checked_mul(input_bins))
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 audio convolution input",
+            ))?
+        || weights.len()
+            != output_channels
+                .checked_mul(input_channels)
+                .and_then(|value| value.checked_mul(9))
+                .ok_or(MultimodalTextError::Overflow(
+                    "Gemma4 audio convolution weights",
+                ))?
+        || normalization_weight.len() != output_channels
+        || mask.len() != input_frames
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 audio convolution storage is malformed",
+        ));
+    }
+    let output_frames = input_frames.div_ceil(2);
+    let output_bins = input_bins.div_ceil(2);
+    let mut output = backend.workspace_vec(
+        context,
+        output_channels
+            .checked_mul(output_frames)
+            .and_then(|value| value.checked_mul(output_bins))
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma4 audio convolution output",
+            ))?,
+    )?;
+    for channel in 0..output_channels {
+        for frame in 0..output_frames {
+            for bin in 0..output_bins {
+                context.cancellation.check()?;
+                let mut sum = 0.0_f32;
+                for input_channel in 0..input_channels {
+                    for kernel_frame in 0..3 {
+                        for kernel_bin in 0..3 {
+                            let source_frame = frame * 2 + kernel_frame;
+                            let source_bin = bin * 2 + kernel_bin;
+                            let Some(source_frame) = source_frame.checked_sub(1) else {
+                                continue;
+                            };
+                            let Some(source_bin) = source_bin.checked_sub(1) else {
+                                continue;
+                            };
+                            if source_frame >= input_frames || source_bin >= input_bins {
+                                continue;
+                            }
+                            let source = (input_channel * input_frames + source_frame) * input_bins
+                                + source_bin;
+                            let weight =
+                                ((channel * input_channels + input_channel) * 3 + kernel_frame) * 3
+                                    + kernel_bin;
+                            let mask_value = if mask[source_frame] == 0 { 0.0 } else { 1.0 };
+                            sum += input[source] * mask_value * weights[weight];
+                        }
+                    }
+                }
+                output.try_push(sum)?;
+            }
+        }
+    }
+    for frame in 0..output_frames {
+        for bin in 0..output_bins {
+            context.cancellation.check()?;
+            let mut mean = 0.0_f32;
+            for channel in 0..output_channels {
+                mean += output[(channel * output_frames + frame) * output_bins + bin];
+            }
+            mean /= output_channels as f32;
+            let mut variance = 0.0_f32;
+            for channel in 0..output_channels {
+                let value = output[(channel * output_frames + frame) * output_bins + bin] - mean;
+                variance += value * value;
+            }
+            variance /= output_channels as f32;
+            let inverse = (variance + epsilon).sqrt().recip();
+            for channel in 0..output_channels {
+                let index = (channel * output_frames + frame) * output_bins + bin;
+                output[index] =
+                    ((output[index] - mean) * inverse * normalization_weight[channel]).max(0.0);
+            }
+        }
+    }
+    Ok((output, output_frames, output_bins))
+}
+
+fn gemma4_audio_flatten_convolution(
+    backend: &CpuBackend,
+    values: &[f32],
+    frames: usize,
+    bins: usize,
+    channels: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let mut output = backend.workspace_vec(context, values.len())?;
+    for frame in 0..frames {
+        context.cancellation.check()?;
+        for bin in 0..bins {
+            for channel in 0..channels {
+                output.try_push(values[(channel * frames + frame) * bins + bin])?;
+            }
+        }
+    }
+    qwen_tensor(backend, &[frames, bins * channels], &output, context)
+}
+
+fn gemma4_audio_relative_encoding(
+    backend: &CpuBackend,
+    configuration: &Gemma4AudioConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let half = configuration.hidden_size / 2;
+    let logarithmic_increment = 10_000.0_f32.ln() / (half.saturating_sub(1).max(1)) as f32;
+    let positions = configuration.attention_chunk_size + 1;
+    let mut output = backend.workspace_vec(context, positions * configuration.hidden_size)?;
+    for position in (0..positions).rev() {
+        context.cancellation.check()?;
+        for timescale in 0..half {
+            let angle = position as f32 * (-(timescale as f32) * logarithmic_increment).exp();
+            output.try_push(angle.sin())?;
+        }
+        for timescale in 0..half {
+            let angle = position as f32 * (-(timescale as f32) * logarithmic_increment).exp();
+            output.try_push(angle.cos())?;
+        }
+    }
+    qwen_tensor(
+        backend,
+        &[positions, configuration.hidden_size],
+        &output,
+        context,
+    )
+}
+
+fn gemma4_audio_attention(
+    backend: &CpuBackend,
+    input: &Tensor,
+    mask: &[u8],
+    block: &NativeGemma4AudioBlock,
+    configuration: &Gemma4AudioConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let tokens = mask.len();
+    let heads = configuration.attention_heads;
+    let head_dimension = configuration.hidden_size / heads;
+    let query = tensor_to_f32(
+        backend,
+        &block.query.forward(backend, input, context)?,
+        context,
+    )?;
+    let key = tensor_to_f32(
+        backend,
+        &block.key.forward(backend, input, context)?,
+        context,
+    )?;
+    let value = tensor_to_f32(
+        backend,
+        &block.value.forward(backend, input, context)?,
+        context,
+    )?;
+    let scales = tensor_to_f32(backend, &block.attention_scale, context)?;
+    let relative = gemma4_audio_relative_encoding(backend, configuration, context)?;
+    let mut relative_key_projection = block.relative_key_projection.clone();
+    let relative = tensor_to_f32(
+        backend,
+        &relative_key_projection.forward_with_context(backend, &relative, context)?,
+        context,
+    )?;
+    let chunk = configuration.attention_chunk_size;
+    let past = configuration.attention_context_left - 1;
+    let future = configuration.attention_context_right;
+    let context_size = chunk + past + future;
+    let relative_positions = chunk + 1;
+    let blocks = tokens.div_ceil(chunk);
+    let q_scale = (head_dimension as f32).powf(-0.5) / 2.0_f32.ln();
+    let k_scale = (1.0_f32 + std::f32::consts::E).ln() / 2.0_f32.ln();
+    let softcap = f32::from_bits(configuration.attention_logit_cap_bits);
+    let mut output = backend.workspace_vec(context, tokens * configuration.hidden_size)?;
+    for _ in 0..tokens * configuration.hidden_size {
+        output.try_push(0.0)?;
+    }
+    let mut logits = backend.workspace_vec(context, context_size)?;
+    for _ in 0..context_size {
+        logits.try_push(0.0)?;
+    }
+    for block_index in 0..blocks {
+        for query_local in 0..chunk {
+            let query_index = block_index * chunk + query_local;
+            if query_index >= tokens {
+                continue;
+            }
+            for head in 0..heads {
+                context.cancellation.check()?;
+                let mut maximum = f32::NEG_INFINITY;
+                for context_index in 0..context_size {
+                    let key_signed = (block_index * chunk + context_index) as i128 - past as i128;
+                    let valid_key = usize::try_from(key_signed).ok().filter(|key| *key < tokens);
+                    let attend = valid_key.is_some_and(|key_index| {
+                        let distance = query_index as i128 - key_index as i128;
+                        ((distance >= 0 && distance < past as i128)
+                            || (distance < 0 && -distance < future as i128))
+                            && mask[key_index] != 0
+                    });
+                    let mut score = if let Some(key_index) = valid_key.filter(|_| attend) {
+                        let mut content = 0.0_f32;
+                        for dimension in 0..head_dimension {
+                            let query_offset = query_index * configuration.hidden_size
+                                + head * head_dimension
+                                + dimension;
+                            let key_offset = key_index * configuration.hidden_size
+                                + head * head_dimension
+                                + dimension;
+                            let softplus = (1.0 + scales[dimension].exp()).ln();
+                            content += query[query_offset]
+                                * q_scale
+                                * softplus
+                                * key[key_offset]
+                                * k_scale;
+                        }
+                        let flattened = query_local * context_size + context_index;
+                        let source_row = flattened / (context_size + 1);
+                        let source_column = flattened % (context_size + 1);
+                        let mut position = 0.0_f32;
+                        if source_row < chunk && source_column < relative_positions {
+                            for dimension in 0..head_dimension {
+                                let query_offset = query_index * configuration.hidden_size
+                                    + head * head_dimension
+                                    + dimension;
+                                let relative_offset = source_column * configuration.hidden_size
+                                    + head * head_dimension
+                                    + dimension;
+                                let softplus = (1.0 + scales[dimension].exp()).ln();
+                                position += query[query_offset]
+                                    * q_scale
+                                    * softplus
+                                    * relative[relative_offset];
+                            }
+                        }
+                        let raw = content + position;
+                        (raw / softcap).tanh() * softcap
+                    } else {
+                        -1.0e9
+                    };
+                    if !score.is_finite() {
+                        score = -1.0e9;
+                    }
+                    maximum = maximum.max(score);
+                    logits[context_index] = score;
+                }
+                let denominator = logits
+                    .iter()
+                    .map(|score| (*score - maximum).exp())
+                    .sum::<f32>();
+                for context_index in 0..context_size {
+                    let key_signed = (block_index * chunk + context_index) as i128 - past as i128;
+                    let Some(key_index) =
+                        usize::try_from(key_signed).ok().filter(|key| *key < tokens)
+                    else {
+                        continue;
+                    };
+                    let probability = (logits[context_index] - maximum).exp() / denominator;
+                    for dimension in 0..head_dimension {
+                        output[query_index * configuration.hidden_size
+                            + head * head_dimension
+                            + dimension] += probability
+                            * value[key_index * configuration.hidden_size
+                                + head * head_dimension
+                                + dimension];
+                    }
+                }
+            }
+        }
+    }
+    let output = qwen_tensor(
+        backend,
+        &[tokens, configuration.hidden_size],
+        &output,
+        context,
+    )?;
+    block.attention_output.forward(backend, &output, context)
+}
+
+fn gemma4_audio_convolution(
+    backend: &CpuBackend,
+    input: &Tensor,
+    block: &NativeGemma4AudioBlock,
+    configuration: &Gemma4AudioConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, MultimodalTextError> {
+    let tokens = u64_to_usize(input.descriptor().shape()[0], "Gemma4 audio tokens")?;
+    let residual = input.clone();
+    let normalized = gemma4_weighted_rms_norm(
+        backend,
+        input,
+        &block.convolution_pre_normalization_weight,
+        tokens,
+        configuration.hidden_size,
+        f32::from_bits(configuration.normalization_epsilon_bits),
+        context,
+    )?;
+    let start = tensor_to_f32(
+        backend,
+        &block
+            .convolution_start
+            .forward(backend, &normalized, context)?,
+        context,
+    )?;
+    let weights = tensor_to_f32(backend, &block.depthwise_convolution_weight, context)?;
+    let mut convolved = backend.workspace_vec(context, tokens * configuration.hidden_size)?;
+    for token in 0..tokens {
+        context.cancellation.check()?;
+        for feature in 0..configuration.hidden_size {
+            let mut sum = 0.0_f32;
+            for kernel in 0..configuration.convolution_kernel_size {
+                let Some(source) = token
+                    .checked_add(kernel + 1)
+                    .and_then(|value| value.checked_sub(configuration.convolution_kernel_size))
+                else {
+                    continue;
+                };
+                let left = start[source * configuration.hidden_size * 2 + feature];
+                let right = start
+                    [source * configuration.hidden_size * 2 + configuration.hidden_size + feature];
+                sum += left
+                    * (1.0 / (1.0 + (-right).exp()))
+                    * weights[feature * configuration.convolution_kernel_size + kernel];
+            }
+            convolved.try_push(sum)?;
+        }
+    }
+    let convolved = qwen_tensor(
+        backend,
+        &[tokens, configuration.hidden_size],
+        &convolved,
+        context,
+    )?;
+    let convolved = gemma4_weighted_rms_norm(
+        backend,
+        &convolved,
+        &block.convolution_normalization_weight,
+        tokens,
+        configuration.hidden_size,
+        f32::from_bits(configuration.normalization_epsilon_bits),
+        context,
+    )?;
+    let mut values = tensor_to_f32(backend, &convolved, context)?;
+    for value in values.iter_mut() {
+        *value *= 1.0 / (1.0 + (-*value).exp());
+    }
+    let activated = qwen_tensor(
+        backend,
+        &[tokens, configuration.hidden_size],
+        &values,
+        context,
+    )?;
+    let output = block
+        .convolution_end
+        .forward(backend, &activated, context)?;
+    qwen_add_tensors(backend, &residual, &output, context)
 }
 
 fn gemma4_linear_module(

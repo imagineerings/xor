@@ -9835,6 +9835,7 @@ def native_gemma4_audio_execution_foundation_task(dependency: str) -> dict[str, 
             "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
             "crates/comfy_model/src/clip_text_encoder_decoder.rs",
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation/manifest.json",
         ],
         [
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",

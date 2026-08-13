@@ -2957,6 +2957,79 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task396_gemma4_audio_has_one_retained_execution_owner =
+        production_source_occurrences(&sources, "pub struct NativeGemma4AudioEncoder {").len() == 1
+            && production_source_occurrences(&sources, "fn gemma4_audio_attention(").len() == 1
+            && production_source_occurrences(&sources, "fn gemma4_audio_convolution(").len() == 1
+            && model_clip_text_encoder_multimodal.contains("blocks: Vec<NativeGemma4AudioBlock>")
+            && model_clip_text_encoder_multimodal.contains("encoder_output: NativeModule")
+            && model_clip_text_encoder_multimodal.contains("projector: NativeModule");
+    let task396_gemma4_audio_delegates_preparation_graph_and_residency =
+        model_clip_text_encoder_multimodal.contains("pub fn prepare_gemma4_audio(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_audio_conv2d_layer(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_audio_attention(")
+            && model_clip_text_encoder_multimodal.contains("gemma4_audio_convolution(")
+            && model_clip_text_encoder_multimodal.contains("prepared.marker_tokens()")
+            && model_clip_text_encoder_multimodal.contains("insert_gemma4_resident_allocation(")
+            && !model_clip_text_encoder_multimodal.contains("struct NativeGemma4AudioDecoder")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task396_gemma4_audio_fixture_proves_exactness_capability_and_rollback =
+        model_clip_text_encoder_multimodal_tests
+            .contains("gemma4_retained_audio_encoder_is_exact_alias_aware_and_transactional")
+            && model_clip_text_encoder_multimodal_tests.contains("gemma4_audio/manifest.json")
+            && model_clip_text_encoder_multimodal_tests.contains("Gemma4AudioProfile::ThirtyOneB")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task396_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_projection_gemma4_audio")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeGemma4AudioEncoder")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-gemma4-audio-execution-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma4-audio-retains-complete-closed-e2b-e4b-graph-and-rejects-31b",
+                            "gemma4-audio-executes-subsampling-relative-attention-causal-convolution-and-projector-order",
+                            "gemma4-audio-consumes-canonical-log-mel-mask-and-marker-plan",
+                            "gemma4-audio-binds-source-semantic-state-and-size-checked-storage-residency",
+                            "gemma4-audio-tests-reduced-exactness-capability-aliasing-and-failure-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task396_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_vision_text_transformer_text_media_projection_gemma4_audio,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma4-audio-execution-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task385_qwen35_hybrid_has_one_checkpoint_backed_decoder_owner =
         production_source_occurrences(&sources, "pub struct Qwen35LinearWeights {").len() == 1
             && production_source_occurrences(&sources, "fn forward_linear_attention(").len() == 1
@@ -9525,6 +9598,22 @@ fn run_ownership_validation(
             task395_gemma4_vision_fixture_proves_exactness_aliasing_and_rollback,
         ),
         (
+            "task396_policy_and_catalog_trace_gemma4_audio",
+            task396_policy_trace && task396_catalog_trace,
+        ),
+        (
+            "task396_gemma4_audio_has_one_retained_execution_owner",
+            task396_gemma4_audio_has_one_retained_execution_owner,
+        ),
+        (
+            "task396_gemma4_audio_delegates_preparation_graph_and_residency",
+            task396_gemma4_audio_delegates_preparation_graph_and_residency,
+        ),
+        (
+            "task396_gemma4_audio_fixture_proves_exactness_capability_and_rollback",
+            task396_gemma4_audio_fixture_proves_exactness_capability_and_rollback,
+        ),
+        (
             "task385_policy_and_catalog_trace_qwen35_hybrid_decoder",
             task385_policy_trace && task385_catalog_trace,
         ),
@@ -10187,6 +10276,17 @@ fn val_ownership_task395_gemma4_vision_001() -> Result<(), Box<dyn std::error::E
         "val-ownership-task395-gemma4-vision-001.json",
         "val_ownership_task395_gemma4_vision_001",
         Some("task395_"),
+    )
+}
+
+#[test]
+fn val_ownership_task396_gemma4_audio_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task396-gemma4-retained-audio-execution-ownership",
+        "val-ownership-task396-gemma4-audio-001.json",
+        "val_ownership_task396_gemma4_audio_001",
+        Some("task396_"),
     )
 }
 

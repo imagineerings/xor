@@ -8,23 +8,25 @@ use comfy_model::{
     GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, GEMMA4_AUDIO_SAMPLE_RATE,
     GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_MULTIMODAL_SOURCE_PATH, GEMMA4_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS, Gemma3VisionConfiguration,
-    Gemma3VisionProfile, Gemma4ClippedLinearWeights, Gemma4VisionBlockWeights,
-    Gemma4VisionConfiguration, Gemma4VisionProfile, Gemma4VisionWeights, GemmaPreparedVisualKind,
-    IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
+    Gemma3VisionProfile, Gemma4AudioBlockWeights, Gemma4AudioConfiguration,
+    Gemma4AudioFeedForwardWeights, Gemma4AudioProfile, Gemma4AudioWeights,
+    Gemma4ClippedLinearWeights, Gemma4VisionBlockWeights, Gemma4VisionConfiguration,
+    Gemma4VisionProfile, Gemma4VisionWeights, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
+    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
     NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector,
-    NativeGemma4VisionEncoder, NativeModelPayload, NativePromptTokenizer, NativeQwenMultimodal,
-    NativeQwenVisionEncoder, NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH,
-    OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN,
-    QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
-    QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
-    QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
-    QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
-    SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
-    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
-    gemma4_audio_marker_tokens, gemma4_target_dimensions, ideogram4_project_taps,
-    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    NativeGemma4AudioEncoder, NativeGemma4VisionEncoder, NativeModelPayload, NativePromptTokenizer,
+    NativeQwenMultimodal, NativeQwenVisionEncoder, NativeTextGenerationRequest,
+    NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
+    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
+    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer,
+    Qwen2PretokenizerProfile, QwenMultimodalGenerationRequest, QwenVisionBlockWeights,
+    QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights,
+    RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
+    TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt,
+    gemma3_target_dimensions, gemma4_audio_marker_tokens, gemma4_target_dimensions,
+    ideogram4_project_taps, join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
     multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
     plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
     prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
@@ -455,6 +457,251 @@ fn reduced_gemma4_vision_weights(
                 u64::try_from(hidden)?,
             ],
             0.075,
+            context,
+        )?,
+    })
+}
+
+fn reduced_gemma4_audio_feed_forward(
+    backend: &CpuBackend,
+    configuration: &Gemma4AudioConfiguration,
+    scale: f32,
+    minimum: &Tensor,
+    maximum: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Gemma4AudioFeedForwardWeights, Box<dyn Error>> {
+    Ok(Gemma4AudioFeedForwardWeights {
+        pre_normalization_weight: filled_tensor(
+            backend,
+            &[u64::try_from(configuration.hidden_size)?],
+            1.0,
+            context,
+        )?,
+        first: reduced_gemma4_clipped_linear(
+            backend,
+            configuration.hidden_size,
+            configuration.intermediate_size,
+            scale,
+            minimum,
+            maximum,
+            context,
+        )?,
+        second: reduced_gemma4_clipped_linear(
+            backend,
+            configuration.intermediate_size,
+            configuration.hidden_size,
+            scale * 0.7,
+            minimum,
+            maximum,
+            context,
+        )?,
+        post_normalization_weight: filled_tensor(
+            backend,
+            &[u64::try_from(configuration.hidden_size)?],
+            1.0,
+            context,
+        )?,
+    })
+}
+
+fn reduced_gemma4_audio_weights(
+    backend: &CpuBackend,
+    configuration: &Gemma4AudioConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Gemma4AudioWeights, Box<dyn Error>> {
+    let minimum = filled_tensor(backend, &[1], -8.0, context)?;
+    let maximum = filled_tensor(backend, &[1], 8.0, context)?;
+    let hidden = configuration.hidden_size;
+    let mut blocks = Vec::new();
+    for index in 0..configuration.layer_count {
+        let scale = 0.01 + index as f32 * 0.001;
+        blocks.push(Gemma4AudioBlockWeights {
+            feed_forward_one: reduced_gemma4_audio_feed_forward(
+                backend,
+                configuration,
+                scale,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            query: reduced_gemma4_clipped_linear(
+                backend, hidden, hidden, scale, &minimum, &maximum, context,
+            )?,
+            key: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 1.1,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            value: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 1.2,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            attention_output: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 0.8,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            attention_scale: filled_tensor(
+                backend,
+                &[u64::try_from(hidden / configuration.attention_heads)?],
+                0.1,
+                context,
+            )?,
+            relative_key_projection_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?, u64::try_from(hidden)?],
+                0.02,
+                context,
+            )?,
+            pre_attention_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            post_attention_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            convolution_pre_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            convolution_start: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden * 2,
+                scale * 0.9,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            depthwise_convolution_weight: filled_tensor(
+                backend,
+                &[
+                    u64::try_from(hidden)?,
+                    1,
+                    u64::try_from(configuration.convolution_kernel_size)?,
+                ],
+                0.2,
+                context,
+            )?,
+            convolution_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+            convolution_end: reduced_gemma4_clipped_linear(
+                backend,
+                hidden,
+                hidden,
+                scale * 0.6,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            feed_forward_two: reduced_gemma4_audio_feed_forward(
+                backend,
+                configuration,
+                scale * 0.5,
+                &minimum,
+                &maximum,
+                context,
+            )?,
+            output_normalization_weight: filled_tensor(
+                backend,
+                &[u64::try_from(hidden)?],
+                1.0,
+                context,
+            )?,
+        });
+    }
+    Ok(Gemma4AudioWeights {
+        first_convolution_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(configuration.first_convolution_channels)?,
+                1,
+                3,
+                3,
+            ],
+            0.04,
+            context,
+        )?,
+        first_convolution_normalization_weight: filled_tensor(
+            backend,
+            &[u64::try_from(configuration.first_convolution_channels)?],
+            1.0,
+            context,
+        )?,
+        second_convolution_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(configuration.second_convolution_channels)?,
+                u64::try_from(configuration.first_convolution_channels)?,
+                3,
+                3,
+            ],
+            0.03,
+            context,
+        )?,
+        second_convolution_normalization_weight: filled_tensor(
+            backend,
+            &[u64::try_from(configuration.second_convolution_channels)?],
+            1.0,
+            context,
+        )?,
+        subsample_projection_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(hidden)?,
+                u64::try_from(configuration.mel_bins.div_ceil(2).div_ceil(2))?
+                    * u64::try_from(configuration.second_convolution_channels)?,
+            ],
+            0.02,
+            context,
+        )?,
+        blocks,
+        encoder_output_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(configuration.encoder_output_size)?,
+                u64::try_from(hidden)?,
+            ],
+            0.025,
+            context,
+        )?,
+        encoder_output_bias: filled_tensor(
+            backend,
+            &[u64::try_from(configuration.encoder_output_size)?],
+            0.01,
+            context,
+        )?,
+        projector_weight: filled_tensor(
+            backend,
+            &[
+                u64::try_from(configuration.output_hidden_size)?,
+                u64::try_from(configuration.encoder_output_size)?,
+            ],
+            0.03,
             context,
         )?,
     })
@@ -1261,6 +1508,126 @@ fn gemma4_retained_vision_projector_is_exact_alias_aware_and_transactional()
     assert_eq!(constrained.scratch.in_use_bytes(), 0);
     drop(prepared_video);
     drop(source);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma4_retained_audio_encoder_is_exact_alias_aware_and_transactional()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_audio/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(
+        Gemma4AudioConfiguration::source(Gemma4AudioProfile::E2B)?.output_hidden_size,
+        1_536
+    );
+    assert_eq!(
+        Gemma4AudioConfiguration::source(Gemma4AudioProfile::E4B)?.output_hidden_size,
+        2_560
+    );
+    assert!(Gemma4AudioConfiguration::source(Gemma4AudioProfile::ThirtyOneB).is_err());
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 48 * 1024 * 1024)?;
+    let configuration = Gemma4AudioConfiguration::reduced_fixture(
+        Gemma4AudioProfile::E4B,
+        128,
+        2,
+        1,
+        4,
+        6,
+        1,
+        1,
+        3,
+        2,
+        3,
+        4,
+        3,
+    )?;
+    let owner = NativeGemma4AudioEncoder::new(
+        configuration.clone(),
+        reduced_gemma4_audio_weights(&backend, &configuration, &setup)?,
+        &cancellation,
+    )?;
+    let waveform_values = (0..640)
+        .map(|index| ((index as f32 * 0.017).sin() * 0.25) + 0.1)
+        .collect::<Vec<_>>();
+    let waveform = tensor(&backend, &[1, 1, 640], &waveform_values, &setup)?;
+    let prepared = prepare_gemma4_audio(&backend, &waveform, 16_000, &setup)?;
+    let output = owner.project(&backend, &prepared, &setup)?;
+    assert_eq!(output.tokens, 1);
+    assert_eq!(output.embedding.descriptor().shape(), [1, 3]);
+    let values = tensor_to_f32(&backend, &output.embedding, &setup)?;
+    assert!(values.iter().all(|value| value.is_finite()));
+    let digest = format!(
+        "{:x}",
+        Sha256::digest(
+            values
+                .iter()
+                .flat_map(|value| value.to_le_bytes())
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(
+        digest,
+        manifest["reduced_fixture"]["output_f32le_sha256"]
+            .as_str()
+            .ok_or("Gemma4 audio output digest is missing")?
+    );
+    drop(values);
+
+    let allocations = owner.resident_tensor_allocations()?;
+    let storage_ids = allocations
+        .iter()
+        .map(|(storage_id, _)| *storage_id)
+        .collect::<Vec<_>>();
+    assert!(storage_ids.iter().enumerate().all(|(index, storage_id)| {
+        !storage_ids[..index].iter().any(|prior| prior == storage_id)
+    }));
+    assert_eq!(
+        owner.semantic_state_digest_sha256(),
+        owner.clone().semantic_state_digest_sha256()
+    );
+    let mut changed_weights = reduced_gemma4_audio_weights(&backend, &configuration, &setup)?;
+    changed_weights.projector_weight = filled_tensor(&backend, &[3, 4], 0.031, &setup)?;
+    let changed =
+        NativeGemma4AudioEncoder::new(configuration.clone(), changed_weights, &cancellation)?;
+    assert_ne!(
+        owner.semantic_state_digest_sha256(),
+        changed.semantic_state_digest_sha256()
+    );
+    let mut forged = Gemma4AudioConfiguration::source(Gemma4AudioProfile::E4B)?;
+    forged.attention_chunk_size = 11;
+    assert!(
+        NativeGemma4AudioEncoder::new(
+            forged,
+            reduced_gemma4_audio_weights(&backend, &configuration, &setup)?,
+            &cancellation,
+        )
+        .is_err()
+    );
+
+    drop(output);
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = context(&authority, &cancelled, 48 * 1024 * 1024)?;
+    assert!(
+        owner
+            .project(&backend, &prepared, &cancelled_context)
+            .is_err()
+    );
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    let constrained = context(&authority, &cancellation, 16)?;
+    assert!(owner.project(&backend, &prepared, &constrained).is_err());
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    drop(prepared);
+    drop(waveform);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }

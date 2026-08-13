@@ -12394,6 +12394,110 @@
       "decision_reason": "NativeGemma4VisionEncoder is the sole retained Gemma4 visual projection owner. It admits the closed E2B, E4B, and 31B graphs, executes checkpoint clipping, learned x/y positions, theta-100 two-axis RoPE, key-masked attention, four normalization boundaries, GELU-tanh gating, spatial pooling, root scaling, and the parameterless-RMS projector, and binds all content and size-checked StorageId residency without retaining invocation state."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_projection_gemma4_audio",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeGemma4AudioEncoder",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeGemma4AudioEncoder",
+        "Gemma4AudioConfiguration",
+        "Gemma4AudioProfile",
+        "Gemma4AudioWeights",
+        "Gemma4AudioProjection"
+      ],
+      "allowed_adapters": [
+        "The canonical Gemma AUDIO preparation owner supplies bounded log-mel features and frame masks and remains the sole waveform, resampling, FFT, mel, and marker-count owner",
+        "NativeModule and comfy_tensor owners supply linear algebra, tensor storage, workspace, stream, memory, and cancellation primitives",
+        "The dependent Gemma multimodal resource may retain this owner and include its semantic digest and StorageId projection but cannot duplicate its graph",
+        "NativeDecoderTextEncoder, runtime controller, executor, NativeCache, persistence, RNG, KV, and output transactions remain outside this audio owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeGemma4AudioEncoder \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeGemma4AudioEncoder",
+          "role": "canonical_state",
+          "symbol": "NativeGemma4AudioEncoder"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct Gemma4AudioConfiguration \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::Gemma4AudioConfiguration",
+          "role": "canonical_state",
+          "symbol": "Gemma4AudioConfiguration"
+        }
+      ],
+      "call_symbols": [
+        "NativeGemma4AudioEncoder::new",
+        "NativeGemma4AudioEncoder::project",
+        "NativeGemma4AudioEncoder::semantic_state_digest_sha256",
+        "NativeGemma4AudioEncoder::resident_tensor_allocations"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma4-audio-retains-complete-closed-e2b-e4b-graph-and-rejects-31b",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeGemma4AudioEncoder[\\s\\S]*subsample_projection: NativeModule[\\s\\S]*blocks: Vec<NativeGemma4AudioBlock>[\\s\\S]*encoder_output: NativeModule[\\s\\S]*projector: NativeModule"
+        },
+        {
+          "name": "gemma4-audio-executes-subsampling-relative-attention-causal-convolution-and-projector-order",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn project[\\s\\S]*gemma4_audio_conv2d_layer[\\s\\S]*block.forward[\\s\\S]*gemma4_audio_attention[\\s\\S]*gemma4_audio_convolution[\\s\\S]*gemma4_parameterless_rms_norm"
+        },
+        {
+          "name": "gemma4-audio-consumes-canonical-log-mel-mask-and-marker-plan",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "prepared.log_mel\\(\\)[\\s\\S]*prepared.frame_mask\\(\\)[\\s\\S]*prepared.marker_tokens\\(\\)"
+        },
+        {
+          "name": "gemma4-audio-binds-source-semantic-state-and-size-checked-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "sim.comfy.gemma4-audio.v1[\\s\\S]*GEMMA4_MULTIMODAL_SOURCE_SHA256[\\s\\S]*pub fn resident_tensor_allocations[\\s\\S]*insert_gemma4_resident_allocation"
+        },
+        {
+          "name": "gemma4-audio-tests-reduced-exactness-capability-aliasing-and-failure-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma4_retained_audio_encoder_is_exact_alias_aware_and_transactional[\\s\\S]*gemma4_audio/manifest.json[\\s\\S]*ThirtyOneB[\\s\\S]*scratch.in_use_bytes\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma4-audio-execution-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma multimodal CLIP resource",
+        "retained native Gemma multimodal generation owner"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-TENSOR-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGemma4AudioEncoder is the sole retained Gemma4 audio execution owner. It admits the closed E2B/E4B graph and rejects 31B, executes masked convolutional subsampling, relative-position soft-capped chunk attention, scaled conformer feed-forwards, causal GLU convolution, encoder output, and the parameterless-RMS text projector, and binds all content and size-checked StorageId residency without retaining prepared audio or invocation state."
+    },
+    {
       "concern": "native_vision_text_transformer_text_media_projection_qwen",
       "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeQwenVisionEncoder",
       "owner_files": [

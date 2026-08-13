@@ -241,6 +241,25 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma4_audio_id]["dependencies"],
             [gemma4_vision_id],
         )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/audio_preparation/manifest.json",
+            tasks_by_id[gemma4_audio_id]["reads"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/gemma4_audio",
+            tasks_by_id[gemma4_audio_id]["writes"],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma4_audio_id]["validations"],
+            [
+                "VAL-CLIP-001",
+                "VAL-TENSOR-001",
+                "VAL-MODEL-FAMILY-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+        )
         self.assertEqual(
             tasks_by_id[gemma_resource_id]["dependencies"],
             [gemma4_audio_id],
