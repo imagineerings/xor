@@ -2184,6 +2184,78 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let gemma_tokenizer_definitions =
+        production_source_occurrences(&sources, "pub struct GemmaTokenizer");
+    let task391_gemma_has_one_native_prompt_tokenizer_family = gemma_tokenizer_definitions.len()
+        == 1
+        && gemma_tokenizer_definitions[0].contains("crates/comfy_model/src/clip_tokenizer.rs")
+        && model_clip_tokenizer.contains("Gemma(GemmaTokenizer)")
+        && model_clip_tokenizer.contains("NativeTokenizerFamily::Gemma(tokenizer)")
+        && !model_clip_tokenizer.contains("struct GemmaPromptTokenizer");
+    let task391_gemma_admission_identity_residency_and_cleanup_are_canonical = model_clip_tokenizer
+        .contains("pub fn gemma3(")
+        && model_clip_tokenizer.contains("pub fn gemma4_from_tokenizer_json(")
+        && model_clip_tokenizer.contains("Gemma3SentencePiece")
+        && model_clip_tokenizer.contains("Gemma4TokenizerJson")
+        && model_clip_tokenizer.contains("GEMMA3_IMAGE_TOKEN")
+        && model_clip_tokenizer.contains("GEMMA4_IMAGE_TOKEN")
+        && model_clip_tokenizer.contains("GEMMA4_AUDIO_TOKEN")
+        && model_clip_tokenizer.contains("GEMMA4_VIDEO_TOKEN")
+        && model_clip_tokenizer.contains("pub fn decode_generated(")
+        && model_clip_tokenizer.contains("sim.comfy.gemma3-sentencepiece-tokenizer.v1")
+        && !model_clip_tokenizer.contains("RngStreamAddress")
+        && !model_clip_tokenizer.contains("NativeCache")
+        && !model_clip_tokenizer.contains("OutputTransaction");
+    let task391_gemma_source_fixtures_and_failures_are_executable = model_clip_tokenizer_tests
+        .contains("gemma_tokenizers_are_profile_checked_left_padded_and_cleanup_exact")
+        && model_clip_tokenizer_tests.contains("gemma4-tokenizer.json")
+        && model_clip_tokenizer_tests.contains("licensed_checkpoint_included")
+        && model_clip_tokenizer_tests.contains("UnsupportedSpecialTokenDecode");
+    let task391_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_diffusion_language_tokenization_and_embedding_artifacts")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| {
+                    tasks.iter().any(|task| {
+                        task.as_str() == Some("comfy-parity-native-gemma-tokenizer-foundation")
+                    })
+                })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma-tokenizers-extend-the-sole-native-prompt-tokenizer-family",
+                            "gemma3-admission-binds-verified-sentencepiece-external-specials-and-left-padding",
+                            "gemma4-tokenizer-json-binds-unigram-specials-cleanup-identity-and-residency",
+                            "gemma-source-fingerprinted-tests-cover-admission-left-padding-cleanup-and-failures",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task391_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with("native_diffusion_language_tokenization_and_embedding_artifacts,")
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma-tokenizer-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let native_clip_text_definitions =
         production_source_occurrences(&sources, "pub struct NativeClipText");
     let clip_text_configuration_definitions =
@@ -8974,6 +9046,22 @@ fn run_ownership_validation(
             task383_qwen2_source_fixtures_and_failures_are_executable,
         ),
         (
+            "task391_policy_and_catalog_trace_gemma_tokenizer",
+            task391_policy_trace && task391_catalog_trace,
+        ),
+        (
+            "task391_gemma_has_one_native_prompt_tokenizer_family",
+            task391_gemma_has_one_native_prompt_tokenizer_family,
+        ),
+        (
+            "task391_gemma_admission_identity_residency_and_cleanup_are_canonical",
+            task391_gemma_admission_identity_residency_and_cleanup_are_canonical,
+        ),
+        (
+            "task391_gemma_source_fixtures_and_failures_are_executable",
+            task391_gemma_source_fixtures_and_failures_are_executable,
+        ),
+        (
             "task339_policy_and_catalog_trace_the_canonical_clip_text_owner",
             task_339_policy_trace && task_339_catalog_trace,
         ),
@@ -9677,6 +9765,17 @@ fn val_ownership_task383_qwen2_tokenizer_001() -> Result<(), Box<dyn std::error:
         "val-ownership-task383-qwen2-tokenizer-001.json",
         "val_ownership_task383_qwen2_tokenizer_001",
         Some("task383_"),
+    )
+}
+
+#[test]
+fn val_ownership_task391_gemma_tokenizer_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task391-gemma-artifact-tokenization-and-native-prompt-tokenizer-ownership",
+        "val-ownership-task391-gemma-tokenizer-001.json",
+        "val_ownership_task391_gemma_tokenizer_001",
+        Some("task391_"),
     )
 }
 

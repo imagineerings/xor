@@ -6202,7 +6202,7 @@
     },
     {
       "concern": "native_diffusion_language_tokenization_and_embedding_artifacts",
-      "canonical_owner": "comfy_model::{clip::Sd1Tokenizer, clip_tokenizer::{NativePromptTokenizer, Qwen2BpeTokenizer}, formats::{SentencePieceVocabulary, parse_verified_embedding_archive_file}, model_store::{VerifiedSentencePieceVocabulary, VerifiedModelTensorPayload, VerifiedEmbeddingArchivePayload}}",
+      "canonical_owner": "comfy_model::{clip::Sd1Tokenizer, clip_tokenizer::{NativePromptTokenizer, Qwen2BpeTokenizer, GemmaTokenizer}, formats::{SentencePieceVocabulary, parse_verified_embedding_archive_file}, model_store::{VerifiedSentencePieceVocabulary, VerifiedModelTensorPayload, VerifiedEmbeddingArchivePayload}}",
       "owner_files": [
         "crates/comfy_model/src/clip.rs",
         "crates/comfy_model/src/clip_tokenizer.rs",
@@ -6214,6 +6214,8 @@
         "NativePromptTokenizer",
         "Qwen2BpeTokenizer",
         "Qwen2PretokenizerProfile",
+        "GemmaTokenizer",
+        "GemmaTokenizerProfile",
         "SentencePieceType",
         "SentencePieceVocabularyEntry",
         "SentencePieceVocabulary",
@@ -6225,6 +6227,7 @@
       "allowed_adapters": [
         "clip_tokenizer::ClipBpeTokenizer delegates SD1 content encoding and decoding to clip::Sd1Tokenizer and owns only source-family section and option projection",
         "clip_tokenizer::Qwen2BpeTokenizer is the sole Qwen2/Qwen3.5 checked-artifact NFC, pretokenization, reversible byte-alphabet, ordered-merge, atomic-added-token, and replacement-decode adapter under NativePromptTokenizer",
+        "clip_tokenizer::GemmaTokenizer is the sole Gemma3 external-special SentencePiece overlay and Gemma4 checked tokenizer-JSON Unigram, control cleanup, semantic-identity, and owned-residency adapter under NativePromptTokenizer",
         "clip_tokenizer::SentencePieceTokenizer consumes only ModelStore-issued VerifiedSentencePieceVocabulary and owns only bounded source-compatible segmentation",
         "clip_tokenizer::TextualInversionEmbedding consumes only inseparable store-scoped VerifiedModelTensorPayload or VerifiedEmbeddingArchivePayload values and cannot accept caller-paired artifact identity, rows, raw archive entries, or raw float bytes",
         "clip_tokenizer::NativePromptTokenizer alone owns bounded section progress and source-compatible missing textual-inversion comma fallback; it delegates vocabulary traversal and artifact admission to the canonical owners",
@@ -6294,6 +6297,12 @@
         },
         {
           "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "qualified": "comfy_model::clip_tokenizer::GemmaTokenizer",
+          "role": "canonical",
+          "symbol": "GemmaTokenizer"
+        },
+        {
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
           "qualified": "comfy_model::clip_tokenizer::SentencePieceTokenizer",
           "role": "allowed_adapter",
           "symbol": "SentencePieceTokenizer"
@@ -6323,6 +6332,8 @@
         "ClipBpeTokenizer",
         "Qwen2BpeTokenizer",
         "Qwen2PretokenizerProfile",
+        "GemmaTokenizer",
+        "GemmaTokenizerProfile",
         "SentencePieceTokenizer",
         "TextualInversionEmbedding",
         "NativePromptTokenizer"
@@ -6352,6 +6363,26 @@
           "name": "qwen2-source-fingerprinted-tests-cover-specials-nfc-profiles-and-failures",
           "path": "crates/comfy_model/tests/clip_tokenizer.rs",
           "pattern": "qwen2_real_artifacts_preserve_text_added_tokens_and_minimum_padding[\\s\\S]*qwen2_fixture_manifest_pins_source_artifacts_and_provenance[\\s\\S]*qwen2_artifact_admission_and_cancellation_are_typed"
+        },
+        {
+          "name": "gemma-tokenizers-extend-the-sole-native-prompt-tokenizer-family",
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "pattern": "pub struct GemmaTokenizer[\\s\\S]*Gemma3SentencePiece[\\s\\S]*Gemma4TokenizerJson[\\s\\S]*Gemma\\(GemmaTokenizer\\)[\\s\\S]*pub fn decode_generated"
+        },
+        {
+          "name": "gemma3-admission-binds-verified-sentencepiece-external-specials-and-left-padding",
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "pattern": "pub fn gemma3\\([\\s\\S]*SentencePieceTokenizer[\\s\\S]*GEMMA3_IMAGE_TOKEN[\\s\\S]*GEMMA3_END_OF_TURN_TOKEN[\\s\\S]*configuration\\.pad_left"
+        },
+        {
+          "name": "gemma4-tokenizer-json-binds-unigram-specials-cleanup-identity-and-residency",
+          "path": "crates/comfy_model/src/clip_tokenizer.rs",
+          "pattern": "pub fn gemma4_from_tokenizer_json[\\s\\S]*Unigram[\\s\\S]*GEMMA4_IMAGE_TOKEN[\\s\\S]*GEMMA4_AUDIO_TOKEN[\\s\\S]*GEMMA4_VIDEO_TOKEN[\\s\\S]*GEMMA4_THOUGHT_CHANNEL_PREFIX[\\s\\S]*fn resident_bytes"
+        },
+        {
+          "name": "gemma-source-fingerprinted-tests-cover-admission-left-padding-cleanup-and-failures",
+          "path": "crates/comfy_model/tests/clip_tokenizer.rs",
+          "pattern": "gemma_tokenizers_are_profile_checked_left_padded_and_cleanup_exact[\\s\\S]*licensed_checkpoint_included[\\s\\S]*UnsupportedSpecialTokenDecode"
         },
         {
           "name": "sentencepiece-parser-retains-ordered-score-and-type-vocabulary",
@@ -6409,13 +6440,15 @@
         "comfy-parity-sd1-tokenizer-owner-consolidation",
         "comfy-parity-clip-tokenizer-foundation",
         "comfy-parity-native-decoder-text-generation-foundation",
-        "comfy-parity-native-qwen2-tokenizer-foundation"
+        "comfy-parity-native-qwen2-tokenizer-foundation",
+        "comfy-parity-native-gemma-tokenizer-foundation"
       ],
       "production_consumers": [
         "native CLIP prompt tokenization",
         "native textual-inversion prompt expansion",
         "native SentencePiece tokenizer-family adapters"
-        ,"native Qwen2 and Qwen3.5 byte-BPE prompt tokenization"
+        ,"native Qwen2 and Qwen3.5 byte-BPE prompt tokenization",
+        "native Gemma3 SentencePiece and Gemma4 tokenizer-JSON prompt tokenization and generated-text cleanup"
       ],
       "requirements": [
         "Requirement 7",

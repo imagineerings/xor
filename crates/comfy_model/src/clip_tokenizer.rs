@@ -1720,9 +1720,908 @@ fn flush_qwen2_bytes(output: &mut String, bytes: &mut Vec<u8>) -> Result<(), Nat
     Ok(())
 }
 
+pub const GEMMA3_IMAGE_TOKEN: u32 = 262_144;
+pub const GEMMA3_END_OF_TURN_TOKEN: u32 = 106;
+pub const GEMMA4_PAD_TOKEN: u32 = 0;
+pub const GEMMA4_START_TOKEN: u32 = 2;
+pub const GEMMA4_IMAGE_TOKEN: u32 = 258_880;
+pub const GEMMA4_AUDIO_TOKEN: u32 = 258_881;
+pub const GEMMA4_VIDEO_TOKEN: u32 = 258_884;
+pub const MAX_GEMMA_TOKENIZER_JSON_BYTES: usize = 128 * 1024 * 1024;
+pub const MAX_GEMMA_TOKENIZER_VOCABULARY: usize = 1_000_000;
+
+const GEMMA3_IMAGE_TOKEN_TEXT: &str = "<image_soft_token>";
+const GEMMA3_END_OF_TURN_TOKEN_TEXT: &str = "<end_of_turn>";
+const GEMMA4_IMAGE_TOKEN_TEXT: &str = "<|image|>";
+const GEMMA4_AUDIO_TOKEN_TEXT: &str = "<|audio|>";
+const GEMMA4_VIDEO_TOKEN_TEXT: &str = "<|video|>";
+const GEMMA4_THOUGHT_CHANNEL_PREFIX: &str = "<|channel>thought\n";
+const GEMMA4_THOUGHT_CHANNEL_SUFFIX: &str = "<channel|>";
+const GEMMA4_TURN_TOKEN_TEXT: &str = "<turn|>";
+const GEMMA4_END_TOKEN_TEXT: &str = "<eos>";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GemmaTokenizerProfile {
+    Gemma3SentencePiece,
+    Gemma4TokenizerJson,
+}
+
+#[derive(Clone, Debug)]
+struct GemmaAddedToken {
+    content: String,
+    token: u32,
+    special: bool,
+}
+
+#[derive(Clone, Debug)]
+struct GemmaUnigramToken {
+    piece: String,
+    score: f64,
+}
+
+#[derive(Clone, Debug)]
+enum GemmaNormalizerOperation {
+    Nfc,
+    Nfkc,
+    Strip { left: bool, right: bool },
+    Prepend(String),
+    ReplaceSpace(String),
+}
+
+#[derive(Clone, Debug)]
+struct GemmaUnigramTokenizer {
+    tokens: Vec<GemmaUnigramToken>,
+    candidates_by_first: BTreeMap<char, Vec<usize>>,
+    byte_tokens: BTreeMap<u8, u32>,
+    unknown_token: u32,
+    byte_fallback: bool,
+    normalizer: Vec<GemmaNormalizerOperation>,
+    decoder_replacement: Option<String>,
+    decoder_prepends: bool,
+}
+
+#[derive(Clone, Debug)]
+enum GemmaTokenizerImplementation {
+    SentencePiece(SentencePieceTokenizer),
+    Unigram(GemmaUnigramTokenizer),
+}
+
+#[derive(Clone, Debug)]
+pub struct GemmaTokenizer {
+    profile: GemmaTokenizerProfile,
+    implementation: GemmaTokenizerImplementation,
+    added_tokens: Vec<GemmaAddedToken>,
+    special_tokens: BTreeSet<u32>,
+    artifact_digest: String,
+}
+
+impl GemmaTokenizer {
+    pub fn gemma3(
+        tokenizer: SentencePieceTokenizer,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        let end_of_turn = tokenizer
+            .entries
+            .get(GEMMA3_END_OF_TURN_TOKEN as usize)
+            .ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma3 SentencePiece vocabulary omits <end_of_turn>".to_owned(),
+                )
+            })?;
+        if end_of_turn.piece != GEMMA3_END_OF_TURN_TOKEN_TEXT {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma3 SentencePiece token 106 is not <end_of_turn>".to_owned(),
+            ));
+        }
+        if tokenizer.entries.len() > GEMMA3_IMAGE_TOKEN as usize {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma3 external image token collides with SentencePiece vocabulary".to_owned(),
+            ));
+        }
+        let added_tokens = vec![
+            GemmaAddedToken {
+                content: GEMMA3_IMAGE_TOKEN_TEXT.to_owned(),
+                token: GEMMA3_IMAGE_TOKEN,
+                special: true,
+            },
+            GemmaAddedToken {
+                content: GEMMA3_END_OF_TURN_TOKEN_TEXT.to_owned(),
+                token: GEMMA3_END_OF_TURN_TOKEN,
+                special: true,
+            },
+        ];
+        let special_tokens = BTreeSet::from([GEMMA3_IMAGE_TOKEN, GEMMA3_END_OF_TURN_TOKEN]);
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.gemma3-sentencepiece-tokenizer.v1");
+        hasher.update(tokenizer.artifact_sha256.as_bytes());
+        for added in &added_tokens {
+            hasher.update(added.token.to_le_bytes());
+            hasher.update(added.content.as_bytes());
+            hasher.update([u8::from(added.special)]);
+        }
+        Ok(Self {
+            profile: GemmaTokenizerProfile::Gemma3SentencePiece,
+            implementation: GemmaTokenizerImplementation::SentencePiece(tokenizer),
+            added_tokens,
+            special_tokens,
+            artifact_digest: format!("{:x}", hasher.finalize()),
+        })
+    }
+
+    pub fn gemma4_from_tokenizer_json(
+        tokenizer_json: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokenizer_json.is_empty() || tokenizer_json.len() > MAX_GEMMA_TOKENIZER_JSON_BYTES {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 tokenizer JSON size is outside the native bound".to_owned(),
+            ));
+        }
+        let document: serde_json::Value = serde_json::from_str(tokenizer_json)
+            .map_err(|error| NativeTokenizerError::InvalidVocabularyJson(error.to_string()))?;
+        if document.get("version").and_then(serde_json::Value::as_str) != Some("1.0")
+            || !document
+                .get("truncation")
+                .is_none_or(serde_json::Value::is_null)
+            || !document
+                .get("padding")
+                .is_none_or(serde_json::Value::is_null)
+            || !document
+                .get("pre_tokenizer")
+                .is_none_or(serde_json::Value::is_null)
+            || !document
+                .get("post_processor")
+                .is_none_or(serde_json::Value::is_null)
+        {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 tokenizer JSON envelope is unsupported".to_owned(),
+            ));
+        }
+        let model = document
+            .get("model")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 tokenizer JSON model is missing".to_owned(),
+                )
+            })?;
+        if model.get("type").and_then(serde_json::Value::as_str) != Some("Unigram") {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 tokenizer JSON must use the Unigram model".to_owned(),
+            ));
+        }
+        let unknown_token = model
+            .get("unk_id")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 tokenizer unknown token is invalid".to_owned(),
+                )
+            })?;
+        let byte_fallback = model
+            .get("byte_fallback")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let vocabulary = model
+            .get("vocab")
+            .and_then(serde_json::Value::as_array)
+            .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+        if vocabulary.is_empty() || vocabulary.len() > MAX_GEMMA_TOKENIZER_VOCABULARY {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+        let mut tokens = Vec::new();
+        tokens
+            .try_reserve_exact(vocabulary.len())
+            .map_err(|_| NativeTokenizerError::Allocation("Gemma4 Unigram vocabulary"))?;
+        let mut candidates_by_first = BTreeMap::<char, Vec<usize>>::new();
+        let mut byte_tokens = BTreeMap::new();
+        let mut seen_pieces = BTreeSet::new();
+        for (index, entry) in vocabulary.iter().enumerate() {
+            if index.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            let row = entry
+                .as_array()
+                .filter(|row| row.len() == 2)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            let piece = row[0]
+                .as_str()
+                .filter(|piece| !piece.is_empty())
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            let score = row[1]
+                .as_f64()
+                .filter(|score| score.is_finite())
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            if !seen_pieces.insert(piece.to_owned()) {
+                return Err(NativeTokenizerError::InvalidVocabulary);
+            }
+            if let Ok(byte) = sentencepiece_byte(piece) {
+                let token = u32::try_from(index).map_err(|_| {
+                    NativeTokenizerError::ArithmeticOverflow("Gemma4 byte token ID")
+                })?;
+                if byte_tokens.insert(byte, token).is_some() {
+                    return Err(NativeTokenizerError::InvalidVocabulary);
+                }
+            } else if let Some(first) = piece.chars().next() {
+                let candidates = candidates_by_first.entry(first).or_default();
+                candidates
+                    .try_reserve(1)
+                    .map_err(|_| NativeTokenizerError::Allocation("Gemma4 candidates"))?;
+                candidates.push(index);
+            }
+            tokens.push(GemmaUnigramToken {
+                piece: piece.to_owned(),
+                score,
+            });
+        }
+        if usize::try_from(unknown_token)
+            .ok()
+            .is_none_or(|index| index >= tokens.len())
+        {
+            return Err(NativeTokenizerError::InvalidVocabulary);
+        }
+        if byte_fallback && byte_tokens.len() != 256 {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 byte fallback requires all 256 byte tokens".to_owned(),
+            ));
+        }
+
+        let added_values = document
+            .get("added_tokens")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 added-token table is missing".to_owned(),
+                )
+            })?;
+        let mut added_tokens = Vec::new();
+        added_tokens
+            .try_reserve_exact(added_values.len())
+            .map_err(|_| NativeTokenizerError::Allocation("Gemma4 added tokens"))?;
+        let mut special_tokens = BTreeSet::new();
+        let mut added_ids = BTreeSet::new();
+        let mut added_contents = BTreeSet::new();
+        for value in added_values {
+            cancellation.check()?;
+            let object = value.as_object().ok_or_else(|| {
+                NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 added-token record is invalid".to_owned(),
+                )
+            })?;
+            let token = object
+                .get("id")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| {
+                    NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "Gemma4 added-token ID is invalid".to_owned(),
+                    )
+                })?;
+            let content = object
+                .get("content")
+                .and_then(serde_json::Value::as_str)
+                .filter(|content| !content.is_empty())
+                .ok_or_else(|| {
+                    NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "Gemma4 added-token content is invalid".to_owned(),
+                    )
+                })?;
+            for flag in ["lstrip", "normalized", "rstrip", "single_word"] {
+                if object.get(flag).and_then(serde_json::Value::as_bool) != Some(false) {
+                    return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                        format!("unsupported Gemma4 added-token flag {flag}"),
+                    ));
+                }
+            }
+            let special = object
+                .get("special")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| {
+                    NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "Gemma4 added-token classification is missing".to_owned(),
+                    )
+                })?;
+            if !added_ids.insert(token) || !added_contents.insert(content.to_owned()) {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 added-token table contains a duplicate".to_owned(),
+                ));
+            }
+            if let Some(base) = usize::try_from(token)
+                .ok()
+                .and_then(|index| tokens.get(index))
+                && base.piece != content
+            {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 added-token ID disagrees with the Unigram vocabulary".to_owned(),
+                ));
+            }
+            if special {
+                special_tokens.insert(token);
+            }
+            added_tokens.push(GemmaAddedToken {
+                content: content.to_owned(),
+                token,
+                special,
+            });
+        }
+        for (token, content) in [
+            (GEMMA4_IMAGE_TOKEN, GEMMA4_IMAGE_TOKEN_TEXT),
+            (GEMMA4_AUDIO_TOKEN, GEMMA4_AUDIO_TOKEN_TEXT),
+            (GEMMA4_VIDEO_TOKEN, GEMMA4_VIDEO_TOKEN_TEXT),
+        ] {
+            if !added_tokens
+                .iter()
+                .any(|added| added.token == token && added.content == content)
+            {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    format!("Gemma4 token {token} is not {content}"),
+                ));
+            }
+        }
+        for content in [
+            GEMMA4_THOUGHT_CHANNEL_SUFFIX,
+            GEMMA4_TURN_TOKEN_TEXT,
+            GEMMA4_END_TOKEN_TEXT,
+        ] {
+            if !added_tokens.iter().any(|added| added.content == content)
+                && !tokens.iter().any(|token| token.piece == content)
+            {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    format!("Gemma4 cleanup token {content} is missing"),
+                ));
+            }
+        }
+        if !token_exists(GEMMA4_PAD_TOKEN, &tokens, &added_tokens)
+            || !token_exists(GEMMA4_START_TOKEN, &tokens, &added_tokens)
+        {
+            return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 start or pad token is missing".to_owned(),
+            ));
+        }
+
+        let normalizer = parse_gemma_normalizer(document.get("normalizer"))?;
+        let (decoder_replacement, decoder_prepends) = parse_gemma_decoder(document.get("decoder"))?;
+        cancellation.check()?;
+        Ok(Self {
+            profile: GemmaTokenizerProfile::Gemma4TokenizerJson,
+            implementation: GemmaTokenizerImplementation::Unigram(GemmaUnigramTokenizer {
+                tokens,
+                candidates_by_first,
+                byte_tokens,
+                unknown_token,
+                byte_fallback,
+                normalizer,
+                decoder_replacement,
+                decoder_prepends,
+            }),
+            added_tokens,
+            special_tokens,
+            artifact_digest: format!("{:x}", Sha256::digest(tokenizer_json.as_bytes())),
+        })
+    }
+
+    pub const fn profile(&self) -> GemmaTokenizerProfile {
+        self.profile
+    }
+
+    pub fn artifact_digest(&self) -> &str {
+        &self.artifact_digest
+    }
+
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u32>, NativeTokenizerError> {
+        cancellation.check()?;
+        if text.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(text.len()));
+        }
+        let mut output = Vec::new();
+        let mut cursor = 0;
+        while cursor < text.len() {
+            cancellation.check()?;
+            let next = next_gemma_added_token(&self.added_tokens, text, cursor);
+            let ordinary_end = next.map_or(text.len(), |(position, _)| position);
+            if ordinary_end > cursor {
+                match &self.implementation {
+                    GemmaTokenizerImplementation::SentencePiece(tokenizer) => {
+                        output.extend(tokenizer.encode(&text[cursor..ordinary_end], cancellation)?)
+                    }
+                    GemmaTokenizerImplementation::Unigram(tokenizer) => {
+                        tokenizer.encode(&text[cursor..ordinary_end], cancellation, &mut output)?
+                    }
+                }
+            }
+            let Some((position, added)) = next else {
+                break;
+            };
+            if position != ordinary_end {
+                return Err(NativeTokenizerError::InvalidUtf8Boundary);
+            }
+            output
+                .try_reserve(1)
+                .map_err(|_| NativeTokenizerError::Allocation("Gemma token output"))?;
+            output.push(added.token);
+            cursor = position.checked_add(added.content.len()).ok_or(
+                NativeTokenizerError::ArithmeticOverflow("Gemma added token cursor"),
+            )?;
+        }
+        if text.is_empty() {
+            return Ok(output);
+        }
+        cancellation.check()?;
+        Ok(output)
+    }
+
+    fn decode(
+        &self,
+        tokens: &[u32],
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokens.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(tokens.len()));
+        }
+        match &self.implementation {
+            GemmaTokenizerImplementation::SentencePiece(tokenizer) => {
+                let mut filtered = Vec::new();
+                filtered
+                    .try_reserve_exact(tokens.len())
+                    .map_err(|_| NativeTokenizerError::Allocation("Gemma3 decode tokens"))?;
+                for token in tokens {
+                    cancellation.check()?;
+                    if self.special_tokens.contains(token) {
+                        if !skip_special {
+                            return Err(NativeTokenizerError::UnsupportedSpecialTokenDecode(
+                                *token,
+                            ));
+                        }
+                    } else {
+                        filtered.push(*token);
+                    }
+                }
+                tokenizer.decode(&filtered, skip_special, cancellation)
+            }
+            GemmaTokenizerImplementation::Unigram(tokenizer) => tokenizer.decode(
+                tokens,
+                &self.added_tokens,
+                &self.special_tokens,
+                skip_special,
+                cancellation,
+            ),
+        }
+    }
+
+    fn decode_generated(
+        &self,
+        tokens: &[u32],
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        match self.profile {
+            GemmaTokenizerProfile::Gemma3SentencePiece => self.decode(tokens, true, cancellation),
+            GemmaTokenizerProfile::Gemma4TokenizerJson => {
+                let decoded = self.decode(tokens, false, cancellation)?;
+                let translated = decoded
+                    .replace(GEMMA4_THOUGHT_CHANNEL_PREFIX, "<think>\n")
+                    .replace(GEMMA4_THOUGHT_CHANNEL_SUFFIX, "</think>")
+                    .replace(GEMMA4_TURN_TOKEN_TEXT, "")
+                    .replace(GEMMA4_END_TOKEN_TEXT, "");
+                Ok(translated.trim().to_owned())
+            }
+        }
+    }
+
+    fn resident_bytes(&self) -> Result<u64, NativeTokenizerError> {
+        let mut bytes = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| NativeTokenizerError::ArithmeticOverflow("Gemma residency"))?;
+        for added in &self.added_tokens {
+            bytes = bytes
+                .checked_add(u64::try_from(added.content.capacity()).map_err(|_| {
+                    NativeTokenizerError::ArithmeticOverflow("Gemma added-token residency")
+                })?)
+                .ok_or(NativeTokenizerError::ArithmeticOverflow("Gemma residency"))?;
+        }
+        match &self.implementation {
+            GemmaTokenizerImplementation::SentencePiece(tokenizer) => {
+                for entry in &tokenizer.entries {
+                    bytes = bytes
+                        .checked_add(u64::try_from(entry.piece.capacity()).map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("Gemma3 residency")
+                        })?)
+                        .ok_or(NativeTokenizerError::ArithmeticOverflow("Gemma residency"))?;
+                }
+            }
+            GemmaTokenizerImplementation::Unigram(tokenizer) => {
+                for token in &tokenizer.tokens {
+                    bytes = bytes
+                        .checked_add(u64::try_from(token.piece.capacity()).map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("Gemma4 residency")
+                        })?)
+                        .ok_or(NativeTokenizerError::ArithmeticOverflow("Gemma residency"))?;
+                }
+                for operation in &tokenizer.normalizer {
+                    if let GemmaNormalizerOperation::Prepend(value)
+                    | GemmaNormalizerOperation::ReplaceSpace(value) = operation
+                    {
+                        bytes = bytes
+                            .checked_add(u64::try_from(value.capacity()).map_err(|_| {
+                                NativeTokenizerError::ArithmeticOverflow("Gemma4 residency")
+                            })?)
+                            .ok_or(NativeTokenizerError::ArithmeticOverflow("Gemma residency"))?;
+                    }
+                }
+            }
+        }
+        Ok(bytes)
+    }
+}
+
+impl GemmaUnigramTokenizer {
+    fn encode(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+        output: &mut Vec<u32>,
+    ) -> Result<(), NativeTokenizerError> {
+        let normalized = apply_gemma_normalizer(text, &self.normalizer)?;
+        if normalized.is_empty() {
+            return Ok(());
+        }
+        let positions =
+            normalized
+                .len()
+                .checked_add(1)
+                .ok_or(NativeTokenizerError::ArithmeticOverflow(
+                    "Gemma4 path positions",
+                ))?;
+        let mut scores = Vec::new();
+        scores
+            .try_reserve_exact(positions)
+            .map_err(|_| NativeTokenizerError::Allocation("Gemma4 path scores"))?;
+        scores.resize(positions, f64::NEG_INFINITY);
+        scores[0] = 0.0;
+        let mut paths = Vec::<Option<SentencePiecePathStep>>::new();
+        paths
+            .try_reserve_exact(positions)
+            .map_err(|_| NativeTokenizerError::Allocation("Gemma4 paths"))?;
+        paths.resize_with(positions, || None);
+        for offset in 0..normalized.len() {
+            if offset.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            if !scores[offset].is_finite() || !normalized.is_char_boundary(offset) {
+                continue;
+            }
+            let tail = normalized
+                .get(offset..)
+                .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?;
+            let first = tail
+                .chars()
+                .next()
+                .ok_or(NativeTokenizerError::InvalidUtf8Boundary)?;
+            let mut matched = false;
+            if let Some(candidates) = self.candidates_by_first.get(&first) {
+                for index in candidates {
+                    let candidate = self
+                        .tokens
+                        .get(*index)
+                        .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+                    if tail.starts_with(&candidate.piece) {
+                        matched = true;
+                        let end = offset
+                            .checked_add(candidate.piece.len())
+                            .ok_or(NativeTokenizerError::ArithmeticOverflow("Gemma4 endpoint"))?;
+                        let token = u32::try_from(*index).map_err(|_| {
+                            NativeTokenizerError::ArithmeticOverflow("Gemma4 token ID")
+                        })?;
+                        update_sentencepiece_path(
+                            &mut scores,
+                            &mut paths,
+                            offset,
+                            end,
+                            candidate.score,
+                            &[token],
+                        )?;
+                    }
+                }
+            }
+            if matched {
+                continue;
+            }
+            let character_length = first.len_utf8();
+            let end = offset.checked_add(character_length).ok_or(
+                NativeTokenizerError::ArithmeticOverflow("Gemma4 fallback endpoint"),
+            )?;
+            let mut fallback = Vec::new();
+            if self.byte_fallback {
+                fallback
+                    .try_reserve_exact(character_length)
+                    .map_err(|_| NativeTokenizerError::Allocation("Gemma4 byte fallback"))?;
+                let mut encoded = [0_u8; 4];
+                for byte in first.encode_utf8(&mut encoded).as_bytes() {
+                    fallback.push(
+                        *self
+                            .byte_tokens
+                            .get(byte)
+                            .ok_or(NativeTokenizerError::InvalidVocabulary)?,
+                    );
+                }
+            } else {
+                fallback.push(self.unknown_token);
+            }
+            let unknown = self
+                .tokens
+                .get(self.unknown_token as usize)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            update_sentencepiece_path(
+                &mut scores,
+                &mut paths,
+                offset,
+                end,
+                unknown.score,
+                &fallback,
+            )?;
+        }
+        let mut reversed = Vec::new();
+        let mut cursor = normalized.len();
+        while cursor != 0 {
+            let step = paths
+                .get_mut(cursor)
+                .and_then(Option::take)
+                .ok_or(NativeTokenizerError::InvalidVocabulary)?;
+            reversed
+                .try_reserve(step.tokens.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Gemma4 output"))?;
+            reversed.extend(step.tokens.into_iter().rev());
+            cursor = step.previous;
+        }
+        reversed.reverse();
+        output
+            .try_reserve(reversed.len())
+            .map_err(|_| NativeTokenizerError::Allocation("Gemma4 token output"))?;
+        output.extend(reversed);
+        Ok(())
+    }
+
+    fn decode(
+        &self,
+        tokens: &[u32],
+        added_tokens: &[GemmaAddedToken],
+        special_tokens: &BTreeSet<u32>,
+        skip_special: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        let mut pieces = String::new();
+        for (index, token) in tokens.iter().copied().enumerate() {
+            if index.is_multiple_of(256) {
+                cancellation.check()?;
+            }
+            if skip_special && special_tokens.contains(&token) {
+                continue;
+            }
+            let piece = if let Some(added) = added_tokens.iter().find(|added| added.token == token)
+            {
+                added.content.as_str()
+            } else {
+                self.tokens
+                    .get(token as usize)
+                    .map(|token| token.piece.as_str())
+                    .ok_or(NativeTokenizerError::UnknownToken(token))?
+            };
+            pieces
+                .try_reserve(piece.len())
+                .map_err(|_| NativeTokenizerError::Allocation("Gemma4 decoded text"))?;
+            pieces.push_str(piece);
+            if pieces.len() > MAX_NATIVE_PROMPT_BYTES {
+                return Err(NativeTokenizerError::TooManyTokenValues(pieces.len()));
+            }
+        }
+        if let Some(replacement) = &self.decoder_replacement {
+            let mut decoded = pieces.replace(replacement, " ");
+            if self.decoder_prepends && decoded.starts_with(' ') {
+                decoded.remove(0);
+            }
+            Ok(decoded)
+        } else {
+            Ok(pieces)
+        }
+    }
+}
+
+fn token_exists(token: u32, tokens: &[GemmaUnigramToken], added: &[GemmaAddedToken]) -> bool {
+    usize::try_from(token)
+        .ok()
+        .is_some_and(|index| index < tokens.len())
+        || added.iter().any(|added| added.token == token)
+}
+
+fn next_gemma_added_token<'a>(
+    added_tokens: &'a [GemmaAddedToken],
+    text: &str,
+    cursor: usize,
+) -> Option<(usize, &'a GemmaAddedToken)> {
+    added_tokens
+        .iter()
+        .filter_map(|added| {
+            text.get(cursor..)?
+                .find(&added.content)
+                .map(|relative| (cursor + relative, added))
+        })
+        .min_by(|(left_position, left), (right_position, right)| {
+            left_position
+                .cmp(right_position)
+                .then_with(|| right.content.len().cmp(&left.content.len()))
+                .then_with(|| left.token.cmp(&right.token))
+        })
+}
+
+fn parse_gemma_normalizer(
+    value: Option<&serde_json::Value>,
+) -> Result<Vec<GemmaNormalizerOperation>, NativeTokenizerError> {
+    fn append(
+        value: &serde_json::Value,
+        output: &mut Vec<GemmaNormalizerOperation>,
+    ) -> Result<(), NativeTokenizerError> {
+        let object = value.as_object().ok_or_else(|| {
+            NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 normalizer is invalid".to_owned(),
+            )
+        })?;
+        match object.get("type").and_then(serde_json::Value::as_str) {
+            Some("Sequence") => {
+                let normalizers = object
+                    .get("normalizers")
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| {
+                        NativeTokenizerError::InvalidTokenizerConfiguration(
+                            "Gemma4 normalizer sequence is invalid".to_owned(),
+                        )
+                    })?;
+                for normalizer in normalizers {
+                    append(normalizer, output)?;
+                }
+            }
+            Some("NFC") => output.push(GemmaNormalizerOperation::Nfc),
+            Some("NFKC") => output.push(GemmaNormalizerOperation::Nfkc),
+            Some("Strip") => output.push(GemmaNormalizerOperation::Strip {
+                left: object
+                    .get("strip_left")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true),
+                right: object
+                    .get("strip_right")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true),
+            }),
+            Some("Prepend") => output.push(GemmaNormalizerOperation::Prepend(
+                object
+                    .get("prepend")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        NativeTokenizerError::InvalidTokenizerConfiguration(
+                            "Gemma4 prepend normalizer is invalid".to_owned(),
+                        )
+                    })?
+                    .to_owned(),
+            )),
+            Some("Replace") => {
+                let pattern = object
+                    .get("pattern")
+                    .and_then(serde_json::Value::as_object)
+                    .and_then(|pattern| pattern.get("String"))
+                    .and_then(serde_json::Value::as_str);
+                if pattern != Some(" ") {
+                    return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                        "Gemma4 replace normalizer only supports literal spaces".to_owned(),
+                    ));
+                }
+                let content = object
+                    .get("content")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        NativeTokenizerError::InvalidTokenizerConfiguration(
+                            "Gemma4 replacement is invalid".to_owned(),
+                        )
+                    })?;
+                output.push(GemmaNormalizerOperation::ReplaceSpace(content.to_owned()));
+            }
+            Some(other) => {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    format!("unsupported Gemma4 normalizer {other}"),
+                ));
+            }
+            None => {
+                return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+                    "Gemma4 normalizer type is missing".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    let mut operations = Vec::new();
+    if let Some(value) = value.filter(|value| !value.is_null()) {
+        append(value, &mut operations)?;
+    }
+    Ok(operations)
+}
+
+fn parse_gemma_decoder(
+    value: Option<&serde_json::Value>,
+) -> Result<(Option<String>, bool), NativeTokenizerError> {
+    let Some(object) = value
+        .filter(|value| !value.is_null())
+        .and_then(serde_json::Value::as_object)
+    else {
+        return Ok((None, false));
+    };
+    if object.get("type").and_then(serde_json::Value::as_str) != Some("Metaspace") {
+        return Err(NativeTokenizerError::InvalidTokenizerConfiguration(
+            "Gemma4 tokenizer decoder must use Metaspace".to_owned(),
+        ));
+    }
+    let replacement = object
+        .get("replacement")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            NativeTokenizerError::InvalidTokenizerConfiguration(
+                "Gemma4 Metaspace replacement is invalid".to_owned(),
+            )
+        })?;
+    let prepends = matches!(
+        object
+            .get("prepend_scheme")
+            .and_then(serde_json::Value::as_str),
+        Some("always") | Some("first")
+    );
+    Ok((Some(replacement.to_owned()), prepends))
+}
+
+fn apply_gemma_normalizer(
+    text: &str,
+    operations: &[GemmaNormalizerOperation],
+) -> Result<String, NativeTokenizerError> {
+    let mut value = text.to_owned();
+    for operation in operations {
+        value = match operation {
+            GemmaNormalizerOperation::Nfc => value.nfc().collect(),
+            GemmaNormalizerOperation::Nfkc => value.nfkc().collect(),
+            GemmaNormalizerOperation::Strip { left, right } => match (*left, *right) {
+                (true, true) => value.trim().to_owned(),
+                (true, false) => value.trim_start().to_owned(),
+                (false, true) => value.trim_end().to_owned(),
+                (false, false) => value,
+            },
+            GemmaNormalizerOperation::Prepend(prefix) => {
+                let mut result = String::new();
+                result
+                    .try_reserve(prefix.len().saturating_add(value.len()))
+                    .map_err(|_| NativeTokenizerError::Allocation("Gemma4 normalization"))?;
+                result.push_str(prefix);
+                result.push_str(&value);
+                result
+            }
+            GemmaNormalizerOperation::ReplaceSpace(replacement) => value.replace(' ', replacement),
+        };
+        if value.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::PromptTooLarge(value.len()));
+        }
+    }
+    Ok(value)
+}
+
 #[derive(Clone, Debug)]
 pub enum NativeTokenizerFamily {
     ClipBpe(ClipBpeTokenizer),
+    Gemma(GemmaTokenizer),
     Qwen2ByteBpe(Qwen2BpeTokenizer),
     SentencePiece(SentencePieceTokenizer),
 }
@@ -1735,6 +2634,7 @@ impl NativeTokenizerFamily {
     ) -> Result<Vec<u32>, NativeTokenizerError> {
         match self {
             Self::ClipBpe(tokenizer) => tokenizer.encode(text, cancellation),
+            Self::Gemma(tokenizer) => tokenizer.encode(text, cancellation),
             Self::Qwen2ByteBpe(tokenizer) => tokenizer.encode(text, cancellation),
             Self::SentencePiece(tokenizer) => tokenizer.encode(text, cancellation),
         }
@@ -1748,6 +2648,7 @@ impl NativeTokenizerFamily {
     ) -> Result<String, NativeTokenizerError> {
         match self {
             Self::ClipBpe(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
+            Self::Gemma(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
             Self::Qwen2ByteBpe(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
             Self::SentencePiece(tokenizer) => tokenizer.decode(tokens, skip_special, cancellation),
         }
@@ -1769,14 +2670,36 @@ impl NativePromptTokenizer {
     pub fn qwen2_profile(&self) -> Option<Qwen2PretokenizerProfile> {
         match &self.family {
             NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => Some(tokenizer.profile()),
-            NativeTokenizerFamily::ClipBpe(_) | NativeTokenizerFamily::SentencePiece(_) => None,
+            NativeTokenizerFamily::ClipBpe(_)
+            | NativeTokenizerFamily::Gemma(_)
+            | NativeTokenizerFamily::SentencePiece(_) => None,
         }
     }
 
     pub fn qwen2_artifact_digest(&self) -> Option<&str> {
         match &self.family {
             NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => Some(tokenizer.artifact_digest()),
-            NativeTokenizerFamily::ClipBpe(_) | NativeTokenizerFamily::SentencePiece(_) => None,
+            NativeTokenizerFamily::ClipBpe(_)
+            | NativeTokenizerFamily::Gemma(_)
+            | NativeTokenizerFamily::SentencePiece(_) => None,
+        }
+    }
+
+    pub fn gemma_profile(&self) -> Option<GemmaTokenizerProfile> {
+        match &self.family {
+            NativeTokenizerFamily::Gemma(tokenizer) => Some(tokenizer.profile()),
+            NativeTokenizerFamily::ClipBpe(_)
+            | NativeTokenizerFamily::Qwen2ByteBpe(_)
+            | NativeTokenizerFamily::SentencePiece(_) => None,
+        }
+    }
+
+    pub fn gemma_artifact_digest(&self) -> Option<&str> {
+        match &self.family {
+            NativeTokenizerFamily::Gemma(tokenizer) => Some(tokenizer.artifact_digest()),
+            NativeTokenizerFamily::ClipBpe(_)
+            | NativeTokenizerFamily::Qwen2ByteBpe(_)
+            | NativeTokenizerFamily::SentencePiece(_) => None,
         }
     }
 
@@ -1796,6 +2719,11 @@ impl NativePromptTokenizer {
             NativeTokenizerFamily::ClipBpe(tokenizer) => {
                 hasher.update(b"clip-bpe");
                 hasher.update(tokenizer.tokenizer.identity().digest().as_bytes());
+            }
+            NativeTokenizerFamily::Gemma(tokenizer) => {
+                hasher.update(b"gemma");
+                hasher.update(format!("{:?}", tokenizer.profile()).as_bytes());
+                hasher.update(tokenizer.artifact_digest().as_bytes());
             }
             NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => {
                 hasher.update(b"qwen2-byte-bpe");
@@ -1851,10 +2779,18 @@ impl NativePromptTokenizer {
         tokens
             .try_reserve_exact(token_count)
             .map_err(|_| NativeTokenizerError::Allocation("numeric prompt tokens"))?;
+        let padding = token_count.checked_sub(unpadded_count).ok_or(
+            NativeTokenizerError::ArithmeticOverflow("numeric prompt padding"),
+        )?;
+        if self.configuration.pad_left {
+            tokens.extend(std::iter::repeat_n(self.configuration.pad_token, padding));
+        }
         tokens.extend(self.configuration.start_token);
         tokens.extend(content);
         tokens.extend(self.configuration.end_token);
-        tokens.resize(token_count, self.configuration.pad_token);
+        if !self.configuration.pad_left {
+            tokens.extend(std::iter::repeat_n(self.configuration.pad_token, padding));
+        }
         cancellation.check()?;
         Ok(tokens)
     }
@@ -1874,6 +2810,29 @@ impl NativePromptTokenizer {
         Ok(decoded)
     }
 
+    pub fn decode_generated(
+        &self,
+        tokens: &[u32],
+        cancellation: &CancellationToken,
+    ) -> Result<String, NativeTokenizerError> {
+        cancellation.check()?;
+        if tokens.len() > MAX_NATIVE_PROMPT_BYTES {
+            return Err(NativeTokenizerError::TooManyTokenValues(tokens.len()));
+        }
+        let decoded = match &self.family {
+            NativeTokenizerFamily::Gemma(tokenizer) => {
+                tokenizer.decode_generated(tokens, cancellation)?
+            }
+            NativeTokenizerFamily::ClipBpe(_)
+            | NativeTokenizerFamily::Qwen2ByteBpe(_)
+            | NativeTokenizerFamily::SentencePiece(_) => {
+                self.family.decode(tokens, true, cancellation)?
+            }
+        };
+        cancellation.check()?;
+        Ok(decoded)
+    }
+
     pub fn resident_bytes(&self) -> Result<u64, NativeTokenizerError> {
         let mut bytes = u64::try_from(std::mem::size_of::<Self>())
             .map_err(|_| NativeTokenizerError::ArithmeticOverflow("tokenizer residency"))?;
@@ -1882,6 +2841,7 @@ impl NativePromptTokenizer {
                 .tokenizer
                 .resident_bytes()
                 .map_err(NativeTokenizerError::from)?,
+            NativeTokenizerFamily::Gemma(tokenizer) => tokenizer.resident_bytes()?,
             NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => tokenizer.resident_bytes()?,
             NativeTokenizerFamily::SentencePiece(tokenizer) => {
                 let mut family_bytes = u64::try_from(std::mem::size_of::<SentencePieceTokenizer>())
@@ -1980,6 +2940,42 @@ impl NativePromptTokenizer {
         embeddings: BTreeMap<String, TextualInversionEmbedding>,
     ) -> Result<Self, NativeTokenizerError> {
         let configuration = configuration.checked()?;
+        if let NativeTokenizerFamily::Gemma(tokenizer) = &family {
+            match tokenizer.profile() {
+                GemmaTokenizerProfile::Gemma3SentencePiece => {
+                    if configuration.start_token != Some(GEMMA4_START_TOKEN)
+                        || configuration.end_token.is_some()
+                        || configuration.pad_token != GEMMA4_PAD_TOKEN
+                        || !configuration.pad_left
+                        || !configuration.disable_weights
+                        || configuration.pad_to_maximum_length
+                        || configuration
+                            .minimum_length
+                            .is_none_or(|length| length == 0)
+                    {
+                        return Err(NativeTokenizerError::InvalidConfiguration(
+                            "Gemma3 requires BOS 2, pad 0, no EOS, left minimum padding, and disabled prompt weights"
+                                .to_owned(),
+                        ));
+                    }
+                }
+                GemmaTokenizerProfile::Gemma4TokenizerJson => {
+                    if configuration.start_token != Some(GEMMA4_START_TOKEN)
+                        || configuration.end_token.is_some()
+                        || configuration.pad_token != GEMMA4_PAD_TOKEN
+                        || !configuration.pad_left
+                        || !configuration.disable_weights
+                        || configuration.pad_to_maximum_length
+                        || configuration.minimum_length != Some(1)
+                    {
+                        return Err(NativeTokenizerError::InvalidConfiguration(
+                            "Gemma4 requires BOS 2, pad 0, no EOS, minimum length 1, left padding, and disabled prompt weights"
+                                .to_owned(),
+                        ));
+                    }
+                }
+            }
+        }
         if embeddings.keys().any(|name| name.trim().is_empty()) {
             return Err(NativeTokenizerError::InvalidEmbeddingName);
         }
@@ -2387,6 +3383,8 @@ pub enum NativeTokenizerError {
     Pretokenization(String),
     #[error("unknown token ID {0}")]
     UnknownToken(u32),
+    #[error("Gemma3 external special token {0} requires skip-special decoding")]
+    UnsupportedSpecialTokenDecode(u32),
     #[error("CLIP vocabulary contains an invalid byte-encoding character {0:?}")]
     InvalidClipByte(char),
     #[error("Qwen2 vocabulary contains an invalid byte-encoding character {0:?}")]

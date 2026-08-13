@@ -7,11 +7,13 @@ use comfy_model::clip_tokenizer::{
     generate_empty_tokens, parse_parentheses, token_weights, unescape_important,
 };
 use comfy_model::{
-    ArtifactIndex, ArtifactKey, ArtifactRoot, ClipBpeTokenizer, ModelParsedFacts,
-    ModelParsedTensorFact, ModelProbe, ModelStore, ModelTokenizerDescriptor, NativePromptTokenizer,
-    NativeTokenValue, NativeTokenizerError, NativeTokenizerFamily, ParserLimits, Qwen2BpeTokenizer,
-    Qwen2PretokenizerProfile, SentencePieceTokenizer, TextualInversionEmbedding,
-    TokenizerConfiguration, parse_prompt_weights,
+    ArtifactIndex, ArtifactKey, ArtifactRoot, ClipBpeTokenizer, GEMMA3_END_OF_TURN_TOKEN,
+    GEMMA3_IMAGE_TOKEN, GEMMA4_AUDIO_TOKEN, GEMMA4_IMAGE_TOKEN, GEMMA4_VIDEO_TOKEN, GemmaTokenizer,
+    GemmaTokenizerProfile, ModelParsedFacts, ModelParsedTensorFact, ModelProbe, ModelStore,
+    ModelTokenizerDescriptor, NativePromptTokenizer, NativeTokenValue, NativeTokenizerError,
+    NativeTokenizerFamily, ParserLimits, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
+    SentencePieceTokenizer, TextualInversionEmbedding, TokenizerConfiguration,
+    parse_prompt_weights,
 };
 use comfy_tensor::CancellationToken;
 use serde_json::{Value, json};
@@ -29,7 +31,7 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/clip_tokenizer.rs",
-        "530f85685d457aff47f5e70965ec667d681eb845e52d7acefb13513f3f6e26f8",
+        "bd0ec6cafdb9f7e70da15fa7ce5390cd4c6e017d65a1866a61fdaf5507c83141",
     ),
     (
         "crates/comfy_model/src/formats.rs",
@@ -226,10 +228,12 @@ fn verify_tokenizer_implementation_closure(
     Ok(())
 }
 
-fn sentencepiece() -> Result<SentencePieceTokenizer, Box<dyn std::error::Error>> {
+fn sentencepiece_from_bytes(
+    bytes: &[u8],
+) -> Result<SentencePieceTokenizer, Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("tokenizer.model");
-    fs::write(&path, sentencepiece_model_bytes())?;
+    fs::write(&path, bytes)?;
     let cancellation = CancellationToken::default();
     let mut index = ArtifactIndex::default();
     index.add_root(ArtifactRoot::canonical(
@@ -247,6 +251,10 @@ fn sentencepiece() -> Result<SentencePieceTokenizer, Box<dyn std::error::Error>>
     Ok(SentencePieceTokenizer::from_verified_vocabulary(
         vocabulary,
     )?)
+}
+
+fn sentencepiece() -> Result<SentencePieceTokenizer, Box<dyn std::error::Error>> {
+    sentencepiece_from_bytes(&sentencepiece_model_bytes())
 }
 
 fn sentencepiece_model_bytes() -> Vec<u8> {
@@ -275,6 +283,41 @@ fn sentencepiece_model_bytes() -> Vec<u8> {
     }
     entries.push(("<image>".to_owned(), 10.0, 4));
 
+    let mut model = Vec::new();
+    for (piece, score, piece_type) in entries {
+        let mut encoded = Vec::new();
+        encoded.push(0x0a);
+        push_varint(&mut encoded, piece.len() as u64);
+        encoded.extend_from_slice(piece.as_bytes());
+        encoded.push(0x15);
+        encoded.extend_from_slice(&score.to_le_bytes());
+        encoded.push(0x18);
+        push_varint(&mut encoded, piece_type);
+        model.push(0x0a);
+        push_varint(&mut model, encoded.len() as u64);
+        model.extend(encoded);
+    }
+    model
+}
+
+fn gemma3_sentencepiece_model_bytes() -> Vec<u8> {
+    let mut entries: Vec<(String, f32, u64)> = vec![
+        ("<pad>".to_owned(), 0.0, 3_u64),
+        ("<eos>".to_owned(), 0.0, 3),
+        ("<bos>".to_owned(), 0.0, 3),
+        ("<unk>".to_owned(), -10.0, 2),
+        ("▁hello".to_owned(), 4.0, 1),
+        ("▁world".to_owned(), 4.0, 1),
+    ];
+    while entries.len() < GEMMA3_END_OF_TURN_TOKEN as usize {
+        let index = entries.len();
+        entries.push((format!("<unused{index}>"), -100.0, 5));
+    }
+    entries.push(("<end_of_turn>".to_owned(), 0.0, 4));
+    sentencepiece_model_from_entries(entries)
+}
+
+fn sentencepiece_model_from_entries(entries: Vec<(String, f32, u64)>) -> Vec<u8> {
     let mut model = Vec::new();
     for (piece, score, piece_type) in entries {
         let mut encoded = Vec::new();
@@ -426,6 +469,166 @@ fn numeric_tokens(prompt: &comfy_model::NativeTokenizedPrompt) -> Vec<Vec<u32>> 
                 .collect()
         })
         .collect()
+}
+
+fn gemma_configuration(minimum_length: usize, embedding_width: usize) -> TokenizerConfiguration {
+    TokenizerConfiguration {
+        maximum_length: 4_096,
+        minimum_length: Some(minimum_length),
+        minimum_padding: None,
+        pad_to_maximum_length: false,
+        pad_left: true,
+        start_token: Some(2),
+        end_token: None,
+        pad_token: 0,
+        maximum_word_length: 8,
+        disable_weights: true,
+        embedding_width: Some(embedding_width),
+    }
+}
+
+fn gemma4_tokenizer_json(world_score: f64) -> String {
+    let mut document: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer/gemma4-tokenizer.json"
+    ))
+    .expect("tracked Gemma4 tokenizer fixture must parse");
+    document["model"]["vocab"][6][1] = json!(world_score);
+    document.to_string()
+}
+
+#[test]
+fn gemma_tokenizers_are_profile_checked_left_padded_and_cleanup_exact()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer/manifest.json"
+    ))?;
+    assert_eq!(manifest["source_snapshot"]["version"], "0.27.1");
+    assert_eq!(manifest["source_snapshot"]["file_count"], 949);
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(manifest["claims"]["licensed_checkpoint_included"], false);
+    assert_eq!(manifest["claims"]["external_server_required"], false);
+    let gemma3 = GemmaTokenizer::gemma3(
+        sentencepiece_from_bytes(&gemma3_sentencepiece_model_bytes())?,
+        &cancellation,
+    )?;
+    assert_eq!(gemma3.profile(), GemmaTokenizerProfile::Gemma3SentencePiece);
+    let gemma3 = NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Gemma(gemma3),
+        gemma_configuration(8, 3_840),
+        BTreeMap::new(),
+    )?;
+    assert_eq!(
+        gemma3.encode_numeric("hello<image_soft_token>world<end_of_turn>", &cancellation,)?,
+        vec![
+            0,
+            0,
+            0,
+            2,
+            4,
+            GEMMA3_IMAGE_TOKEN,
+            5,
+            GEMMA3_END_OF_TURN_TOKEN
+        ]
+    );
+    assert_eq!(
+        gemma3.decode_generated(
+            &[GEMMA3_END_OF_TURN_TOKEN, 4, GEMMA3_IMAGE_TOKEN, 5],
+            &cancellation,
+        )?,
+        "hello world"
+    );
+    assert!(matches!(
+        gemma3.decode_numeric(&[GEMMA3_IMAGE_TOKEN], false, &cancellation),
+        Err(NativeTokenizerError::UnsupportedSpecialTokenDecode(
+            GEMMA3_IMAGE_TOKEN
+        ))
+    ));
+    assert_eq!(
+        gemma3.gemma_profile(),
+        Some(GemmaTokenizerProfile::Gemma3SentencePiece)
+    );
+
+    let tokenizer_json = gemma4_tokenizer_json(4.0);
+    let gemma4_family = GemmaTokenizer::gemma4_from_tokenizer_json(&tokenizer_json, &cancellation)?;
+    assert_eq!(
+        gemma4_family.profile(),
+        GemmaTokenizerProfile::Gemma4TokenizerJson
+    );
+    let artifact_digest = gemma4_family.artifact_digest().to_owned();
+    let gemma4 = NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Gemma(gemma4_family),
+        gemma_configuration(1, 2_560),
+        BTreeMap::new(),
+    )?;
+    assert_eq!(
+        gemma4.encode_numeric("hello world", &cancellation)?,
+        vec![2, 4, 5, 4, 6]
+    );
+    assert_eq!(
+        gemma4.encode_numeric("<|image|>", &cancellation)?,
+        vec![2, GEMMA4_IMAGE_TOKEN]
+    );
+    assert_eq!(
+        gemma4.decode_numeric(&[4, 5, 4, 6], false, &cancellation)?,
+        "hello world"
+    );
+    assert_eq!(
+        gemma4.decode_generated(&[258885, 5, 258886, 258887, 258888], &cancellation)?,
+        "<think>\nhello</think>"
+    );
+    assert_eq!(
+        gemma4.decode_numeric(
+            &[GEMMA4_IMAGE_TOKEN, GEMMA4_AUDIO_TOKEN, GEMMA4_VIDEO_TOKEN],
+            true,
+            &cancellation,
+        )?,
+        ""
+    );
+    assert_eq!(
+        gemma4.gemma_artifact_digest(),
+        Some(artifact_digest.as_str())
+    );
+    assert!(gemma4.resident_bytes()? > std::mem::size_of_val(&gemma4) as u64);
+
+    let changed =
+        GemmaTokenizer::gemma4_from_tokenizer_json(&gemma4_tokenizer_json(3.5), &cancellation)?;
+    assert_ne!(changed.artifact_digest(), artifact_digest);
+    let first_digest = gemma4.semantic_digest(&cancellation)?;
+    let changed = NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Gemma(changed),
+        gemma_configuration(1, 2_560),
+        BTreeMap::new(),
+    )?;
+    assert_ne!(first_digest, changed.semantic_digest(&cancellation)?);
+
+    let mut wrong_configuration = gemma_configuration(1, 2_560);
+    wrong_configuration.pad_left = false;
+    assert!(matches!(
+        NativePromptTokenizer::checked(
+            NativeTokenizerFamily::Gemma(GemmaTokenizer::gemma4_from_tokenizer_json(
+                &tokenizer_json,
+                &cancellation,
+            )?),
+            wrong_configuration,
+            BTreeMap::new(),
+        ),
+        Err(NativeTokenizerError::InvalidConfiguration(_))
+    ));
+    assert!(matches!(
+        GemmaTokenizer::gemma4_from_tokenizer_json("{}", &cancellation),
+        Err(NativeTokenizerError::InvalidTokenizerConfiguration(_))
+    ));
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        GemmaTokenizer::gemma4_from_tokenizer_json(&tokenizer_json, &cancelled),
+        Err(NativeTokenizerError::Cancellation(_))
+    ));
+    Ok(())
 }
 
 fn write_f32_safetensors(

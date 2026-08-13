@@ -148,6 +148,14 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma_tokenizer_id]["dependencies"],
             [gemma_audio_preparation_id],
         )
+        self.assertIn(
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            tasks_by_id[gemma_tokenizer_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer",
+            tasks_by_id[gemma_tokenizer_id]["writes"],
+        )
         self.assertEqual(
             tasks_by_id[gemma3_decoder_id]["dependencies"],
             [gemma_tokenizer_id],
