@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 556)
+        self.assertEqual(len(tasks), 557)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -411,6 +411,9 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         sdpose_capture_id = "comfy-parity-native-sdpose-sd2-capture-foundation"
         sdpose_resource_id = "comfy-parity-native-sdpose-model-resource-foundation"
+        bounded_dense_spatial_id = (
+            "comfy-parity-native-bounded-dense-spatial-inference-foundation"
+        )
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
@@ -658,9 +661,31 @@ class ValidationGenerationTests(unittest.TestCase):
                 ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
             ],
         )
-        self.assertIn(
-            "crates/comfy_model/src/native_node_payload.rs",
+        self.assertEqual(
             tasks_by_id[sdpose_resource_id]["writes"],
+            [
+                "crates/comfy_model/src/sdpose.rs",
+                "crates/comfy_model/src/native_node_payload.rs",
+                "crates/comfy_model/src/comfy_model.rs",
+                "crates/comfy_model/tests/sdpose.rs",
+                "crates/comfy_nodes/src/stored_payload.rs",
+                "crates/comfy_test_support/fixtures/sdpose/resource",
+                "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertEqual(
+            tasks_by_id[sdpose_resource_id]["validations"],
+            [
+                "VAL-MODEL-FAMILY-001",
+                "VAL-TENSOR-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
         )
         self.assertIn(
             sdpose_projection_id,
@@ -693,6 +718,27 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             sdpose_resource_id,
+            tasks_by_id[bounded_dense_spatial_id]["dependencies"],
+        )
+        self.assertEqual(
+            tasks_by_id[bounded_dense_spatial_id]["writes"],
+            [
+                "crates/comfy_model/src/native_ops.rs",
+                "crates/comfy_model/tests/native_ops.rs",
+                "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+                "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+                "crates/comfy_tensor/src/ops/neural_network_module_02.rs",
+                "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+                "crates/comfy_tensor/src/comfy_tensor.rs",
+                "crates/comfy_tensor/tests/ops.rs",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertIn(
+            bounded_dense_spatial_id,
             tasks_by_id[sdpose_foundation_id]["dependencies"],
         )
         self.assertIn(
@@ -823,7 +869,12 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[sdpose_capture_id], waves[immutable_dense_attention_id] + 1
         )
         self.assertEqual(waves[sdpose_resource_id], waves[sdpose_capture_id] + 1)
-        self.assertEqual(waves[sdpose_foundation_id], waves[sdpose_resource_id] + 1)
+        self.assertEqual(
+            waves[bounded_dense_spatial_id], waves[sdpose_resource_id] + 1
+        )
+        self.assertEqual(
+            waves[sdpose_foundation_id], waves[bounded_dense_spatial_id] + 1
+        )
         self.assertEqual(
             waves[video_foundation_id], waves[hook_consumers_id] + 1
         )

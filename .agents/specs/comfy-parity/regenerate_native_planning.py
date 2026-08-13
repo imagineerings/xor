@@ -9149,31 +9149,45 @@ def native_sdpose_model_resource_foundation_task(dependency: str) -> dict[str, o
         "comfy-parity-native-sdpose-model-resource-foundation",
         "Implement the retained SDPose model and heatmap-head resource",
         [18, 26, 28, 31, 37, 41, 44],
-        [18, 26, 28, 31, 34, 41],
+        [18, 25, 26, 28, 31, 41],
         [
             "VAL-MODEL-FAMILY-001",
-            "VAL-NATIVE-E2E-001",
+            "VAL-TENSOR-001",
             "VAL-CANCEL-001",
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "One sealed MODEL-role SDPose resource retains the exact full SD2 denoiser and 640-to-133 heatmap head, validates the complete checkpoint and family contract, and projects content identity plus StorageId-aware residency through NativeModelPayload and NativeStoredPayload without retaining invocation capture, heatmaps, sampler state, or output payloads.",
+        "One sealed MODEL-role NativeSdPoseModel retains the exact full LotusD SD2 denoiser and complete five-tensor 640-to-133 heatmap head from one bound mapped checkpoint, then projects source- and content-sensitive identity plus size-consistent StorageId-aware residency through NativeModelPayload and NativeStoredPayload without retaining invocation capture, heatmaps, sampler state, or output payloads.",
         [
             "projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/diffusionmodules/openaimodel.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
             "projects/comfy/ComfyUI/comfy/model_detection.py",
+            "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/sd2_family.rs",
+            "crates/comfy_model/src/families/lotusd_comfy_model_0106.rs",
             "crates/comfy_model/src/sdpose.rs",
             "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/source_type.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_module_02.rs",
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/production_manifest/manifest.json",
+            "crates/comfy_test_support/fixtures/sdpose/sd2_capture/reduced_numeric/manifest.json",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
         ],
         [
             "crates/comfy_model/src/sdpose.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/comfy_model.rs",
             "crates/comfy_model/tests/sdpose.rs",
-            "crates/comfy_sampler/src/native_diffusion_payload.rs",
-            "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
-            "crates/comfy_nodes/src/comfy_nodes.rs",
             "crates/comfy_test_support/fixtures/sdpose/resource",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
@@ -9181,10 +9195,63 @@ def native_sdpose_model_resource_foundation_task(dependency: str) -> dict[str, o
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Fixtures prove exact denoiser and heatmap-head key/shape admission, wrong family and ordinary SD15/Lotus rejection, content-sensitive semantic identity, size-consistent StorageId union and alias deduplication, concrete sealed MODEL publication, lease retention, capacity rollback, forged handle rejection, restart staleness, and absence of metadata-only or invocation-state resource fields.",
+        "A source-fingerprinted manifest-only production fixture proves the exact 690-tensor denoiser plus five-tensor heatmap-head closure, 695 tensors and 874,605,897 scalars total, accepted mapped native-prefix policy, typed rejection of Diffusers, ordinary LotusD without the complete head, SD15, sentinel-only, missing, extra, wrong-shape, wrong-dtype, mixed-stream, and nonfinite state, without fabricating licensed checkpoint values. A separately named test-support-only reduced fixture proves content-sensitive semantic identity, size-consistent StorageId union and alias deduplication, concrete sealed MODEL publication, lease retention, byte-capacity rollback, forged digest rejection, restart staleness, cancellation atomicity, production rejection of reduced resources, and absence of metadata-only or invocation-state resource fields. NativeDiffusionPayload remains the SD15 sampler boundary and is not broadened by this resource leaf.",
         [dependency],
         locked=True,
         criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_nodes"],
+    )
+
+
+def native_bounded_dense_spatial_inference_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-bounded-dense-spatial-inference-foundation",
+        "Implement bounded tensor-returning dense spatial inference",
+        [26, 28, 34, 37, 41, 44],
+        [26, 28, 34, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-NUMERIC-FORMATS-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical tensor and NativeModule owners expose immutable tensor-returning ordinary Conv2d, ConvTranspose2d, parameterless InstanceNorm2d, and SiLU execution whose input decoding, kernel output, activation, normalization, encoded-result, and result-staging allocations are all charged to the caller's ExecutionContext. The APIs preserve F16, BF16, or F32 dtype, device, stream, semantic state, parameters, generation, and prefetch state and return fresh backend-accounted Tensor results.",
+        [
+            "projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py",
+            "projects/comfy/ComfyUI/comfy/ops.py",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/tests/native_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_module_02.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+        ],
+        [
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/tests/native_ops.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/neural_network_module_02.rs",
+            "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/tests/ops.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "F16, BF16, and F32 fixtures prove ordinary and transposed two-dimensional convolution, parameterless InstanceNorm2d, and SiLU values against the established equations while returning fresh Tensor storage and leaving immutable module state unchanged. Cancellation and injected backend-capacity or workspace exhaustion at every decode, convolution, normalization, activation, result, and encoding phase return no Tensor and release all scratch. Ownership scans reject ordinary heap Vec result allocation, private workspace creation, mutable-forward delegation, duplicate kernels, and metadata-only wrappers. This prerequisite repairs the bounded-output gap before SDPose may execute its retained heatmap head.",
+        [dependency],
+        locked=True,
+        criterion_ids=["26.2", "28.2", "34.1", "37.5", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_tensor"],
+        validation_packages=["comfy_test_support"],
     )
 
 
@@ -9211,6 +9278,7 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
             "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
             "projects/comfy/ComfyUI/comfy/utils.py",
             "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/native_ops.rs",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/vae.rs",
@@ -9219,6 +9287,8 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/tests/sdpose.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
@@ -11397,8 +11467,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     sdpose_model_resource_foundation = native_sdpose_model_resource_foundation_task(
         str(sdpose_sd2_capture_foundation["id"])
     )
+    bounded_dense_spatial_inference_foundation = (
+        native_bounded_dense_spatial_inference_foundation_task(
+            str(sdpose_model_resource_foundation["id"])
+        )
+    )
     sdpose_foundation = native_sdpose_execution_foundation_task(
-        str(sdpose_model_resource_foundation["id"])
+        str(bounded_dense_spatial_inference_foundation["id"])
     )
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
@@ -11493,6 +11568,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             immutable_dense_inference_attention_foundation,
             sdpose_sd2_capture_foundation,
             sdpose_model_resource_foundation,
+            bounded_dense_spatial_inference_foundation,
             sdpose_foundation,
             video_foundation,
             detection_foundation,

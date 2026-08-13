@@ -1,8 +1,10 @@
 use comfy_media::NativePoseKeypoint;
 use comfy_model::{
-    NativeSdPoseSd2Denoiser, SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH,
-    SdPoseProjectionError, SdPoseRawKeypoint, SdPoseSd2Configuration, SdPoseSd2Error,
-    decode_sdpose_heatmaps, project_sdpose_openpose_person, sdpose_sd2_weight_manifest,
+    NativeModelPayload, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
+    SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH,
+    SdPoseHeatmapHeadConfiguration, SdPoseModelError, SdPoseProjectionError, SdPoseRawKeypoint,
+    SdPoseSd2Configuration, SdPoseSd2Error, decode_sdpose_heatmaps, project_sdpose_openpose_person,
+    sdpose_heatmap_head_weight_manifest, sdpose_sd2_weight_manifest,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, StreamId,
@@ -30,9 +32,36 @@ struct ProductionCapture {
     shape: Vec<u64>,
 }
 
+#[derive(Deserialize)]
+struct ResourceManifest {
+    resource_contract: ResourceContract,
+    head_state: Vec<ResourceHeadState>,
+    licensed_checkpoint_oracle: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ResourceContract {
+    combined_tensor_count: usize,
+    combined_scalar_count: u64,
+    capture_shape: Vec<u64>,
+    heatmap_shape: Vec<u64>,
+}
+
+#[derive(Deserialize)]
+struct ResourceHeadState {
+    key: String,
+    shape: Vec<u64>,
+}
+
 fn fixture(path: &str) -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../comfy_test_support/fixtures/sdpose/sd2_capture")
+        .join(path)
+}
+
+fn resource_fixture(path: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../comfy_test_support/fixtures/sdpose/resource")
         .join(path)
 }
 
@@ -91,6 +120,64 @@ fn reduced_sd2_weights(
         );
     }
     Ok(weights)
+}
+
+fn reduced_head_weights(
+    backend: &CpuBackend,
+    configuration: &SdPoseHeatmapHeadConfiguration,
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<BTreeMap<String, Tensor>, Box<dyn Error>> {
+    let mut weights = BTreeMap::new();
+    for specification in sdpose_heatmap_head_weight_manifest(configuration)? {
+        context.check()?;
+        let element_count = specification
+            .shape()
+            .iter()
+            .try_fold(1usize, |count, dimension| {
+                count.checked_mul(usize::try_from(*dimension).ok()?)
+            })
+            .ok_or_else(|| std::io::Error::other("SDPose head fixture weight is too large"))?;
+        weights.insert(
+            specification.key().to_owned(),
+            tensor_with_dtype(
+                backend,
+                specification.shape(),
+                &vec![0.0; element_count],
+                dtype,
+                context,
+            )?,
+        );
+    }
+    Ok(weights)
+}
+
+fn reduced_sdpose_model(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    cancellation: &CancellationToken,
+) -> Result<NativeSdPoseModel, Box<dyn Error>> {
+    let denoiser_configuration = SdPoseSd2Configuration::reduced_fixture(4, 3, 1, 1, 8, 8)?;
+    let denoiser_weights =
+        reduced_sd2_weights(backend, &denoiser_configuration, DType::F32, context)?;
+    let denoiser = NativeSdPoseSd2Denoiser::from_reduced_fixture(
+        denoiser_configuration,
+        denoiser_weights,
+        cancellation,
+    )?;
+    let head_configuration = SdPoseHeatmapHeadConfiguration::reduced_fixture(8, 8, 3)?;
+    let head_weights = reduced_head_weights(backend, &head_configuration, DType::F32, context)?;
+    let head = NativeSdPoseHeatmapHead::from_reduced_fixture(
+        head_configuration,
+        head_weights,
+        cancellation,
+    )?;
+    Ok(NativeSdPoseModel::from_reduced_fixture(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+        denoiser,
+        head,
+        cancellation,
+    )?)
 }
 
 fn raw_points(score: f32) -> Result<Vec<SdPoseRawKeypoint>, SdPoseProjectionError> {
@@ -253,6 +340,142 @@ fn sdpose_sd2_manifest_is_complete_and_source_sized() -> Result<(), Box<dyn Erro
             .iter()
             .all(|specification| !specification.key().starts_with("native.heatmap_head."))
     );
+    Ok(())
+}
+
+#[test]
+fn sdpose_model_resource_manifest_is_exact_and_production_admission_is_closed()
+-> Result<(), Box<dyn Error>> {
+    let tracked: ResourceManifest = serde_json::from_slice(&fs::read(resource_fixture(
+        "production_manifest/manifest.json",
+    ))?)?;
+    assert_eq!(tracked.resource_contract.combined_tensor_count, 695);
+    assert_eq!(tracked.resource_contract.combined_scalar_count, 874_605_897);
+    assert_eq!(tracked.resource_contract.capture_shape, [1, 640, 128, 96]);
+    assert_eq!(tracked.resource_contract.heatmap_shape, [1, 133, 256, 192]);
+    assert!(tracked.licensed_checkpoint_oracle.is_none());
+    let head_manifest =
+        sdpose_heatmap_head_weight_manifest(&SdPoseHeatmapHeadConfiguration::source())?;
+    assert_eq!(head_manifest.len(), 5);
+    let head_scalars = head_manifest.iter().try_fold(0u64, |count, specification| {
+        let elements = specification
+            .shape()
+            .iter()
+            .try_fold(1u64, |elements, dimension| elements.checked_mul(*dimension))?;
+        count.checked_add(elements)
+    });
+    assert_eq!(head_scalars, Some(7_049_093));
+    assert_eq!(
+        head_manifest
+            .first()
+            .map(|specification| specification.shape()),
+        Some([640, 640, 4, 4].as_slice())
+    );
+    assert_eq!(
+        head_manifest
+            .last()
+            .map(|specification| specification.shape()),
+        Some([133].as_slice())
+    );
+    assert_eq!(tracked.head_state.len(), head_manifest.len());
+    for (tracked, specification) in tracked.head_state.iter().zip(&head_manifest) {
+        assert_eq!(tracked.key, specification.key());
+        assert_eq!(tracked.shape, specification.shape());
+    }
+
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let resource = std::sync::Arc::new(reduced_sdpose_model(&backend, &context, &cancellation)?);
+    assert!(!resource.is_source_exact_profile());
+    assert!(matches!(
+        NativeModelPayload::sdpose_model(resource),
+        Err(comfy_model::NativeModelPayloadError::ResourceMismatch(
+            "SDPose production source-exact profile"
+        ))
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_model_resource_identity_residency_and_cancellation_are_transactional()
+-> Result<(), Box<dyn Error>> {
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let first = reduced_sdpose_model(&backend, &context, &cancellation)?;
+    let second = reduced_sdpose_model(&backend, &context, &cancellation)?;
+    assert_eq!(
+        first.semantic_state_digest_sha256(),
+        second.semantic_state_digest_sha256()
+    );
+    assert_eq!(first.resident_tensor_allocations()?.len(), 695);
+    let first_storage = first
+        .resident_tensor_allocations()?
+        .into_iter()
+        .map(|(storage, _)| storage.get())
+        .collect::<std::collections::BTreeSet<_>>();
+    let second_storage = second
+        .resident_tensor_allocations()?
+        .into_iter()
+        .map(|(storage, _)| storage.get())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(first_storage.is_disjoint(&second_storage));
+    assert_eq!(first.resident_bytes()?, second.resident_bytes()?);
+    first.validate(&cancellation)?;
+
+    cancellation.cancel();
+    assert!(matches!(
+        first.validate(&cancellation),
+        Err(SdPoseModelError::Cancellation(_))
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn sdpose_heatmap_head_rejects_missing_and_nonfinite_state() -> Result<(), Box<dyn Error>> {
+    let configuration = SdPoseHeatmapHeadConfiguration::reduced_fixture(8, 8, 3)?;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(SD2_WORKSPACE_BYTES)?;
+    let cancellation = CancellationToken::default();
+    let context = ExecutionContext {
+        stream: StreamId::DEFAULT,
+        scratch: authority.authorize_workspace(SD2_WORKSPACE_BYTES)?,
+        rng_phase: None,
+        cancellation: &cancellation,
+    };
+    let mut missing = reduced_head_weights(&backend, &configuration, DType::F32, &context)?;
+    missing.remove("native.heatmap_head.final_layer.bias");
+    assert!(matches!(
+        NativeSdPoseHeatmapHead::from_reduced_fixture(
+            configuration.clone(),
+            missing,
+            &cancellation,
+        ),
+        Err(SdPoseModelError::WeightKeys { .. })
+    ));
+
+    let mut nonfinite = reduced_head_weights(&backend, &configuration, DType::F32, &context)?;
+    nonfinite.insert(
+        "native.heatmap_head.final_layer.bias".to_owned(),
+        tensor(&backend, &[3], &[f32::INFINITY, 0.0, 0.0], &context)?,
+    );
+    assert!(matches!(
+        NativeSdPoseHeatmapHead::from_reduced_fixture(configuration, nonfinite, &cancellation),
+        Err(SdPoseModelError::NonFinite)
+    ));
+    assert_eq!(context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

@@ -11453,6 +11453,121 @@
       "decision_reason": "NativeSdPoseSd2Denoiser is the sole immutable retained owner of the complete normalized LotusD OpenAI U-Net and the attempt-local last-640 pre-concat capture. It binds the exact family and exhaustive state schema, delegates dense math and attention to canonical operators, keeps capture state local to each call, and excludes reduced family programs, tiny diffusion models, sampler state, handles, cache, persistence, and publication."
     },
     {
+      "concern": "native_sdpose_sd2_model_resource",
+      "canonical_owner": "comfy_model::sdpose::NativeSdPoseModel",
+      "owner_files": [
+        "crates/comfy_model/src/sdpose.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeSdPoseModel",
+        "NativeSdPoseHeatmapHead",
+        "NativeModelPayload::sdpose_model"
+      ],
+      "allowed_adapters": [
+        "MappedModelWeights retains family detection, normalization, artifact binding, and checkpoint ownership",
+        "NativeSdPoseSd2Denoiser retains exact U-Net execution and attempt-local capture ownership",
+        "NativeModelPayload and NativeStoredModelPayload seal the specialized MODEL identity and residency without broadening the legacy SD15 diffusion accessor",
+        "NativeHandleStoreGeneration retains lease, capacity, forgery, and generation-staleness ownership",
+        "Task404 retains VAE, image, bounding-box, sampler, runtime composition, cache, and final publication ownership"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub struct NativeSdPoseModel",
+          "qualified": "comfy_model::sdpose::NativeSdPoseModel",
+          "role": "canonical",
+          "symbol": "NativeSdPoseModel"
+        },
+        {
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "^pub struct NativeSdPoseHeatmapHead",
+          "qualified": "comfy_model::sdpose::NativeSdPoseHeatmapHead",
+          "role": "canonical",
+          "symbol": "NativeSdPoseHeatmapHead"
+        }
+      ],
+      "call_symbols": [
+        "NativeSdPoseModel::from_mapped_weights",
+        "NativeModelPayload::sdpose_model",
+        "sdpose_model_resource"
+      ],
+      "required_mappings": [
+        {
+          "name": "task403-resource-retains-exact-denoiser-and-complete-head",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub struct NativeSdPoseHeatmapHead[\\s\\S]*pub struct NativeSdPoseModel[\\s\\S]*pub fn sdpose_heatmap_head_weight_manifest"
+        },
+        {
+          "name": "task403-production-admission-is-lotus-bound-and-source-exact",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "impl NativeSdPoseModel[\\s\\S]*pub fn from_mapped_weights[\\s\\S]*pub fn is_source_exact_profile"
+        },
+        {
+          "name": "task403-identity-and-residency-bind-content-and-storage",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "resident_tensor_allocations[\\s\\S]*checked_sdpose_storage_union[\\s\\S]*sdpose_model_semantic_digest"
+        },
+        {
+          "name": "task403-model-payload-is-specialized-and-sealed",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn sdpose_model\\([\\s\\S]*NativeModelResource::SdPoseModel[\\s\\S]*pub fn sdpose_model_resource"
+        },
+        {
+          "name": "task403-stored-model-admission-preserves-legacy-diffusion-boundary",
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "pattern": "NativeModelResourceRole::Model => resource.sdpose_model_resource\\(\\).is_some\\(\\)"
+        },
+        {
+          "name": "task403-production-and-reduced-fixtures-are-truthfully-split",
+          "path": "crates/comfy_test_support/fixtures/sdpose/resource/production_manifest/manifest.json",
+          "pattern": "code-inferred-manifest-only[\\s\\S]*combined_tensor_count[\\s\\S]*licensed_checkpoint_oracle"
+        },
+        {
+          "name": "task403-resource-tests-cover-closure-identity-and-rollback",
+          "path": "crates/comfy_model/tests/sdpose.rs",
+          "pattern": "sdpose_model_resource_manifest_is_exact_and_production_admission_is_closed[\\s\\S]*sdpose_model_resource_identity_residency_and_cancellation_are_transactional"
+        },
+        {
+          "name": "task403-resource-retains-no-invocation-or-sampler-state",
+          "path": "crates/comfy_model/src/sdpose.rs",
+          "pattern": "pub struct NativeSdPoseModel \\{[\\s\\S]*artifact_sha256[\\s\\S]*denoiser[\\s\\S]*heatmap_head[\\s\\S]*semantic_state_digest_sha256"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-sdpose-model-resource-foundation"
+      ],
+      "production_consumers": [
+        "native SDPose execution composition"
+      ],
+      "requirements": [
+        "Requirement 18",
+        "Requirement 26",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-TENSOR-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeSdPoseModel is the sole immutable retained owner joining the exact LotusD denoiser with the complete five-tensor heatmap head. NativeModelPayload and NativeStoredModelPayload provide a narrow sealed MODEL projection while the legacy SD15 diffusion accessor remains unchanged. Content identity is independent of physical placement, residency is a size-checked StorageId union, and invocation, sampler, RNG, cache, persistence, and output state remain outside the resource."
+    },
+    {
       "concern": "native_sgd_optimizer_state",
       "canonical_owner": "comfy_tensor::generated_elementwise_or_runtime_operation_07::NativeSgd",
       "owner_files": [

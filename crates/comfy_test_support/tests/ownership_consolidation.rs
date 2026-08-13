@@ -13327,3 +13327,72 @@ fn val_ownership_task402_sdpose_sd2_capture_001() -> Result<(), Box<dyn std::err
     assert_eq!(mappings.len(), 5);
     Ok(())
 }
+
+#[test]
+fn val_ownership_task403_sdpose_model_resource_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let production = fs::read_to_string(root.join("crates/comfy_model/src/sdpose.rs"))?;
+    for required in [
+        "pub struct NativeSdPoseModel",
+        "pub struct NativeSdPoseHeatmapHead",
+        "pub fn sdpose_heatmap_head_weight_manifest(",
+        "pub fn from_mapped_weights(",
+        "checked_sdpose_storage_union",
+    ] {
+        assert!(
+            production.contains(required),
+            "SDPose resource lacks {required}"
+        );
+    }
+    let payload = fs::read_to_string(root.join("crates/comfy_model/src/native_node_payload.rs"))?;
+    for required in [
+        "NativeModelResource::SdPoseModel",
+        "NativeModelBackingKind::NativeSdPoseModel",
+        "pub fn sdpose_model(",
+        "pub fn sdpose_model_resource(",
+    ] {
+        assert!(
+            payload.contains(required),
+            "SDPose payload lacks {required}"
+        );
+    }
+    let stored = fs::read_to_string(root.join("crates/comfy_nodes/src/stored_payload.rs"))?;
+    assert!(
+        stored.contains(
+            "NativeModelResourceRole::Model => resource.sdpose_model_resource().is_some()"
+        )
+    );
+    let manifest = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/sdpose/resource/production_manifest/manifest.json",
+    ))?;
+    for required in [
+        "code-inferred-manifest-only",
+        "\"combined_tensor_count\": 695",
+        "\"combined_scalar_count\": 874605897",
+        "\"licensed_checkpoint_oracle\": null",
+    ] {
+        assert!(
+            manifest.contains(required),
+            "SDPose resource manifest lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_sdpose_sd2_model_resource")
+            })
+        })
+        .ok_or("missing SDPose resource ownership concern")?;
+    let mappings = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing SDPose resource mappings")?;
+    assert_eq!(mappings.len(), 8);
+    Ok(())
+}

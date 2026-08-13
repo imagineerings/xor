@@ -38,6 +38,12 @@ const MMPOSE_INDICES: [usize; 15] = [17, 6, 8, 10, 7, 9, 12, 14, 16, 13, 15, 2, 
 const OPENPOSE_INDICES: [usize; 15] = [1, 2, 3, 4, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17];
 
 const SDPOSE_SD2_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-sd2-capture.v1\0";
+const SDPOSE_MODEL_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-model-resource.v1\0";
+const SDPOSE_HEATMAP_HEAD_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-heatmap-head.v1\0";
+pub const SDPOSE_HEAD_SOURCE_SHA256: &str =
+    "19a55d1ecf16796226ed204241852b9b237a563addf636ff738167d9273cf97a";
+pub const SDPOSE_MODEL_DETECTION_SOURCE_SHA256: &str =
+    "f13b11988fccf9fa4d878ef5f63313c23c5f1400ec8cde04a502584e157c5072";
 const OPENAI_MODEL_SOURCE_SHA256: &str =
     "9d27fb036cab8a262ef3d866a643f7fdc40994022616f1b8be14b7d919f57f96";
 const ATTENTION_SOURCE_SHA256: &str =
@@ -250,6 +256,166 @@ pub struct NativeSdPoseSd2Denoiser {
     dtype: DType,
     stream: StreamId,
     semantic_state_digest_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SdPoseHeatmapHeadConfiguration {
+    source_exact_profile: bool,
+    input_channels: usize,
+    hidden_channels: usize,
+    output_channels: usize,
+}
+
+impl SdPoseHeatmapHeadConfiguration {
+    pub const fn source() -> Self {
+        Self {
+            source_exact_profile: true,
+            input_channels: 640,
+            hidden_channels: 640,
+            output_channels: SDPOSE_HEATMAP_CHANNELS,
+        }
+    }
+
+    pub fn reduced_fixture(
+        input_channels: usize,
+        hidden_channels: usize,
+        output_channels: usize,
+    ) -> Result<Self, SdPoseModelError> {
+        let configuration = Self {
+            source_exact_profile: false,
+            input_channels,
+            hidden_channels,
+            output_channels,
+        };
+        configuration.validate()?;
+        Ok(configuration)
+    }
+
+    pub const fn is_source_exact(&self) -> bool {
+        self.source_exact_profile
+    }
+
+    pub const fn input_channels(&self) -> usize {
+        self.input_channels
+    }
+
+    pub const fn output_channels(&self) -> usize {
+        self.output_channels
+    }
+
+    fn validate(&self) -> Result<(), SdPoseModelError> {
+        if self.input_channels == 0 || self.hidden_channels == 0 || self.output_channels == 0 {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        if self.source_exact_profile && self != &Self::source() {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SdPoseHeatmapHeadWeightSpec {
+    key: String,
+    shape: Vec<u64>,
+}
+
+impl SdPoseHeatmapHeadWeightSpec {
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    pub fn shape(&self) -> &[u64] {
+        &self.shape
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeSdPoseHeatmapHead {
+    configuration: SdPoseHeatmapHeadConfiguration,
+    weights: BTreeMap<String, Tensor>,
+    dtype: DType,
+    stream: StreamId,
+    semantic_state_digest_sha256: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeSdPoseModel {
+    artifact_sha256: String,
+    denoiser: NativeSdPoseSd2Denoiser,
+    heatmap_head: NativeSdPoseHeatmapHead,
+    semantic_state_digest_sha256: String,
+}
+
+#[derive(Debug, Error)]
+pub enum SdPoseModelError {
+    #[error("SDPose model or heatmap-head configuration is invalid")]
+    InvalidConfiguration,
+    #[error("SDPose model production admission requires the exact source profile")]
+    ReducedProductionResource,
+    #[error("SDPose model artifact identity is invalid")]
+    InvalidArtifactIdentity,
+    #[error(
+        "SDPose heatmap-head weights differ from the complete source topology; missing={missing:?}, unexpected={unexpected:?}"
+    )]
+    WeightKeys {
+        missing: Vec<String>,
+        unexpected: Vec<String>,
+    },
+    #[error("SDPose heatmap-head weight {key} expected shape {expected:?}, got {actual:?}")]
+    WeightShape {
+        key: String,
+        expected: Vec<u64>,
+        actual: Vec<u64>,
+    },
+    #[error("SDPose denoiser and heatmap head target different dtype, device, stream, or channels")]
+    ComponentMismatch,
+    #[error("SDPose retained storage {0:?} has inconsistent byte lengths")]
+    InconsistentStorage(StorageId),
+    #[error("SDPose model arithmetic overflowed while computing {0}")]
+    Overflow(&'static str),
+    #[error("SDPose heatmap-head weight contains a non-finite value")]
+    NonFinite,
+    #[error(transparent)]
+    Denoiser(#[from] SdPoseSd2Error),
+    #[error(transparent)]
+    Cancellation(#[from] CancellationError),
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
+}
+
+pub fn sdpose_heatmap_head_weight_manifest(
+    configuration: &SdPoseHeatmapHeadConfiguration,
+) -> Result<Vec<SdPoseHeatmapHeadWeightSpec>, SdPoseModelError> {
+    configuration.validate()?;
+    let input = u64::try_from(configuration.input_channels)
+        .map_err(|_| SdPoseModelError::Overflow("heatmap input channels"))?;
+    let hidden = u64::try_from(configuration.hidden_channels)
+        .map_err(|_| SdPoseModelError::Overflow("heatmap hidden channels"))?;
+    let output = u64::try_from(configuration.output_channels)
+        .map_err(|_| SdPoseModelError::Overflow("heatmap output channels"))?;
+    Ok(vec![
+        SdPoseHeatmapHeadWeightSpec {
+            key: "native.heatmap_head.deconv_layers.0.weight".to_owned(),
+            shape: vec![input, hidden, 4, 4],
+        },
+        SdPoseHeatmapHeadWeightSpec {
+            key: "native.heatmap_head.conv_layers.0.weight".to_owned(),
+            shape: vec![hidden, hidden, 1, 1],
+        },
+        SdPoseHeatmapHeadWeightSpec {
+            key: "native.heatmap_head.conv_layers.0.bias".to_owned(),
+            shape: vec![hidden],
+        },
+        SdPoseHeatmapHeadWeightSpec {
+            key: "native.heatmap_head.final_layer.weight".to_owned(),
+            shape: vec![output, hidden, 1, 1],
+        },
+        SdPoseHeatmapHeadWeightSpec {
+            key: "native.heatmap_head.final_layer.bias".to_owned(),
+            shape: vec![output],
+        },
+    ])
 }
 
 pub fn sdpose_sd2_weight_manifest(
@@ -717,6 +883,10 @@ impl NativeSdPoseSd2Denoiser {
 
     pub const fn execution_stream(&self) -> StreamId {
         self.stream
+    }
+
+    pub const fn execution_dtype(&self) -> DType {
+        self.dtype
     }
 
     pub fn semantic_state_digest_sha256(&self) -> &str {
@@ -1393,6 +1563,495 @@ impl NativeSdPoseSd2Denoiser {
             context,
         )
     }
+}
+
+impl NativeSdPoseHeatmapHead {
+    fn from_mapped_weights(
+        mapped: &MappedModelWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        let weights = mapped
+            .tensors()
+            .iter()
+            .filter(|(key, _)| key.starts_with("native.heatmap_head."))
+            .map(|(key, tensor)| (key.clone(), tensor.clone()))
+            .collect();
+        Self::checked(
+            SdPoseHeatmapHeadConfiguration::source(),
+            weights,
+            cancellation,
+        )
+    }
+
+    pub fn from_reduced_fixture(
+        configuration: SdPoseHeatmapHeadConfiguration,
+        weights: BTreeMap<String, Tensor>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        if configuration.is_source_exact() {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        Self::checked(configuration, weights, cancellation)
+    }
+
+    fn checked(
+        configuration: SdPoseHeatmapHeadConfiguration,
+        candidate_weights: BTreeMap<String, Tensor>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        cancellation.check()?;
+        configuration.validate()?;
+        let manifest = sdpose_heatmap_head_weight_manifest(&configuration)?;
+        let expected = manifest
+            .iter()
+            .map(|specification| specification.key.as_str())
+            .collect::<BTreeSet<_>>();
+        let actual = candidate_weights
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        if expected != actual {
+            return Err(SdPoseModelError::WeightKeys {
+                missing: expected
+                    .difference(&actual)
+                    .map(|key| (*key).to_owned())
+                    .collect(),
+                unexpected: actual
+                    .difference(&expected)
+                    .map(|key| (*key).to_owned())
+                    .collect(),
+            });
+        }
+        let first = manifest
+            .first()
+            .and_then(|specification| candidate_weights.get(&specification.key))
+            .ok_or(SdPoseModelError::InvalidConfiguration)?;
+        let dtype = first.descriptor().dtype();
+        let stream = first.descriptor().stream();
+        if !matches!(dtype, DType::F32 | DType::F16 | DType::Bf16) {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        for specification in &manifest {
+            cancellation.check()?;
+            let tensor = candidate_weights
+                .get(&specification.key)
+                .ok_or(SdPoseModelError::InvalidConfiguration)?;
+            let descriptor = tensor.descriptor();
+            if descriptor.shape() != specification.shape
+                || descriptor.dtype() != dtype
+                || descriptor.device() != DeviceId::CPU
+                || descriptor.stream() != stream
+            {
+                return Err(SdPoseModelError::WeightShape {
+                    key: specification.key.clone(),
+                    expected: specification.shape.clone(),
+                    actual: descriptor.shape().to_vec(),
+                });
+            }
+            require_finite_heatmap_tensor(tensor, cancellation)?;
+        }
+        let semantic_state_digest_sha256 =
+            sdpose_heatmap_head_semantic_digest(&configuration, &candidate_weights, cancellation)?;
+        Ok(Self {
+            configuration,
+            weights: candidate_weights,
+            dtype,
+            stream,
+            semantic_state_digest_sha256,
+        })
+    }
+
+    pub fn configuration(&self) -> &SdPoseHeatmapHeadConfiguration {
+        &self.configuration
+    }
+
+    pub const fn execution_dtype(&self) -> DType {
+        self.dtype
+    }
+
+    pub const fn execution_stream(&self) -> StreamId {
+        self.stream
+    }
+
+    pub fn semantic_state_digest_sha256(&self) -> &str {
+        &self.semantic_state_digest_sha256
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), SdPoseModelError> {
+        cancellation.check()?;
+        self.configuration.validate()?;
+        let expected = sdpose_heatmap_head_weight_manifest(&self.configuration)?;
+        if expected.len() != self.weights.len() {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        for specification in expected {
+            cancellation.check()?;
+            let tensor = self
+                .weights
+                .get(&specification.key)
+                .ok_or(SdPoseModelError::InvalidConfiguration)?;
+            if tensor.descriptor().shape() != specification.shape
+                || tensor.descriptor().dtype() != self.dtype
+                || tensor.descriptor().device() != DeviceId::CPU
+                || tensor.descriptor().stream() != self.stream
+            {
+                return Err(SdPoseModelError::InvalidConfiguration);
+            }
+        }
+        if self.semantic_state_digest_sha256
+            != sdpose_heatmap_head_semantic_digest(
+                &self.configuration,
+                &self.weights,
+                cancellation,
+            )?
+        {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        self.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Result<Vec<(StorageId, u64)>, SdPoseModelError> {
+        checked_sdpose_storage_union(
+            self.weights
+                .values()
+                .map(|tensor| (tensor.storage_id(), tensor.storage_byte_len())),
+        )
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, SdPoseModelError> {
+        let entries = self
+            .weights
+            .len()
+            .checked_mul(std::mem::size_of::<(String, Tensor)>())
+            .ok_or(SdPoseModelError::Overflow("heatmap retained entries"))?;
+        let keys = self.weights.keys().try_fold(0usize, |total, key| {
+            total
+                .checked_add(key.capacity())
+                .ok_or(SdPoseModelError::Overflow("heatmap retained keys"))
+        })?;
+        let bytes = std::mem::size_of::<Self>()
+            .checked_add(entries)
+            .and_then(|bytes| bytes.checked_add(keys))
+            .and_then(|bytes| bytes.checked_add(self.semantic_state_digest_sha256.capacity()))
+            .ok_or(SdPoseModelError::Overflow("heatmap owner residency"))?;
+        u64::try_from(bytes).map_err(|_| SdPoseModelError::Overflow("heatmap owner residency"))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, SdPoseModelError> {
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |total, (_, bytes)| {
+                total
+                    .checked_add(bytes)
+                    .ok_or(SdPoseModelError::Overflow("heatmap total residency"))
+            },
+        )
+    }
+}
+
+impl NativeSdPoseModel {
+    pub fn from_mapped_weights(
+        mapped: &MappedModelWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        cancellation.check()?;
+        let denoiser = NativeSdPoseSd2Denoiser::from_mapped_weights(mapped, cancellation)?;
+        let heatmap_head = NativeSdPoseHeatmapHead::from_mapped_weights(mapped, cancellation)?;
+        Self::checked(
+            mapped.base_artifact_digest().to_owned(),
+            denoiser,
+            heatmap_head,
+            true,
+            cancellation,
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn from_reduced_fixture(
+        artifact_sha256: String,
+        denoiser: NativeSdPoseSd2Denoiser,
+        heatmap_head: NativeSdPoseHeatmapHead,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        Self::checked(artifact_sha256, denoiser, heatmap_head, false, cancellation)
+    }
+
+    fn checked(
+        artifact_sha256: String,
+        denoiser: NativeSdPoseSd2Denoiser,
+        heatmap_head: NativeSdPoseHeatmapHead,
+        require_source_exact: bool,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, SdPoseModelError> {
+        cancellation.check()?;
+        if !valid_sdpose_sha256(&artifact_sha256) {
+            return Err(SdPoseModelError::InvalidArtifactIdentity);
+        }
+        denoiser.validate(cancellation)?;
+        heatmap_head.validate(cancellation)?;
+        let source_exact = denoiser.configuration().is_source_exact()
+            && heatmap_head.configuration().is_source_exact();
+        if require_source_exact && !source_exact {
+            return Err(SdPoseModelError::ReducedProductionResource);
+        }
+        if denoiser.configuration().capture_channels()
+            != heatmap_head.configuration().input_channels()
+            || denoiser.execution_dtype() != heatmap_head.execution_dtype()
+            || denoiser.execution_stream() != heatmap_head.execution_stream()
+        {
+            return Err(SdPoseModelError::ComponentMismatch);
+        }
+        let semantic_state_digest_sha256 =
+            sdpose_model_semantic_digest(&artifact_sha256, &denoiser, &heatmap_head, cancellation)?;
+        let model = Self {
+            artifact_sha256,
+            denoiser,
+            heatmap_head,
+            semantic_state_digest_sha256,
+        };
+        model.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(model)
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    pub fn denoiser(&self) -> &NativeSdPoseSd2Denoiser {
+        &self.denoiser
+    }
+
+    pub fn heatmap_head(&self) -> &NativeSdPoseHeatmapHead {
+        &self.heatmap_head
+    }
+
+    pub fn is_source_exact_profile(&self) -> bool {
+        self.denoiser.configuration().is_source_exact()
+            && self.heatmap_head.configuration().is_source_exact()
+    }
+
+    pub fn semantic_state_digest_sha256(&self) -> &str {
+        &self.semantic_state_digest_sha256
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), SdPoseModelError> {
+        cancellation.check()?;
+        if !valid_sdpose_sha256(&self.artifact_sha256) {
+            return Err(SdPoseModelError::InvalidArtifactIdentity);
+        }
+        self.denoiser.validate(cancellation)?;
+        self.heatmap_head.validate(cancellation)?;
+        if self.denoiser.configuration().capture_channels()
+            != self.heatmap_head.configuration().input_channels()
+            || self.denoiser.execution_dtype() != self.heatmap_head.execution_dtype()
+            || self.denoiser.execution_stream() != self.heatmap_head.execution_stream()
+        {
+            return Err(SdPoseModelError::ComponentMismatch);
+        }
+        if self.semantic_state_digest_sha256
+            != sdpose_model_semantic_digest(
+                &self.artifact_sha256,
+                &self.denoiser,
+                &self.heatmap_head,
+                cancellation,
+            )?
+        {
+            return Err(SdPoseModelError::InvalidConfiguration);
+        }
+        self.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Result<Vec<(StorageId, u64)>, SdPoseModelError> {
+        checked_sdpose_storage_union(
+            self.denoiser
+                .resident_tensor_allocations()?
+                .into_iter()
+                .chain(self.heatmap_head.resident_tensor_allocations()?),
+        )
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, SdPoseModelError> {
+        let denoiser_inline = u64::try_from(std::mem::size_of::<NativeSdPoseSd2Denoiser>())
+            .map_err(|_| SdPoseModelError::Overflow("SDPose denoiser inline residency"))?;
+        let head_inline = u64::try_from(std::mem::size_of::<NativeSdPoseHeatmapHead>())
+            .map_err(|_| SdPoseModelError::Overflow("SDPose head inline residency"))?;
+        let denoiser_owned = self
+            .denoiser
+            .resident_owned_bytes()?
+            .checked_sub(denoiser_inline)
+            .ok_or(SdPoseModelError::Overflow(
+                "SDPose denoiser owner residency",
+            ))?;
+        let head_owned = self
+            .heatmap_head
+            .resident_owned_bytes()?
+            .checked_sub(head_inline)
+            .ok_or(SdPoseModelError::Overflow("SDPose head owner residency"))?;
+        let artifact_capacity = u64::try_from(self.artifact_sha256.capacity())
+            .map_err(|_| SdPoseModelError::Overflow("SDPose artifact residency"))?;
+        let digest_capacity = u64::try_from(self.semantic_state_digest_sha256.capacity())
+            .map_err(|_| SdPoseModelError::Overflow("SDPose digest residency"))?;
+        let owned = u64::try_from(std::mem::size_of::<Self>())
+            .map_err(|_| SdPoseModelError::Overflow("SDPose owner residency"))?
+            .checked_add(denoiser_owned)
+            .and_then(|bytes| bytes.checked_add(head_owned))
+            .and_then(|bytes| bytes.checked_add(artifact_capacity))
+            .and_then(|bytes| bytes.checked_add(digest_capacity))
+            .ok_or(SdPoseModelError::Overflow("SDPose owner residency"))?;
+        Ok(owned)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, SdPoseModelError> {
+        self.resident_tensor_allocations()?.into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |total, (_, bytes)| {
+                total
+                    .checked_add(bytes)
+                    .ok_or(SdPoseModelError::Overflow("SDPose total residency"))
+            },
+        )
+    }
+}
+
+fn valid_sdpose_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn checked_sdpose_storage_union(
+    allocations: impl IntoIterator<Item = (StorageId, u64)>,
+) -> Result<Vec<(StorageId, u64)>, SdPoseModelError> {
+    let mut unique = BTreeMap::<u64, (StorageId, u64)>::new();
+    for (storage_id, bytes) in allocations {
+        if let Some((_, existing)) = unique.get(&storage_id.get()) {
+            if *existing != bytes {
+                return Err(SdPoseModelError::InconsistentStorage(storage_id));
+            }
+        } else {
+            unique.insert(storage_id.get(), (storage_id, bytes));
+        }
+    }
+    Ok(unique.into_values().collect())
+}
+
+fn sdpose_heatmap_head_semantic_digest(
+    configuration: &SdPoseHeatmapHeadConfiguration,
+    weights: &BTreeMap<String, Tensor>,
+    cancellation: &CancellationToken,
+) -> Result<String, SdPoseModelError> {
+    cancellation.check()?;
+    let mut digest = Sha256::new();
+    digest.update(SDPOSE_HEATMAP_HEAD_SOURCE_DOMAIN);
+    digest.update(SDPOSE_HEAD_SOURCE_SHA256.as_bytes());
+    digest.update(SDPOSE_MODEL_DETECTION_SOURCE_SHA256.as_bytes());
+    digest.update([u8::from(configuration.source_exact_profile)]);
+    for value in [
+        configuration.input_channels,
+        configuration.hidden_channels,
+        configuration.output_channels,
+    ] {
+        digest.update(
+            u64::try_from(value)
+                .map_err(|_| SdPoseModelError::Overflow("heatmap configuration digest"))?
+                .to_le_bytes(),
+        );
+    }
+    hash_sdpose_weight_map(&mut digest, weights, cancellation)?;
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn sdpose_model_semantic_digest(
+    artifact_sha256: &str,
+    denoiser: &NativeSdPoseSd2Denoiser,
+    heatmap_head: &NativeSdPoseHeatmapHead,
+    cancellation: &CancellationToken,
+) -> Result<String, SdPoseModelError> {
+    cancellation.check()?;
+    let mut digest = Sha256::new();
+    digest.update(SDPOSE_MODEL_SOURCE_DOMAIN);
+    for field in [
+        artifact_sha256,
+        generated_lotusd_comfy_model_0106::MODEL_FAMILY_FEATURE_ID,
+        generated_lotusd_comfy_model_0106::MODEL_FAMILY_IDENTIFIER,
+        denoiser.semantic_state_digest_sha256(),
+        heatmap_head.semantic_state_digest_sha256(),
+        SDPOSE_HEAD_SOURCE_SHA256,
+        SDPOSE_MODEL_DETECTION_SOURCE_SHA256,
+    ] {
+        digest.update(
+            u64::try_from(field.len())
+                .map_err(|_| SdPoseModelError::Overflow("SDPose model digest"))?
+                .to_le_bytes(),
+        );
+        digest.update(field.as_bytes());
+    }
+    cancellation.check()?;
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn hash_sdpose_weight_map(
+    digest: &mut Sha256,
+    weights: &BTreeMap<String, Tensor>,
+    cancellation: &CancellationToken,
+) -> Result<(), SdPoseModelError> {
+    for (index, (key, tensor)) in weights.iter().enumerate() {
+        if index.is_multiple_of(8) {
+            cancellation.check()?;
+        }
+        digest.update(
+            u64::try_from(key.len())
+                .map_err(|_| SdPoseModelError::Overflow("heatmap key digest"))?
+                .to_le_bytes(),
+        );
+        digest.update(key.as_bytes());
+        digest.update(
+            u64::try_from(tensor.descriptor().shape().len())
+                .map_err(|_| SdPoseModelError::Overflow("heatmap shape digest"))?
+                .to_le_bytes(),
+        );
+        for dimension in tensor.descriptor().shape() {
+            digest.update(dimension.to_le_bytes());
+        }
+        digest.update([sdpose_sd2_dtype_tag(tensor.descriptor().dtype())?]);
+        let bytes = tensor.contiguous_bytes()?;
+        digest.update(
+            u64::try_from(bytes.len())
+                .map_err(|_| SdPoseModelError::Overflow("heatmap bytes digest"))?
+                .to_le_bytes(),
+        );
+        digest.update(bytes);
+    }
+    cancellation.check()?;
+    Ok(())
+}
+
+fn require_finite_heatmap_tensor(
+    tensor: &Tensor,
+    cancellation: &CancellationToken,
+) -> Result<(), SdPoseModelError> {
+    let count = tensor.descriptor().element_count()?;
+    for index in 0..count {
+        if index.is_multiple_of(1_024) {
+            cancellation.check()?;
+        }
+        let value = tensor
+            .descriptor()
+            .dtype()
+            .decode_scalar(tensor.linear_element_bytes(index)?)?;
+        if matches!(value, DecodedScalar::Real(value) if !value.is_finite())
+            || matches!(value, DecodedScalar::Complex { real, imaginary } if !real.is_finite() || !imaginary.is_finite())
+        {
+            return Err(SdPoseModelError::NonFinite);
+        }
+    }
+    Ok(())
 }
 
 fn sdpose_sd2_semantic_digest(

@@ -1,18 +1,27 @@
 use comfy_media::{PngLimits, encode_png_frame};
-use comfy_nodes::{NativePreparedEffectKind, NativeStructuredValue, built_in_source_schema};
+use comfy_model::{
+    NativeModelPayload, NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser,
+    SdPoseHeatmapHeadConfiguration, SdPoseSd2Configuration, sdpose_heatmap_head_weight_manifest,
+    sdpose_sd2_weight_manifest,
+};
+use comfy_nodes::{
+    NativePreparedEffectKind, NativeStoredModelPayload, NativeStructuredValue,
+    built_in_source_schema,
+};
 use comfy_runtime::{
     AttemptState, NATIVE_IMAGE_REGISTRY_VERSION, NativeHandleKind, NativeHandleStoreError,
     NativeHandleStoreGeneration, NativeHandleType, NativeImageWorkerEvent, NativeImageWorkerPlan,
     NativeInputDescriptor, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
-    NativeNodeOutcome, NativePortCardinality, NativePreparedEffectRequest, NativePrimitive,
-    NativePrimitiveType, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
-    RuntimeSupervisor, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
+    NativeNodeOutcome, NativeOpaqueHandle, NativePortCardinality, NativePreparedEffectRequest,
+    NativePrimitive, NativePrimitiveType, NativeStoredPayload, NativeTypeUnion, NativeValue,
+    NativeValueType, RuntimeSupervisor, SupervisorPolicy, WorkerHealth, WorkerLaunchConfig,
     compile_generated_native_prompt, generated_native_frontend_descriptors,
     generated_native_node_registry_projection, graph_to_prompt, native_image_registry_projection,
 };
 use comfy_tensor::{
-    CancellationToken, CpuWorkspaceAuthority, ImageTensor, NativeTensorPayload, NativeTensorRole,
-    StreamId,
+    CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, ExecutionContext, ImageTensor,
+    NativeTensorPayload, NativeTensorRole, StreamId, Tensor, TensorBackend,
+    generated_comfy_operator_indirection_01::tensor_from_f32_with_context_exact_native,
 };
 use comfy_types::{AttemptId, NodeId, ProfileId, PromptId, WorkerId, WorkerMessage};
 use serde_json::json;
@@ -27,6 +36,77 @@ use uuid::Uuid;
 
 const PROFILE_ID: ProfileId = ProfileId(Uuid::from_u128(0x3670));
 const WORKFLOW_FIXTURE: &[u8] = include_bytes!("../fixtures/native_image/workflow.json");
+const SDPOSE_FIXTURE_ARTIFACT: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+fn sdpose_tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn Error>> {
+    let elements = shape.iter().try_fold(1usize, |count, dimension| {
+        count.checked_mul(usize::try_from(*dimension).ok()?)
+    });
+    let elements = elements.ok_or("SDPose fixture tensor shape overflowed")?;
+    let mut values = Vec::new();
+    values.try_reserve_exact(elements)?;
+    values.resize(elements, 0.0);
+    Ok(tensor_from_f32_with_context_exact_native(
+        backend,
+        shape,
+        &values,
+        DType::F32,
+        backend.device(),
+        context,
+    )?)
+}
+
+fn reduced_sdpose_stored_payload() -> Result<NativeStoredPayload, Box<dyn Error>> {
+    let workspace_bytes = 64 * 1024 * 1024;
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(workspace_bytes)?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        authority.authorize_workspace(workspace_bytes)?,
+        &cancellation,
+    );
+    let denoiser_configuration = SdPoseSd2Configuration::reduced_fixture(4, 3, 1, 1, 8, 8)?;
+    let mut denoiser_weights = BTreeMap::new();
+    for specification in sdpose_sd2_weight_manifest(&denoiser_configuration)? {
+        denoiser_weights.insert(
+            specification.key().to_owned(),
+            sdpose_tensor(&backend, specification.shape(), &context)?,
+        );
+    }
+    let denoiser = NativeSdPoseSd2Denoiser::from_reduced_fixture(
+        denoiser_configuration,
+        denoiser_weights,
+        &cancellation,
+    )?;
+    let head_configuration = SdPoseHeatmapHeadConfiguration::reduced_fixture(8, 8, 3)?;
+    let mut head_weights = BTreeMap::new();
+    for specification in sdpose_heatmap_head_weight_manifest(&head_configuration)? {
+        head_weights.insert(
+            specification.key().to_owned(),
+            sdpose_tensor(&backend, specification.shape(), &context)?,
+        );
+    }
+    let head = NativeSdPoseHeatmapHead::from_reduced_fixture(
+        head_configuration,
+        head_weights,
+        &cancellation,
+    )?;
+    let resource = Arc::new(NativeSdPoseModel::from_reduced_fixture(
+        SDPOSE_FIXTURE_ARTIFACT.to_owned(),
+        denoiser,
+        head,
+        &cancellation,
+    )?);
+    let model = Arc::new(NativeModelPayload::sdpose_model_test_fixture(resource)?);
+    Ok(NativeStoredPayload::Model(Arc::new(
+        NativeStoredModelPayload::model_resource(model)?,
+    )))
+}
 
 #[test]
 fn generated_registry_frontend_compiler_and_worker_dispatch_share_one_path()
@@ -347,6 +427,75 @@ fn source_structured_values_keep_resolved_handles_typed_across_recovery()
         store.resolve(&handle, &image_type, &cancelled),
         Err(NativeHandleStoreError::Cancelled)
     ));
+    Ok(())
+}
+
+#[test]
+fn sdpose_model_resource_handle_is_sealed_alias_aware_and_restart_safe()
+-> Result<(), Box<dyn Error>> {
+    let payload = reduced_sdpose_stored_payload()?;
+    payload.validate()?;
+    let handle_type = payload.handle_type()?;
+    assert_eq!(handle_type.kind, NativeHandleKind::Model);
+    assert_eq!(handle_type.type_id, "MODEL");
+    let byte_capacity = payload.resident_bytes()?;
+    let generation = NativeHandleStoreGeneration::with_capacities(3, byte_capacity)?;
+    let attempt_id = AttemptId(Uuid::from_u128(0x4030));
+    let store = generation.handle_store_for_attempt(attempt_id);
+    let cancellation = CancellationToken::default();
+    let first = store.publish(payload.clone(), &cancellation)?;
+    let first_bytes = generation.resident_bytes();
+    assert_eq!(first_bytes, byte_capacity);
+    let second = store.publish(payload, &cancellation)?;
+    assert_eq!(generation.len(), 2);
+    assert_eq!(generation.resident_bytes(), first_bytes);
+
+    let resolved = store.resolve(&first, &handle_type, &cancellation)?;
+    let NativeStoredPayload::Model(model) = resolved.as_ref() else {
+        return Err("SDPose MODEL handle resolved to another stored payload kind".into());
+    };
+    assert!(model.model_payload().sdpose_model_resource().is_some());
+    assert_eq!(Some(model.digest_sha256()), first.digest_sha256());
+
+    let distinct = reduced_sdpose_stored_payload()?;
+    assert_eq!(distinct.digest_sha256(), model.digest_sha256());
+    assert!(matches!(
+        store.publish(distinct, &cancellation),
+        Err(NativeHandleStoreError::Rejected(message)) if message.contains("capacity is exhausted")
+    ));
+    assert_eq!(generation.len(), 2);
+    assert_eq!(generation.resident_bytes(), first_bytes);
+
+    let forged = NativeOpaqueHandle::new(
+        handle_type.clone(),
+        first.store_identity(),
+        first.identifier(),
+        first.generation(),
+        Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned()),
+    )?;
+    assert!(matches!(
+        store.resolve(&forged, &handle_type, &cancellation),
+        Err(NativeHandleStoreError::DigestMismatch)
+    ));
+
+    let restarted = NativeHandleStoreGeneration::with_capacities(2, byte_capacity)?
+        .handle_store_for_attempt(attempt_id);
+    assert!(matches!(
+        restarted.resolve(&first, &handle_type, &cancellation),
+        Err(NativeHandleStoreError::WrongStore | NativeHandleStoreError::WrongGeneration)
+    ));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let before_len = generation.len();
+    let before_bytes = generation.resident_bytes();
+    assert!(matches!(
+        store.publish(reduced_sdpose_stored_payload()?, &cancelled),
+        Err(NativeHandleStoreError::Cancelled)
+    ));
+    assert_eq!(generation.len(), before_len);
+    assert_eq!(generation.resident_bytes(), before_bytes);
+    assert_ne!(first.identifier(), second.identifier());
     Ok(())
 }
 

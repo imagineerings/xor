@@ -534,10 +534,13 @@ pub use sd2_family::{
     weight_statistic_request_for_probe as sd2_weight_statistic_request_for_probe,
 };
 pub use sdpose::{
-    NativeSdPoseSd2Denoiser, SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH,
-    SDPOSE_INPUT_HEIGHT, SDPOSE_INPUT_WIDTH, SdPoseProjectionError, SdPoseRawKeypoint,
+    NativeSdPoseHeatmapHead, NativeSdPoseModel, NativeSdPoseSd2Denoiser, SDPOSE_HEAD_SOURCE_SHA256,
+    SDPOSE_HEATMAP_CHANNELS, SDPOSE_HEATMAP_HEIGHT, SDPOSE_HEATMAP_WIDTH, SDPOSE_INPUT_HEIGHT,
+    SDPOSE_INPUT_WIDTH, SDPOSE_MODEL_DETECTION_SOURCE_SHA256, SdPoseHeatmapHeadConfiguration,
+    SdPoseHeatmapHeadWeightSpec, SdPoseModelError, SdPoseProjectionError, SdPoseRawKeypoint,
     SdPoseSd2Configuration, SdPoseSd2Error, SdPoseSd2ForwardOutput, SdPoseSd2WeightSpec,
-    decode_sdpose_heatmaps, project_sdpose_openpose_person, sdpose_sd2_weight_manifest,
+    decode_sdpose_heatmaps, project_sdpose_openpose_person, sdpose_heatmap_head_weight_manifest,
+    sdpose_sd2_weight_manifest,
 };
 pub use sdxl_family::{
     SDXL_ADM_INPUT_DIMENSION, SDXL_ATTENTION_HEAD_CHANNELS, SDXL_CLIP_CANDIDATES, SDXL_CLIP_TARGET,

@@ -13,9 +13,9 @@ use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 use crate::{
     GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
     GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder,
-    NativeGemmaMultimodal, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeVae,
-    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
-    QWEN35_SOURCE_SHA256,
+    NativeGemmaMultimodal, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
+    NativeSdPoseModel, NativeVae, QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256,
+    QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -281,6 +281,9 @@ enum NativeModelResource {
     GemmaMultimodalClip {
         resource: Arc<NativeGemmaMultimodal>,
     },
+    SdPoseModel {
+        resource: Arc<NativeSdPoseModel>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -299,6 +302,7 @@ pub enum NativeModelBackingKind {
     NativeGemma3VisionProjector,
     NativeGemma4VisionEncoder,
     NativeGemma4AudioEncoder,
+    NativeSdPoseModel,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -683,6 +687,52 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn sdpose_model(resource: Arc<NativeSdPoseModel>) -> Result<Self, NativeModelPayloadError> {
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "SDPose production source-exact profile",
+            ));
+        }
+        Self::sdpose_model_checked(resource)
+    }
+
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn sdpose_model_test_fixture(
+        resource: Arc<NativeSdPoseModel>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        if resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "SDPose reduced test fixture profile",
+            ));
+        }
+        Self::sdpose_model_checked(resource)
+    }
+
+    fn sdpose_model_checked(
+        resource: Arc<NativeSdPoseModel>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Model,
+            "native-sdpose-lotusd",
+            "sim-native-sdpose-model-v1",
+            resource.artifact_sha256(),
+            resource.semantic_state_digest_sha256(),
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::SdPoseModel { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -897,6 +947,29 @@ impl NativeModelPayload {
                 }
                 allocations
             }
+            NativeModelResource::SdPoseModel { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                vec![NativeModelResidentAllocation {
+                    kind: NativeModelBackingKind::NativeSdPoseModel,
+                    address: Arc::as_ptr(resource) as usize,
+                    resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                        NativeModelPayloadError::ResourceAccounting(error.to_string())
+                    })?,
+                }]
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -920,7 +993,8 @@ impl NativeModelPayload {
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
-            | NativeModelResource::GemmaMultimodalClip { .. } => None,
+            | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::SdPoseModel { .. } => None,
         }
     }
 
@@ -935,7 +1009,8 @@ impl NativeModelPayload {
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
-            | NativeModelResource::GemmaMultimodalClip { .. } => None,
+            | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::SdPoseModel { .. } => None,
         }
     }
 
@@ -948,7 +1023,8 @@ impl NativeModelPayload {
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
-            | NativeModelResource::GemmaMultimodalClip { .. } => None,
+            | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::SdPoseModel { .. } => None,
         }
     }
 
@@ -961,7 +1037,8 @@ impl NativeModelPayload {
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
-            | NativeModelResource::GemmaMultimodalClip { .. } => None,
+            | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::SdPoseModel { .. } => None,
         }
     }
 
@@ -974,7 +1051,8 @@ impl NativeModelPayload {
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
-            | NativeModelResource::GemmaMultimodalClip { .. } => None,
+            | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::SdPoseModel { .. } => None,
         }
     }
 
@@ -1001,6 +1079,13 @@ impl NativeModelPayload {
         }
     }
 
+    pub fn sdpose_model_resource(&self) -> Option<&Arc<NativeSdPoseModel>> {
+        match &self.resource {
+            NativeModelResource::SdPoseModel { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), NativeModelPayloadError> {
         let expected = match &self.resource {
             NativeModelResource::Sd15Model { model } => Self::sd15_model(model.clone())?,
@@ -1020,6 +1105,22 @@ impl NativeModelPayload {
             }
             NativeModelResource::GemmaMultimodalClip { resource } => {
                 Self::gemma_multimodal_clip(resource.clone())?
+            }
+            NativeModelResource::SdPoseModel { resource } => {
+                if resource.is_source_exact_profile() {
+                    Self::sdpose_model(resource.clone())?
+                } else {
+                    #[cfg(feature = "test-support")]
+                    {
+                        Self::sdpose_model_test_fixture(resource.clone())?
+                    }
+                    #[cfg(not(feature = "test-support"))]
+                    {
+                        return Err(NativeModelPayloadError::ResourceMismatch(
+                            "SDPose reduced test fixture profile",
+                        ));
+                    }
+                }
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes
