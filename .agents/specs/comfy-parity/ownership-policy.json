@@ -21105,7 +21105,8 @@
         "TensorBackend resize and CpuBackend resize_vjp own interpolation coordinates, sampling, transpose scatter, allocation, and publication",
         "CpuBackend, ExecutionContext, Tensor storage, and comfy_types CancellationToken remain the sole allocation, execution, storage, and cancellation owners",
         "operation resolution records and fixtures are ABI and conformance projections",
-        "Task 89 AvgPool1d/2d/3d functional identities are focused source adapters over AveragePoolGeometry; the canonical geometry is extended here for count_include_pad, divisor_override, and ceil-mode terminal padding and Task 89 owns no second window traversal"
+        "Task 89 AvgPool1d/2d/3d functional identities are focused source adapters over AveragePoolGeometry; the canonical geometry is extended here for count_include_pad, divisor_override, and ceil-mode terminal padding and Task 89 owns no second window traversal",
+        "The native FILM tensor average-pool foundation projects retained F16/BF16/F32 Tensor input through the same AveragePoolGeometry connection/divisor traversal, caller-authorized F32 workspace, and one fresh backend allocation; later FILM execution consumes that adapter without owning another pyramid-pooling equation"
       ],
       "definitions": [
         {
@@ -21176,6 +21177,21 @@
           "name": "task89-average-pool-tests-prove-dimensions-divisors-and-derivatives",
           "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
           "pattern": "average_pool_dimensions_divisors_and_derivatives_are_exact[\\s\\S]*count_include_pad[\\s\\S]*divisor_override[\\s\\S]*average_pool_vjp_with_context_exact_native[\\s\\S]*average_pool_jvp_with_context_exact_native"
+        },
+        {
+          "name": "film-tensor-average-pool-delegates-existing-geometry-and-bounded-storage-owners",
+          "path": "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+          "pattern": "pub fn average_pool_2d_tensor_with_context_exact_native[\\s\\S]*tensor_to_f32_workspace[\\s\\S]*checked_average_pool_geometry[\\s\\S]*for_each_connection_with_divisor[\\s\\S]*backend\\.allocate"
+        },
+        {
+          "name": "film-tensor-average-pool-proves-low-precision-failure-atomic-publication",
+          "path": "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+          "pattern": "average_pool_tensor_is_bounded_dtype_preserving_and_failure_atomic[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*WorkspaceAuthorizationExceeded[\\s\\S]*SpatialFunctionalKernelError::Cancelled"
+        },
+        {
+          "name": "film-tensor-average-pool-fixture-bounds-primitive-only-claims",
+          "path": "crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool/manifest.json",
+          "pattern": "(?=[\\s\\S]*film_net.py)(?=[\\s\\S]*4x4_to_2x2)(?=[\\s\\S]*licensed_checkpoint_included)(?=[\\s\\S]*codec_execution)"
         }
       ],
       "known_open_reasons": [],
@@ -21184,11 +21200,13 @@
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-5b8ce1451811",
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-904c1e14bae4",
         "comfy-parity-tensor-ops-neural-network-module-comfy-tensor-op-d60003ac2b14",
-        "comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331"
+        "comfy-parity-tensor-ops-spatial-functional-kernel-comfy-tensor-op-1f9d23f3b331",
+        "comfy-parity-native-film-tensor-average-pool-foundation"
       ],
       "production_consumers": [
         "canonical native module forward execution",
-        "source-compatible native neural-network module constructors"
+        "source-compatible native neural-network module constructors",
+        "native FILM image and feature pyramid execution"
       ],
       "requirements": [
         "Requirement 7",

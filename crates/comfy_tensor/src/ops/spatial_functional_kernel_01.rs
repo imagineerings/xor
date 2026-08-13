@@ -131,6 +131,109 @@ pub fn average_pool_2d_with_context_exact_native(
     )
 }
 
+#[cfg(feature = "cpu")]
+pub fn average_pool_2d_tensor_with_context_exact_native(
+    backend: &CpuBackend,
+    input: &Tensor,
+    configuration: &AveragePoolConfiguration,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, SpatialFunctionalKernelError> {
+    context.check()?;
+    validate_real_tensor(
+        backend,
+        input,
+        "input",
+        AVG_POOL_2D_OPERATION_ID,
+        context,
+    )?;
+    let input_shape =
+        tensor_shape_to_usize(input, AVG_POOL_2D_OPERATION_ID, "input shape")?;
+    let input_values =
+        tensor_to_f32_workspace(backend, input, AVG_POOL_2D_OPERATION_ID, context)?;
+    let geometry = checked_average_pool_geometry(
+        AVG_POOL_2D_OPERATION_ID,
+        2,
+        &input_values,
+        &input_shape,
+        configuration,
+    )?;
+    let output_count = geometry
+        .output_count()
+        .map_err(|error| pool_error(AVG_POOL_2D_OPERATION_ID, error))?;
+    let mut output_values = backend.workspace_vec(context, output_count)?;
+    for index in 0..output_count {
+        if index.is_multiple_of(64) {
+            context.check()?;
+        }
+        output_values.try_push(0.0)?;
+    }
+    geometry
+        .for_each_connection_with_divisor(
+            context,
+            configuration.count_include_pad,
+            configuration.divisor_override,
+            |input_index, output_index, scale| {
+                let source = input_values.get(input_index).copied().ok_or(
+                    NeuralNetworkModuleError::ShapeOverflow("average-pool input index"),
+                )?;
+                let destination = output_values.get_mut(output_index).ok_or(
+                    NeuralNetworkModuleError::ShapeOverflow("average-pool output index"),
+                )?;
+                *destination = source.mul_add(scale, *destination);
+                Ok(())
+            },
+        )
+        .map_err(|error| pool_error(AVG_POOL_2D_OPERATION_ID, error))?;
+
+    let output_shape = geometry
+        .output_shape()
+        .iter()
+        .map(|value| {
+            u64::try_from(*value)
+                .map_err(|_| overflow(AVG_POOL_2D_OPERATION_ID, "output shape"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let descriptor = TensorDescriptor::contiguous(
+        output_shape,
+        input.descriptor().dtype(),
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let (mut output, allocation_event) = backend.allocate(descriptor, context)?;
+    backend.wait_event(allocation_event, context)?;
+    let dtype = output.descriptor().dtype();
+    let byte_width = usize::try_from(dtype.byte_width())
+        .map_err(|_| overflow(AVG_POOL_2D_OPERATION_ID, "output dtype width"))?;
+    {
+        let mut write = output.write()?;
+        let output_bytes = write.bytes_mut()?;
+        for (index, value) in output_values.iter().copied().enumerate() {
+            if index.is_multiple_of(64) {
+                context.check()?;
+            }
+            let start = index
+                .checked_mul(byte_width)
+                .ok_or_else(|| overflow(AVG_POOL_2D_OPERATION_ID, "output byte index"))?;
+            let end = start
+                .checked_add(byte_width)
+                .ok_or_else(|| overflow(AVG_POOL_2D_OPERATION_ID, "output byte range"))?;
+            let destination = output_bytes
+                .get_mut(start..end)
+                .ok_or_else(|| overflow(AVG_POOL_2D_OPERATION_ID, "output byte destination"))?;
+            let encoded = dtype.encode_scalar(
+                Scalar::Float(f64::from(value)),
+                AVG_POOL_2D_OPERATION_ID,
+                DeviceId::CPU,
+            )?;
+            destination.copy_from_slice(&encoded);
+        }
+    }
+    let event = backend.record_event(context)?;
+    backend.wait_event(event, context)?;
+    context.check()?;
+    Ok(output)
+}
+
 pub fn average_pool_3d_with_context_exact_native(
     input: &[f32],
     input_shape: &[usize],

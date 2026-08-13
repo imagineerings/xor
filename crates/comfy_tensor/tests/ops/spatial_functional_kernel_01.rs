@@ -7,6 +7,7 @@ use comfy_tensor::{
         GRID_SAMPLE_OPERATION_ID, GridPaddingMode, GridSampleConfiguration, GridSampleMode,
         INTERPOLATE_OPERATION_ID, InterpolateConfiguration, InterpolateMode,
         SpatialFunctionalKernelError, average_pool_1d_with_context_exact_native,
+        average_pool_2d_tensor_with_context_exact_native,
         average_pool_2d_with_context_exact_native, average_pool_3d_with_context_exact_native,
         average_pool_jvp_with_context_exact_native, average_pool_vjp_with_context_exact_native,
         conv_1d_with_context_exact_native, conv_2d_tensor_with_context_exact_native,
@@ -217,6 +218,120 @@ fn average_pool_dimensions_divisors_and_derivatives_are_exact()
         &context,
     )?;
     close(&output.values, &[2.0], 0.0);
+    Ok(())
+}
+
+#[test]
+fn average_pool_tensor_is_bounded_dtype_preserving_and_failure_atomic()
+-> Result<(), Box<dyn std::error::Error>> {
+    let backend = TestBackend::new()?;
+    let cancellation = CancellationToken::default();
+    let context = backend.execution(&cancellation)?;
+    let configuration = AveragePoolConfiguration {
+        kernel_size: vec![2, 2],
+        stride: Some(vec![2, 2]),
+        padding: vec![0, 0],
+        ceil_mode: false,
+        count_include_pad: true,
+        divisor_override: None,
+    };
+    let input_values = (1..=16).map(|value| value as f64).collect::<Vec<_>>();
+    let expected = [3.5, 5.5, 11.5, 13.5];
+
+    for dtype in [DType::F16, DType::Bf16, DType::F32] {
+        let bytes = input_values
+            .iter()
+            .map(|value| {
+                dtype.encode_scalar(
+                    Scalar::Float(*value),
+                    "average-pool-tensor-test",
+                    DeviceId::CPU,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let descriptor =
+            TensorDescriptor::contiguous(vec![1, 1, 4, 4], dtype, DeviceId::CPU, context.stream)?;
+        let input = backend.upload_bytes(descriptor, &bytes, &context)?.0;
+        let input_bytes = input.contiguous_bytes()?.to_vec();
+        let output = average_pool_2d_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &context,
+        )?;
+        assert_eq!(output.descriptor().shape(), [1, 1, 2, 2]);
+        assert_eq!(output.descriptor().dtype(), dtype);
+        assert_eq!(output.descriptor().device(), DeviceId::CPU);
+        assert_eq!(output.descriptor().stream(), StreamId::DEFAULT);
+        assert_ne!(output.storage_id(), input.storage_id());
+        close(
+            &tensor_to_f32_with_context_exact_native(&backend, &output, &context)?,
+            &expected,
+            0.0,
+        );
+        assert_eq!(input.contiguous_bytes()?, input_bytes);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+    }
+
+    let descriptor =
+        TensorDescriptor::contiguous(vec![1, 1, 4, 4], DType::F32, DeviceId::CPU, context.stream)?;
+    let input = backend
+        .upload_f32(
+            descriptor,
+            &input_values
+                .iter()
+                .map(|value| *value as f32)
+                .collect::<Vec<_>>(),
+            &context,
+        )?
+        .0;
+    let before_failure = backend.memory_snapshot();
+    let limited_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(79)?,
+        &cancellation,
+    );
+    assert!(matches!(
+        average_pool_2d_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &limited_context,
+        ),
+        Err(SpatialFunctionalKernelError::Tensor(
+            comfy_tensor::TensorError::WorkspaceAuthorizationExceeded { .. }
+        ))
+    ));
+    assert_eq!(limited_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let cancelled_context = backend.backend.execution_context(
+        StreamId::DEFAULT,
+        backend.authority.authorize_workspace(backend.limit)?,
+        &cancelled,
+    );
+    assert!(matches!(
+        average_pool_2d_tensor_with_context_exact_native(
+            &backend,
+            &input,
+            &configuration,
+            &cancelled_context,
+        ),
+        Err(SpatialFunctionalKernelError::Cancelled)
+    ));
+    assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+    assert_eq!(
+        backend.memory_snapshot().current_bytes,
+        before_failure.current_bytes
+    );
     Ok(())
 }
 

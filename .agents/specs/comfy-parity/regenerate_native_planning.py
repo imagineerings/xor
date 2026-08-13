@@ -9873,6 +9873,45 @@ def native_rife_sequence_execution_foundation_task(dependency: str) -> dict[str,
     )
 
 
+def native_film_tensor_average_pool_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-tensor-average-pool-foundation",
+        "Publish bounded tensor average pooling for FILM pyramids",
+        [31, 34, 35, 36, 41],
+        [25, 27, 28, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical spatial functional owner exposes one tensor-returning AvgPool2d adapter over its existing AveragePoolGeometry traversal. It decodes F16, BF16, or F32 input and accumulates the FILM pyramid result in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without adding a second pooling equation, allocator, workspace, model, cache, codec, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/dtypes.rs",
+            "crates/comfy_tensor/src/ops/neural_network_module_01.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted tensor fixture proves exact 4-by-4 to 2-by-2 FILM pyramid averaging for F16, BF16, and F32 input, F32 accumulation and output-dtype rounding, exact dtype/device/stream/shape preservation, fresh nonaliasing storage, immutable input, pre-cancellation, one-byte-short caller-workspace failure before publication, backend-memory convergence, and delegation to the existing AveragePoolGeometry connection/divisor owner. It explicitly makes no FILM checkpoint, flow, fusion, frame-sequence, codec, handle, cache, effect, or publication claim.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12087,8 +12126,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     rife_sequence_execution_foundation = native_rife_sequence_execution_foundation_task(
         str(rife_execution_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_tensor_average_pool_foundation = native_film_tensor_average_pool_foundation_task(
         str(rife_sequence_execution_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_tensor_average_pool_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12193,6 +12235,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             rife_tensor_arithmetic_foundation,
             rife_execution_foundation,
             rife_sequence_execution_foundation,
+            film_tensor_average_pool_foundation,
             video_foundation,
             detection_foundation,
         ]

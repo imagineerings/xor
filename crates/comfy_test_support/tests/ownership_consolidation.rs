@@ -14036,6 +14036,73 @@ fn val_ownership_native_rife_sequence_execution_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_film_tensor_average_pool_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let tensor = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs"),
+    )?;
+    for required in [
+        "pub fn average_pool_2d_tensor_with_context_exact_native(",
+        "tensor_to_f32_workspace(",
+        "checked_average_pool_geometry(",
+        "for_each_connection_with_divisor(",
+        "backend.allocate(descriptor, context)",
+    ] {
+        assert!(
+            tensor.contains(required),
+            "bounded FILM tensor average pool lacks {required}"
+        );
+    }
+    let tests = fs::read_to_string(
+        root.join("crates/comfy_tensor/tests/ops/spatial_functional_kernel_01.rs"),
+    )?;
+    for required in [
+        "average_pool_tensor_is_bounded_dtype_preserving_and_failure_atomic",
+        "DType::F16",
+        "DType::Bf16",
+        "WorkspaceAuthorizationExceeded",
+        "SpatialFunctionalKernelError::Cancelled",
+    ] {
+        assert!(
+            tests.contains(required),
+            "bounded FILM tensor average-pool tests lack {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/tensor_operations/spatial_functional_kernel_01/film-average-pool/manifest.json",
+    ))?;
+    assert!(fixture.contains("film_net.py"));
+    assert!(fixture.contains("4x4_to_2x2"));
+    assert!(fixture.contains("\"film_checkpoint_execution\": false"));
+    assert!(fixture.contains("\"codec_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("workspace_tensor_neural_network_module_part_one_local_mechanics")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-film-tensor-average-pool-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_task404_bounded_dense_spatial_inference_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
