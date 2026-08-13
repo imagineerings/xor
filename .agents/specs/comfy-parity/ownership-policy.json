@@ -12718,6 +12718,123 @@
       "decision_reason": "NativeQwenMultimodal is the sole retained Qwen vision-text CLIP resource. It derives one of seven closed family identities from concrete tokenizer, decoder, and vision owners, binds pinned source and artifact identities, and exposes exact owned and StorageId-deduplicated residency through NativeModelPayload. It owns no execution transaction, prepared state, KV, RNG, cache, persistence, workflow, handle-store lifecycle, or output publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_resource_specialized_gemma",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeGemmaMultimodal",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+        "crates/comfy_model/src/native_node_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeGemmaMultimodal",
+        "NativeModelPayload::gemma_multimodal_clip",
+        "NativeModelPayload::gemma_multimodal_resource",
+        "NativeModelBackingKind::NativeGemmaMultimodal"
+      ],
+      "allowed_adapters": [
+        "NativePromptTokenizer, NativeDecoderTextEncoder, NativeGemma3VisionProjector, NativeGemma4VisionEncoder, and NativeGemma4AudioEncoder remain the sole tokenizer, decoder, vision, and audio graph owners retained by the composite",
+        "NativeModelPayload binds the composite to one sealed CLIP role and NativeStoredModelPayload admits only that concrete specialization without treating legacy or reduced resources as production",
+        "The native handle store remains the sole owner of allocation deduplication, leases, capacity rollback, forgery checks, and generation-stale restart behavior",
+        "The dependent Gemma generation adapter may borrow this retained resource but cannot duplicate its identity, residency, tokenizer, decoder, media graphs, or handle ownership",
+        "Runtime controller, executor, NativeCache, persistence, workflow, RNG, KV, prepared tensors, and output transactions remain outside this resource"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct NativeGemmaMultimodal \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::NativeGemmaMultimodal",
+          "role": "canonical_state",
+          "symbol": "NativeGemmaMultimodal"
+        },
+        {
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "^    pub fn gemma_multimodal_clip\\(",
+          "qualified": "comfy_model::native_node_payload::NativeModelPayload::gemma_multimodal_clip",
+          "role": "adapter",
+          "symbol": "gemma_multimodal_clip"
+        }
+      ],
+      "call_symbols": [
+        "NativeGemmaMultimodal::gemma3",
+        "NativeGemmaMultimodal::gemma4",
+        "NativeGemmaMultimodal::validate",
+        "NativeGemmaMultimodal::semantic_state_digest",
+        "NativeGemmaMultimodal::resident_tensor_allocations",
+        "NativeModelPayload::gemma_multimodal_clip",
+        "NativeModelPayload::gemma_multimodal_resource"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma-multimodal-resource-retains-tokenizer-decoder-vision-and-optional-audio",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub struct NativeGemmaMultimodal[\\s\\S]*tokenizer: Arc<NativePromptTokenizer>[\\s\\S]*decoder: Arc<NativeDecoderTextEncoder>[\\s\\S]*vision: NativeGemmaVisionResource[\\s\\S]*audio: Option<Arc<NativeGemma4AudioEncoder>>"
+        },
+        {
+          "name": "gemma-multimodal-resource-cross-admission-is-closed",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "impl GemmaMultimodalFamily[\\s\\S]*tokenizer_profile[\\s\\S]*decoder_configuration[\\s\\S]*supports_audio[\\s\\S]*impl NativeGemmaMultimodal[\\s\\S]*pub fn validate[\\s\\S]*execution_stream"
+        },
+        {
+          "name": "gemma-multimodal-resource-binds-source-and-component-identities",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "sim.comfy.gemma-multimodal-resource.v1[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*LLAMA_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*SPIECE_TOKENIZER_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest_sha256[\\s\\S]*audio.semantic_state_digest_sha256"
+        },
+        {
+          "name": "gemma-multimodal-resource-unions-size-consistent-storage-residency",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn resident_tensor_allocations[\\s\\S]*decoder.resident_tensor_allocations[\\s\\S]*vision.resident_tensor_allocations[\\s\\S]*audio.resident_tensor_allocations[\\s\\S]*insert_gemma4_resident_allocation"
+        },
+        {
+          "name": "gemma-multimodal-resource-is-sealed-clip-payload",
+          "path": "crates/comfy_model/src/native_node_payload.rs",
+          "pattern": "pub fn gemma_multimodal_clip[\\s\\S]*NativeModelResourceRole::Clip[\\s\\S]*NativeModelResource::GemmaMultimodalClip"
+        },
+        {
+          "name": "gemma-multimodal-resource-stored-adapter-preserves-specialization",
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "pattern": "NativeModelResourceRole::Clip =>[\\s\\S]*qwen_multimodal_resource[\\s\\S]*gemma_multimodal_resource"
+        },
+        {
+          "name": "gemma-multimodal-resource-tests-family-identity-residency-and-reduced-rejection",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma_multimodal_resource_closes_family_identity_residency_and_payload_admission[\\s\\S]*resident_tensor_allocations[\\s\\S]*semantic_state_digest[\\s\\S]*gemma_multimodal_clip"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma-multimodal-resource-foundation"
+      ],
+      "production_consumers": [
+        "retained native Gemma multimodal generation owner",
+        "native multimodal text generation controller"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-CLIP-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGemmaMultimodal is the sole retained Gemma vision-text CLIP resource. It closes the five-family tokenizer, decoder, vision, and optional-audio admission matrix, binds pinned source and artifact identities, and exposes exact owned and size-checked StorageId-deduplicated residency through NativeModelPayload. It owns no execution transaction, prepared state, KV, RNG, cache, persistence, workflow, handle-store lifecycle, or output publication."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

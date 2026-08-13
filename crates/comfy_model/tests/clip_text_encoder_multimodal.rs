@@ -2,31 +2,34 @@ use comfy_model::{
     ClipVisionActivation, ClipVisionConfiguration, ClipVisionLayerWeights, ClipVisionModelType,
     ClipVisionWeights, DecoderActivation, DecoderArchitecture, DecoderAttentionWeights,
     DecoderLayerKind, DecoderLayerWeights, DecoderRopeConfiguration, DecoderTextConfiguration,
-    DecoderTextWeights, GEMMA3_IMAGE_AREA_PIXELS, GEMMA3_MULTIMODAL_SOURCE_PATH,
-    GEMMA3_MULTIMODAL_SOURCE_SHA256, GEMMA4_AUDIO_FFT_LENGTH, GEMMA4_AUDIO_FRAME_LENGTH,
-    GEMMA4_AUDIO_FRAME_STEP, GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE, GEMMA4_AUDIO_MAXIMUM_TOKENS,
-    GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE, GEMMA4_AUDIO_SAMPLE_RATE,
-    GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_MULTIMODAL_SOURCE_PATH, GEMMA4_MULTIMODAL_SOURCE_SHA256,
-    GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS, Gemma3VisionConfiguration,
-    Gemma3VisionProfile, Gemma4AudioBlockWeights, Gemma4AudioConfiguration,
-    Gemma4AudioFeedForwardWeights, Gemma4AudioProfile, Gemma4AudioWeights,
-    Gemma4ClippedLinearWeights, Gemma4VisionBlockWeights, Gemma4VisionConfiguration,
-    Gemma4VisionProfile, Gemma4VisionWeights, GemmaPreparedVisualKind, IDEOGRAM4_SOURCE_PATH,
+    DecoderTextWeights, GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_IMAGE_AREA_PIXELS,
+    GEMMA3_MULTIMODAL_SOURCE_PATH, GEMMA3_MULTIMODAL_SOURCE_SHA256, GEMMA4_AUDIO_FFT_LENGTH,
+    GEMMA4_AUDIO_FRAME_LENGTH, GEMMA4_AUDIO_FRAME_STEP, GEMMA4_AUDIO_MAXIMUM_SAMPLE_RATE,
+    GEMMA4_AUDIO_MAXIMUM_TOKENS, GEMMA4_AUDIO_MEL_BINS, GEMMA4_AUDIO_MINIMUM_SAMPLE_RATE,
+    GEMMA4_AUDIO_SAMPLE_RATE, GEMMA4_IMAGE_SOFT_TOKENS, GEMMA4_MULTIMODAL_SOURCE_PATH,
+    GEMMA4_MULTIMODAL_SOURCE_SHA256, GEMMA4_VIDEO_SOFT_TOKENS, GEMMA4_VIDEO_SOURCE_FPS,
+    Gemma3VisionConfiguration, Gemma3VisionProfile, Gemma4AudioBlockWeights,
+    Gemma4AudioConfiguration, Gemma4AudioFeedForwardWeights, Gemma4AudioProfile,
+    Gemma4AudioWeights, Gemma4ClippedLinearWeights, Gemma4DecoderConfiguration,
+    Gemma4LayerInputWeights, Gemma4PerLayerWeights, Gemma4VisionBlockWeights,
+    Gemma4VisionConfiguration, Gemma4VisionProfile, Gemma4VisionWeights, GemmaMultimodalFamily,
+    GemmaPreparedVisualKind, GemmaTokenizer, GemmaTokenizerProfile, IDEOGRAM4_SOURCE_PATH,
     IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
     JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
     MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
     NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector,
-    NativeGemma4AudioEncoder, NativeGemma4VisionEncoder, NativeModelPayload, NativePromptTokenizer,
-    NativeQwenMultimodal, NativeQwenVisionEncoder, NativeTextGenerationRequest,
-    NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256, QWEN_VL_SOURCE_PATH,
-    QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH, QWEN3VL_SOURCE_SHA256,
-    QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN, QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer,
-    Qwen2PretokenizerProfile, QwenMultimodalGenerationRequest, QwenVisionBlockWeights,
-    QwenVisionConfiguration, QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights,
-    RopeScaling, SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition,
-    TokenizerConfiguration, format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt,
-    gemma3_target_dimensions, gemma4_audio_marker_tokens, gemma4_target_dimensions,
-    ideogram4_project_taps, join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
+    NativeGemma4AudioEncoder, NativeGemma4VisionEncoder, NativeGemmaMultimodal, NativeModelPayload,
+    NativePromptTokenizer, NativeQwenMultimodal, NativeQwenVisionEncoder,
+    NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
+    QWEN_VL_SOURCE_PATH, QWEN_VL_SOURCE_SHA256, QWEN3VL_IMAGE_PAD_TOKEN, QWEN3VL_SOURCE_PATH,
+    QWEN3VL_SOURCE_SHA256, QWEN35_IMAGE_MEAN, QWEN35_IMAGE_PAD_TOKEN,
+    QWEN35_IMAGE_STANDARD_DEVIATION, Qwen2BpeTokenizer, Qwen2PretokenizerProfile,
+    QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
+    QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
+    SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
+    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
+    gemma4_audio_marker_tokens, gemma4_target_dimensions, ideogram4_project_taps,
+    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
     multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
     plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
     prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
@@ -112,6 +115,33 @@ fn filled_tensor(
         backend,
         shape,
         &vec![value; elements.ok_or("fixture tensor shape overflowed")?],
+        context,
+    )
+}
+
+fn matrix_tensor(
+    backend: &CpuBackend,
+    output: usize,
+    input: usize,
+    scale: f32,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, Box<dyn Error>> {
+    let count = output.checked_mul(input).ok_or("matrix size overflowed")?;
+    let values = (0..count)
+        .map(|index| {
+            let row = index / input;
+            let column = index % input;
+            if row % input == column {
+                scale
+            } else {
+                ((index * 11 % 17) as f32 - 8.0) * scale * 0.0125
+            }
+        })
+        .collect::<Vec<_>>();
+    tensor(
+        backend,
+        &[u64::try_from(output)?, u64::try_from(input)?],
+        &values,
         context,
     )
 }
@@ -705,6 +735,183 @@ fn reduced_gemma4_audio_weights(
             context,
         )?,
     })
+}
+
+fn gemma4_prompt_tokenizer(
+    hidden_size: usize,
+) -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
+    let family = GemmaTokenizer::gemma4_from_tokenizer_json(
+        include_str!(
+            "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/tokenizer/gemma4-tokenizer.json"
+        ),
+        &CancellationToken::default(),
+    )?;
+    Ok(Arc::new(NativePromptTokenizer::checked(
+        NativeTokenizerFamily::Gemma(family),
+        TokenizerConfiguration {
+            maximum_length: 131_072,
+            minimum_length: Some(1),
+            minimum_padding: None,
+            pad_to_maximum_length: false,
+            pad_left: true,
+            start_token: Some(2),
+            end_token: None,
+            pad_token: 0,
+            maximum_word_length: 8,
+            disable_weights: true,
+            embedding_width: Some(hidden_size),
+        },
+        BTreeMap::new(),
+    )?))
+}
+
+fn reduced_gemma4_decoder_configuration() -> DecoderTextConfiguration {
+    DecoderTextConfiguration {
+        architecture: DecoderArchitecture::Gemma,
+        dtype: DType::F32,
+        device: DeviceId::CPU,
+        vocabulary_size: 262_144,
+        maximum_tokens: 131_072,
+        hidden_size: 4,
+        feed_forward_size: 8,
+        layer_kinds: (0_usize..10)
+            .map(|index| {
+                if (index + 1).is_multiple_of(5) {
+                    DecoderLayerKind::FullAttention
+                } else {
+                    DecoderLayerKind::SlidingAttention
+                }
+            })
+            .collect(),
+        attention_heads: 2,
+        key_value_heads: 1,
+        head_dimension: 2,
+        query_key_norm: true,
+        qwen35_linear: None,
+        gemma3: None,
+        gemma4: Some(Gemma4DecoderConfiguration {
+            source_profile: None,
+            local_rope: DecoderRopeConfiguration {
+                theta: 10_000.0,
+                rotary_dimension: 2,
+                interleaved_sections: Vec::new(),
+                scaling: RopeScaling::None,
+            },
+            global_head_dimension: 4,
+            global_rotary_pairs: 1,
+            sliding_layers_per_cycle: 4,
+            hidden_size_per_layer_input: 2,
+            shared_key_value_layers: 5,
+            double_wide_mlp: true,
+        }),
+        normalization_epsilon_bits: 1.0e-6_f32.to_bits(),
+        rope: DecoderRopeConfiguration {
+            theta: 1_000_000.0,
+            rotary_dimension: 2,
+            interleaved_sections: Vec::new(),
+            scaling: RopeScaling::None,
+        },
+        sliding_window: Some(512),
+        activation: DecoderActivation::GeluTanh,
+        embedding_scale_bits: 2.0_f32.to_bits(),
+        residual_scale_bits: 1.0_f32.to_bits(),
+        norm_weight_offset_bits: 0.0_f32.to_bits(),
+        logits_soft_cap_bits: Some(30.0_f32.to_bits()),
+        tied_output_head: true,
+        stop_tokens: vec![1, 50, 106],
+    }
+}
+
+fn reduced_gemma4_decoder(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    scale_offset: f32,
+) -> Result<Arc<NativeDecoderTextEncoder>, Box<dyn Error>> {
+    let configuration = reduced_gemma4_decoder_configuration();
+    let gemma4 = configuration.gemma4.as_ref().ok_or("Gemma4 config")?;
+    let first_shared = configuration.layer_kinds.len() - gemma4.shared_key_value_layers;
+    let mut layers = Vec::new();
+    for (index, kind) in configuration.layer_kinds.iter().copied().enumerate() {
+        let head_dimension = if kind == DecoderLayerKind::FullAttention {
+            gemma4.global_head_dimension
+        } else {
+            configuration.head_dimension
+        };
+        let query_width = configuration.attention_heads * head_dimension;
+        let key_value_width = configuration.key_value_heads * head_dimension;
+        let feed_forward = if gemma4.double_wide_mlp && index >= first_shared {
+            configuration.feed_forward_size * 2
+        } else {
+            configuration.feed_forward_size
+        };
+        let scale = scale_offset + 0.01 + index as f32 * 0.001;
+        layers.push(DecoderLayerWeights {
+            attention_norm_weight: filled_tensor(backend, &[4], 0.3, context)?,
+            attention: DecoderAttentionWeights::DotProduct {
+                query_weight: matrix_tensor(backend, query_width, 4, scale, context)?,
+                key_weight: matrix_tensor(backend, key_value_width, 4, scale + 0.01, context)?,
+                value_weight: matrix_tensor(backend, key_value_width, 4, scale + 0.02, context)?,
+                query_norm_weight: Some(filled_tensor(
+                    backend,
+                    &[u64::try_from(head_dimension)?],
+                    0.8,
+                    context,
+                )?),
+                key_norm_weight: Some(filled_tensor(
+                    backend,
+                    &[u64::try_from(head_dimension)?],
+                    1.1,
+                    context,
+                )?),
+                output_weight: matrix_tensor(backend, 4, query_width, scale + 0.03, context)?,
+            },
+            feed_forward_norm_weight: filled_tensor(backend, &[4], 0.25, context)?,
+            feed_forward_gate_weight: matrix_tensor(
+                backend,
+                feed_forward,
+                4,
+                scale + 0.04,
+                context,
+            )?,
+            feed_forward_up_weight: matrix_tensor(backend, feed_forward, 4, scale + 0.05, context)?,
+            feed_forward_down_weight: matrix_tensor(
+                backend,
+                4,
+                feed_forward,
+                scale + 0.06,
+                context,
+            )?,
+            post_attention_norm_weight: Some(filled_tensor(backend, &[4], 0.2, context)?),
+            post_feed_forward_norm_weight: Some(filled_tensor(backend, &[4], 0.22, context)?),
+            attention_sink: None,
+            gemma4_layer_input: Some(Gemma4LayerInputWeights {
+                gate_weight: matrix_tensor(backend, 2, 4, scale + 0.07, context)?,
+                projection_weight: matrix_tensor(backend, 4, 2, scale + 0.08, context)?,
+                post_norm_weight: filled_tensor(backend, &[4], 0.4, context)?,
+                layer_scalar: tensor(backend, &[1], &[0.97 + index as f32 * 0.001], context)?,
+            }),
+        });
+    }
+    let total_per_layer = configuration.layer_kinds.len() * gemma4.hidden_size_per_layer_input;
+    Ok(Arc::new(NativeDecoderTextEncoder::new(
+        configuration,
+        DecoderTextWeights {
+            token_embedding: filled_tensor(backend, &[262_144, 4], 0.001, context)?,
+            layers,
+            final_norm_weight: filled_tensor(backend, &[4], 0.35, context)?,
+            output_head_weight: None,
+            gemma4_per_layer: Some(Gemma4PerLayerWeights {
+                token_embedding: filled_tensor(
+                    backend,
+                    &[262_144, u64::try_from(total_per_layer)?],
+                    0.002 + scale_offset,
+                    context,
+                )?,
+                model_projection_weight: matrix_tensor(backend, total_per_layer, 4, 0.03, context)?,
+                projection_norm_weight: tensor(backend, &[2], &[0.9, 1.1], context)?,
+            }),
+        },
+    )?))
 }
 
 fn qwen25_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
@@ -1629,6 +1836,238 @@ fn gemma4_retained_audio_encoder_is_exact_alias_aware_and_transactional()
     drop(prepared);
     drop(waveform);
     assert_eq!(setup.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma_multimodal_resource_closes_family_identity_residency_and_payload_admission()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/resource/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["source_snapshot"]["tree_sha256"],
+        "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
+    );
+    assert_eq!(
+        manifest["accepted_families"]
+            .as_array()
+            .ok_or("Gemma family matrix is missing")?
+            .len(),
+        5
+    );
+    let family_matrix = [
+        (
+            GemmaMultimodalFamily::Gemma3FourBVision,
+            Gemma3VisionConfiguration::source(Gemma3VisionProfile::FourBVision).output_hidden_size,
+            None,
+        ),
+        (
+            GemmaMultimodalFamily::Gemma3TwelveB,
+            Gemma3VisionConfiguration::source(Gemma3VisionProfile::TwelveB).output_hidden_size,
+            None,
+        ),
+        (
+            GemmaMultimodalFamily::Gemma4E2B,
+            Gemma4VisionConfiguration::source(Gemma4VisionProfile::E2B).output_hidden_size,
+            Some(Gemma4AudioProfile::E2B),
+        ),
+        (
+            GemmaMultimodalFamily::Gemma4E4B,
+            Gemma4VisionConfiguration::source(Gemma4VisionProfile::E4B).output_hidden_size,
+            Some(Gemma4AudioProfile::E4B),
+        ),
+        (
+            GemmaMultimodalFamily::Gemma4ThirtyOneB,
+            Gemma4VisionConfiguration::source(Gemma4VisionProfile::ThirtyOneB).output_hidden_size,
+            None,
+        ),
+    ];
+    for (family, vision_width, audio_profile) in family_matrix {
+        let decoder = family.decoder_configuration();
+        assert_eq!(decoder.hidden_size, vision_width);
+        assert_eq!(family.supports_audio(), audio_profile.is_some());
+        if let Some(profile) = audio_profile {
+            assert_eq!(
+                Gemma4AudioConfiguration::source(profile)?.output_hidden_size,
+                decoder.hidden_size
+            );
+        }
+    }
+    assert_eq!(
+        GemmaMultimodalFamily::Gemma3FourBVision.source_sha256(),
+        GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256
+    );
+    assert_eq!(
+        GemmaMultimodalFamily::Gemma3TwelveB.tokenizer_profile(),
+        GemmaTokenizerProfile::Gemma3SentencePiece
+    );
+    assert_eq!(
+        GemmaMultimodalFamily::Gemma4E4B.tokenizer_profile(),
+        GemmaTokenizerProfile::Gemma4TokenizerJson
+    );
+
+    let (backend, authority) = backend()?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 64 * 1024 * 1024)?;
+    let tokenizer = gemma4_prompt_tokenizer(4)?;
+    let decoder = reduced_gemma4_decoder(&backend, &setup, 0.0)?;
+    let vision_configuration = Gemma4VisionConfiguration::reduced_fixture(
+        Gemma4VisionProfile::E4B,
+        4,
+        8,
+        1,
+        1,
+        4,
+        16,
+        64,
+        3,
+        4,
+    );
+    let vision = Arc::new(NativeGemma4VisionEncoder::new(
+        vision_configuration.clone(),
+        reduced_gemma4_vision_weights(&backend, &vision_configuration, &setup)?,
+    )?);
+    let audio_configuration = Gemma4AudioConfiguration::reduced_fixture(
+        Gemma4AudioProfile::E4B,
+        4,
+        2,
+        2,
+        4,
+        8,
+        1,
+        2,
+        3,
+        2,
+        3,
+        4,
+        4,
+    )?;
+    let audio = Arc::new(NativeGemma4AudioEncoder::new(
+        audio_configuration.clone(),
+        reduced_gemma4_audio_weights(&backend, &audio_configuration, &setup)?,
+        &cancellation,
+    )?);
+    let resource = NativeGemmaMultimodal::reduced_gemma4_fixture(
+        tokenizer.clone(),
+        decoder.clone(),
+        vision.clone(),
+        Some(audio.clone()),
+        &cancellation,
+    )?;
+    assert_eq!(resource.family(), GemmaMultimodalFamily::Gemma4E4B);
+    assert!(Arc::ptr_eq(resource.tokenizer(), &tokenizer));
+    assert!(Arc::ptr_eq(resource.decoder(), &decoder));
+    assert!(Arc::ptr_eq(
+        resource.gemma4_vision().ok_or("Gemma4 vision missing")?,
+        &vision
+    ));
+    assert!(Arc::ptr_eq(
+        resource.audio().ok_or("Gemma4 audio missing")?,
+        &audio
+    ));
+    assert!(resource.gemma3_vision().is_none());
+    assert!(!resource.is_source_exact_profile());
+    let digest = resource.semantic_state_digest(&cancellation)?;
+    assert_eq!(digest.len(), 64);
+    let allocations = resource.resident_tensor_allocations()?;
+    assert!(
+        allocations
+            .iter()
+            .enumerate()
+            .all(|(index, (storage_id, _))| {
+                !allocations[..index]
+                    .iter()
+                    .any(|(prior, _)| prior == storage_id)
+            })
+    );
+    let tensor_bytes = allocations
+        .iter()
+        .try_fold(0_u64, |total, (_, bytes)| total.checked_add(*bytes))
+        .ok_or("Gemma tensor residency overflowed")?;
+    assert!(resource.resident_bytes()? > tensor_bytes);
+    let clone = NativeGemmaMultimodal::reduced_gemma4_fixture(
+        tokenizer.clone(),
+        decoder.clone(),
+        vision.clone(),
+        Some(audio.clone()),
+        &cancellation,
+    )?;
+    assert_eq!(clone.semantic_state_digest(&cancellation)?, digest);
+    assert_eq!(clone.resident_tensor_allocations()?, allocations);
+
+    let (changed_backend, changed_authority) = CpuWorkspaceAuthority::create_backend(MEMORY_LIMIT)?;
+    let changed_context = context(&changed_authority, &cancellation, 64 * 1024 * 1024)?;
+    let changed_decoder = reduced_gemma4_decoder(&changed_backend, &changed_context, 0.005)?;
+    let changed = NativeGemmaMultimodal::reduced_gemma4_fixture(
+        tokenizer.clone(),
+        changed_decoder,
+        vision.clone(),
+        Some(audio.clone()),
+        &cancellation,
+    )?;
+    assert_ne!(changed.semantic_state_digest(&cancellation)?, digest);
+    assert!(
+        NativeGemmaMultimodal::reduced_gemma4_fixture(
+            tokenizer.clone(),
+            decoder.clone(),
+            vision.clone(),
+            None,
+            &cancellation,
+        )
+        .is_err()
+    );
+    let e2_vision_configuration = Gemma4VisionConfiguration::reduced_fixture(
+        Gemma4VisionProfile::E2B,
+        4,
+        8,
+        1,
+        1,
+        4,
+        16,
+        64,
+        3,
+        4,
+    );
+    let e2_vision = Arc::new(NativeGemma4VisionEncoder::new(
+        e2_vision_configuration.clone(),
+        reduced_gemma4_vision_weights(&backend, &e2_vision_configuration, &setup)?,
+    )?);
+    assert!(
+        NativeGemmaMultimodal::reduced_gemma4_fixture(
+            tokenizer.clone(),
+            decoder.clone(),
+            e2_vision,
+            Some(audio.clone()),
+            &cancellation,
+        )
+        .is_err()
+    );
+    assert!(
+        NativeGemmaMultimodal::gemma4(
+            tokenizer.clone(),
+            decoder.clone(),
+            vision.clone(),
+            Some(audio.clone()),
+            &cancellation,
+        )
+        .is_err()
+    );
+    assert!(NativeModelPayload::gemma_multimodal_clip(Arc::new(resource)).is_err());
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert!(matches!(
+        NativeGemmaMultimodal::reduced_gemma4_fixture(
+            tokenizer,
+            decoder,
+            vision,
+            Some(audio),
+            &cancelled,
+        ),
+        Err(MultimodalTextError::Cancelled)
+    ));
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
+    assert_eq!(changed_context.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

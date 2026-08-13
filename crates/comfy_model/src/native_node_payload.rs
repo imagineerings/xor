@@ -11,8 +11,11 @@ use thiserror::Error;
 use comfy_tensor::{CancellationToken, DType, StorageId, Tensor, TensorError};
 
 use crate::{
-    NativeDecoderTextEncoder, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge,
-    NativeVae, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256, QWEN35_SOURCE_SHA256,
+    GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256, GEMMA3_MULTIMODAL_SOURCE_SHA256,
+    GEMMA4_MULTIMODAL_SOURCE_SHA256, LLAMA_SOURCE_SHA256, NativeDecoderTextEncoder,
+    NativeGemmaMultimodal, NativePromptTokenizer, NativeQwenMultimodal, NativeRaftLarge, NativeVae,
+    QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
+    QWEN35_SOURCE_SHA256,
     clip::{LoadedSd1Clip, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
@@ -275,6 +278,9 @@ enum NativeModelResource {
     QwenMultimodalClip {
         resource: Arc<NativeQwenMultimodal>,
     },
+    GemmaMultimodalClip {
+        resource: Arc<NativeGemmaMultimodal>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -289,6 +295,10 @@ pub enum NativeModelBackingKind {
     NativeDecoderTextEncoder,
     NativeQwenMultimodal,
     NativeQwenVisionEncoder,
+    NativeGemmaMultimodal,
+    NativeGemma3VisionProjector,
+    NativeGemma4VisionEncoder,
+    NativeGemma4AudioEncoder,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -620,6 +630,59 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn gemma_multimodal_clip(
+        resource: Arc<NativeGemmaMultimodal>,
+    ) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        if !resource.is_source_exact_profile() {
+            return Err(NativeModelPayloadError::ResourceMismatch(
+                "Gemma production source-exact profile",
+            ));
+        }
+        let artifact_sha256 = digest_fields(
+            b"sim.comfy.native-gemma-multimodal-artifacts.v1",
+            [
+                QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256,
+                LLAMA_SOURCE_SHA256,
+                match resource.family() {
+                    crate::GemmaMultimodalFamily::Gemma3FourBVision => {
+                        GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256
+                    }
+                    crate::GemmaMultimodalFamily::Gemma3TwelveB => GEMMA3_MULTIMODAL_SOURCE_SHA256,
+                    crate::GemmaMultimodalFamily::Gemma4E2B
+                    | crate::GemmaMultimodalFamily::Gemma4E4B
+                    | crate::GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+                        GEMMA4_MULTIMODAL_SOURCE_SHA256
+                    }
+                },
+                resource.tokenizer().gemma_artifact_digest().ok_or(
+                    NativeModelPayloadError::ResourceMismatch("Gemma tokenizer artifact identity"),
+                )?,
+            ],
+        )?;
+        let execution_sha256 = resource
+            .semantic_state_digest(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Clip,
+            format!("native-gemma-multimodal-{:?}", resource.family()),
+            "sim-native-gemma-multimodal-clip-v1",
+            artifact_sha256,
+            execution_sha256,
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::GemmaMultimodalClip { resource },
+        })
+    }
+
     pub fn identity(&self) -> &NativeModelResourceIdentity {
         &self.identity
     }
@@ -767,6 +830,73 @@ impl NativeModelPayload {
                     },
                 ]
             }
+            NativeModelResource::GemmaMultimodalClip { resource } => {
+                tensor_allocations.extend(
+                    resource
+                        .resident_tensor_allocations()
+                        .map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?
+                        .into_iter()
+                        .map(
+                            |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                                storage_id,
+                                resident_bytes,
+                            },
+                        ),
+                );
+                let mut allocations = vec![
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeGemmaMultimodal,
+                        address: Arc::as_ptr(resource) as usize,
+                        resident_bytes: resource.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativePromptTokenizer,
+                        address: Arc::as_ptr(resource.tokenizer()) as usize,
+                        resident_bytes: resource.tokenizer().resident_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    },
+                    NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeDecoderTextEncoder,
+                        address: Arc::as_ptr(resource.decoder()) as usize,
+                        resident_bytes: resource.decoder().resident_owned_bytes().map_err(
+                            |error| NativeModelPayloadError::ResourceAccounting(error.to_string()),
+                        )?,
+                    },
+                ];
+                if let Some(vision) = resource.gemma3_vision() {
+                    allocations.push(NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeGemma3VisionProjector,
+                        address: Arc::as_ptr(vision) as usize,
+                        resident_bytes: vision.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    });
+                }
+                if let Some(vision) = resource.gemma4_vision() {
+                    allocations.push(NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeGemma4VisionEncoder,
+                        address: Arc::as_ptr(vision) as usize,
+                        resident_bytes: vision.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    });
+                }
+                if let Some(audio) = resource.audio() {
+                    allocations.push(NativeModelResidentAllocation {
+                        kind: NativeModelBackingKind::NativeGemma4AudioEncoder,
+                        address: Arc::as_ptr(audio) as usize,
+                        resident_bytes: audio.resident_owned_bytes().map_err(|error| {
+                            NativeModelPayloadError::ResourceAccounting(error.to_string())
+                        })?,
+                    });
+                }
+                allocations
+            }
         };
         let parts = NativeModelResidentParts {
             owned_bytes,
@@ -789,7 +919,8 @@ impl NativeModelPayload {
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
-            | NativeModelResource::QwenMultimodalClip { .. } => None,
+            | NativeModelResource::QwenMultimodalClip { .. }
+            | NativeModelResource::GemmaMultimodalClip { .. } => None,
         }
     }
 
@@ -803,7 +934,8 @@ impl NativeModelPayload {
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
-            | NativeModelResource::QwenMultimodalClip { .. } => None,
+            | NativeModelResource::QwenMultimodalClip { .. }
+            | NativeModelResource::GemmaMultimodalClip { .. } => None,
         }
     }
 
@@ -815,7 +947,8 @@ impl NativeModelPayload {
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
-            | NativeModelResource::QwenMultimodalClip { .. } => None,
+            | NativeModelResource::QwenMultimodalClip { .. }
+            | NativeModelResource::GemmaMultimodalClip { .. } => None,
         }
     }
 
@@ -827,7 +960,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::ClipVision { .. }
             | NativeModelResource::DecoderClip { .. }
-            | NativeModelResource::QwenMultimodalClip { .. } => None,
+            | NativeModelResource::QwenMultimodalClip { .. }
+            | NativeModelResource::GemmaMultimodalClip { .. } => None,
         }
     }
 
@@ -839,7 +973,8 @@ impl NativeModelPayload {
             | NativeModelResource::NativeVae { .. }
             | NativeModelResource::OpticalFlow { .. }
             | NativeModelResource::DecoderClip { .. }
-            | NativeModelResource::QwenMultimodalClip { .. } => None,
+            | NativeModelResource::QwenMultimodalClip { .. }
+            | NativeModelResource::GemmaMultimodalClip { .. } => None,
         }
     }
 
@@ -855,6 +990,13 @@ impl NativeModelPayload {
     pub fn qwen_multimodal_resource(&self) -> Option<&Arc<NativeQwenMultimodal>> {
         match &self.resource {
             NativeModelResource::QwenMultimodalClip { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn gemma_multimodal_resource(&self) -> Option<&Arc<NativeGemmaMultimodal>> {
+        match &self.resource {
+            NativeModelResource::GemmaMultimodalClip { resource } => Some(resource),
             _ => None,
         }
     }
@@ -875,6 +1017,9 @@ impl NativeModelPayload {
             }
             NativeModelResource::QwenMultimodalClip { resource } => {
                 Self::qwen_multimodal_clip(resource.clone())?
+            }
+            NativeModelResource::GemmaMultimodalClip { resource } => {
+                Self::gemma_multimodal_clip(resource.clone())?
             }
         };
         if self.identity() != expected.identity() || self.resident_bytes != expected.resident_bytes

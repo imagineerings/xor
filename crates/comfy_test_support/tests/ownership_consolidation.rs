@@ -3252,6 +3252,90 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task397_gemma_resource_has_one_retained_composite =
+        production_source_occurrences(&sources, "pub struct NativeGemmaMultimodal {").len() == 1
+            && model_clip_text_encoder_multimodal.contains("tokenizer: Arc<NativePromptTokenizer>")
+            && model_clip_text_encoder_multimodal
+                .contains("decoder: Arc<NativeDecoderTextEncoder>")
+            && model_clip_text_encoder_multimodal.contains("vision: NativeGemmaVisionResource")
+            && model_clip_text_encoder_multimodal
+                .contains("audio: Option<Arc<NativeGemma4AudioEncoder>>")
+            && model_native_node_payload.contains("GemmaMultimodalClip")
+            && model_native_node_payload.contains("gemma_multimodal_resource");
+    let task397_gemma_resource_closes_family_identity_residency_and_storage =
+        model_clip_text_encoder_multimodal.contains("GemmaMultimodalFamily")
+            && model_clip_text_encoder_multimodal.contains("pub const fn supports_audio")
+            && model_clip_text_encoder_multimodal
+                .contains("sim.comfy.gemma-multimodal-resource.v1")
+            && model_clip_text_encoder_multimodal
+                .contains("Gemma4 aliased tensor storage has inconsistent residency")
+            && nodes_stored_payload.contains("resource.gemma_multimodal_resource().is_some()")
+            && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+            && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task397_gemma_resource_fixture_proves_family_identity_residency_and_reduced_rejection =
+        model_clip_text_encoder_multimodal_tests.contains(
+            "gemma_multimodal_resource_closes_family_identity_residency_and_payload_admission",
+        ) && model_clip_text_encoder_multimodal_tests
+            .contains("NativeGemmaMultimodal::reduced_gemma4_fixture")
+            && model_clip_text_encoder_multimodal_tests
+                .contains("NativeModelPayload::gemma_multimodal_clip")
+            && model_clip_text_encoder_multimodal_tests.contains("resident_tensor_allocations")
+            && model_clip_text_encoder_multimodal_tests.contains("semantic_state_digest");
+    let task397_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_resource_specialized_gemma")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeGemmaMultimodal")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-gemma-multimodal-resource-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma-multimodal-resource-retains-tokenizer-decoder-vision-and-optional-audio",
+                            "gemma-multimodal-resource-cross-admission-is-closed",
+                            "gemma-multimodal-resource-binds-source-and-component-identities",
+                            "gemma-multimodal-resource-unions-size-consistent-storage-residency",
+                            "gemma-multimodal-resource-is-sealed-clip-payload",
+                            "gemma-multimodal-resource-stored-adapter-preserves-specialization",
+                            "gemma-multimodal-resource-tests-family-identity-residency-and-reduced-rejection",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task397_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_vision_text_transformer_text_media_resource_specialized_gemma,",
+            )
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma-multimodal-resource-foundation")
+                && line.contains("VAL-CLIP-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task388_qwen_generation_has_one_model_domain_adapter =
         production_source_occurrences(&sources, "pub struct QwenMultimodalGenerationRequest<'a> {")
             .len()
@@ -9662,6 +9746,22 @@ fn run_ownership_validation(
             task387_qwen_resource_fixture_proves_admission_identity_and_residency,
         ),
         (
+            "task397_policy_and_catalog_trace_gemma_multimodal_resource",
+            task397_policy_trace && task397_catalog_trace,
+        ),
+        (
+            "task397_gemma_resource_has_one_retained_composite",
+            task397_gemma_resource_has_one_retained_composite,
+        ),
+        (
+            "task397_gemma_resource_closes_family_identity_residency_and_storage",
+            task397_gemma_resource_closes_family_identity_residency_and_storage,
+        ),
+        (
+            "task397_gemma_resource_fixture_proves_family_identity_residency_and_reduced_rejection",
+            task397_gemma_resource_fixture_proves_family_identity_residency_and_reduced_rejection,
+        ),
+        (
             "task388_policy_and_catalog_trace_qwen_multimodal_generation",
             task388_policy_trace && task388_catalog_trace,
         ),
@@ -10331,6 +10431,17 @@ fn val_ownership_task387_qwen_multimodal_resource_001() -> Result<(), Box<dyn st
         "val-ownership-task387-qwen-multimodal-resource-001.json",
         "val_ownership_task387_qwen_multimodal_resource_001",
         Some("task387_"),
+    )
+}
+
+#[test]
+fn val_ownership_task397_gemma_multimodal_resource_001() -> Result<(), Box<dyn std::error::Error>> {
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task397-gemma-multimodal-clip-resource-ownership",
+        "val-ownership-task397-gemma-multimodal-resource-001.json",
+        "val_ownership_task397_gemma_multimodal_resource_001",
+        Some("task397_"),
     )
 }
 

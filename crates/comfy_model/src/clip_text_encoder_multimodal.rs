@@ -6,11 +6,14 @@ use crate::{
     DecoderArchitecture, DecoderLayerKind, DecoderPreparedDeepstack,
     DecoderPreparedGenerationPrompt, DecoderRopePositions, DecoderTextConfiguration,
     DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation,
-    LLAMA_SOURCE_SHA256, NativeClipText, NativeClipVision, NativeDecoderTextEncoder, NativeModule,
-    NativeOpsError, NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
+    Gemma3DecoderProfile, Gemma4DecoderProfile, GemmaTokenizerProfile, LLAMA_SOURCE_SHA256,
+    NativeClipText, NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError,
+    NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
     NativeTextGenerationResult, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
     QWEN35_SOURCE_SHA256, QWEN35_TOKENIZER_ARTIFACT_DIGEST, Qwen2PretokenizerProfile,
-    SD1_CLIP_SOURCE_SHA256, decoder_profile_fact, scaled_dot_product_attention_with_context,
+    SD1_CLIP_SOURCE_SHA256, SPIECE_TOKENIZER_SOURCE_SHA256, decoder_profile_fact,
+    gemma3_decoder_configuration, gemma4_decoder_configuration,
+    scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
     CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor, ResizeCrop,
@@ -79,6 +82,10 @@ pub const GEMMA3_IMAGE_SOFT_TOKENS: usize = 256;
 pub const GEMMA3_MULTIMODAL_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/lt.py";
 pub const GEMMA3_MULTIMODAL_SOURCE_SHA256: &str =
     "9ddf9e68c4afd1cf848f881b7489abb49d37ac8ad6d5d2893eba4f98c9c37ca2";
+pub const GEMMA3_FOUR_B_MULTIMODAL_SOURCE_PATH: &str =
+    "projects/comfy/ComfyUI/comfy/ldm/lumina/model/lumina2.py";
+pub const GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256: &str =
+    "f6af934b3d5014c6df37bb527167d1f94e44b1309079f57d4cb2f9460729da84";
 pub const GEMMA4_MULTIMODAL_SOURCE_PATH: &str =
     "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py";
 pub const GEMMA4_MULTIMODAL_SOURCE_SHA256: &str =
@@ -1694,6 +1701,10 @@ impl NativeGemma3VisionProjector {
 
     pub fn vision(&self) -> &Arc<NativeClipVision> {
         &self.vision
+    }
+
+    pub fn execution_stream(&self) -> StreamId {
+        self.normalization_weight.descriptor().stream()
     }
 
     pub fn semantic_state_digest_sha256(&self) -> &str {
@@ -4218,6 +4229,30 @@ pub struct NativeQwenMultimodal {
     vision: Arc<NativeQwenVisionEncoder>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GemmaMultimodalFamily {
+    Gemma3FourBVision,
+    Gemma3TwelveB,
+    Gemma4E2B,
+    Gemma4E4B,
+    Gemma4ThirtyOneB,
+}
+
+#[derive(Clone)]
+enum NativeGemmaVisionResource {
+    Gemma3(Arc<NativeGemma3VisionProjector>),
+    Gemma4(Arc<NativeGemma4VisionEncoder>),
+}
+
+#[derive(Clone)]
+pub struct NativeGemmaMultimodal {
+    family: GemmaMultimodalFamily,
+    tokenizer: Arc<NativePromptTokenizer>,
+    decoder: Arc<NativeDecoderTextEncoder>,
+    vision: NativeGemmaVisionResource,
+    audio: Option<Arc<NativeGemma4AudioEncoder>>,
+}
+
 pub fn qwen_multimodal_tokenizer_profile(family: QwenVisionFamily) -> Qwen2PretokenizerProfile {
     match family {
         QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B => {
@@ -4704,6 +4739,539 @@ impl NativeQwenMultimodal {
         Ok(self
             .decoder
             .finish_prepared_generation(&self.tokenizer, outcome, context)?)
+    }
+}
+
+impl GemmaMultimodalFamily {
+    pub const fn tokenizer_profile(self) -> GemmaTokenizerProfile {
+        match self {
+            Self::Gemma3FourBVision | Self::Gemma3TwelveB => {
+                GemmaTokenizerProfile::Gemma3SentencePiece
+            }
+            Self::Gemma4E2B | Self::Gemma4E4B | Self::Gemma4ThirtyOneB => {
+                GemmaTokenizerProfile::Gemma4TokenizerJson
+            }
+        }
+    }
+
+    pub fn decoder_configuration(self) -> DecoderTextConfiguration {
+        match self {
+            Self::Gemma3FourBVision => {
+                gemma3_decoder_configuration(Gemma3DecoderProfile::FourBVision)
+            }
+            Self::Gemma3TwelveB => gemma3_decoder_configuration(Gemma3DecoderProfile::TwelveB),
+            Self::Gemma4E2B => gemma4_decoder_configuration(Gemma4DecoderProfile::E2B),
+            Self::Gemma4E4B => gemma4_decoder_configuration(Gemma4DecoderProfile::E4B),
+            Self::Gemma4ThirtyOneB => {
+                gemma4_decoder_configuration(Gemma4DecoderProfile::ThirtyOneB)
+            }
+        }
+    }
+
+    pub const fn supports_audio(self) -> bool {
+        matches!(self, Self::Gemma4E2B | Self::Gemma4E4B)
+    }
+
+    pub const fn source_sha256(self) -> &'static str {
+        match self {
+            Self::Gemma3FourBVision => GEMMA3_FOUR_B_MULTIMODAL_SOURCE_SHA256,
+            Self::Gemma3TwelveB => GEMMA3_MULTIMODAL_SOURCE_SHA256,
+            Self::Gemma4E2B | Self::Gemma4E4B | Self::Gemma4ThirtyOneB => {
+                GEMMA4_MULTIMODAL_SOURCE_SHA256
+            }
+        }
+    }
+}
+
+impl NativeGemmaMultimodal {
+    pub fn gemma3(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeGemma3VisionProjector>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        let family = match vision.configuration().source_profile {
+            Some(Gemma3VisionProfile::FourBVision) => GemmaMultimodalFamily::Gemma3FourBVision,
+            Some(Gemma3VisionProfile::TwelveB) => GemmaMultimodalFamily::Gemma3TwelveB,
+            None => {
+                return Err(MultimodalTextError::InvalidInput(
+                    "production Gemma3 resources require a closed source vision profile",
+                ));
+            }
+        };
+        Self::checked(
+            family,
+            tokenizer,
+            decoder,
+            NativeGemmaVisionResource::Gemma3(vision),
+            None,
+            true,
+            cancellation,
+        )
+    }
+
+    pub fn gemma4(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeGemma4VisionEncoder>,
+        audio: Option<Arc<NativeGemma4AudioEncoder>>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        if !vision.configuration().source_exact_profile {
+            return Err(MultimodalTextError::InvalidInput(
+                "production Gemma4 resources require a closed source vision profile",
+            ));
+        }
+        let family = match vision.configuration().profile {
+            Gemma4VisionProfile::E2B => GemmaMultimodalFamily::Gemma4E2B,
+            Gemma4VisionProfile::E4B => GemmaMultimodalFamily::Gemma4E4B,
+            Gemma4VisionProfile::ThirtyOneB => GemmaMultimodalFamily::Gemma4ThirtyOneB,
+        };
+        Self::checked(
+            family,
+            tokenizer,
+            decoder,
+            NativeGemmaVisionResource::Gemma4(vision),
+            audio,
+            true,
+            cancellation,
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn reduced_gemma3_fixture(
+        family: GemmaMultimodalFamily,
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeGemma3VisionProjector>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        if !matches!(
+            family,
+            GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB
+        ) || vision.configuration().source_profile.is_some()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "reduced Gemma3 fixtures require a reduced Gemma3 vision profile",
+            ));
+        }
+        Self::checked(
+            family,
+            tokenizer,
+            decoder,
+            NativeGemmaVisionResource::Gemma3(vision),
+            None,
+            false,
+            cancellation,
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn reduced_gemma4_fixture(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeGemma4VisionEncoder>,
+        audio: Option<Arc<NativeGemma4AudioEncoder>>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        if vision.configuration().source_exact_profile
+            || audio
+                .as_ref()
+                .is_some_and(|owner| owner.configuration().source_exact_profile)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "reduced Gemma4 fixtures require reduced vision and audio profiles",
+            ));
+        }
+        let family = match vision.configuration().profile {
+            Gemma4VisionProfile::E2B => GemmaMultimodalFamily::Gemma4E2B,
+            Gemma4VisionProfile::E4B => GemmaMultimodalFamily::Gemma4E4B,
+            Gemma4VisionProfile::ThirtyOneB => GemmaMultimodalFamily::Gemma4ThirtyOneB,
+        };
+        Self::checked(
+            family,
+            tokenizer,
+            decoder,
+            NativeGemmaVisionResource::Gemma4(vision),
+            audio,
+            false,
+            cancellation,
+        )
+    }
+
+    fn checked(
+        family: GemmaMultimodalFamily,
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: NativeGemmaVisionResource,
+        audio: Option<Arc<NativeGemma4AudioEncoder>>,
+        source_exact: bool,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        let resource = Self {
+            family,
+            tokenizer,
+            decoder,
+            vision,
+            audio,
+        };
+        resource.validate(cancellation)?;
+        if resource.is_source_exact_profile() != source_exact {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma retained components mix production and reduced profiles",
+            ));
+        }
+        Ok(resource)
+    }
+
+    pub const fn family(&self) -> GemmaMultimodalFamily {
+        self.family
+    }
+
+    pub fn tokenizer(&self) -> &Arc<NativePromptTokenizer> {
+        &self.tokenizer
+    }
+
+    pub fn decoder(&self) -> &Arc<NativeDecoderTextEncoder> {
+        &self.decoder
+    }
+
+    pub fn gemma3_vision(&self) -> Option<&Arc<NativeGemma3VisionProjector>> {
+        match &self.vision {
+            NativeGemmaVisionResource::Gemma3(vision) => Some(vision),
+            NativeGemmaVisionResource::Gemma4(_) => None,
+        }
+    }
+
+    pub fn gemma4_vision(&self) -> Option<&Arc<NativeGemma4VisionEncoder>> {
+        match &self.vision {
+            NativeGemmaVisionResource::Gemma3(_) => None,
+            NativeGemmaVisionResource::Gemma4(vision) => Some(vision),
+        }
+    }
+
+    pub fn audio(&self) -> Option<&Arc<NativeGemma4AudioEncoder>> {
+        self.audio.as_ref()
+    }
+
+    pub fn is_source_exact_profile(&self) -> bool {
+        let decoder_exact = self.decoder.configuration() == &self.family.decoder_configuration();
+        let vision_exact = match (&self.vision, self.family) {
+            (
+                NativeGemmaVisionResource::Gemma3(vision),
+                GemmaMultimodalFamily::Gemma3FourBVision,
+            ) => {
+                vision.configuration()
+                    == &Gemma3VisionConfiguration::source(Gemma3VisionProfile::FourBVision)
+            }
+            (NativeGemmaVisionResource::Gemma3(vision), GemmaMultimodalFamily::Gemma3TwelveB) => {
+                vision.configuration()
+                    == &Gemma3VisionConfiguration::source(Gemma3VisionProfile::TwelveB)
+            }
+            (NativeGemmaVisionResource::Gemma4(vision), family) => {
+                let expected = match family {
+                    GemmaMultimodalFamily::Gemma4E2B => Some(Gemma4VisionProfile::E2B),
+                    GemmaMultimodalFamily::Gemma4E4B => Some(Gemma4VisionProfile::E4B),
+                    GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+                        Some(Gemma4VisionProfile::ThirtyOneB)
+                    }
+                    GemmaMultimodalFamily::Gemma3FourBVision
+                    | GemmaMultimodalFamily::Gemma3TwelveB => None,
+                };
+                expected.is_some_and(|profile| {
+                    vision.configuration() == &Gemma4VisionConfiguration::source(profile)
+                })
+            }
+            _ => false,
+        };
+        let audio_exact = match (self.family, &self.audio) {
+            (GemmaMultimodalFamily::Gemma4E2B, Some(audio)) => {
+                Gemma4AudioConfiguration::source(Gemma4AudioProfile::E2B)
+                    .is_ok_and(|expected| audio.configuration() == &expected)
+            }
+            (GemmaMultimodalFamily::Gemma4E4B, Some(audio)) => {
+                Gemma4AudioConfiguration::source(Gemma4AudioProfile::E4B)
+                    .is_ok_and(|expected| audio.configuration() == &expected)
+            }
+            (GemmaMultimodalFamily::Gemma4ThirtyOneB, None)
+            | (GemmaMultimodalFamily::Gemma3FourBVision, None)
+            | (GemmaMultimodalFamily::Gemma3TwelveB, None) => true,
+            _ => false,
+        };
+        decoder_exact && vision_exact && audio_exact
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        if self.tokenizer.gemma_profile() != Some(self.family.tokenizer_profile())
+            || self.tokenizer.gemma_artifact_digest().is_none()
+            || self.tokenizer.has_textual_inversion_embeddings()
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma multimodal resources require a canonical checkpoint-bound Gemma tokenizer",
+            ));
+        }
+        let tokenizer = self.tokenizer.configuration();
+        let decoder = self.decoder.configuration();
+        if tokenizer.pad_token != 0
+            || tokenizer.start_token != Some(2)
+            || tokenizer.end_token.is_some()
+            || tokenizer.minimum_length != Some(1)
+            || tokenizer.minimum_padding.is_some()
+            || tokenizer.pad_to_maximum_length
+            || !tokenizer.pad_left
+            || !tokenizer.disable_weights
+            || tokenizer.maximum_word_length != 8
+            || tokenizer.embedding_width != Some(decoder.hidden_size)
+            || tokenizer.maximum_length < decoder.maximum_tokens
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma multimodal tokenizer sequence and embedding configuration changed",
+            ));
+        }
+        let marker = match self.family.tokenizer_profile() {
+            GemmaTokenizerProfile::Gemma3SentencePiece => crate::GEMMA3_IMAGE_TOKEN,
+            GemmaTokenizerProfile::Gemma4TokenizerJson => crate::GEMMA4_IMAGE_TOKEN,
+        };
+        if self
+            .tokenizer
+            .encode_numeric(
+                if self.family.tokenizer_profile() == GemmaTokenizerProfile::Gemma3SentencePiece {
+                    "<image_soft_token>"
+                } else {
+                    "<|image|>"
+                },
+                cancellation,
+            )?
+            .last()
+            != Some(&marker)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma tokenizer marker projection changed",
+            ));
+        }
+        let (vision_hidden, vision_stream) = match (&self.vision, self.family) {
+            (
+                NativeGemmaVisionResource::Gemma3(vision),
+                GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB,
+            ) => {
+                vision.validate(cancellation)?;
+                (
+                    vision.configuration().output_hidden_size,
+                    vision.execution_stream(),
+                )
+            }
+            (
+                NativeGemmaVisionResource::Gemma4(vision),
+                GemmaMultimodalFamily::Gemma4E2B
+                | GemmaMultimodalFamily::Gemma4E4B
+                | GemmaMultimodalFamily::Gemma4ThirtyOneB,
+            ) => {
+                vision.validate(cancellation)?;
+                (
+                    vision.configuration().output_hidden_size,
+                    vision.execution_stream(),
+                )
+            }
+            _ => {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma multimodal family and retained vision owner disagree",
+                ));
+            }
+        };
+        if decoder.hidden_size != vision_hidden
+            || self.decoder.execution_stream() != vision_stream
+            || decoder.architecture != DecoderArchitecture::Gemma
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma decoder and vision execution profiles disagree",
+            ));
+        }
+        match (self.family, &self.audio) {
+            (GemmaMultimodalFamily::Gemma4E2B, Some(audio))
+                if audio.configuration().profile == Gemma4AudioProfile::E2B =>
+            {
+                audio.validate(cancellation)?;
+                if audio.configuration().output_hidden_size != decoder.hidden_size
+                    || audio.execution_stream() != self.decoder.execution_stream()
+                {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Gemma4 audio and decoder execution profiles disagree",
+                    ));
+                }
+            }
+            (GemmaMultimodalFamily::Gemma4E4B, Some(audio))
+                if audio.configuration().profile == Gemma4AudioProfile::E4B =>
+            {
+                audio.validate(cancellation)?;
+                if audio.configuration().output_hidden_size != decoder.hidden_size
+                    || audio.execution_stream() != self.decoder.execution_stream()
+                {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Gemma4 audio and decoder execution profiles disagree",
+                    ));
+                }
+            }
+            (GemmaMultimodalFamily::Gemma4ThirtyOneB, None)
+            | (GemmaMultimodalFamily::Gemma3FourBVision, None)
+            | (GemmaMultimodalFamily::Gemma3TwelveB, None) => {}
+            _ => {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma multimodal audio capability does not match its family",
+                ));
+            }
+        }
+        if self.is_source_exact_profile() {
+            if decoder != &self.family.decoder_configuration() {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma decoder configuration does not match the closed source family",
+                ));
+            }
+        } else if !gemma_reduced_decoder_is_compatible(decoder, self.family) {
+            return Err(MultimodalTextError::InvalidInput(
+                "reduced Gemma decoder is incompatible with its retained family",
+            ));
+        }
+        self.resident_tensor_allocations()?;
+        cancellation.check()?;
+        Ok(())
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        self.validate(cancellation)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"sim.comfy.gemma-multimodal-resource.v1");
+        hasher.update(b"standard-comfy-text-generation-adapter");
+        hasher.update(format!("{:?}", self.family).as_bytes());
+        hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());
+        hasher.update(LLAMA_SOURCE_SHA256.as_bytes());
+        hasher.update(SD1_CLIP_SOURCE_SHA256.as_bytes());
+        hasher.update(self.family.source_sha256().as_bytes());
+        if matches!(
+            self.family,
+            GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB
+        ) {
+            hasher.update(SPIECE_TOKENIZER_SOURCE_SHA256.as_bytes());
+        }
+        hasher.update(
+            self.tokenizer
+                .gemma_artifact_digest()
+                .ok_or(MultimodalTextError::InvalidInput(
+                    "Gemma tokenizer artifact identity is unavailable",
+                ))?
+                .as_bytes(),
+        );
+        hasher.update(self.tokenizer.semantic_digest(cancellation)?.as_bytes());
+        hasher.update(self.decoder.semantic_state_digest(cancellation)?.as_bytes());
+        match &self.vision {
+            NativeGemmaVisionResource::Gemma3(vision) => {
+                hasher.update(vision.semantic_state_digest_sha256().as_bytes())
+            }
+            NativeGemmaVisionResource::Gemma4(vision) => {
+                hasher.update(vision.semantic_state_digest_sha256().as_bytes())
+            }
+        }
+        if let Some(audio) = &self.audio {
+            hasher.update(b"audio");
+            hasher.update(audio.semantic_state_digest_sha256().as_bytes());
+        } else {
+            hasher.update(b"no-audio");
+        }
+        cancellation.check()?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| MultimodalTextError::Overflow("Gemma multimodal owner residency"))
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = Vec::new();
+        for (storage_id, bytes) in self.decoder.resident_tensor_allocations() {
+            insert_gemma4_resident_allocation(&mut allocations, storage_id, bytes)?;
+        }
+        let vision_allocations = match &self.vision {
+            NativeGemmaVisionResource::Gemma3(vision) => vision.resident_tensor_allocations()?,
+            NativeGemmaVisionResource::Gemma4(vision) => vision.resident_tensor_allocations()?,
+        };
+        for (storage_id, bytes) in vision_allocations {
+            insert_gemma4_resident_allocation(&mut allocations, storage_id, bytes)?;
+        }
+        if let Some(audio) = &self.audio {
+            for (storage_id, bytes) in audio.resident_tensor_allocations()? {
+                insert_gemma4_resident_allocation(&mut allocations, storage_id, bytes)?;
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let mut bytes = self.resident_owned_bytes()?;
+        bytes = bytes.checked_add(self.tokenizer.resident_bytes()?).ok_or(
+            MultimodalTextError::Overflow("Gemma multimodal retained owner residency"),
+        )?;
+        bytes = bytes
+            .checked_add(self.decoder.resident_owned_bytes()?)
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma multimodal retained owner residency",
+            ))?;
+        bytes = bytes
+            .checked_add(match &self.vision {
+                NativeGemmaVisionResource::Gemma3(vision) => vision.resident_owned_bytes()?,
+                NativeGemmaVisionResource::Gemma4(vision) => vision.resident_owned_bytes()?,
+            })
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma multimodal vision residency",
+            ))?;
+        if let Some(audio) = &self.audio {
+            bytes = bytes.checked_add(audio.resident_owned_bytes()?).ok_or(
+                MultimodalTextError::Overflow("Gemma multimodal audio residency"),
+            )?;
+        }
+        self.resident_tensor_allocations()?
+            .into_iter()
+            .try_fold(bytes, |total, (_, allocation)| {
+                total
+                    .checked_add(allocation)
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Gemma multimodal tensor residency",
+                    ))
+            })
+    }
+}
+
+fn gemma_reduced_decoder_is_compatible(
+    configuration: &DecoderTextConfiguration,
+    family: GemmaMultimodalFamily,
+) -> bool {
+    if configuration.architecture != DecoderArchitecture::Gemma
+        || configuration.hidden_size == 0
+        || !configuration.query_key_norm
+    {
+        return false;
+    }
+    match family {
+        GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB => {
+            configuration.gemma3.is_some() && configuration.gemma4.is_none()
+        }
+        GemmaMultimodalFamily::Gemma4E2B
+        | GemmaMultimodalFamily::Gemma4E4B
+        | GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+            configuration
+                .gemma4
+                .as_ref()
+                .is_some_and(|gemma4| gemma4.source_profile.is_none())
+                && configuration.gemma3.is_none()
+        }
     }
 }
 

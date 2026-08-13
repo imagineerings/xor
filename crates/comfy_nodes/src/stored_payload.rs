@@ -272,6 +272,7 @@ fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
         NativeModelResourceRole::Clip => {
             resource.decoder_clip_resource().is_some()
                 || resource.qwen_multimodal_resource().is_some()
+                || resource.gemma_multimodal_resource().is_some()
         }
         _ => false,
     }
