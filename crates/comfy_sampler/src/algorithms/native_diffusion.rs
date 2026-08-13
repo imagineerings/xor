@@ -4,7 +4,8 @@ use crate::{
     NoiseError, ObservedSamplingStep, SamplerRegistry, SamplingError, SamplingPlan,
     SamplingProfile, SamplingProfileError, SamplingProfileIdentity, SamplingProgress,
     SamplingSession, SamplingTrace, SchedulerError, SchedulerRegistry, SchedulerRequest,
-    normal_schedule,
+    SIMPLE_SCHEDULER_ID,
+    generated_simple_comfy_model_0211::simple_schedule, normal_schedule,
 };
 use comfy_tensor::{
     BackendCapabilityMatrix, CompatibilityRngTransaction, CpuBackend, DeviceId, ExecutionContext,
@@ -162,6 +163,78 @@ pub enum NativeDiffusionSamplerError {
     Overflow(&'static str),
     #[error("the native diffusion slice supports only Euler, normal, four steps, and denoise 1")]
     UnsupportedSlice,
+}
+
+#[derive(Debug, Error)]
+pub enum LotusSdPoseSamplingError<DenoiserError>
+where
+    DenoiserError: Display,
+{
+    #[error("Lotus SDPose denoiser failed: {0}")]
+    Denoiser(DenoiserError),
+    #[error("Lotus SDPose Euler execution returned no typed denoiser error")]
+    MissingDenoiserError,
+    #[error(transparent)]
+    Sampler(#[from] NativeDiffusionSamplerError),
+}
+
+pub fn sample_lotus_sdpose_one_step_euler<DenoiserError>(
+    backend: &CpuBackend,
+    initial: Tensor,
+    context: &ExecutionContext<'_>,
+    mut denoiser: impl FnMut(&Tensor, f32, usize) -> Result<Tensor, DenoiserError>,
+) -> Result<SamplingTrace, LotusSdPoseSamplingError<DenoiserError>>
+where
+    DenoiserError: Display,
+{
+    context.check().map_err(NativeDiffusionSamplerError::from)?;
+    let profile = DiscreteSamplingProfile::lotus_sdpose()
+        .map_err(NativeDiffusionSamplerError::from)?;
+    let registry = SchedulerRegistry::foundational()
+        .map_err(NativeDiffusionSamplerError::from)?;
+    let request = SchedulerRequest::new(SIMPLE_SCHEDULER_ID, 1, 1.0)
+        .map_err(NativeDiffusionSamplerError::from)?;
+    let sigmas = simple_schedule(backend, context, &registry, &profile, &request)
+        .map_err(NativeDiffusionSamplerError::from)?;
+    let plan = SamplingPlan::new(
+        EULER_SAMPLER_ID,
+        SIMPLE_SCHEDULER_ID,
+        profile.identity().clone(),
+        0,
+        1,
+        1.0,
+        1.0,
+    )
+    .map_err(NativeDiffusionSamplerError::from)?;
+    let mut typed_error = None;
+    let result = sample_euler_canonical(
+        backend,
+        plan,
+        profile.identity(),
+        EULER_SAMPLER_ID,
+        initial,
+        &sigmas,
+        EulerOptions::source_defaults(),
+        None,
+        context,
+        |input, sigma, step| match denoiser(input, sigma, step) {
+            Ok(output) => Ok(output),
+            Err(error) => {
+                typed_error = Some(error);
+                Err("typed Lotus SDPose denoiser failure".to_owned())
+            }
+        },
+        |_, _, _| Ok::<(), String>(()),
+    );
+    match (result, typed_error) {
+        (Ok((trace, None)), None) => Ok(trace),
+        (Ok((_trace, Some(_))), _) => Err(LotusSdPoseSamplingError::Sampler(
+            NativeDiffusionSamplerError::MissingEulerNoiseRequest,
+        )),
+        (Err(_), Some(error)) => Err(LotusSdPoseSamplingError::Denoiser(error)),
+        (Err(error), None) => Err(LotusSdPoseSamplingError::Sampler(error)),
+        (Ok(_), Some(_)) => Err(LotusSdPoseSamplingError::MissingDenoiserError),
+    }
 }
 
 pub fn validate_euler_noise_generation_device(
@@ -776,6 +849,68 @@ mod tests {
 
     fn digest(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
         Ok(format!("{:x}", Sha256::digest(fs::read(path)?)))
+    }
+
+    #[derive(Debug, Error)]
+    #[error("fixture denoiser failed")]
+    struct FixtureDenoiserError;
+
+    #[test]
+    fn lotus_sdpose_sampling_is_direct_denoised_typed_and_rng_free()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let cancellation = CancellationToken::default();
+        let context = execution_context(&backend, &authority, &cancellation)?;
+        let sd15 = DiscreteSamplingProfile::sd15()?;
+        let lotus = DiscreteSamplingProfile::lotus_sdpose()?;
+        assert_ne!(lotus.identity(), sd15.identity());
+        assert_eq!(lotus.prediction(), crate::PredictionInterpretation::Denoised);
+        assert_eq!(lotus.sigmas(), sd15.sigmas());
+        assert_eq!(lotus.model_time_for_sigma(lotus.sigma_max())?, 999.0);
+
+        let initial = tensor_from_f32(&backend, &[1], &[2.0], &context)?;
+        let mut calls = Vec::new();
+        let trace = sample_lotus_sdpose_one_step_euler(
+            &backend,
+            initial,
+            &context,
+            |input, sigma, step| {
+                calls.push((
+                    tensor_to_f32(&backend, input, &context)
+                        .map_err(|_| FixtureDenoiserError)?
+                        .to_vec(),
+                    sigma,
+                    step,
+                ));
+                tensor_from_f32(&backend, &[1], &[7.0], &context)
+                    .map_err(|_| FixtureDenoiserError)
+            },
+        )?;
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, vec![2.0]);
+        assert_eq!(calls[0].1, lotus.sigma_max());
+        assert_eq!(calls[0].2, 0);
+        assert_eq!(trace.sigmas, vec![lotus.sigma_max(), 0.0]);
+        assert_eq!(trace.denoiser_evaluations.len(), 1);
+        assert_eq!(trace.latents.len(), 2);
+        assert_eq!(
+            &*tensor_to_f32(&backend, trace.latents.last().ok_or("missing final latent")?, &context)?,
+            &[7.0]
+        );
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let typed = sample_lotus_sdpose_one_step_euler(
+            &backend,
+            tensor_from_f32(&backend, &[1], &[2.0], &context)?,
+            &context,
+            |_, _, _| Err::<Tensor, _>(FixtureDenoiserError),
+        );
+        assert!(matches!(
+            typed,
+            Err(LotusSdPoseSamplingError::Denoiser(FixtureDenoiserError))
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
     }
 
     fn write_artifact(

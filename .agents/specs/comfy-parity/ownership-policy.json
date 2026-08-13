@@ -22962,10 +22962,13 @@
         "observe_euler_prediction",
         "observe_euler_denoised",
         "advance_euler",
-        "validate_euler_noise_generation_device"
+        "validate_euler_noise_generation_device",
+        "LotusSdPoseSamplingError",
+        "sample_lotus_sdpose_one_step_euler"
       ],
       "allowed_adapters": [
-        "0159 selects the DDIM identity and replacement-noise denoiser ABI; 0179 delegates the immutable Euler identity and options; 0180 owns only ancestral/CONST rescale and noise; 0181 owns CFG++ alpha and unconditional equations while reusing canonical callback and native-noise admission"
+        "0159 selects the DDIM identity and replacement-noise denoiser ABI; 0179 delegates the immutable Euler identity and options; 0180 owns only ancestral/CONST rescale and noise; 0181 owns CFG++ alpha and unconditional equations while reusing canonical callback and native-noise admission",
+        "sample_lotus_sdpose_one_step_euler is the typed no-churn LotusD adapter over the same canonical Euler traversal and owns no second step equation or RNG state"
       ],
       "definitions": [
         {
@@ -23011,6 +23014,13 @@
           "pattern": "^pub fn validate_euler_noise_generation_device"
         },
         {
+          "path": "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+          "qualified": "comfy_sampler::generated_native_diffusion::sample_lotus_sdpose_one_step_euler",
+          "role": "allowed_adapter",
+          "symbol": "sample_lotus_sdpose_one_step_euler",
+          "pattern": "^pub fn sample_lotus_sdpose_one_step_euler"
+        },
+        {
           "path": "crates/comfy_sampler/src/algorithms/ddim_comfy_model_0159.rs",
           "qualified": "comfy_sampler::generated_ddim_comfy_model_0159::sample_ddim",
           "role": "allowed_adapter",
@@ -23039,7 +23049,8 @@
         "observe_euler_prediction",
         "observe_euler_denoised",
         "advance_euler",
-        "validate_euler_noise_generation_device"
+        "validate_euler_noise_generation_device",
+        "sample_lotus_sdpose_one_step_euler"
       ],
       "call_path_prefixes": [
         "crates/comfy_sampler/src/algorithms/"
@@ -23074,6 +23085,11 @@
           "name": "task307-euler-cfgpp-reuses-euler-callback-and-capability-owners",
           "path": "crates/comfy_sampler/src/algorithms/euler_ancestral_cfg_pp_comfy_model_0181.rs",
           "pattern": "fn sample_euler_cfg_pp_family[\\s\\S]*validate_generation_device\\(device\\)[\\s\\S]*observe_euler_denoised[\\s\\S]*fn validate_generation_device[\\s\\S]*validate_euler_noise_generation_device"
+        },
+        {
+          "name": "task405-lotusd-sampling-delegates-canonical-no-churn-euler",
+          "path": "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+          "pattern": "sample_lotus_sdpose_one_step_euler[\\s\\S]*DiscreteSamplingProfile::lotus_sdpose[\\s\\S]*simple_schedule[\\s\\S]*sample_euler_canonical[\\s\\S]*EulerOptions::source_defaults\\(\\)[\\s\\S]*None"
         }
       ],
       "known_open_reasons": [],
@@ -23082,10 +23098,11 @@
         "comfy-parity-native-sampler-euler-comfy-model-0179",
         "comfy-parity-native-sampler-euler-ancestral-comfy-model-0180",
         "comfy-parity-sampler-algorithm-family-ownership-consolidation",
-        "comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181"
+        "comfy-parity-native-sampler-euler-ancestral-cfg-pp-comfy-model-0181",
+        "comfy-parity-native-lotusd-sampling-foundation"
       ],
       "production_consumers": [
-        "native DDIM, deterministic, churn, ancestral, rectified-flow, and CFG++ Euler samplers"
+        "native DDIM, deterministic, churn, ancestral, rectified-flow, CFG++, and LotusD no-churn Euler samplers"
       ],
       "requirements": [
         "Requirement 7",
@@ -23650,6 +23667,11 @@
           "pattern": "DiscreteSamplingProfile::sd15\\(\\)[\\s\\S]*model_time_for_sigma"
         },
         {
+          "name": "task405-lotusd-profile-binds-distinct-denoised-identity-to-canonical-grid",
+          "path": "crates/comfy_sampler/src/sampling_profile.rs",
+          "pattern": "LOTUS_SDPOSE_SAMPLING_PROFILE_ID[\\s\\S]*pub fn lotus_sdpose\\(\\)[\\s\\S]*Self::sd15\\(\\)\\?\\.sigmas[\\s\\S]*PredictionInterpretation::Denoised"
+        },
+        {
           "name": "runtime-ksampler-is-a-focused-domain-adapter",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "checked_native_diffusion_plan[\\s\\S]*NoiseRequest::native_diffusion[\\s\\S]*normal_sigmas[\\s\\S]*normal_noise[\\s\\S]*scale_initial_noise[\\s\\S]*sample_euler[\\s\\S]*scale_model_input"
@@ -23733,12 +23755,14 @@
         "comfy-parity-native-sampler-exp-heun-2-x0-sde-comfy-model-0184",
         "comfy-parity-native-sampler-uni-pc-comfy-model-0201",
         "comfy-parity-native-sampler-uni-pc-bh2-comfy-model-0202",
-        "comfy-parity-sampler-algorithm-family-ownership-consolidation"
+        "comfy-parity-sampler-algorithm-family-ownership-consolidation",
+        "comfy-parity-native-lotusd-sampling-foundation"
       ],
       "production_consumers": [
         "native KSampler runtime node",
         "native model-family denoiser adapters",
-        "generated native sampler and scheduler algorithm rows"
+        "generated native sampler and scheduler algorithm rows",
+        "native LotusD SDPose no-churn composition"
       ],
       "requirements": [
         "Requirement 7",

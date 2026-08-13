@@ -7,6 +7,7 @@ const SD15_TIMESTEPS: usize = 1_000;
 const SD15_LINEAR_START: f64 = 0.00085;
 const SD15_LINEAR_END: f64 = 0.012;
 pub const SD15_SAMPLING_PROFILE_ID: &str = "sd15-discrete-epsilon-v1";
+pub const LOTUS_SDPOSE_SAMPLING_PROFILE_ID: &str = "lotus-sdpose-discrete-denoised-v1";
 
 pub fn exponential_integrator_phi_one(value: f32) -> f32 {
     value.exp_m1()
@@ -217,6 +218,15 @@ impl DiscreteSamplingProfile {
         Self::new(
             SamplingProfileIdentity::sd15(),
             PredictionInterpretation::Epsilon,
+            sigmas,
+        )
+    }
+
+    pub fn lotus_sdpose() -> Result<Self, SamplingProfileError> {
+        let sigmas = Self::sd15()?.sigmas;
+        Self::new(
+            SamplingProfileIdentity::new(LOTUS_SDPOSE_SAMPLING_PROFILE_ID)?,
+            PredictionInterpretation::Denoised,
             sigmas,
         )
     }

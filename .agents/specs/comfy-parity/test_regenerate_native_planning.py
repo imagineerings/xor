@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 557)
+        self.assertEqual(len(tasks), 559)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -414,6 +414,10 @@ class ValidationGenerationTests(unittest.TestCase):
         bounded_dense_spatial_id = (
             "comfy-parity-native-bounded-dense-spatial-inference-foundation"
         )
+        lotusd_sampling_id = "comfy-parity-native-lotusd-sampling-foundation"
+        sdpose_head_projection_id = (
+            "comfy-parity-native-sdpose-head-projection-foundation"
+        )
         video_foundation_id = "comfy-parity-native-video-execution-foundation"
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
@@ -532,6 +536,41 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             "crates/comfy_runtime/src/native_execution_controller.rs",
+            tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertEqual(
+            tasks_by_id[lotusd_sampling_id]["writes"][:2],
+            [
+                "crates/comfy_sampler/src/sampling_profile.rs",
+                "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            ],
+        )
+        self.assertNotIn(
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            tasks_by_id[lotusd_sampling_id]["writes"],
+        )
+        self.assertIn(
+            bounded_dense_spatial_id,
+            tasks_by_id[lotusd_sampling_id]["dependencies"],
+        )
+        self.assertIn(
+            lotusd_sampling_id,
+            tasks_by_id[sdpose_head_projection_id]["dependencies"],
+        )
+        self.assertIn(
+            "crates/comfy_model/src/sdpose.rs",
+            tasks_by_id[sdpose_head_projection_id]["writes"],
+        )
+        self.assertIn(
+            sdpose_head_projection_id,
+            tasks_by_id[sdpose_foundation_id]["dependencies"],
+        )
+        self.assertNotIn(
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            tasks_by_id[sdpose_foundation_id]["writes"],
+        )
+        self.assertNotIn(
+            "crates/comfy_model/src/sdpose.rs",
             tasks_by_id[sdpose_foundation_id]["writes"],
         )
         self.assertIn(
@@ -739,7 +778,7 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         self.assertIn(
-            bounded_dense_spatial_id,
+            sdpose_head_projection_id,
             tasks_by_id[sdpose_foundation_id]["dependencies"],
         )
         self.assertIn(
@@ -874,7 +913,13 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[bounded_dense_spatial_id], waves[sdpose_resource_id] + 1
         )
         self.assertEqual(
-            waves[sdpose_foundation_id], waves[bounded_dense_spatial_id] + 1
+            waves[lotusd_sampling_id], waves[bounded_dense_spatial_id] + 1
+        )
+        self.assertEqual(
+            waves[sdpose_head_projection_id], waves[lotusd_sampling_id] + 1
+        )
+        self.assertEqual(
+            waves[sdpose_foundation_id], waves[sdpose_head_projection_id] + 1
         )
         self.assertEqual(
             waves[video_foundation_id], waves[hook_consumers_id] + 1

@@ -13454,3 +13454,77 @@ fn val_ownership_task404_bounded_dense_spatial_inference_001()
     );
     Ok(())
 }
+
+#[test]
+fn val_ownership_task405_lotusd_sampling_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let profile = fs::read_to_string(root.join("crates/comfy_sampler/src/sampling_profile.rs"))?;
+    for required in [
+        "LOTUS_SDPOSE_SAMPLING_PROFILE_ID",
+        "pub fn lotus_sdpose()",
+        "PredictionInterpretation::Denoised",
+    ] {
+        assert!(
+            profile.contains(required),
+            "LotusD profile lacks {required}"
+        );
+    }
+    let sampler =
+        fs::read_to_string(root.join("crates/comfy_sampler/src/algorithms/native_diffusion.rs"))?;
+    for required in [
+        "pub enum LotusSdPoseSamplingError",
+        "pub fn sample_lotus_sdpose_one_step_euler",
+        "simple_schedule(",
+        "EulerOptions::source_defaults()",
+        "sample_euler_canonical(",
+    ] {
+        assert!(
+            sampler.contains(required),
+            "LotusD sampler lacks {required}"
+        );
+    }
+    let lotus_adapter = sampler
+        .split_once("pub fn sample_lotus_sdpose_one_step_euler")
+        .and_then(|(_, implementation)| {
+            implementation.split_once("pub fn validate_euler_noise_generation_device")
+        })
+        .map(|(implementation, _)| implementation)
+        .ok_or("LotusD sampling adapter boundary is missing")?;
+    for forbidden in [
+        "CompatibilityNoiseRequest",
+        "RngStream",
+        "RngCheckpoint",
+        "open_transaction(",
+        "NativeDiffusionPayload",
+    ] {
+        assert!(
+            !lotus_adapter.contains(forbidden),
+            "LotusD sampling adapter owns forbidden state: {forbidden}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task = "comfy-parity-native-lotusd-sampling-foundation";
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    assert!(
+        concerns
+            .iter()
+            .filter(|concern| {
+                concern
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks
+                            .iter()
+                            .any(|candidate| candidate.as_str() == Some(task))
+                    })
+            })
+            .count()
+            >= 2
+    );
+    Ok(())
+}

@@ -9274,6 +9274,92 @@ def native_bounded_dense_spatial_inference_foundation_task(
     )
 
 
+def native_lotusd_sampling_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-lotusd-sampling-foundation",
+        "Implement deterministic LotusD sampling",
+        [34, 35, 36, 37],
+        [25, 31, 34],
+        [
+            "VAL-SAMPLER-001",
+            "VAL-SCHEDULER-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical sampling-profile and Euler owners expose one distinct LotusD IMG_TO_IMG/X0 profile over the established one-thousand-step linear sigma grid and one typed-error-preserving no-churn Euler invocation. The invocation uses the canonical simple one-step schedule, treats model output as denoised state, opens no RNG transaction, and retains no model, image, capture, or output state.",
+        [
+            "projects/comfy/ComfyUI/comfy/model_base.py",
+            "projects/comfy/ComfyUI/comfy/model_sampling.py",
+            "projects/comfy/ComfyUI/comfy/sample.py",
+            "projects/comfy/ComfyUI/comfy/samplers.py",
+            "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            "crates/comfy_sampler/src/schedulers/simple_comfy_model_0211.rs",
+            "crates/comfy_sampler/tests/sampling_foundation.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/catalogs/native-compute-closure.json",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused fixtures prove a LotusD semantic identity distinct from SD15 despite the identical canonical numeric sigma grid, Denoised prediction interpretation, raw model input, one simple schedule transition from sigma index 999 to zero, and exactly one denoiser call whose output is the terminal latent. Arbitrary typed denoiser cancellation or allocation failures survive without String erasure; no CompatibilityNoiseRequest, RNG stream, draw, checkpoint, model resource, or runtime payload is created; and all existing SD15 sampling results remain unchanged.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.5", "35.6", "36.3", "37.2", "37.5", "37.6"],
+        registered_source_edits=["comfy_sampler"],
+        validation_packages=["comfy_test_support"],
+    )
+
+
+def native_sdpose_head_projection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sdpose-head-projection-foundation",
+        "Execute the retained SDPose head and conditioning projection",
+        [34, 35, 36, 37, 41],
+        [25, 31, 34, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-TENSOR-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained SDPose model owner executes its exact seven-stage heatmap head through the bounded immutable dense-spatial operators, prepares the source-exact attempt-local Lotus cross-attention and ADM tensors, and decodes heatmaps plane-by-plane through the canonical DARK and OpenPose projection without creating another model, head, allocator, or retained invocation state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lotus.py",
+            "projects/comfy/ComfyUI/comfy/ldm/modules/sdpose.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sdpose.py",
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/tests/sdpose.rs",
+            "crates/comfy_test_support/fixtures/sdpose/projection/oracle-provenance.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_model/src/sdpose.rs",
+            "crates/comfy_model/tests/sdpose.rs",
+            "crates/comfy_test_support/fixtures/sdpose/head_projection",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "F16, BF16, and F32 reduced exact-weight fixtures prove ConvTranspose2d, parameterless InstanceNorm2d, SiLU, Conv2d, InstanceNorm2d, SiLU, and final Conv2d ordering with fresh output storage and unchanged retained identity. Source-fingerprinted fixtures prove exact broadcast Lotus conditioning and ADM values plus plane-streaming DARK/OpenPose equivalence. Wrong shape, dtype, stream, cancellation, workspace, and result-capacity failures return no heatmap or pose and release all attempt-local state; scans reject a second head/model owner and whole-heatmap f32 materialization.",
+        [dependency],
+        locked=True,
+        criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "37.5", "41.3"],
+        registered_source_edits=["comfy_model"],
+        validation_packages=["comfy_test_support"],
+    )
+
+
 def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-sdpose-execution-foundation",
@@ -9296,20 +9382,17 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
             "projects/comfy/ComfyUI/comfy/samplers.py",
             "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
             "projects/comfy/ComfyUI/comfy/utils.py",
-            "crates/comfy_model/src/sdpose.rs",
-            "crates/comfy_model/src/native_ops.rs",
-            "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_model/src/vae.rs",
-            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_model/src/vae_image.rs",
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/algorithms/native_diffusion.rs",
+            "crates/comfy_sampler/src/schedulers/simple_comfy_model_0211.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
-            "crates/comfy_model/src/sdpose.rs",
-            "crates/comfy_model/tests/sdpose.rs",
-            "crates/comfy_sampler/src/native_diffusion_payload.rs",
-            "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
@@ -9321,7 +9404,7 @@ def native_sdpose_execution_foundation_task(dependency: str) -> dict[str, object
         "Source-derived fixtures prove exact 768-by-1024 stretch resize mode, VAE encode, immutable 1-by-2-by-1024 Lotus conditioning, zero-noise one-step simple-schedule Euler execution with no RNG draw, whole-image batching, bounding-box normalization and remap, typed cancellation and workspace exhaustion at every bounded phase, final-only pose publication, deterministic retry, and no second model, VAE, sampler, RNG, cache, persistence, or publication owner.",
         [dependency],
         locked=True,
-        criterion_ids=["18.1", "26.2", "28.2", "31.5", "37.5", "41.2", "44.1", "44.3"],
+        criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "37.2", "37.5", "37.6", "38.4", "41.3", "41.5", "44.3"],
     )
 
 
@@ -11491,8 +11574,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(sdpose_model_resource_foundation["id"])
         )
     )
-    sdpose_foundation = native_sdpose_execution_foundation_task(
+    lotusd_sampling_foundation = native_lotusd_sampling_foundation_task(
         str(bounded_dense_spatial_inference_foundation["id"])
+    )
+    sdpose_head_projection_foundation = native_sdpose_head_projection_foundation_task(
+        str(lotusd_sampling_foundation["id"])
+    )
+    sdpose_foundation = native_sdpose_execution_foundation_task(
+        str(sdpose_head_projection_foundation["id"])
     )
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
@@ -11588,6 +11677,8 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             sdpose_sd2_capture_foundation,
             sdpose_model_resource_foundation,
             bounded_dense_spatial_inference_foundation,
+            lotusd_sampling_foundation,
+            sdpose_head_projection_foundation,
             sdpose_foundation,
             video_foundation,
             detection_foundation,
