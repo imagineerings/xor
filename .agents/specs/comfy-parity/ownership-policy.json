@@ -12835,6 +12835,103 @@
       "decision_reason": "NativeGemmaMultimodal is the sole retained Gemma vision-text CLIP resource. It closes the five-family tokenizer, decoder, vision, and optional-audio admission matrix, binds pinned source and artifact identities, and exposes exact owned and size-checked StorageId-deduplicated residency through NativeModelPayload. It owns no execution transaction, prepared state, KV, RNG, cache, persistence, workflow, handle-store lifecycle, or output publication."
     },
     {
+      "concern": "native_vision_text_transformer_text_media_resource_specialized_gemma_generation",
+      "canonical_owner": "comfy_model::clip_text_encoder_multimodal::NativeGemmaMultimodal::generate",
+      "owner_files": [
+        "crates/comfy_model/src/clip_text_encoder_multimodal.rs"
+      ],
+      "owner_symbols": [
+        "NativeGemmaMultimodal::generate",
+        "GemmaMultimodalGenerationRequest",
+        "format_gemma_multimodal_prompt"
+      ],
+      "allowed_adapters": [
+        "Canonical Gemma image, video, and audio preparation owners supply private-field family-tagged attempt-local values and exact source media ordering",
+        "NativeGemma3VisionProjector, NativeGemma4VisionEncoder, and NativeGemma4AudioEncoder remain the sole projection graph owners",
+        "NativeDecoderTextEncoder remains the sole prepared prefill, per-layer input-ID, KV, sampling, stopping, bounded final-token logit projection, and borrowed RNG transaction owner",
+        "NativePromptTokenizer remains the sole Gemma encode and family-specific generated-text cleanup owner",
+        "The later native text-generation controller remains the sole raw media handle resolution, RNG opening, cache, restart, and scalar publication owner",
+        "No formatted prompt, prepared media, projected embedding, expanded ID, KV, RNG, cache, persistence, workflow, or output state is retained by the Gemma resource"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "^pub struct GemmaMultimodalGenerationRequest<'a> \\{",
+          "qualified": "comfy_model::clip_text_encoder_multimodal::GemmaMultimodalGenerationRequest",
+          "role": "adapter",
+          "symbol": "GemmaMultimodalGenerationRequest"
+        }
+      ],
+      "call_symbols": [
+        "NativeGemmaMultimodal::generate",
+        "format_gemma_multimodal_prompt",
+        "NativeDecoderTextEncoder::generation_configuration",
+        "NativeDecoderTextEncoder::embed_token_values",
+        "NativeDecoderTextEncoder::generate_prepared",
+        "NativePromptTokenizer::decode_generated"
+      ],
+      "required_mappings": [
+        {
+          "name": "gemma-generation-formats-and-validates-capabilities-before-projection",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "pub fn generate[\\s\\S]*self.validate[\\s\\S]*format_gemma_multimodal_prompt[\\s\\S]*encode_numeric[\\s\\S]*vision.project[\\s\\S]*audio.project"
+        },
+        {
+          "name": "gemma-generation-replaces-every-media-marker-with-real-projections",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "plan_gemma_markers[\\s\\S]*MultimodalImageEmbedding[\\s\\S]*join_multimodal_embeddings"
+        },
+        {
+          "name": "gemma-generation-projects-source-history-and-initial-input-id-routes",
+          "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+          "pattern": "let sampling_history = if gemma4[\\s\\S]*expanded_tokens.as_slice[\\s\\S]*initial_input_ids = gemma4.then_some[\\s\\S]*DecoderPreparedGenerationPrompt[\\s\\S]*deepstack: None"
+        },
+        {
+          "name": "gemma-generation-delegates-bounded-final-token-logits-and-family-cleanup",
+          "path": "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+          "pattern": "project_last_token_only[\\s\\S]*narrow_method_exact_native[\\s\\S]*output_head.forward_with_context"
+        },
+        {
+          "name": "gemma-generation-tests-template-media-rng-and-workspace-atomicity",
+          "path": "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+          "pattern": "gemma_multimodal_generation_formats_replaces_and_delegates_transactionally[\\s\\S]*GemmaMultimodalGenerationRequest[\\s\\S]*generated_tokens.len\\(\\), 1[\\s\\S]*transaction.checkpoint[\\s\\S]*scratch.in_use_bytes"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-gemma-multimodal-generation-foundation"
+      ],
+      "production_consumers": [
+        "native multimodal text-generation controller"
+      ],
+      "requirements": [
+        "Requirement 7",
+        "Requirement 18",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D26",
+        "D28",
+        "D31",
+        "D32",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MODEL-FAMILY-001",
+        "VAL-RNG-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeGemmaMultimodal::generate is the sole model-domain Gemma media-generation adapter. It owns exact family templates and marker planning, composes canonical prepared media and retained projection owners, supplies Gemma3 empty history versus Gemma4 expanded zero-filled history and per-layer input IDs, delegates once to the canonical prepared decoder with a borrowed transaction, and delegates final cleanup to the canonical tokenizer. Runtime handles, RNG opening, cache, restart, persistence, and scalar publication remain outside this owner."
+    },
+    {
       "concern": "native_vision_text_transformer_unidirectional_decoder_execution",
       "canonical_owner": "comfy_model::clip_text_encoder_decoder::NativeDecoderTextEncoder",
       "owner_files": [

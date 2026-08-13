@@ -37,7 +37,7 @@ use comfy_tensor::{
     generated_spectral_transform_01::{SpectralTransformError, fftn_with_context_exact_native},
 };
 use sha2::{Digest, Sha256};
-use std::{mem, sync::Arc};
+use std::{fmt::Write as _, mem, sync::Arc};
 use thiserror::Error;
 
 pub const IDEOGRAM4_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/ideogram4.py";
@@ -1323,6 +1323,15 @@ pub struct Qwen3VlMarkerPlan {
 pub struct QwenMultimodalGenerationRequest<'a> {
     pub text: NativeTextGenerationRequest<'a>,
     pub prepared_images: &'a [Qwen3VlPreparedImage],
+    pub transaction: &'a RngTransaction,
+}
+
+pub struct GemmaMultimodalGenerationRequest<'a> {
+    pub text: NativeTextGenerationRequest<'a>,
+    pub prepared_visuals: &'a [GemmaPreparedVisual],
+    pub prepared_audio: Option<&'a GemmaPreparedAudio>,
+    pub use_default_template: bool,
+    pub thinking: bool,
     pub transaction: &'a RngTransaction,
 }
 
@@ -4674,7 +4683,7 @@ impl NativeQwenMultimodal {
         let embeddings =
             join_multimodal_embeddings(backend, &text_embeddings, &image_embeddings, context)?;
         let sequence_length = marker_plan.expanded_tokens().len();
-        let causal_positions = qwen_causal_positions(sequence_length)?;
+        let causal_positions = decoder_causal_positions(sequence_length)?;
         let multidimensional_positions = if matches!(
             self.family(),
             QwenVisionFamily::Qwen3Vl4B | QwenVisionFamily::Qwen3Vl8B
@@ -5247,6 +5256,546 @@ impl NativeGemmaMultimodal {
                     ))
             })
     }
+
+    pub fn generate(
+        &self,
+        backend: &CpuBackend,
+        request: GemmaMultimodalGenerationRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeTextGenerationResult, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let configuration = self.decoder.generation_configuration(&request.text)?;
+        let formatted_prompt = format_gemma_multimodal_prompt(
+            self.family,
+            request.text.formatted_prompt,
+            request.prepared_visuals,
+            request.prepared_audio,
+            request.use_default_template,
+            request.thinking,
+            context.cancellation,
+        )?;
+        let prompt_tokens = self
+            .tokenizer
+            .encode_numeric(&formatted_prompt, context.cancellation)?
+            .into_iter()
+            .map(i64::from)
+            .collect::<Vec<_>>();
+
+        let mut media = Vec::new();
+        media
+            .try_reserve_exact(
+                request
+                    .prepared_visuals
+                    .len()
+                    .checked_add(usize::from(request.prepared_audio.is_some()))
+                    .ok_or(MultimodalTextError::Overflow("Gemma projected media"))?,
+            )
+            .map_err(|_| MultimodalTextError::Overflow("Gemma projected media"))?;
+        match self.family {
+            GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB => {
+                let vision = self
+                    .gemma3_vision()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma3 generation requires the retained Gemma3 vision owner",
+                    ))?;
+                for prepared in request.prepared_visuals {
+                    context.check()?;
+                    let projection = vision.project(backend, prepared, context)?;
+                    let (embedding, tokens) =
+                        flatten_gemma3_projection(backend, projection, context)?;
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(crate::GEMMA3_IMAGE_TOKEN),
+                        source_markers: 1,
+                        tokens,
+                        embedding,
+                    });
+                }
+            }
+            GemmaMultimodalFamily::Gemma4E2B
+            | GemmaMultimodalFamily::Gemma4E4B
+            | GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+                let vision = self
+                    .gemma4_vision()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma4 generation requires the retained Gemma4 vision owner",
+                    ))?;
+                for prepared in request.prepared_visuals {
+                    context.check()?;
+                    let projection = vision.project(backend, prepared, context)?;
+                    let marker = match projection.kind {
+                        GemmaPreparedVisualKind::Gemma4Image => crate::GEMMA4_IMAGE_TOKEN,
+                        GemmaPreparedVisualKind::Gemma4VideoFrame => crate::GEMMA4_VIDEO_TOKEN,
+                        GemmaPreparedVisualKind::Gemma3Image => {
+                            return Err(MultimodalTextError::InvalidInput(
+                                "Gemma4 generation cannot consume Gemma3 visual projection",
+                            ));
+                        }
+                    };
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(marker),
+                        source_markers: 1,
+                        tokens: projection.tokens,
+                        embedding: projection.embedding,
+                    });
+                }
+                if let Some(prepared_audio) = request.prepared_audio {
+                    let audio = self
+                        .audio
+                        .as_ref()
+                        .ok_or(MultimodalTextError::InvalidInput(
+                            "Gemma family does not admit audio generation",
+                        ))?;
+                    let projection = audio.project(backend, prepared_audio, context)?;
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(crate::GEMMA4_AUDIO_TOKEN),
+                        source_markers: prepared_audio.marker_tokens(),
+                        tokens: projection.tokens,
+                        embedding: projection.embedding,
+                    });
+                }
+            }
+        }
+
+        let marker_plan =
+            plan_gemma_markers(&prompt_tokens, &media, self.family, context.cancellation)?;
+        if marker_plan
+            .expanded_tokens
+            .len()
+            .checked_add(configuration.maximum_new_tokens)
+            .ok_or(MultimodalTextError::Overflow(
+                "Gemma prompt and generation length",
+            ))?
+            > self.decoder.configuration().maximum_tokens
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma prompt and generation exceed the decoder token limit",
+            ));
+        }
+        let text_embeddings =
+            self.decoder
+                .embed_token_values(backend, &marker_plan.expanded_tokens, context)?;
+        let mut projected_embeddings = Vec::new();
+        projected_embeddings
+            .try_reserve_exact(marker_plan.entries.len())
+            .map_err(|_| MultimodalTextError::Overflow("Gemma joined media"))?;
+        for entry in &marker_plan.entries {
+            let projected =
+                media
+                    .get(entry.media_index)
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma marker projection is unavailable",
+                    ))?;
+            projected_embeddings.push(MultimodalImageEmbedding {
+                span: entry.span,
+                embedding: &projected.embedding,
+                deepstack: &[],
+            });
+        }
+        let embeddings =
+            join_multimodal_embeddings(backend, &text_embeddings, &projected_embeddings, context)?;
+        let causal_positions = decoder_causal_positions(marker_plan.expanded_tokens.len())?;
+        let gemma4 = matches!(
+            self.family,
+            GemmaMultimodalFamily::Gemma4E2B
+                | GemmaMultimodalFamily::Gemma4E4B
+                | GemmaMultimodalFamily::Gemma4ThirtyOneB
+        );
+        let sampling_history = if gemma4 {
+            marker_plan.expanded_tokens.as_slice()
+        } else {
+            &[]
+        };
+        let initial_input_ids = gemma4.then_some(marker_plan.expanded_tokens.as_slice());
+        let outcome = self.decoder.generate_prepared(
+            backend,
+            DecoderPreparedGenerationPrompt {
+                embeddings: &embeddings,
+                sampling_history,
+                attention_mask: None,
+                rope_positions: DecoderRopePositions::Scalar(&causal_positions),
+                causal_positions: &causal_positions,
+                deepstack: None,
+                initial_input_ids,
+            },
+            &configuration,
+            request.transaction,
+            context,
+        )?;
+        let mut generated_tokens = Vec::new();
+        generated_tokens
+            .try_reserve_exact(outcome.generated_tokens.len())
+            .map_err(|_| MultimodalTextError::Overflow("Gemma generated tokens"))?;
+        for token in outcome.generated_tokens {
+            generated_tokens.push(u32::try_from(token).map_err(|_| {
+                MultimodalTextError::InvalidInput("Gemma generated token is out of range")
+            })?);
+        }
+        let text = self
+            .tokenizer
+            .decode_generated(&generated_tokens, context.cancellation)?;
+        context.check()?;
+        Ok(NativeTextGenerationResult {
+            text,
+            generated_tokens,
+            transaction: outcome.transaction,
+        })
+    }
+}
+
+struct GemmaProjectedMedia {
+    marker: i64,
+    source_markers: usize,
+    tokens: usize,
+    embedding: Tensor,
+}
+
+struct GemmaMarkerEntry {
+    span: MultimodalSpan,
+    media_index: usize,
+}
+
+struct GemmaMarkerPlan {
+    expanded_tokens: Vec<i64>,
+    entries: Vec<GemmaMarkerEntry>,
+}
+
+pub fn format_gemma_multimodal_prompt(
+    family: GemmaMultimodalFamily,
+    prompt: &str,
+    visuals: &[GemmaPreparedVisual],
+    audio: Option<&GemmaPreparedAudio>,
+    use_default_template: bool,
+    thinking: bool,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<String, MultimodalTextError> {
+    cancellation.check()?;
+    match family {
+        GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB => {
+            if visuals.len() > 1
+                || visuals
+                    .iter()
+                    .any(|visual| visual.kind() != GemmaPreparedVisualKind::Gemma3Image)
+                || audio.is_some()
+            {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma3 generation admits one image and no video or audio",
+                ));
+            }
+            if !use_default_template || prompt.starts_with("<start_of_turn>") {
+                return Ok(prompt.to_owned());
+            }
+            let template_prefix = if visuals.is_empty() {
+                "<start_of_turn>system\nYou are a helpful assistant.<end_of_turn>\n<start_of_turn>user\n"
+            } else {
+                "<start_of_turn>system\nYou are a helpful assistant.<end_of_turn>\n<start_of_turn>user\n\n<image_soft_token>"
+            };
+            let template_suffix = if visuals.is_empty() {
+                "<end_of_turn>\n<start_of_turn>model\n"
+            } else {
+                "<end_of_turn>\n\n<start_of_turn>model\n"
+            };
+            let capacity = template_prefix
+                .len()
+                .checked_add(prompt.len())
+                .and_then(|value| value.checked_add(template_suffix.len()))
+                .ok_or(MultimodalTextError::Overflow("Gemma3 prompt template"))?;
+            let mut formatted = String::new();
+            formatted
+                .try_reserve_exact(capacity)
+                .map_err(|_| MultimodalTextError::Overflow("Gemma3 prompt template"))?;
+            formatted.push_str(template_prefix);
+            formatted.push_str(prompt);
+            formatted.push_str(template_suffix);
+            cancellation.check()?;
+            Ok(formatted)
+        }
+        GemmaMultimodalFamily::Gemma4E2B
+        | GemmaMultimodalFamily::Gemma4E4B
+        | GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+            let mut visual_kind = None;
+            for visual in visuals {
+                cancellation.check()?;
+                if !matches!(
+                    visual.kind(),
+                    GemmaPreparedVisualKind::Gemma4Image
+                        | GemmaPreparedVisualKind::Gemma4VideoFrame
+                ) {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Gemma4 generation requires canonical Gemma4 visual preparation",
+                    ));
+                }
+                if visual_kind.is_some_and(|kind| kind != visual.kind()) {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Gemma4 generation cannot mix prepared image and video frames",
+                    ));
+                }
+                visual_kind = Some(visual.kind());
+                match visual.kind() {
+                    GemmaPreparedVisualKind::Gemma4Image
+                        if visual.timestamp_seconds().is_some() =>
+                    {
+                        return Err(MultimodalTextError::InvalidInput(
+                            "Gemma4 prepared images cannot carry video timestamps",
+                        ));
+                    }
+                    GemmaPreparedVisualKind::Gemma4VideoFrame
+                        if visual.timestamp_seconds().is_none() =>
+                    {
+                        return Err(MultimodalTextError::InvalidInput(
+                            "Gemma4 prepared video frames require timestamps",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+            if matches!(family, GemmaMultimodalFamily::Gemma4ThirtyOneB) && audio.is_some() {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma4 31B does not admit audio generation",
+                ));
+            }
+            if audio.is_some_and(|prepared| prepared.marker_tokens() == 0) {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma4 audio preparation requires at least one marker token",
+                ));
+            }
+            if !use_default_template || prompt.starts_with("<|turn>") {
+                return Ok(prompt.to_owned());
+            }
+            let audio_markers = audio.map_or(0, GemmaPreparedAudio::marker_tokens);
+            let capacity = prompt
+                .len()
+                .checked_add(160)
+                .and_then(|value| value.checked_add(visuals.len().checked_mul(64)?))
+                .and_then(|value| value.checked_add(audio_markers.checked_mul(11)?))
+                .ok_or(MultimodalTextError::Overflow("Gemma4 prompt template"))?;
+            let mut media = String::new();
+            media
+                .try_reserve_exact(capacity)
+                .map_err(|_| MultimodalTextError::Overflow("Gemma4 prompt template"))?;
+            match visual_kind {
+                Some(GemmaPreparedVisualKind::Gemma4VideoFrame) => {
+                    media.push_str("\n\n");
+                    for (index, visual) in visuals.iter().enumerate() {
+                        cancellation.check()?;
+                        if index > 0 {
+                            media.push(' ');
+                        }
+                        let seconds =
+                            visual
+                                .timestamp_seconds()
+                                .ok_or(MultimodalTextError::InvalidInput(
+                                    "Gemma4 prepared video timestamp is unavailable",
+                                ))?;
+                        write!(
+                            &mut media,
+                            "{:02}:{:02} <|image><|video|><image|>",
+                            seconds / 60,
+                            seconds % 60
+                        )
+                        .map_err(|_| {
+                            MultimodalTextError::InvalidInput(
+                                "Gemma4 video template could not be formatted",
+                            )
+                        })?;
+                    }
+                    media.push_str("\n\n");
+                }
+                Some(GemmaPreparedVisualKind::Gemma4Image) => {
+                    media.push_str("\n\n");
+                    for (index, _) in visuals.iter().enumerate() {
+                        cancellation.check()?;
+                        if index > 0 {
+                            media.push_str("\n\n\n\n");
+                        }
+                        media.push_str("<|image><|image|><image|>");
+                    }
+                    media.push_str("\n\n");
+                }
+                None => {}
+                Some(GemmaPreparedVisualKind::Gemma3Image) => {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Gemma4 template cannot contain Gemma3 images",
+                    ));
+                }
+            }
+            if let Some(prepared) = audio {
+                media.push_str("<|audio>");
+                for _ in 0..prepared.marker_tokens() {
+                    cancellation.check()?;
+                    media.push_str("<|audio|>");
+                }
+                media.push_str("<audio|>");
+            }
+            let system = if thinking {
+                "<|turn>system\n<|think|><turn|>\n"
+            } else {
+                ""
+            };
+            let mut formatted = String::new();
+            formatted
+                .try_reserve_exact(capacity)
+                .map_err(|_| MultimodalTextError::Overflow("Gemma4 prompt template"))?;
+            formatted.push_str(system);
+            formatted.push_str("<|turn>user\n");
+            formatted.push_str(&media);
+            formatted.push_str(prompt);
+            formatted.push_str("<turn|>\n<|turn>model\n");
+            cancellation.check()?;
+            Ok(formatted)
+        }
+    }
+}
+
+fn flatten_gemma3_projection(
+    backend: &CpuBackend,
+    projection: Gemma3VisionProjection,
+    context: &ExecutionContext<'_>,
+) -> Result<(Tensor, usize), MultimodalTextError> {
+    let shape = projection.embedding.descriptor().shape();
+    if shape.len() != 3
+        || shape[0] == 0
+        || shape[1] != usize_to_u64(projection.tokens_per_image, "Gemma3 projected image tokens")?
+        || shape[2] == 0
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma3 projected image embedding has the wrong shape",
+        ));
+    }
+    let tokens = u64_to_usize(shape[0], "Gemma3 projected image batch")?
+        .checked_mul(projection.tokens_per_image)
+        .ok_or(MultimodalTextError::Overflow(
+            "Gemma3 projected image tokens",
+        ))?;
+    let embedding = torch_reshape_with_context_exact_native(
+        backend,
+        &projection.embedding,
+        &[
+            usize_to_i64(tokens, "Gemma3 projected image tokens")?,
+            u64_to_i64(shape[2], "Gemma3 projected image hidden size")?,
+        ],
+        context,
+    )?;
+    Ok((embedding, tokens))
+}
+
+fn plan_gemma_markers(
+    prompt_tokens: &[i64],
+    media: &[GemmaProjectedMedia],
+    family: GemmaMultimodalFamily,
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<GemmaMarkerPlan, MultimodalTextError> {
+    cancellation.check()?;
+    let mut removed_markers = 0_usize;
+    let mut inserted_tokens = 0_usize;
+    for projected in media {
+        if projected.source_markers == 0 || projected.tokens == 0 {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma projected media requires nonempty marker and embedding spans",
+            ));
+        }
+        removed_markers = removed_markers
+            .checked_add(projected.source_markers)
+            .ok_or(MultimodalTextError::Overflow("Gemma marker count"))?;
+        inserted_tokens = inserted_tokens
+            .checked_add(projected.tokens)
+            .ok_or(MultimodalTextError::Overflow("Gemma projected token count"))?;
+    }
+    let expanded_length = prompt_tokens
+        .len()
+        .checked_sub(removed_markers)
+        .and_then(|value| value.checked_add(inserted_tokens))
+        .ok_or(MultimodalTextError::InvalidInput(
+            "Gemma prompt does not contain every required media marker",
+        ))?;
+    let mut expanded_tokens = Vec::new();
+    expanded_tokens
+        .try_reserve_exact(expanded_length)
+        .map_err(|_| MultimodalTextError::Overflow("Gemma expanded prompt"))?;
+    let mut consumed = Vec::new();
+    consumed
+        .try_reserve_exact(media.len())
+        .map_err(|_| MultimodalTextError::Overflow("Gemma marker state"))?;
+    consumed.resize(media.len(), false);
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(media.len())
+        .map_err(|_| MultimodalTextError::Overflow("Gemma marker spans"))?;
+    let mut source_index = 0_usize;
+    while source_index < prompt_tokens.len() {
+        cancellation.check()?;
+        let token = *prompt_tokens
+            .get(source_index)
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Gemma prompt token storage is incomplete",
+            ))?;
+        if gemma_media_marker(family, token) {
+            let media_index = media
+                .iter()
+                .enumerate()
+                .find_map(|(index, projected)| {
+                    (!consumed[index] && projected.marker == token).then_some(index)
+                })
+                .ok_or(MultimodalTextError::InvalidInput(
+                    "Gemma prompt contains an unmatched media marker",
+                ))?;
+            let projected = &media[media_index];
+            let source_end = source_index
+                .checked_add(projected.source_markers)
+                .ok_or(MultimodalTextError::Overflow("Gemma media marker run"))?;
+            if source_end > prompt_tokens.len()
+                || prompt_tokens[source_index..source_end]
+                    .iter()
+                    .any(|candidate| *candidate != token)
+            {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma media marker run does not match its prepared projection",
+                ));
+            }
+            let start = expanded_tokens.len();
+            expanded_tokens.extend(std::iter::repeat_n(0, projected.tokens));
+            entries.push(GemmaMarkerEntry {
+                span: MultimodalSpan {
+                    start,
+                    size: projected.tokens,
+                    grid_thw: [1, 1, projected.tokens],
+                },
+                media_index,
+            });
+            consumed[media_index] = true;
+            source_index = source_end;
+        } else {
+            expanded_tokens.push(token);
+            source_index += 1;
+        }
+    }
+    if consumed.iter().any(|value| !*value) || expanded_tokens.len() != expanded_length {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma prepared media does not cover the prompt marker plan",
+        ));
+    }
+    Ok(GemmaMarkerPlan {
+        expanded_tokens,
+        entries,
+    })
+}
+
+fn gemma_media_marker(family: GemmaMultimodalFamily, token: i64) -> bool {
+    match family {
+        GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB => {
+            token == i64::from(crate::GEMMA3_IMAGE_TOKEN)
+        }
+        GemmaMultimodalFamily::Gemma4E2B
+        | GemmaMultimodalFamily::Gemma4E4B
+        | GemmaMultimodalFamily::Gemma4ThirtyOneB => [
+            crate::GEMMA4_IMAGE_TOKEN,
+            crate::GEMMA4_VIDEO_TOKEN,
+            crate::GEMMA4_AUDIO_TOKEN,
+        ]
+        .into_iter()
+        .map(i64::from)
+        .any(|marker| marker == token),
+    }
 }
 
 fn gemma_reduced_decoder_is_compatible(
@@ -5275,11 +5824,11 @@ fn gemma_reduced_decoder_is_compatible(
     }
 }
 
-fn qwen_causal_positions(sequence_length: usize) -> Result<Vec<usize>, MultimodalTextError> {
+fn decoder_causal_positions(sequence_length: usize) -> Result<Vec<usize>, MultimodalTextError> {
     let mut positions = Vec::new();
     positions
         .try_reserve_exact(sequence_length)
-        .map_err(|_| MultimodalTextError::Overflow("Qwen causal positions"))?;
+        .map_err(|_| MultimodalTextError::Overflow("decoder causal positions"))?;
     positions.extend(0..sequence_length);
     Ok(positions)
 }

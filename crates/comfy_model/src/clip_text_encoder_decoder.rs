@@ -12,6 +12,7 @@ use comfy_tensor::{
     },
     generated_indexing_masking_01::{
         IndexingMaskingPartOneError, index_add_in_place_with_context_exact_native,
+        narrow_method_exact_native,
     },
     generated_native_diffusion::{NativeDiffusionTensorError, add, tensor_from_f32, tensor_to_f32},
 };
@@ -2465,6 +2466,16 @@ impl NativeDecoderTextEncoder {
         request: DecoderTextRequest<'_>,
         context: &ExecutionContext<'_>,
     ) -> Result<DecoderTextOutput, DecoderTextError> {
+        self.forward_tokens_internal(backend, request, false, context)
+    }
+
+    fn forward_tokens_internal(
+        &self,
+        backend: &CpuBackend,
+        request: DecoderTextRequest<'_>,
+        project_last_token_only: bool,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderTextOutput, DecoderTextError> {
         self.admit_execution_target(backend, context)?;
         let (batch, query_tokens) = validate_tokens(
             backend,
@@ -2495,6 +2506,7 @@ impl NativeDecoderTextEncoder {
             input_ids.as_deref(),
             batch,
             query_tokens,
+            project_last_token_only,
             context,
         )
     }
@@ -2577,6 +2589,16 @@ impl NativeDecoderTextEncoder {
         request: DecoderPreparedTextRequest<'_>,
         context: &ExecutionContext<'_>,
     ) -> Result<DecoderTextOutput, DecoderTextError> {
+        self.forward_prepared_internal(backend, request, false, context)
+    }
+
+    fn forward_prepared_internal(
+        &self,
+        backend: &CpuBackend,
+        request: DecoderPreparedTextRequest<'_>,
+        project_last_token_only: bool,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderTextOutput, DecoderTextError> {
         self.admit_execution_target(backend, context)?;
         let (batch, query_tokens) =
             self.validate_prepared_embeddings(request.embeddings, context)?;
@@ -2605,6 +2627,7 @@ impl NativeDecoderTextEncoder {
             request.initial_input_ids,
             batch,
             query_tokens,
+            project_last_token_only,
             context,
         )
     }
@@ -2641,6 +2664,7 @@ impl NativeDecoderTextEncoder {
         initial_input_ids: Option<&[i64]>,
         batch: usize,
         query_tokens: usize,
+        project_last_token_only: bool,
         context: &ExecutionContext<'_>,
     ) -> Result<DecoderTextOutput, DecoderTextError> {
         let mut staged_cache = match cache {
@@ -2740,8 +2764,20 @@ impl NativeDecoderTextEncoder {
             self.configuration.norm_weight_offset(),
             context,
         )?;
+        let logits_hidden = if project_last_token_only && query_tokens > 1 {
+            narrow_method_exact_native(
+                &last_hidden_state,
+                1,
+                i64::try_from(query_tokens - 1)
+                    .map_err(|_| DecoderTextError::Overflow("generation query position"))?,
+                1,
+                context.cancellation,
+            )?
+        } else {
+            last_hidden_state.clone()
+        };
         let mut output_head = self.output_head.clone();
-        let logits = output_head.forward_with_context(backend, &last_hidden_state, context)?;
+        let logits = output_head.forward_with_context(backend, &logits_hidden, context)?;
         let logits = apply_logits_soft_cap(
             backend,
             &logits,
@@ -3186,7 +3222,7 @@ impl NativeDecoderTextEncoder {
         for _ in 0..configuration.maximum_new_tokens {
             context.check()?;
             let output = match prefill.take() {
-                Some(DecoderGenerationPrefill::Tokens(tokens)) => self.forward(
+                Some(DecoderGenerationPrefill::Tokens(tokens)) => self.forward_tokens_internal(
                     backend,
                     DecoderTextRequest {
                         tokens,
@@ -3195,10 +3231,11 @@ impl NativeDecoderTextEncoder {
                         cache: None,
                         capture_layer: None,
                     },
+                    true,
                     context,
                 )?,
                 Some(DecoderGenerationPrefill::Prepared(request)) => {
-                    self.forward_prepared(backend, request, context)?
+                    self.forward_prepared_internal(backend, request, true, context)?
                 }
                 None => {
                     let token = current.as_ref().ok_or(DecoderTextError::InvalidInput(
@@ -3216,7 +3253,7 @@ impl NativeDecoderTextEncoder {
                             )
                         })
                         .transpose()?;
-                    let output = self.forward(
+                    let output = self.forward_tokens_internal(
                         backend,
                         DecoderTextRequest {
                             tokens: token,
@@ -3225,6 +3262,7 @@ impl NativeDecoderTextEncoder {
                             cache: cache.as_ref(),
                             capture_layer: None,
                         },
+                        true,
                         context,
                     )?;
                     next_position = next_position

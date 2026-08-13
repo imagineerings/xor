@@ -13,11 +13,11 @@ use comfy_model::{
     Gemma4AudioWeights, Gemma4ClippedLinearWeights, Gemma4DecoderConfiguration,
     Gemma4LayerInputWeights, Gemma4PerLayerWeights, Gemma4VisionBlockWeights,
     Gemma4VisionConfiguration, Gemma4VisionProfile, Gemma4VisionWeights, GemmaMultimodalFamily,
-    GemmaPreparedVisualKind, GemmaTokenizer, GemmaTokenizerProfile, IDEOGRAM4_SOURCE_PATH,
-    IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS, JINA_CLIP2_SOURCE_PATH,
-    JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS, MultimodalFamily,
-    MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior, MultimodalTextError,
-    NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector,
+    GemmaMultimodalGenerationRequest, GemmaPreparedVisualKind, GemmaTokenizer,
+    GemmaTokenizerProfile, IDEOGRAM4_SOURCE_PATH, IDEOGRAM4_SOURCE_SHA256, IDEOGRAM4_TAP_LAYERS,
+    JINA_CLIP2_SOURCE_PATH, JINA_CLIP2_SOURCE_SHA256, MULTIMODAL_TEXT_ENCODER_CATALOG_SYMBOLS,
+    MultimodalFamily, MultimodalImageEmbedding, MultimodalSpan, MultimodalSymbolBehavior,
+    MultimodalTextError, NativeClipVision, NativeDecoderTextEncoder, NativeGemma3VisionProjector,
     NativeGemma4AudioEncoder, NativeGemma4VisionEncoder, NativeGemmaMultimodal, NativeModelPayload,
     NativePromptTokenizer, NativeQwenMultimodal, NativeQwenVisionEncoder,
     NativeTextGenerationRequest, NativeTokenizerFamily, OVIS_SOURCE_PATH, OVIS_SOURCE_SHA256,
@@ -27,14 +27,15 @@ use comfy_model::{
     QwenMultimodalGenerationRequest, QwenVisionBlockWeights, QwenVisionConfiguration,
     QwenVisionFamily, QwenVisionMergerWeights, QwenVisionWeights, RopeScaling,
     SAM3_CLIP_SOURCE_PATH, SAM3_CLIP_SOURCE_SHA256, Sam3EncodedCondition, TokenizerConfiguration,
-    format_ideogram4_prompt, format_ovis_prompt, format_qwen3vl_prompt, gemma3_target_dimensions,
-    gemma4_audio_marker_tokens, gemma4_target_dimensions, ideogram4_project_taps,
-    join_multimodal_embeddings, join_qwen3vl_deepstack, multimodal_profile,
-    multimodal_symbol_behavior, ovis_template_end, pack_sam3_conditions, parse_sam3_prompts,
-    plan_qwen_markers, plan_qwen3vl_markers, prepare_gemma3_image, prepare_gemma4_audio,
-    prepare_gemma4_visuals, prepare_qwen_images, prepare_qwen3vl_images,
-    qwen_multimodal_decoder_configuration, qwen_multimodal_tokenizer_profile,
-    qwen2vl_mrope_position_ids, qwen3vl_target_dimensions, trim_ovis_conditioning,
+    format_gemma_multimodal_prompt, format_ideogram4_prompt, format_ovis_prompt,
+    format_qwen3vl_prompt, gemma3_target_dimensions, gemma4_audio_marker_tokens,
+    gemma4_target_dimensions, ideogram4_project_taps, join_multimodal_embeddings,
+    join_qwen3vl_deepstack, multimodal_profile, multimodal_symbol_behavior, ovis_template_end,
+    pack_sam3_conditions, parse_sam3_prompts, plan_qwen_markers, plan_qwen3vl_markers,
+    prepare_gemma3_image, prepare_gemma4_audio, prepare_gemma4_visuals, prepare_qwen_images,
+    prepare_qwen3vl_images, qwen_multimodal_decoder_configuration,
+    qwen_multimodal_tokenizer_profile, qwen2vl_mrope_position_ids, qwen3vl_target_dimensions,
+    trim_ovis_conditioning,
 };
 use comfy_tensor::{
     CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId, ExecutionContext,
@@ -771,7 +772,7 @@ fn reduced_gemma4_decoder_configuration() -> DecoderTextConfiguration {
         dtype: DType::F32,
         device: DeviceId::CPU,
         vocabulary_size: 262_144,
-        maximum_tokens: 131_072,
+        maximum_tokens: 512,
         hidden_size: 4,
         feed_forward_size: 8,
         layer_kinds: (0_usize..10)
@@ -2068,6 +2069,199 @@ fn gemma_multimodal_resource_closes_family_identity_residency_and_payload_admiss
     ));
     assert_eq!(setup.scratch.in_use_bytes(), 0);
     assert_eq!(changed_context.scratch.in_use_bytes(), 0);
+    Ok(())
+}
+
+#[test]
+fn gemma_multimodal_generation_formats_replaces_and_delegates_transactionally()
+-> Result<(), Box<dyn Error>> {
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../comfy_test_support/fixtures/text_generation/gemma_multimodal/generation/manifest.json"
+    ))?;
+    assert_eq!(
+        manifest["generation_contract"]["gemma4_initial_input_ids"],
+        "expanded-prompt-zero-media-ids"
+    );
+    assert_eq!(
+        manifest["generation_contract"]["decoder_delegation"],
+        "one-borrowed-rng-prepared-generation-call"
+    );
+    assert_eq!(
+        format_gemma_multimodal_prompt(
+            GemmaMultimodalFamily::Gemma3FourBVision,
+            "hello",
+            &[],
+            None,
+            true,
+            true,
+            &CancellationToken::default(),
+        )?,
+        "<start_of_turn>system\nYou are a helpful assistant.<end_of_turn>\n<start_of_turn>user\nhello<end_of_turn>\n<start_of_turn>model\n"
+    );
+    assert_eq!(
+        format_gemma_multimodal_prompt(
+            GemmaMultimodalFamily::Gemma3TwelveB,
+            "<start_of_turn>user\nhello",
+            &[],
+            None,
+            true,
+            false,
+            &CancellationToken::default(),
+        )?,
+        "<start_of_turn>user\nhello"
+    );
+
+    let (backend, authority) = CpuWorkspaceAuthority::create_backend(128 * 1024 * 1024)?;
+    let cancellation = CancellationToken::default();
+    let setup = context(&authority, &cancellation, 112 * 1024 * 1024)?;
+    let tokenizer = gemma4_prompt_tokenizer(4)?;
+    let decoder = reduced_gemma4_decoder(&backend, &setup, 0.0)?;
+    let vision_configuration = Gemma4VisionConfiguration::reduced_fixture(
+        Gemma4VisionProfile::E4B,
+        4,
+        8,
+        1,
+        1,
+        4,
+        16,
+        64,
+        3,
+        4,
+    );
+    let vision = Arc::new(NativeGemma4VisionEncoder::new(
+        vision_configuration.clone(),
+        reduced_gemma4_vision_weights(&backend, &vision_configuration, &setup)?,
+    )?);
+    let audio_configuration = Gemma4AudioConfiguration::reduced_fixture(
+        Gemma4AudioProfile::E4B,
+        128,
+        2,
+        2,
+        4,
+        8,
+        1,
+        2,
+        3,
+        2,
+        3,
+        4,
+        4,
+    )?;
+    let audio = Arc::new(NativeGemma4AudioEncoder::new(
+        audio_configuration.clone(),
+        reduced_gemma4_audio_weights(&backend, &audio_configuration, &setup)?,
+        &cancellation,
+    )?);
+    let resource = NativeGemmaMultimodal::reduced_gemma4_fixture(
+        tokenizer,
+        decoder,
+        vision,
+        Some(audio),
+        &cancellation,
+    )?;
+    let source = ImageTensor::from_f32(&backend, &setup, 1, 1, 1, 3, &[0.2, 0.5, 0.9])?;
+    let prepared_visuals = prepare_gemma4_visuals(&backend, None, Some(&source), &setup)?;
+    let waveform_values = (0..640)
+        .map(|index| (index as f32 * 0.017).sin() * 0.25)
+        .collect::<Vec<_>>();
+    let waveform = tensor(&backend, &[1, 1, 640], &waveform_values, &setup)?;
+    let prepared_audio = prepare_gemma4_audio(&backend, &waveform, 16_000, &setup)?;
+    assert_eq!(prepared_visuals[0].timestamp_seconds(), Some(0));
+    assert_eq!(prepared_audio.marker_tokens(), 1);
+    assert_eq!(
+        format_gemma_multimodal_prompt(
+            GemmaMultimodalFamily::Gemma4E4B,
+            "hello",
+            &prepared_visuals,
+            Some(&prepared_audio),
+            true,
+            true,
+            &cancellation,
+        )?,
+        "<|turn>system\n<|think|><turn|>\n<|turn>user\n\n\n00:00 <|image><|video|><image|>\n\n<|audio><|audio|><audio|>hello<turn|>\n<|turn>model\n"
+    );
+    let text = NativeTextGenerationRequest {
+        formatted_prompt: "hello",
+        maximum_new_tokens: 1,
+        do_sample: false,
+        temperature_bits: 0.0_f32.to_bits(),
+        top_k: 0,
+        top_p_bits: 1.0_f32.to_bits(),
+        minimum_p_bits: 0.0_f32.to_bits(),
+        repetition_penalty_bits: 1.0_f32.to_bits(),
+        presence_penalty_bits: 0.0_f32.to_bits(),
+    };
+    let transaction = qwen_generation_transaction()?;
+    let checkpoint = transaction.checkpoint();
+    let digest = resource.semantic_state_digest(&cancellation)?;
+    let residency = resource.resident_tensor_allocations()?;
+    let outcome = resource.generate(
+        &backend,
+        GemmaMultimodalGenerationRequest {
+            text: text.clone(),
+            prepared_visuals: &prepared_visuals,
+            prepared_audio: Some(&prepared_audio),
+            use_default_template: true,
+            thinking: true,
+            transaction: &transaction,
+        },
+        &setup,
+    )?;
+    assert_eq!(outcome.generated_tokens.len(), 1);
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(resource.semantic_state_digest(&cancellation)?, digest);
+    assert_eq!(resource.resident_tensor_allocations()?, residency);
+
+    assert!(
+        resource
+            .generate(
+                &backend,
+                GemmaMultimodalGenerationRequest {
+                    text,
+                    prepared_visuals: &prepared_visuals,
+                    prepared_audio: Some(&prepared_audio),
+                    use_default_template: false,
+                    thinking: false,
+                    transaction: &transaction,
+                },
+                &setup,
+            )
+            .is_err()
+    );
+    assert_eq!(transaction.checkpoint(), checkpoint);
+
+    let constrained = context(&authority, &cancellation, 4)?;
+    assert!(
+        resource
+            .generate(
+                &backend,
+                GemmaMultimodalGenerationRequest {
+                    text: NativeTextGenerationRequest {
+                        formatted_prompt: "hello",
+                        maximum_new_tokens: 1,
+                        do_sample: false,
+                        temperature_bits: 0.0_f32.to_bits(),
+                        top_k: 0,
+                        top_p_bits: 1.0_f32.to_bits(),
+                        minimum_p_bits: 0.0_f32.to_bits(),
+                        repetition_penalty_bits: 1.0_f32.to_bits(),
+                        presence_penalty_bits: 0.0_f32.to_bits(),
+                    },
+                    prepared_visuals: &prepared_visuals,
+                    prepared_audio: Some(&prepared_audio),
+                    use_default_template: true,
+                    thinking: false,
+                    transaction: &transaction,
+                },
+                &constrained,
+            )
+            .is_err()
+    );
+    assert_eq!(constrained.scratch.in_use_bytes(), 0);
+    assert_eq!(transaction.checkpoint(), checkpoint);
+    assert_eq!(resource.semantic_state_digest(&cancellation)?, digest);
+    assert_eq!(resource.resident_tensor_allocations()?, residency);
+    assert_eq!(setup.scratch.in_use_bytes(), 0);
     Ok(())
 }
 

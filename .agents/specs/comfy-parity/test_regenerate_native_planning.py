@@ -302,6 +302,24 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[gemma_generation_id]["dependencies"],
             [gemma_resource_id],
         )
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            tasks_by_id[gemma_generation_id]["writes"],
+        )
+        self.assertIn(
+            "crates/comfy_test_support/fixtures/text_generation/gemma_multimodal/generation",
+            tasks_by_id[gemma_generation_id]["writes"],
+        )
+        self.assertEqual(
+            tasks_by_id[gemma_generation_id]["validations"],
+            [
+                "VAL-MODEL-FAMILY-001",
+                "VAL-RNG-001",
+                "VAL-CANCEL-001",
+                "VAL-MEMORY-001",
+                "VAL-OWNERSHIP-001",
+            ],
+        )
         self.assertEqual(
             tasks_by_id[multimodal_generation_id]["dependencies"],
             [gemma_generation_id],

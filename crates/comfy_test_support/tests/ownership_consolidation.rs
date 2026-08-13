@@ -3409,6 +3409,86 @@ fn run_ownership_validation(
                 && line.contains("VAL-OWNERSHIP-001")
                 && line.contains("authoritative_owner_confirmed")
         });
+    let task398_gemma_generation_has_one_model_domain_adapter = production_source_occurrences(
+        &sources,
+        "pub struct GemmaMultimodalGenerationRequest<'a> {",
+    )
+    .len()
+        == 1
+        && model_clip_text_encoder_multimodal.contains("pub fn format_gemma_multimodal_prompt(")
+        && model_clip_text_encoder_multimodal.contains("plan_gemma_markers(")
+        && model_clip_text_encoder_multimodal.contains("join_multimodal_embeddings(")
+        && model_clip_text_encoder_multimodal.contains("generate_prepared(")
+        && model_clip_text_encoder_multimodal.contains("decode_generated(")
+        && !model_clip_text_encoder_multimodal.contains("RngStreamAddress")
+        && !model_clip_text_encoder_multimodal.contains("NativeCache");
+    let task398_gemma_generation_preserves_source_routes_and_atomicity =
+        model_clip_text_encoder_multimodal.contains("let sampling_history = if gemma4")
+            && model_clip_text_encoder_multimodal
+                .contains("let initial_input_ids = gemma4.then_some")
+            && model_clip_text_encoder_multimodal.contains("deepstack: None")
+            && model_clip_text_encoder_decoder.contains("project_last_token_only")
+            && model_clip_text_encoder_decoder.contains("narrow_method_exact_native")
+            && model_clip_text_encoder_multimodal_tests.contains(
+                "gemma_multimodal_generation_formats_replaces_and_delegates_transactionally",
+            )
+            && model_clip_text_encoder_multimodal_tests
+                .contains("gemma_multimodal/generation/manifest.json")
+            && model_clip_text_encoder_multimodal_tests.contains("transaction.checkpoint()")
+            && model_clip_text_encoder_multimodal_tests.contains("scratch.in_use_bytes()");
+    let task398_policy_trace = policy_concerns
+        .iter()
+        .find(|entry| {
+            entry.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_vision_text_transformer_text_media_resource_specialized_gemma_generation")
+        })
+        .is_some_and(|entry| {
+            entry
+                .get("canonical_owner")
+                .and_then(serde_json::Value::as_str)
+                == Some("comfy_model::clip_text_encoder_multimodal::NativeGemmaMultimodal::generate")
+                && entry
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| {
+                        tasks.iter().any(|task| {
+                            task.as_str()
+                                == Some("comfy-parity-native-gemma-multimodal-generation-foundation")
+                        })
+                    })
+                && entry
+                    .get("required_mappings")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|mappings| {
+                        [
+                            "gemma-generation-formats-and-validates-capabilities-before-projection",
+                            "gemma-generation-replaces-every-media-marker-with-real-projections",
+                            "gemma-generation-projects-source-history-and-initial-input-id-routes",
+                            "gemma-generation-delegates-bounded-final-token-logits-and-family-cleanup",
+                            "gemma-generation-tests-template-media-rng-and-workspace-atomicity",
+                        ]
+                        .iter()
+                        .all(|required| {
+                            mappings.iter().any(|mapping| {
+                                mapping.get("name").and_then(serde_json::Value::as_str)
+                                    == Some(*required)
+                            })
+                        })
+                    })
+        });
+    let task398_catalog_trace = ownership_catalog
+        .lines()
+        .find(|line| {
+            line.starts_with(
+                "native_vision_text_transformer_text_media_resource_specialized_gemma_generation,",
+            )
+        })
+        .is_some_and(|line| {
+            line.contains("comfy-parity-native-gemma-multimodal-generation-foundation")
+                && line.contains("VAL-RNG-001")
+                && line.contains("VAL-OWNERSHIP-001")
+                && line.contains("authoritative_owner_confirmed")
+        });
     let task381p_qwen_preparation_has_one_attempt_local_owner =
         production_source_occurrences(&sources, "pub struct Qwen3VlPreparedImage {").len() == 1
             && production_source_occurrences(&sources, "pub struct Qwen3VlMarkerPlan {").len() == 1
@@ -9774,6 +9854,18 @@ fn run_ownership_validation(
             task388_qwen_generation_preserves_source_routes_and_atomicity,
         ),
         (
+            "task398_policy_and_catalog_trace_gemma_multimodal_generation",
+            task398_policy_trace && task398_catalog_trace,
+        ),
+        (
+            "task398_gemma_generation_has_one_model_domain_adapter",
+            task398_gemma_generation_has_one_model_domain_adapter,
+        ),
+        (
+            "task398_gemma_generation_preserves_source_routes_and_atomicity",
+            task398_gemma_generation_preserves_source_routes_and_atomicity,
+        ),
+        (
             "task381p_policy_and_catalog_trace_qwen_preparation",
             task381p_policy_trace && task381p_catalog_trace,
         ),
@@ -10454,6 +10546,18 @@ fn val_ownership_task388_qwen_multimodal_generation_001() -> Result<(), Box<dyn 
         "val-ownership-task388-qwen-multimodal-generation-001.json",
         "val_ownership_task388_qwen_multimodal_generation_001",
         Some("task388_"),
+    )
+}
+
+#[test]
+fn val_ownership_task398_gemma_multimodal_generation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    run_ownership_validation(
+        "VAL-OWNERSHIP-001",
+        "task398-gemma-multimodal-generation-ownership",
+        "val-ownership-task398-gemma-multimodal-generation-001.json",
+        "val_ownership_task398_gemma_multimodal_generation_001",
+        Some("task398_"),
     )
 }
 
