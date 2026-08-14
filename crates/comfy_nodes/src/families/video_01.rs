@@ -8,20 +8,32 @@ use crate::{
     built_in_source_schema,
 };
 use comfy_media::{NativeVideoBitDepth, NativeVideoPayload};
-use comfy_tensor::NativeTensorRole;
+use comfy_tensor::{
+    DType, DeviceId, ImageTensor, Layout, MemoryFormatReference, NativeTensorPayload,
+    NativeTensorRole, Scalar, TensorError,
+    generated_comfy_operator_indirection_01::cast_to_with_context_exact_native,
+    generated_elementwise_or_runtime_operation_03::ElementwiseOperand,
+    generated_elementwise_or_runtime_operation_05::div_with_context_exact_native,
+    generated_storage_dtype_device_01::contiguous_with_context_exact_native,
+};
+use comfy_types::CancellationToken;
 use futures::future::BoxFuture;
 use std::{collections::BTreeMap, sync::Arc};
 
-pub const NODE_DESCRIPTOR_IDS: &[&str] = &["CreateVideo"];
+pub const NODE_DESCRIPTOR_IDS: &[&str] = &["CreateVideo", "GetVideoComponents"];
 pub const NATIVE_NODE_BINDINGS: NativeNodeBindingsFactory = native_node_bindings;
 
 const CLASS_TYPE: &str = "CreateVideo";
 const FEATURE_ID: &str = "COMFY-NODE-0124";
 const IMPLEMENTATION_VERSION: &str = "source-7b8f73c9-v1";
 const CACHE_CHANGE_TOKEN: &str = "source-7b8f73c9-video-components-v1";
+const COMPONENTS_CLASS_TYPE: &str = "GetVideoComponents";
+const COMPONENTS_FEATURE_ID: &str = "COMFY-NODE-0207";
+const COMPONENTS_IMPLEMENTATION_VERSION: &str = "source-b2232b2c-v1";
+const COMPONENTS_CACHE_CHANGE_TOKEN: &str = "source-b2232b2c-video-components-v1";
 
 fn native_node_bindings() -> Result<Vec<NativeNodeBinding>, NativeNodeContractError> {
-    Ok(vec![native_node_binding()?])
+    Ok(vec![native_node_binding()?, components_node_binding()?])
 }
 
 fn native_node_binding() -> Result<NativeNodeBinding, NativeNodeContractError> {
@@ -71,6 +83,80 @@ fn native_node_binding() -> Result<NativeNodeBinding, NativeNodeContractError> {
             is_experimental: false,
         },
         node: Arc::new(CreateVideoNode),
+    })
+}
+
+fn components_node_binding() -> Result<NativeNodeBinding, NativeNodeContractError> {
+    let source_schema = built_in_source_schema(COMPONENTS_CLASS_TYPE)
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?
+        .bind_execution_ports(
+            &["video".to_owned()],
+            &[],
+            &[
+                "images".to_owned(),
+                "audio".to_owned(),
+                "fps".to_owned(),
+                "bit_depth".to_owned(),
+            ],
+        )
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
+    Ok(NativeNodeBinding::Executable {
+        feature_id: COMPONENTS_FEATURE_ID.to_owned(),
+        descriptor: NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: COMPONENTS_CLASS_TYPE.to_owned(),
+            implementation_version: COMPONENTS_IMPLEMENTATION_VERSION.to_owned(),
+            source_schema: Some(source_schema),
+            inputs: vec![handle_input("video", video_type()?, true)?],
+            dynamic_inputs: Vec::new(),
+            outputs: vec![
+                NativeOutputDescriptor {
+                    name: "images".to_owned(),
+                    produced_type: NativeValueType::Handle(image_type()?),
+                    is_list: false,
+                },
+                NativeOutputDescriptor {
+                    name: "audio".to_owned(),
+                    produced_type: NativeValueType::Handle(audio_type()?),
+                    is_list: false,
+                },
+                NativeOutputDescriptor {
+                    name: "fps".to_owned(),
+                    produced_type: NativeValueType::Primitive(NativePrimitiveType::Number),
+                    is_list: false,
+                },
+                NativeOutputDescriptor {
+                    name: "bit_depth".to_owned(),
+                    produced_type: NativeValueType::Primitive(NativePrimitiveType::Integer),
+                    is_list: false,
+                },
+            ],
+            output_node: false,
+            effect: NativeEffectClass::Pure,
+            cache: NativeCachePolicy::InputIdentity,
+        },
+        presentation: NativeNodePresentation {
+            display_name: "Get Video Components".to_owned(),
+            category: "video".to_owned(),
+            description:
+                "Extracts all components from a video: frames, audio, framerate, and bit depth."
+                    .to_owned(),
+            output_names: vec![
+                "images".to_owned(),
+                "audio".to_owned(),
+                "fps".to_owned(),
+                "bit_depth".to_owned(),
+            ],
+            search_aliases: vec![
+                "extract frames".to_owned(),
+                "split video".to_owned(),
+                "video to images".to_owned(),
+                "demux".to_owned(),
+            ],
+            is_deprecated: false,
+            is_experimental: false,
+        },
+        node: Arc::new(GetVideoComponentsNode),
     })
 }
 
@@ -225,6 +311,314 @@ impl NativeNode for CreateVideoNode {
             drop(resolved_image);
             Ok(outcome)
         })
+    }
+}
+
+#[derive(Debug)]
+struct GetVideoComponentsNode;
+
+impl NativeNode for GetVideoComponentsNode {
+    fn class_type(&self) -> &str {
+        COMPONENTS_CLASS_TYPE
+    }
+
+    fn implementation_version(&self) -> &str {
+        COMPONENTS_IMPLEMENTATION_VERSION
+    }
+
+    fn demanded_lazy_inputs(
+        &self,
+        context: &NativeNodeContext,
+        available_inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<std::collections::BTreeSet<String>, NativeNodeFailure> {
+        check_components_cancellation(context)?;
+        components_input(available_inputs)?;
+        Ok(std::collections::BTreeSet::new())
+    }
+
+    fn cache_change_token(
+        &self,
+        inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<String, NativeNodeFailure> {
+        components_input(inputs)?;
+        Ok(COMPONENTS_CACHE_CHANGE_TOKEN.to_owned())
+    }
+
+    fn execute<'a>(
+        &'a self,
+        context: NativeNodeContext,
+        inputs: BTreeMap<String, NativeValue>,
+    ) -> BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
+        Box::pin(async move {
+            check_components_cancellation(&context)?;
+            let video_handle = components_input(&inputs)?;
+            let resolved = context
+                .handle_store()
+                .resolve(
+                    video_handle,
+                    &video_type().map_err(|error| components_invalid(error.to_string()))?,
+                    &context.cancellation,
+                )
+                .map_err(components_handle_failure)?;
+            let NativeStoredPayload::Video(video) = resolved.as_ref() else {
+                return Err(components_invalid(
+                    "VIDEO handle does not contain a canonical video payload",
+                ));
+            };
+            video
+                .validate()
+                .map_err(|error| components_invalid(error.to_string()))?;
+            let image = project_video_frames(&context, video.frames())?;
+            let image_payload = NativeTensorPayload::from_image(NativeTensorRole::Image, image)
+                .map_err(|error| components_invalid(error.to_string()))?;
+            let audio_payload = video
+                .audio()
+                .cloned()
+                .map(|audio| NativeStoredPayload::Audio(Arc::new(audio)));
+            let (frame_rate_numerator, frame_rate_denominator) = video.frame_rate();
+            let frame_rate = frame_rate_numerator as f64 / frame_rate_denominator as f64;
+            let bit_depth = i64::from(video.bit_depth().bits());
+            drop(resolved);
+
+            let mut published = Vec::with_capacity(2);
+            let image_handle = publish_component(
+                &context,
+                NativeStoredPayload::Tensor(Arc::new(image_payload)),
+                &mut published,
+            )?;
+            let audio_value = if let Some(audio_payload) = audio_payload {
+                match publish_component(&context, audio_payload, &mut published) {
+                    Ok(handle) => NativeValue::Handle { value: handle },
+                    Err(error) => {
+                        rollback_components(&context, &published)?;
+                        return Err(error);
+                    }
+                }
+            } else {
+                NativeValue::Primitive {
+                    value: NativePrimitive::Null,
+                }
+            };
+            if let Err(error) = check_components_cancellation(&context) {
+                rollback_components(&context, &published)?;
+                return Err(error);
+            }
+            let outcome = NativeNodeOutcome::Values {
+                outputs: vec![
+                    NativeValue::Handle {
+                        value: image_handle,
+                    },
+                    audio_value,
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Number(frame_rate),
+                    },
+                    NativeValue::Primitive {
+                        value: NativePrimitive::Integer(bit_depth),
+                    },
+                ],
+                ui: None,
+                effects: Vec::new(),
+            };
+            if let Err(error) = outcome.validate() {
+                rollback_components(&context, &published)?;
+                return Err(components_invalid(error.to_string()));
+            }
+            Ok(outcome)
+        })
+    }
+}
+
+fn components_input(
+    inputs: &BTreeMap<String, NativeValue>,
+) -> Result<&NativeOpaqueHandle, NativeNodeFailure> {
+    if inputs.len() != 1 || !inputs.contains_key("video") {
+        return Err(components_invalid(
+            "GetVideoComponents requires exactly one video input",
+        ));
+    }
+    exact_components_handle(inputs.get("video"))
+}
+
+fn exact_components_handle(
+    value: Option<&NativeValue>,
+) -> Result<&NativeOpaqueHandle, NativeNodeFailure> {
+    let Some(NativeValue::Handle { value }) = value else {
+        return Err(components_invalid(
+            "GetVideoComponents video must be a handle",
+        ));
+    };
+    if value.handle_type().kind != NativeHandleKind::Video
+        || value.handle_type().type_id != "VIDEO"
+    {
+        return Err(components_invalid(
+            "GetVideoComponents video must be an exact VIDEO handle",
+        ));
+    }
+    Ok(value)
+}
+
+fn project_video_frames(
+    context: &NativeNodeContext,
+    frames: &comfy_tensor::Tensor,
+) -> Result<ImageTensor, NativeNodeFailure> {
+    let descriptor = frames.descriptor();
+    if descriptor.device() != DeviceId::CPU {
+        return Err(components_invalid("VIDEO frames must use CPU storage"));
+    }
+    let [_, _, _, channels] = descriptor.shape() else {
+        return Err(components_invalid("VIDEO frames must use BHWC rank four"));
+    };
+    if !matches!(channels, 1 | 3 | 4) {
+        return Err(components_invalid(
+            "VIDEO frames must have one, three, or four channels",
+        ));
+    }
+    let contiguous = descriptor
+        .is_contiguous()
+        .map_err(components_tensor_failure)?;
+    match (descriptor.dtype(), contiguous) {
+        (DType::F32, true) => {
+            ImageTensor::from_tensor(frames.clone()).map_err(components_tensor_failure)
+        }
+        (DType::F32, false) => {
+            let compute = context.compute_session().map_err(|error| {
+                components_invalid(format!("VIDEO frame conversion needs compute access: {error}"))
+            })?;
+            let execution = compute
+                .execution_context(context)
+                .map_err(|error| components_invalid(error.to_string()))?;
+            let frames = contiguous_with_context_exact_native(
+                compute.backend(),
+                frames,
+                MemoryFormatReference::Layout(Layout::Contiguous),
+                &execution,
+            )
+            .map_err(|error| components_operation_failure(context, error.to_string()))?;
+            ImageTensor::from_tensor(frames).map_err(components_tensor_failure)
+        }
+        (DType::U8, _) => {
+            let compute = context.compute_session().map_err(|error| {
+                components_invalid(format!("VIDEO frame conversion needs compute access: {error}"))
+            })?;
+            let execution = compute
+                .execution_context(context)
+                .map_err(|error| components_invalid(error.to_string()))?;
+            let frames = cast_to_with_context_exact_native(
+                compute.backend(),
+                frames,
+                DType::F32,
+                DeviceId::CPU,
+                false,
+                false,
+                &execution,
+            )
+            .map_err(|error| components_operation_failure(context, error.to_string()))?;
+            let frames = div_with_context_exact_native(
+                compute.backend(),
+                &frames,
+                ElementwiseOperand::Scalar(Scalar::Float(255.0)),
+                &execution,
+            )
+            .map_err(|error| components_operation_failure(context, error.to_string()))?;
+            check_components_cancellation(context)?;
+            ImageTensor::from_tensor(frames).map_err(components_tensor_failure)
+        }
+        _ => Err(components_invalid(
+            "VIDEO frames must use F32 or U8 storage",
+        )),
+    }
+}
+
+fn components_operation_failure(
+    context: &NativeNodeContext,
+    message: String,
+) -> NativeNodeFailure {
+    if context.cancellation.is_cancelled() {
+        return NativeNodeFailure {
+            code: "execution_interrupted".to_owned(),
+            message: "GetVideoComponents execution was interrupted".to_owned(),
+            kind: NativeNodeFailureKind::Interrupted,
+            retryable: false,
+        };
+    }
+    components_invalid(message)
+}
+
+fn publish_component(
+    context: &NativeNodeContext,
+    payload: NativeStoredPayload,
+    published: &mut Vec<NativeOpaqueHandle>,
+) -> Result<NativeOpaqueHandle, NativeNodeFailure> {
+    check_components_cancellation(context)?;
+    let handle = context
+        .handle_store()
+        .publish(payload, &context.cancellation)
+        .map_err(components_handle_failure)?;
+    published.push(handle.clone());
+    Ok(handle)
+}
+
+fn rollback_components(
+    context: &NativeNodeContext,
+    published: &[NativeOpaqueHandle],
+) -> Result<(), NativeNodeFailure> {
+    let cleanup = CancellationToken::default();
+    for handle in published.iter().rev() {
+        context
+            .handle_store()
+            .revoke(handle, &cleanup)
+            .map_err(|error| NativeNodeFailure {
+                code: "video_component_rollback_failed".to_owned(),
+                message: format!("GetVideoComponents could not revoke partial output: {error}"),
+                kind: NativeNodeFailureKind::Failure,
+                retryable: false,
+            })?;
+    }
+    Ok(())
+}
+
+fn check_components_cancellation(context: &NativeNodeContext) -> Result<(), NativeNodeFailure> {
+    context
+        .cancellation
+        .check()
+        .map_err(|_| NativeNodeFailure {
+            code: "execution_interrupted".to_owned(),
+            message: "GetVideoComponents execution was interrupted".to_owned(),
+            kind: NativeNodeFailureKind::Interrupted,
+            retryable: false,
+        })
+}
+
+fn components_handle_failure(error: NativeHandleStoreError) -> NativeNodeFailure {
+    if matches!(error, NativeHandleStoreError::Cancelled) {
+        return NativeNodeFailure {
+            code: "execution_interrupted".to_owned(),
+            message: "GetVideoComponents execution was interrupted".to_owned(),
+            kind: NativeNodeFailureKind::Interrupted,
+            retryable: false,
+        };
+    }
+    components_invalid(format!("video component handle is unavailable: {error}"))
+}
+
+fn components_tensor_failure(error: TensorError) -> NativeNodeFailure {
+    if matches!(error, TensorError::Cancelled) {
+        return NativeNodeFailure {
+            code: "execution_interrupted".to_owned(),
+            message: "GetVideoComponents execution was interrupted".to_owned(),
+            kind: NativeNodeFailureKind::Interrupted,
+            retryable: false,
+        };
+    }
+    components_invalid(error.to_string())
+}
+
+fn components_invalid(message: impl Into<String>) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "invalid_video_components".to_owned(),
+        message: format!("GetVideoComponents: {}", message.into()),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
     }
 }
 
@@ -384,7 +778,8 @@ fn interrupted_failure() -> NativeNodeFailure {
 mod tests {
     use super::*;
     use crate::{
-        NativeHandleStore, NativeHandleStoreIdentity, NativeResolvedPayload,
+        NativeHandleStore, NativeHandleStoreIdentity, NativeNodeComputeSession,
+        NativeNodeServiceIdentity, NativeNodeServices, NativeResolvedPayload,
         NativeResolvedPayloadRetention,
     };
     use comfy_media::NativeAudioPayload;
@@ -406,6 +801,10 @@ mod tests {
     const FIXTURE: &str = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json"
+    ));
+    const COMPONENTS_FIXTURE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../comfy_test_support/fixtures/nodes/video-comfy-node-0207/fixture.json"
     ));
 
     #[derive(Debug)]
@@ -439,6 +838,20 @@ mod tests {
                 .lock()
                 .map(|values| values.len())
                 .map_err(|_| NativeHandleStoreError::Rejected("test store lock was poisoned".to_owned()))
+        }
+
+        fn payload(
+            &self,
+            handle: &NativeOpaqueHandle,
+        ) -> Result<Arc<NativeStoredPayload>, NativeHandleStoreError> {
+            self.values
+                .lock()
+                .map_err(|_| {
+                    NativeHandleStoreError::Rejected("test store lock was poisoned".to_owned())
+                })?
+                .get(handle.identifier())
+                .cloned()
+                .ok_or_else(|| NativeHandleStoreError::Missing(handle.identifier().to_owned()))
         }
     }
 
@@ -530,7 +943,7 @@ mod tests {
 
     struct Harness {
         store: Arc<TestStore>,
-        backend: comfy_tensor::CpuBackend,
+        backend: Arc<comfy_tensor::CpuBackend>,
         workspace: CpuWorkspaceAuthority,
         attempt_id: AttemptId,
         node_id: NodeId,
@@ -542,7 +955,7 @@ mod tests {
             let (backend, workspace) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
             Ok(Self {
                 store: TestStore::new(attempt_id)?,
-                backend,
+                backend: Arc::new(backend),
                 workspace,
                 attempt_id,
                 node_id: NodeId("create-video-test".to_owned()),
@@ -600,17 +1013,50 @@ mod tests {
             Ok((handle, storage_id))
         }
 
+        fn video_handle(
+            &self,
+            frames: comfy_tensor::Tensor,
+            audio: Option<NativeAudioPayload>,
+            frame_rate: (u64, u64),
+            bit_depth: NativeVideoBitDepth,
+        ) -> Result<NativeOpaqueHandle, Box<dyn Error>> {
+            Ok(self.store.publish(
+                NativeStoredPayload::Video(Arc::new(NativeVideoPayload::checked(
+                    frames,
+                    frame_rate.0,
+                    frame_rate.1,
+                    bit_depth,
+                    audio,
+                    None,
+                    BTreeMap::new(),
+                )?)),
+                &CancellationToken::default(),
+            )?)
+        }
+
         fn context(
             &self,
             cancellation: CancellationToken,
         ) -> Result<NativeNodeContext, Box<dyn Error>> {
-            Ok(NativeNodeContext::new(
+            let scratch = self.workspace.authorize_workspace(1024 * 1024)?;
+            let compute = NativeNodeComputeSession::checked(
+                NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x12405),
+                    self.attempt_id,
+                    self.node_id.clone(),
+                )?,
+                self.backend.clone(),
+                StreamId::DEFAULT,
+                &scratch,
+            )?;
+            Ok(NativeNodeContext::new_with_services(
                 PromptId(Uuid::from_u128(0x12404)),
                 self.attempt_id,
                 self.node_id.clone(),
                 cancellation,
-                self.workspace.authorize_workspace(0)?,
+                scratch,
                 self.store.clone(),
+                NativeNodeServices::checked(None, None, Some(compute))?,
             )?)
         }
 
@@ -667,10 +1113,28 @@ mod tests {
         native_node_bindings()?
             .into_iter()
             .find_map(|binding| match binding {
-                NativeNodeBinding::Executable { node, .. } => Some(node),
+                NativeNodeBinding::Executable { descriptor, node, .. }
+                    if descriptor.class_type == CLASS_TYPE =>
+                {
+                    Some(node)
+                }
                 _ => None,
             })
             .ok_or_else(|| "CreateVideo executable binding is absent".into())
+    }
+
+    fn components_executable() -> Result<Arc<dyn NativeNode>, Box<dyn Error>> {
+        native_node_bindings()?
+            .into_iter()
+            .find_map(|binding| match binding {
+                NativeNodeBinding::Executable { descriptor, node, .. }
+                    if descriptor.class_type == COMPONENTS_CLASS_TYPE =>
+                {
+                    Some(node)
+                }
+                _ => None,
+            })
+            .ok_or_else(|| "GetVideoComponents executable binding is absent".into())
     }
 
     #[test]
@@ -770,6 +1234,196 @@ mod tests {
         assert_eq!(video.bit_depth(), NativeVideoBitDepth::Eight);
         assert!(video.audio().is_none());
         assert_eq!(harness.store.count()?, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn get_video_components_descriptor_and_aliases_match_source() -> Result<(), Box<dyn Error>> {
+        let fixture: Value = serde_json::from_str(COMPONENTS_FIXTURE)?;
+        assert_eq!(fixture["feature_id"], COMPONENTS_FEATURE_ID);
+        assert_eq!(
+            fixture["source"]["definition_sha256"],
+            "b2232b2c558b472226418d56910b9b763d8398612b31c4019d4881d0c4717b8d"
+        );
+        let binding = components_node_binding()?;
+        binding.validate()?;
+        assert_eq!(binding.feature_id(), COMPONENTS_FEATURE_ID);
+        let descriptor = binding.descriptor();
+        assert_eq!(descriptor.class_type, COMPONENTS_CLASS_TYPE);
+        assert_eq!(descriptor.inputs.len(), 1);
+        assert_eq!(descriptor.inputs[0].name, "video");
+        assert_eq!(
+            descriptor
+                .outputs
+                .iter()
+                .map(|output| output.name.as_str())
+                .collect::<Vec<_>>(),
+            ["images", "audio", "fps", "bit_depth"]
+        );
+        assert_eq!(descriptor.effect, NativeEffectClass::Pure);
+        assert_eq!(descriptor.cache, NativeCachePolicy::InputIdentity);
+        let NativeNodeBinding::Executable { presentation, .. } = binding else {
+            return Err("GetVideoComponents binding is not executable".into());
+        };
+        assert_eq!(
+            presentation.description,
+            "Extracts all components from a video: frames, audio, framerate, and bit depth."
+        );
+        assert_eq!(
+            presentation.search_aliases,
+            ["extract frames", "split video", "video to images", "demux"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn get_video_components_preserves_aliases_and_nullable_audio() -> Result<(), Box<dyn Error>> {
+        let harness = Harness::new()?;
+        let (image_handle, image_storage) = harness.image_handle()?;
+        let image_payload = harness.store.payload(&image_handle)?;
+        let NativeStoredPayload::Tensor(image_payload) = image_payload.as_ref() else {
+            return Err("test IMAGE payload is unavailable".into());
+        };
+        let (audio_handle, audio_storage) = harness.audio_handle()?;
+        let audio_payload = harness.store.payload(&audio_handle)?;
+        let NativeStoredPayload::Audio(audio_payload) = audio_payload.as_ref() else {
+            return Err("test AUDIO payload is unavailable".into());
+        };
+        let video = harness.video_handle(
+            image_payload.tensor().clone(),
+            Some(audio_payload.as_ref().clone()),
+            (24_000, 1_001),
+            NativeVideoBitDepth::Ten,
+        )?;
+        let outcome = futures::executor::block_on(components_executable()?.execute(
+            harness.context(CancellationToken::default())?,
+            BTreeMap::from([(
+                "video".to_owned(),
+                NativeValue::Handle {
+                    value: video.clone(),
+                },
+            )]),
+        ))?;
+        let NativeNodeOutcome::Values { outputs, ui, effects } = outcome else {
+            return Err("GetVideoComponents did not return values".into());
+        };
+        assert!(ui.is_none());
+        assert!(effects.is_empty());
+        let [NativeValue::Handle { value: image }, NativeValue::Handle { value: audio }, NativeValue::Primitive { value: NativePrimitive::Number(fps) }, NativeValue::Primitive { value: NativePrimitive::Integer(depth) }] =
+            outputs.as_slice()
+        else {
+            return Err("GetVideoComponents returned the wrong output shape".into());
+        };
+        let image = harness.store.payload(image)?;
+        let NativeStoredPayload::Tensor(image) = image.as_ref() else {
+            return Err("GetVideoComponents IMAGE output is invalid".into());
+        };
+        let audio = harness.store.payload(audio)?;
+        let NativeStoredPayload::Audio(audio) = audio.as_ref() else {
+            return Err("GetVideoComponents AUDIO output is invalid".into());
+        };
+        assert_eq!(image.tensor().storage_id(), image_storage);
+        assert_eq!(audio.waveform().storage_id(), audio_storage);
+        assert_eq!(*fps, 24_000.0 / 1_001.0);
+        assert_eq!(*depth, 10);
+
+        let video = harness.video_handle(
+            image_payload.tensor().clone(),
+            None,
+            (30, 1),
+            NativeVideoBitDepth::Eight,
+        )?;
+        let outcome = futures::executor::block_on(components_executable()?.execute(
+            harness.context(CancellationToken::default())?,
+            BTreeMap::from([(
+                "video".to_owned(),
+                NativeValue::Handle {
+                    value: video.clone(),
+                },
+            )]),
+        ))?;
+        let NativeNodeOutcome::Values { outputs, .. } = outcome else {
+            return Err("GetVideoComponents did not return values".into());
+        };
+        assert!(matches!(
+            outputs.get(1),
+            Some(NativeValue::Primitive {
+                value: NativePrimitive::Null
+            })
+        ));
+        assert!(matches!(
+            outputs.get(2),
+            Some(NativeValue::Primitive {
+                value: NativePrimitive::Number(value)
+            }) if *value == 30.0
+        ));
+        assert!(matches!(
+            outputs.get(3),
+            Some(NativeValue::Primitive {
+                value: NativePrimitive::Integer(8)
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn get_video_components_normalizes_u8_and_cancels_atomically() -> Result<(), Box<dyn Error>> {
+        let harness = Harness::new()?;
+        let descriptor = TensorDescriptor::contiguous(
+            vec![1, 1, 2, 3],
+            DType::U8,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let cancellation = CancellationToken::default();
+        let context = harness.backend.execution_context(
+            StreamId::DEFAULT,
+            harness.workspace.authorize_workspace(0)?,
+            &cancellation,
+        );
+        let (frames, _) = harness
+            .backend
+            .upload_bytes(descriptor, &[0, 1, 127, 128, 254, 255], &context)?;
+        let video = harness.video_handle(
+            frames,
+            None,
+            (30, 1),
+            NativeVideoBitDepth::Eight,
+        )?;
+        let outcome = futures::executor::block_on(components_executable()?.execute(
+            harness.context(CancellationToken::default())?,
+            BTreeMap::from([(
+                "video".to_owned(),
+                NativeValue::Handle {
+                    value: video.clone(),
+                },
+            )]),
+        ))?;
+        let NativeNodeOutcome::Values { outputs, .. } = outcome else {
+            return Err("GetVideoComponents did not return values".into());
+        };
+        let Some(NativeValue::Handle { value: image }) = outputs.first() else {
+            return Err("GetVideoComponents IMAGE output is absent".into());
+        };
+        let image = harness.store.payload(image)?;
+        let NativeStoredPayload::Tensor(image) = image.as_ref() else {
+            return Err("GetVideoComponents IMAGE output is invalid".into());
+        };
+        assert_eq!(
+            image.image().ok_or("IMAGE wrapper is absent")?.as_f32_slice()?,
+            &[0.0, 1.0 / 255.0, 127.0 / 255.0, 128.0 / 255.0, 254.0 / 255.0, 1.0]
+        );
+
+        let baseline = harness.store.count()?;
+        let cancellation = CancellationToken::default();
+        cancellation.cancel();
+        let error = futures::executor::block_on(components_executable()?.execute(
+            harness.context(cancellation)?,
+            BTreeMap::from([("video".to_owned(), NativeValue::Handle { value: video })]),
+        ))
+        .expect_err("cancelled GetVideoComponents must fail");
+        assert_eq!(error.kind, NativeNodeFailureKind::Interrupted);
+        assert_eq!(harness.store.count()?, baseline);
         Ok(())
     }
 }

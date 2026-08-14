@@ -3468,6 +3468,12 @@ fn native_output_type_accepts(
 ) -> bool {
     match (expected, value) {
         (comfy_nodes::NativeValueType::Any, _) => true,
+        (
+            _,
+            NativeValue::Primitive {
+                value: comfy_nodes::NativePrimitive::Null,
+            },
+        ) => true,
         (comfy_nodes::NativeValueType::Primitive(expected), NativeValue::Primitive { value }) => {
             *expected == value.primitive_type()
                 || (*expected == comfy_nodes::NativePrimitiveType::Number
@@ -7546,6 +7552,19 @@ pub(crate) mod tests {
             Some(&cuda_capabilities),
             &CancellationToken::default(),
         )?;
+        Ok(())
+    }
+
+    #[test]
+    fn typed_outputs_accept_source_null_without_weakening_inputs()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let audio = comfy_nodes::NativeHandleType::new(NativeHandleKind::Audio, "AUDIO")?;
+        let expected = NativeValueType::Handle(audio.clone());
+        let null = native_null();
+        assert!(native_output_type_accepts(&expected, &null));
+        assert!(!native_output_type_accepts(&expected, &native_integer(1)));
+        let input = NativeTypeUnion::new([NativeValueType::Handle(audio)])?;
+        assert!(!input.accepts(&null));
         Ok(())
     }
 }

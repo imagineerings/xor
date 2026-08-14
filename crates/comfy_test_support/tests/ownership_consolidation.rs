@@ -15455,7 +15455,7 @@ fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn 
     let root = repository_root()?;
     let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
     for required in [
-        "pub const NODE_DESCRIPTOR_IDS: &[&str] = &[\"CreateVideo\"]",
+        "pub const NODE_DESCRIPTOR_IDS: &[&str] = &[\"CreateVideo\", \"GetVideoComponents\"]",
         "const FEATURE_ID: &str = \"COMFY-NODE-0124\"",
         "exact_positive_f64_fraction(fps)",
         "NativeVideoPayload::checked(",
@@ -15516,6 +15516,70 @@ fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn 
             .and_then(serde_json::Value::as_array)
             .is_some_and(|tasks| tasks.iter().any(|task| {
                 task.as_str() == Some("comfy-parity-native-video-component-create-node-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_component_extract_node_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    for required in [
+        "const COMPONENTS_FEATURE_ID: &str = \"COMFY-NODE-0207\"",
+        "impl NativeNode for GetVideoComponentsNode",
+        "project_video_frames(&context, video.frames())",
+        "NativePrimitive::Null",
+        "rollback_components(&context, &published)",
+        "get_video_components_preserves_aliases_and_nullable_audio",
+        "get_video_components_normalizes_u8_and_cancels_atomically",
+    ] {
+        assert!(
+            node.contains(required),
+            "GetVideoComponents node lacks {required}"
+        );
+    }
+    assert_eq!(
+        node.matches("impl NativeNode for GetVideoComponentsNode")
+            .count(),
+        1
+    );
+    let executor = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
+    assert!(executor.contains("typed_outputs_accept_source_null_without_weakening_inputs"));
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/nodes/video-comfy-node-0207/fixture.json"),
+    )?;
+    for required in [
+        "COMFY-NODE-0207",
+        "IMAGE_aliases_contiguous_CPU_F32_VIDEO_frame_storage",
+        "typed_Null",
+        "codec_container_or_file_demux_execution",
+        "external_media_publication",
+    ] {
+        assert!(fixture.contains(required));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_service_noncodec_video_component_extract_node_runtime_adapter")
+            })
+        })
+        .ok_or("missing GetVideoComponents ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-component-extract-node-foundation")
             }))
     );
     Ok(())

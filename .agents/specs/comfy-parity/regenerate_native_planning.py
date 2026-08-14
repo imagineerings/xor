@@ -11448,6 +11448,75 @@ def native_video_component_create_node_foundation_task(
     )
 
 
+def native_video_component_extract_node_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-component-extract-node-foundation",
+        "Extract canonical video components as a native node",
+        [6, 7, 28, 31, 32, 34, 35, 41, 42],
+        [8, 17, 18, 19, 20, 28, 31, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-NODE-001",
+            "VAL-NODE-002",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The exact GetVideoComponents native node resolves one canonical materialized VIDEO, publishes IMAGE and optional AUDIO component aliases, returns the rational frame rate as a float and the exact 8/10-bit identity, and preserves source None through output-only typed Null. Contiguous F32 frames alias storage; admitted U8 or strided CPU frames materialize through canonical caller-authorized tensor operations. No codec, file demux, slice, effect, persistence, recovery, or external publication authority is introduced.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json",
+        ],
+        [
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0207/fixture.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-bound tests prove the exact descriptor, presentation, port order, F32 frame and AUDIO storage aliasing, absent-AUDIO typed Null, exact rational-to-f64 fps, both bit depths, bounded U8 normalization, malformed input and cancellation rejection, reverse rollback of partial handle publication, and clean retry. Runtime tests prove typed Null is output-only and does not weaken typed inputs. The fixture explicitly claims no codec, container, file demux, slice, effect, cache owner, persistence, recovery, or external media publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "6.1",
+            "6.2",
+            "6.3",
+            "6.4",
+            "7.1",
+            "7.5",
+            "28.6",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "35.3",
+            "35.5",
+            "41.3",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13757,8 +13826,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_component_create_node_foundation = native_video_component_create_node_foundation_task(
         str(video_codec_ltxv_node_adapter_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_component_extract_node_foundation = native_video_component_extract_node_foundation_task(
         str(video_component_create_node_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_component_extract_node_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13898,8 +13970,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_node_service_foundation,
         video_codec_ltxv_node_adapter_foundation,
         video_component_create_node_foundation,
+        video_component_extract_node_foundation,
         video_foundation,
-            detection_foundation,
+        detection_foundation,
         ]
         + nodes
         + user_interface_tasks

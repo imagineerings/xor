@@ -15274,6 +15274,115 @@
       "decision_reason": "One early executable node slice owns the exact CreateVideo descriptor, Python-compatible finite-float rational projection, canonical component resolution, bit-depth admission, cancellation, and failure-atomic VIDEO publication. It consumes the existing handle-store and NativeVideoPayload owners without introducing codec, container, filesystem, effect, persistence, recovery, or external publication authority."
     },
     {
+      "concern": "native_video_reviewed_codec_service_noncodec_video_component_extract_node_runtime_adapter",
+      "canonical_owner": "comfy_nodes::generated_video_01::GetVideoComponentsNode",
+      "owner_files": [
+        "crates/comfy_nodes/src/families/video_01.rs",
+        "crates/comfy_runtime/src/executor.rs"
+      ],
+      "owner_symbols": [
+        "GetVideoComponentsNode",
+        "project_video_frames",
+        "native_output_type_accepts"
+      ],
+      "allowed_adapters": [
+        "NativeVideoPayload remains the sole frame, audio, rational frame-rate, bit-depth, alpha, metadata, semantic digest, and residency owner",
+        "canonical tensor cast, divide, and contiguous operations own U8 or strided frame materialization under caller compute authority",
+        "NativeHandleStore remains the sole component publication and revocation owner; this adapter publishes only completed IMAGE and optional AUDIO projections",
+        "runtime typed-null output acceptance models source None without weakening typed input validation",
+        "codec, container, file demux, slicing, effect, persistence, recovery, and external publication owners remain separate"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "qualified": "comfy_nodes::generated_video_01::GetVideoComponentsNode",
+          "role": "canonical_implementation",
+          "symbol": "GetVideoComponentsNode"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoPayload::frames",
+        "NativeVideoPayload::audio",
+        "cast_to_with_context_exact_native",
+        "div_with_context_exact_native"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "required_mappings": [
+        {
+          "name": "get-video-components-binds-exact-source-ports-and-order",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "GetVideoComponents[\\s\\S]*images[\\s\\S]*audio[\\s\\S]*fps[\\s\\S]*bit_depth"
+        },
+        {
+          "name": "get-video-components-projects-canonical-frame-and-audio-aliases",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "project_video_frames[\\s\\S]*NativeTensorPayload::from_image[\\s\\S]*video[\\s\\S]*audio\\(\\)[\\s\\S]*NativePrimitive::Null"
+        },
+        {
+          "name": "get-video-components-materializes-u8-through-canonical-tensor-owners",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "DType::U8[\\s\\S]*cast_to_with_context_exact_native[\\s\\S]*div_with_context_exact_native[\\s\\S]*255"
+        },
+        {
+          "name": "get-video-components-revokes-partial-publication-in-reverse",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "rollback_components[\\s\\S]*published.iter\\(\\).rev\\(\\)[\\s\\S]*revoke"
+        },
+        {
+          "name": "get-video-components-keeps-null-output-only",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "native_output_type_accepts[\\s\\S]*NativePrimitive::Null[\\s\\S]*typed_outputs_accept_source_null_without_weakening_inputs"
+        },
+        {
+          "name": "get-video-components-fixture-bounds-positive-and-negative-claims",
+          "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0207/fixture.json",
+          "pattern": "COMFY-NODE-0207[\\s\\S]*typed_Null[\\s\\S]*codec_container_or_file_demux_execution[\\s\\S]*external_media_publication"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-component-extract-node-foundation"
+      ],
+      "production_consumers": [
+        "the generated native implementation registry, GetVideoComponents workflow execution, and later source video-family reconciliation"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D8",
+        "D17",
+        "D18",
+        "D19",
+        "D20",
+        "D28",
+        "D31",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-NODE-001",
+        "VAL-NODE-002",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One exact source node resolves a materialized VIDEO once, publishes canonical IMAGE and optional AUDIO aliases, projects rational fps and bit depth, and owns only bounded U8 or strided frame adaptation plus output-only typed-null compatibility. General codecs, file demux, slicing, effects, persistence, recovery, and external publication remain separate."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [
