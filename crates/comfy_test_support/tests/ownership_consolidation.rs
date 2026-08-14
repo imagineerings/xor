@@ -15019,6 +15019,82 @@ fn val_ownership_native_video_codec_ltxv_h264_mp4_demux_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_ltxv_h264_mp4_decode_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeLtxvH264DecodeLimits",
+        "pub(crate) enum NativeVideoCodecLtxvDecodeError",
+        "pub(crate) fn decode_first_rgb8_frame",
+        "decode_first_ltxv_h264_frame_with_check",
+        "struct NativeLtxvPacketContent",
+        "avcodec_parameters_to_context",
+        "avcodec_send_packet",
+        "avcodec_receive_frame",
+        "av_read_frame",
+        "sws_scale",
+        "retained_ltxv_h264_decode_returns_first_rgb8_frame_and_drains_packets",
+        "retained_ltxv_h264_decode_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(ffi.contains(required), "LTXV H.264 decode lacks {required}");
+    }
+    for forbidden in [
+        "pub fn frame_ptr",
+        "pub fn packet_ptr",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "LTXV H.264 decode exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-decode/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-retained-ltxv-h264-first-frame-decode",
+        "native_decode_call_choreography_executed",
+        "decoded_rgb_tensor_constructed",
+        "valid_mp4_h264_numeric_oracle",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "LTXV decode fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some(
+                        "native_video_reviewed_codec_registry_ltxv_h264_mp4_retained_first_frame_decode",
+                    )
+            })
+        })
+        .ok_or("missing LTXV H.264 MP4 first-frame decode ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

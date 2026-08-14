@@ -14642,6 +14642,99 @@
       "decision_reason": "One retained attempt-local owner reopens only the canonical staged LTXV MP4 through borrowed bounded AVIO, executes native container probing, binds the exact single stream to the admitted decoder, and preserves reverse cleanup and scratch accounting without claiming packet decode, RGB, media, or publication authority."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_retained_first_frame_decode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Demux::decode_first_rgb8_frame",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeLtxvH264DecodeLimits",
+        "NativeVideoCodecLtxvDecodeError",
+        "NativeLtxvH264Demux::decode_first_rgb8_frame",
+        "decode_first_ltxv_h264_frame_with_check",
+        "NativeLtxvPacketContent"
+      ],
+      "allowed_adapters": [
+        "the retained demux owner supplies the already selected single stream, bounded borrowed AVIO, and exact originating codec lifetime",
+        "the admitted codec owner supplies the exact retained H.264 decoder and private reviewed function table without a second registry lookup",
+        "the canonical CPU workspace owner supplies bounded RGB staging and backend tensor upload",
+        "the following LTXV tensor adapter may consume only the canonical RGB8 result and cannot access native pointers or sessions"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Demux::decode_first_rgb8_frame",
+          "role": "canonical_service",
+          "symbol": "decode_first_rgb8_frame",
+          "pattern": "pub\\(crate\\) fn decode_first_rgb8_frame\\("
+        }
+      ],
+      "call_symbols": [
+        "avcodec_parameters_to_context",
+        "avcodec_open2",
+        "av_read_frame",
+        "avcodec_send_packet",
+        "avcodec_receive_frame",
+        "sws_scale"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-h264-first-frame-decode-consumes-retained-demux-and-admitted-decoder",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "decode_first_rgb8_frame[\\s\\S]*self.video_stream_index[\\s\\S]*self.codec.decoder[\\s\\S]*decode_first_ltxv_h264_frame_with_check"
+        },
+        {
+          "name": "ltxv-h264-first-frame-decode-bounds-packets-frame-and-rgb-publication",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "maximum_packet_iterations[\\s\\S]*maximum_receive_iterations[\\s\\S]*NativeLtxvPacketContent[\\s\\S]*AV_ERROR_END_OF_FILE[\\s\\S]*workspace_vec[\\s\\S]*Rgb8ImageTensor"
+        },
+        {
+          "name": "ltxv-h264-first-frame-decode-tests-state-failure-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_ltxv_h264_decode_returns_first_rgb8_frame_and_drains_packets[\\s\\S]*retained_ltxv_h264_decode_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "ltxv-h264-first-frame-decode-fixture-bounds-numeric-and-publication-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-decode/manifest.json",
+          "pattern": "synthetic-retained-ltxv-h264-first-frame-decode[\\s\\S]*native_decode_call_choreography_executed[\\s\\S]*valid_mp4_h264_numeric_oracle[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-h264-mp4-decode-foundation"
+      ],
+      "production_consumers": [
+        "the following source-compatible LTXV tensor preprocessing adapter"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The consumed retained demux is the sole first-frame H.264 decoder owner. It preserves packet ownership across bounded send/receive transitions, converts only the controlled YUV420P frame into caller-accounted RGB8, and publishes no native pointer, general media, cache, effect, persistence, recovery, or output authority."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [

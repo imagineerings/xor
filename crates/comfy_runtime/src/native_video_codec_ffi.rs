@@ -3,7 +3,8 @@ use crate::{
     native_video_codec_abi as abi,
 };
 use comfy_tensor::{
-    CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, ExecutionContext, Rgb8ImageTensor, TensorError,
+    CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext,
+    Rgb8ImageTensor, TensorDescriptor, TensorError,
 };
 use comfy_types::{CancellationError, CancellationToken};
 use std::{
@@ -134,6 +135,8 @@ impl NativeLtxvH264EncodeLimits {
 pub(crate) struct NativeLtxvH264Mp4<'codec> {
     codec: &'codec NativeLtxvH264Codec,
     output: NativeVideoCodecMemoryOutput<'codec>,
+    width: i32,
+    height: i32,
 }
 
 #[allow(
@@ -198,8 +201,100 @@ pub(crate) struct NativeLtxvH264Demux<'codec, 'bytes> {
     input: NativeVideoCodecMemoryInput<'codec, 'bytes>,
     _native_session_workspace: CpuWorkspaceLease,
     video_stream_index: i32,
+    expected_width: i32,
+    expected_height: i32,
     codec: &'codec NativeLtxvH264Codec,
     _thread_bound: PhantomData<std::rc::Rc<()>>,
+}
+
+#[allow(
+    dead_code,
+    reason = "constructed by the following source-compatible LTXV tensor adapter"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeLtxvH264DecodeLimits {
+    maximum_packet_iterations: usize,
+    maximum_receive_iterations: usize,
+    maximum_width: u64,
+    maximum_height: u64,
+    maximum_pixels: u64,
+    maximum_output_bytes: usize,
+    maximum_native_session_bytes: u64,
+}
+
+impl NativeLtxvH264DecodeLimits {
+    #[allow(
+        dead_code,
+        reason = "constructed by the following source-compatible LTXV tensor adapter"
+    )]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn checked(
+        maximum_packet_iterations: usize,
+        maximum_receive_iterations: usize,
+        maximum_width: u64,
+        maximum_height: u64,
+        maximum_pixels: u64,
+        maximum_output_bytes: usize,
+        maximum_native_session_bytes: u64,
+    ) -> Result<Self, NativeVideoCodecLtxvDecodeError> {
+        if maximum_packet_iterations == 0
+            || maximum_receive_iterations == 0
+            || maximum_width == 0
+            || maximum_height == 0
+            || maximum_pixels == 0
+            || maximum_output_bytes == 0
+            || maximum_native_session_bytes == 0
+        {
+            return Err(NativeVideoCodecLtxvDecodeError::InvalidLimits);
+        }
+        Ok(Self {
+            maximum_packet_iterations,
+            maximum_receive_iterations,
+            maximum_width,
+            maximum_height,
+            maximum_pixels,
+            maximum_output_bytes,
+            maximum_native_session_bytes,
+        })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "returned through the following source-compatible LTXV tensor adapter"
+)]
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecLtxvDecodeError {
+    #[error("native LTXV H.264 first-frame decode was cancelled")]
+    Cancelled,
+    #[error("native LTXV H.264 first-frame decode received invalid resource limits")]
+    InvalidLimits,
+    #[error("native LTXV H.264 first-frame decode exhausted resources during {phase}")]
+    ResourceExhausted { phase: &'static str },
+    #[error("native LTXV H.264 first-frame decode allocation failed during {phase}")]
+    NativeAllocation { phase: &'static str },
+    #[error("native LTXV H.264 first-frame decode failed during {phase} with status {status}")]
+    NativeCall { phase: &'static str, status: i32 },
+    #[error("native LTXV H.264 first-frame decode exceeded its packet iteration limit")]
+    PacketIterationLimit,
+    #[error("native LTXV H.264 first-frame decode exceeded its receive iteration limit")]
+    ReceiveIterationLimit,
+    #[error("native LTXV H.264 input yielded no decoded frame")]
+    MissingFrame,
+    #[error("native LTXV H.264 decoded frame exceeded its reviewed bounds")]
+    InvalidFrame,
+    #[error("native LTXV H.264 decoder made no protocol progress")]
+    ProtocolStalled,
+    #[error(transparent)]
+    Io(#[from] NativeVideoCodecIoError),
+    #[error("native LTXV H.264 tensor operation failed: {0}")]
+    Tensor(#[source] TensorError),
+}
+
+impl From<CancellationError> for NativeVideoCodecLtxvDecodeError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
 }
 
 #[allow(
@@ -295,6 +390,8 @@ impl NativeLtxvH264Codec {
         Ok(NativeLtxvH264Mp4 {
             codec: self,
             output,
+            width,
+            height,
         })
     }
 }
@@ -339,9 +436,64 @@ impl<'codec> NativeLtxvH264Mp4<'codec> {
             input,
             _native_session_workspace: native_session_workspace,
             video_stream_index,
+            expected_width: self.width,
+            expected_height: self.height,
             codec: self.codec,
             _thread_bound: PhantomData,
         })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following source-compatible LTXV tensor adapter"
+)]
+impl NativeLtxvH264Demux<'_, '_> {
+    pub(crate) fn decode_first_rgb8_frame(
+        self,
+        limits: NativeLtxvH264DecodeLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Rgb8ImageTensor, NativeVideoCodecLtxvDecodeError> {
+        context.check().map_err(map_ltxv_decode_tensor_error)?;
+        let _native_decode_workspace = backend
+            .reserve_workspace(context, limits.maximum_native_session_bytes)
+            .map_err(map_ltxv_decode_tensor_error)?;
+        let functions = NativeLtxvH264DecodeFunctions::from_codec(self.codec);
+        let format = self.format.pointer().map_err(|_| {
+            NativeVideoCodecLtxvDecodeError::NativeAllocation {
+                phase: "access retained MP4 input",
+            }
+        })?;
+        let rgb = decode_first_ltxv_h264_frame_with_check(
+            format,
+            self.video_stream_index,
+            self.codec.decoder,
+            self.expected_width,
+            self.expected_height,
+            limits,
+            &functions,
+            &self.input,
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        context.check().map_err(map_ltxv_decode_tensor_error)?;
+        Ok(rgb)
+    }
+}
+
+fn map_ltxv_decode_tensor_error(error: TensorError) -> NativeVideoCodecLtxvDecodeError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecLtxvDecodeError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeVideoCodecLtxvDecodeError::ResourceExhausted {
+                phase: "authorize or allocate decode output",
+            }
+        }
+        error => NativeVideoCodecLtxvDecodeError::Tensor(error),
     }
 }
 
@@ -1400,6 +1552,54 @@ struct NativeLtxvH264EncodeFunctions {
     sws_scale: abi::SwsScale,
 }
 
+#[derive(Clone, Copy)]
+struct NativeLtxvH264DecodeFunctions {
+    av_packet_alloc: abi::AvPacketAlloc,
+    av_packet_free: abi::AvPacketFree,
+    av_packet_unref: abi::AvPacketUnref,
+    avcodec_alloc_context3: abi::AvcodecAllocContext3,
+    avcodec_free_context: abi::AvcodecFreeContext,
+    avcodec_open2: abi::AvcodecOpen2,
+    avcodec_parameters_to_context: abi::AvcodecParametersToContext,
+    avcodec_receive_frame: abi::AvcodecReceiveFrame,
+    avcodec_send_packet: abi::AvcodecSendPacket,
+    av_read_frame: abi::AvReadFrame,
+    av_frame_alloc: abi::AvFrameAlloc,
+    av_frame_free: abi::AvFrameFree,
+    av_opt_set_int: abi::AvOptSetInt,
+    sws_free_context: abi::SwsFreeContext,
+    sws_get_context: abi::SwsGetContext,
+    sws_scale: abi::SwsScale,
+}
+
+impl NativeLtxvH264DecodeFunctions {
+    #[allow(
+        dead_code,
+        reason = "consumed by the following source-compatible LTXV tensor adapter"
+    )]
+    fn from_codec(codec: &NativeLtxvH264Codec) -> Self {
+        let symbols = &codec.binding._symbols;
+        Self {
+            av_packet_alloc: symbols.avcodec.av_packet_alloc,
+            av_packet_free: symbols.avcodec.av_packet_free,
+            av_packet_unref: symbols.avcodec.av_packet_unref,
+            avcodec_alloc_context3: symbols.avcodec.avcodec_alloc_context3,
+            avcodec_free_context: symbols.avcodec.avcodec_free_context,
+            avcodec_open2: symbols.avcodec.avcodec_open2,
+            avcodec_parameters_to_context: symbols.avcodec.avcodec_parameters_to_context,
+            avcodec_receive_frame: symbols.avcodec.avcodec_receive_frame,
+            avcodec_send_packet: symbols.avcodec.avcodec_send_packet,
+            av_read_frame: symbols.avformat.av_read_frame,
+            av_frame_alloc: symbols.avutil.av_frame_alloc,
+            av_frame_free: symbols.avutil.av_frame_free,
+            av_opt_set_int: symbols.avutil.av_opt_set_int,
+            sws_free_context: symbols.swscale.sws_free_context,
+            sws_get_context: symbols.swscale.sws_get_context,
+            sws_scale: symbols.swscale.sws_scale,
+        }
+    }
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the following retained H.264 decode leaf"
@@ -1532,6 +1732,391 @@ impl Drop for NativeLtxvDictionary {
     fn drop(&mut self) {
         unsafe { (self.free)(std::ptr::addr_of_mut!(self.pointer)) };
     }
+}
+
+struct NativeLtxvPacketContent {
+    packet: NonNull<abi::AvPacket>,
+    unref: abi::AvPacketUnref,
+    active: bool,
+}
+
+impl NativeLtxvPacketContent {
+    fn new(packet: NonNull<abi::AvPacket>, unref: abi::AvPacketUnref) -> Self {
+        Self {
+            packet,
+            unref,
+            active: true,
+        }
+    }
+
+    fn clear(&mut self) {
+        if self.active {
+            unsafe { (self.unref)(self.packet.as_ptr()) };
+            self.active = false;
+        }
+    }
+}
+
+impl Drop for NativeLtxvPacketContent {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decode_first_ltxv_h264_frame_with_check(
+    format: NonNull<abi::AvFormatContext>,
+    video_stream_index: i32,
+    decoder: NonNull<abi::AvCodec>,
+    expected_width: i32,
+    expected_height: i32,
+    limits: NativeLtxvH264DecodeLimits,
+    functions: &NativeLtxvH264DecodeFunctions,
+    input: &NativeVideoCodecMemoryInput<'_, '_>,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<Rgb8ImageTensor, NativeVideoCodecLtxvDecodeError> {
+    macro_rules! checked_native_call {
+        ($expression:expr) => {{
+            check_cancellation()?;
+            let result = unsafe { $expression };
+            check_cancellation()?;
+            result
+        }};
+    }
+
+    check_cancellation()?;
+    let stream_count = unsafe { format.as_ref().stream_count };
+    let stream_index = usize::try_from(video_stream_index)
+        .ok()
+        .filter(|index| *index < usize::try_from(stream_count).unwrap_or(0))
+        .ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    let streams = unsafe { format.as_ref().streams };
+    if streams.is_null() {
+        return Err(NativeVideoCodecLtxvDecodeError::InvalidFrame);
+    }
+    let stream_pointer = unsafe { *streams.add(stream_index) };
+    let stream =
+        NonNull::new(stream_pointer).ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    let codec_parameters = unsafe { stream.as_ref().codec_parameters };
+    if codec_parameters.is_null() {
+        return Err(NativeVideoCodecLtxvDecodeError::InvalidFrame);
+    }
+
+    let codec_pointer = checked_native_call!((functions.avcodec_alloc_context3)(decoder.as_ptr()));
+    let codec = NativeLtxvCodecContext {
+        pointer: NonNull::new(codec_pointer).ok_or(
+            NativeVideoCodecLtxvDecodeError::NativeAllocation {
+                phase: "allocate H.264 decoder context",
+            },
+        )?,
+        free: functions.avcodec_free_context,
+    };
+    check_ltxv_decode_status(
+        "copy H.264 decoder parameters",
+        checked_native_call!((functions.avcodec_parameters_to_context)(
+            codec.pointer.as_ptr(),
+            codec_parameters,
+        )),
+    )?;
+    check_ltxv_decode_status(
+        "set H.264 decoder threads",
+        checked_native_call!((functions.av_opt_set_int)(
+            codec.pointer.as_ptr().cast(),
+            c"threads".as_ptr(),
+            1,
+            0,
+        )),
+    )?;
+    check_ltxv_decode_status(
+        "open H.264 decoder",
+        checked_native_call!((functions.avcodec_open2)(
+            codec.pointer.as_ptr(),
+            decoder.as_ptr(),
+            std::ptr::null_mut(),
+        )),
+    )?;
+
+    let packet_pointer = checked_native_call!((functions.av_packet_alloc)());
+    let packet = NativeLtxvPacket {
+        pointer: NonNull::new(packet_pointer).ok_or(
+            NativeVideoCodecLtxvDecodeError::NativeAllocation {
+                phase: "allocate H.264 input packet",
+            },
+        )?,
+        free: functions.av_packet_free,
+    };
+    let frame_pointer = checked_native_call!((functions.av_frame_alloc)());
+    let frame = NativeLtxvFrame {
+        pointer: NonNull::new(frame_pointer).ok_or(
+            NativeVideoCodecLtxvDecodeError::NativeAllocation {
+                phase: "allocate H.264 output frame",
+            },
+        )?,
+        free: functions.av_frame_free,
+    };
+
+    let mut packet_iterations = limits.maximum_packet_iterations;
+    let mut receive_iterations = limits.maximum_receive_iterations;
+    let mut flushing = false;
+    'decode: loop {
+        consume_decode_iteration(&mut receive_iterations, false)?;
+        let receive_status = checked_native_call!((functions.avcodec_receive_frame)(
+            codec.pointer.as_ptr(),
+            frame.pointer.as_ptr(),
+        ));
+        match receive_status {
+            0 => break 'decode,
+            abi::AV_ERROR_END_OF_FILE => {
+                return Err(NativeVideoCodecLtxvDecodeError::MissingFrame);
+            }
+            abi::AV_ERROR_TRY_AGAIN if flushing => {
+                return Err(NativeVideoCodecLtxvDecodeError::ProtocolStalled);
+            }
+            abi::AV_ERROR_TRY_AGAIN => {}
+            status => check_ltxv_decode_status("receive H.264 frame", status)?,
+        }
+
+        consume_decode_iteration(&mut packet_iterations, true)?;
+        check_cancellation()?;
+        let read_status =
+            unsafe { (functions.av_read_frame)(format.as_ptr(), packet.pointer.as_ptr()) };
+        let mut packet_content = (read_status == 0)
+            .then(|| NativeLtxvPacketContent::new(packet.pointer, functions.av_packet_unref));
+        let post_read_cancellation = check_cancellation();
+        let callback_status = input.check_callback_status();
+        post_read_cancellation?;
+        callback_status.map_err(map_ltxv_decode_io_error)?;
+        match read_status {
+            0 => {
+                if unsafe { packet.pointer.as_ref().stream_index } != video_stream_index {
+                    continue;
+                }
+                consume_decode_iteration(&mut receive_iterations, false)?;
+                check_cancellation()?;
+                let send_status = unsafe {
+                    (functions.avcodec_send_packet)(codec.pointer.as_ptr(), packet.pointer.as_ptr())
+                };
+                let post_send_cancellation = check_cancellation();
+                if send_status == 0 {
+                    if let Some(content) = packet_content.as_mut() {
+                        content.clear();
+                    }
+                    post_send_cancellation?;
+                    continue;
+                }
+                post_send_cancellation?;
+                if send_status != abi::AV_ERROR_TRY_AGAIN {
+                    check_ltxv_decode_status("send H.264 packet", send_status)?;
+                }
+                consume_decode_iteration(&mut receive_iterations, false)?;
+                let pending_receive_status = checked_native_call!((functions
+                    .avcodec_receive_frame)(
+                    codec.pointer.as_ptr(),
+                    frame.pointer.as_ptr(),
+                ));
+                match pending_receive_status {
+                    0 => break 'decode,
+                    abi::AV_ERROR_END_OF_FILE => {
+                        return Err(NativeVideoCodecLtxvDecodeError::MissingFrame);
+                    }
+                    abi::AV_ERROR_TRY_AGAIN => {
+                        return Err(NativeVideoCodecLtxvDecodeError::ProtocolStalled);
+                    }
+                    status => check_ltxv_decode_status("receive pending H.264 frame", status)?,
+                }
+            }
+            abi::AV_ERROR_TRY_AGAIN => continue,
+            abi::AV_ERROR_END_OF_FILE => {
+                flushing = true;
+                consume_decode_iteration(&mut receive_iterations, false)?;
+                let flush_status = checked_native_call!((functions.avcodec_send_packet)(
+                    codec.pointer.as_ptr(),
+                    std::ptr::null(),
+                ));
+                match flush_status {
+                    0 => continue,
+                    abi::AV_ERROR_END_OF_FILE => {
+                        return Err(NativeVideoCodecLtxvDecodeError::MissingFrame);
+                    }
+                    abi::AV_ERROR_TRY_AGAIN => {
+                        return Err(NativeVideoCodecLtxvDecodeError::ProtocolStalled);
+                    }
+                    status => check_ltxv_decode_status("flush H.264 decoder", status)?,
+                }
+            }
+            status => check_ltxv_decode_status("read H.264 packet", status)?,
+        }
+    }
+
+    validate_ltxv_decoded_frame(frame.pointer, expected_width, expected_height, limits)?;
+    let width = unsafe { frame.pointer.as_ref().width };
+    let height = unsafe { frame.pointer.as_ref().height };
+    let output_bytes = decoded_rgb_byte_count(width, height, limits)?;
+    let mut rgb = backend
+        .workspace_vec::<u8>(context, output_bytes)
+        .map_err(map_ltxv_decode_tensor_error)?;
+    for index in 0..output_bytes {
+        if index & 0xffff == 0 {
+            check_cancellation()?;
+        }
+        rgb.try_push(0).map_err(map_ltxv_decode_tensor_error)?;
+    }
+    let sws_pointer = checked_native_call!((functions.sws_get_context)(
+        width,
+        height,
+        abi::AV_PIXEL_FORMAT_YUV420P,
+        width,
+        height,
+        abi::AV_PIXEL_FORMAT_RGB24,
+        abi::SWS_BILINEAR,
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+        std::ptr::null(),
+    ));
+    let sws = NativeLtxvSwsContext {
+        pointer: NonNull::new(sws_pointer).ok_or(
+            NativeVideoCodecLtxvDecodeError::NativeAllocation {
+                phase: "allocate decoded RGB conversion",
+            },
+        )?,
+        free: functions.sws_free_context,
+    };
+    let mut destination_data = [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS];
+    destination_data[0] = rgb.as_mut_ptr();
+    let mut destination_line_size = [0_i32; abi::AV_NUM_DATA_POINTERS];
+    destination_line_size[0] = width
+        .checked_mul(3)
+        .ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    let converted_height = checked_native_call!((functions.sws_scale)(
+        sws.pointer.as_ptr(),
+        frame.pointer.as_ref().data.as_ptr().cast(),
+        frame.pointer.as_ref().line_size.as_ptr(),
+        0,
+        height,
+        destination_data.as_mut_ptr(),
+        destination_line_size.as_ptr(),
+    ));
+    if converted_height != height {
+        return Err(NativeVideoCodecLtxvDecodeError::NativeCall {
+            phase: "convert decoded H.264 frame to RGB",
+            status: converted_height,
+        });
+    }
+    check_cancellation()?;
+    let descriptor = TensorDescriptor::contiguous(
+        vec![
+            u64::try_from(height).map_err(|_| NativeVideoCodecLtxvDecodeError::InvalidFrame)?,
+            u64::try_from(width).map_err(|_| NativeVideoCodecLtxvDecodeError::InvalidFrame)?,
+            3,
+        ],
+        DType::U8,
+        DeviceId::CPU,
+        context.stream,
+    )
+    .map_err(map_ltxv_decode_tensor_error)?;
+    let (tensor, _) = backend
+        .upload_bytes(descriptor, &rgb, context)
+        .map_err(map_ltxv_decode_tensor_error)?;
+    let image = Rgb8ImageTensor::from_tensor(tensor).map_err(map_ltxv_decode_tensor_error)?;
+    check_cancellation()?;
+    Ok(image)
+}
+
+fn consume_decode_iteration(
+    remaining: &mut usize,
+    packet: bool,
+) -> Result<(), NativeVideoCodecLtxvDecodeError> {
+    if *remaining == 0 {
+        return if packet {
+            Err(NativeVideoCodecLtxvDecodeError::PacketIterationLimit)
+        } else {
+            Err(NativeVideoCodecLtxvDecodeError::ReceiveIterationLimit)
+        };
+    }
+    *remaining -= 1;
+    Ok(())
+}
+
+fn validate_ltxv_decoded_frame(
+    frame: NonNull<abi::AvFrame>,
+    expected_width: i32,
+    expected_height: i32,
+    limits: NativeLtxvH264DecodeLimits,
+) -> Result<(), NativeVideoCodecLtxvDecodeError> {
+    let frame = unsafe { frame.as_ref() };
+    if frame.width <= 0
+        || frame.height <= 0
+        || frame.width % 2 != 0
+        || frame.height % 2 != 0
+        || frame.width != expected_width
+        || frame.height != expected_height
+        || frame.format != abi::AV_PIXEL_FORMAT_YUV420P
+        || u64::try_from(frame.width)
+            .ok()
+            .is_none_or(|width| width > limits.maximum_width)
+        || u64::try_from(frame.height)
+            .ok()
+            .is_none_or(|height| height > limits.maximum_height)
+        || frame.data[..3].iter().any(|plane| plane.is_null())
+        || frame.line_size[0] < frame.width
+        || frame.line_size[1] < frame.width / 2
+        || frame.line_size[2] < frame.width / 2
+    {
+        return Err(NativeVideoCodecLtxvDecodeError::InvalidFrame);
+    }
+    decoded_rgb_byte_count(frame.width, frame.height, limits)?;
+    Ok(())
+}
+
+fn decoded_rgb_byte_count(
+    width: i32,
+    height: i32,
+    limits: NativeLtxvH264DecodeLimits,
+) -> Result<usize, NativeVideoCodecLtxvDecodeError> {
+    let width = u64::try_from(width).map_err(|_| NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    let height =
+        u64::try_from(height).map_err(|_| NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    let pixels = width
+        .checked_mul(height)
+        .filter(|pixels| *pixels <= limits.maximum_pixels)
+        .ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)?;
+    usize::try_from(
+        pixels
+            .checked_mul(3)
+            .ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)?,
+    )
+    .ok()
+    .filter(|bytes| *bytes <= limits.maximum_output_bytes)
+    .ok_or(NativeVideoCodecLtxvDecodeError::InvalidFrame)
+}
+
+fn map_ltxv_decode_io_error(error: NativeVideoCodecIoError) -> NativeVideoCodecLtxvDecodeError {
+    match error {
+        NativeVideoCodecIoError::Cancelled => NativeVideoCodecLtxvDecodeError::Cancelled,
+        NativeVideoCodecIoError::CallbackResourceExhausted
+        | NativeVideoCodecIoError::OutputLimitExceeded
+        | NativeVideoCodecIoError::NativeAllocationFailed => {
+            NativeVideoCodecLtxvDecodeError::ResourceExhausted {
+                phase: "read bounded MP4 input",
+            }
+        }
+        error => NativeVideoCodecLtxvDecodeError::Io(error),
+    }
+}
+
+fn check_ltxv_decode_status(
+    phase: &'static str,
+    status: i32,
+) -> Result<(), NativeVideoCodecLtxvDecodeError> {
+    if status >= 0 {
+        return Ok(());
+    }
+    if status == abi::AV_ERROR_OUT_OF_MEMORY {
+        return Err(NativeVideoCodecLtxvDecodeError::ResourceExhausted { phase });
+    }
+    Err(NativeVideoCodecLtxvDecodeError::NativeCall { phase, status })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5371,6 +5956,9 @@ mod tests {
     #[test]
     fn retained_video_codec_avio_allocation_raii_and_retry_are_atomic()
     -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
         take_avio_events()?;
         let cancellation = CancellationToken::default();
         let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
@@ -5523,6 +6111,445 @@ mod tests {
             &mut || Ok(()),
         )?;
         drop(retry);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    static DECODE_EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+    static DECODE_MODE: AtomicUsize = AtomicUsize::new(0);
+    static DECODE_RECEIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static DECODE_READ_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static DECODE_Y_PLANE: [u8; 4] = [16, 32, 48, 64];
+    static DECODE_U_PLANE: [u8; 1] = [128];
+    static DECODE_V_PLANE: [u8; 1] = [128];
+
+    fn record_decode_event(event: &'static str) {
+        match DECODE_EVENTS.lock() {
+            Ok(mut events) => events.push(event),
+            Err(_) => std::process::abort(),
+        }
+    }
+
+    fn reset_decode_fixture(mode: usize) -> Result<(), Box<dyn std::error::Error>> {
+        DECODE_MODE.store(mode, Ordering::Release);
+        DECODE_RECEIVE_CALLS.store(0, Ordering::Release);
+        DECODE_READ_CALLS.store(0, Ordering::Release);
+        DECODE_EVENTS
+            .lock()
+            .map_err(|_| "decode event mutex was poisoned")?
+            .clear();
+        Ok(())
+    }
+
+    unsafe extern "C" fn mock_decode_codec_alloc(
+        _codec: *const abi::AvCodec,
+    ) -> *mut abi::AvCodecContext {
+        record_decode_event("codec_alloc");
+        if DECODE_MODE.load(Ordering::Acquire) == 3 {
+            return std::ptr::null_mut();
+        }
+        Box::into_raw(Box::new(0_u8)).cast()
+    }
+
+    unsafe extern "C" fn mock_decode_codec_free(context: *mut *mut abi::AvCodecContext) {
+        record_decode_event("codec_free");
+        if !context.is_null() {
+            let pointer = unsafe { *context };
+            if !pointer.is_null() {
+                drop(unsafe { Box::from_raw(pointer.cast::<u8>()) });
+                unsafe { *context = std::ptr::null_mut() };
+            }
+        }
+    }
+
+    unsafe extern "C" fn mock_decode_parameters(
+        _context: *mut abi::AvCodecContext,
+        _parameters: *const abi::AvCodecParameters,
+    ) -> i32 {
+        record_decode_event("parameters");
+        0
+    }
+
+    unsafe extern "C" fn mock_decode_opt_int(
+        _object: *mut c_void,
+        _name: *const std::ffi::c_char,
+        _value: i64,
+        _flags: i32,
+    ) -> i32 {
+        record_decode_event("threads");
+        0
+    }
+
+    unsafe extern "C" fn mock_decode_open(
+        _context: *mut abi::AvCodecContext,
+        _codec: *const abi::AvCodec,
+        _options: *mut *mut abi::AvDictionary,
+    ) -> i32 {
+        record_decode_event("codec_open");
+        0
+    }
+
+    unsafe extern "C" fn mock_decode_packet_alloc() -> *mut abi::AvPacket {
+        record_decode_event("packet_alloc");
+        Box::into_raw(Box::new(abi::AvPacket {
+            buffer: std::ptr::null_mut(),
+            presentation_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            decoding_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+            data: std::ptr::null_mut(),
+            size: 0,
+            stream_index: 0,
+            flags: 0,
+            side_data: std::ptr::null_mut(),
+            side_data_count: 0,
+            duration: 0,
+        }))
+    }
+
+    unsafe extern "C" fn mock_decode_packet_unref(packet: *mut abi::AvPacket) {
+        record_decode_event("packet_unref");
+        if !packet.is_null() {
+            unsafe {
+                (*packet).data = std::ptr::null_mut();
+                (*packet).size = 0;
+            }
+        }
+    }
+
+    unsafe extern "C" fn mock_decode_packet_free(packet: *mut *mut abi::AvPacket) {
+        record_decode_event("packet_free");
+        if !packet.is_null() {
+            let pointer = unsafe { *packet };
+            if !pointer.is_null() {
+                drop(unsafe { Box::from_raw(pointer) });
+                unsafe { *packet = std::ptr::null_mut() };
+            }
+        }
+    }
+
+    unsafe extern "C" fn mock_decode_frame_alloc() -> *mut abi::AvFrame {
+        record_decode_event("frame_alloc");
+        Box::into_raw(Box::new(abi::AvFrame {
+            data: [std::ptr::null_mut(); abi::AV_NUM_DATA_POINTERS],
+            line_size: [0; abi::AV_NUM_DATA_POINTERS],
+            extended_data: std::ptr::null_mut(),
+            width: 0,
+            height: 0,
+            sample_count: 0,
+            format: -1,
+            key_frame: 0,
+            picture_type: 0,
+            sample_aspect_ratio: abi::AvRational {
+                numerator: 0,
+                denominator: 1,
+            },
+            presentation_timestamp: abi::AV_NO_PRESENTATION_TIMESTAMP,
+        }))
+    }
+
+    unsafe extern "C" fn mock_decode_frame_free(frame: *mut *mut abi::AvFrame) {
+        record_decode_event("frame_free");
+        if !frame.is_null() {
+            let pointer = unsafe { *frame };
+            if !pointer.is_null() {
+                drop(unsafe { Box::from_raw(pointer) });
+                unsafe { *frame = std::ptr::null_mut() };
+            }
+        }
+    }
+
+    unsafe extern "C" fn mock_decode_read_frame(
+        _format: *mut abi::AvFormatContext,
+        packet: *mut abi::AvPacket,
+    ) -> i32 {
+        record_decode_event("read");
+        DECODE_READ_CALLS.fetch_add(1, Ordering::AcqRel);
+        match DECODE_MODE.load(Ordering::Acquire) {
+            1 => abi::AV_ERROR_END_OF_FILE,
+            2 => abi::AV_ERROR_TRY_AGAIN,
+            _ if packet.is_null() => abi::AV_ERROR_INVALID_ARGUMENT,
+            _ => {
+                unsafe {
+                    (*packet).data = NonNull::<u8>::dangling().as_ptr();
+                    (*packet).size = 1;
+                    (*packet).stream_index = 0;
+                }
+                0
+            }
+        }
+    }
+
+    unsafe extern "C" fn mock_decode_send_packet(
+        _context: *mut abi::AvCodecContext,
+        packet: *const abi::AvPacket,
+    ) -> i32 {
+        record_decode_event(if packet.is_null() { "flush" } else { "send" });
+        0
+    }
+
+    unsafe extern "C" fn mock_decode_receive_frame(
+        _context: *mut abi::AvCodecContext,
+        frame: *mut abi::AvFrame,
+    ) -> i32 {
+        record_decode_event("receive");
+        let call = DECODE_RECEIVE_CALLS.fetch_add(1, Ordering::AcqRel);
+        if call == 0 || DECODE_MODE.load(Ordering::Acquire) == 2 {
+            return abi::AV_ERROR_TRY_AGAIN;
+        }
+        if frame.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        unsafe {
+            (*frame).width = if DECODE_MODE.load(Ordering::Acquire) == 4 {
+                4
+            } else {
+                2
+            };
+            (*frame).height = 2;
+            (*frame).format = abi::AV_PIXEL_FORMAT_YUV420P;
+            (*frame).data[0] = DECODE_Y_PLANE.as_ptr().cast_mut();
+            (*frame).data[1] = DECODE_U_PLANE.as_ptr().cast_mut();
+            (*frame).data[2] = DECODE_V_PLANE.as_ptr().cast_mut();
+            (*frame).line_size[0] = 2;
+            (*frame).line_size[1] = 1;
+            (*frame).line_size[2] = 1;
+        }
+        0
+    }
+
+    unsafe extern "C" fn mock_decode_sws_get(
+        _source_width: i32,
+        _source_height: i32,
+        _source_format: i32,
+        _destination_width: i32,
+        _destination_height: i32,
+        _destination_format: i32,
+        _flags: i32,
+        _source_filter: *mut abi::SwsFilter,
+        _destination_filter: *mut abi::SwsFilter,
+        _parameters: *const f64,
+    ) -> *mut abi::SwsContext {
+        record_decode_event("sws_get");
+        NonNull::<u8>::dangling().as_ptr().cast()
+    }
+
+    unsafe extern "C" fn mock_decode_sws_scale(
+        _context: *mut abi::SwsContext,
+        _source_data: *const *const u8,
+        _source_line_size: *const i32,
+        _source_y: i32,
+        source_height: i32,
+        destination_data: *const *mut u8,
+        _destination_line_size: *const i32,
+    ) -> i32 {
+        record_decode_event("sws_scale");
+        if destination_data.is_null() || unsafe { (*destination_data).is_null() } {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        for index in 0..12_usize {
+            unsafe { *(*destination_data).add(index) = u8::try_from(index).unwrap_or(0) };
+        }
+        source_height
+    }
+
+    unsafe extern "C" fn mock_decode_sws_free(_context: *mut abi::SwsContext) {
+        record_decode_event("sws_free");
+    }
+
+    fn mock_decode_functions() -> NativeLtxvH264DecodeFunctions {
+        NativeLtxvH264DecodeFunctions {
+            av_packet_alloc: mock_decode_packet_alloc,
+            av_packet_free: mock_decode_packet_free,
+            av_packet_unref: mock_decode_packet_unref,
+            avcodec_alloc_context3: mock_decode_codec_alloc,
+            avcodec_free_context: mock_decode_codec_free,
+            avcodec_open2: mock_decode_open,
+            avcodec_parameters_to_context: mock_decode_parameters,
+            avcodec_receive_frame: mock_decode_receive_frame,
+            avcodec_send_packet: mock_decode_send_packet,
+            av_read_frame: mock_decode_read_frame,
+            av_frame_alloc: mock_decode_frame_alloc,
+            av_frame_free: mock_decode_frame_free,
+            av_opt_set_int: mock_decode_opt_int,
+            sws_free_context: mock_decode_sws_free,
+            sws_get_context: mock_decode_sws_get,
+            sws_scale: mock_decode_sws_scale,
+        }
+    }
+
+    fn decode_test_format() -> Box<MockDemuxFormat> {
+        let mut parameters = Box::new(0_u8);
+        let parameters_pointer = std::ptr::addr_of_mut!(*parameters).cast();
+        let mut stream = Box::new(abi::AvStream {
+            class: std::ptr::null(),
+            index: 0,
+            identifier: 0,
+            codec_parameters: parameters_pointer,
+            private_data: std::ptr::null_mut(),
+            time_base: ltxv_frame_time_base(),
+        });
+        let stream_pointer = std::ptr::addr_of_mut!(*stream);
+        let mut format = Box::new(MockDemuxFormat {
+            prefix: abi::AvFormatContext {
+                class: std::ptr::null(),
+                input_format: std::ptr::null(),
+                output_format: std::ptr::null(),
+                private_data: std::ptr::null_mut(),
+                io_context: std::ptr::null_mut(),
+                context_flags: 0,
+                stream_count: 1,
+                streams: std::ptr::null_mut(),
+            },
+            parameters: vec![parameters],
+            streams: vec![stream],
+            stream_pointers: vec![stream_pointer],
+        });
+        format.prefix.streams = format.stream_pointers.as_mut_ptr();
+        format
+    }
+
+    fn decode_limits() -> Result<NativeLtxvH264DecodeLimits, NativeVideoCodecLtxvDecodeError> {
+        NativeLtxvH264DecodeLimits::checked(8, 8, 2, 2, 4, 12, 1_024)
+    }
+
+    #[test]
+    fn retained_ltxv_h264_decode_returns_first_rgb8_frame_and_drains_packets()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        for mode in [0, 1] {
+            reset_decode_fixture(mode)?;
+            let cancellation = CancellationToken::default();
+            let (backend, context) = avio_context(&cancellation, 128 * 1024)?;
+            let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+            let mut format = decode_test_format();
+            let format_pointer = NonNull::new(std::ptr::addr_of_mut!(format.prefix))
+                .ok_or("decode format pointer was null")?;
+            let image = decode_first_ltxv_h264_frame_with_check(
+                format_pointer,
+                0,
+                NonNull::dangling(),
+                2,
+                2,
+                decode_limits()?,
+                &mock_decode_functions(),
+                &input,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            )?;
+            assert_eq!(image.dimensions()?, (2, 2));
+            assert_eq!(image.as_u8_slice()?, (0_u8..12).collect::<Vec<_>>());
+            let events = DECODE_EVENTS
+                .lock()
+                .map_err(|_| "decode event mutex was poisoned")?;
+            assert!(events.starts_with(&[
+                "codec_alloc",
+                "parameters",
+                "threads",
+                "codec_open",
+                "packet_alloc",
+                "frame_alloc",
+                "receive",
+            ]));
+            assert!(events.contains(&"packet_unref") || mode == 1);
+            assert!(events.ends_with(&["sws_free", "frame_free", "packet_free", "codec_free"]));
+            drop(events);
+            drop(input);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn retained_ltxv_h264_decode_failure_cancellation_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        assert!(matches!(
+            NativeLtxvH264DecodeLimits::checked(0, 1, 2, 2, 4, 12, 1_024),
+            Err(NativeVideoCodecLtxvDecodeError::InvalidLimits)
+        ));
+        for (mode, expected) in [(2, "iteration"), (3, "allocation"), (4, "frame")] {
+            reset_decode_fixture(mode)?;
+            let cancellation = CancellationToken::default();
+            let (backend, context) = avio_context(&cancellation, 128 * 1024)?;
+            let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+            let mut format = decode_test_format();
+            let format_pointer = NonNull::new(std::ptr::addr_of_mut!(format.prefix))
+                .ok_or("decode format pointer was null")?;
+            let result = decode_first_ltxv_h264_frame_with_check(
+                format_pointer,
+                0,
+                NonNull::dangling(),
+                2,
+                2,
+                decode_limits()?,
+                &mock_decode_functions(),
+                &input,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            );
+            assert!(result.is_err(), "{expected} failure unexpectedly succeeded");
+            drop(input);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
+
+        reset_decode_fixture(0)?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 128 * 1024)?;
+        let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+        let mut format = decode_test_format();
+        let format_pointer = NonNull::new(std::ptr::addr_of_mut!(format.prefix))
+            .ok_or("decode format pointer was null")?;
+        let mut checks = 0;
+        assert!(matches!(
+            decode_first_ltxv_h264_frame_with_check(
+                format_pointer,
+                0,
+                NonNull::dangling(),
+                2,
+                2,
+                decode_limits()?,
+                &mock_decode_functions(),
+                &input,
+                &backend,
+                &context,
+                &mut || {
+                    checks += 1;
+                    if checks == 14 {
+                        Err(CancellationError)
+                    } else {
+                        Ok(())
+                    }
+                },
+            ),
+            Err(NativeVideoCodecLtxvDecodeError::Cancelled)
+        ));
+        drop(input);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        reset_decode_fixture(0)?;
+        let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+        let mut retry_format = decode_test_format();
+        let retry_pointer = NonNull::new(std::ptr::addr_of_mut!(retry_format.prefix))
+            .ok_or("retry decode format pointer was null")?;
+        decode_first_ltxv_h264_frame_with_check(
+            retry_pointer,
+            0,
+            NonNull::dangling(),
+            2,
+            2,
+            decode_limits()?,
+            &mock_decode_functions(),
+            &input,
+            &backend,
+            &context,
+            &mut || Ok(()),
+        )?;
+        drop(input);
         assert_eq!(context.scratch.in_use_bytes(), 0);
         Ok(())
     }
