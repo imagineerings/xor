@@ -8,7 +8,7 @@
     "tree_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f"
   },
   "dependency_fixtures": {
-    "video/codec-ffi-certification/manifest.json": "7b2bfaf4e31f574932fdd83bd156c214a69ac6d21da268a5614befa2968651a6"
+    "video/codec-ffi-certification/manifest.json": "f69947e75aae0a17d5b14ca2e100b2bd86f817ddb4e9930b75f4319528947d75"
   },
   "capture_contract": {
     "exact_library_count": 5,

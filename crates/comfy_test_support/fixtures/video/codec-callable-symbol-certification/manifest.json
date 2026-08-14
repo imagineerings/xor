@@ -10,10 +10,10 @@
   },
   "prerequisites": {
     "compiled_abi_manifest_sha256": "cefc4429df3abe09508a4f6c91ba2c749580109fab52f3f79e9db7a998b4bb76",
-    "reviewed_abi_manifest_sha256": "9283b05888da51e0fa42adfa5e92bc6fac88d663b2b5b6901097937ef6730442",
-    "elf_inspection_manifest_sha256": "cba3dc9db253c0b0d996888fb497d54a6c85d0b1b0b729c015e7c8ba4005af0c",
-    "inspected_certification_manifest_sha256": "71209c54b52ae1c18df0407a367869edea8306bfe8147953916c96f15a9fe883",
-    "dependency_closure_manifest_sha256": "7bd2f550fa0896f3c0c724259fa5ea0fc3a37ae29a2abb3b385d1970ed709e01"
+    "reviewed_abi_manifest_sha256": "95ce8a8e4ab7538868fad0201f4ffc3c311ebdc98165e600eb339418a73dd58a",
+    "elf_inspection_manifest_sha256": "326bf18151f9e069b19aa4e18a0b832e84e03d4c11474f0d11e81153e24b0a52",
+    "inspected_certification_manifest_sha256": "8c97c3bcb90aa8d4981794e4ab2cd0e6138109407e0a9dc280a5b4deebbadd10",
+    "dependency_closure_manifest_sha256": "12a664c88dc63529e78e410263815e7deb627fb8d246290d5c59a8f3c50b2e49"
   },
   "contract": {
     "required_symbol_count": 54,

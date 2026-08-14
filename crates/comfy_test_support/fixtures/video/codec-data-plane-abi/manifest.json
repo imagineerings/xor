@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "reviewed_abi_manifest_sha256": "cefc4429df3abe09508a4f6c91ba2c749580109fab52f3f79e9db7a998b4bb76",
-    "reviewed_abi_fixture_sha256": "9283b05888da51e0fa42adfa5e92bc6fac88d663b2b5b6901097937ef6730442",
-    "symbol_binding_fixture_sha256": "1a9b142f08b84c01dcd31c3e2bc05c84e27758c3a3bccea742b9fe2f6cf2fdbd"
+    "reviewed_abi_fixture_sha256": "95ce8a8e4ab7538868fad0201f4ffc3c311ebdc98165e600eb339418a73dd58a",
+    "symbol_binding_fixture_sha256": "9c8bd3881c94513b86901d88d4e574a3a2d846748a32a22f86238ed296736d46"
   },
   "evidence": {
     "data_plane_abi_manifest_sha256": "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec",

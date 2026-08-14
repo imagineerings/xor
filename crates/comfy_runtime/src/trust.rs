@@ -3306,8 +3306,7 @@ const VIDEO_CODEC_FFI_TARGETS: [&str; 6] = [
     "x86_64-unknown-linux-gnu",
     "x86_64-pc-windows-msvc",
 ];
-const VIDEO_CODEC_EXTERNAL_ENCODERS: [&str; 5] =
-    ["aac", "h264", "libsvtav1", "libvpx-vp9", "libx264"];
+const VIDEO_CODEC_EXTERNAL_ENCODERS: [&str; 4] = ["aac", "libsvtav1", "libvpx-vp9", "libx264"];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -4812,7 +4811,7 @@ fn validate_video_codec_dependency_contract_envelope(
     }
     for provider in &contract.encoder_providers {
         let provider_is_valid = match provider.encoder.as_str() {
-            "aac" | "h264" => provider.provider == "avcodec",
+            "aac" => provider.provider == "avcodec",
             _ => dependency_identities.contains(&provider.provider),
         };
         if !provider_is_valid {
@@ -6167,7 +6166,6 @@ mod tests {
                 .to_vec(),
             encoder_providers: [
                 ("aac", "avcodec"),
-                ("h264", "avcodec"),
                 ("libsvtav1", "svtav1"),
                 ("libvpx-vp9", "vpx"),
                 ("libx264", "x264"),
@@ -6439,7 +6437,7 @@ mod tests {
         assert_eq!(verified.license_bundle_sha256(), "3".repeat(64));
         assert_eq!(verified.dependencies().len(), 3);
         assert_eq!(verified.edges().len(), 13);
-        assert_eq!(verified.encoder_providers().len(), 5);
+        assert_eq!(verified.encoder_providers().len(), 4);
         assert_eq!(verified.system_libraries().len(), 8);
         let x264 = verified
             .dependencies()

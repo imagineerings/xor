@@ -9,10 +9,10 @@
     "signing_key_fingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8"
   },
   "dependency_fixtures": {
-    "codec_dependency_closure": "7bd2f550fa0896f3c0c724259fa5ea0fc3a37ae29a2abb3b385d1970ed709e01",
-    "codec_retained_loader": "af76b4501b54212d54be70e8b87f21dae097f1a11a6886154b2ea1e136f111eb",
-    "codec_reviewed_abi": "9283b05888da51e0fa42adfa5e92bc6fac88d663b2b5b6901097937ef6730442",
-    "codec_callable_symbol_certification": "31ab6df07156f7317edf15aaca9e4c4492c5bc88d2b0834e7ad067d6fd6ac019"
+    "codec_dependency_closure": "12a664c88dc63529e78e410263815e7deb627fb8d246290d5c59a8f3c50b2e49",
+    "codec_retained_loader": "2ef96c055442b97635cece8661b7610de669bb437482d880a22888a115875f11",
+    "codec_reviewed_abi": "95ce8a8e4ab7538868fad0201f4ffc3c311ebdc98165e600eb339418a73dd58a",
+    "codec_callable_symbol_certification": "49d80c3588ff61e5023ae41ea43321f115f201ac25bbf271a8b64237c9d7eaf1"
   },
   "contract": {
     "reviewed_symbols_bound": 54,

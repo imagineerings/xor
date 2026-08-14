@@ -15,8 +15,8 @@
     "aviobuf_source_sha256": "318a36bcb5dffd145ff74619190a023458cba95ee90c1ce316e0e1a946f78f1b"
   },
   "dependencies": {
-    "symbol_binding_fixture_sha256": "1a9b142f08b84c01dcd31c3e2bc05c84e27758c3a3bccea742b9fe2f6cf2fdbd",
-    "data_plane_abi_fixture_sha256": "cfce72d02ad3276b411743e6eb24bfd21a5aebed586f157732b77510db1654af"
+    "symbol_binding_fixture_sha256": "9c8bd3881c94513b86901d88d4e574a3a2d846748a32a22f86238ed296736d46",
+    "data_plane_abi_fixture_sha256": "217afd57f2c750727f227da55f5621215ae62c8f65ed7153acc23d424f3fe7e7"
   },
   "contract": {
     "canonical_owner": "comfy_runtime::native_video_codec_ffi",

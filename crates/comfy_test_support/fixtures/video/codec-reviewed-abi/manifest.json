@@ -14,8 +14,8 @@
     "detached_signature_verified": true
   },
   "dependencies": {
-    "codec_ffi_certification_manifest_sha256": "7b2bfaf4e31f574932fdd83bd156c214a69ac6d21da268a5614befa2968651a6",
-    "codec_retained_loader_manifest_sha256": "af76b4501b54212d54be70e8b87f21dae097f1a11a6886154b2ea1e136f111eb"
+    "codec_ffi_certification_manifest_sha256": "f69947e75aae0a17d5b14ca2e100b2bd86f817ddb4e9930b75f4319528947d75",
+    "codec_retained_loader_manifest_sha256": "2ef96c055442b97635cece8661b7610de669bb437482d880a22888a115875f11"
   },
   "evidence": {
     "reviewed_abi_manifest_sha256": "b9d999e2d15a155fe6f6955d240042f34ee49a98a09e6c1ba4300dd58e8049a3",

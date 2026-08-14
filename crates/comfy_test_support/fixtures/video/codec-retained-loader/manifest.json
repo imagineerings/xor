@@ -10,7 +10,7 @@
     "loader_policy_source": "sim-reviewed-glibc-dlmopen-and-live-link-map-proof"
   },
   "dependencies": {
-    "codec_dependency_closure_manifest_sha256": "7bd2f550fa0896f3c0c724259fa5ea0fc3a37ae29a2abb3b385d1970ed709e01"
+    "codec_dependency_closure_manifest_sha256": "12a664c88dc63529e78e410263815e7deb627fb8d246290d5c59a8f3c50b2e49"
   },
   "contract": {
     "target": "x86_64-unknown-linux-gnu",

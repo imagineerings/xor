@@ -14786,6 +14786,86 @@ fn val_ownership_native_video_codec_bounded_avio_001() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn val_ownership_native_video_codec_ltxv_h264_admission_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub struct NativeLtxvH264Codec",
+        "pub fn admit_ltxv_h264(",
+        "has_exact_ltxv_h264_dependency_contract",
+        "c\"libx264\"",
+        "abi::AV_CODEC_ID_H264",
+        "prove_codec_descriptor_provider",
+        "libc::dladdr1(",
+        "retained_ltxv_h264_admission_uses_exact_registered_codec_pair",
+        "retained_ltxv_h264_admission_rejects_missing_registry_entries",
+        "retained_ltxv_h264_admission_rejects_wrong_descriptor_provider",
+        "retained_ltxv_h264_admission_cancellation_is_atomic_and_retryable",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "LTXV H.264 admission lacks {required}"
+        );
+    }
+    for forbidden in [
+        "avcodec_find_encoder_by_name)(c\"h264\"",
+        "pub fn encoder_ptr",
+        "pub fn decoder_ptr",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "LTXV H.264 admission exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture =
+        fs::read_to_string(root.join(
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+        ))?;
+    for required in [
+        "synthetic-retained-ltxv-h264-codec-admission",
+        "native_registry_lookup_invoked",
+        "concrete_encoder_name",
+        "h264_decoder_codec_id",
+        "codec_context_or_format_allocated",
+        "codec_or_media_result_produced",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "LTXV H.264 fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_ltxv_h264_admission")
+            })
+        })
+        .ok_or("missing LTXV H.264 codec admission ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-h264-admission-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

@@ -11,11 +11,11 @@
     "nodes_lt_sha256": "d3c0a82b42808216b08fe9ca97e055f2a3793083755168a292cf8c076539d12d"
   },
   "dependencies": {
-    "codec_ffi_certification_manifest_sha256": "7b2bfaf4e31f574932fdd83bd156c214a69ac6d21da268a5614befa2968651a6",
-    "codec_package_capture_manifest_sha256": "05d13b0175e4f9762f8b6dca0602a2e59c4f8975991eb6c8eb0aebfc19638e9e",
-    "codec_elf_inspection_manifest_sha256": "cba3dc9db253c0b0d996888fb497d54a6c85d0b1b0b729c015e7c8ba4005af0c",
-    "codec_inspected_certification_manifest_sha256": "71209c54b52ae1c18df0407a367869edea8306bfe8147953916c96f15a9fe883",
-    "codec_dependency_contract_manifest_sha256": "afebad823dd59bf18e3fccb8da5e9c733c59be65a8b7c2978b8be0f6f57c10be"
+    "codec_ffi_certification_manifest_sha256": "f69947e75aae0a17d5b14ca2e100b2bd86f817ddb4e9930b75f4319528947d75",
+    "codec_package_capture_manifest_sha256": "808de8318a888e8101e0deb8b458492ac68562859aba8e239d295868b1d086b0",
+    "codec_elf_inspection_manifest_sha256": "326bf18151f9e069b19aa4e18a0b832e84e03d4c11474f0d11e81153e24b0a52",
+    "codec_inspected_certification_manifest_sha256": "8c97c3bcb90aa8d4981794e4ab2cd0e6138109407e0a9dc280a5b4deebbadd10",
+    "codec_dependency_contract_manifest_sha256": "7c55e2dfe7f631c70c025623756dbad3795f71a3d947da308f4fa245ec910f71"
   },
   "contract": {
     "target": "x86_64-unknown-linux-gnu",

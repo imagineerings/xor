@@ -33,7 +33,7 @@
       "x86_64-unknown-linux-gnu",
       "x86_64-pc-windows-msvc"
     ],
-    "required_encoder_names": ["aac", "h264", "libsvtav1", "libvpx-vp9", "libx264"]
+    "required_encoder_names": ["aac", "libsvtav1", "libvpx-vp9", "libx264"]
   },
   "contract": {
     "catalog_encoding": "canonical-json-with-trailing-newline",

@@ -10954,6 +10954,67 @@ def native_video_codec_bounded_memory_avio_foundation_task(
     )
 
 
+def native_video_codec_ltxv_h264_admission_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ltxv-h264-admission-foundation",
+        "Admit the retained LTXV H.264 codec pair",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The native video codec FFI owner consumes one exact retained FFmpeg binding, invokes the already certified registry lookups for the concrete libx264 encoder and H.264 decoder ID 27, proves both descriptors originate in the retained avcodec image, and retains the private non-null codec pair with the thread-bound binding for the following LTXV session. The signed package contract admits only concrete encoder implementation names, so the decoder-only h264 name is no longer misrepresented as an encoder. No codec context, frame, packet, format, AVIO, media value, handle, cache, persistence, recovery, effect, or publication state is created.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Exact-signature native fixtures and focused tests prove the concrete libx264 encoder name, H.264 decoder ID 27, encoder-before-decoder lookup order, non-null registry results, retained avcodec provider identity, exact libx264-to-x264 dependency admission, cancellation at every lookup and provider-proof boundary, reverse cleanup, and clean retry. Trust and fixture evidence reject h264 as a concrete encoder name and preserve an exact dependency-first provenance chain. The new fixture explicitly claims no licensed or installed FFmpeg package, codec context, format, mux, demux, encode, decode, media result, numerical oracle, effect, cache, persistence, recovery, or publication evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "35.3", "35.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13220,8 +13281,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_data_plane_abi_foundation["id"])
         )
     )
+    video_codec_ltxv_h264_admission_foundation = (
+        native_video_codec_ltxv_h264_admission_foundation_task(
+            str(video_codec_bounded_memory_avio_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_bounded_memory_avio_foundation["id"])
+        str(video_codec_ltxv_h264_admission_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13352,6 +13418,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_symbol_binding_foundation,
         video_codec_data_plane_abi_foundation,
         video_codec_bounded_memory_avio_foundation,
+        video_codec_ltxv_h264_admission_foundation,
         video_foundation,
             detection_foundation,
         ]
