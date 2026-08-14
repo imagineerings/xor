@@ -14453,6 +14453,106 @@
       "decision_reason": "One retained operation-scoped owner converts the exact typed FFmpeg binding into the concrete libx264 encoder and H.264 decoder authority required by LTXV. It invokes only bounded registry lookups, proves retained avcodec descriptor provenance, and keeps all pointers private until the following session owns codec allocation and execution."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::encode_rgb8_frame",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeLtxvH264EncodeLimits",
+        "NativeLtxvH264Mp4",
+        "NativeLtxvH264Codec::encode_rgb8_frame",
+        "encode_ltxv_h264_rgb8_with_check",
+        "drain_ltxv_h264_packets"
+      ],
+      "allowed_adapters": [
+        "the admitted retained LTXV pair supplies the exact private libx264 encoder descriptor and typed FFmpeg function table",
+        "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed MP4 sink and callback failure contract",
+        "the canonical RGB8 image tensor supplies checked contiguous CPU HWC bytes without a duplicate input allocation",
+        "the following retained H.264 decoder may borrow the opaque staged MP4 bytes while this owner remains alive"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Mp4",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeLtxvH264Mp4"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_output_context2",
+        "avformat_new_stream",
+        "avcodec_alloc_context3",
+        "avcodec_open2",
+        "avformat_write_header",
+        "sws_scale",
+        "avcodec_send_frame",
+        "avcodec_receive_packet",
+        "av_interleaved_write_frame",
+        "av_write_trailer"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-h264-encode-uses-retained-pair-and-bounded-avio",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_rgb8_frame[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_ltxv_h264_rgb8_with_check"
+        },
+        {
+          "name": "ltxv-h264-encode-pins-source-options-and-data-plane",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "video_size[\\s\\S]*pixel_format[\\s\\S]*yuv420p[\\s\\S]*time_base[\\s\\S]*threads[\\s\\S]*crf[\\s\\S]*veryfast[\\s\\S]*sws_scale"
+        },
+        {
+          "name": "ltxv-h264-encode-bounds-drain-cancellation-and-raii",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_ltxv_h264_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+        },
+        {
+          "name": "ltxv-h264-encode-tests-call-order-failure-cancellation-and-cleanup",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_ltxv_h264_mp4_encode_uses_exact_options_packets_and_cleanup[\\s\\S]*retained_ltxv_h264_mp4_encode_failure_and_cancellation_are_atomic"
+        },
+        {
+          "name": "ltxv-h264-encode-fixture-bounds-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json",
+          "pattern": "synthetic-retained-ltxv-h264-mp4-encode[\\s\\S]*native_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_package[\\s\\S]*decoded_rgb_result_produced[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-h264-mp4-encode-foundation"
+      ],
+      "production_consumers": [
+        "the following bounded retained H.264 MP4 memory decoder"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The retained LTXV pair is the sole owner of libx264 one-frame execution. It consumes canonical RGB8 and bounded AVIO adapters, keeps every native object and staged byte private, and proves exact option, packet, cancellation, cleanup, and scratch-accounting behavior without claiming decoder or media publication authority."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [
