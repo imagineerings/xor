@@ -11690,6 +11690,110 @@
       "decision_reason": "The frame-interpolation owner constructs only FILM's source pixel-center grid and normalized attempt-local flow before delegating interpolation, storage, workspace, and cancellation to canonical tensor owners. It cannot retain invocation state or duplicate the distinct RIFE grid contract."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_pyramid_algebra_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::film_concatenate_pyramids_with_context_exact_native",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "film_concatenate_pyramids_with_context_exact_native",
+        "film_multiply_pyramid_with_context_exact_native",
+        "film_warp_pyramid_with_context_exact_native"
+      ],
+      "allowed_adapters": [
+        "canonical tensor concatenation, unsqueeze, elementwise multiplication, allocation, storage, stream, workspace, and cancellation owners retain their mechanics",
+        "the existing FILM pixel-center warp owner remains the sole warp equation and is only applied pairwise here",
+        "future retained FILM fusion execution may consume these attempt-local pyramids but cannot retain them in the model, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_concatenate_pyramids_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "film_concatenate_pyramids_with_context_exact_native",
+          "pattern": "^pub fn film_concatenate_pyramids_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_multiply_pyramid_with_context_exact_native",
+          "role": "adapter",
+          "symbol": "film_multiply_pyramid_with_context_exact_native",
+          "pattern": "^pub fn film_multiply_pyramid_with_context_exact_native\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_warp_pyramid_with_context_exact_native",
+          "role": "adapter",
+          "symbol": "film_warp_pyramid_with_context_exact_native",
+          "pattern": "^pub fn film_warp_pyramid_with_context_exact_native\\("
+        }
+      ],
+      "call_symbols": [
+        "film_concatenate_pyramids_with_context_exact_native",
+        "film_multiply_pyramid_with_context_exact_native",
+        "film_warp_pyramid_with_context_exact_native"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-pyramid-concatenation-delegates-pairwise-channel-concatenation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_concatenate_pyramids_with_context_exact_native[\\s\\S]*first\\.len\\(\\) != second\\.len\\(\\)[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*1,[\\s\\S]*context"
+        },
+        {
+          "name": "film-pyramid-multiplication-builds-batch-broadcast-and-delegates-elementwise-equation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_multiply_pyramid_with_context_exact_native[\\s\\S]*for dimension in 1\\.\\.=3_i64[\\s\\S]*torch_unsqueeze_exact_native[\\s\\S]*real_multiply_with_context_exact_native[\\s\\S]*ElementwiseOperand::Tensor"
+        },
+        {
+          "name": "film-pyramid-warp-delegates-existing-pixel-center-owner-pairwise",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_warp_pyramid_with_context_exact_native[\\s\\S]*feature_pyramid\\.len\\(\\) != flow_pyramid\\.len\\(\\)[\\s\\S]*film_warp_with_context_exact_native"
+        },
+        {
+          "name": "film-pyramid-algebra-oracle-proves-values-storage-immutability-and-cancellation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_pyramid_algebra_delegates_concat_broadcast_multiply_and_warp[\\s\\S]*\\[1\\.0_f32, 2\\.0\\][\\s\\S]*\\[0\\.5_f32, 1\\.5\\][\\s\\S]*\\[1\\.0_f32, 3\\.0\\][\\s\\S]*assert_ne!\\(warped\\[index\\]\\.storage_id\\(\\), first\\[index\\]\\.storage_id\\(\\)\\)[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-pyramid-algebra-fixture-excludes-checkpoints-fusion-codecs-cache-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra/manifest.json",
+          "pattern": "(?=[\\s\\S]*concatenate_pyramids)(?=[\\s\\S]*multiply_pyramid)(?=[\\s\\S]*pyramid_warp)(?=[\\s\\S]*checkpoint_weight_execution)(?=[\\s\\S]*fusion_execution)(?=[\\s\\S]*codec_or_container_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-pyramid-algebra-foundation"
+      ],
+      "production_consumers": [
+        "native FILM fusion and sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation module owns only FILM's bounded pyramid-level schedule. It delegates every tensor equation and warp to existing canonical owners and returns invocation-local outputs for later fusion."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_subtree_feature_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_subtree_features",
       "owner_files": [

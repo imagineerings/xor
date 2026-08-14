@@ -10174,6 +10174,37 @@ def native_film_flow_estimator_foundation_task(dependency: str) -> dict[str, obj
     )
 
 
+def native_film_pyramid_algebra_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-pyramid-algebra-foundation",
+        "Execute bounded FILM pyramid algebra",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        ["VAL-MEDIA-001", "VAL-TENSOR-001", "VAL-DEVICE-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "The frame-interpolation owner exposes FILM's three bounded pyramid adapters: pairwise image/feature channel concatenation, per-batch scalar multiplication through an unsqueezed broadcast view, and pairwise feature warping by delegated FILM flow. Every output is attempt-local and every tensor equation, allocation, storage, stream, workspace, and cancellation boundary remains owned by canonical tensor or FILM warp primitives; no retained graph, allocator, cache, handle, codec, effect, or publication owner is added.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-estimator/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted analytic oracle proves pairwise channel values [1,2], per-batch scalar multiplication values 0.5/1.5, zero-flow warp identity values 1/3, fresh nonaliasing outputs, immutable source pyramids, pre-cancellation with zero scratch residue, bounded equal-length validation, and explicit absence of checkpoint weights, flow prediction or synthesis duplication, fusion, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12414,8 +12445,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_flow_estimator_foundation = native_film_flow_estimator_foundation_task(
         str(film_flow_pyramid_synthesis_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_pyramid_algebra_foundation = native_film_pyramid_algebra_foundation_task(
         str(film_flow_estimator_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_pyramid_algebra_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12528,6 +12562,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_feature_pyramid_foundation,
         film_flow_pyramid_synthesis_foundation,
         film_flow_estimator_foundation,
+        film_pyramid_algebra_foundation,
         video_foundation,
             detection_foundation,
         ]

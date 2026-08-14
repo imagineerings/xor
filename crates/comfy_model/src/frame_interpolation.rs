@@ -15,6 +15,7 @@ use comfy_tensor::{
     generated_elementwise_or_runtime_operation_09::clamp_with_context_exact_native,
     generated_indexing_masking_01::narrow_method_exact_native,
     generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
+    generated_shape_layout_transform_01::torch_unsqueeze_exact_native,
     generated_shape_layout_transform_02::torch_cat_with_context_exact_native,
     generated_shape_layout_transform_03::{
         FunctionalPadMode, functional_pad_with_context_exact_native, tensor_permute_exact_native,
@@ -1794,6 +1795,114 @@ pub fn film_flow_pyramid_synthesis_with_context_exact_native(
     Ok(flow_pyramid)
 }
 
+pub fn film_concatenate_pyramids_with_context_exact_native(
+    backend: &CpuBackend,
+    first: &[Tensor],
+    second: &[Tensor],
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if first.is_empty() || first.len() != second.len() || first.len() > 7 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM pyramid concatenation requires equal nonempty bounded inputs",
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(first.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    for (first, second) in first.iter().zip(second) {
+        context.cancellation.check()?;
+        output.push(execution_result(
+            torch_cat_with_context_exact_native(
+                backend,
+                &[first.clone(), second.clone()],
+                1,
+                context,
+            ),
+            context,
+        )?);
+    }
+    context.cancellation.check()?;
+    Ok(output)
+}
+
+pub fn film_multiply_pyramid_with_context_exact_native(
+    backend: &CpuBackend,
+    pyramid: &[Tensor],
+    scalar: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if pyramid.is_empty() || pyramid.len() > 7 || scalar.descriptor().shape().len() != 1 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM pyramid multiplication inputs are invalid",
+        ));
+    }
+    let mut broadcast = scalar.clone();
+    for dimension in 1..=3_i64 {
+        broadcast = execution_result(
+            torch_unsqueeze_exact_native(&broadcast, dimension, context.cancellation),
+            context,
+        )?;
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(pyramid.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    for image in pyramid {
+        context.cancellation.check()?;
+        if image.descriptor().shape().first() != scalar.descriptor().shape().first()
+            || image.descriptor().dtype() != scalar.descriptor().dtype()
+            || image.descriptor().device() != scalar.descriptor().device()
+            || image.descriptor().stream() != scalar.descriptor().stream()
+            || image.descriptor().stream() != context.stream
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        output.push(execution_result(
+            real_multiply_with_context_exact_native(
+                backend,
+                image,
+                ElementwiseOperand::Tensor(&broadcast),
+                context,
+            ),
+            context,
+        )?);
+    }
+    context.cancellation.check()?;
+    Ok(output)
+}
+
+pub fn film_warp_pyramid_with_context_exact_native(
+    backend: &CpuBackend,
+    feature_pyramid: &[Tensor],
+    flow_pyramid: &[Tensor],
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if feature_pyramid.is_empty()
+        || feature_pyramid.len() != flow_pyramid.len()
+        || feature_pyramid.len() > 7
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM pyramid warp requires equal nonempty bounded inputs",
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(feature_pyramid.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    for (features, flow) in feature_pyramid.iter().zip(flow_pyramid) {
+        context.cancellation.check()?;
+        output.push(film_warp_with_context_exact_native(
+            backend, features, flow, context,
+        )?);
+    }
+    context.cancellation.check()?;
+    Ok(output)
+}
+
 fn film_upsample_double_to_residual(
     backend: &CpuBackend,
     flow: &Tensor,
@@ -2621,6 +2730,104 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_pyramid_algebra_delegates_concat_broadcast_multiply_and_warp()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let make_tensor = |value: f32, channels: u64| {
+            tensor_from_f32(
+                &backend,
+                &[1, channels, 1, 1],
+                &vec![
+                    value;
+                    usize::try_from(channels).map_err(|_| FrameInterpolationError::Overflow)?
+                ],
+                DType::F32,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        };
+        let first = vec![make_tensor(1.0, 1)?, make_tensor(3.0, 1)?];
+        let second = vec![make_tensor(2.0, 1)?, make_tensor(4.0, 1)?];
+        let first_bytes = first
+            .iter()
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        let concatenated = film_concatenate_pyramids_with_context_exact_native(
+            &backend, &first, &second, &context,
+        )?;
+        assert_eq!(concatenated[0].descriptor().shape(), &[1, 2, 1, 1]);
+        for (linear, expected) in [1.0_f32, 2.0].into_iter().enumerate() {
+            let actual = match DType::F32.decode_scalar(concatenated[0].linear_element_bytes(
+                u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?,
+            )?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        let scalar = tensor_from_f32(&backend, &[1], &[0.5], DType::F32, DeviceId::CPU, &context)
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let multiplied =
+            film_multiply_pyramid_with_context_exact_native(&backend, &first, &scalar, &context)?;
+        for (index, expected) in [0.5_f32, 1.5].into_iter().enumerate() {
+            let actual =
+                match DType::F32.decode_scalar(multiplied[index].linear_element_bytes(0)?)? {
+                    DecodedScalar::Real(value) => value as f32,
+                    _ => return Err(FrameInterpolationError::StateMismatch),
+                };
+            assert_eq!(actual, expected);
+        }
+        let flows = vec![make_tensor(0.0, 2)?, make_tensor(0.0, 2)?];
+        let warped =
+            film_warp_pyramid_with_context_exact_native(&backend, &first, &flows, &context)?;
+        for (index, expected) in [1.0_f32, 3.0].into_iter().enumerate() {
+            let actual = match DType::F32.decode_scalar(warped[index].linear_element_bytes(0)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+            assert_ne!(warped[index].storage_id(), first[index].storage_id());
+            assert_eq!(first[index].contiguous_bytes()?, first_bytes[index]);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_warp_pyramid_with_context_exact_native(
+                &backend,
+                &first,
+                &flows,
+                &cancelled_context,
+            ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_flow_estimator_executes_five_source_convolutions() -> Result<(), FrameInterpolationError>

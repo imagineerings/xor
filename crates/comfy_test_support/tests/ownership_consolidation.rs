@@ -14359,6 +14359,60 @@ fn val_ownership_native_film_flow_estimator_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_film_pyramid_algebra_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_concatenate_pyramids_with_context_exact_native(",
+        "pub fn film_multiply_pyramid_with_context_exact_native(",
+        "pub fn film_warp_pyramid_with_context_exact_native(",
+        "torch_cat_with_context_exact_native(",
+        "torch_unsqueeze_exact_native(",
+        "real_multiply_with_context_exact_native(",
+        "film_warp_with_context_exact_native(",
+        "film_pyramid_algebra_delegates_concat_broadcast_multiply_and_warp",
+    ] {
+        assert!(
+            model.contains(required),
+            "bounded FILM pyramid algebra lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra/manifest.json",
+    ))?;
+    assert!(fixture.contains("concatenate_pyramids"));
+    assert!(fixture.contains("multiply_pyramid"));
+    assert!(fixture.contains("pyramid_warp"));
+    assert!(fixture.contains("[1.0, 2.0]"));
+    assert!(fixture.contains("[0.5, 1.5]"));
+    assert!(fixture.contains("\"fusion_execution\": false"));
+    assert!(fixture.contains("\"effect_or_publication_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_pyramid_algebra_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some("comfy-parity-native-film-pyramid-algebra-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_image_pyramid_foundation_001() -> Result<(), Box<dyn std::error::Error>>
 {
     let root = repository_root()?;
