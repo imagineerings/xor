@@ -10101,6 +10101,43 @@ def native_film_feature_pyramid_foundation_task(dependency: str) -> dict[str, ob
     )
 
 
+def native_film_flow_pyramid_synthesis_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-flow-pyramid-synthesis-foundation",
+        "Synthesize bounded FILM flow pyramids",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The frame-interpolation owner synthesizes FILM accumulated flow pyramids from borrowed residual flows in source fine-to-coarse order. It aliases the coarsest residual, repeatedly delegates exact-size bilinear interpolation, doubles the upsampled flow, adds the next residual through canonical tensor arithmetic, reverses the attempt-local outputs back to fine-to-coarse order, and creates no predictor, retained graph, allocator, cache, handle, codec, effect, or publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_03.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted analytic oracle proves three residual levels with constant fine/middle/coarse values 100/10/1 synthesize exact fine-to-coarse flow values 124/12/1, exact output extents, coarsest source aliasing, fresh finer storage, immutable residuals, pre-cancellation with zero scratch residue, and explicit absence of production checkpoint weights, flow predictor execution, feature warping, fusion, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12333,8 +12370,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_feature_pyramid_foundation = native_film_feature_pyramid_foundation_task(
         str(film_subtree_foundation["id"])
     )
+    film_flow_pyramid_synthesis_foundation = (
+        native_film_flow_pyramid_synthesis_foundation_task(
+            str(film_feature_pyramid_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(film_feature_pyramid_foundation["id"])
+        str(film_flow_pyramid_synthesis_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12445,6 +12487,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_image_pyramid_foundation,
         film_subtree_foundation,
         film_feature_pyramid_foundation,
+        film_flow_pyramid_synthesis_foundation,
         video_foundation,
             detection_foundation,
         ]

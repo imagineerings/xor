@@ -11292,6 +11292,81 @@
       "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_flow_pyramid_synthesis",
+      "canonical_owner": "comfy_model::frame_interpolation::film_flow_pyramid_synthesis_with_context_exact_native",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "film_flow_pyramid_synthesis_with_context_exact_native"
+      ],
+      "allowed_adapters": [
+        "canonical tensor bilinear interpolation and elementwise multiply/add owners retain numerical, allocation, storage, stream, workspace, and cancellation mechanics",
+        "future retained FILM flow predictors may supply borrowed residuals but cannot duplicate accumulation or retain synthesized flows in the model, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_flow_pyramid_synthesis_with_context_exact_native",
+          "role": "canonical",
+          "symbol": "film_flow_pyramid_synthesis_with_context_exact_native",
+          "pattern": "pub fn film_flow_pyramid_synthesis_with_context_exact_native\\("
+        }
+      ],
+      "call_symbols": [
+        "film_flow_pyramid_synthesis_with_context_exact_native"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-flow-pyramid-synthesis-upsamples-doubles-adds-and-reverses-through-canonical-tensors",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn film_flow_pyramid_synthesis_with_context_exact_native[\\s\\S]*residual_pyramid\\.last\\(\\)[\\s\\S]*interpolate_bilinear[\\s\\S]*Scalar::Float\\(2\\.0\\)[\\s\\S]*real_add_with_context_exact_native[\\s\\S]*flow_pyramid\\.reverse\\(\\)"
+        },
+        {
+          "name": "film-flow-pyramid-analytic-oracle-proves-values-aliases-immutability-and-cancellation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_flow_pyramid_synthesis_upsamples_doubles_adds_and_reverses[\\s\\S]*124\\.0_f32[\\s\\S]*12\\.0_f32[\\s\\S]*storage_id\\(\\), residuals\\[2\\]\\.storage_id\\(\\)[\\s\\S]*source_bytes[\\s\\S]*cancelled_context\\.scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-flow-pyramid-fixture-excludes-predictor-fusion-codec-and-publication-claims",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis/manifest.json",
+          "pattern": "(?=[\\s\\S]*flow_pyramid_synthesis)(?=[\\s\\S]*expected_accumulated_values)(?=[\\s\\S]*flow_predictor_execution)(?=[\\s\\S]*fusion_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-flow-pyramid-synthesis-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM flow, fusion, and sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation module owns only FILM's source residual-flow accumulation schedule and delegates all tensor equations and allocation. Synthesized flows remain attempt-local inputs to later flow and fusion execution."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_image_pyramid_execution",
       "canonical_owner": "comfy_model::frame_interpolation::film_image_pyramid_with_context_exact_native",
       "owner_files": [

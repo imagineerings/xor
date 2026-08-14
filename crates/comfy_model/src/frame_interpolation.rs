@@ -1613,6 +1613,93 @@ pub fn film_image_pyramid_with_context_exact_native(
     Ok(pyramid)
 }
 
+pub fn film_flow_pyramid_synthesis_with_context_exact_native(
+    backend: &CpuBackend,
+    residual_pyramid: &[Tensor],
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let finest = residual_pyramid
+        .first()
+        .ok_or(FrameInterpolationError::InvalidInvocation(
+            "FILM residual flow pyramid is empty",
+        ))?;
+    if residual_pyramid.len() > 7 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM residual flow pyramid exceeds the source depth",
+        ));
+    }
+    let descriptor = finest.descriptor();
+    let shape = descriptor.shape();
+    if shape.len() != 4
+        || shape.first() == Some(&0)
+        || shape.get(1) != Some(&2)
+        || shape.get(2) == Some(&0)
+        || shape.get(3) == Some(&0)
+        || descriptor.device() != DeviceId::CPU
+        || descriptor.stream() != context.stream
+        || !descriptor.is_contiguous()?
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM residual flows must be nonempty contiguous NCHW two-channel tensors",
+        ));
+    }
+    let mut flow = residual_pyramid
+        .last()
+        .ok_or(FrameInterpolationError::StateMismatch)?
+        .clone();
+    let mut flow_pyramid = Vec::new();
+    flow_pyramid
+        .try_reserve_exact(residual_pyramid.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    flow_pyramid.push(flow.clone());
+    for residual in residual_pyramid.iter().rev().skip(1) {
+        context.cancellation.check()?;
+        let residual_descriptor = residual.descriptor();
+        let residual_shape = residual_descriptor.shape();
+        if residual_shape.len() != 4
+            || residual_shape.first() != shape.first()
+            || residual_shape.get(1) != Some(&2)
+            || residual_descriptor.dtype() != descriptor.dtype()
+            || residual_descriptor.device() != descriptor.device()
+            || residual_descriptor.stream() != descriptor.stream()
+            || !residual_descriptor.is_contiguous()?
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        let height = usize::try_from(
+            *residual_shape
+                .get(2)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+        )
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+        let width = usize::try_from(
+            *residual_shape
+                .get(3)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+        )
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+        flow = interpolate_bilinear(backend, &flow, height, width, context)?;
+        flow = execution_result(
+            real_multiply_with_context_exact_native(
+                backend,
+                &flow,
+                ElementwiseOperand::Scalar(Scalar::Float(2.0)),
+                context,
+            ),
+            context,
+        )?;
+        flow = execution_result(
+            real_add_with_context_exact_native(backend, &flow, residual, context),
+            context,
+        )?;
+        flow_pyramid.push(flow.clone());
+    }
+    flow_pyramid.reverse();
+    context.cancellation.check()?;
+    Ok(flow_pyramid)
+}
+
 fn film_average_pool_configuration() -> AveragePoolConfiguration {
     AveragePoolConfiguration {
         kernel_size: vec![2, 2],
@@ -2317,6 +2404,98 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_flow_pyramid_synthesis_upsamples_doubles_adds_and_reverses()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let residuals = [
+            ([1, 2, 4, 4], 100.0_f32),
+            ([1, 2, 2, 2], 10.0_f32),
+            ([1, 2, 1, 1], 1.0_f32),
+        ]
+        .into_iter()
+        .map(|(shape, value)| {
+            let count = shape.iter().try_fold(1_usize, |count, extent| {
+                count
+                    .checked_mul(
+                        usize::try_from(*extent).map_err(|_| FrameInterpolationError::Overflow)?,
+                    )
+                    .ok_or(FrameInterpolationError::Overflow)
+            })?;
+            tensor_from_f32(
+                &backend,
+                &shape,
+                &vec![value; count],
+                DType::F32,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+        let source_bytes = residuals
+            .iter()
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        let flows =
+            film_flow_pyramid_synthesis_with_context_exact_native(&backend, &residuals, &context)?;
+        assert_eq!(flows.len(), 3);
+        for (index, (shape, expected)) in [
+            ([1, 2, 4, 4], 124.0_f32),
+            ([1, 2, 2, 2], 12.0_f32),
+            ([1, 2, 1, 1], 1.0_f32),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_eq!(flows[index].descriptor().shape(), &shape);
+            let actual = match DType::F32.decode_scalar(flows[index].linear_element_bytes(0)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        assert_eq!(flows[2].storage_id(), residuals[2].storage_id());
+        assert_ne!(flows[0].storage_id(), residuals[0].storage_id());
+        for (residual, expected) in residuals.iter().zip(source_bytes) {
+            assert_eq!(residual.contiguous_bytes()?, expected);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_flow_pyramid_synthesis_with_context_exact_native(
+                &backend,
+                &residuals,
+                &cancelled_context,
+            ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_feature_pyramid_concatenates_source_diagonals_and_releases_inputs()

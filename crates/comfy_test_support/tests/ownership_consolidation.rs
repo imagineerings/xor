@@ -14254,6 +14254,58 @@ fn val_ownership_native_film_feature_pyramid_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_film_flow_pyramid_synthesis_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_flow_pyramid_synthesis_with_context_exact_native(",
+        "residual_pyramid.iter().rev().skip(1)",
+        "interpolate_bilinear(backend, &flow, height, width, context)",
+        "Scalar::Float(2.0)",
+        "real_add_with_context_exact_native(backend, &flow, residual, context)",
+        "flow_pyramid.reverse()",
+        "film_flow_pyramid_synthesis_upsamples_doubles_adds_and_reverses",
+    ] {
+        assert!(
+            model.contains(required),
+            "FILM flow synthesis lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis/manifest.json",
+    ))?;
+    assert!(fixture.contains("flow_pyramid_synthesis"));
+    assert!(fixture.contains("[124.0, 12.0, 1.0]"));
+    assert!(fixture.contains("\"coarsest_output_aliases_source\": true"));
+    assert!(fixture.contains("\"flow_predictor_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_flow_pyramid_synthesis")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-film-flow-pyramid-synthesis-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_image_pyramid_foundation_001() -> Result<(), Box<dyn std::error::Error>>
 {
     let root = repository_root()?;
