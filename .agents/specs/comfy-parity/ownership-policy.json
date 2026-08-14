@@ -6933,6 +6933,21 @@
           "name": "video-codec-certification-fixture-separates-contract-from-execution",
           "path": "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
           "pattern": "reviewed-abi-and-signed-catalog-contract[\\s\\S]*FFmpeg 7.1[\\s\\S]*registry_certificate_projection[\\s\\S]*native_library_loaded[\\s\\S]*encoder_availability_probed[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-codec-package-capture-reuses-canonical-sealed-image-owner",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "pub fn capture_video_codec_package[\\s\\S]*capture_native_library_image[\\s\\S]*captured.seal"
+        },
+        {
+          "name": "video-codec-package-capture-tests-completeness-cancellation-and-mutation",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "video_codec_package_capture_seals_exact_catalog_images[\\s\\S]*VideoCodecPackageCaptureError::Incomplete[\\s\\S]*VideoCodecPackageCaptureError::Cancelled[\\s\\S]*VideoCodecPackageCaptureError::ContractMismatch"
+        },
+        {
+          "name": "video-codec-package-capture-fixture-forbids-load-and-certificate-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+          "pattern": "source-fingerprinted-library-image-capture-contract[\\s\\S]*immutable_snapshot_retention[\\s\\S]*native_library_loaded[\\s\\S]*symbols_resolved[\\s\\S]*ffi_certificate_issued_by_capture[\\s\\S]*codec_execution"
         }
       ],
       "known_open_reasons": [],
@@ -6945,6 +6960,7 @@
         "comfy-parity-provision-native-ffi-contracts-huawei-ascend-npu-comfy-model-0019",
         "comfy-parity-mlu-directml-execution-ownership-reconciliation",
         "comfy-parity-native-video-codec-ffi-certification-foundation",
+        "comfy-parity-native-video-codec-package-capture-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"

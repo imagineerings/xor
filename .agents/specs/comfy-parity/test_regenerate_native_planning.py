@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 586)
+        self.assertEqual(len(tasks), 587)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -425,6 +425,9 @@ class ValidationGenerationTests(unittest.TestCase):
         video_codec_ffi_certification_foundation_id = (
             "comfy-parity-native-video-codec-ffi-certification-foundation"
         )
+        video_codec_package_capture_foundation_id = (
+            "comfy-parity-native-video-codec-package-capture-foundation"
+        )
         video_output_prefix_foundation_id = "comfy-parity-native-video-output-prefix-foundation"
         video_component_foundation_id = "comfy-parity-native-video-component-foundation"
         video_output_media_foundation_id = "comfy-parity-native-video-output-media-foundation"
@@ -625,12 +628,29 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_codec_ffi_certification_foundation_id,
+            tasks_by_id[video_codec_package_capture_foundation_id]["dependencies"],
+        )
+        self.assertIn(
+            video_codec_package_capture_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
         self.assertIn("crates/comfy_runtime/src/trust.rs", codec_certification["writes"])
         self.assertIn("VAL-RUNTIME-TRUST-001", codec_certification["validations"])
         self.assertNotIn("Cargo.lock", codec_certification["writes"])
+        codec_capture = tasks_by_id[video_codec_package_capture_foundation_id]
+        self.assertEqual(
+            codec_capture["writes"],
+            [
+                "crates/comfy_runtime/src/trust.rs",
+                "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertNotIn("Cargo.lock", codec_capture["writes"])
         self.assertEqual(
             tasks_by_id[video_codec_plan_foundation_id]["writes"],
             [
@@ -955,7 +975,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_plan_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_codec_ffi_certification_foundation_id,
+            video_codec_package_capture_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
@@ -1529,8 +1549,12 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_codec_plan_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id],
+            waves[video_codec_package_capture_foundation_id],
             waves[video_codec_ffi_certification_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id],
+            waves[video_codec_package_capture_foundation_id] + 1,
         )
         self.assertEqual(
             waves[film_tensor_average_pool_foundation_id],

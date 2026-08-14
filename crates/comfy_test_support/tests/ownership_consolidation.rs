@@ -13747,6 +13747,98 @@ fn val_ownership_native_video_codec_ffi_certification_001() -> Result<(), Box<dy
 }
 
 #[test]
+fn val_ownership_native_video_codec_package_capture_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let source = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "pub struct CapturedVideoCodecPackage",
+        "pub enum VideoCodecPackageCaptureError",
+        "pub fn capture_video_codec_package(",
+        "capture_native_library_image(path, cancellation)",
+        ".seal(&format!(\"video-codec-{identity}\"), cancellation)",
+        "video_codec_package_capture_seals_exact_catalog_images",
+    ] {
+        assert!(
+            source.contains(required),
+            "video codec package capture owner lacks {required}"
+        );
+    }
+    let boundary_start = source
+        .find("pub struct CapturedVideoCodecPackage")
+        .ok_or("video codec package capture boundary is missing")?;
+    let boundary_end = source
+        .find("pub struct NativeVideoCodecLibraryObservation")
+        .ok_or("video codec package capture boundary end is missing")?;
+    let boundary = source
+        .get(boundary_start..boundary_end)
+        .ok_or("video codec package capture boundary range is invalid")?;
+    for forbidden in [
+        "dlopen",
+        "dlsym",
+        "LoadLibrary",
+        "GetProcAddress",
+        ".authorize(",
+        "NativeCache",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !boundary.contains(forbidden),
+            "video codec package capture boundary contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json"),
+    )?;
+    for required in [
+        "source-fingerprinted-library-image-capture-contract",
+        "immutable_snapshot_retention",
+        "native_library_loaded",
+        "symbols_resolved",
+        "ffi_certificate_issued_by_capture",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video codec package capture fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_ffi_certification")
+            })
+        })
+        .ok_or("missing native FFI certification concern")?;
+    let mapping_names = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("native FFI mappings are missing")?
+        .iter()
+        .filter_map(|mapping| mapping.get("name").and_then(serde_json::Value::as_str))
+        .collect::<Vec<_>>();
+    for expected in [
+        "video-codec-package-capture-reuses-canonical-sealed-image-owner",
+        "video-codec-package-capture-tests-completeness-cancellation-and-mutation",
+        "video-codec-package-capture-fixture-forbids-load-and-certificate-claims",
+    ] {
+        assert!(
+            mapping_names.contains(&expected),
+            "missing mapping {expected}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

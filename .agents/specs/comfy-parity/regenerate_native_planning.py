@@ -10489,6 +10489,39 @@ def native_video_codec_ffi_certification_foundation_task(dependency: str) -> dic
     )
 
 
+def native_video_codec_package_capture_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-package-capture-foundation",
+        "Capture and seal native video codec packages",
+        [28, 31, 32, 35, 36, 42],
+        [17, 28, 31, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical native-library image owner captures each exact FFmpeg catalog file without following a final symlink, rechecks stable file identity and length while hashing bounded bytes, compares filename and digest with the signed five-library contract, and seals immutable retained snapshots. This leaf does not load a library, resolve a symbol, issue an FFI certificate, probe an encoder, or execute a codec.",
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted capture fixture and focused tests prove exact five-file completeness, filename and digest binding, immutable sealed retention, cancellation before capture, missing-image rejection, and post-catalog byte mutation rejection. The result exposes only target and signed logical identities; raw bytes, loader paths, handles, symbols, certificates, codec state, paths in payloads, cache, persistence, effects, and publication remain unowned.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.6", "32.1", "35.6", "36.4", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12700,8 +12733,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_plan_foundation["id"])
         )
     )
+    video_codec_package_capture_foundation = (
+        native_video_codec_package_capture_foundation_task(
+            str(video_codec_ffi_certification_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_ffi_certification_foundation["id"])
+        str(video_codec_package_capture_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12821,6 +12859,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         frame_interpolation_resource_exhaustion_foundation,
         video_codec_plan_foundation,
         video_codec_ffi_certification_foundation,
+        video_codec_package_capture_foundation,
         video_foundation,
             detection_foundation,
         ]

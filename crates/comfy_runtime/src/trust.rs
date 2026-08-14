@@ -1,22 +1,11 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
-    net::IpAddr,
-    time::{Duration, Instant},
-};
-
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
-use std::{
     fs::{File, OpenOptions},
     io::Read,
+    net::IpAddr,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 use ring::{
@@ -44,27 +33,9 @@ use comfy_plugin_sdk::{
     PluginContractError, PluginManifest, TypeRegistry,
 };
 use comfy_tensor::CancellationToken;
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 use comfy_types::CancellationError;
 
-#[cfg(all(
-    any(target_os = "linux", target_os = "windows"),
-    any(
-        test,
-        feature = "mlu",
-        feature = "npu",
-        feature = "rocm",
-        feature = "cuda",
-        feature = "xpu"
-    )
-))]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::{
@@ -91,23 +62,7 @@ const DIRECTML_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-directml-package-v1
 const VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-video-codec-package-v1\0";
 const NATIVE_PACKAGE_SIGNATURE_ALGORITHM: &str = "ed25519";
 const MAX_NATIVE_PACKAGE_SIGNATURE_RECEIPT_BYTES: usize = 1_024;
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 const MAX_NATIVE_LIBRARY_IMAGE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 const NATIVE_LIBRARY_IMAGE_CHUNK_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -751,59 +706,28 @@ pub(crate) struct NativePackagePayloadLimit {
     maximum_bytes: usize,
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 #[derive(Debug, Error)]
 pub(crate) enum NativeLibraryImageError {
     #[error("native-library image capture was cancelled")]
     Cancelled,
     #[error("native-library image capture or sealing is unsupported on this platform")]
+    #[cfg_attr(any(unix, target_os = "windows"), allow(dead_code))]
     UnsupportedPlatform,
     #[error("native-library image is invalid: {0}")]
     Invalid(String),
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 impl From<CancellationError> for NativeLibraryImageError {
     fn from(_: CancellationError) -> Self {
         Self::Cancelled
     }
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 pub(crate) struct CapturedNativeLibraryImage {
     bytes: Vec<u8>,
     digest_sha256: String,
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 impl CapturedNativeLibraryImage {
     #[cfg(any(test, feature = "rocm"))]
     pub(crate) fn bytes(&self) -> &[u8] {
@@ -831,14 +755,6 @@ impl CapturedNativeLibraryImage {
     }
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 #[cfg_attr(
     not(all(
         target_os = "linux",
@@ -848,21 +764,14 @@ impl CapturedNativeLibraryImage {
 )]
 pub(crate) struct RetainedNativeLibraryImage {
     _file: File,
+    #[allow(dead_code)]
     loader_path: PathBuf,
-    #[cfg(all(target_os = "windows", any(test, feature = "cuda", feature = "xpu")))]
+    #[cfg(target_os = "windows")]
     _temporary_directory: tempfile::TempDir,
     #[cfg(all(test, not(any(target_os = "linux", target_os = "windows"))))]
     _temporary_path: tempfile::TempPath,
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 #[cfg_attr(
     not(all(
         target_os = "linux",
@@ -871,6 +780,7 @@ pub(crate) struct RetainedNativeLibraryImage {
     allow(dead_code)
 )]
 impl RetainedNativeLibraryImage {
+    #[allow(dead_code)]
     pub(crate) fn loader_path(&self) -> &Path {
         &self.loader_path
     }
@@ -881,14 +791,6 @@ impl RetainedNativeLibraryImage {
     }
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 pub(crate) fn capture_native_library_image(
     path: &Path,
     cancellation: &CancellationToken,
@@ -896,14 +798,6 @@ pub(crate) fn capture_native_library_image(
     capture_native_library_image_with_check(path, || cancellation.check())
 }
 
-#[cfg(any(
-    test,
-    feature = "mlu",
-    feature = "npu",
-    feature = "rocm",
-    feature = "cuda",
-    feature = "xpu"
-))]
 pub(crate) fn capture_native_library_image_with_check(
     path: &Path,
     mut check_cancellation: impl FnMut() -> Result<(), CancellationError>,
@@ -915,17 +809,7 @@ pub(crate) fn capture_native_library_image_with_check(
     )
 }
 
-#[cfg(all(
-    unix,
-    any(
-        test,
-        feature = "mlu",
-        feature = "npu",
-        feature = "rocm",
-        feature = "cuda",
-        feature = "xpu"
-    )
-))]
+#[cfg(unix)]
 fn capture_native_library_image_with_limit(
     path: &Path,
     maximum_bytes: u64,
@@ -1018,7 +902,7 @@ fn capture_native_library_image_with_limit(
     })
 }
 
-#[cfg(all(target_os = "windows", any(test, feature = "cuda", feature = "xpu")))]
+#[cfg(target_os = "windows")]
 fn capture_native_library_image_with_limit(
     path: &Path,
     maximum_bytes: u64,
@@ -1094,7 +978,7 @@ fn capture_native_library_image_with_limit(
     })
 }
 
-#[cfg(all(target_os = "windows", any(test, feature = "cuda", feature = "xpu")))]
+#[cfg(target_os = "windows")]
 fn read_bounded_native_library_image(
     file: &mut File,
     expected_bytes: u64,
@@ -1135,18 +1019,7 @@ fn read_bounded_native_library_image(
     Ok(bytes)
 }
 
-#[cfg(all(
-    not(unix),
-    not(target_os = "windows"),
-    any(
-        test,
-        feature = "mlu",
-        feature = "npu",
-        feature = "rocm",
-        feature = "cuda",
-        feature = "xpu"
-    )
-))]
+#[cfg(all(not(unix), not(target_os = "windows")))]
 fn capture_native_library_image_with_limit(
     _path: &Path,
     _maximum_bytes: u64,
@@ -1155,17 +1028,7 @@ fn capture_native_library_image_with_limit(
     Err(NativeLibraryImageError::UnsupportedPlatform)
 }
 
-#[cfg(all(
-    target_os = "linux",
-    any(
-        test,
-        feature = "mlu",
-        feature = "npu",
-        feature = "rocm",
-        feature = "cuda",
-        feature = "xpu"
-    )
-))]
+#[cfg(target_os = "linux")]
 fn seal_native_library_image(
     bytes: &[u8],
     snapshot_name: &str,
@@ -1214,7 +1077,7 @@ fn seal_native_library_image(
     })
 }
 
-#[cfg(all(target_os = "windows", any(test, feature = "cuda", feature = "xpu")))]
+#[cfg(target_os = "windows")]
 fn seal_native_library_image(
     bytes: &[u8],
     snapshot_name: &str,
@@ -1311,18 +1174,7 @@ fn seal_native_library_image(
     })
 }
 
-#[cfg(all(
-    not(target_os = "linux"),
-    not(target_os = "windows"),
-    not(test),
-    any(
-        feature = "mlu",
-        feature = "npu",
-        feature = "rocm",
-        feature = "cuda",
-        feature = "xpu"
-    )
-))]
+#[cfg(all(not(target_os = "linux"), not(target_os = "windows"), not(test)))]
 fn seal_native_library_image(
     _bytes: &[u8],
     _snapshot_name: &str,
@@ -3507,6 +3359,104 @@ impl VerifiedVideoCodecFfiCatalog {
     }
 }
 
+pub struct CapturedVideoCodecPackage {
+    target: String,
+    libraries: BTreeMap<String, VideoCodecFfiLibraryIdentity>,
+    _sealed_images: BTreeMap<String, RetainedNativeLibraryImage>,
+}
+
+impl CapturedVideoCodecPackage {
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
+        &self.libraries
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum VideoCodecPackageCaptureError {
+    #[error("video codec package capture was cancelled")]
+    Cancelled,
+    #[error("video codec package capture is unsupported on this platform")]
+    UnsupportedPlatform,
+    #[error("video codec package paths are incomplete or contain unexpected libraries")]
+    Incomplete,
+    #[error("video codec package image {identity} differs from the signed catalog")]
+    ContractMismatch { identity: String },
+    #[error("video codec package image {identity} could not be captured: {reason}")]
+    InvalidImage { identity: String, reason: String },
+}
+
+pub fn capture_video_codec_package(
+    catalog: &VerifiedVideoCodecFfiCatalog,
+    paths: BTreeMap<String, PathBuf>,
+    cancellation: &CancellationToken,
+) -> Result<CapturedVideoCodecPackage, VideoCodecPackageCaptureError> {
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecPackageCaptureError::Cancelled)?;
+    if paths.len() != catalog.libraries.len()
+        || !catalog
+            .libraries
+            .keys()
+            .all(|identity| paths.contains_key(identity))
+    {
+        return Err(VideoCodecPackageCaptureError::Incomplete);
+    }
+
+    let mut sealed_images = BTreeMap::new();
+    for (identity, expected) in &catalog.libraries {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecPackageCaptureError::Cancelled)?;
+        let path = paths
+            .get(identity)
+            .ok_or(VideoCodecPackageCaptureError::Incomplete)?;
+        if path.file_name().and_then(|name| name.to_str()) != Some(expected.filename()) {
+            return Err(VideoCodecPackageCaptureError::ContractMismatch {
+                identity: identity.clone(),
+            });
+        }
+        let captured = capture_native_library_image(path, cancellation)
+            .map_err(|error| map_video_codec_image_error(identity, error))?;
+        if captured.digest_sha256() != expected.digest_sha256() {
+            return Err(VideoCodecPackageCaptureError::ContractMismatch {
+                identity: identity.clone(),
+            });
+        }
+        let retained = captured
+            .seal(&format!("video-codec-{identity}"), cancellation)
+            .map_err(|error| map_video_codec_image_error(identity, error))?;
+        sealed_images.insert(identity.clone(), retained);
+    }
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecPackageCaptureError::Cancelled)?;
+    Ok(CapturedVideoCodecPackage {
+        target: catalog.target.clone(),
+        libraries: catalog.libraries.clone(),
+        _sealed_images: sealed_images,
+    })
+}
+
+fn map_video_codec_image_error(
+    identity: &str,
+    error: NativeLibraryImageError,
+) -> VideoCodecPackageCaptureError {
+    match error {
+        NativeLibraryImageError::Cancelled => VideoCodecPackageCaptureError::Cancelled,
+        NativeLibraryImageError::UnsupportedPlatform => {
+            VideoCodecPackageCaptureError::UnsupportedPlatform
+        }
+        NativeLibraryImageError::Invalid(reason) => VideoCodecPackageCaptureError::InvalidImage {
+            identity: identity.to_owned(),
+            reason,
+        },
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeVideoCodecLibraryObservation {
     identity: String,
@@ -5022,17 +4972,28 @@ mod tests {
         key_pair: &Ed25519KeyPair,
     ) -> Result<(Vec<u8>, Vec<u8>, VideoCodecPackageVerificationKey), Box<dyn std::error::Error>>
     {
+        signed_video_codec_catalog_with_digests(key_pair, &BTreeMap::new())
+    }
+
+    fn signed_video_codec_catalog_with_digests(
+        key_pair: &Ed25519KeyPair,
+        digests: &BTreeMap<String, String>,
+    ) -> Result<(Vec<u8>, Vec<u8>, VideoCodecPackageVerificationKey), Box<dyn std::error::Error>>
+    {
         let target = "x86_64-unknown-linux-gnu";
-        let libraries = video_codec_library_contracts()
-            .into_iter()
-            .map(|(identity, abi_major, symbols)| VideoCodecFfiLibraryDto {
+        let mut libraries = Vec::new();
+        for (identity, abi_major, symbols) in video_codec_library_contracts() {
+            libraries.push(VideoCodecFfiLibraryDto {
                 identity: identity.to_owned(),
                 filename: video_codec_expected_filename(identity, abi_major, target),
-                sha256: DIGEST.to_owned(),
+                sha256: digests
+                    .get(identity)
+                    .cloned()
+                    .unwrap_or_else(|| DIGEST.to_owned()),
                 abi_major,
                 required_symbols: symbols.iter().map(|symbol| (*symbol).to_owned()).collect(),
-            })
-            .collect();
+            });
+        }
         let catalog = VideoCodecFfiCatalogDto {
             schema_version: 1,
             profile: VIDEO_CODEC_FFI_PROFILE.to_owned(),
@@ -5111,6 +5072,63 @@ mod tests {
             assert_eq!(certificate.unsafe_owner(), VIDEO_CODEC_FFI_UNSAFE_OWNER);
             assert!(!certificate.required_symbols().is_empty());
         }
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn video_codec_package_capture_seals_exact_catalog_images()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
+            .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
+        let directory = tempfile::tempdir()?;
+        let mut paths = BTreeMap::new();
+        let mut digests = BTreeMap::new();
+        for (identity, abi_major, _) in video_codec_library_contracts() {
+            let filename =
+                video_codec_expected_filename(identity, abi_major, "x86_64-unknown-linux-gnu");
+            let path = directory.path().join(filename);
+            let bytes = format!("fixture-{identity}-{abi_major}").into_bytes();
+            std::fs::write(&path, &bytes)?;
+            digests.insert(identity.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
+            paths.insert(identity.to_owned(), path);
+        }
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog_with_digests(&key_pair, &digests)?;
+        let cancellation = CancellationToken::default();
+        let verified = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        let captured = capture_video_codec_package(&verified, paths.clone(), &cancellation)?;
+        assert_eq!(captured.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(captured.libraries(), verified.libraries());
+
+        let mut missing = paths.clone();
+        missing.remove("avcodec");
+        assert!(matches!(
+            capture_video_codec_package(&verified, missing, &cancellation),
+            Err(VideoCodecPackageCaptureError::Incomplete)
+        ));
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        assert!(matches!(
+            capture_video_codec_package(&verified, paths.clone(), &cancelled),
+            Err(VideoCodecPackageCaptureError::Cancelled)
+        ));
+
+        let avutil = paths
+            .get("avutil")
+            .ok_or_else(|| io::Error::other("fixture avutil path is missing"))?;
+        std::fs::write(avutil, b"changed")?;
+        assert!(matches!(
+            capture_video_codec_package(&verified, paths, &cancellation),
+            Err(VideoCodecPackageCaptureError::ContractMismatch { identity })
+                if identity == "avutil"
+        ));
         Ok(())
     }
 
