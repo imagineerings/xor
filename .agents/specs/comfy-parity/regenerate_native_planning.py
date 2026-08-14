@@ -10452,6 +10452,43 @@ def native_video_codec_plan_foundation_task(dependency: str) -> dict[str, object
     )
 
 
+def native_video_codec_ffi_certification_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ffi-certification-foundation",
+        "Certify native video codec ABI contracts",
+        [31, 32, 35, 36, 41, 42],
+        [17, 28, 31, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical NativeFfiRegistry admits a signed canonical FFmpeg 7.1 five-library catalog only for the reviewed target filename, ABI-major, digest, symbol, external-encoder, license-notice, unsafe-owner, and no-runtime-compilation contract. A separate complete observation pass yields opaque registry-issued certificates; catalog verification does not load a library, probe a codec, claim availability, or create an unsafe adapter.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Canonical signed-catalog fixtures and tests prove FFmpeg 7.1 ABI majors 61/61/59/8/5, six target filename profiles, exact sorted symbols, five complete libraries, codec capability declarations, digest and signer binding, canonical JSON, target and license policy, cancellation, and rejection of tampering, duplicate/missing observations, wrong ABI/digest/filename, and incomplete symbols. Certificates can only come from NativeFfiRegistry; no library capture, dynamic load, raw function pointer, encoder probe, codec execution, path/handle/effect/cache/persistence/publication owner, installed package, or source/runtime numerical oracle is claimed.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "32.1", "35.6", "36.4", "41.2", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12658,8 +12695,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_codec_plan_foundation = native_video_codec_plan_foundation_task(
         str(frame_interpolation_resource_exhaustion_foundation["id"])
     )
+    video_codec_ffi_certification_foundation = (
+        native_video_codec_ffi_certification_foundation_task(
+            str(video_codec_plan_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_plan_foundation["id"])
+        str(video_codec_ffi_certification_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12778,6 +12820,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_sequence_foundation,
         frame_interpolation_resource_exhaustion_foundation,
         video_codec_plan_foundation,
+        video_codec_ffi_certification_foundation,
         video_foundation,
             detection_foundation,
         ]

@@ -54,7 +54,17 @@ use comfy_tensor::CancellationToken;
 ))]
 use comfy_types::CancellationError;
 
-#[cfg(any(target_os = "linux", target_os = "windows", test))]
+#[cfg(all(
+    any(target_os = "linux", target_os = "windows"),
+    any(
+        test,
+        feature = "mlu",
+        feature = "npu",
+        feature = "rocm",
+        feature = "cuda",
+        feature = "xpu"
+    )
+))]
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::{
@@ -78,6 +88,7 @@ const NPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-npu-package-v1\0";
 const CUDA_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-cuda-package-v1\0";
 const XPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-xpu-package-v1\0";
 const DIRECTML_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-directml-package-v1\0";
+const VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-video-codec-package-v1\0";
 const NATIVE_PACKAGE_SIGNATURE_ALGORITHM: &str = "ed25519";
 const MAX_NATIVE_PACKAGE_SIGNATURE_RECEIPT_BYTES: usize = 1_024;
 #[cfg(any(
@@ -184,6 +195,11 @@ pub struct XpuPackageVerificationKey {
 
 #[derive(Clone, Eq, PartialEq)]
 pub struct DirectMlPackageVerificationKey {
+    authority: NativePackageVerificationAuthority,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct VideoCodecPackageVerificationKey {
     authority: NativePackageVerificationAuthority,
 }
 
@@ -499,6 +515,42 @@ impl DirectMlPackageVerificationKey {
     }
 }
 
+impl VideoCodecPackageVerificationKey {
+    pub fn new(signer: impl Into<String>, key: impl AsRef<[u8]>) -> Result<Self, TrustError> {
+        Ok(Self {
+            authority: NativePackageVerificationAuthority::new(
+                signer,
+                key,
+                TrustError::InvalidVideoCodecPackageVerificationKey,
+            )?,
+        })
+    }
+
+    pub fn signer(&self) -> &str {
+        &self.authority.signer
+    }
+
+    pub fn public_key_bytes(&self) -> &[u8; ED25519_PUBLIC_KEY_BYTES] {
+        &self.authority.public_key
+    }
+
+    pub fn verify_package(
+        &self,
+        signer: &str,
+        coverage: &[u8],
+        receipt_bytes: &[u8],
+    ) -> Result<(), TrustError> {
+        self.authority.verify(
+            VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN,
+            signer,
+            coverage,
+            receipt_bytes,
+            TrustError::UnknownVideoCodecPackageSigner,
+            TrustError::InvalidVideoCodecPackageSignature,
+        )
+    }
+}
+
 impl fmt::Debug for RocmPackageVerificationKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -642,6 +694,19 @@ pub fn directml_package_signing_payload(
         signer,
         coverage,
         TrustError::InvalidDirectMlPackageSignature,
+    )
+}
+
+#[cfg(any(test, feature = "signing-tooling"))]
+pub fn video_codec_package_signing_payload(
+    signer: &str,
+    coverage: &[u8],
+) -> Result<Vec<u8>, TrustError> {
+    package_signing_payload(
+        VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN,
+        signer,
+        coverage,
+        TrustError::InvalidVideoCodecPackageSignature,
     )
 }
 
@@ -3362,6 +3427,420 @@ impl CertifiedNativeFfi {
     }
 }
 
+pub const VIDEO_CODEC_FFI_PROFILE: &str = "ffmpeg-7.1";
+pub const VIDEO_CODEC_FFI_UNSAFE_OWNER: &str = "comfy_runtime::native_video_codec_ffi";
+
+const VIDEO_CODEC_FFI_TARGETS: [&str; 6] = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+];
+const VIDEO_CODEC_EXTERNAL_ENCODERS: [&str; 5] =
+    ["aac", "h264", "libsvtav1", "libvpx-vp9", "libx264"];
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VideoCodecFfiCatalogDto {
+    schema_version: u16,
+    profile: String,
+    target: String,
+    signer: String,
+    signature_algorithm: String,
+    signature_domain: String,
+    certificate_owner: String,
+    unsafe_owner: String,
+    runtime_compilation_forbidden: bool,
+    redistributes_codec_libraries: bool,
+    license_notice_sha256: String,
+    external_encoders: Vec<String>,
+    libraries: Vec<VideoCodecFfiLibraryDto>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct VideoCodecFfiLibraryDto {
+    identity: String,
+    filename: String,
+    sha256: String,
+    abi_major: u16,
+    required_symbols: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VideoCodecFfiLibraryIdentity {
+    filename: String,
+    digest_sha256: String,
+    abi_major: u16,
+}
+
+impl VideoCodecFfiLibraryIdentity {
+    pub fn filename(&self) -> &str {
+        &self.filename
+    }
+
+    pub fn digest_sha256(&self) -> &str {
+        &self.digest_sha256
+    }
+
+    pub fn abi_major(&self) -> u16 {
+        self.abi_major
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct VerifiedVideoCodecFfiCatalog {
+    target: String,
+    registry: NativeFfiRegistry,
+    libraries: BTreeMap<String, VideoCodecFfiLibraryIdentity>,
+}
+
+impl VerifiedVideoCodecFfiCatalog {
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
+        &self.libraries
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeVideoCodecLibraryObservation {
+    identity: String,
+    filename: String,
+    digest_sha256: String,
+    abi_major: u16,
+    available_symbols: BTreeSet<String>,
+}
+
+impl NativeVideoCodecLibraryObservation {
+    pub fn checked(
+        identity: impl Into<String>,
+        filename: impl Into<String>,
+        digest_sha256: impl Into<String>,
+        abi_major: u16,
+        available_symbols: impl IntoIterator<Item = String>,
+    ) -> Result<Self, VideoCodecFfiCertificationError> {
+        let observation = Self {
+            identity: identity.into(),
+            filename: filename.into(),
+            digest_sha256: digest_sha256.into(),
+            abi_major,
+            available_symbols: available_symbols.into_iter().collect(),
+        };
+        if !video_codec_library_identity_valid(&observation.identity)
+            || !video_codec_filename_valid(&observation.filename)
+            || validate_sha256(&observation.digest_sha256).is_err()
+            || observation.abi_major == 0
+            || observation.available_symbols.is_empty()
+            || observation
+                .available_symbols
+                .iter()
+                .any(|symbol| !video_codec_symbol_valid(symbol))
+        {
+            return Err(VideoCodecFfiCertificationError::InvalidObservation);
+        }
+        Ok(observation)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CertifiedVideoCodecFfi {
+    target: String,
+    certificates: BTreeMap<String, CertifiedNativeFfi>,
+}
+
+impl CertifiedVideoCodecFfi {
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn certificates(&self) -> &BTreeMap<String, CertifiedNativeFfi> {
+        &self.certificates
+    }
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum VideoCodecFfiCatalogError {
+    #[error("video codec catalog verification was cancelled")]
+    Cancelled,
+    #[error(transparent)]
+    Trust(#[from] TrustError),
+    #[error("signed video codec FFI catalog is malformed")]
+    Malformed,
+    #[error("signed video codec FFI catalog differs from the reviewed ABI")]
+    ContractMismatch,
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum VideoCodecFfiCertificationError {
+    #[error("video codec FFI certification was cancelled")]
+    Cancelled,
+    #[error(transparent)]
+    Trust(#[from] TrustError),
+    #[error("video codec library observation is malformed")]
+    InvalidObservation,
+    #[error("video codec library observations are incomplete or duplicated")]
+    IncompleteObservationSet,
+    #[error("video codec library observation differs from the signed catalog")]
+    ObservationMismatch,
+}
+
+pub fn verify_video_codec_ffi_catalog(
+    catalog_bytes: &[u8],
+    signature_receipt: &[u8],
+    verification_key: &VideoCodecPackageVerificationKey,
+    cancellation: &CancellationToken,
+) -> Result<VerifiedVideoCodecFfiCatalog, VideoCodecFfiCatalogError> {
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCatalogError::Cancelled)?;
+    if catalog_bytes.is_empty() || catalog_bytes.len() > 1024 * 1024 {
+        return Err(VideoCodecFfiCatalogError::Malformed);
+    }
+    let value =
+        parse_strict_json_value(catalog_bytes).map_err(|_| VideoCodecFfiCatalogError::Malformed)?;
+    let catalog: VideoCodecFfiCatalogDto =
+        serde_json::from_value(value).map_err(|_| VideoCodecFfiCatalogError::Malformed)?;
+    let mut canonical =
+        serde_json::to_vec(&catalog).map_err(|_| VideoCodecFfiCatalogError::Malformed)?;
+    canonical.push(b'\n');
+    if canonical != catalog_bytes {
+        return Err(VideoCodecFfiCatalogError::Malformed);
+    }
+    validate_video_codec_catalog_envelope(&catalog)?;
+    verification_key.verify_package(&catalog.signer, catalog_bytes, signature_receipt)?;
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCatalogError::Cancelled)?;
+
+    let mut contracts = Vec::with_capacity(catalog.libraries.len());
+    let mut identities = BTreeMap::new();
+    for library in &catalog.libraries {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecFfiCatalogError::Cancelled)?;
+        let abi_version = video_codec_abi_version(library.abi_major);
+        contracts.push(NativeFfiContract::new(
+            library.identity.clone(),
+            library.sha256.clone(),
+            abi_version,
+            library.required_symbols.clone(),
+            VIDEO_CODEC_FFI_UNSAFE_OWNER,
+        )?);
+        identities.insert(
+            library.identity.clone(),
+            VideoCodecFfiLibraryIdentity {
+                filename: library.filename.clone(),
+                digest_sha256: library.sha256.clone(),
+                abi_major: library.abi_major,
+            },
+        );
+    }
+    Ok(VerifiedVideoCodecFfiCatalog {
+        target: catalog.target,
+        registry: NativeFfiRegistry::new(contracts)?,
+        libraries: identities,
+    })
+}
+
+pub fn certify_video_codec_ffi(
+    verified: VerifiedVideoCodecFfiCatalog,
+    observations: impl IntoIterator<Item = NativeVideoCodecLibraryObservation>,
+    cancellation: &CancellationToken,
+) -> Result<CertifiedVideoCodecFfi, VideoCodecFfiCertificationError> {
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+    let mut observations_by_identity = BTreeMap::new();
+    for observation in observations {
+        if observations_by_identity
+            .insert(observation.identity.clone(), observation)
+            .is_some()
+        {
+            return Err(VideoCodecFfiCertificationError::IncompleteObservationSet);
+        }
+    }
+    if observations_by_identity.len() != verified.libraries.len() {
+        return Err(VideoCodecFfiCertificationError::IncompleteObservationSet);
+    }
+
+    let mut certificates = BTreeMap::new();
+    for (identity, expected) in &verified.libraries {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+        let observation = observations_by_identity
+            .get(identity)
+            .ok_or(VideoCodecFfiCertificationError::IncompleteObservationSet)?;
+        if observation.filename != expected.filename
+            || observation.digest_sha256 != expected.digest_sha256
+            || observation.abi_major != expected.abi_major
+        {
+            return Err(VideoCodecFfiCertificationError::ObservationMismatch);
+        }
+        let certificate = verified.registry.authorize(
+            identity,
+            &observation.digest_sha256,
+            &video_codec_abi_version(observation.abi_major),
+            &observation.available_symbols,
+        )?;
+        certificates.insert(identity.clone(), certificate);
+    }
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+    Ok(CertifiedVideoCodecFfi {
+        target: verified.target,
+        certificates,
+    })
+}
+
+fn validate_video_codec_catalog_envelope(
+    catalog: &VideoCodecFfiCatalogDto,
+) -> Result<(), VideoCodecFfiCatalogError> {
+    if catalog.schema_version != 1
+        || catalog.profile != VIDEO_CODEC_FFI_PROFILE
+        || !VIDEO_CODEC_FFI_TARGETS.contains(&catalog.target.as_str())
+        || !valid_ascii_identifier(&catalog.signer, 256)
+        || catalog.signature_algorithm != NATIVE_PACKAGE_SIGNATURE_ALGORITHM
+        || catalog.signature_domain != "sim-comfy-video-codec-package-v1"
+        || catalog.certificate_owner != "comfy_runtime::NativeFfiRegistry"
+        || catalog.unsafe_owner != VIDEO_CODEC_FFI_UNSAFE_OWNER
+        || !catalog.runtime_compilation_forbidden
+        || catalog.redistributes_codec_libraries
+        || validate_sha256(&catalog.license_notice_sha256).is_err()
+        || catalog.external_encoders != VIDEO_CODEC_EXTERNAL_ENCODERS.map(str::to_owned)
+        || catalog.libraries.len() != video_codec_library_contracts().len()
+    {
+        return Err(VideoCodecFfiCatalogError::ContractMismatch);
+    }
+    for (row, (identity, abi_major, symbols)) in catalog
+        .libraries
+        .iter()
+        .zip(video_codec_library_contracts())
+    {
+        if row.identity != identity
+            || row.abi_major != abi_major
+            || row.filename != video_codec_expected_filename(identity, abi_major, &catalog.target)
+            || validate_sha256(&row.sha256).is_err()
+            || row.required_symbols
+                != symbols
+                    .iter()
+                    .map(|symbol| (*symbol).to_owned())
+                    .collect::<Vec<_>>()
+        {
+            return Err(VideoCodecFfiCatalogError::ContractMismatch);
+        }
+    }
+    Ok(())
+}
+
+fn video_codec_library_contracts() -> [(&'static str, u16, &'static [&'static str]); 5] {
+    [
+        ("avcodec", 61, &VIDEO_CODEC_AVCODEC_SYMBOLS),
+        ("avformat", 61, &VIDEO_CODEC_AVFORMAT_SYMBOLS),
+        ("avutil", 59, &VIDEO_CODEC_AVUTIL_SYMBOLS),
+        ("swresample", 5, &VIDEO_CODEC_SWRESAMPLE_SYMBOLS),
+        ("swscale", 8, &VIDEO_CODEC_SWSCALE_SYMBOLS),
+    ]
+}
+
+fn video_codec_expected_filename(identity: &str, major: u16, target: &str) -> String {
+    if target.ends_with("windows-msvc") {
+        format!("{identity}-{major}.dll")
+    } else if target.ends_with("apple-darwin") {
+        format!("lib{identity}.{major}.dylib")
+    } else {
+        format!("lib{identity}.so.{major}")
+    }
+}
+
+fn video_codec_abi_version(major: u16) -> String {
+    format!("{VIDEO_CODEC_FFI_PROFILE}:{major}")
+}
+
+fn video_codec_library_identity_valid(value: &str) -> bool {
+    video_codec_library_contracts()
+        .into_iter()
+        .any(|(identity, _, _)| identity == value)
+}
+
+fn video_codec_filename_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 255
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
+fn video_codec_symbol_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 256
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+const VIDEO_CODEC_AVCODEC_SYMBOLS: [&str; 14] = [
+    "av_packet_alloc",
+    "av_packet_free",
+    "av_packet_unref",
+    "avcodec_alloc_context3",
+    "avcodec_find_decoder",
+    "avcodec_find_encoder_by_name",
+    "avcodec_free_context",
+    "avcodec_open2",
+    "avcodec_parameters_from_context",
+    "avcodec_parameters_to_context",
+    "avcodec_receive_frame",
+    "avcodec_receive_packet",
+    "avcodec_send_frame",
+    "avcodec_send_packet",
+];
+const VIDEO_CODEC_AVFORMAT_SYMBOLS: [&str; 14] = [
+    "av_find_best_stream",
+    "av_interleaved_write_frame",
+    "av_read_frame",
+    "av_write_trailer",
+    "avformat_alloc_context",
+    "avformat_alloc_output_context2",
+    "avformat_close_input",
+    "avformat_find_stream_info",
+    "avformat_free_context",
+    "avformat_new_stream",
+    "avformat_open_input",
+    "avformat_write_header",
+    "avio_alloc_context",
+    "avio_context_free",
+];
+const VIDEO_CODEC_AVUTIL_SYMBOLS: [&str; 13] = [
+    "av_channel_layout_default",
+    "av_channel_layout_uninit",
+    "av_dict_free",
+    "av_dict_set",
+    "av_frame_alloc",
+    "av_frame_free",
+    "av_frame_get_buffer",
+    "av_frame_make_writable",
+    "av_free",
+    "av_malloc",
+    "av_opt_set",
+    "av_opt_set_int",
+    "av_rescale_q",
+];
+const VIDEO_CODEC_SWRESAMPLE_SYMBOLS: [&str; 5] = [
+    "swr_alloc",
+    "swr_alloc_set_opts2",
+    "swr_convert",
+    "swr_free",
+    "swr_init",
+];
+const VIDEO_CODEC_SWSCALE_SYMBOLS: [&str; 3] = ["sws_freeContext", "sws_getContext", "sws_scale"];
+
 pub fn cudart_exact_native<'a>(
     certification: &'a CertifiedNativeFfi,
     cancellation: &CancellationToken,
@@ -3435,6 +3914,12 @@ pub enum TrustError {
     UnknownDirectMlPackageSigner,
     #[error("DirectML package signature is missing, malformed, or invalid")]
     InvalidDirectMlPackageSignature,
+    #[error("video codec package verification key is invalid")]
+    InvalidVideoCodecPackageVerificationKey,
+    #[error("video codec package signer is not the explicitly configured authority")]
+    UnknownVideoCodecPackageSigner,
+    #[error("video codec package signature is missing, malformed, or invalid")]
+    InvalidVideoCodecPackageSignature,
     #[error("plugin authorization does not belong to this manifest")]
     AuthorizationManifestMismatch,
     #[error("sealed plugin authorization is malformed or internally inconsistent")]
@@ -4530,6 +5015,330 @@ mod tests {
             ]),
             Err(TrustError::InvalidFfiContract)
         );
+        Ok(())
+    }
+
+    fn signed_video_codec_catalog(
+        key_pair: &Ed25519KeyPair,
+    ) -> Result<(Vec<u8>, Vec<u8>, VideoCodecPackageVerificationKey), Box<dyn std::error::Error>>
+    {
+        let target = "x86_64-unknown-linux-gnu";
+        let libraries = video_codec_library_contracts()
+            .into_iter()
+            .map(|(identity, abi_major, symbols)| VideoCodecFfiLibraryDto {
+                identity: identity.to_owned(),
+                filename: video_codec_expected_filename(identity, abi_major, target),
+                sha256: DIGEST.to_owned(),
+                abi_major,
+                required_symbols: symbols.iter().map(|symbol| (*symbol).to_owned()).collect(),
+            })
+            .collect();
+        let catalog = VideoCodecFfiCatalogDto {
+            schema_version: 1,
+            profile: VIDEO_CODEC_FFI_PROFILE.to_owned(),
+            target: target.to_owned(),
+            signer: "video-codec.release".to_owned(),
+            signature_algorithm: "ed25519".to_owned(),
+            signature_domain: "sim-comfy-video-codec-package-v1".to_owned(),
+            certificate_owner: "comfy_runtime::NativeFfiRegistry".to_owned(),
+            unsafe_owner: VIDEO_CODEC_FFI_UNSAFE_OWNER.to_owned(),
+            runtime_compilation_forbidden: true,
+            redistributes_codec_libraries: false,
+            license_notice_sha256: DIGEST.to_owned(),
+            external_encoders: VIDEO_CODEC_EXTERNAL_ENCODERS.map(str::to_owned).to_vec(),
+            libraries,
+        };
+        let mut catalog_bytes = serde_json::to_vec(&catalog)?;
+        catalog_bytes.push(b'\n');
+        let signature_receipt = sign_video_codec_catalog(&catalog_bytes, key_pair)?;
+        let verification_key = VideoCodecPackageVerificationKey::new(
+            "video-codec.release",
+            key_pair.public_key().as_ref(),
+        )?;
+        Ok((catalog_bytes, signature_receipt, verification_key))
+    }
+
+    fn sign_video_codec_catalog(
+        catalog_bytes: &[u8],
+        key_pair: &Ed25519KeyPair,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let signing_payload =
+            video_codec_package_signing_payload("video-codec.release", catalog_bytes)?;
+        let mut signature_receipt = serde_json::to_vec(&NativePackageSignatureReceipt {
+            schema_version: 1,
+            algorithm: "ed25519".to_owned(),
+            signature: encode_hex(key_pair.sign(&signing_payload).as_ref()),
+        })?;
+        signature_receipt.push(b'\n');
+        Ok(signature_receipt)
+    }
+
+    #[test]
+    fn video_codec_catalog_is_signed_complete_and_registry_certified()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
+            .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog(&key_pair)?;
+        let cancellation = CancellationToken::default();
+        let verified = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        assert_eq!(verified.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(verified.libraries().len(), 5);
+
+        let observations = video_codec_library_contracts()
+            .into_iter()
+            .map(|(identity, abi_major, symbols)| {
+                NativeVideoCodecLibraryObservation::checked(
+                    identity,
+                    video_codec_expected_filename(identity, abi_major, verified.target()),
+                    DIGEST,
+                    abi_major,
+                    symbols.iter().map(|symbol| (*symbol).to_owned()),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let certified = certify_video_codec_ffi(verified, observations, &cancellation)?;
+        assert_eq!(certified.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(certified.certificates().len(), 5);
+        for (identity, certificate) in certified.certificates() {
+            assert_eq!(certificate.library_id(), identity);
+            assert_eq!(certificate.digest_sha256(), DIGEST);
+            assert_eq!(certificate.unsafe_owner(), VIDEO_CODEC_FFI_UNSAFE_OWNER);
+            assert!(!certificate.required_symbols().is_empty());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn video_codec_catalog_rejects_tampering_incomplete_symbols_and_cancellation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
+            .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog(&key_pair)?;
+        let cancellation = CancellationToken::default();
+
+        let mut tampered = catalog_bytes.clone();
+        let first_digit = tampered
+            .iter()
+            .position(|byte| *byte == b'7')
+            .ok_or_else(|| io::Error::other("fixture profile digit is missing"))?;
+        let digit = tampered
+            .get_mut(first_digit)
+            .ok_or_else(|| io::Error::other("fixture profile digit is out of bounds"))?;
+        *digit = b'8';
+        assert!(
+            verify_video_codec_ffi_catalog(
+                &tampered,
+                &signature_receipt,
+                &verification_key,
+                &cancellation,
+            )
+            .is_err()
+        );
+
+        let verified = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        let observations = video_codec_library_contracts()
+            .into_iter()
+            .map(|(identity, abi_major, symbols)| {
+                let available = if identity == "avcodec" {
+                    symbols
+                        .iter()
+                        .skip(1)
+                        .map(|symbol| (*symbol).to_owned())
+                        .collect::<Vec<_>>()
+                } else {
+                    symbols.iter().map(|symbol| (*symbol).to_owned()).collect()
+                };
+                NativeVideoCodecLibraryObservation::checked(
+                    identity,
+                    video_codec_expected_filename(identity, abi_major, verified.target()),
+                    DIGEST,
+                    abi_major,
+                    available,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert!(matches!(
+            certify_video_codec_ffi(verified, observations, &cancellation),
+            Err(VideoCodecFfiCertificationError::Trust(
+                TrustError::UncertifiedFfi
+            ))
+        ));
+
+        let cancelled = CancellationToken::default();
+        assert!(cancelled.cancel());
+        assert!(matches!(
+            verify_video_codec_ffi_catalog(
+                &catalog_bytes,
+                &signature_receipt,
+                &verification_key,
+                &cancelled,
+            ),
+            Err(VideoCodecFfiCatalogError::Cancelled)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn video_codec_catalog_rejects_noncanonical_policy_and_observation_mismatches()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
+            .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog(&key_pair)?;
+        let cancellation = CancellationToken::default();
+
+        let catalog_value: serde_json::Value = serde_json::from_slice(&catalog_bytes)?;
+        let mut noncanonical = serde_json::to_vec_pretty(&catalog_value)?;
+        noncanonical.push(b'\n');
+        let noncanonical_signature = sign_video_codec_catalog(&noncanonical, &key_pair)?;
+        assert!(matches!(
+            verify_video_codec_ffi_catalog(
+                &noncanonical,
+                &noncanonical_signature,
+                &verification_key,
+                &cancellation,
+            ),
+            Err(VideoCodecFfiCatalogError::Malformed)
+        ));
+
+        for (field, replacement) in [
+            ("target", json!("riscv64-unknown-linux-gnu")),
+            ("license_notice_sha256", json!("invalid")),
+        ] {
+            let mut changed = catalog_value.clone();
+            let object = changed
+                .as_object_mut()
+                .ok_or_else(|| io::Error::other("catalog fixture is not an object"))?;
+            object.insert(field.to_owned(), replacement);
+            let mut changed_bytes = serde_json::to_vec(&changed)?;
+            changed_bytes.push(b'\n');
+            let changed_signature = sign_video_codec_catalog(&changed_bytes, &key_pair)?;
+            assert!(matches!(
+                verify_video_codec_ffi_catalog(
+                    &changed_bytes,
+                    &changed_signature,
+                    &verification_key,
+                    &cancellation,
+                ),
+                Err(VideoCodecFfiCatalogError::ContractMismatch)
+            ));
+        }
+
+        let mut changed_abi = catalog_value.clone();
+        let libraries = changed_abi
+            .get_mut("libraries")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| io::Error::other("catalog libraries are missing"))?;
+        let avcodec = libraries
+            .first_mut()
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| io::Error::other("avcodec contract is missing"))?;
+        avcodec.insert("abi_major".to_owned(), json!(62));
+        let mut changed_abi_bytes = serde_json::to_vec(&changed_abi)?;
+        changed_abi_bytes.push(b'\n');
+        let changed_abi_signature = sign_video_codec_catalog(&changed_abi_bytes, &key_pair)?;
+        assert!(matches!(
+            verify_video_codec_ffi_catalog(
+                &changed_abi_bytes,
+                &changed_abi_signature,
+                &verification_key,
+                &cancellation,
+            ),
+            Err(VideoCodecFfiCatalogError::ContractMismatch)
+        ));
+
+        let observation_set = |filename_override: Option<&str>, digest: &str, abi_delta: u16| {
+            video_codec_library_contracts()
+                .into_iter()
+                .map(|(identity, abi_major, symbols)| {
+                    NativeVideoCodecLibraryObservation::checked(
+                        identity,
+                        filename_override
+                            .filter(|_| identity == "avcodec")
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| {
+                                video_codec_expected_filename(
+                                    identity,
+                                    abi_major,
+                                    "x86_64-unknown-linux-gnu",
+                                )
+                            }),
+                        if identity == "avcodec" {
+                            digest
+                        } else {
+                            DIGEST
+                        },
+                        if identity == "avcodec" {
+                            abi_major.saturating_add(abi_delta)
+                        } else {
+                            abi_major
+                        },
+                        symbols.iter().map(|symbol| (*symbol).to_owned()),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+        };
+
+        let missing = observation_set(None, DIGEST, 0)?
+            .into_iter()
+            .skip(1)
+            .collect::<Vec<_>>();
+        let verified = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        assert!(matches!(
+            certify_video_codec_ffi(verified, missing, &cancellation),
+            Err(VideoCodecFfiCertificationError::IncompleteObservationSet)
+        ));
+
+        let mut duplicate = observation_set(None, DIGEST, 0)?;
+        let repeated = duplicate
+            .first()
+            .cloned()
+            .ok_or_else(|| io::Error::other("observation fixture is empty"))?;
+        duplicate.push(repeated);
+        let verified = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        assert!(matches!(
+            certify_video_codec_ffi(verified, duplicate, &cancellation),
+            Err(VideoCodecFfiCertificationError::IncompleteObservationSet)
+        ));
+
+        for observations in [
+            observation_set(Some("libavcodec.so.62"), DIGEST, 0)?,
+            observation_set(None, &"f".repeat(64), 0)?,
+            observation_set(None, DIGEST, 1)?,
+        ] {
+            let verified = verify_video_codec_ffi_catalog(
+                &catalog_bytes,
+                &signature_receipt,
+                &verification_key,
+                &cancellation,
+            )?;
+            assert!(matches!(
+                certify_video_codec_ffi(verified, observations, &cancellation),
+                Err(VideoCodecFfiCertificationError::ObservationMismatch)
+            ));
+        }
         Ok(())
     }
 

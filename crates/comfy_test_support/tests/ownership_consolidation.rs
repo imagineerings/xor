@@ -13644,6 +13644,109 @@ fn val_ownership_native_video_codec_plan_foundation_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_native_video_codec_ffi_certification_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let source = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "pub struct VideoCodecPackageVerificationKey",
+        "pub struct VerifiedVideoCodecFfiCatalog",
+        "pub struct NativeVideoCodecLibraryObservation",
+        "pub struct CertifiedVideoCodecFfi",
+        "pub fn verify_video_codec_ffi_catalog(",
+        "pub fn certify_video_codec_ffi(",
+        "VIDEO_CODEC_FFI_PROFILE",
+        "NativeFfiRegistry::new(contracts)",
+        "verified.registry.authorize(",
+        "video_codec_catalog_is_signed_complete_and_registry_certified",
+        "video_codec_catalog_rejects_tampering_incomplete_symbols_and_cancellation",
+        "video_codec_catalog_rejects_noncanonical_policy_and_observation_mismatches",
+    ] {
+        assert!(
+            source.contains(required),
+            "video codec FFI certification owner lacks {required}"
+        );
+    }
+    let boundary_start = source
+        .find("pub const VIDEO_CODEC_FFI_PROFILE")
+        .ok_or("video codec FFI profile boundary is missing")?;
+    let boundary_end = source
+        .find("pub fn cudart_exact_native")
+        .ok_or("video codec FFI boundary end is missing")?;
+    let boundary = source
+        .get(boundary_start..boundary_end)
+        .ok_or("video codec FFI boundary range is invalid")?;
+    for forbidden in [
+        "libloading",
+        "std::process",
+        "Command::new",
+        "NativeCache",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !boundary.contains(forbidden),
+            "video codec FFI certification boundary contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json"),
+    )?;
+    for required in [
+        "reviewed-abi-and-signed-catalog-contract",
+        "FFmpeg 7.1",
+        "registry_certificate_projection",
+        "native_library_loaded",
+        "encoder_availability_probed",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video codec FFI fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_ffi_certification")
+            })
+        })
+        .ok_or("missing native FFI certification concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::NativeFfiRegistry")
+    );
+    let mapping_names = concern
+        .get("required_mappings")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("native FFI mappings are missing")?
+        .iter()
+        .filter_map(|mapping| mapping.get("name").and_then(serde_json::Value::as_str))
+        .collect::<Vec<_>>();
+    for expected in [
+        "video-codec-catalog-is-signed-canonical-and-reviewed",
+        "video-codec-observations-require-complete-registry-certification",
+        "video-codec-certification-tests-tampering-symbols-and-cancellation",
+        "video-codec-certification-fixture-separates-contract-from-execution",
+    ] {
+        assert!(
+            mapping_names.contains(&expected),
+            "missing mapping {expected}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

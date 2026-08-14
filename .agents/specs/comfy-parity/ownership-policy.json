@@ -6843,7 +6843,8 @@
         "comfy_backend_rocm owns signed-package-to-external-SDK discovery, reviewed ABI declarations, immutable sealed-descriptor validation, and unsafe dlopen calls but cannot issue or fabricate a certificate",
         "comfy_backend_metal owns reviewed Apple framework, Objective-C ABI, layout, target, and device observations plus the focused unsafe calls, but remains unbound and cannot issue or fabricate a certificate",
         "MLU and DirectML owned execution sessions consume only unsafe or opaque retained certificate projections, never call NativeFfiRegistry, and cannot turn ABI observations, package receipts, feature compilation, or native handles into availability",
-        "Task 59 cudart_exact_native consumes a registry-issued certificate for the exact CUDA-runtime library and host-registration symbols; it cannot construct a certificate, claim device availability, or expose an unchecked raw handle"
+        "Task 59 cudart_exact_native consumes a registry-issued certificate for the exact CUDA-runtime library and host-registration symbols; it cannot construct a certificate, claim device availability, or expose an unchecked raw handle",
+        "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; it cannot capture or load libraries, probe encoder availability, expose function pointers, or execute codecs"
       ],
       "definitions": [
         {
@@ -6912,6 +6913,26 @@
           "name": "task58-cudart-certificate-adapter-semantics-test",
           "path": "crates/comfy_runtime/src/trust.rs",
           "pattern": "task_59_cudart_requires_registry_issued_exact_symbol_certification"
+        },
+        {
+          "name": "video-codec-catalog-is-signed-canonical-and-reviewed",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "VideoCodecPackageVerificationKey[\\s\\S]*pub fn verify_video_codec_ffi_catalog[\\s\\S]*validate_video_codec_catalog_envelope[\\s\\S]*NativeFfiRegistry::new\\(contracts\\)"
+        },
+        {
+          "name": "video-codec-observations-require-complete-registry-certification",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "pub struct NativeVideoCodecLibraryObservation[\\s\\S]*pub fn certify_video_codec_ffi[\\s\\S]*IncompleteObservationSet[\\s\\S]*verified.registry.authorize"
+        },
+        {
+          "name": "video-codec-certification-tests-tampering-symbols-and-cancellation",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "video_codec_catalog_is_signed_complete_and_registry_certified[\\s\\S]*video_codec_catalog_rejects_tampering_incomplete_symbols_and_cancellation[\\s\\S]*video_codec_catalog_rejects_noncanonical_policy_and_observation_mismatches"
+        },
+        {
+          "name": "video-codec-certification-fixture-separates-contract-from-execution",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+          "pattern": "reviewed-abi-and-signed-catalog-contract[\\s\\S]*FFmpeg 7.1[\\s\\S]*registry_certificate_projection[\\s\\S]*native_library_loaded[\\s\\S]*encoder_availability_probed[\\s\\S]*codec_execution"
         }
       ],
       "known_open_reasons": [],
@@ -6923,6 +6944,7 @@
         "comfy-parity-provision-native-ffi-contracts-apple-metal-mps-comfy-model-0015",
         "comfy-parity-provision-native-ffi-contracts-huawei-ascend-npu-comfy-model-0019",
         "comfy-parity-mlu-directml-execution-ownership-reconciliation",
+        "comfy-parity-native-video-codec-ffi-certification-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
