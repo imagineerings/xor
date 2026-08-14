@@ -14221,6 +14221,99 @@ fn val_ownership_native_video_codec_dependency_closure_certification_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_retained_loader_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let loader =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub struct NativeVideoCodecLoad",
+        "pub fn load_certified_video_codec_closure(",
+        "CertifiedVideoCodecDependencyClosure",
+        "retained_loader_paths()",
+        "dependency_first_order",
+        "libc::dlmopen(",
+        "libc::LM_ID_NEWLM",
+        "libc::RTLD_NOW | libc::RTLD_LOCAL",
+        "libc::RTLD_DI_LMID",
+        "libc::RTLD_DI_LINKMAP",
+        "actual_namespace == libc::LM_ID_BASE",
+        "prove_exact_loaded_bindings(",
+        "while let Some(library) = self.libraries.pop()",
+        "retained_video_codec_loader_uses_one_isolated_exact_namespace",
+        "retained_video_codec_loader_rolls_back_binding_failure_in_reverse_order",
+        "retained_video_codec_loader_discards_late_cancellation_and_retries_cleanly",
+    ] {
+        assert!(
+            loader.contains(required),
+            "native video codec retained loader lacks {required}"
+        );
+    }
+    for forbidden in [
+        "dlsym",
+        "dladdr",
+        "GetProcAddress",
+        "find_encoder",
+        "avcodec_open2",
+        "NativeCache",
+        "OutputCommitter",
+        "NativeStoredPayload",
+    ] {
+        assert!(
+            !loader.contains(forbidden),
+            "native video codec retained loader contains forbidden {forbidden}"
+        );
+    }
+
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    assert!(trust.contains("pub(crate) fn retained_loader_paths("));
+    assert!(trust.contains("pub(crate) fn reviewed_system_libraries("));
+    assert!(trust.contains("target_env = \"gnu\""));
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-glibc-isolated-loader",
+        "native_library_loaded",
+        "loader_relocation_binding",
+        "library_constructors_or_destructors_may_run",
+        "globally_side_effect_free_rollback",
+        "explicit_dlsym_or_callable_address_projection",
+        "encoder_availability_probed",
+        "sim_invoked_codec_api",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "native video codec retained-loader fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_retained_codec_library_loading")
+            })
+        })
+        .ok_or("missing native video codec retained-loader ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-retained-loader-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

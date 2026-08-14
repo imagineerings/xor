@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 591)
+        self.assertEqual(len(tasks), 592)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -440,6 +440,9 @@ class ValidationGenerationTests(unittest.TestCase):
         video_codec_dependency_closure_foundation_id = (
             "comfy-parity-native-video-codec-dependency-closure-certification-foundation"
         )
+        video_codec_retained_loader_foundation_id = (
+            "comfy-parity-native-video-codec-retained-loader-foundation"
+        )
         video_output_prefix_foundation_id = "comfy-parity-native-video-output-prefix-foundation"
         video_component_foundation_id = "comfy-parity-native-video-component-foundation"
         video_output_media_foundation_id = "comfy-parity-native-video-output-media-foundation"
@@ -660,6 +663,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_codec_dependency_closure_foundation_id,
+            tasks_by_id[video_codec_retained_loader_foundation_id]["dependencies"],
+        )
+        self.assertIn(
+            video_codec_retained_loader_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
@@ -750,6 +757,33 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertNotIn("Cargo.toml", codec_dependency_closure["writes"])
         self.assertNotIn("Cargo.lock", codec_dependency_closure["writes"])
+        codec_retained_loader = tasks_by_id[
+            video_codec_retained_loader_foundation_id
+        ]
+        self.assertEqual(
+            codec_retained_loader["writes"],
+            [
+                "crates/comfy_runtime/src/trust.rs",
+                "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+                "crates/comfy_runtime/src/comfy_runtime.rs",
+                "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertEqual(
+            codec_retained_loader["validations"],
+            [
+                "VAL-RUNTIME-TRUST-001",
+                "VAL-NATIVE-BOUNDARY-001",
+                "VAL-CANCEL-001",
+                "VAL-OWNERSHIP-001",
+            ],
+        )
+        self.assertNotIn("Cargo.toml", codec_retained_loader["writes"])
+        self.assertNotIn("Cargo.lock", codec_retained_loader["writes"])
         self.assertEqual(
             tasks_by_id[video_codec_plan_foundation_id]["writes"],
             [
@@ -1079,6 +1113,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_codec_dependency_closure_foundation_id,
+            tasks_by_id[video_codec_retained_loader_foundation_id]["dependencies"],
+        )
+        self.assertIn(
+            video_codec_retained_loader_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
@@ -1672,8 +1710,12 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_codec_dependency_contract_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id],
+            waves[video_codec_retained_loader_foundation_id],
             waves[video_codec_dependency_closure_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id],
+            waves[video_codec_retained_loader_foundation_id] + 1,
         )
         self.assertEqual(
             waves[film_tensor_average_pool_foundation_id],

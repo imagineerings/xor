@@ -10685,6 +10685,46 @@ def native_video_codec_dependency_closure_foundation_task(
     )
 
 
+def native_video_codec_retained_loader_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-retained-loader-foundation",
+        "Load certified native video codec closures",
+        [28, 31, 32, 41, 42],
+        [17, 18, 19, 27, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The focused native video codec FFI adapter consumes one certified retained dependency closure and loads every sealed object in its signed dependency-first order into one isolated GNU loader namespace. It proves each runtime link-map path, SONAME, DT_NEEDED edge, reviewed system object, namespace identity, and retained certificate/image lifetime before returning an opaque loaded package. The loader performs relocation-time binding and may run library constructors, but it performs no explicit dlsym or callable-address projection, probes no encoder, calls no codec ABI, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.",
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_runtime/src/native_ffi_rocm.rs",
+            "crates/comfy_backend_rocm/src/loader.rs",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted synthetic x86_64 GNU/Linux fixture and focused loader tests prove exact closure-to-retained-path projection, dependency-first isolated-namespace loading, one non-base namespace, runtime link-map path/SONAME/DT_NEEDED equality, reviewed-system-only namespace contents, reverse-order handle cleanup on load, binding, or cancellation failure, cancellation checks before and after each non-preemptible loader call, late-cancellation discard, immutable closure retention, and clean retry. The fixture records relocation binding and possible constructor or destructor side effects, scopes rollback to owned handles and unpublished Rust state, and explicitly claims no licensed or installed FFmpeg package, explicit dlsym or callable address, reviewed FFmpeg C layout, encoder availability, Sim-invoked codec API, media allocation, effect, cache, persistence, recovery, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "41.4", "41.5", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12921,8 +12961,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_dependency_contract_foundation["id"])
         )
     )
+    video_codec_retained_loader_foundation = (
+        native_video_codec_retained_loader_foundation_task(
+            str(video_codec_dependency_closure_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_dependency_closure_foundation["id"])
+        str(video_codec_retained_loader_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13047,6 +13092,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_inspected_certification_foundation,
         video_codec_dependency_contract_foundation,
         video_codec_dependency_closure_foundation,
+        video_codec_retained_loader_foundation,
         video_foundation,
             detection_foundation,
         ]

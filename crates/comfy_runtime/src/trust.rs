@@ -3685,6 +3685,25 @@ impl CertifiedVideoCodecDependencyClosure {
     pub fn retained_dependency_bytes(&self) -> u64 {
         self.retained_dependency_bytes
     }
+
+    pub(crate) fn reviewed_system_libraries(&self) -> &BTreeSet<String> {
+        self.contract.system_libraries()
+    }
+
+    pub(crate) fn retained_loader_paths(&self) -> Option<BTreeMap<String, PathBuf>> {
+        let mut paths = BTreeMap::new();
+        for identity in &self.dependency_first_order {
+            let retained = self
+                .primary
+                .inspected
+                .captured
+                ._sealed_images
+                .get(identity)
+                .or_else(|| self._sealed_dependency_images.get(identity))?;
+            paths.insert(identity.clone(), retained.loader_path().to_path_buf());
+        }
+        Some(paths)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -4263,7 +4282,11 @@ fn certify_video_codec_dependency_closure_with_limits(
         .check()
         .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
     if contract.target() != VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET
-        || !cfg!(all(target_os = "linux", target_arch = "x86_64"))
+        || !cfg!(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_env = "gnu"
+        ))
     {
         return Err(VideoCodecDependencyClosureError::UnsupportedTarget);
     }
