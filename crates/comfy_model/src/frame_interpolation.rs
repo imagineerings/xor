@@ -15,7 +15,9 @@ use comfy_tensor::{
     generated_elementwise_or_runtime_operation_09::clamp_with_context_exact_native,
     generated_indexing_masking_01::narrow_method_exact_native,
     generated_neural_network_functional_01::pixel_shuffle_tensor_with_context_exact_native,
-    generated_shape_layout_transform_01::torch_unsqueeze_exact_native,
+    generated_shape_layout_transform_01::{
+        tensor_expand_exact_native, torch_unsqueeze_exact_native,
+    },
     generated_shape_layout_transform_02::torch_cat_with_context_exact_native,
     generated_shape_layout_transform_03::{
         FunctionalPadMode, functional_pad_with_context_exact_native, tensor_permute_exact_native,
@@ -277,6 +279,88 @@ impl FrameInterpolationFallbackState {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FrameInterpolationSequenceAttempt<'a> {
+    MultiTimestep(&'a [f32]),
+    SingleTimestepBatch(&'a [f32]),
+}
+
+fn execute_frame_interpolation_sequence_fallback<T>(
+    profile: &FrameInterpolationProfile,
+    timesteps: &[f32],
+    fallback: &mut FrameInterpolationFallbackState,
+    cancellation: &CancellationToken,
+    mut execute: impl FnMut(FrameInterpolationSequenceAttempt<'_>) -> Result<T, FrameInterpolationError>,
+) -> Result<Vec<T>, FrameInterpolationError> {
+    cancellation.check()?;
+    if timesteps.is_empty() || fallback.single_timestep_batch() == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "frame interpolation fallback requires at least one timestep",
+        ));
+    }
+
+    if fallback.multi_timestep_enabled() {
+        match execute(FrameInterpolationSequenceAttempt::MultiTimestep(timesteps)) {
+            Ok(output) => {
+                cancellation.check()?;
+                return Ok(vec![output]);
+            }
+            Err(FrameInterpolationError::ResourceExhausted(_)) => {
+                cancellation.check()?;
+                fallback.record_multi_timestep_oom();
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    if matches!(profile, FrameInterpolationProfile::Film) && timesteps.len() > 1 {
+        return Err(FrameInterpolationError::Execution(
+            "FILM source fallback cannot scalarize a multi-timestep batch".into(),
+        ));
+    }
+
+    let mut outputs = Vec::new();
+    outputs
+        .try_reserve_exact(timesteps.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    let mut offset = 0_usize;
+    while offset < timesteps.len() {
+        cancellation.check()?;
+        let remaining = timesteps
+            .len()
+            .checked_sub(offset)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let batch = usize::try_from(fallback.single_timestep_batch())
+            .map_err(|_| FrameInterpolationError::Overflow)?
+            .min(remaining);
+        let end = offset
+            .checked_add(batch)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let batch_timesteps = timesteps
+            .get(offset..end)
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        match execute(FrameInterpolationSequenceAttempt::SingleTimestepBatch(
+            batch_timesteps,
+        )) {
+            Ok(output) => {
+                cancellation.check()?;
+                outputs.push(output);
+                offset = end;
+            }
+            Err(error @ FrameInterpolationError::ResourceExhausted(_)) => {
+                cancellation.check()?;
+                if fallback.single_timestep_batch() == 1 {
+                    return Err(error);
+                }
+                fallback.record_single_timestep_oom()?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    cancellation.check()?;
+    Ok(outputs)
+}
+
 impl From<CancellationError> for FrameInterpolationError {
     fn from(_: CancellationError) -> Self {
         Self::Cancelled
@@ -377,6 +461,23 @@ impl NativeFrameInterpolationModel {
             stream,
             semantic_state_digest_sha256,
         })
+    }
+
+    pub fn interpolate_sequence(
+        &self,
+        backend: &CpuBackend,
+        images: &Tensor,
+        multiplier: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        match self.profile {
+            FrameInterpolationProfile::Film => {
+                self.interpolate_film_sequence(backend, images, multiplier, context)
+            }
+            FrameInterpolationProfile::Rife { .. } => {
+                self.interpolate_rife_sequence(backend, images, multiplier, context)
+            }
+        }
     }
 
     pub fn profile(&self) -> &FrameInterpolationProfile {
@@ -913,6 +1014,7 @@ impl NativeFrameInterpolationModel {
             context.cancellation.check()?;
             return Ok(images.clone());
         }
+        let mut fallback = FrameInterpolationFallbackState::for_plan(&plan, true)?;
 
         let pair_count = frame_count.saturating_sub(1);
         let output_tensor_capacity = pair_count
@@ -938,15 +1040,30 @@ impl NativeFrameInterpolationModel {
                 film_image_pyramid_with_context_exact_native(backend, &second_frame, 7, context)?;
             let second_features =
                 self.film_feature_pyramid_from_images(backend, &second_images, context)?;
-            output_tensors.push(self.film_pair_multi_timestep_from_pyramids(
-                backend,
-                &first_images,
-                &first_features,
-                &second_images,
-                &second_features,
+            let midpoints = execute_frame_interpolation_sequence_fallback(
+                &self.profile,
                 plan.timesteps(),
-                context,
-            )?);
+                &mut fallback,
+                context.cancellation,
+                |attempt| {
+                    let timesteps = match attempt {
+                        FrameInterpolationSequenceAttempt::MultiTimestep(timesteps)
+                        | FrameInterpolationSequenceAttempt::SingleTimestepBatch(timesteps) => {
+                            timesteps
+                        }
+                    };
+                    self.film_pair_multi_timestep_from_pyramids(
+                        backend,
+                        &first_images,
+                        &first_features,
+                        &second_images,
+                        &second_features,
+                        timesteps,
+                        context,
+                    )
+                },
+            )?;
+            output_tensors.extend(midpoints);
             output_tensors.push(second_frame);
             first_images = second_images;
             first_features = second_features;
@@ -984,7 +1101,6 @@ impl NativeFrameInterpolationModel {
             ));
         }
         let shape = first.descriptor().shape();
-        let batch = *shape.first().ok_or(FrameInterpolationError::Overflow)?;
         let height = *shape.get(2).ok_or(FrameInterpolationError::Overflow)?;
         let width = *shape.get(3).ok_or(FrameInterpolationError::Overflow)?;
         if !height.is_multiple_of(64) || !width.is_multiple_of(64) {
@@ -1002,8 +1118,7 @@ impl NativeFrameInterpolationModel {
             &first_features,
             &second_features,
             &base_grid,
-            timestep,
-            batch,
+            &[timestep],
             height,
             width,
             context,
@@ -1056,6 +1171,7 @@ impl NativeFrameInterpolationModel {
             context.cancellation.check()?;
             return Ok(images.clone());
         }
+        let mut fallback = FrameInterpolationFallbackState::for_plan(&plan, false)?;
 
         let output_capacity = usize::try_from(plan.output_frame_count())
             .map_err(|_| FrameInterpolationError::Overflow)?;
@@ -1066,6 +1182,7 @@ impl NativeFrameInterpolationModel {
 
         let first_unpadded = rife_sequence_frame(backend, images, 0, context)?;
         output_frames.push(first_unpadded.clone());
+        let mut emitted_frames = 1_u64;
         let mut first = pad_rife_sequence_frame(backend, &first_unpadded, &plan, context)?;
         let base_grid =
             rife_base_grid(backend, plan.padded_height(), plan.padded_width(), context)?;
@@ -1076,31 +1193,54 @@ impl NativeFrameInterpolationModel {
             let second_unpadded = rife_sequence_frame(backend, images, pair + 1, context)?;
             let second = pad_rife_sequence_frame(backend, &second_unpadded, &plan, context)?;
             let second_features = self.rife_head(backend, &second, head_channels, context)?;
-            for &timestep in plan.timesteps() {
-                context.cancellation.check()?;
-                let midpoint = self.interpolate_rife_pair_with_features(
-                    backend,
-                    &first,
-                    &second,
-                    &first_features,
-                    &second_features,
-                    &base_grid,
-                    timestep,
-                    1,
-                    plan.padded_height(),
-                    plan.padded_width(),
-                    context,
-                )?;
+            let midpoints = execute_frame_interpolation_sequence_fallback(
+                &self.profile,
+                plan.timesteps(),
+                &mut fallback,
+                context.cancellation,
+                |attempt| {
+                    let timesteps = match attempt {
+                        FrameInterpolationSequenceAttempt::MultiTimestep(timesteps)
+                        | FrameInterpolationSequenceAttempt::SingleTimestepBatch(timesteps) => {
+                            timesteps
+                        }
+                    };
+                    self.interpolate_rife_pair_with_features(
+                        backend,
+                        &first,
+                        &second,
+                        &first_features,
+                        &second_features,
+                        &base_grid,
+                        timesteps,
+                        plan.padded_height(),
+                        plan.padded_width(),
+                        context,
+                    )
+                },
+            )?;
+            for midpoint in midpoints {
+                let midpoint_batch = *midpoint
+                    .descriptor()
+                    .shape()
+                    .first()
+                    .ok_or(FrameInterpolationError::StateMismatch)?;
+                emitted_frames = emitted_frames
+                    .checked_add(midpoint_batch)
+                    .ok_or(FrameInterpolationError::Overflow)?;
                 output_frames.push(crop_rife_sequence_frame(
                     backend, &midpoint, height, width, context,
                 )?);
             }
             output_frames.push(second_unpadded);
+            emitted_frames = emitted_frames
+                .checked_add(1)
+                .ok_or(FrameInterpolationError::Overflow)?;
             first = second;
             first_features = second_features;
         }
 
-        if output_frames.len() != output_capacity {
+        if emitted_frames != plan.output_frame_count() {
             return Err(FrameInterpolationError::StateMismatch);
         }
         let output = execution_result(
@@ -1143,19 +1283,33 @@ impl NativeFrameInterpolationModel {
         first_features: &Tensor,
         second_features: &Tensor,
         base_grid: &Tensor,
-        timestep: f32,
-        batch: u64,
+        timesteps: &[f32],
         height: u64,
         width: u64,
         context: &ExecutionContext<'_>,
     ) -> Result<Tensor, FrameInterpolationError> {
         context.cancellation.check()?;
-        let timestep_tensor = constant_tensor(
-            backend,
-            &[batch, 1, height, width],
-            timestep,
-            self.dtype,
-            context,
+        let source_batch = *first
+            .descriptor()
+            .shape()
+            .first()
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let batch = if timesteps.len() == 1 {
+            source_batch
+        } else {
+            if source_batch != 1 {
+                return Err(FrameInterpolationError::InvalidInvocation(
+                    "RIFE timestep batches require batch-one endpoints",
+                ));
+            }
+            u64::try_from(timesteps.len()).map_err(|_| FrameInterpolationError::Overflow)?
+        };
+        let first = expand_rife_batch(first, batch, context)?;
+        let second = expand_rife_batch(second, batch, context)?;
+        let first_features = expand_rife_batch(first_features, batch, context)?;
+        let second_features = expand_rife_batch(second_features, batch, context)?;
+        let timestep_tensor = rife_timestep_tensor(
+            backend, timesteps, batch, height, width, self.dtype, context,
         )?;
         let mut flow: Option<Tensor> = None;
         let mut mask: Option<Tensor> = None;
@@ -1171,14 +1325,14 @@ impl NativeFrameInterpolationModel {
                 let second_feature_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
                 let warped_first_features = warp_rife(
                     backend,
-                    first_features,
+                    &first_features,
                     &first_feature_flow,
                     base_grid,
                     context,
                 )?;
                 let warped_second_features = warp_rife(
                     backend,
-                    second_features,
+                    &second_features,
                     &second_feature_flow,
                     base_grid,
                     context,
@@ -1241,8 +1395,8 @@ impl NativeFrameInterpolationModel {
                 .ok_or(FrameInterpolationError::StateMismatch)?;
             let first_flow = contiguous_narrow(backend, flow, 1, 0, 2, context)?;
             let second_flow = contiguous_narrow(backend, flow, 1, 2, 2, context)?;
-            warped_first = warp_rife(backend, first, &first_flow, base_grid, context)?;
-            warped_second = warp_rife(backend, second, &second_flow, base_grid, context)?;
+            warped_first = warp_rife(backend, &first, &first_flow, base_grid, context)?;
+            warped_second = warp_rife(backend, &second, &second_flow, base_grid, context)?;
         }
         let mask = mask.ok_or(FrameInterpolationError::StateMismatch)?;
         let weight = execution_result(
@@ -1587,6 +1741,100 @@ fn validate_rife_image(
         return Err(FrameInterpolationError::Placement);
     }
     Ok(())
+}
+
+fn expand_rife_batch(
+    input: &Tensor,
+    batch: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let shape = input.descriptor().shape();
+    let current_batch = *shape.first().ok_or(FrameInterpolationError::Overflow)?;
+    if current_batch == batch {
+        return Ok(input.clone());
+    }
+    if current_batch != 1 || batch == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE batch expansion requires a batch-one tensor",
+        ));
+    }
+    let mut expanded_shape = shape
+        .iter()
+        .map(|dimension| i64::try_from(*dimension).map_err(|_| FrameInterpolationError::Overflow))
+        .collect::<Result<Vec<_>, _>>()?;
+    let expanded_batch = i64::try_from(batch).map_err(|_| FrameInterpolationError::Overflow)?;
+    let first_dimension = expanded_shape
+        .first_mut()
+        .ok_or(FrameInterpolationError::Overflow)?;
+    *first_dimension = expanded_batch;
+    execution_result(
+        tensor_expand_exact_native(input, &expanded_shape, context.cancellation),
+        context,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn rife_timestep_tensor(
+    backend: &CpuBackend,
+    timesteps: &[f32],
+    batch: u64,
+    height: u64,
+    width: u64,
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let timestep_count =
+        u64::try_from(timesteps.len()).map_err(|_| FrameInterpolationError::Overflow)?;
+    if timesteps.is_empty() || (timestep_count != 1 && timestep_count != batch) {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "RIFE timestep batch does not match the endpoint batch",
+        ));
+    }
+    let plane_elements = height
+        .checked_mul(width)
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let element_count = batch
+        .checked_mul(height)
+        .and_then(|count| count.checked_mul(width))
+        .and_then(|count| usize::try_from(count).ok())
+        .ok_or(FrameInterpolationError::Overflow)?;
+    let mut values = execution_result(backend.workspace_vec(context, element_count), context)?;
+    for batch_index in 0..batch {
+        context.cancellation.check()?;
+        let timestep_index = if timesteps.len() == 1 {
+            0
+        } else {
+            usize::try_from(batch_index).map_err(|_| FrameInterpolationError::Overflow)?
+        };
+        let timestep = *timesteps
+            .get(timestep_index)
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        if !timestep.is_finite() || !(0.0..=1.0).contains(&timestep) {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "RIFE timestep must be finite and between zero and one",
+            ));
+        }
+        for element in 0..plane_elements {
+            if element.is_multiple_of(64) {
+                context.cancellation.check()?;
+            }
+            execution_result(values.try_push(timestep), context)?;
+        }
+    }
+    execution_result(
+        tensor_from_f32(
+            backend,
+            &[batch, 1, height, width],
+            &values,
+            dtype,
+            DeviceId::CPU,
+            context,
+        ),
+        context,
+    )
 }
 
 fn constant_tensor(
@@ -4816,6 +5064,233 @@ mod tests {
     }
 
     #[test]
+    fn frame_interpolation_sequence_fallback_preserves_rife_halving_and_terminal_exhaustion()
+    -> Result<(), FrameInterpolationError> {
+        let cancellation = CancellationToken::default();
+        let profile = FrameInterpolationProfile::Rife {
+            head_channels: 2,
+            block_channels: [2; 5],
+        };
+        let plan =
+            FrameInterpolationInvocationPlan::checked(&profile, 3, 5, 64, 64, &cancellation)?;
+        let mut fallback = FrameInterpolationFallbackState::for_plan(&plan, false)?;
+        let mut attempts = Vec::new();
+        let outputs = execute_frame_interpolation_sequence_fallback(
+            &profile,
+            plan.timesteps(),
+            &mut fallback,
+            &cancellation,
+            |attempt| {
+                let FrameInterpolationSequenceAttempt::SingleTimestepBatch(timesteps) = attempt
+                else {
+                    return Err(FrameInterpolationError::StateMismatch);
+                };
+                attempts.push(timesteps.to_vec());
+                match timesteps.len() {
+                    4 => Err(FrameInterpolationError::ResourceExhausted(
+                        "batch four".into(),
+                    )),
+                    2 => Err(FrameInterpolationError::ResourceExhausted(
+                        "batch two".into(),
+                    )),
+                    1 => Ok(timesteps.to_vec()),
+                    _ => Err(FrameInterpolationError::StateMismatch),
+                }
+            },
+        )?;
+        assert_eq!(fallback.single_timestep_batch(), 1);
+        assert_eq!(
+            attempts.iter().map(Vec::len).collect::<Vec<_>>(),
+            [4, 2, 1, 1, 1, 1]
+        );
+        assert_eq!(outputs.concat(), plan.timesteps());
+
+        attempts.clear();
+        let second_pair = execute_frame_interpolation_sequence_fallback(
+            &profile,
+            plan.timesteps(),
+            &mut fallback,
+            &cancellation,
+            |attempt| {
+                let FrameInterpolationSequenceAttempt::SingleTimestepBatch(timesteps) = attempt
+                else {
+                    return Err(FrameInterpolationError::StateMismatch);
+                };
+                attempts.push(timesteps.to_vec());
+                Ok(timesteps.to_vec())
+            },
+        )?;
+        assert_eq!(
+            attempts.iter().map(Vec::len).collect::<Vec<_>>(),
+            [1, 1, 1, 1]
+        );
+        assert_eq!(second_pair.concat(), plan.timesteps());
+
+        let terminal_plan =
+            FrameInterpolationInvocationPlan::checked(&profile, 2, 2, 64, 64, &cancellation)?;
+        let mut terminal = FrameInterpolationFallbackState::for_plan(&terminal_plan, false)?;
+        let error = execute_frame_interpolation_sequence_fallback::<()>(
+            &profile,
+            terminal_plan.timesteps(),
+            &mut terminal,
+            &cancellation,
+            |_| {
+                Err(FrameInterpolationError::ResourceExhausted(
+                    "terminal".into(),
+                ))
+            },
+        )
+        .expect_err("batch-one exhaustion must remain typed");
+        assert!(matches!(
+            error,
+            FrameInterpolationError::ResourceExhausted(message) if message == "terminal"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn frame_interpolation_sequence_fallback_preserves_film_scalarization_failure()
+    -> Result<(), FrameInterpolationError> {
+        let cancellation = CancellationToken::default();
+        let profile = FrameInterpolationProfile::Film;
+        let scalar_plan =
+            FrameInterpolationInvocationPlan::checked(&profile, 2, 2, 8, 8, &cancellation)?;
+        let mut scalar_fallback = FrameInterpolationFallbackState::for_plan(&scalar_plan, true)?;
+        let mut scalar_attempts = Vec::new();
+        let scalar = execute_frame_interpolation_sequence_fallback(
+            &profile,
+            scalar_plan.timesteps(),
+            &mut scalar_fallback,
+            &cancellation,
+            |attempt| {
+                scalar_attempts.push(match attempt {
+                    FrameInterpolationSequenceAttempt::MultiTimestep(_) => "multi",
+                    FrameInterpolationSequenceAttempt::SingleTimestepBatch(_) => "single",
+                });
+                if scalar_attempts.len() == 1 {
+                    Err(FrameInterpolationError::ResourceExhausted("multi".into()))
+                } else {
+                    Ok(())
+                }
+            },
+        )?;
+        assert_eq!(scalar, [()]);
+        assert_eq!(scalar_attempts, ["multi", "single"]);
+        assert!(!scalar_fallback.multi_timestep_enabled());
+
+        let batched_plan =
+            FrameInterpolationInvocationPlan::checked(&profile, 2, 4, 8, 8, &cancellation)?;
+        let mut batched_fallback = FrameInterpolationFallbackState::for_plan(&batched_plan, true)?;
+        let mut calls = 0_usize;
+        let error = execute_frame_interpolation_sequence_fallback::<()>(
+            &profile,
+            batched_plan.timesteps(),
+            &mut batched_fallback,
+            &cancellation,
+            |_| {
+                calls = calls.saturating_add(1);
+                Err(FrameInterpolationError::ResourceExhausted("multi".into()))
+            },
+        )
+        .expect_err("the pinned FILM fallback cannot scalarize more than one timestep");
+        assert_eq!(calls, 1);
+        assert!(matches!(error, FrameInterpolationError::Execution(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn frame_interpolation_sequence_fallback_prioritizes_cancellation_and_never_retries_execution()
+    -> Result<(), FrameInterpolationError> {
+        let profile = FrameInterpolationProfile::Rife {
+            head_channels: 2,
+            block_channels: [2; 5],
+        };
+        let cancellation = CancellationToken::default();
+        let plan =
+            FrameInterpolationInvocationPlan::checked(&profile, 2, 4, 64, 64, &cancellation)?;
+        let mut cancelled_fallback = FrameInterpolationFallbackState::for_plan(&plan, false)?;
+        let mut cancelled_calls = 0_usize;
+        let error = execute_frame_interpolation_sequence_fallback::<()>(
+            &profile,
+            plan.timesteps(),
+            &mut cancelled_fallback,
+            &cancellation,
+            |_| {
+                cancelled_calls = cancelled_calls.saturating_add(1);
+                cancellation.cancel();
+                Err(FrameInterpolationError::ResourceExhausted(
+                    "cancelled".into(),
+                ))
+            },
+        )
+        .expect_err("cancellation must dominate a retryable exhaustion");
+        assert_eq!(cancelled_calls, 1);
+        assert!(matches!(error, FrameInterpolationError::Cancelled));
+
+        let ordinary_cancellation = CancellationToken::default();
+        let ordinary_plan = FrameInterpolationInvocationPlan::checked(
+            &profile,
+            2,
+            4,
+            64,
+            64,
+            &ordinary_cancellation,
+        )?;
+        let mut ordinary_fallback =
+            FrameInterpolationFallbackState::for_plan(&ordinary_plan, false)?;
+        let mut ordinary_calls = 0_usize;
+        let error = execute_frame_interpolation_sequence_fallback::<()>(
+            &profile,
+            ordinary_plan.timesteps(),
+            &mut ordinary_fallback,
+            &ordinary_cancellation,
+            |_| {
+                ordinary_calls = ordinary_calls.saturating_add(1);
+                Err(FrameInterpolationError::Execution("ordinary".into()))
+            },
+        )
+        .expect_err("ordinary execution errors must not retry");
+        assert_eq!(ordinary_calls, 1);
+        assert!(matches!(error, FrameInterpolationError::Execution(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn rife_timestep_batches_preserve_source_order() -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let tensor =
+            rife_timestep_tensor(&backend, &[0.25, 0.5, 0.75], 3, 2, 2, DType::F32, &context)?;
+        assert_eq!(tensor.descriptor().shape(), &[3, 1, 2, 2]);
+        for (linear, expected) in [
+            0.25_f32, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 0.75,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let linear = u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?;
+            let actual = match DType::F32.decode_scalar(tensor.linear_element_bytes(linear)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn invocation_plans_bypass_and_reject_unbounded_or_unreflectable_requests()
     -> Result<(), FrameInterpolationError> {
         let cancellation = CancellationToken::default();
@@ -5220,6 +5695,34 @@ mod tests {
             .iter()
             .flat_map(|value| value.to_ne_bytes())
             .collect::<Vec<_>>();
+        assert_eq!(images.contiguous_bytes()?, expected_input_bytes);
+
+        let batched_output = model.interpolate_rife_sequence(&backend, &images, 4, &context)?;
+        assert_eq!(batched_output.descriptor().shape(), &[5, 64, 63, 3]);
+        let batched_bytes = batched_output.contiguous_bytes()?;
+        for (frame, expected) in [0.0_f32, 0.5, 0.5, 0.5, 1.0].into_iter().enumerate() {
+            let start = frame
+                .checked_mul(frame_elements)
+                .and_then(|offset| offset.checked_mul(4))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let end = start
+                .checked_add(
+                    frame_elements
+                        .checked_mul(4)
+                        .ok_or(FrameInterpolationError::Overflow)?,
+                )
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let frame_bytes = batched_bytes
+                .get(start..end)
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            for encoded in frame_bytes.chunks_exact(4) {
+                let encoded: [u8; 4] = encoded
+                    .try_into()
+                    .map_err(|_| FrameInterpolationError::StateMismatch)?;
+                assert_eq!(f32::from_ne_bytes(encoded), expected);
+            }
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
         assert_eq!(images.contiguous_bytes()?, expected_input_bytes);
 
         let cancelled = CancellationToken::default();

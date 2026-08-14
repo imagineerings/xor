@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 607)
+        self.assertEqual(len(tasks), 608)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -537,6 +537,9 @@ class ValidationGenerationTests(unittest.TestCase):
         frame_interpolation_resource_exhaustion_foundation_id = (
             "comfy-parity-native-frame-interpolation-resource-exhaustion-foundation"
         )
+        frame_interpolation_sequence_fallback_foundation_id = (
+            "comfy-parity-native-frame-interpolation-sequence-fallback-foundation"
+        )
         image_source_foundation_id = "comfy-parity-native-image-source-compatibility-foundation"
         structured_link_foundation_id = "comfy-parity-native-structured-input-link-foundation"
         shader_foundation_id = "comfy-parity-native-shader-execution-foundation"
@@ -729,7 +732,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_component_extract_node_foundation_id,
+            frame_interpolation_sequence_fallback_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
@@ -1124,8 +1127,17 @@ class ValidationGenerationTests(unittest.TestCase):
             [video_component_create_node_foundation_id],
         )
         self.assertEqual(
+            tasks_by_id[frame_interpolation_sequence_fallback_foundation_id][
+                "dependencies"
+            ],
+            [
+                video_component_extract_node_foundation_id,
+                frame_interpolation_resource_exhaustion_foundation_id,
+            ],
+        )
+        self.assertEqual(
             tasks_by_id[video_foundation_id]["dependencies"],
-            [video_component_extract_node_foundation_id],
+            [frame_interpolation_sequence_fallback_foundation_id],
         )
         self.assertNotIn("Cargo.toml", codec_callable_symbols["writes"])
         self.assertNotIn("Cargo.lock", codec_callable_symbols["writes"])
@@ -1452,6 +1464,24 @@ class ValidationGenerationTests(unittest.TestCase):
             frame_interpolation_resource_exhaustion_foundation_id,
             tasks_by_id[video_codec_plan_foundation_id]["dependencies"],
         )
+        self.assertEqual(
+            tasks_by_id[frame_interpolation_sequence_fallback_foundation_id]["writes"],
+            [
+                "crates/comfy_model/src/frame_interpolation.rs",
+                "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertIn(
+            "VAL-MODEL-FORMAT-001",
+            tasks_by_id[frame_interpolation_sequence_fallback_foundation_id][
+                "validations"
+            ],
+        )
         self.assertIn(
             video_codec_dependency_contract_foundation_id,
             tasks_by_id[video_codec_dependency_closure_foundation_id]["dependencies"],
@@ -1479,7 +1509,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_component_extract_node_foundation_id,
+            frame_interpolation_sequence_fallback_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
@@ -1497,6 +1527,9 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertTrue(tasks_by_id[film_sequence_foundation_id]["locked"])
         self.assertTrue(
             tasks_by_id[frame_interpolation_resource_exhaustion_foundation_id]["locked"]
+        )
+        self.assertTrue(
+            tasks_by_id[frame_interpolation_sequence_fallback_foundation_id]["locked"]
         )
         self.assertIn(text_regex_foundation_id, dependencies[text_regex_id])
         self.assertIn(
@@ -2138,7 +2171,15 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             waves[video_foundation_id],
-            waves[video_component_extract_node_foundation_id] + 1,
+            waves[frame_interpolation_sequence_fallback_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[frame_interpolation_sequence_fallback_foundation_id],
+            max(
+                waves[video_component_extract_node_foundation_id],
+                waves[frame_interpolation_resource_exhaustion_foundation_id],
+            )
+            + 1,
         )
         self.assertEqual(
             waves[film_tensor_average_pool_foundation_id],

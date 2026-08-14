@@ -9065,7 +9065,8 @@
         "FrameInterpolationFallbackState"
       ],
       "allowed_adapters": [
-        "future FILM and RIFE execution consumes the immutable checked plan",
+        "retained FILM and RIFE execution consumes the immutable checked plan while the sequence-fallback owner alone executes typed retry transitions",
+        "persistent floor halving is source RIFE policy; FILM multi-element fallback retains its pinned scalarization failure instead of inheriting a false generic recovery promise",
         "ExecutionContext remains the cancellation and bounded-workspace owner"
       ],
       "definitions": [
@@ -9109,7 +9110,7 @@
         "comfy-parity-native-frame-interpolation-invocation-foundation"
       ],
       "production_consumers": [
-        "future native FILM and RIFE execution foundations"
+        "native FILM and RIFE sequence execution plus the source-exact sequence-fallback owner"
       ],
       "requirements": [
         "Requirement 34",
@@ -9130,7 +9131,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The invocation plan owns only checked sequence geometry and attempt-local fallback state. Retained weights, tensor equations, feature/grid reuse, handles, caches, and output publication remain separate owners."
+      "decision_reason": "The invocation plan owns only checked sequence geometry and attempt-local fallback state. Its batch-halving field carries source RIFE policy, while the execution owner preserves FILM's pinned multi-element scalarization failure. Retained weights, tensor equations, executable retry transitions, feature/grid reuse, handles, caches, and output publication remain separate owners."
     },
     {
       "concern": "native_frame_interpolation_model_resource",
@@ -12613,6 +12614,106 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "The frame-interpolation execution adapter preserves canonical typed tensor exhaustion while retaining cancellation priority and generic non-retryable failures. It introduces no message matching, retry, allocation, cache, or publication authority."
+    },
+    {
+      "concern": "native_frame_interpolation_sequence_fallback_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_sequence",
+        "execute_frame_interpolation_sequence_fallback",
+        "FrameInterpolationFallbackState"
+      ],
+      "allowed_adapters": [
+        "FrameInterpolationFallbackState remains the sole attempt-local multi-disable and persistent single-batch policy state",
+        "execution_result and FrameInterpolationError::ResourceExhausted remain the sole typed exhaustion classifier and branch value; fallback cannot inspect messages or reclassify errors",
+        "existing retained FILM and RIFE pair graphs own interpolation equations while the fallback scheduler owns only attempt order, same-chunk retry, floor halving, and cancellation priority",
+        "canonical tensor expansion, concatenation, layout, workspace, and backend owners remain authoritative; this scheduler cannot open a private allocator, cache, handle, effect, codec, persistence, recovery, or publication boundary"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
+          "role": "canonical",
+          "symbol": "interpolate_sequence",
+          "pattern": "pub fn interpolate_sequence\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::execute_frame_interpolation_sequence_fallback",
+          "role": "canonical_implementation",
+          "symbol": "execute_frame_interpolation_sequence_fallback",
+          "pattern": "^fn execute_frame_interpolation_sequence_fallback<"
+        }
+      ],
+      "call_symbols": [
+        "interpolate_sequence",
+        "execute_frame_interpolation_sequence_fallback",
+        "record_multi_timestep_oom",
+        "record_single_timestep_oom"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-fallback-retries-only-typed-exhaustion-with-cancellation-priority",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn execute_frame_interpolation_sequence_fallback[\\s\\S]*FrameInterpolationError::ResourceExhausted[\\s\\S]*cancellation\\.check\\(\\)[\\s\\S]*record_multi_timestep_oom[\\s\\S]*record_single_timestep_oom[\\s\\S]*return Err\\(error\\)"
+        },
+        {
+          "name": "frame-interpolation-fallback-preserves-pinned-film-multi-element-scalarization-failure",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "matches!\\(profile, FrameInterpolationProfile::Film\\)[\\s\\S]*timesteps\\.len\\(\\) > 1[\\s\\S]*FILM source fallback cannot scalarize a multi-timestep batch"
+        },
+        {
+          "name": "rife-sequence-delegates-persistent-batches-and-source-ordered-timestep-tensors",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "interpolate_rife_sequence[\\s\\S]*FrameInterpolationFallbackState::for_plan\\(&plan, false\\)[\\s\\S]*execute_frame_interpolation_sequence_fallback[\\s\\S]*interpolate_rife_pair_with_features[\\s\\S]*rife_timestep_tensor"
+        },
+        {
+          "name": "frame-interpolation-fallback-oracle-proves-rife-halving-film-negative-cancellation-and-timestep-order",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "frame_interpolation_sequence_fallback_preserves_rife_halving_and_terminal_exhaustion[\\s\\S]*frame_interpolation_sequence_fallback_preserves_film_scalarization_failure[\\s\\S]*frame_interpolation_sequence_fallback_prioritizes_cancellation_and_never_retries_execution[\\s\\S]*rife_timestep_batches_preserve_source_order"
+        },
+        {
+          "name": "frame-interpolation-fallback-fixture-bounds-source-policy-and-excludes-foreign-authority",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+          "pattern": "(?=[\\s\\S]*multi_timestep_attempted_once)(?=[\\s\\S]*reduced_batch_persists_across_pairs)(?=[\\s\\S]*multi_element_fallback_halving)(?=[\\s\\S]*error_message_matching)(?=[\\s\\S]*allocator_or_workspace_owner)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-sequence-fallback-foundation"
+      ],
+      "production_consumers": [
+        "the following FrameInterpolate native node adapter and later video-family integration"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The retained model owns one source-fingerprinted fallback scheduler over existing FILM and RIFE equations. It branches only on the canonical typed exhaustion variant, preserves cancellation and the pinned FILM scalarization failure, keeps reduced RIFE batch state invocation-local, and introduces no parallel model, tensor, allocator, cache, handle, codec, effect, or publication owner."
     },
     {
       "concern": "native_rife_frame_interpolation_sequence_execution",

@@ -16641,6 +16641,80 @@ fn val_ownership_native_frame_interpolation_resource_exhaustion_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_frame_interpolation_sequence_fallback_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn interpolate_sequence(",
+        "fn execute_frame_interpolation_sequence_fallback<",
+        "FrameInterpolationSequenceAttempt::MultiTimestep",
+        "FrameInterpolationSequenceAttempt::SingleTimestepBatch",
+        "fallback.record_multi_timestep_oom()",
+        "fallback.record_single_timestep_oom()?",
+        "FILM source fallback cannot scalarize a multi-timestep batch",
+        "frame_interpolation_sequence_fallback_preserves_rife_halving_and_terminal_exhaustion",
+        "frame_interpolation_sequence_fallback_preserves_film_scalarization_failure",
+        "frame_interpolation_sequence_fallback_prioritizes_cancellation_and_never_retries_execution",
+        "rife_timestep_batches_preserve_source_order",
+    ] {
+        assert!(
+            model.contains(required),
+            "frame-interpolation sequence fallback lacks {required}"
+        );
+    }
+    let scheduler = model
+        .split("fn execute_frame_interpolation_sequence_fallback<")
+        .nth(1)
+        .and_then(|tail| tail.split("\nimpl From<CancellationError>").next())
+        .ok_or("frame-interpolation sequence fallback body is unavailable")?;
+    assert!(!scheduler.contains("contains("));
+    assert!(!scheduler.contains("NativeCache"));
+    assert!(!scheduler.contains("NativeHandleStore"));
+    assert!(scheduler.contains("FrameInterpolationError::ResourceExhausted"));
+    assert!(scheduler.contains("cancellation.check()?"));
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+    ))?;
+    for required in [
+        "multi_timestep_attempted_once",
+        "reduced_batch_persists_across_pairs",
+        "multi_element_fallback_halving",
+        "terminal_batch_one_preserves_original_resource_exhaustion",
+    ] {
+        assert!(fixture.contains(required));
+    }
+    assert!(fixture.contains("\"error_message_matching\": false"));
+    assert!(fixture.contains("\"allocator_or_workspace_owner\": false"));
+    assert!(fixture.contains("\"effect_or_publication_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_frame_interpolation_sequence_fallback_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-frame-interpolation-sequence-fallback-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_pyramid_algebra_foundation_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

@@ -9642,7 +9642,7 @@ def native_frame_interpolation_invocation_foundation_task(dependency: str) -> di
             "VAL-MEMORY-001",
             "VAL-OWNERSHIP-001",
         ],
-        "FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and the attempt-local multi-to-single plus persistent batch-halving OOM state. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.",
+        "FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and attempt-local fallback state. The state can disable FILM multi-timestep execution and carries the source RIFE single-timestep batch with persistent floor halving; it does not promise recovery from FILM's pinned multi-element scalarization failure. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
             "projects/comfy/ComfyUI/comfy/ldm/common_dit.py",
@@ -9657,7 +9657,7 @@ def native_frame_interpolation_invocation_foundation_task(dependency: str) -> di
             ".agents/specs/comfy-parity/regenerate_native_planning.py",
             ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Focused tests prove N<2 and multiplier<2 bypass; multiplier 2..16; `(N-1)*multiplier+1` endpoint ordering and `(N-1)*(multiplier-1)` work count; exact `j/multiplier` timesteps; FILM alignment one; RIFE reflection padding to 64 and unrepresentable small-extent rejection; overflow and cancellation; multi-path disable on OOM; persistent floor-halving single batches and terminal batch-one OOM; and absence of model math, cache, handle, or publication ownership.",
+        "Focused tests prove N<2 and multiplier<2 bypass; multiplier 2..16; `(N-1)*multiplier+1` endpoint ordering and `(N-1)*(multiplier-1)` work count; exact `j/multiplier` timesteps; FILM alignment one; RIFE reflection padding to 64 and unrepresentable small-extent rejection; overflow and cancellation; FILM multi-path disable; source RIFE persistent floor-halving batches and terminal batch-one state; and absence of model math, retry execution, cache, handle, or publication ownership. Executable error preservation and retry behavior remain owned by the later sequence-fallback leaf.",
         [dependency],
         locked=True,
         criterion_ids=["34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
@@ -10358,6 +10358,54 @@ def native_frame_interpolation_resource_exhaustion_foundation_task(
         [dependency],
         locked=True,
         criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.4", "41.2"],
+    )
+
+
+def native_frame_interpolation_sequence_fallback_foundation_task(
+    dependency: str,
+    resource_exhaustion_dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolation-sequence-fallback-foundation",
+        "Execute source-exact frame-interpolation sequence fallback",
+        [31, 34, 35, 36, 41],
+        [18, 25, 28, 31, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained frame-interpolation model executes the pinned attempt-local sequence fallback policy over its already admitted FILM and RIFE graphs. FILM tries multi-timestep synthesis once and disables it after typed resource exhaustion; multiplier two can retry the scalar path, while larger fallback batches preserve the pinned source scalarization failure as a non-retryable execution error. RIFE starts with multiplier-minus-one timesteps, retries only typed exhaustion with floor-halved batches that persist across pairs, and propagates the original typed exhaustion at batch one. Cancellation dominates every retry, failed attempt temporaries remain local, and only a complete fresh BHWC result escapes; no node, handle, cache, allocator, effect, codec, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/invocation/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-execution/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/rife-sequence/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted tests prove FILM multi success, multiplier-two multi-to-scalar recovery, the pinned multiplier-greater-than-two scalarization failure, RIFE multiplier-minus-one batching, floor-halving and persistence across pairs, same-chunk retry, original batch-one typed exhaustion, non-retryable ordinary errors, cancellation dominance, exact timestep order, fresh output storage, immutable inputs and model identity, zero scratch residue, and clean retry. The fixture explicitly excludes licensed checkpoint or accelerator numeric evidence, a second exhaustion taxonomy, allocator authority, node or handle execution, cache, effects, codecs, persistence, recovery, and publication.",
+        [dependency, resource_exhaustion_dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.4", "41.2"],
+        registered_source_edits=["comfy_model"],
     )
 
 
@@ -13829,8 +13877,14 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_component_extract_node_foundation = native_video_component_extract_node_foundation_task(
         str(video_component_create_node_foundation["id"])
     )
+    frame_interpolation_sequence_fallback_foundation = (
+        native_frame_interpolation_sequence_fallback_foundation_task(
+            str(video_component_extract_node_foundation["id"]),
+            str(frame_interpolation_resource_exhaustion_foundation["id"]),
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_component_extract_node_foundation["id"])
+        str(frame_interpolation_sequence_fallback_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13971,6 +14025,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_node_adapter_foundation,
         video_component_create_node_foundation,
         video_component_extract_node_foundation,
+        frame_interpolation_sequence_fallback_foundation,
         video_foundation,
         detection_foundation,
         ]
