@@ -13634,6 +13634,96 @@
       "decision_reason": "NativeVideoPayload is the sole in-memory VIDEO component value. It owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, duration, dimensions, content identity, and alias-aware residency. Provider and stored-payload layers only transport or seal that value. Codec/container execution, filesystem paths, interpolation state, cache, persistence, and publication remain outside this concern."
     },
     {
+      "concern": "native_video_encoding_codec_planning",
+      "canonical_owner": "comfy_media::video::plan_native_video_encode",
+      "owner_files": [
+        "crates/comfy_media/src/video.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecLimits",
+        "NativeVideoEncodeOptions",
+        "NativeVideoEncodePlan",
+        "plan_native_video_encode"
+      ],
+      "allowed_adapters": [
+        "NativeVideoPayload supplies the immutable checked component value and retains all tensor, audio, alpha, metadata, identity, and residency ownership",
+        "A later registry-certified native codec adapter may consume the completed plan but cannot reinterpret its rate, bit depth, pixel format, alpha, audio, metadata, CRF, preset, or limits"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::video::plan_native_video_encode",
+          "role": "canonical",
+          "symbol": "plan_native_video_encode",
+          "pattern": "pub fn plan_native_video_encode"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::video::NativeVideoEncodePlan",
+          "role": "canonical",
+          "symbol": "NativeVideoEncodePlan"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecLimits",
+        "NativeVideoEncodeOptions",
+        "NativeVideoEncodePlan",
+        "plan_native_video_encode"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-codec-plan-binds-closed-source-profiles",
+          "path": "crates/comfy_media/src/video.rs",
+          "pattern": "pub enum NativeVideoEncodeOptions[\\s\\S]*ComponentMp4[\\s\\S]*WebmVp9[\\s\\S]*WebmAv1[\\s\\S]*pub fn plan_native_video_encode"
+        },
+        {
+          "name": "video-codec-plan-binds-rate-depth-alpha-audio-and-limits",
+          "path": "crates/comfy_media/src/video.rs",
+          "pattern": "rounded_millisecond_frame_rate[\\s\\S]*NativeVideoPixelFormat::Yuv420p10le[\\s\\S]*plan_audio[\\s\\S]*NativeVideoAlphaPolicy::Preserve[\\s\\S]*max_encoded_bytes"
+        },
+        {
+          "name": "video-codec-plan-tests-source-profiles-and-failure-atomicity",
+          "path": "crates/comfy_media/src/video.rs",
+          "pattern": "codec_plan_preserves_source_profiles_without_executing_a_codec[\\s\\S]*codec_plan_rejects_unsupported_profiles_limits_and_cancellation"
+        },
+        {
+          "name": "video-codec-plan-fixture-is-source-fingerprinted-and-execution-free",
+          "path": "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+          "pattern": "code-inferred-codec-plan-contract[\\s\\S]*component_h264_10_bit[\\s\\S]*webm_vp9_alpha[\\s\\S]*native_library_loaded[\\s\\S]*plan_is_allocation_free"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-video-codec-plan-foundation"
+      ],
+      "production_consumers": [
+        "future certified native MP4/H.264 codec adapter",
+        "future certified native WebM VP9/AV1 codec adapter"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The media-domain planner is the sole owner of source-compatible codec invocation intent. It validates one immutable NativeVideoPayload and returns a closed allocation-free plan. It cannot load or certify native libraries, execute codecs, handle filesystem paths or stored handles, allocate workspace, prepare effects, mutate cache or persistence, or publish output."
+    },
+    {
       "concern": "native_vision_model_architectures",
       "canonical_owner": "comfy_model::vision_models",
       "owner_files": [

@@ -10415,6 +10415,43 @@ def native_video_execution_foundation_task(dependency: str) -> dict[str, object]
     )
 
 
+def native_video_codec_plan_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-plan-foundation",
+        "Plan bounded native video codec invocations",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical media-domain codec planner converts one checked NativeVideoPayload into a closed, allocation-free MP4/H.264, WebM/VP9, or WebM/AV1 invocation contract. It binds exact source and millisecond-rounded frame rates, pixel format, bit depth, alpha, audio layout and sample cap, metadata, CRF, preset, and caller limits without loading a codec, opening native libraries, resolving paths or handles, or owning effects, caches, persistence, or publication.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+        ],
+        [
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-fingerprinted plan fixtures prove exact ties-even millisecond frame-rate projection, H.264 8/10-bit pixel formats, alpha discard, bounded AAC layout and sample truncation, VP9 alpha preservation, AV1 10-bit alpha discard and preset, CRF and component-limit rejection, cancellation before return, immutable input identity, and structural absence of codec, FFI, path, handle, effect, cache, persistence, and publication owners.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.4", "41.2"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12618,8 +12655,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(film_sequence_foundation["id"])
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_codec_plan_foundation = native_video_codec_plan_foundation_task(
         str(frame_interpolation_resource_exhaustion_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_codec_plan_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12737,6 +12777,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_multi_timestep_foundation,
         film_sequence_foundation,
         frame_interpolation_resource_exhaustion_foundation,
+        video_codec_plan_foundation,
         video_foundation,
             detection_foundation,
         ]

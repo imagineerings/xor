@@ -3871,7 +3871,7 @@ mod tests {
             1_054_475_631_502_295,
             35_184_372_088_832,
             NativeVideoBitDepth::Ten,
-            Some(audio.clone()),
+            Some(audio),
             Some(alpha),
             video.metadata().clone(),
         )?;

@@ -13562,6 +13562,88 @@ fn val_ownership_video_component_foundation_001() -> Result<(), Box<dyn std::err
 }
 
 #[test]
+fn val_ownership_native_video_codec_plan_foundation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let source = fs::read_to_string(root.join("crates/comfy_media/src/video.rs"))?;
+    for required in [
+        "pub enum NativeVideoEncodeOptions",
+        "ComponentMp4",
+        "WebmVp9",
+        "WebmAv1",
+        "pub fn plan_native_video_encode(",
+        "rounded_millisecond_frame_rate",
+        "NativeVideoPixelFormat::Yuv420p10le",
+        "NativeVideoAlphaPolicy::Preserve",
+        "plan_audio",
+        "check_cancelled(cancellation)?",
+    ] {
+        assert!(
+            source.contains(required),
+            "codec plan owner lacks {required}"
+        );
+    }
+    for forbidden in [
+        "std::process",
+        "Command::new",
+        "PathBuf",
+        "NativeFfiRegistry",
+        "NativeCache",
+        "OutputCommitter",
+        "NativeHandleStoreGeneration",
+    ] {
+        assert!(
+            !source.contains(forbidden),
+            "codec plan owner contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-plan/manifest.json"),
+    )?;
+    for required in [
+        "code-inferred-codec-plan-contract",
+        "component_h264_10_bit",
+        "webm_vp9_alpha",
+        "native_library_loaded",
+        "plan_is_allocation_free",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "codec plan fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_encoding_codec_planning")
+            })
+        })
+        .ok_or("missing native video codec planning ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_media::video::plan_native_video_encode")
+    );
+    assert_eq!(
+        concern
+            .get("required_mappings")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len),
+        Some(4)
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
