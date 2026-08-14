@@ -564,6 +564,121 @@ impl NativeFrameInterpolationModel {
         compose_film_feature_pyramid(backend, sub_pyramids, 4, context)
     }
 
+    pub fn film_residual_flow_pyramid(
+        &self,
+        backend: &CpuBackend,
+        first_features: &[Tensor],
+        second_features: &[Tensor],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM flow prediction requires a FILM checkpoint",
+            ));
+        }
+        validate_film_feature_pyramids(
+            first_features,
+            second_features,
+            self.dtype,
+            self.stream,
+            context,
+        )?;
+        let deepest = 6_usize;
+        let mut flow = film_flow_estimator_from_weights(
+            backend,
+            "predict_flow._predictor",
+            first_features
+                .get(deepest)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            second_features
+                .get(deepest)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            &self.weights,
+            context,
+        )?;
+        let mut residuals = Vec::new();
+        residuals
+            .try_reserve_exact(7)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        residuals.push(flow.clone());
+        for index in [5_usize, 4, 3] {
+            context.cancellation.check()?;
+            flow = film_upsample_double_to_residual(
+                backend,
+                &flow,
+                first_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                context,
+            )?;
+            let warped = film_warp_with_context_exact_native(
+                backend,
+                second_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                &flow,
+                context,
+            )?;
+            let residual = film_flow_estimator_from_weights(
+                backend,
+                "predict_flow._predictor",
+                first_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                &warped,
+                &self.weights,
+                context,
+            )?;
+            flow = execution_result(
+                real_add_with_context_exact_native(backend, &flow, &residual, context),
+                context,
+            )?;
+            residuals.push(residual);
+        }
+        for (index, predictor) in [
+            (2_usize, "predict_flow._predictors.0"),
+            (1_usize, "predict_flow._predictors.1"),
+            (0_usize, "predict_flow._predictors.2"),
+        ] {
+            context.cancellation.check()?;
+            flow = film_upsample_double_to_residual(
+                backend,
+                &flow,
+                first_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                context,
+            )?;
+            let warped = film_warp_with_context_exact_native(
+                backend,
+                second_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                &flow,
+                context,
+            )?;
+            let residual = film_flow_estimator_from_weights(
+                backend,
+                predictor,
+                first_features
+                    .get(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)?,
+                &warped,
+                &self.weights,
+                context,
+            )?;
+            flow = execution_result(
+                real_add_with_context_exact_native(backend, &flow, &residual, context),
+                context,
+            )?;
+            residuals.push(residual);
+        }
+        residuals.reverse();
+        context.cancellation.check()?;
+        Ok(residuals)
+    }
+
     pub fn interpolate_rife_pair(
         &self,
         backend: &CpuBackend,
@@ -1667,28 +1782,7 @@ pub fn film_flow_pyramid_synthesis_with_context_exact_native(
         {
             return Err(FrameInterpolationError::Placement);
         }
-        let height = usize::try_from(
-            *residual_shape
-                .get(2)
-                .ok_or(FrameInterpolationError::StateMismatch)?,
-        )
-        .map_err(|_| FrameInterpolationError::Overflow)?;
-        let width = usize::try_from(
-            *residual_shape
-                .get(3)
-                .ok_or(FrameInterpolationError::StateMismatch)?,
-        )
-        .map_err(|_| FrameInterpolationError::Overflow)?;
-        flow = interpolate_bilinear(backend, &flow, height, width, context)?;
-        flow = execution_result(
-            real_multiply_with_context_exact_native(
-                backend,
-                &flow,
-                ElementwiseOperand::Scalar(Scalar::Float(2.0)),
-                context,
-            ),
-            context,
-        )?;
+        flow = film_upsample_double_to_residual(backend, &flow, residual, context)?;
         flow = execution_result(
             real_add_with_context_exact_native(backend, &flow, residual, context),
             context,
@@ -1698,6 +1792,129 @@ pub fn film_flow_pyramid_synthesis_with_context_exact_native(
     flow_pyramid.reverse();
     context.cancellation.check()?;
     Ok(flow_pyramid)
+}
+
+fn film_upsample_double_to_residual(
+    backend: &CpuBackend,
+    flow: &Tensor,
+    residual: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let shape = residual.descriptor().shape();
+    let height = usize::try_from(*shape.get(2).ok_or(FrameInterpolationError::StateMismatch)?)
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    let width = usize::try_from(*shape.get(3).ok_or(FrameInterpolationError::StateMismatch)?)
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    let flow = interpolate_bilinear(backend, flow, height, width, context)?;
+    execution_result(
+        real_multiply_with_context_exact_native(
+            backend,
+            &flow,
+            ElementwiseOperand::Scalar(Scalar::Float(2.0)),
+            context,
+        ),
+        context,
+    )
+}
+
+fn validate_film_feature_pyramids(
+    first_features: &[Tensor],
+    second_features: &[Tensor],
+    dtype: DType,
+    stream: StreamId,
+    context: &ExecutionContext<'_>,
+) -> Result<(), FrameInterpolationError> {
+    context.cancellation.check()?;
+    let expected_channels = [64_u64, 192, 448, 960, 960, 960, 960];
+    if first_features.len() != expected_channels.len()
+        || second_features.len() != expected_channels.len()
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM flow prediction requires exact seven-level feature pyramids",
+        ));
+    }
+    for (index, ((first_feature, second_feature), channels)) in first_features
+        .iter()
+        .zip(second_features)
+        .zip(expected_channels)
+        .enumerate()
+    {
+        context.cancellation.check()?;
+        let first_descriptor = first_feature.descriptor();
+        let second_descriptor = second_feature.descriptor();
+        let shape = first_descriptor.shape();
+        if shape.len() != 4
+            || shape.first() == Some(&0)
+            || shape.get(1) != Some(&channels)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) == Some(&0)
+            || second_descriptor.shape() != shape
+            || first_descriptor.dtype() != dtype
+            || second_descriptor.dtype() != dtype
+            || first_descriptor.device() != DeviceId::CPU
+            || second_descriptor.device() != DeviceId::CPU
+            || first_descriptor.stream() != stream
+            || second_descriptor.stream() != stream
+            || stream != context.stream
+            || !first_descriptor.is_contiguous()?
+            || !second_descriptor.is_contiguous()?
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        if index > 0 {
+            let prior = first_features
+                .get(index - 1)
+                .ok_or(FrameInterpolationError::StateMismatch)?
+                .descriptor();
+            if prior.shape().get(2).copied().unwrap_or_default() / 2
+                != shape.get(2).copied().unwrap_or_default()
+                || prior.shape().get(3).copied().unwrap_or_default() / 2
+                    != shape.get(3).copied().unwrap_or_default()
+            {
+                return Err(FrameInterpolationError::InvalidInvocation(
+                    "FILM feature pyramid extents are not source-compatible",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn film_flow_estimator_from_weights(
+    backend: &CpuBackend,
+    prefix: &str,
+    first: &Tensor,
+    second: &Tensor,
+    weights: &BTreeMap<String, Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    let mut output = execution_result(
+        torch_cat_with_context_exact_native(backend, &[first.clone(), second.clone()], 1, context),
+        context,
+    )?;
+    for convolution in 0..5_usize {
+        context.cancellation.check()?;
+        let parameter = format!("{prefix}._convs.{convolution}.conv");
+        let weight = weights
+            .get(&format!("{parameter}.weight"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        let bias = weights
+            .get(&format!("{parameter}.bias"))
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        output = film_conv_2d_with_context_exact_native(
+            backend,
+            &output,
+            weight,
+            bias,
+            convolution < 4,
+            context,
+        )?;
+    }
+    if output.descriptor().shape().get(1) != Some(&2) {
+        return Err(FrameInterpolationError::StateMismatch);
+    }
+    Ok(output)
 }
 
 fn film_average_pool_configuration() -> AveragePoolConfiguration {
@@ -2404,6 +2621,135 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_flow_estimator_executes_five_source_convolutions() -> Result<(), FrameInterpolationError>
+    {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let prefix = "predict_flow.reduced";
+        let shapes = [
+            ([2_u64, 2, 3, 3], 2_usize),
+            ([2, 2, 3, 3], 2),
+            ([2, 2, 3, 3], 2),
+            ([1, 2, 1, 1], 1),
+            ([2, 1, 1, 1], 2),
+        ];
+        let mut weights = BTreeMap::new();
+        for (convolution, (shape, output_channels)) in shapes.into_iter().enumerate() {
+            let count = shape.iter().try_fold(1_usize, |count, extent| {
+                count
+                    .checked_mul(
+                        usize::try_from(*extent).map_err(|_| FrameInterpolationError::Overflow)?,
+                    )
+                    .ok_or(FrameInterpolationError::Overflow)
+            })?;
+            let mut values = vec![0.0_f32; count];
+            match convolution {
+                0 => {
+                    values[4] = 1.0;
+                    values[13] = 1.0;
+                    values[22] = 1.0;
+                    values[31] = 1.0;
+                }
+                1 | 2 => {
+                    values[4] = 1.0;
+                    values[31] = 1.0;
+                }
+                3 => {
+                    values[0] = 1.0;
+                    values[1] = 1.0;
+                }
+                4 => {
+                    values[0] = 1.0;
+                    values[1] = 2.0;
+                }
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            }
+            let parameter = format!("{prefix}._convs.{convolution}.conv");
+            weights.insert(
+                format!("{parameter}.weight"),
+                tensor_from_f32(
+                    &backend,
+                    &shape,
+                    &values,
+                    DType::F32,
+                    DeviceId::CPU,
+                    &context,
+                )
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?,
+            );
+            weights.insert(
+                format!("{parameter}.bias"),
+                tensor_from_f32(
+                    &backend,
+                    &[u64::try_from(output_channels)
+                        .map_err(|_| FrameInterpolationError::Overflow)?],
+                    &vec![0.0; output_channels],
+                    DType::F32,
+                    DeviceId::CPU,
+                    &context,
+                )
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?,
+            );
+        }
+        let first = tensor_from_f32(
+            &backend,
+            &[1, 1, 1, 1],
+            &[1.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let second = tensor_from_f32(
+            &backend,
+            &[1, 1, 1, 1],
+            &[2.0],
+            DType::F32,
+            DeviceId::CPU,
+            &context,
+        )
+        .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?;
+        let first_bytes = first.contiguous_bytes()?;
+        let second_bytes = second.contiguous_bytes()?;
+        let output = film_flow_estimator_from_weights(
+            &backend, prefix, &first, &second, &weights, &context,
+        )?;
+        assert_eq!(output.descriptor().shape(), &[1, 2, 1, 1]);
+        for (linear, expected) in [6.0_f32, 12.0].into_iter().enumerate() {
+            let actual = match DType::F32.decode_scalar(output.linear_element_bytes(
+                u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?,
+            )?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        assert_ne!(output.storage_id(), first.storage_id());
+        assert_ne!(output.storage_id(), second.storage_id());
+        assert_eq!(first.contiguous_bytes()?, first_bytes);
+        assert_eq!(second.contiguous_bytes()?, second_bytes);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let rife = NativeFrameInterpolationModel::reduced_rife_test_fixture(&backend, &context)?;
+        assert!(matches!(
+            rife.film_residual_flow_pyramid(&backend, &[], &[], &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+        Ok(())
+    }
 
     #[test]
     fn film_flow_pyramid_synthesis_upsamples_doubles_adds_and_reverses()

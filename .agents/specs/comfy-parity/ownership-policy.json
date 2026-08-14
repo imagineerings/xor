@@ -11292,6 +11292,77 @@
       "decision_reason": "NativeFrameInterpolationModel is the sole retained RIFE graph owner. Its pair method composes immutable admitted weights with canonical tensor operators and returns only attempt-local output; the sibling sequence method owns attempt-local feature reuse and ordering while handle resolution, caching, output effects, and publication remain later owners."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_flow_estimator_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_residual_flow_pyramid",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::film_residual_flow_pyramid",
+        "film_flow_estimator_from_weights",
+        "validate_film_feature_pyramids"
+      ],
+      "allowed_adapters": [
+        "film_flow_estimator_from_weights is the private five-convolution predictor shared with the reduced exact-weight oracle",
+        "FILM warp, interpolation, concatenation, convolution, and elementwise owners retain numerical, allocation, storage, stream, workspace, and cancellation mechanics",
+        "FILM flow-pyramid synthesis consumes returned residuals but cannot duplicate predictor execution or retain flows in the model, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_residual_flow_pyramid",
+          "role": "canonical",
+          "symbol": "film_residual_flow_pyramid",
+          "pattern": "pub fn film_residual_flow_pyramid\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_flow_estimator_from_weights",
+          "role": "canonical_implementation",
+          "symbol": "film_flow_estimator_from_weights",
+          "pattern": "^fn film_flow_estimator_from_weights\\("
+        }
+      ],
+      "call_symbols": [
+        "film_residual_flow_pyramid",
+        "film_flow_estimator_from_weights"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-flow-estimator-binds-retained-film-profile-weights-and-seven-level-schedule",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn film_residual_flow_pyramid[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*validate_film_feature_pyramids[\\s\\S]*predict_flow\\._predictor[\\s\\S]*\\[5_usize, 4, 3\\][\\s\\S]*predict_flow\\._predictors\\.0[\\s\\S]*predict_flow\\._predictors\\.2[\\s\\S]*residuals\\.reverse\\(\\)"
+        },
+        {
+          "name": "film-flow-estimator-executes-five-source-convolutions-with-final-linear-output",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn film_flow_estimator_from_weights[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*for convolution in 0\\.\\.5_usize[\\s\\S]*convolution < 4[\\s\\S]*shape\\(\\)\\.get\\(1\\) != Some\\(&2\\)"
+        },
+        {
+          "name": "film-flow-estimator-reduced-oracle-proves-values-storage-immutability-and-profile-rejection",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_flow_estimator_executes_five_source_convolutions[\\s\\S]*\\[6\\.0_f32, 12\\.0\\][\\s\\S]*assert_ne!\\(output\\.storage_id\\(\\), first\\.storage_id\\(\\)\\)[\\s\\S]*first_bytes[\\s\\S]*film_residual_flow_pyramid[\\s\\S]*InvalidInvocation"
+        },
+        {
+          "name": "film-flow-estimator-fixture-separates-reduced-predictor-from-production-parity-fusion-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-estimator/manifest.json",
+          "pattern": "(?=[\\s\\S]*PyramidFlowEstimator.forward)(?=[\\s\\S]*shared_predictor_levels)(?=[\\s\\S]*expected_output)(?=[\\s\\S]*production_dense_weight_numeric_parity)(?=[\\s\\S]*fusion_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-flow-estimator-foundation"
+      ],
+      "production_consumers": [
+        "native FILM flow synthesis, fusion, and sequence execution"
+      ],
+      "requirements": ["Requirement 31", "Requirement 34", "Requirement 35", "Requirement 36", "Requirement 41"],
+      "design": ["D25", "D28", "D31", "D34", "D36", "D41"],
+      "validation": ["VAL-MEDIA-001", "VAL-TENSOR-001", "VAL-DEVICE-001", "VAL-MODEL-FORMAT-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+      "decision_reason": "The existing retained interpolation model remains the sole FILM checkpoint owner and executes the source shared and specialized flow predictors over borrowed feature pyramids. All predicted residuals and accumulated flows remain invocation-local."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_flow_pyramid_synthesis",
       "canonical_owner": "comfy_model::frame_interpolation::film_flow_pyramid_synthesis_with_context_exact_native",
       "owner_files": [

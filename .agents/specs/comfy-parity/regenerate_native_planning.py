@@ -10138,6 +10138,42 @@ def native_film_flow_pyramid_synthesis_foundation_task(dependency: str) -> dict[
     )
 
 
+def native_film_flow_estimator_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-flow-estimator-foundation",
+        "Execute retained FILM flow estimators",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model executes FILM PyramidFlowEstimator from its admitted checkpoint tensors. It validates exact seven-level feature channels and geometry, predicts the deepest residual through the shared five-convolution estimator, reuses that estimator for levels five through three, routes levels two through zero through the three specialized predictors, upsamples and doubles accumulated flow, warps the second features, and returns source-ordered attempt-local residuals without retaining flows, features, workspace, cache, handles, codecs, effects, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-pyramid-synthesis/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-flow-estimator",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight predictor proves concatenated scalar features 1/2 pass through three three-by-three activated convolutions, one activated one-by-one bottleneck, and one nonactivated two-channel output to exact values 6/12 with fresh output storage and immutable inputs. Production ownership evidence proves the shared levels 6/5/4/3 and specialized levels 2/1/0 routes, exact channel preflight, warp-and-residual accumulation, non-FILM rejection, cancellation checkpoints, and explicit absence of licensed production-weight numeric parity, flow synthesis duplication, fusion, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12375,8 +12411,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(film_feature_pyramid_foundation["id"])
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_flow_estimator_foundation = native_film_flow_estimator_foundation_task(
         str(film_flow_pyramid_synthesis_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_flow_estimator_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12488,6 +12527,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_subtree_foundation,
         film_feature_pyramid_foundation,
         film_flow_pyramid_synthesis_foundation,
+        film_flow_estimator_foundation,
         video_foundation,
             detection_foundation,
         ]
