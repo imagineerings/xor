@@ -10904,6 +10904,56 @@ def native_video_codec_data_plane_abi_foundation_task(
     )
 
 
+def native_video_codec_bounded_memory_avio_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-bounded-memory-avio-foundation",
+        "Execute bounded retained FFmpeg memory I/O",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The focused native video codec FFI owner borrows one exact retained FFmpeg binding and constructs bounded seekable in-memory AVIO input and output sessions through the certified av_malloc, av_free, avio_alloc_context, and avio_context_free functions. Stable boxed callback state, caller-authorized CPU workspace, checked BytesIO-compatible read, write, and seek callbacks, and reverse RAII cleanup keep every raw context, buffer, function pointer, and staged output private and attempt-local. This prerequisite opens no format, probes no encoder or decoder, executes no codec, and owns no media value, handle, cache, persistence, recovery, effect, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Synthetic exact-signature native fixtures and focused tests prove bound allocation and context invocation, chunked input and EOF, checked SET/CUR/END/SIZE/FORCE seeks, output overwrite and zero-filled holes, exact-cap success and cap-plus-one atomic rejection, first callback failure with cancellation precedence, callback unwind containment, workspace exhaustion, null native allocation, late cancellation, current-buffer replacement, exact buffer-before-context cleanup, zero scratch residue, and clean retry. The fixture records the reviewed source and prerequisite digests and explicitly claims no licensed or installed FFmpeg package, format open, codec capability, mux, demux, codec or media result, effect, cache, persistence, recovery, or publication evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "35.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13165,8 +13215,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_symbol_binding_foundation["id"])
         )
     )
+    video_codec_bounded_memory_avio_foundation = (
+        native_video_codec_bounded_memory_avio_foundation_task(
+            str(video_codec_data_plane_abi_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_data_plane_abi_foundation["id"])
+        str(video_codec_bounded_memory_avio_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13296,6 +13351,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_callable_symbol_certification_foundation,
         video_codec_symbol_binding_foundation,
         video_codec_data_plane_abi_foundation,
+        video_codec_bounded_memory_avio_foundation,
         video_foundation,
             detection_foundation,
         ]

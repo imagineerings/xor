@@ -18,8 +18,8 @@
     "symbol_binding_fixture_sha256": "1a9b142f08b84c01dcd31c3e2bc05c84e27758c3a3bccea742b9fe2f6cf2fdbd"
   },
   "evidence": {
-    "data_plane_abi_manifest_sha256": "792a1de8f69834823170c921a68f64dd620e25444b5444156ce577344550af35",
-    "c_data_plane_verifier_sha256": "5b4a72bf5d7502343a7bc85bcdd8a5e6ca305968b66df2f9ae7652dccbbbb277",
+    "data_plane_abi_manifest_sha256": "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec",
+    "c_data_plane_verifier_sha256": "bb61bec6fa7e300f2730f1df7ad88abafabdb21f0942b5a61f9dfde3f7ffc9f6",
     "target": "x86_64-unknown-linux-gnu",
     "compiler": "gcc 15.2.0",
     "compiler_command": "cc -std=c11 -Wall -Wextra -Werror -I<configured-ffmpeg-7.1-source> -c verify-data-plane-bindings.c",

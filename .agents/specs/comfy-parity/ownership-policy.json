@@ -14229,10 +14229,12 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-data-plane-abi-foundation"
+        "comfy-parity-native-video-codec-data-plane-abi-foundation",
+        "comfy-parity-native-video-codec-bounded-memory-avio-foundation"
       ],
       "production_consumers": [
-        "later bounded native FFmpeg AVIO and codec operations"
+        "bounded native FFmpeg memory AVIO",
+        "later bounded native FFmpeg codec operations"
       ],
       "requirements": [
         "Requirement 28",
@@ -14254,6 +14256,110 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One private source-verified ABI owner defines only the FFmpeg-owned prefixes and constants needed for the first bounded video data plane. Prefix evidence enables later checked dereferences without treating a Rust prefix as a complete allocatable C object or broadening loader and codec ownership."
+    },
+    {
+      "concern": "native_video_reviewed_codec_memory_avio",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::{NativeVideoCodecBinding::open_bounded_avio_input,NativeVideoCodecBinding::open_bounded_avio_output}",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecMemoryInput",
+        "NativeVideoCodecMemoryOutput",
+        "open_bounded_avio_input",
+        "open_bounded_avio_output",
+        "native_video_codec_input_read",
+        "native_video_codec_output_write",
+        "native_video_codec_input_seek",
+        "native_video_codec_output_seek"
+      ],
+      "allowed_adapters": [
+        "the reviewed ABI owner supplies AVIOContext.buffer, AVSEEK_FORCE, AVSEEK_SIZE, and exact AVERROR constants without allocating a complete FFmpeg object",
+        "the canonical CPU backend supplies caller-authorized workspace leases and capacity-fixed byte staging without creating a second allocator",
+        "later synchronous codec operations may borrow the private context pointer and inspect staged bytes only after callback status and cancellation checks",
+        "the adapter is attempt-local and may not become a payload, handle-store resource, cache entry, persistent object, recovery record, effect, or publication owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecMemoryInput",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVideoCodecMemoryInput"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecMemoryOutput",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVideoCodecMemoryOutput"
+        }
+      ],
+      "call_symbols": [
+        "av_malloc",
+        "av_free",
+        "avio_alloc_context",
+        "avio_context_free"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-codec-bounded-avio-borrows-binding-and-caller-workspace",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "(?=[\\s\\S]*open_bounded_avio_input)(?=[\\s\\S]*open_bounded_avio_output)(?=[\\s\\S]*workspace_vec)(?=[\\s\\S]*reserve_workspace)(?=[\\s\\S]*NativeVideoCodecAvioFunctions::from_binding)"
+        },
+        {
+          "name": "video-codec-bounded-avio-callbacks-check-bounds-cancellation-and-first-failure",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "native_video_codec_input_read[\\s\\S]*native_video_codec_output_write[\\s\\S]*native_video_codec_input_seek[\\s\\S]*native_video_codec_output_seek[\\s\\S]*catch_unwind[\\s\\S]*record_callback_failure"
+        },
+        {
+          "name": "video-codec-bounded-avio-frees-current-buffer-before-context",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "impl<State> Drop for NativeVideoCodecAvio[\\s\\S]*\\(\\*context\\)\\.buffer[\\s\\S]*av_free[\\s\\S]*avio_context_free"
+        },
+        {
+          "name": "video-codec-bounded-avio-tests-callbacks-raii-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "bounded_video_codec_avio_callbacks_enforce_read_write_seek_and_limits[\\s\\S]*bounded_video_codec_avio_cancellation_and_panics_are_latched[\\s\\S]*retained_video_codec_avio_allocation_raii_and_retry_are_atomic"
+        },
+        {
+          "name": "video-codec-bounded-avio-fixture-forbids-codec-media-and-publication-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+          "pattern": "synthetic-bounded-retained-binding-memory-avio[\\s\\S]*raw_context_buffer_and_callbacks_private[\\s\\S]*format_opened_or_probed[\\s\\S]*codec_or_media_result_produced[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-bounded-memory-avio-foundation"
+      ],
+      "production_consumers": [
+        "later bounded native FFmpeg mux, demux, and codec operations"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One private retained-binding adapter owns bounded seekable memory AVIO construction, callbacks, workspace leases, failure latching, cancellation, and exact reverse cleanup. Keeping the raw context and staged bytes crate-private prepares the first mux/demux data plane without creating a payload or a second loader, allocator, or publication owner."
     },
     {
       "concern": "native_video_reviewed_codec_symbol_binding",
@@ -14321,9 +14427,11 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-symbol-binding-foundation"
+        "comfy-parity-native-video-codec-symbol-binding-foundation",
+        "comfy-parity-native-video-codec-bounded-memory-avio-foundation"
       ],
       "production_consumers": [
+        "bounded native FFmpeg memory AVIO",
         "later native FFmpeg encoder probe and bounded codec execution"
       ],
       "requirements": [

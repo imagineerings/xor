@@ -84,6 +84,7 @@ pub(crate) const AV_PIXEL_FORMAT_YUV420P: c_int = 0;
 pub(crate) const AV_PIXEL_FORMAT_RGB24: c_int = 2;
 pub(crate) const AV_NO_PRESENTATION_TIMESTAMP: i64 = i64::MIN;
 pub(crate) const AV_SEEK_SIZE: c_int = 0x1_0000;
+pub(crate) const AV_SEEK_FORCE: c_int = 0x2_0000;
 pub(crate) const AV_FORMAT_FLAG_CUSTOM_IO: c_int = 0x0080;
 pub(crate) const AV_CODEC_FLAG_GLOBAL_HEADER: c_int = 1 << 22;
 pub(crate) const AV_OPTION_SEARCH_CHILDREN: c_int = 1;
@@ -91,6 +92,7 @@ pub(crate) const SWS_BILINEAR: c_int = 2;
 pub(crate) const AV_ERROR_TRY_AGAIN: c_int = -11;
 pub(crate) const AV_ERROR_OUT_OF_MEMORY: c_int = -12;
 pub(crate) const AV_ERROR_INVALID_ARGUMENT: c_int = -22;
+pub(crate) const AV_ERROR_NO_SPACE: c_int = -28;
 pub(crate) const AV_ERROR_END_OF_FILE: c_int = -541_478_725;
 pub(crate) const AV_ERROR_EXIT: c_int = -1_414_092_869;
 
@@ -523,6 +525,7 @@ mod tests {
         assert_eq!(AV_PIXEL_FORMAT_RGB24, 2);
         assert_eq!(AV_NO_PRESENTATION_TIMESTAMP, i64::MIN);
         assert_eq!(AV_SEEK_SIZE, 0x1_0000);
+        assert_eq!(AV_SEEK_FORCE, 0x2_0000);
         assert_eq!(AV_FORMAT_FLAG_CUSTOM_IO, 0x0080);
         assert_eq!(AV_CODEC_FLAG_GLOBAL_HEADER, 1 << 22);
         assert_eq!(AV_OPTION_SEARCH_CHILDREN, 1);
@@ -530,6 +533,7 @@ mod tests {
         assert_eq!(AV_ERROR_TRY_AGAIN, -11);
         assert_eq!(AV_ERROR_OUT_OF_MEMORY, -12);
         assert_eq!(AV_ERROR_INVALID_ARGUMENT, -22);
+        assert_eq!(AV_ERROR_NO_SPACE, -28);
         assert_eq!(AV_ERROR_END_OF_FILE, -541_478_725);
         assert_eq!(AV_ERROR_EXIT, -1_414_092_869);
         assert_eq!(
@@ -632,6 +636,7 @@ mod tests {
                 "AV_PIX_FMT_RGB24": AV_PIXEL_FORMAT_RGB24,
                 "AV_NOPTS_VALUE": AV_NO_PRESENTATION_TIMESTAMP,
                 "AVSEEK_SIZE": AV_SEEK_SIZE,
+                "AVSEEK_FORCE": AV_SEEK_FORCE,
                 "AVFMT_FLAG_CUSTOM_IO": AV_FORMAT_FLAG_CUSTOM_IO,
                 "AV_CODEC_FLAG_GLOBAL_HEADER": AV_CODEC_FLAG_GLOBAL_HEADER,
                 "AV_OPT_SEARCH_CHILDREN": AV_OPTION_SEARCH_CHILDREN,
@@ -639,6 +644,7 @@ mod tests {
                 "AVERROR_EAGAIN": AV_ERROR_TRY_AGAIN,
                 "AVERROR_ENOMEM": AV_ERROR_OUT_OF_MEMORY,
                 "AVERROR_EINVAL": AV_ERROR_INVALID_ARGUMENT,
+                "AVERROR_ENOSPC": AV_ERROR_NO_SPACE,
                 "AVERROR_EOF": AV_ERROR_END_OF_FILE,
                 "AVERROR_EXIT": AV_ERROR_EXIT
             })

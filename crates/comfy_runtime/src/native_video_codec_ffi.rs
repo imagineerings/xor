@@ -2,10 +2,15 @@ use crate::{
     CertifiedVideoCodecDependencyClosure, VIDEO_CODEC_FFI_UNSAFE_OWNER,
     native_video_codec_abi as abi,
 };
+use comfy_tensor::{CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, ExecutionContext, TensorError};
 use comfy_types::{CancellationError, CancellationToken};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    ffi::c_void,
+    marker::PhantomData,
     path::PathBuf,
+    ptr::NonNull,
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -92,6 +97,635 @@ impl NativeVideoCodecBinding {
 
     pub fn runtime_versions(&self) -> NativeVideoCodecRuntimeVersions {
         self.versions
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn open_bounded_avio_input<'binding>(
+        &'binding self,
+        bytes: Arc<[u8]>,
+        maximum_input_bytes: usize,
+        buffer_bytes: usize,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryInput<'binding>, NativeVideoCodecIoError> {
+        let state = NativeVideoCodecInputState {
+            bytes,
+            position: 0,
+            maximum_position: maximum_input_bytes,
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            #[cfg(test)]
+            panic_on_next_callback: false,
+        };
+        if state.bytes.len() > maximum_input_bytes {
+            return Err(NativeVideoCodecIoError::InvalidBounds);
+        }
+        let functions = NativeVideoCodecAvioFunctions::from_binding(self);
+        let avio = allocate_native_video_codec_avio(
+            self,
+            state,
+            functions,
+            buffer_bytes,
+            false,
+            Some(native_video_codec_input_read),
+            None,
+            Some(native_video_codec_input_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryInput { avio })
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn open_bounded_avio_output<'binding>(
+        &'binding self,
+        maximum_output_bytes: usize,
+        buffer_bytes: usize,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryOutput<'binding>, NativeVideoCodecIoError> {
+        if maximum_output_bytes == 0 {
+            return Err(NativeVideoCodecIoError::InvalidBounds);
+        }
+        let bytes = backend.workspace_vec::<u8>(context, maximum_output_bytes)?;
+        let state = NativeVideoCodecOutputState {
+            bytes,
+            position: 0,
+            maximum_bytes: maximum_output_bytes,
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            #[cfg(test)]
+            panic_on_next_callback: false,
+        };
+        let functions = NativeVideoCodecAvioFunctions::from_binding(self);
+        let avio = allocate_native_video_codec_avio(
+            self,
+            state,
+            functions,
+            buffer_bytes,
+            true,
+            None,
+            Some(native_video_codec_output_write),
+            Some(native_video_codec_output_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryOutput { avio })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+const NATIVE_VIDEO_CODEC_AVIO_CONTEXT_HEADROOM_BYTES: u64 = 4_096;
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeVideoCodecIoCallbackFailure {
+    Cancelled,
+    InvalidArgument,
+    OutputLimit,
+    ResourceExhausted,
+    Panicked,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecIoError {
+    #[error("native video codec memory I/O was cancelled")]
+    Cancelled,
+    #[error("native video codec memory I/O bounds are invalid")]
+    InvalidBounds,
+    #[error("native video codec memory I/O allocation failed")]
+    NativeAllocationFailed,
+    #[error("native video codec memory I/O callback rejected an argument")]
+    InvalidCallbackArgument,
+    #[error("native video codec memory I/O output limit was exceeded")]
+    OutputLimitExceeded,
+    #[error("native video codec memory I/O callback exhausted its authorized storage")]
+    CallbackResourceExhausted,
+    #[error("native video codec memory I/O callback panicked")]
+    CallbackPanicked,
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
+}
+
+impl From<CancellationError> for NativeVideoCodecIoError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+#[derive(Clone, Copy)]
+struct NativeVideoCodecAvioFunctions {
+    av_malloc: abi::AvMalloc,
+    av_free: abi::AvFree,
+    avio_alloc_context: abi::AvioAllocContext,
+    avio_context_free: abi::AvioContextFree,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+impl NativeVideoCodecAvioFunctions {
+    fn from_binding(binding: &NativeVideoCodecBinding) -> Self {
+        Self {
+            av_malloc: binding._symbols.avutil.av_malloc,
+            av_free: binding._symbols.avutil.av_free,
+            avio_alloc_context: binding._symbols.avformat.avio_alloc_context,
+            avio_context_free: binding._symbols.avformat.avio_context_free,
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+struct NativeVideoCodecInputState {
+    bytes: Arc<[u8]>,
+    position: usize,
+    maximum_position: usize,
+    cancellation: CancellationToken,
+    failure: Option<NativeVideoCodecIoCallbackFailure>,
+    #[cfg(test)]
+    panic_on_next_callback: bool,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+struct NativeVideoCodecOutputState {
+    bytes: CpuWorkspaceVec<u8>,
+    position: usize,
+    maximum_bytes: usize,
+    cancellation: CancellationToken,
+    failure: Option<NativeVideoCodecIoCallbackFailure>,
+    #[cfg(test)]
+    panic_on_next_callback: bool,
+}
+
+struct NativeVideoCodecAvio<'binding, State> {
+    context: NonNull<abi::AvIoContext>,
+    state: Box<[State]>,
+    functions: NativeVideoCodecAvioFunctions,
+    _workspace: CpuWorkspaceLease,
+    _binding: PhantomData<&'binding NativeVideoCodecBinding>,
+    _thread_bound: PhantomData<std::rc::Rc<()>>,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+pub(crate) struct NativeVideoCodecMemoryInput<'binding> {
+    avio: NativeVideoCodecAvio<'binding, NativeVideoCodecInputState>,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+pub(crate) struct NativeVideoCodecMemoryOutput<'binding> {
+    avio: NativeVideoCodecAvio<'binding, NativeVideoCodecOutputState>,
+}
+
+impl NativeVideoCodecMemoryInput<'_> {
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn context_ptr(&self) -> *mut abi::AvIoContext {
+        self.avio.context.as_ptr()
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn check_callback_status(&self) -> Result<(), NativeVideoCodecIoError> {
+        callback_status(&self.avio.state[0].cancellation, self.avio.state[0].failure)
+    }
+}
+
+impl NativeVideoCodecMemoryOutput<'_> {
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn context_ptr(&self) -> *mut abi::AvIoContext {
+        self.avio.context.as_ptr()
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn check_callback_status(&self) -> Result<(), NativeVideoCodecIoError> {
+        callback_status(&self.avio.state[0].cancellation, self.avio.state[0].failure)
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following bounded codec operation"
+    )]
+    pub(crate) fn staged_bytes(&self) -> Result<&[u8], NativeVideoCodecIoError> {
+        self.check_callback_status()?;
+        Ok(&self.avio.state[0].bytes)
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+fn callback_status(
+    cancellation: &CancellationToken,
+    failure: Option<NativeVideoCodecIoCallbackFailure>,
+) -> Result<(), NativeVideoCodecIoError> {
+    cancellation.check()?;
+    match failure {
+        None => Ok(()),
+        Some(NativeVideoCodecIoCallbackFailure::Cancelled) => {
+            Err(NativeVideoCodecIoError::Cancelled)
+        }
+        Some(NativeVideoCodecIoCallbackFailure::InvalidArgument) => {
+            Err(NativeVideoCodecIoError::InvalidCallbackArgument)
+        }
+        Some(NativeVideoCodecIoCallbackFailure::OutputLimit) => {
+            Err(NativeVideoCodecIoError::OutputLimitExceeded)
+        }
+        Some(NativeVideoCodecIoCallbackFailure::ResourceExhausted) => {
+            Err(NativeVideoCodecIoError::CallbackResourceExhausted)
+        }
+        Some(NativeVideoCodecIoCallbackFailure::Panicked) => {
+            Err(NativeVideoCodecIoError::CallbackPanicked)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn allocate_native_video_codec_avio<'binding, State>(
+    _binding: &'binding NativeVideoCodecBinding,
+    state: State,
+    functions: NativeVideoCodecAvioFunctions,
+    buffer_bytes: usize,
+    write: bool,
+    read_packet: Option<abi::AvIoReadPacket>,
+    write_packet: Option<abi::AvIoWritePacket>,
+    seek: Option<abi::AvIoSeek>,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeVideoCodecAvio<'binding, State>, NativeVideoCodecIoError> {
+    allocate_native_video_codec_avio_inner(
+        state,
+        functions,
+        buffer_bytes,
+        write,
+        read_packet,
+        write_packet,
+        seek,
+        backend,
+        context,
+        check_cancellation,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn allocate_native_video_codec_avio_inner<'binding, State>(
+    state: State,
+    functions: NativeVideoCodecAvioFunctions,
+    buffer_bytes: usize,
+    write: bool,
+    read_packet: Option<abi::AvIoReadPacket>,
+    write_packet: Option<abi::AvIoWritePacket>,
+    seek: Option<abi::AvIoSeek>,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeVideoCodecAvio<'binding, State>, NativeVideoCodecIoError> {
+    check_cancellation()?;
+    let buffer_size = i32::try_from(buffer_bytes)
+        .ok()
+        .filter(|size| *size > 0)
+        .ok_or(NativeVideoCodecIoError::InvalidBounds)?;
+    let requested_workspace = u64::try_from(buffer_bytes)
+        .ok()
+        .and_then(|bytes| bytes.checked_add(NATIVE_VIDEO_CODEC_AVIO_CONTEXT_HEADROOM_BYTES))
+        .ok_or(NativeVideoCodecIoError::InvalidBounds)?;
+    let workspace = backend.reserve_workspace(context, requested_workspace)?;
+    let mut states = Vec::new();
+    states
+        .try_reserve_exact(1)
+        .map_err(|_| NativeVideoCodecIoError::NativeAllocationFailed)?;
+    states.push(state);
+    let state = states.into_boxed_slice();
+    check_cancellation()?;
+    let buffer = unsafe { (functions.av_malloc)(buffer_bytes) }.cast::<u8>();
+    if buffer.is_null() {
+        return Err(NativeVideoCodecIoError::NativeAllocationFailed);
+    }
+    if let Err(error) = check_cancellation() {
+        unsafe { (functions.av_free)(buffer.cast()) };
+        return Err(error.into());
+    }
+    let opaque = state.as_ptr().cast_mut().cast::<c_void>();
+    let context_ptr = unsafe {
+        (functions.avio_alloc_context)(
+            buffer,
+            buffer_size,
+            i32::from(write),
+            opaque,
+            read_packet,
+            write_packet,
+            seek,
+        )
+    };
+    let Some(context_ptr) = NonNull::new(context_ptr) else {
+        unsafe { (functions.av_free)(buffer.cast()) };
+        return Err(NativeVideoCodecIoError::NativeAllocationFailed);
+    };
+    let avio = NativeVideoCodecAvio {
+        context: context_ptr,
+        state,
+        functions,
+        _workspace: workspace,
+        _binding: PhantomData,
+        _thread_bound: PhantomData,
+    };
+    if let Err(error) = check_cancellation() {
+        drop(avio);
+        return Err(error.into());
+    }
+    Ok(avio)
+}
+
+impl<State> Drop for NativeVideoCodecAvio<'_, State> {
+    fn drop(&mut self) {
+        let mut context = self.context.as_ptr();
+        let buffer = unsafe { (*context).buffer };
+        unsafe {
+            (*context).buffer = std::ptr::null_mut();
+            if !buffer.is_null() {
+                (self.functions.av_free)(buffer.cast());
+            }
+            (self.functions.avio_context_free)(std::ptr::addr_of_mut!(context));
+        }
+        if !context.is_null() {
+            eprintln!("native video codec AVIO context cleanup did not clear its pointer");
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+unsafe extern "C" fn native_video_codec_input_read(
+    opaque: *mut c_void,
+    destination: *mut u8,
+    requested: i32,
+) -> i32 {
+    if opaque.is_null() {
+        return abi::AV_ERROR_INVALID_ARGUMENT;
+    }
+    let state = unsafe { &mut *opaque.cast::<NativeVideoCodecInputState>() };
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        #[cfg(test)]
+        if std::mem::take(&mut state.panic_on_next_callback) {
+            panic!("injected AVIO input callback panic");
+        }
+        if state.cancellation.is_cancelled() {
+            return Err(NativeVideoCodecIoCallbackFailure::Cancelled);
+        }
+        if let Some(failure) = state.failure {
+            return Err(failure);
+        }
+        if destination.is_null() || requested <= 0 {
+            return Err(NativeVideoCodecIoCallbackFailure::InvalidArgument);
+        }
+        if state.position >= state.bytes.len() {
+            return Ok(abi::AV_ERROR_END_OF_FILE);
+        }
+        let requested = usize::try_from(requested)
+            .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?;
+        let count = requested.min(state.bytes.len() - state.position);
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                state.bytes.as_ptr().add(state.position),
+                destination,
+                count,
+            );
+        }
+        state.position += count;
+        i32::try_from(count).map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)
+    })) {
+        Ok(Ok(result)) => result,
+        Ok(Err(failure)) => record_callback_failure(&mut state.failure, failure),
+        Err(_) => record_callback_failure(
+            &mut state.failure,
+            NativeVideoCodecIoCallbackFailure::Panicked,
+        ),
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+unsafe extern "C" fn native_video_codec_output_write(
+    opaque: *mut c_void,
+    source: *const u8,
+    requested: i32,
+) -> i32 {
+    if opaque.is_null() {
+        return abi::AV_ERROR_INVALID_ARGUMENT;
+    }
+    let state = unsafe { &mut *opaque.cast::<NativeVideoCodecOutputState>() };
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        #[cfg(test)]
+        if std::mem::take(&mut state.panic_on_next_callback) {
+            panic!("injected AVIO output callback panic");
+        }
+        if state.cancellation.is_cancelled() {
+            return Err(NativeVideoCodecIoCallbackFailure::Cancelled);
+        }
+        if let Some(failure) = state.failure {
+            return Err(failure);
+        }
+        if source.is_null() || requested <= 0 {
+            return Err(NativeVideoCodecIoCallbackFailure::InvalidArgument);
+        }
+        let count = usize::try_from(requested)
+            .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?;
+        let end = state
+            .position
+            .checked_add(count)
+            .ok_or(NativeVideoCodecIoCallbackFailure::OutputLimit)?;
+        if end > state.maximum_bytes {
+            return Err(NativeVideoCodecIoCallbackFailure::OutputLimit);
+        }
+        while state.bytes.len() < end {
+            state
+                .bytes
+                .try_push(0)
+                .map_err(|_| NativeVideoCodecIoCallbackFailure::ResourceExhausted)?;
+        }
+        let source = unsafe { std::slice::from_raw_parts(source, count) };
+        state.bytes[state.position..end].copy_from_slice(source);
+        state.position = end;
+        Ok(requested)
+    })) {
+        Ok(Ok(result)) => result,
+        Ok(Err(failure)) => record_callback_failure(&mut state.failure, failure),
+        Err(_) => record_callback_failure(
+            &mut state.failure,
+            NativeVideoCodecIoCallbackFailure::Panicked,
+        ),
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+unsafe extern "C" fn native_video_codec_input_seek(
+    opaque: *mut c_void,
+    offset: i64,
+    whence: i32,
+) -> i64 {
+    if opaque.is_null() {
+        return i64::from(abi::AV_ERROR_INVALID_ARGUMENT);
+    }
+    let state = unsafe { &mut *opaque.cast::<NativeVideoCodecInputState>() };
+    seek_callback(
+        &state.cancellation,
+        &mut state.failure,
+        &mut state.position,
+        state.bytes.len(),
+        state.maximum_position,
+        offset,
+        whence,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+unsafe extern "C" fn native_video_codec_output_seek(
+    opaque: *mut c_void,
+    offset: i64,
+    whence: i32,
+) -> i64 {
+    if opaque.is_null() {
+        return i64::from(abi::AV_ERROR_INVALID_ARGUMENT);
+    }
+    let state = unsafe { &mut *opaque.cast::<NativeVideoCodecOutputState>() };
+    seek_callback(
+        &state.cancellation,
+        &mut state.failure,
+        &mut state.position,
+        state.bytes.len(),
+        state.maximum_bytes,
+        offset,
+        whence,
+    )
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+fn seek_callback(
+    cancellation: &CancellationToken,
+    failure: &mut Option<NativeVideoCodecIoCallbackFailure>,
+    position: &mut usize,
+    logical_length: usize,
+    maximum_position: usize,
+    offset: i64,
+    whence: i32,
+) -> i64 {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if cancellation.is_cancelled() {
+            return Err(NativeVideoCodecIoCallbackFailure::Cancelled);
+        }
+        if let Some(failure) = *failure {
+            return Err(failure);
+        }
+        let operation = whence & !abi::AV_SEEK_FORCE;
+        if operation == abi::AV_SEEK_SIZE {
+            return i64::try_from(logical_length)
+                .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument);
+        }
+        let base = match operation {
+            value if value == libc::SEEK_SET => 0_i64,
+            value if value == libc::SEEK_CUR => i64::try_from(*position)
+                .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?,
+            value if value == libc::SEEK_END => i64::try_from(logical_length)
+                .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?,
+            _ => return Err(NativeVideoCodecIoCallbackFailure::InvalidArgument),
+        };
+        let next = base
+            .checked_add(offset)
+            .ok_or(NativeVideoCodecIoCallbackFailure::InvalidArgument)?;
+        let next = usize::try_from(next)
+            .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?;
+        if next > maximum_position {
+            return Err(NativeVideoCodecIoCallbackFailure::InvalidArgument);
+        }
+        *position = next;
+        i64::try_from(next).map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)
+    })) {
+        Ok(Ok(result)) => result,
+        Ok(Err(callback_failure)) => record_callback_failure(failure, callback_failure).into(),
+        Err(_) => {
+            record_callback_failure(failure, NativeVideoCodecIoCallbackFailure::Panicked).into()
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following bounded codec operation"
+)]
+fn record_callback_failure(
+    failure: &mut Option<NativeVideoCodecIoCallbackFailure>,
+    callback_failure: NativeVideoCodecIoCallbackFailure,
+) -> i32 {
+    if callback_failure == NativeVideoCodecIoCallbackFailure::Cancelled {
+        failure.get_or_insert(callback_failure);
+        return abi::AV_ERROR_EXIT;
+    }
+    let first_failure = *failure.get_or_insert(callback_failure);
+    match first_failure {
+        NativeVideoCodecIoCallbackFailure::Cancelled
+        | NativeVideoCodecIoCallbackFailure::Panicked => abi::AV_ERROR_EXIT,
+        NativeVideoCodecIoCallbackFailure::InvalidArgument => abi::AV_ERROR_INVALID_ARGUMENT,
+        NativeVideoCodecIoCallbackFailure::OutputLimit => abi::AV_ERROR_NO_SPACE,
+        NativeVideoCodecIoCallbackFailure::ResourceExhausted => abi::AV_ERROR_OUT_OF_MEMORY,
     }
 }
 
@@ -1362,7 +1996,100 @@ mod tests {
     use crate::{
         native_ffi_elf::inspect_elf64_dynamic_contract, trust::capture_native_library_image,
     };
-    use std::{fs, process::Command};
+    use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
+    use std::{
+        fs,
+        process::Command,
+        sync::{
+            Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
+
+    static AVIO_EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+    static AVIO_MALLOC_RETURNS_NULL: AtomicBool = AtomicBool::new(false);
+    static AVIO_CONTEXT_RETURNS_NULL: AtomicBool = AtomicBool::new(false);
+
+    fn record_avio_event(event: &'static str) {
+        match AVIO_EVENTS.lock() {
+            Ok(mut events) => events.push(event),
+            Err(_) => std::process::abort(),
+        }
+    }
+
+    fn take_avio_events() -> Result<Vec<&'static str>, Box<dyn std::error::Error>> {
+        let mut events = AVIO_EVENTS
+            .lock()
+            .map_err(|_| "AVIO event log mutex was poisoned")?;
+        Ok(std::mem::take(&mut *events))
+    }
+
+    unsafe extern "C" fn mock_av_malloc(bytes: usize) -> *mut c_void {
+        record_avio_event("malloc");
+        if AVIO_MALLOC_RETURNS_NULL.swap(false, Ordering::AcqRel) {
+            return std::ptr::null_mut();
+        }
+        unsafe { libc::malloc(bytes) }
+    }
+
+    unsafe extern "C" fn mock_av_free(pointer: *mut c_void) {
+        record_avio_event("free");
+        unsafe { libc::free(pointer) };
+    }
+
+    unsafe extern "C" fn mock_avio_alloc_context(
+        buffer: *mut u8,
+        _buffer_size: i32,
+        _write: i32,
+        _opaque: *mut c_void,
+        _read: Option<abi::AvIoReadPacket>,
+        _write_packet: Option<abi::AvIoWritePacket>,
+        _seek: Option<abi::AvIoSeek>,
+    ) -> *mut abi::AvIoContext {
+        record_avio_event("alloc_context");
+        if AVIO_CONTEXT_RETURNS_NULL.swap(false, Ordering::AcqRel) {
+            return std::ptr::null_mut();
+        }
+        Box::into_raw(Box::new(abi::AvIoContext {
+            class: std::ptr::null(),
+            buffer,
+        }))
+    }
+
+    unsafe extern "C" fn mock_avio_context_free(context: *mut *mut abi::AvIoContext) {
+        record_avio_event("context_free");
+        if context.is_null() {
+            return;
+        }
+        let pointer = unsafe { *context };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer) });
+            unsafe { *context = std::ptr::null_mut() };
+        }
+    }
+
+    fn mock_avio_functions() -> NativeVideoCodecAvioFunctions {
+        NativeVideoCodecAvioFunctions {
+            av_malloc: mock_av_malloc,
+            av_free: mock_av_free,
+            avio_alloc_context: mock_avio_alloc_context,
+            avio_context_free: mock_avio_context_free,
+        }
+    }
+
+    fn avio_context<'a>(
+        cancellation: &'a CancellationToken,
+        scratch_bytes: u64,
+    ) -> Result<(CpuBackend, ExecutionContext<'a>), Box<dyn std::error::Error>> {
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(scratch_bytes)?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(scratch_bytes)?,
+            rng_phase: None,
+            cancellation,
+        };
+        Ok((backend, context))
+    }
 
     struct LoaderFixture {
         _directory: tempfile::TempDir,
@@ -1802,6 +2529,367 @@ mod tests {
             close_order()?,
             ["swscale", "swresample", "avutil", "avformat", "avcodec"]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn bounded_video_codec_avio_callbacks_enforce_read_write_seek_and_limits()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let mut input = NativeVideoCodecInputState {
+            bytes: Arc::from([1_u8, 2, 3, 4]),
+            position: 0,
+            maximum_position: 8,
+            cancellation: cancellation.clone(),
+            failure: None,
+            panic_on_next_callback: false,
+        };
+        let mut destination = [0_u8; 3];
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    3,
+                )
+            },
+            3
+        );
+        assert_eq!(destination, [1, 2, 3]);
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    3,
+                )
+            },
+            1
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    3,
+                )
+            },
+            abi::AV_ERROR_END_OF_FILE
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_seek(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    0,
+                    abi::AV_SEEK_SIZE,
+                )
+            },
+            4
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_seek(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    6,
+                    libc::SEEK_SET | abi::AV_SEEK_FORCE,
+                )
+            },
+            6
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    3,
+                )
+            },
+            abi::AV_ERROR_END_OF_FILE
+        );
+
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let mut output = NativeVideoCodecOutputState {
+            bytes: backend.workspace_vec(&context, 8)?,
+            position: 0,
+            maximum_bytes: 8,
+            cancellation: cancellation.clone(),
+            failure: None,
+            panic_on_next_callback: false,
+        };
+        let first = [5_u8, 6];
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_write(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    first.as_ptr(),
+                    2,
+                )
+            },
+            2
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_seek(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    4,
+                    libc::SEEK_SET,
+                )
+            },
+            4
+        );
+        let last = [9_u8];
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_write(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    last.as_ptr(),
+                    1,
+                )
+            },
+            1
+        );
+        assert_eq!(&*output.bytes, &[5, 6, 0, 0, 9]);
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_seek(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    8,
+                    libc::SEEK_SET,
+                )
+            },
+            8
+        );
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_write(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    last.as_ptr(),
+                    1,
+                )
+            },
+            abi::AV_ERROR_NO_SPACE
+        );
+        assert_eq!(&*output.bytes, &[5, 6, 0, 0, 9]);
+        assert_eq!(
+            unsafe {
+                native_video_codec_output_write(
+                    std::ptr::addr_of_mut!(output).cast(),
+                    last.as_ptr(),
+                    1,
+                )
+            },
+            abi::AV_ERROR_NO_SPACE
+        );
+        assert!(matches!(
+            callback_status(&output.cancellation, output.failure),
+            Err(NativeVideoCodecIoError::OutputLimitExceeded)
+        ));
+        drop(output);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn bounded_video_codec_avio_cancellation_and_panics_are_latched()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let mut input = NativeVideoCodecInputState {
+            bytes: Arc::from([1_u8]),
+            position: 0,
+            maximum_position: 1,
+            cancellation: cancellation.clone(),
+            failure: None,
+            panic_on_next_callback: true,
+        };
+        let mut destination = [0_u8; 1];
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    1,
+                )
+            },
+            abi::AV_ERROR_EXIT
+        );
+        assert!(matches!(
+            callback_status(&input.cancellation, input.failure),
+            Err(NativeVideoCodecIoError::CallbackPanicked)
+        ));
+        cancellation.cancel();
+        assert_eq!(
+            unsafe {
+                native_video_codec_input_read(
+                    std::ptr::addr_of_mut!(input).cast(),
+                    destination.as_mut_ptr(),
+                    1,
+                )
+            },
+            abi::AV_ERROR_EXIT
+        );
+        assert!(matches!(
+            callback_status(&input.cancellation, input.failure),
+            Err(NativeVideoCodecIoError::Cancelled)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn retained_video_codec_avio_allocation_raii_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let avio = allocate_native_video_codec_avio_inner(
+            (),
+            mock_avio_functions(),
+            64,
+            false,
+            None,
+            None,
+            None,
+            &backend,
+            &context,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(take_avio_events()?, ["malloc", "alloc_context"]);
+        let original_buffer = unsafe { (*avio.context.as_ptr()).buffer };
+        unsafe { mock_av_free(original_buffer.cast()) };
+        let replacement = unsafe { mock_av_malloc(64) }.cast::<u8>();
+        if replacement.is_null() {
+            return Err("replacement AVIO buffer allocation failed".into());
+        }
+        unsafe { (*avio.context.as_ptr()).buffer = replacement };
+        take_avio_events()?;
+        drop(avio);
+        assert_eq!(take_avio_events()?, ["free", "context_free"]);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        AVIO_MALLOC_RETURNS_NULL.store(true, Ordering::Release);
+        assert!(matches!(
+            allocate_native_video_codec_avio_inner(
+                (),
+                mock_avio_functions(),
+                64,
+                false,
+                None,
+                None,
+                None,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            ),
+            Err(NativeVideoCodecIoError::NativeAllocationFailed)
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        AVIO_CONTEXT_RETURNS_NULL.store(true, Ordering::Release);
+        assert!(matches!(
+            allocate_native_video_codec_avio_inner(
+                (),
+                mock_avio_functions(),
+                64,
+                false,
+                None,
+                None,
+                None,
+                &backend,
+                &context,
+                &mut || cancellation.check(),
+            ),
+            Err(NativeVideoCodecIoError::NativeAllocationFailed)
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        take_avio_events()?;
+
+        let (constrained_backend, constrained_context) = avio_context(&cancellation, 4_159)?;
+        assert!(matches!(
+            allocate_native_video_codec_avio_inner(
+                (),
+                mock_avio_functions(),
+                64,
+                false,
+                None,
+                None,
+                None,
+                &constrained_backend,
+                &constrained_context,
+                &mut || cancellation.check(),
+            ),
+            Err(NativeVideoCodecIoError::Tensor(_))
+        ));
+        assert!(take_avio_events()?.is_empty());
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+
+        let mut checks = 0;
+        assert!(matches!(
+            allocate_native_video_codec_avio_inner(
+                (),
+                mock_avio_functions(),
+                64,
+                false,
+                None,
+                None,
+                None,
+                &backend,
+                &context,
+                &mut || {
+                    checks += 1;
+                    if checks == 3 {
+                        Err(CancellationError)
+                    } else {
+                        Ok(())
+                    }
+                },
+            ),
+            Err(NativeVideoCodecIoError::Cancelled)
+        ));
+        assert_eq!(take_avio_events()?, ["malloc", "free"]);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let mut checks = 0;
+        assert!(matches!(
+            allocate_native_video_codec_avio_inner(
+                (),
+                mock_avio_functions(),
+                64,
+                false,
+                None,
+                None,
+                None,
+                &backend,
+                &context,
+                &mut || {
+                    checks += 1;
+                    if checks == 4 {
+                        Err(CancellationError)
+                    } else {
+                        Ok(())
+                    }
+                },
+            ),
+            Err(NativeVideoCodecIoError::Cancelled)
+        ));
+        assert_eq!(
+            take_avio_events()?,
+            ["malloc", "alloc_context", "free", "context_free"]
+        );
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let retry = allocate_native_video_codec_avio_inner(
+            (),
+            mock_avio_functions(),
+            64,
+            false,
+            None,
+            None,
+            None,
+            &backend,
+            &context,
+            &mut || Ok(()),
+        )?;
+        drop(retry);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
         Ok(())
     }
 }

@@ -14647,6 +14647,8 @@ fn val_ownership_native_video_codec_data_plane_abi_001() -> Result<(), Box<dyn s
         "FIELD_OFFSET(AVFrame",
         "FIELD_OFFSET(AVIOContext",
         "_Static_assert(AV_CODEC_ID_H264 == 27",
+        "_Static_assert(AVSEEK_FORCE == 0x20000",
+        "_Static_assert(AVERROR(ENOSPC) == -28",
         "_Static_assert(AVERROR_EXIT == -1414092869",
     ] {
         assert!(
@@ -14693,6 +14695,91 @@ fn val_ownership_native_video_codec_data_plane_abi_001() -> Result<(), Box<dyn s
             .and_then(serde_json::Value::as_array)
             .is_some_and(|tasks| tasks.iter().any(|task| {
                 task.as_str() == Some("comfy-parity-native-video-codec-data-plane-abi-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_bounded_avio_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "open_bounded_avio_input",
+        "open_bounded_avio_output",
+        "NativeVideoCodecMemoryInput",
+        "NativeVideoCodecMemoryOutput",
+        "NativeVideoCodecAvioFunctions::from_binding",
+        "workspace_vec::<u8>",
+        "reserve_workspace",
+        "native_video_codec_input_read",
+        "native_video_codec_output_write",
+        "native_video_codec_input_seek",
+        "native_video_codec_output_seek",
+        "std::panic::catch_unwind",
+        "impl<State> Drop for NativeVideoCodecAvio",
+        "(*context).buffer",
+        "avio_context_free",
+        "bounded_video_codec_avio_callbacks_enforce_read_write_seek_and_limits",
+        "bounded_video_codec_avio_cancellation_and_panics_are_latched",
+        "retained_video_codec_avio_allocation_raii_and_retry_are_atomic",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "bounded AVIO owner lacks {required}"
+        );
+    }
+    for forbidden in [
+        "pub fn open_bounded_avio_input",
+        "pub fn open_bounded_avio_output",
+        "pub fn context_ptr",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "bounded AVIO owner exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture =
+        fs::read_to_string(root.join(
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+        ))?;
+    for required in [
+        "synthetic-bounded-retained-binding-memory-avio",
+        "raw_context_buffer_and_callbacks_private",
+        "current_replacement_buffer_freed_before_context",
+        "format_opened_or_probed",
+        "codec_or_media_result_produced",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "bounded AVIO fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_memory_avio")
+            })
+        })
+        .ok_or("missing bounded native video AVIO ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-bounded-memory-avio-foundation")
             }))
     );
     Ok(())
