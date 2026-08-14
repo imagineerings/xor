@@ -3717,6 +3717,10 @@ impl CertifiedVideoCodecDependencyClosure {
         self.contract.system_libraries()
     }
 
+    pub(crate) fn source_archive_sha256(&self) -> &str {
+        self.contract.source_archive_sha256()
+    }
+
     pub(crate) fn retained_loader_paths(&self) -> Option<BTreeMap<String, PathBuf>> {
         let mut paths = BTreeMap::new();
         for identity in &self.dependency_first_order {

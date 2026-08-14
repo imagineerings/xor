@@ -14249,20 +14249,18 @@ fn val_ownership_native_video_codec_retained_loader_001() -> Result<(), Box<dyn 
             "native video codec retained loader lacks {required}"
         );
     }
-    for forbidden in [
-        "dlsym",
-        "dladdr",
-        "GetProcAddress",
-        "find_encoder",
-        "avcodec_open2",
-        "NativeCache",
-        "OutputCommitter",
-        "NativeStoredPayload",
-    ] {
+    let loader_boundary = loader
+        .split("pub fn bind_certified_video_codec_abi(")
+        .next()
+        .ok_or("native video codec loader boundary is missing")?;
+    for forbidden in ["dlsym", "dladdr", "GetProcAddress"] {
         assert!(
-            !loader.contains(forbidden),
+            !loader_boundary.contains(forbidden),
             "native video codec retained loader contains forbidden {forbidden}"
         );
+    }
+    for forbidden in ["NativeCache", "OutputCommitter", "NativeStoredPayload"] {
+        assert!(!loader.contains(forbidden));
     }
 
     let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
@@ -14353,7 +14351,7 @@ fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std
     }
 
     let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
-    assert!(trust.contains("native_video_codec_abi::video_codec_library_contracts"));
+    assert!(trust.contains("native_video_codec_abi::{video_codec_library_contracts"));
     assert!(!trust.contains("const VIDEO_CODEC_AVCODEC_SYMBOLS"));
 
     let verifier =
@@ -14514,6 +14512,92 @@ fn val_ownership_native_video_codec_callable_symbol_certification_001()
                 }))
         );
     }
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_symbol_binding_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let binding =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub struct NativeVideoCodecBinding",
+        "pub struct NativeVideoCodecRuntimeVersions",
+        "pub fn bind_certified_video_codec_abi(",
+        "FFMPEG_7_1_SOURCE_ARCHIVE_SHA256",
+        "primary_certificates()",
+        "dependency_certificates()",
+        "libc::dlvsym(",
+        "libc::dladdr1(",
+        "loaded_link_map(library)",
+        "checked_add(",
+        "information.dli_fname",
+        "information.dli_sname",
+        "std::mem::transmute_copy",
+        "FFMPEG_7_1_AVCODEC_VERSION",
+        "FFMPEG_7_1_AVFORMAT_VERSION",
+        "FFMPEG_7_1_AVUTIL_VERSION",
+        "FFMPEG_7_1_SWRESAMPLE_VERSION",
+        "FFMPEG_7_1_SWSCALE_VERSION",
+        "retained_video_codec_binding_resolves_exact_primary_symbols_and_versions",
+        "retained_video_codec_binding_rejects_version_and_provider_mismatch_atomically",
+        "retained_video_codec_binding_discards_cancellation_and_retries_cleanly",
+    ] {
+        assert!(
+            binding.contains(required),
+            "native video codec typed binding lacks {required}"
+        );
+    }
+    for forbidden in [
+        "NativeCache",
+        "OutputCommitter",
+        "NativeStoredPayload",
+        "NativeVideoPayload",
+    ] {
+        assert!(
+            !binding.contains(forbidden),
+            "native video codec typed binding contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-typed-symbol-binding-and-runtime-version-admission",
+        "reviewed_symbols_bound",
+        "runtime_versions_checked",
+        "encoder_availability_probed",
+        "codec_execution",
+        "media_allocated",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "native video codec typed-binding fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_symbol_binding")
+            })
+        })
+        .ok_or("missing native video codec typed-binding ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-symbol-binding-foundation")
+            }))
+    );
     Ok(())
 }
 

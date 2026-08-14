@@ -10817,6 +10817,51 @@ def native_video_codec_callable_symbol_certification_foundation_task(
     )
 
 
+def native_video_codec_symbol_binding_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-symbol-binding-foundation",
+        "Bind retained FFmpeg 7.1 symbols and admit runtime versions",
+        [28, 31, 32, 41, 42],
+        [17, 18, 19, 27, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The focused native video codec FFI owner consumes one exact retained and callable-certified FFmpeg closure, resolves all 54 reviewed symbols through their exact primary handles and GNU version namespaces, proves each defining retained image and certified load-bias-relative address, privately converts the addresses to the reviewed typed aliases, invokes only the five version functions, and admits only the exact FFmpeg 7.1 packed releases. The opaque thread-bound binding retains the complete load and exposes no handle, path, address, function pointer, encoder capability, codec/media authority, controller, effect, cache, persistence, recovery, or publication state.",
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Synthetic GNU fixtures and focused tests prove exact source-archive and certificate admission, one exact typed binding for all 54 reviewed symbols, exact primary-handle and retained-path provider identity, exact load-bias plus certified-value address equality, exact versioned lookup, the five packed runtime values 0x3d1364, 0x3d0764, 0x3b2764, 0x050364, and 0x080364, cancellation before and after every non-preemptible lookup, provider proof, version call, and final publication, reverse cleanup, and clean retry. The fixture records possible loader constructor/destructor and native-call side effects and explicitly claims no licensed or installed FFmpeg package, encoder probe, codec or media execution, effect, cache, persistence, recovery, or publication evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "41.4", "41.5", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13068,8 +13113,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_reviewed_abi_foundation["id"])
         )
     )
+    video_codec_symbol_binding_foundation = (
+        native_video_codec_symbol_binding_foundation_task(
+            str(video_codec_callable_symbol_certification_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_callable_symbol_certification_foundation["id"])
+        str(video_codec_symbol_binding_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13197,6 +13247,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_retained_loader_foundation,
         video_codec_reviewed_abi_foundation,
         video_codec_callable_symbol_certification_foundation,
+        video_codec_symbol_binding_foundation,
         video_foundation,
             detection_foundation,
         ]

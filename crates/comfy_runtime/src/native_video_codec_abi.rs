@@ -293,6 +293,17 @@ pub(crate) fn video_codec_symbol_version_namespace(identity: &str) -> Option<&'s
     }
 }
 
+pub(crate) fn video_codec_abi_version(identity: &str) -> Option<&'static str> {
+    match identity {
+        "avcodec" => Some("ffmpeg-7.1:61"),
+        "avformat" => Some("ffmpeg-7.1:61"),
+        "avutil" => Some("ffmpeg-7.1:59"),
+        "swresample" => Some("ffmpeg-7.1:5"),
+        "swscale" => Some("ffmpeg-7.1:8"),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
