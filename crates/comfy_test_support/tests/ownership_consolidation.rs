@@ -14013,6 +14013,101 @@ fn val_ownership_native_video_codec_inspected_certification_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_dependency_contract_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN",
+        "pub struct VerifiedVideoCodecDependencyContract",
+        "pub fn verify_video_codec_dependency_contract(",
+        "validate_video_codec_dependency_contract_envelope(",
+        "primary_catalog_sha256 != primary.catalog_sha256()",
+        "contract.system_libraries != reviewed_system_libraries",
+        "NativeFfiContract::new_dependency(",
+        "NativeFfiRegistry::new(registry_contracts)",
+        "video_codec_dependency_contract_is_signed_complete_and_non_callable",
+        "video_codec_dependency_contract_rejects_graph_policy_and_signature_drift",
+    ] {
+        assert!(
+            trust.contains(required),
+            "video codec dependency contract lacks {required}"
+        );
+    }
+    let verification_start = trust
+        .find("pub fn verify_video_codec_dependency_contract(")
+        .ok_or("video codec dependency-contract boundary is missing")?;
+    let verification_end = trust
+        .get(verification_start..)
+        .and_then(|source| source.find("pub fn certify_video_codec_ffi("))
+        .map(|offset| verification_start + offset)
+        .ok_or("video codec dependency-contract boundary end is missing")?;
+    let verification = trust
+        .get(verification_start..verification_end)
+        .ok_or("video codec dependency-contract boundary range is invalid")?;
+    for forbidden in [
+        "capture_native_library_image",
+        "inspect_elf64_dynamic_contract",
+        "authorize_dependency(",
+        "dlopen",
+        "dlsym",
+        "LoadLibrary",
+        "GetProcAddress",
+    ] {
+        assert!(
+            !verification.contains(forbidden),
+            "video codec dependency contract contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture =
+        fs::read_to_string(root.join(
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+        ))?;
+    for required in [
+        "synthetic-signed-dependency-contract",
+        "primary_catalog_digest_bound",
+        "source_build_license_digests_bound",
+        "complete_consumer_edges_bound",
+        "dependency_contracts_non_callable",
+        "dependency_image_captured",
+        "dependency_certificate_issued",
+        "native_library_loaded",
+        "encoder_availability_probed",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video codec dependency-contract fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_ffi_certification")
+            })
+        })
+        .ok_or("missing native FFI certification ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-dependency-contract-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

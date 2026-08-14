@@ -6929,7 +6929,8 @@
         "comfy_backend_metal owns reviewed Apple framework, Objective-C ABI, layout, target, and device observations plus the focused unsafe calls, but remains unbound and cannot issue or fabricate a certificate",
         "MLU and DirectML owned execution sessions consume only unsafe or opaque retained certificate projections, never call NativeFfiRegistry, and cannot turn ABI observations, package receipts, feature compilation, or native handles into availability",
         "Task 59 cudart_exact_native consumes a registry-issued certificate for the exact CUDA-runtime library and host-registration symbols; it cannot construct a certificate, claim device availability, or expose an unchecked raw handle",
-        "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; the sealed-package adapter may consume the separate canonical ELF inspector but cannot authorize observed dependencies, load libraries, probe encoder availability, expose function pointers, or execute codecs"
+        "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; the sealed-package adapter may consume the separate canonical ELF inspector but cannot authorize observed dependencies, load libraries, probe encoder availability, expose function pointers, or execute codecs",
+        "the video codec dependency-contract verifier authenticates a separately domain-separated exact primary-catalog, provenance, SONAME, digest, ABI, sponsor, consumer-edge, system-policy, and encoder-provider addendum and retains only non-callable registry configuration; later closure code alone may capture and certify those declared images"
       ],
       "definitions": [
         {
@@ -7022,7 +7023,7 @@
         {
           "name": "video-codec-package-capture-reuses-canonical-sealed-image-owner",
           "path": "crates/comfy_runtime/src/trust.rs",
-          "pattern": "pub fn capture_video_codec_package[\\s\\S]*capture_native_library_image[\\s\\S]*captured.seal"
+          "pattern": "pub fn capture_video_codec_package[\\s\\S]*capture_video_codec_package_internal[\\s\\S]*capture_native_library_image[\\s\\S]*\\.seal\\("
         },
         {
           "name": "video-codec-package-capture-tests-completeness-cancellation-and-mutation",
@@ -7048,6 +7049,21 @@
           "name": "video-codec-inspected-certification-fixture-separates-certificates-from-load-and-dependency-authorization",
           "path": "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
           "pattern": "synthetic-structural-registry-certification[\\s\\S]*sealed_images_retained_with_certificates[\\s\\S]*dependency_names_authorized[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-codec-dependency-contract-is-domain-separated-canonical-and-non-callable",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN[\\s\\S]*pub struct VerifiedVideoCodecDependencyContract[\\s\\S]*pub fn verify_video_codec_dependency_contract[\\s\\S]*validate_video_codec_dependency_contract_envelope[\\s\\S]*NativeFfiContract::new_dependency[\\s\\S]*NativeFfiRegistry::new"
+        },
+        {
+          "name": "video-codec-dependency-contract-tests-graph-policy-signature-and-cancellation",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "video_codec_dependency_contract_is_signed_complete_and_non_callable[\\s\\S]*VideoCodecDependencyContractError::Cancelled[\\s\\S]*video_codec_dependency_contract_rejects_graph_policy_and_signature_drift"
+        },
+        {
+          "name": "video-codec-dependency-contract-fixture-forbids-capture-load-and-execution-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+          "pattern": "synthetic-signed-dependency-contract[\\s\\S]*primary_catalog_digest_bound[\\s\\S]*dependency_contracts_non_callable[\\s\\S]*dependency_image_captured[\\s\\S]*dependency_certificate_issued[\\s\\S]*native_library_loaded[\\s\\S]*codec_execution"
         }
       ],
       "known_open_reasons": [],
@@ -7063,6 +7079,7 @@
         "comfy-parity-native-video-codec-package-capture-foundation",
         "comfy-parity-native-video-codec-elf-inspection-foundation",
         "comfy-parity-native-video-codec-inspected-certification-foundation",
+        "comfy-parity-native-video-codec-dependency-contract-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
