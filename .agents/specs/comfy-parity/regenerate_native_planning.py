@@ -10560,6 +10560,43 @@ def native_video_codec_elf_inspection_foundation_task(dependency: str) -> dict[s
     )
 
 
+def native_video_codec_inspected_certification_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-inspected-certification-foundation",
+        "Certify inspected native video codec packages",
+        [28, 31, 32, 35, 36, 42],
+        [17, 28, 31, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical NativeFfiRegistry converts one signed-catalog-matched, sealed, statically inspected five-library video codec package into registry-issued certificates. The result retains the inspected sealed images beside the certificates so later unsafe adapters cannot outlive their exact bytes. It does not authorize DT_NEEDED dependencies, load a library, resolve a runtime address, probe an encoder, or execute a codec.",
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A synthetic source-fingerprinted five-library fixture proves catalog-target and library-map equality, exact SONAME and digest binding, complete exported-symbol authorization through NativeFfiRegistry, one registry-issued certificate per library, immutable sealed-image retention, cancellation before result publication, and rejection of mismatched inspected packages. It explicitly records that dependency names remain observed but unauthorized and that no licensed FFmpeg binary, host probe, loader call, runtime symbol address, encoder availability, or codec execution is claimed.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.6", "32.1", "35.6", "36.4", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12781,8 +12818,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_package_capture_foundation["id"])
         )
     )
+    video_codec_inspected_certification_foundation = (
+        native_video_codec_inspected_certification_foundation_task(
+            str(video_codec_elf_inspection_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_elf_inspection_foundation["id"])
+        str(video_codec_inspected_certification_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12904,6 +12946,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ffi_certification_foundation,
         video_codec_package_capture_foundation,
         video_codec_elf_inspection_foundation,
+        video_codec_inspected_certification_foundation,
         video_foundation,
             detection_foundation,
         ]

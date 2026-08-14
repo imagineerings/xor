@@ -13934,6 +13934,85 @@ fn val_ownership_native_video_codec_elf_inspection_001() -> Result<(), Box<dyn s
 }
 
 #[test]
+fn val_ownership_native_video_codec_inspected_certification_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "pub struct CertifiedInspectedVideoCodecPackage",
+        "pub fn certify_inspected_video_codec_package(",
+        "inspected.target() != verified.target()",
+        "inspected.libraries() != verified.libraries()",
+        "elf.soname() != expected.filename()",
+        "verified.registry.authorize(",
+        "VideoCodecFfiCertificationError::Cancelled",
+    ] {
+        assert!(
+            trust.contains(required),
+            "inspected video codec certification lacks {required}"
+        );
+    }
+    let certification_start = trust
+        .find("pub fn certify_inspected_video_codec_package(")
+        .ok_or("inspected certification boundary is missing")?;
+    let certification_end = trust
+        .get(certification_start..)
+        .and_then(|source| source.find("fn validate_video_codec_catalog_envelope("))
+        .map(|offset| certification_start + offset)
+        .ok_or("inspected certification boundary end is missing")?;
+    let certification = trust
+        .get(certification_start..certification_end)
+        .ok_or("inspected certification boundary range is invalid")?;
+    for forbidden in ["dlopen", "dlsym", "LoadLibrary", "GetProcAddress"] {
+        assert!(
+            !certification.contains(forbidden),
+            "inspected certification contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-structural-registry-certification",
+        "sealed_images_retained_with_certificates",
+        "dependency_names_authorized",
+        "native_library_loaded",
+        "runtime_symbol_address_resolved",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "inspected certification fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_ffi_certification")
+            })
+        })
+        .ok_or("missing native FFI certification ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-inspected-certification-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

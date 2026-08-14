@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "fixture_id": "native-video-codec-inspected-certification-v1",
+  "truth_mode": "synthetic-structural-registry-certification",
+  "source": {
+    "comfyui_version": "0.27.1",
+    "canonical_file_count": 949,
+    "canonical_tree_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+    "requirements_sha256": "48f4835af39b753fb2e637ec17813716024e08952e82e6e4e536a0fcfd944d0e"
+  },
+  "dependencies": {
+    "codec_ffi_certification_manifest_sha256": "7b2bfaf4e31f574932fdd83bd156c214a69ac6d21da268a5614befa2968651a6",
+    "codec_package_capture_manifest_sha256": "05d13b0175e4f9762f8b6dca0602a2e59c4f8975991eb6c8eb0aebfc19638e9e",
+    "codec_elf_inspection_manifest_sha256": "cba3dc9db253c0b0d996888fb497d54a6c85d0b1b0b729c015e7c8ba4005af0c"
+  },
+  "contract": {
+    "target": "x86_64-unknown-linux-gnu",
+    "library_count": 5,
+    "certificate_owner": "comfy_runtime::NativeFfiRegistry",
+    "unsafe_owner": "comfy_runtime::native_video_codec_ffi",
+    "certificate_inputs": [
+      "signed catalog identity",
+      "sealed image digest",
+      "ELF SONAME",
+      "ELF exported symbol set"
+    ],
+    "sealed_images_retained_with_certificates": true,
+    "cancellation_before_certificate_publication": true
+  },
+  "claims": {
+    "licensed_ffmpeg_binary": false,
+    "host_library_probe": false,
+    "dependency_names_authorized": false,
+    "native_library_loaded": false,
+    "runtime_symbol_address_resolved": false,
+    "encoder_availability_probed": false,
+    "codec_execution": false,
+    "upstream_runtime_numeric_oracle": false
+  }
+}

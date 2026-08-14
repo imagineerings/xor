@@ -3405,6 +3405,29 @@ impl InspectedVideoCodecPackage {
     }
 }
 
+pub struct CertifiedInspectedVideoCodecPackage {
+    inspected: InspectedVideoCodecPackage,
+    certificates: BTreeMap<String, CertifiedNativeFfi>,
+}
+
+impl CertifiedInspectedVideoCodecPackage {
+    pub fn target(&self) -> &str {
+        self.inspected.target()
+    }
+
+    pub fn libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
+        self.inspected.libraries()
+    }
+
+    pub fn elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
+        self.inspected.elf_libraries()
+    }
+
+    pub fn certificates(&self) -> &BTreeMap<String, CertifiedNativeFfi> {
+        &self.certificates
+    }
+}
+
 impl CapturedVideoCodecPackage {
     pub fn target(&self) -> &str {
         &self.target
@@ -3666,6 +3689,8 @@ pub enum VideoCodecFfiCertificationError {
     IncompleteObservationSet,
     #[error("video codec library observation differs from the signed catalog")]
     ObservationMismatch,
+    #[error("inspected video codec package differs from the signed catalog")]
+    InspectedPackageMismatch,
 }
 
 pub fn verify_video_codec_ffi_catalog(
@@ -3774,6 +3799,50 @@ pub fn certify_video_codec_ffi(
         .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
     Ok(CertifiedVideoCodecFfi {
         target: verified.target,
+        certificates,
+    })
+}
+
+pub fn certify_inspected_video_codec_package(
+    verified: &VerifiedVideoCodecFfiCatalog,
+    inspected: InspectedVideoCodecPackage,
+    cancellation: &CancellationToken,
+) -> Result<CertifiedInspectedVideoCodecPackage, VideoCodecFfiCertificationError> {
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+    if inspected.target() != verified.target()
+        || inspected.libraries() != verified.libraries()
+        || inspected.elf_libraries().len() != verified.libraries().len()
+    {
+        return Err(VideoCodecFfiCertificationError::InspectedPackageMismatch);
+    }
+
+    let mut certificates = BTreeMap::new();
+    for (identity, expected) in verified.libraries() {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+        let elf = inspected
+            .elf_libraries()
+            .get(identity)
+            .ok_or(VideoCodecFfiCertificationError::InspectedPackageMismatch)?;
+        if elf.soname() != expected.filename() {
+            return Err(VideoCodecFfiCertificationError::InspectedPackageMismatch);
+        }
+        let certificate = verified.registry.authorize(
+            identity,
+            expected.digest_sha256(),
+            &video_codec_abi_version(expected.abi_major()),
+            elf.exported_symbols(),
+        )?;
+        certificates.insert(identity.clone(), certificate);
+    }
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
+    Ok(CertifiedInspectedVideoCodecPackage {
+        inspected,
         certificates,
     })
 }
@@ -5259,6 +5328,46 @@ mod tests {
                 &BTreeSet::from(["libc.so.6".to_owned()])
             );
         }
+        let certified = certify_inspected_video_codec_package(&verified, inspected, &cancellation)?;
+        assert_eq!(certified.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(certified.libraries(), verified.libraries());
+        assert_eq!(certified.elf_libraries().len(), 5);
+        assert_eq!(certified.certificates().len(), 5);
+        for (identity, certificate) in certified.certificates() {
+            let expected = verified
+                .libraries()
+                .get(identity)
+                .ok_or_else(|| io::Error::other("certificate is not in the signed catalog"))?;
+            assert_eq!(certificate.library_id(), identity);
+            assert_eq!(certificate.digest_sha256(), expected.digest_sha256());
+            assert_eq!(certificate.unsafe_owner(), VIDEO_CODEC_FFI_UNSAFE_OWNER);
+        }
+
+        let inspected =
+            capture_and_inspect_video_codec_package(&verified, paths.clone(), &cancellation)?;
+        let cancelled_certification = CancellationToken::default();
+        cancelled_certification.cancel();
+        assert!(matches!(
+            certify_inspected_video_codec_package(&verified, inspected, &cancelled_certification,),
+            Err(VideoCodecFfiCertificationError::Cancelled)
+        ));
+
+        let inspected =
+            capture_and_inspect_video_codec_package(&verified, paths.clone(), &cancellation)?;
+        let mut mismatched_digests = digests.clone();
+        mismatched_digests.insert("avcodec".to_owned(), "f".repeat(64));
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog_with_digests(&key_pair, &mismatched_digests)?;
+        let mismatched = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        assert!(matches!(
+            certify_inspected_video_codec_package(&mismatched, inspected, &cancellation),
+            Err(VideoCodecFfiCertificationError::InspectedPackageMismatch)
+        ));
 
         let mut missing = paths.clone();
         missing.remove("avcodec");

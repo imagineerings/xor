@@ -7033,6 +7033,21 @@
           "name": "video-codec-package-capture-fixture-forbids-load-and-certificate-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
           "pattern": "source-fingerprinted-library-image-capture-contract[\\s\\S]*immutable_snapshot_retention[\\s\\S]*native_library_loaded[\\s\\S]*symbols_resolved[\\s\\S]*ffi_certificate_issued_by_capture[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-codec-inspected-package-requires-registry-issued-certificates-and-retains-images",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "pub struct CertifiedInspectedVideoCodecPackage[\\s\\S]*InspectedVideoCodecPackage[\\s\\S]*BTreeMap<String, CertifiedNativeFfi>[\\s\\S]*pub fn certify_inspected_video_codec_package[\\s\\S]*verified\\.registry\\.authorize"
+        },
+        {
+          "name": "video-codec-inspected-certification-binds-catalog-target-library-map-soname-and-cancellation",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "certify_inspected_video_codec_package[\\s\\S]*inspected\\.target\\(\\) != verified\\.target\\(\\)[\\s\\S]*inspected\\.libraries\\(\\) != verified\\.libraries\\(\\)[\\s\\S]*elf\\.soname\\(\\) != expected\\.filename\\(\\)[\\s\\S]*VideoCodecFfiCertificationError::Cancelled"
+        },
+        {
+          "name": "video-codec-inspected-certification-fixture-separates-certificates-from-load-and-dependency-authorization",
+          "path": "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+          "pattern": "synthetic-structural-registry-certification[\\s\\S]*sealed_images_retained_with_certificates[\\s\\S]*dependency_names_authorized[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*codec_execution"
         }
       ],
       "known_open_reasons": [],
@@ -7047,6 +7062,7 @@
         "comfy-parity-native-video-codec-ffi-certification-foundation",
         "comfy-parity-native-video-codec-package-capture-foundation",
         "comfy-parity-native-video-codec-elf-inspection-foundation",
+        "comfy-parity-native-video-codec-inspected-certification-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
