@@ -10638,6 +10638,53 @@ def native_video_codec_dependency_contract_foundation_task(
     )
 
 
+def native_video_codec_dependency_closure_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
+        "Certify retained native video codec dependency closures",
+        [28, 31, 32, 41, 42],
+        [17, 18, 19, 27, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical native trust owner consumes one exact certified inspected five-library FFmpeg package and its separately verified dependency contract, captures and seals every signed non-system dependency, requires the observed ELF DT_NEEDED graph to equal the signed graph, issues only dependency registry certificates, and retains the complete opaque package in deterministic dependency-first order. It performs no library load, symbol-address resolution, encoder probe, codec execution, media allocation, controller work, effect, cache, persistence, recovery, or publication.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_runtime/src/native_ffi_rocm.rs",
+            "crates/comfy_runtime/src/native_ffi_npu.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_test_support/fixtures/video/codec-inspected-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted synthetic x86_64 GNU/Linux fixture proves exact primary-catalog and certificate binding, five primary plus three dependency image retention, exact filename/digest/machine/SONAME/ABI/sponsor admission, duplicate-DT_NEEDED rejection, complete observed-versus-signed dependency equality, reviewed system SONAME policy, dependency-only certificates, deterministic dependency-first order, immutable captured bytes, bounded dependency count and aggregate bytes, cancellation and failure atomicity, and clean retry. It explicitly claims no licensed or installed FFmpeg package, dynamic loader call, runtime symbol address, encoder availability, codec execution, media allocation, effect, cache, persistence, recovery, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "41.4", "41.5", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12869,8 +12916,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_inspected_certification_foundation["id"])
         )
     )
+    video_codec_dependency_closure_foundation = (
+        native_video_codec_dependency_closure_foundation_task(
+            str(video_codec_dependency_contract_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_dependency_contract_foundation["id"])
+        str(video_codec_dependency_closure_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12994,6 +13046,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_elf_inspection_foundation,
         video_codec_inspected_certification_foundation,
         video_codec_dependency_contract_foundation,
+        video_codec_dependency_closure_foundation,
         video_foundation,
             detection_foundation,
         ]

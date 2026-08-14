@@ -291,7 +291,12 @@ fn inspect_elf64_dynamic_contract_inner(
     for offset in needed_offsets {
         let offset = usize::try_from(offset)
             .map_err(|_| "DT_NEEDED string offset exceeds address space".to_owned())?;
-        needed.insert(dynamic_string(strings, offset, cancellation)?.to_owned());
+        let dependency = dynamic_string(strings, offset, cancellation)?.to_owned();
+        if !needed.insert(dependency.clone()) {
+            return Err(format!(
+                "PT_DYNAMIC contains duplicate DT_NEEDED entry {dependency}"
+            ));
+        }
     }
     let soname = soname_offset
         .map(|offset| {
@@ -651,6 +656,20 @@ pub(crate) mod tests {
         assert!(
             inspect_elf64_dynamic_contract(&bytes, 183, &CancellationToken::default()).is_err()
         );
+    }
+
+    #[test]
+    fn elf_inspection_rejects_duplicate_needed_entries() {
+        let bytes = fixture(
+            62,
+            &BTreeSet::from(["avcodec_open2".to_owned()]),
+            &["libc.so.6", "libc.so.6"],
+            None,
+            "libavcodec.so.61",
+        );
+        let error = inspect_elf64_dynamic_contract(&bytes, 62, &CancellationToken::default())
+            .expect_err("duplicate DT_NEEDED entries must fail closed");
+        assert!(error.to_string().contains("duplicate DT_NEEDED"));
     }
 
     #[test]

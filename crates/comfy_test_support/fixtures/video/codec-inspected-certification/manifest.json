@@ -24,6 +24,7 @@
       "ELF SONAME",
       "ELF exported symbol set"
     ],
+    "primary_catalog_sha256_retained": true,
     "sealed_images_retained_with_certificates": true,
     "cancellation_before_certificate_publication": true
   },

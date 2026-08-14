@@ -3337,6 +3337,9 @@ struct VideoCodecFfiLibraryDto {
 }
 
 const VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET: &str = "x86_64-unknown-linux-gnu";
+const MAX_VIDEO_CODEC_DEPENDENCY_IMAGES: usize = 64;
+const MAX_VIDEO_CODEC_DEPENDENCY_EDGES: usize = 512;
+const MAX_VIDEO_CODEC_DEPENDENCY_RETAINED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const VIDEO_CODEC_SYSTEM_ELF_DEPENDENCIES: [&str; 8] = [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -3534,6 +3537,7 @@ impl VerifiedVideoCodecDependencyContract {
 
 pub struct CapturedVideoCodecPackage {
     target: String,
+    catalog_sha256: String,
     libraries: BTreeMap<String, VideoCodecFfiLibraryIdentity>,
     _sealed_images: BTreeMap<String, RetainedNativeLibraryImage>,
 }
@@ -3573,6 +3577,10 @@ impl InspectedVideoCodecPackage {
         self.captured.libraries()
     }
 
+    pub fn catalog_sha256(&self) -> &str {
+        self.captured.catalog_sha256()
+    }
+
     pub fn elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
         &self.elf_libraries
     }
@@ -3592,6 +3600,10 @@ impl CertifiedInspectedVideoCodecPackage {
         self.inspected.libraries()
     }
 
+    pub fn catalog_sha256(&self) -> &str {
+        self.inspected.catalog_sha256()
+    }
+
     pub fn elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
         self.inspected.elf_libraries()
     }
@@ -3609,6 +3621,94 @@ impl CapturedVideoCodecPackage {
     pub fn libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
         &self.libraries
     }
+
+    pub fn catalog_sha256(&self) -> &str {
+        &self.catalog_sha256
+    }
+}
+
+pub struct CertifiedVideoCodecDependencyClosure {
+    primary: CertifiedInspectedVideoCodecPackage,
+    contract: VerifiedVideoCodecDependencyContract,
+    dependency_elf_libraries: BTreeMap<String, VideoCodecElfLibraryIdentity>,
+    dependency_certificates: BTreeMap<String, CertifiedNativeFfi>,
+    dependency_first_order: Vec<String>,
+    retained_dependency_bytes: u64,
+    _sealed_dependency_images: BTreeMap<String, RetainedNativeLibraryImage>,
+}
+
+impl CertifiedVideoCodecDependencyClosure {
+    pub fn target(&self) -> &str {
+        self.contract.target()
+    }
+
+    pub fn primary_catalog_sha256(&self) -> &str {
+        self.primary.catalog_sha256()
+    }
+
+    pub fn primary_libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
+        self.primary.libraries()
+    }
+
+    pub fn dependencies(&self) -> &BTreeMap<String, VideoCodecDependencyIdentity> {
+        self.contract.dependencies()
+    }
+
+    pub fn edges(&self) -> &BTreeSet<VideoCodecDependencyEdge> {
+        self.contract.edges()
+    }
+
+    pub fn encoder_providers(&self) -> &BTreeMap<String, String> {
+        self.contract.encoder_providers()
+    }
+
+    pub fn primary_elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
+        self.primary.elf_libraries()
+    }
+
+    pub fn dependency_elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
+        &self.dependency_elf_libraries
+    }
+
+    pub fn primary_certificates(&self) -> &BTreeMap<String, CertifiedNativeFfi> {
+        self.primary.certificates()
+    }
+
+    pub fn dependency_certificates(&self) -> &BTreeMap<String, CertifiedNativeFfi> {
+        &self.dependency_certificates
+    }
+
+    pub fn dependency_first_order(&self) -> &[String] {
+        &self.dependency_first_order
+    }
+
+    pub fn retained_dependency_bytes(&self) -> u64 {
+        self.retained_dependency_bytes
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum VideoCodecDependencyClosureError {
+    #[error("video codec dependency closure certification was cancelled")]
+    Cancelled,
+    #[error("video codec dependency closures are unsupported for this target")]
+    UnsupportedTarget,
+    #[error("video codec dependency paths are incomplete or contain unexpected identities")]
+    IncompletePathSet,
+    #[error("video codec dependency closure differs from the signed contract")]
+    ContractMismatch,
+    #[error("video codec dependency image {identity} could not be captured: {reason}")]
+    InvalidImage { identity: String, reason: String },
+    #[error("video codec dependency image {identity} is not an admitted ELF object: {reason}")]
+    InvalidElf { identity: String, reason: String },
+    #[error("video codec library {consumer} requires unaccounted dependency {soname}")]
+    UnaccountedDependency { consumer: String, soname: String },
+    #[error("video codec dependency graph is invalid")]
+    InvalidGraph,
+    #[error("video codec dependency closure exceeds the reviewed resource limits")]
+    ResourceLimitExceeded,
+    #[error(transparent)]
+    Trust(#[from] TrustError),
 }
 
 #[derive(Debug, Error)]
@@ -3759,6 +3859,7 @@ fn capture_video_codec_package_internal(
     Ok((
         CapturedVideoCodecPackage {
             target: catalog.target.clone(),
+            catalog_sha256: catalog.catalog_sha256.clone(),
             libraries: catalog.libraries.clone(),
             _sealed_images: sealed_images,
         },
@@ -4098,6 +4199,7 @@ pub fn certify_inspected_video_codec_package(
         .check()
         .map_err(|_| VideoCodecFfiCertificationError::Cancelled)?;
     if inspected.target() != verified.target()
+        || inspected.catalog_sha256() != verified.catalog_sha256()
         || inspected.libraries() != verified.libraries()
         || inspected.elf_libraries().len() != verified.libraries().len()
     {
@@ -4131,6 +4233,290 @@ pub fn certify_inspected_video_codec_package(
         inspected,
         certificates,
     })
+}
+
+pub fn certify_video_codec_dependency_closure(
+    primary: CertifiedInspectedVideoCodecPackage,
+    contract: VerifiedVideoCodecDependencyContract,
+    dependency_paths: BTreeMap<String, PathBuf>,
+    cancellation: &CancellationToken,
+) -> Result<CertifiedVideoCodecDependencyClosure, VideoCodecDependencyClosureError> {
+    certify_video_codec_dependency_closure_with_limits(
+        primary,
+        contract,
+        dependency_paths,
+        MAX_VIDEO_CODEC_DEPENDENCY_IMAGES,
+        MAX_VIDEO_CODEC_DEPENDENCY_RETAINED_BYTES,
+        cancellation,
+    )
+}
+
+fn certify_video_codec_dependency_closure_with_limits(
+    primary: CertifiedInspectedVideoCodecPackage,
+    contract: VerifiedVideoCodecDependencyContract,
+    dependency_paths: BTreeMap<String, PathBuf>,
+    maximum_dependency_images: usize,
+    maximum_retained_bytes: u64,
+    cancellation: &CancellationToken,
+) -> Result<CertifiedVideoCodecDependencyClosure, VideoCodecDependencyClosureError> {
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+    if contract.target() != VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET
+        || !cfg!(all(target_os = "linux", target_arch = "x86_64"))
+    {
+        return Err(VideoCodecDependencyClosureError::UnsupportedTarget);
+    }
+    if primary.target() != contract.target()
+        || primary.catalog_sha256() != contract.primary_catalog_sha256()
+        || primary.libraries().len() != primary.elf_libraries().len()
+        || primary.libraries().len() != primary.certificates().len()
+    {
+        return Err(VideoCodecDependencyClosureError::ContractMismatch);
+    }
+    if contract.dependencies().len() > maximum_dependency_images {
+        return Err(VideoCodecDependencyClosureError::ResourceLimitExceeded);
+    }
+    if dependency_paths.len() != contract.dependencies().len()
+        || !contract
+            .dependencies()
+            .keys()
+            .all(|identity| dependency_paths.contains_key(identity))
+    {
+        return Err(VideoCodecDependencyClosureError::IncompletePathSet);
+    }
+
+    for (identity, library) in primary.libraries() {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+        let elf = primary
+            .elf_libraries()
+            .get(identity)
+            .ok_or(VideoCodecDependencyClosureError::ContractMismatch)?;
+        let expected_certificate = contract._registry.authorize(
+            identity,
+            library.digest_sha256(),
+            &video_codec_abi_version(library.abi_major()),
+            elf.exported_symbols(),
+        )?;
+        if primary.certificates().get(identity) != Some(&expected_certificate) {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+    }
+
+    let mut soname_identities = BTreeMap::new();
+    for (identity, library) in primary.libraries() {
+        if soname_identities
+            .insert(library.filename().to_owned(), identity.clone())
+            .is_some()
+        {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+    }
+    for (identity, dependency) in contract.dependencies() {
+        if contract.system_libraries().contains(dependency.filename())
+            || soname_identities
+                .insert(dependency.filename().to_owned(), identity.clone())
+                .is_some()
+        {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+    }
+
+    let mut dependency_elf_libraries = BTreeMap::new();
+    let mut sealed_dependency_images = BTreeMap::new();
+    let mut retained_dependency_bytes = 0_u64;
+    for (identity, expected) in contract.dependencies() {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+        let path = dependency_paths
+            .get(identity)
+            .ok_or(VideoCodecDependencyClosureError::IncompletePathSet)?;
+        if path.file_name().and_then(|name| name.to_str()) != Some(expected.filename()) {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+        let captured = capture_native_library_image(path, cancellation)
+            .map_err(|error| map_video_codec_dependency_image_error(identity, error))?;
+        if captured.digest_sha256() != expected.digest_sha256() {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+        retained_dependency_bytes = retained_dependency_bytes
+            .checked_add(
+                u64::try_from(captured.bytes().len())
+                    .map_err(|_| VideoCodecDependencyClosureError::ResourceLimitExceeded)?,
+            )
+            .ok_or(VideoCodecDependencyClosureError::ResourceLimitExceeded)?;
+        if retained_dependency_bytes > maximum_retained_bytes {
+            return Err(VideoCodecDependencyClosureError::ResourceLimitExceeded);
+        }
+        let dynamic = inspect_elf64_dynamic_contract(captured.bytes(), 62, cancellation).map_err(
+            |error| match error {
+                NativeElfInspectionError::Cancelled(_) => {
+                    VideoCodecDependencyClosureError::Cancelled
+                }
+                NativeElfInspectionError::Invalid(reason) => {
+                    VideoCodecDependencyClosureError::InvalidElf {
+                        identity: identity.clone(),
+                        reason,
+                    }
+                }
+            },
+        )?;
+        if dynamic.soname() != Some(expected.filename()) {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+        dependency_elf_libraries.insert(
+            identity.clone(),
+            VideoCodecElfLibraryIdentity {
+                soname: expected.filename().to_owned(),
+                exported_symbols: dynamic.symbols().clone(),
+                needed_libraries: dynamic.needed().clone(),
+            },
+        );
+        let retained = captured
+            .seal(&format!("video-codec-dependency-{identity}"), cancellation)
+            .map_err(|error| map_video_codec_dependency_image_error(identity, error))?;
+        sealed_dependency_images.insert(identity.clone(), retained);
+    }
+
+    let mut actual_edges = BTreeSet::new();
+    for (consumer, elf) in primary
+        .elf_libraries()
+        .iter()
+        .chain(dependency_elf_libraries.iter())
+    {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+        for needed in elf.needed_libraries() {
+            let dependency = if let Some(identity) = soname_identities.get(needed) {
+                identity.clone()
+            } else if contract.system_libraries().contains(needed) {
+                needed.clone()
+            } else {
+                return Err(VideoCodecDependencyClosureError::UnaccountedDependency {
+                    consumer: consumer.clone(),
+                    soname: needed.clone(),
+                });
+            };
+            actual_edges.insert(VideoCodecDependencyEdge {
+                consumer: consumer.clone(),
+                dependency,
+            });
+        }
+    }
+    if &actual_edges != contract.edges() {
+        return Err(VideoCodecDependencyClosureError::ContractMismatch);
+    }
+
+    let dependency_first_order = video_codec_dependency_first_order(
+        primary.libraries().keys(),
+        contract.dependencies().keys(),
+        contract.edges(),
+        cancellation,
+    )?;
+    let mut dependency_certificates = BTreeMap::new();
+    for identity in &dependency_first_order {
+        let Some(expected) = contract.dependencies().get(identity) else {
+            continue;
+        };
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+        let certificate = contract._registry.authorize_dependency(
+            identity,
+            expected.digest_sha256(),
+            expected.abi_version(),
+            expected.certificate_sponsor(),
+        )?;
+        if certificate.library_id() != identity
+            || certificate.digest_sha256() != expected.digest_sha256()
+            || certificate.abi_version() != expected.abi_version()
+            || !certificate.required_symbols().is_empty()
+            || certificate.unsafe_owner() != VIDEO_CODEC_FFI_UNSAFE_OWNER
+        {
+            return Err(VideoCodecDependencyClosureError::ContractMismatch);
+        }
+        dependency_certificates.insert(identity.clone(), certificate);
+    }
+    if dependency_certificates.len() != contract.dependencies().len() {
+        return Err(VideoCodecDependencyClosureError::ContractMismatch);
+    }
+    cancellation
+        .check()
+        .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+    Ok(CertifiedVideoCodecDependencyClosure {
+        primary,
+        contract,
+        dependency_elf_libraries,
+        dependency_certificates,
+        dependency_first_order,
+        retained_dependency_bytes,
+        _sealed_dependency_images: sealed_dependency_images,
+    })
+}
+
+fn video_codec_dependency_first_order<'a>(
+    primary_identities: impl Iterator<Item = &'a String>,
+    dependency_identities: impl Iterator<Item = &'a String>,
+    edges: &BTreeSet<VideoCodecDependencyEdge>,
+    cancellation: &CancellationToken,
+) -> Result<Vec<String>, VideoCodecDependencyClosureError> {
+    let package_identities = primary_identities
+        .chain(dependency_identities)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut remaining = package_identities
+        .iter()
+        .map(|identity| {
+            let dependencies = edges
+                .iter()
+                .filter(|edge| {
+                    edge.consumer() == identity && package_identities.contains(edge.dependency())
+                })
+                .map(|edge| edge.dependency().to_owned())
+                .collect::<BTreeSet<_>>();
+            (identity.clone(), dependencies)
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut order = Vec::with_capacity(package_identities.len());
+    while !remaining.is_empty() {
+        cancellation
+            .check()
+            .map_err(|_| VideoCodecDependencyClosureError::Cancelled)?;
+        let ready = remaining
+            .iter()
+            .find(|(_, dependencies)| {
+                dependencies
+                    .iter()
+                    .all(|dependency| !remaining.contains_key(dependency))
+            })
+            .map(|(identity, _)| identity.clone())
+            .ok_or(VideoCodecDependencyClosureError::InvalidGraph)?;
+        remaining.remove(&ready);
+        order.push(ready);
+    }
+    Ok(order)
+}
+
+fn map_video_codec_dependency_image_error(
+    identity: &str,
+    error: NativeLibraryImageError,
+) -> VideoCodecDependencyClosureError {
+    match error {
+        NativeLibraryImageError::Cancelled => VideoCodecDependencyClosureError::Cancelled,
+        NativeLibraryImageError::UnsupportedPlatform => {
+            VideoCodecDependencyClosureError::UnsupportedTarget
+        }
+        NativeLibraryImageError::Invalid(reason) => {
+            VideoCodecDependencyClosureError::InvalidImage {
+                identity: identity.to_owned(),
+                reason,
+            }
+        }
+    }
 }
 
 fn validate_video_codec_catalog_envelope(
@@ -4197,6 +4583,8 @@ fn validate_video_codec_dependency_contract_envelope(
         || validate_sha256(&contract.build_recipe_sha256).is_err()
         || validate_sha256(&contract.license_bundle_sha256).is_err()
         || contract.system_libraries != reviewed_system_libraries
+        || contract.dependencies.len() > MAX_VIDEO_CODEC_DEPENDENCY_IMAGES
+        || contract.edges.len() > MAX_VIDEO_CODEC_DEPENDENCY_EDGES
     {
         return Err(VideoCodecDependencyContractError::ContractMismatch);
     }
@@ -4250,6 +4638,7 @@ fn validate_video_codec_dependency_contract_envelope(
             || primary_identities.contains(&dependency.identity)
             || !video_codec_filename_valid(&dependency.filename)
             || primary_filenames.contains(&dependency.filename)
+            || VIDEO_CODEC_SYSTEM_ELF_DEPENDENCIES.contains(&dependency.filename.as_str())
             || !dependency_filenames.insert(dependency.filename.clone())
             || validate_sha256(&dependency.sha256).is_err()
             || !video_codec_dependency_abi_valid(&dependency.abi_version)
@@ -4936,7 +5325,7 @@ mod tests {
     use std::{
         collections::BTreeMap,
         fs, io,
-        io::{Seek as _, SeekFrom, Write as _},
+        io::{Read as _, Seek as _, SeekFrom, Write as _},
         net::Ipv4Addr,
         path::{Path, PathBuf},
         str::FromStr,
@@ -5797,6 +6186,135 @@ mod tests {
         Ok((contract_bytes, signature_receipt))
     }
 
+    #[cfg(target_os = "linux")]
+    fn video_codec_dependency_closure_fixture() -> Result<
+        (
+            tempfile::TempDir,
+            CertifiedInspectedVideoCodecPackage,
+            VerifiedVideoCodecDependencyContract,
+            BTreeMap<String, PathBuf>,
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
+            .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
+        let directory = tempfile::tempdir()?;
+        let cancellation = CancellationToken::default();
+        let dependency_rows = [
+            ("svtav1", "libSvtAv1Enc.so.2"),
+            ("vpx", "libvpx.so.9"),
+            ("x264", "libx264.so.164"),
+        ];
+        let mut dependency_paths = BTreeMap::new();
+        let mut dependency_digests = BTreeMap::new();
+        for (identity, filename) in dependency_rows {
+            let path = directory.path().join(filename);
+            let bytes = crate::native_ffi_elf::tests::fixture(
+                62,
+                &BTreeSet::from([format!("{identity}_fixture_symbol")]),
+                &["libc.so.6"],
+                None,
+                filename,
+            );
+            fs::write(&path, &bytes)?;
+            dependency_digests.insert(identity.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
+            dependency_paths.insert(identity.to_owned(), path);
+        }
+
+        let filenames = BTreeMap::from([
+            ("avcodec", "libavcodec.so.61"),
+            ("avformat", "libavformat.so.61"),
+            ("avutil", "libavutil.so.59"),
+            ("svtav1", "libSvtAv1Enc.so.2"),
+            ("swresample", "libswresample.so.5"),
+            ("swscale", "libswscale.so.8"),
+            ("vpx", "libvpx.so.9"),
+            ("x264", "libx264.so.164"),
+        ]);
+        let primary_needed = BTreeMap::from([
+            (
+                "avcodec",
+                vec!["avutil", "libc.so.6", "svtav1", "vpx", "x264"],
+            ),
+            ("avformat", vec!["avcodec", "avutil"]),
+            ("avutil", vec!["libc.so.6"]),
+            ("swresample", vec!["avutil"]),
+            ("swscale", vec!["avutil"]),
+        ]);
+        let mut primary_paths = BTreeMap::new();
+        let mut primary_digests = BTreeMap::new();
+        for (identity, abi_major, symbols) in video_codec_library_contracts() {
+            let filename = video_codec_expected_filename(
+                identity,
+                abi_major,
+                VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET,
+            );
+            let needed = primary_needed
+                .get(identity)
+                .ok_or_else(|| io::Error::other("fixture primary dependency row is missing"))?
+                .iter()
+                .map(|dependency| {
+                    filenames
+                        .get(dependency)
+                        .copied()
+                        .unwrap_or(dependency)
+                        .to_owned()
+                })
+                .collect::<Vec<_>>();
+            let needed = needed.iter().map(String::as_str).collect::<Vec<_>>();
+            let path = directory.path().join(&filename);
+            let bytes = crate::native_ffi_elf::tests::fixture(
+                62,
+                &symbols.iter().map(|symbol| (*symbol).to_owned()).collect(),
+                &needed,
+                None,
+                &filename,
+            );
+            fs::write(&path, &bytes)?;
+            primary_digests.insert(identity.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
+            primary_paths.insert(identity.to_owned(), path);
+        }
+        let (catalog_bytes, catalog_receipt, verification_key) =
+            signed_video_codec_catalog_with_digests(&key_pair, &primary_digests)?;
+        let verified_primary = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &catalog_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        let inspected = capture_and_inspect_video_codec_package(
+            &verified_primary,
+            primary_paths,
+            &cancellation,
+        )?;
+        let certified_primary =
+            certify_inspected_video_codec_package(&verified_primary, inspected, &cancellation)?;
+
+        let mut contract =
+            video_codec_dependency_contract_fixture(verified_primary.catalog_sha256());
+        for dependency in &mut contract.dependencies {
+            dependency.sha256 = dependency_digests
+                .get(&dependency.identity)
+                .ok_or_else(|| io::Error::other("fixture dependency digest is missing"))?
+                .clone();
+        }
+        let (contract_bytes, contract_receipt) =
+            sign_video_codec_dependency_contract(&contract, &key_pair)?;
+        let verified_contract = verify_video_codec_dependency_contract(
+            &verified_primary,
+            &contract_bytes,
+            &contract_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        Ok((
+            directory,
+            certified_primary,
+            verified_contract,
+            dependency_paths,
+        ))
+    }
+
     #[test]
     fn video_codec_catalog_is_signed_complete_and_registry_certified()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -6008,6 +6526,13 @@ mod tests {
             .ok_or_else(|| io::Error::other("fixture dependency set is empty"))?
             .filename = "../libsvtav1.so".to_owned();
         variants.push(malformed_filename);
+        let mut system_filename_collision = valid.clone();
+        system_filename_collision
+            .dependencies
+            .first_mut()
+            .ok_or_else(|| io::Error::other("fixture dependency set is empty"))?
+            .filename = "libc.so.6".to_owned();
+        variants.push(system_filename_collision);
         let mut malformed_digest = valid.clone();
         malformed_digest
             .dependencies
@@ -6244,6 +6769,178 @@ mod tests {
                 symbol: rejected_symbol,
             }) if rejected_identity == identity && rejected_symbol == missing_symbol
         ));
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn video_codec_dependency_closure_certifies_retains_and_orders_exact_graph()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, primary, contract, dependency_paths) =
+            video_codec_dependency_closure_fixture()?;
+        let expected_bytes = dependency_paths.values().try_fold(0_u64, |total, path| {
+            total
+                .checked_add(fs::metadata(path)?.len())
+                .ok_or_else(|| io::Error::other("fixture dependency byte total overflowed"))
+        })?;
+        let source_path = dependency_paths
+            .get("x264")
+            .ok_or_else(|| io::Error::other("fixture x264 path is missing"))?
+            .clone();
+        let closure = certify_video_codec_dependency_closure(
+            primary,
+            contract,
+            dependency_paths,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(closure.target(), VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET);
+        assert_eq!(closure.primary_libraries().len(), 5);
+        assert_eq!(closure.dependencies().len(), 3);
+        assert_eq!(closure.primary_certificates().len(), 5);
+        assert_eq!(closure.dependency_certificates().len(), 3);
+        assert_eq!(closure.dependency_elf_libraries().len(), 3);
+        assert_eq!(closure.edges().len(), 13);
+        assert_eq!(closure.retained_dependency_bytes(), expected_bytes);
+        assert_eq!(
+            closure
+                .encoder_providers()
+                .get("libx264")
+                .map(String::as_str),
+            Some("x264")
+        );
+        for (identity, certificate) in closure.dependency_certificates() {
+            assert_eq!(certificate.library_id(), identity);
+            assert!(certificate.required_symbols().is_empty());
+            assert_eq!(certificate.unsafe_owner(), VIDEO_CODEC_FFI_UNSAFE_OWNER);
+        }
+        let positions = closure
+            .dependency_first_order()
+            .iter()
+            .enumerate()
+            .map(|(index, identity)| (identity.as_str(), index))
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(positions.len(), 8);
+        for edge in closure.edges() {
+            let Some(dependency_position) = positions.get(edge.dependency()) else {
+                continue;
+            };
+            let consumer_position = positions
+                .get(edge.consumer())
+                .ok_or_else(|| io::Error::other("fixture consumer is absent from load order"))?;
+            assert!(dependency_position < consumer_position);
+        }
+
+        fs::write(&source_path, b"changed after certification")?;
+        let retained = closure
+            ._sealed_dependency_images
+            .get("x264")
+            .ok_or_else(|| io::Error::other("retained x264 image is missing"))?;
+        let mut retained_file = retained.file().try_clone()?;
+        retained_file.seek(SeekFrom::Start(0))?;
+        let mut retained_bytes = Vec::new();
+        retained_file.read_to_end(&mut retained_bytes)?;
+        let expected_digest = closure
+            .dependencies()
+            .get("x264")
+            .ok_or_else(|| io::Error::other("x264 contract is missing"))?
+            .digest_sha256();
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&retained_bytes)),
+            expected_digest
+        );
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn video_codec_dependency_closure_rejects_contract_path_and_resource_drift()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, primary, contract, mut paths) = video_codec_dependency_closure_fixture()?;
+        paths.remove("x264");
+        assert!(matches!(
+            certify_video_codec_dependency_closure(
+                primary,
+                contract,
+                paths,
+                &CancellationToken::default(),
+            ),
+            Err(VideoCodecDependencyClosureError::IncompletePathSet)
+        ));
+
+        let (_directory, primary, mut contract, paths) = video_codec_dependency_closure_fixture()?;
+        contract.primary_catalog_sha256 = "f".repeat(64);
+        assert!(matches!(
+            certify_video_codec_dependency_closure(
+                primary,
+                contract,
+                paths,
+                &CancellationToken::default(),
+            ),
+            Err(VideoCodecDependencyClosureError::ContractMismatch)
+        ));
+
+        let (_directory, primary, mut contract, paths) = video_codec_dependency_closure_fixture()?;
+        contract.edges.remove(&VideoCodecDependencyEdge {
+            consumer: "x264".to_owned(),
+            dependency: "libc.so.6".to_owned(),
+        });
+        assert!(matches!(
+            certify_video_codec_dependency_closure(
+                primary,
+                contract,
+                paths,
+                &CancellationToken::default(),
+            ),
+            Err(VideoCodecDependencyClosureError::ContractMismatch)
+        ));
+
+        let (_directory, primary, contract, paths) = video_codec_dependency_closure_fixture()?;
+        assert!(matches!(
+            certify_video_codec_dependency_closure_with_limits(
+                primary,
+                contract,
+                paths,
+                2,
+                u64::MAX,
+                &CancellationToken::default(),
+            ),
+            Err(VideoCodecDependencyClosureError::ResourceLimitExceeded)
+        ));
+        let (_directory, primary, contract, paths) = video_codec_dependency_closure_fixture()?;
+        assert!(matches!(
+            certify_video_codec_dependency_closure_with_limits(
+                primary,
+                contract,
+                paths,
+                MAX_VIDEO_CODEC_DEPENDENCY_IMAGES,
+                1,
+                &CancellationToken::default(),
+            ),
+            Err(VideoCodecDependencyClosureError::ResourceLimitExceeded)
+        ));
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn video_codec_dependency_closure_cancellation_is_atomic_and_retryable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, primary, contract, paths) = video_codec_dependency_closure_fixture()?;
+        let cancelled = CancellationToken::default();
+        assert!(cancelled.cancel());
+        assert!(matches!(
+            certify_video_codec_dependency_closure(primary, contract, paths, &cancelled),
+            Err(VideoCodecDependencyClosureError::Cancelled)
+        ));
+
+        let (_directory, primary, contract, paths) = video_codec_dependency_closure_fixture()?;
+        let closure = certify_video_codec_dependency_closure(
+            primary,
+            contract,
+            paths,
+            &CancellationToken::default(),
+        )?;
+        assert_eq!(closure.dependency_certificates().len(), 3);
         Ok(())
     }
 

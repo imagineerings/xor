@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "fixture_id": "native-video-codec-dependency-closure-v1",
+  "truth_mode": "synthetic-static-retained-dependency-closure",
+  "source": {
+    "comfyui_version": "0.27.1",
+    "canonical_file_count": 949,
+    "canonical_tree_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+    "requirements_sha256": "48f4835af39b753fb2e637ec17813716024e08952e82e6e4e536a0fcfd944d0e",
+    "nodes_video_sha256": "db1d0d40e065a50a4b10c2780511e4a9a75482916a76c175000e58ab875da7c9",
+    "nodes_lt_sha256": "d3c0a82b42808216b08fe9ca97e055f2a3793083755168a292cf8c076539d12d"
+  },
+  "dependencies": {
+    "codec_ffi_certification_manifest_sha256": "7b2bfaf4e31f574932fdd83bd156c214a69ac6d21da268a5614befa2968651a6",
+    "codec_package_capture_manifest_sha256": "05d13b0175e4f9762f8b6dca0602a2e59c4f8975991eb6c8eb0aebfc19638e9e",
+    "codec_elf_inspection_manifest_sha256": "cba3dc9db253c0b0d996888fb497d54a6c85d0b1b0b729c015e7c8ba4005af0c",
+    "codec_inspected_certification_manifest_sha256": "71209c54b52ae1c18df0407a367869edea8306bfe8147953916c96f15a9fe883",
+    "codec_dependency_contract_manifest_sha256": "afebad823dd59bf18e3fccb8da5e9c733c59be65a8b7c2978b8be0f6f57c10be"
+  },
+  "contract": {
+    "target": "x86_64-unknown-linux-gnu",
+    "profile": "ffmpeg-7.1",
+    "primary_image_count": 5,
+    "dependency_image_count": 3,
+    "total_package_image_count": 8,
+    "certificate_owner": "comfy_runtime::NativeFfiRegistry",
+    "unsafe_owner": "comfy_runtime::native_video_codec_ffi",
+    "primary_catalog_digest_bound": true,
+    "primary_certificates_revalidated": true,
+    "dependency_image_capture_no_follow_and_stable": true,
+    "dependency_images_sealed_and_retained": true,
+    "dependency_certificates_non_callable": true,
+    "duplicate_needed_names_rejected": true,
+    "observed_needed_graph_equals_signed_graph": true,
+    "reviewed_system_sonames_exact": true,
+    "deterministic_dependency_first_order": [
+      "avutil",
+      "svtav1",
+      "swresample",
+      "swscale",
+      "vpx",
+      "x264",
+      "avcodec",
+      "avformat"
+    ],
+    "dependency_count_bounded": true,
+    "aggregate_retained_bytes_bounded": true,
+    "cancellation_and_failure_atomic": true
+  },
+  "claims": {
+    "licensed_ffmpeg_binary": false,
+    "production_package_catalog": false,
+    "host_library_probe": false,
+    "native_library_loaded": false,
+    "runtime_symbol_address_resolved": false,
+    "encoder_availability_probed": false,
+    "codec_execution": false,
+    "media_allocation": false,
+    "effect_or_cache_publication": false,
+    "persistence_or_recovery": false,
+    "upstream_runtime_numeric_oracle": false
+  }
+}

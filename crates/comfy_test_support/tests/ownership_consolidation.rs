@@ -14108,6 +14108,119 @@ fn val_ownership_native_video_codec_dependency_contract_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_dependency_closure_certification_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "pub struct CertifiedVideoCodecDependencyClosure",
+        "pub fn certify_video_codec_dependency_closure(",
+        "primary.catalog_sha256() != contract.primary_catalog_sha256()",
+        "capture_native_library_image(path, cancellation)",
+        "inspect_elf64_dynamic_contract(captured.bytes(), 62, cancellation)",
+        "if &actual_edges != contract.edges()",
+        "contract._registry.authorize_dependency(",
+        "video_codec_dependency_first_order(",
+        "_sealed_dependency_images: sealed_dependency_images",
+        "video_codec_dependency_closure_certifies_retains_and_orders_exact_graph",
+        "video_codec_dependency_closure_rejects_contract_path_and_resource_drift",
+        "video_codec_dependency_closure_cancellation_is_atomic_and_retryable",
+    ] {
+        assert!(
+            trust.contains(required),
+            "video codec dependency closure lacks {required}"
+        );
+    }
+    let certification_start = trust
+        .find("pub fn certify_video_codec_dependency_closure(")
+        .ok_or("video codec dependency-closure boundary is missing")?;
+    let certification_end = trust
+        .get(certification_start..)
+        .and_then(|source| source.find("fn video_codec_dependency_first_order"))
+        .map(|offset| certification_start + offset)
+        .ok_or("video codec dependency-closure boundary end is missing")?;
+    let certification = trust
+        .get(certification_start..certification_end)
+        .ok_or("video codec dependency-closure range is invalid")?;
+    for forbidden in [
+        "unsafe {",
+        "dlopen",
+        "dlmopen",
+        "dlsym",
+        "LoadLibrary",
+        "GetProcAddress",
+        "find_encoder",
+        "NativeCache",
+        "OutputCommitter",
+        "NativeStoredPayload",
+    ] {
+        assert!(
+            !certification.contains(forbidden),
+            "video codec dependency closure contains forbidden {forbidden}"
+        );
+    }
+
+    let elf = fs::read_to_string(root.join("crates/comfy_runtime/src/native_ffi_elf.rs"))?;
+    for required in [
+        "PT_DYNAMIC contains duplicate DT_NEEDED entry",
+        "elf_inspection_rejects_duplicate_needed_entries",
+    ] {
+        assert!(
+            elf.contains(required),
+            "ELF duplicate-needed closure lacks {required}"
+        );
+    }
+
+    let fixture =
+        fs::read_to_string(root.join(
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+        ))?;
+    for required in [
+        "synthetic-static-retained-dependency-closure",
+        "primary_catalog_digest_bound",
+        "dependency_images_sealed_and_retained",
+        "dependency_certificates_non_callable",
+        "observed_needed_graph_equals_signed_graph",
+        "deterministic_dependency_first_order",
+        "native_library_loaded",
+        "runtime_symbol_address_resolved",
+        "encoder_availability_probed",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video codec dependency-closure fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_ffi_certification")
+            })
+        })
+        .ok_or("missing native FFI certification ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some(
+                        "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
+                    )
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

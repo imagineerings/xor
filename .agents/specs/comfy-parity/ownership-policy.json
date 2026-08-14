@@ -6839,6 +6839,7 @@
       "allowed_adapters": [
         "native_ffi_rocm supplies its exact x86_64 machine contract and consumes the inspected SONAME, exports, and dependency names before registry certification and its focused unsafe loader",
         "comfy_runtime::trust supplies the signed video target, catalog filename, and required-symbol subset and retains the inspected metadata with the sealed five-library package",
+        "the video codec dependency-closure certifier reuses this parser for every signed dependency image, rejects duplicate DT_NEEDED names, and compares the complete normalized observed graph to the signed contract before registry certification",
         "the inspector records DT_NEEDED names but never authorizes dependencies, resolves runtime addresses, issues certificates, probes encoders, or executes codecs"
       ],
       "definitions": [
@@ -6878,12 +6879,18 @@
           "name": "video-elf-inspection-fixture-separates-static-structure-from-load-certification-and-execution",
           "path": "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
           "pattern": "synthetic-structural-elf-contract[\\s\\S]*needed_names_authorized[\\s\\S]*licensed_ffmpeg_binary[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*ffi_certificate_issued_by_inspection[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-dependency-closure-reuses-elf-owner-and-rejects-needed-duplicates",
+          "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
+          "pattern": "PT_DYNAMIC contains duplicate DT_NEEDED entry[\\s\\S]*elf_inspection_rejects_duplicate_needed_entries"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-elf-inspection-foundation"
+        "comfy-parity-native-video-codec-elf-inspection-foundation",
+        "comfy-parity-native-video-codec-dependency-closure-certification-foundation"
       ],
       "production_consumers": [
         "ROCm retained native-library certification",
@@ -6930,7 +6937,8 @@
         "MLU and DirectML owned execution sessions consume only unsafe or opaque retained certificate projections, never call NativeFfiRegistry, and cannot turn ABI observations, package receipts, feature compilation, or native handles into availability",
         "Task 59 cudart_exact_native consumes a registry-issued certificate for the exact CUDA-runtime library and host-registration symbols; it cannot construct a certificate, claim device availability, or expose an unchecked raw handle",
         "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; the sealed-package adapter may consume the separate canonical ELF inspector but cannot authorize observed dependencies, load libraries, probe encoder availability, expose function pointers, or execute codecs",
-        "the video codec dependency-contract verifier authenticates a separately domain-separated exact primary-catalog, provenance, SONAME, digest, ABI, sponsor, consumer-edge, system-policy, and encoder-provider addendum and retains only non-callable registry configuration; later closure code alone may capture and certify those declared images"
+        "the video codec dependency-contract verifier authenticates a separately domain-separated exact primary-catalog, provenance, SONAME, digest, ABI, sponsor, consumer-edge, system-policy, and encoder-provider addendum and retains only non-callable registry configuration; later closure code alone may capture and certify those declared images",
+        "the video codec dependency-closure certifier consumes the exact certified primary package and verified contract, reuses canonical capture and ELF inspection, issues only dependency certificates, retains every sealed image, and exposes no loader path, address, probe, codec, media, effect, cache, persistence, recovery, or publication capability"
       ],
       "definitions": [
         {
@@ -7064,6 +7072,21 @@
           "name": "video-codec-dependency-contract-fixture-forbids-capture-load-and-execution-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
           "pattern": "synthetic-signed-dependency-contract[\\s\\S]*primary_catalog_digest_bound[\\s\\S]*dependency_contracts_non_callable[\\s\\S]*dependency_image_captured[\\s\\S]*dependency_certificate_issued[\\s\\S]*native_library_loaded[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-codec-dependency-closure-binds-captures-certifies-retains-and-orders",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "pub struct CertifiedVideoCodecDependencyClosure[\\s\\S]*pub fn certify_video_codec_dependency_closure[\\s\\S]*primary\\.catalog_sha256\\(\\) != contract\\.primary_catalog_sha256\\(\\)[\\s\\S]*capture_native_library_image[\\s\\S]*inspect_elf64_dynamic_contract[\\s\\S]*actual_edges != contract\\.edges\\(\\)[\\s\\S]*authorize_dependency[\\s\\S]*dependency_first_order[\\s\\S]*_sealed_dependency_images"
+        },
+        {
+          "name": "video-codec-dependency-closure-tests-identity-graph-order-retention-and-atomicity",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "video_codec_dependency_closure_certifies_retains_and_orders_exact_graph[\\s\\S]*video_codec_dependency_closure_rejects_contract_path_and_resource_drift[\\s\\S]*video_codec_dependency_closure_cancellation_is_atomic_and_retryable"
+        },
+        {
+          "name": "video-codec-dependency-closure-fixture-forbids-loader-and-execution-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+          "pattern": "synthetic-static-retained-dependency-closure[\\s\\S]*observed_needed_graph_equals_signed_graph[\\s\\S]*dependency_certificates_non_callable[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*encoder_availability_probed[\\s\\S]*codec_execution"
         }
       ],
       "known_open_reasons": [],
@@ -7080,6 +7103,7 @@
         "comfy-parity-native-video-codec-elf-inspection-foundation",
         "comfy-parity-native-video-codec-inspected-certification-foundation",
         "comfy-parity-native-video-codec-dependency-contract-foundation",
+        "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
@@ -9247,6 +9271,7 @@
         "native_ffi_cuda maps the shared typed error, uses the canonical digest for all four callable contracts, opens only retained Linux memfd or Windows read-locked snapshot paths, and retains the canonical image owners and registry certificates for the complete CUDA session lifetime",
         "MLU, NPU, ROCm, XPU, and CUDA retain distinct signed-package, target, discovery-root, ABI, symbol, dependency, and public error semantics; none of those focused rules repeats native-library filesystem capture, digest, sealing, snapshot, or descriptor lifetime behavior",
         "DirectML remains a justified Windows-specific System32 and Authenticode adapter while XPU and CUDA reuse this canonical owner for Windows non-reparse stable capture and read-locked snapshots; the future CoreX certification adapter must reuse this owner",
+        "the video codec dependency-closure certifier captures each exact signed dependency through this owner, inspects the immutable bytes, seals the admitted image, and retains the descriptor without exposing its loader path",
         "NativeFfiRegistry remains the sole certificate issuer; successful capture or sealing cannot authorize availability or synthesize a certificate"
       ],
       "definitions": [
@@ -9317,6 +9342,11 @@
           "pattern": "(?=[\\s\\S]*capture_native_library_image)(?=[\\s\\S]*digest_sha256)(?=[\\s\\S]*NativeFfiRegistry)(?=[\\s\\S]*\\.seal\\()(?=[\\s\\S]*loader_path)"
         },
         {
+          "name": "video-codec-dependency-closure-reuses-canonical-native-library-images",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "certify_video_codec_dependency_closure_with_limits[\\s\\S]*capture_native_library_image[\\s\\S]*digest_sha256[\\s\\S]*inspect_elf64_dynamic_contract[\\s\\S]*\\.seal\\([\\s\\S]*_sealed_dependency_images"
+        },
+        {
           "name": "native-library-image-owner-oracle-rejects-duplicates",
           "path": "crates/comfy_test_support/tests/ownership_consolidation.rs",
           "pattern": "native_library_image_capture_and_sealing_have_one_owner"
@@ -9328,6 +9358,7 @@
         "comfy-parity-provision-native-ffi-contracts-huawei-ascend-npu-comfy-model-0019",
         "comfy-parity-provision-native-ffi-contracts-intel-xpu-comfy-model-0021",
         "comfy-parity-provision-native-ffi-contracts-nvidia-cuda-comfy-model-0022",
+        "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation",
         "comfy-parity-integrate-device-huawei-ascend-npu-comfy-model-0019"
       ],
@@ -9337,6 +9368,7 @@
         "signed ROCm primary and recursive-dependency certification",
         "signed XPU Level Zero and oneDNN retained-image certification",
         "signed CUDA Driver, NVRTC, cuBLASLt, and cuDNN retained-image certification",
+        "signed native video codec dependency closure certification",
         "future CoreX certification adapter"
       ],
       "requirements": [
