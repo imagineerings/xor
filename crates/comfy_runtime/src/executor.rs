@@ -7,12 +7,12 @@ use crate::{
 use chrono::Utc;
 use comfy_nodes::{
     NativeAssetReference, NativeAssetServiceError, NativeHandleStore, NativeHandleStoreError,
-    NativeHandleStoreIdentity, NativeHandleType, NativeNodeBindingDisposition,
-    NativeNodeComputeSession, NativeNodeContractError, NativeNodeServiceIdentity,
-    NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency, NativePreparedEffectKind,
-    NativePreparedEffectService, NativeProviderExecutionIdentity, NativeResidentAllocationId,
-    NativeResolvedPayload, NativeResolvedPayloadRetention, NativeStoredPayload,
-    NativeStructuredValue, NativeValue, NodeRegistry,
+    NativeHandleStoreIdentity, NativeHandleType, NativeLtxvPreprocessService,
+    NativeNodeBindingDisposition, NativeNodeComputeSession, NativeNodeContractError,
+    NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency,
+    NativePreparedEffectKind, NativePreparedEffectService, NativeProviderExecutionIdentity,
+    NativeResidentAllocationId, NativeResolvedPayload, NativeResolvedPayloadRetention,
+    NativeStoredPayload, NativeStructuredValue, NativeValue, NodeRegistry,
 };
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
@@ -2226,6 +2226,7 @@ pub struct ExecutionEngine {
     scratch: ScratchReservation,
     compute_backend: Option<Arc<CpuBackend>>,
     shader_executor: Option<Arc<dyn NativeShaderExecutor>>,
+    ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
     asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
@@ -2279,6 +2280,7 @@ impl ExecutionEngine {
             scratch,
             compute_backend: None,
             shader_executor: None,
+            ltxv_preprocess_service: None,
             asset_resolvers: None,
             handle_store_generation,
         })
@@ -2306,6 +2308,14 @@ impl ExecutionEngine {
 
     pub fn with_shader_executor(mut self, shader: Arc<dyn NativeShaderExecutor>) -> Self {
         self.shader_executor = Some(shader);
+        self
+    }
+
+    pub fn with_ltxv_preprocess_service(
+        mut self,
+        service: Arc<dyn NativeLtxvPreprocessService>,
+    ) -> Self {
+        self.ltxv_preprocess_service = Some(service);
         self
     }
 
@@ -2679,6 +2689,11 @@ impl ExecutionEngine {
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         if let Some(shader) = &self.shader_executor {
             services = services.with_shader(shader.clone());
+        }
+        if let Some(ltxv_preprocess) = &self.ltxv_preprocess_service {
+            services = services
+                .with_ltxv_preprocess(ltxv_preprocess.clone())
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         }
         if let Some(provider_execution) = &plan.provider_execution {
             services = services.with_provider_execution(

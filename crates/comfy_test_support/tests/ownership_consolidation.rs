@@ -15258,6 +15258,120 @@ fn val_ownership_native_video_codec_ltxv_thread_service_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_ltxv_node_service_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let nodes = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    for required in [
+        "pub struct NativeLtxvPreprocessServiceIdentity",
+        "pub enum NativeLtxvPreprocessServiceError",
+        "pub trait NativeLtxvPreprocessService: Send + Sync + fmt::Debug",
+        "ltxv_preprocess: Option<Arc<dyn NativeLtxvPreprocessService>>",
+        "pub fn with_ltxv_preprocess(",
+        "pub fn ltxv_preprocess_service(",
+        "ltxv_preprocess_service_requires_checked_identity_and_preserves_context_authority",
+    ] {
+        assert!(
+            nodes.contains(required),
+            "LTXV node service lacks {required}"
+        );
+    }
+
+    let codec_service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "impl NativeLtxvPreprocessService for NativeLtxvCodecRequestProxy",
+        "map_ltxv_node_service_error",
+        "NativeLtxvPreprocessServiceError::Cancelled",
+        "NativeLtxvPreprocessServiceError::Busy",
+        "NativeLtxvPreprocessServiceError::InvalidRequest",
+        "NativeLtxvPreprocessServiceError::ResourceExhausted",
+        "NativeLtxvPreprocessServiceError::Unavailable",
+    ] {
+        assert!(
+            codec_service.contains(required),
+            "LTXV codec proxy adapter lacks {required}"
+        );
+    }
+
+    let executor = fs::read_to_string(root.join("crates/comfy_runtime/src/executor.rs"))?;
+    for required in [
+        "ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>",
+        "pub fn with_ltxv_preprocess_service(",
+        ".with_ltxv_preprocess(ltxv_preprocess.clone())",
+    ] {
+        assert!(
+            executor.contains(required),
+            "execution engine omits LTXV service propagation {required}"
+        );
+    }
+
+    let native_executor =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
+    for required in [
+        "ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>",
+        "service.identity().configuration_sha256()",
+        ":ltxv={ltxv_identity}",
+        "engine = engine.with_ltxv_preprocess_service(ltxv_preprocess_service.clone())",
+        "IdentityLtxvPreprocessService",
+    ] {
+        assert!(
+            native_executor.contains(required),
+            "native image executor omits LTXV service identity or propagation {required}"
+        );
+    }
+
+    for forbidden in [
+        "unsafe impl Send",
+        "unsafe impl Sync",
+        "Arc<NativeLtxvH264Codec>",
+        "NativeStoredPayload::Ltxv",
+    ] {
+        assert!(!nodes.contains(forbidden));
+        assert!(!codec_service.contains(forbidden));
+        assert!(!executor.contains(forbidden));
+        assert!(!native_executor.contains(forbidden));
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-ltxv-node-service/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-ltxv-node-service-injection",
+        "execution_engine_exact_proxy_propagation",
+        "configuration_identity_partitions_cache",
+        "codec_package_discovery_or_provisioning",
+        "ltxv_preprocess_node_implemented",
+    ] {
+        assert!(fixture.contains(required));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_service_ltxv_node_injection")
+            })
+        })
+        .ok_or("missing LTXV node-service injection ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-node-service-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

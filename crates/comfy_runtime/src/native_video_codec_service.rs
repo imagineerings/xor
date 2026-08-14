@@ -4,6 +4,10 @@ use crate::{
     NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions,
     bind_certified_video_codec_abi, load_certified_video_codec_closure,
 };
+use comfy_nodes::{
+    NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
+    NativeLtxvPreprocessServiceIdentity,
+};
 use comfy_tensor::{
     CpuBackend, ExecutionContext, ImageTensor, ScratchReservation, StreamId, TensorError,
 };
@@ -12,7 +16,7 @@ use futures::channel::oneshot;
 use futures::future::{BoxFuture, FutureExt};
 use sha2::{Digest, Sha256};
 use std::{
-    io,
+    fmt, io,
     sync::{Arc, Mutex, TryLockError, mpsc},
     thread::{self, JoinHandle},
 };
@@ -102,6 +106,7 @@ struct NativeLtxvCodecThreadInvocation {
 
 struct NativeLtxvCodecThreadInner {
     identity: NativeLtxvCodecThreadIdentity,
+    node_service_identity: NativeLtxvPreprocessServiceIdentity,
     sender: Mutex<Option<mpsc::SyncSender<NativeLtxvCodecThreadRequest>>>,
     runner: Mutex<Option<JoinHandle<()>>>,
 }
@@ -121,6 +126,15 @@ pub(crate) struct NativeLtxvCodecThreadService {
 #[derive(Clone)]
 pub(crate) struct NativeLtxvCodecRequestProxy {
     inner: Arc<NativeLtxvCodecThreadInner>,
+}
+
+impl fmt::Debug for NativeLtxvCodecRequestProxy {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NativeLtxvCodecRequestProxy")
+            .field("identity", &self.inner.node_service_identity)
+            .finish_non_exhaustive()
+    }
 }
 
 #[allow(
@@ -254,6 +268,23 @@ impl NativeLtxvCodecRequestProxy {
     }
 }
 
+impl NativeLtxvPreprocessService for NativeLtxvCodecRequestProxy {
+    fn identity(&self) -> &NativeLtxvPreprocessServiceIdentity {
+        &self.inner.node_service_identity
+    }
+
+    fn preprocess_image(
+        &self,
+        image: &ImageTensor,
+        compression: u8,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<ImageTensor, NativeLtxvPreprocessServiceError>> {
+        NativeLtxvCodecRequestProxy::preprocess_image(self, image, compression, context)
+            .map(|result| result.map_err(map_ltxv_node_service_error))
+            .boxed()
+    }
+}
+
 impl NativeLtxvCodecThreadInner {
     fn close(&self) -> Result<(), NativeLtxvCodecThreadError> {
         let sender = self
@@ -339,11 +370,42 @@ where
     };
     Ok(NativeLtxvCodecThreadService {
         inner: Arc::new(NativeLtxvCodecThreadInner {
+            node_service_identity: NativeLtxvPreprocessServiceIdentity::checked(
+                identity.configuration_sha256().to_owned(),
+            )
+            .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?,
             identity,
             sender: Mutex::new(Some(sender)),
             runner: Mutex::new(Some(runner)),
         }),
     })
+}
+
+fn map_ltxv_node_service_error(
+    error: NativeLtxvCodecThreadError,
+) -> NativeLtxvPreprocessServiceError {
+    match error {
+        NativeLtxvCodecThreadError::Cancelled => NativeLtxvPreprocessServiceError::Cancelled,
+        NativeLtxvCodecThreadError::Busy => NativeLtxvPreprocessServiceError::Busy,
+        NativeLtxvCodecThreadError::InvalidScratch(_) => {
+            NativeLtxvPreprocessServiceError::InvalidRequest
+        }
+        NativeLtxvCodecThreadError::ResourceExhausted => {
+            NativeLtxvPreprocessServiceError::ResourceExhausted
+        }
+        NativeLtxvCodecThreadError::ThreadStopped
+        | NativeLtxvCodecThreadError::ThreadPanicked
+        | NativeLtxvCodecThreadError::StatePoisoned => {
+            NativeLtxvPreprocessServiceError::Unavailable
+        }
+        error @ (NativeLtxvCodecThreadError::ThreadSpawn(_)
+        | NativeLtxvCodecThreadError::Load(_)
+        | NativeLtxvCodecThreadError::Binding(_)
+        | NativeLtxvCodecThreadError::Admission(_)
+        | NativeLtxvCodecThreadError::Preprocess(_)) => {
+            NativeLtxvPreprocessServiceError::Execution(error.to_string())
+        }
+    }
 }
 
 fn process_ltxv_codec_request(
@@ -547,6 +609,10 @@ mod tests {
         })?;
         let proxy = service.proxy();
         assert_eq!(proxy.identity().target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(
+            NativeLtxvPreprocessService::identity(&proxy).configuration_sha256(),
+            proxy.identity().configuration_sha256()
+        );
         let context = request_context(scratch, &cancellation);
         let first = block_on(proxy.preprocess_image(&image, 0, &context))?;
         let second = block_on(proxy.preprocess_image(&image, 0, &context))?;
@@ -686,6 +752,49 @@ mod tests {
             finalize_video_codec_thread_identity("second", versions)
         );
         Ok(())
+    }
+
+    #[test]
+    fn retained_ltxv_codec_thread_node_service_maps_typed_failures() {
+        for (error, expected) in [
+            (
+                NativeLtxvCodecThreadError::Cancelled,
+                NativeLtxvPreprocessServiceError::Cancelled,
+            ),
+            (
+                NativeLtxvCodecThreadError::Busy,
+                NativeLtxvPreprocessServiceError::Busy,
+            ),
+            (
+                NativeLtxvCodecThreadError::ResourceExhausted,
+                NativeLtxvPreprocessServiceError::ResourceExhausted,
+            ),
+            (
+                NativeLtxvCodecThreadError::ThreadStopped,
+                NativeLtxvPreprocessServiceError::Unavailable,
+            ),
+            (
+                NativeLtxvCodecThreadError::ThreadPanicked,
+                NativeLtxvPreprocessServiceError::Unavailable,
+            ),
+            (
+                NativeLtxvCodecThreadError::StatePoisoned,
+                NativeLtxvPreprocessServiceError::Unavailable,
+            ),
+        ] {
+            assert_eq!(
+                std::mem::discriminant(&map_ltxv_node_service_error(error)),
+                std::mem::discriminant(&expected)
+            );
+        }
+        let execution = map_ltxv_node_service_error(NativeLtxvCodecThreadError::ThreadSpawn(
+            io::Error::other("synthetic spawn failure"),
+        ));
+        assert!(matches!(
+            execution,
+            NativeLtxvPreprocessServiceError::Execution(message)
+                if message.contains("synthetic spawn failure")
+        ));
     }
 
     struct ThreadBoundDrop {

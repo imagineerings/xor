@@ -14937,6 +14937,137 @@
       "decision_reason": "One bounded Send plus Sync proxy owns the channel and join lifecycle while one named OS thread alone creates, retains, invokes, and destroys the intentionally thread-bound native codec. The service preserves caller scratch and cancellation, publishes only canonical IMAGE results or typed errors, and introduces no unsafe, package provisioning, node, cache, media, persistence, recovery, or output authority."
     },
     {
+      "concern": "native_video_reviewed_codec_service_ltxv_node_injection",
+      "canonical_owner": "comfy_nodes::execution::NativeLtxvPreprocessService",
+      "owner_files": [
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_runtime/src/native_execution_controller.rs"
+      ],
+      "owner_symbols": [
+        "NativeLtxvPreprocessServiceIdentity",
+        "NativeLtxvPreprocessServiceError",
+        "NativeLtxvPreprocessService",
+        "NativeLtxvCodecRequestProxy",
+        "with_ltxv_preprocess",
+        "with_ltxv_preprocess_service"
+      ],
+      "allowed_adapters": [
+        "the retained codec-thread owner implements the domain-neutral port and maps typed actor failures without exposing its native codec or channel internals",
+        "NativeNodeServices carries the optional proxy into one node context while ExecutionEngine preserves the caller scratch, stream, and cancellation",
+        "NativeImageExecutor carries only the Send plus Sync service object and appends its stable configuration digest to cache identity",
+        "the following worker provisioning leaf may construct the service owner and inject its proxy, while the following LTXVPreprocess node may only consume this port",
+        "no adapter may load a codec, add unsafe Send or Sync, persist the proxy, publish it as a handle, or omit its behavior-bearing digest from cache configuration"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeLtxvPreprocessService",
+          "role": "canonical_service",
+          "symbol": "NativeLtxvPreprocessService",
+          "pattern": "pub trait NativeLtxvPreprocessService: Send \\+ Sync \\+ fmt::Debug"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeLtxvPreprocessServiceIdentity",
+          "role": "canonical_identity",
+          "symbol": "NativeLtxvPreprocessServiceIdentity"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy",
+          "role": "adapter",
+          "symbol": "NativeLtxvCodecRequestProxy"
+        }
+      ],
+      "call_symbols": [
+        "NativeLtxvPreprocessService",
+        "NativeLtxvCodecRequestProxy"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_nodes/",
+        "crates/comfy_runtime/"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-node-service-owns-checked-port-identity-errors-and-image-contract",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeLtxvPreprocessServiceIdentity[\\s\\S]*valid_sha256[\\s\\S]*NativeLtxvPreprocessServiceError[\\s\\S]*pub trait NativeLtxvPreprocessService[\\s\\S]*ImageTensor[\\s\\S]*ExecutionContext"
+        },
+        {
+          "name": "ltxv-node-services-carry-optional-proxy-into-the-node-context",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeNodeServices[\\s\\S]*ltxv_preprocess[\\s\\S]*with_ltxv_preprocess[\\s\\S]*ltxv_preprocess_service"
+        },
+        {
+          "name": "ltxv-codec-proxy-exhaustively-maps-thread-errors-into-the-node-port",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "impl NativeLtxvPreprocessService for NativeLtxvCodecRequestProxy[\\s\\S]*map_ltxv_node_service_error[\\s\\S]*NativeLtxvPreprocessServiceError"
+        },
+        {
+          "name": "ltxv-execution-engine-propagates-the-exact-service-proxy",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>[\\s\\S]*with_ltxv_preprocess_service[\\s\\S]*services = services[\\s\\S]*with_ltxv_preprocess"
+        },
+        {
+          "name": "ltxv-native-image-executor-binds-service-identity-into-cache-and-engine",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>[\\s\\S]*with_ltxv_preprocess_service[\\s\\S]*configuration_sha256[\\s\\S]*:ltxv=[\\s\\S]*engine = engine.with_ltxv_preprocess_service"
+        },
+        {
+          "name": "ltxv-node-service-tests-identity-authority-proxy-and-cache-partitioning",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "ltxv_preprocess_service_requires_checked_identity_and_preserves_context_authority"
+        },
+        {
+          "name": "ltxv-node-service-fixture-bounds-injection-and-runtime-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-node-service/manifest.json",
+          "pattern": "synthetic-ltxv-node-service-injection[\\s\\S]*execution_engine_exact_proxy_propagation[\\s\\S]*configuration_identity_partitions_cache[\\s\\S]*codec_package_discovery_or_provisioning[\\s\\S]*ltxv_preprocess_node_implemented"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-node-service-foundation"
+      ],
+      "production_consumers": [
+        "the following worker codec-package provisioning and LTXVPreprocess node adapter"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D31",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-NODE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One checked domain-neutral port moves only canonical IMAGE values and caller execution authority across the retained codec thread boundary. Runtime adapters preserve one service identity through node context and cache configuration without owning codec loading, package provisioning, a node implementation, media state, effects, persistence, recovery, or publication."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [

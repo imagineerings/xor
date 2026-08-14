@@ -52,13 +52,13 @@ use comfy_nodes::{
     CatalogNodeDescriptor, CatalogNodeStatus, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
     NativeDynamicInputDescriptor, NativeHandleKind, NativeHandleStoreError, NativeHandleType,
     NativeImageDescriptor, NativeImageDescriptorError, NativeImageEffect, NativeInputDescriptor,
-    NativeInputRequirement, NativeNodeBinding, NativeNodeBindingDisposition,
-    NativeNodeContractError, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
-    NativeOutputSchemaMetadata, NativePortCardinality, NativePrimitive, NativePrimitiveType,
-    NativeResolvedPayload, NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion,
-    NativeValue, NativeValueType, NodeDescriptor, NodeRegistry, PortDescriptor,
-    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
-    native_source_type_projection, native_text_generation_transaction,
+    NativeInputRequirement, NativeLtxvPreprocessService, NativeNodeBinding,
+    NativeNodeBindingDisposition, NativeNodeContractError, NativeNodePresentation,
+    NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputSchemaMetadata, NativePortCardinality,
+    NativePrimitive, NativePrimitiveType, NativeResolvedPayload, NativeStoredModelPayload,
+    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor,
+    NodeRegistry, PortDescriptor, generated_family_node_bindings, native_diffusion_descriptors,
+    native_image_descriptors, native_source_type_projection, native_text_generation_transaction,
     native_value_type_for_output_schema, native_value_types_for_input_schema,
 };
 use comfy_nodes::{
@@ -4122,6 +4122,7 @@ pub struct NativeImageExecutor {
     handle_store_generation: crate::NativeHandleStoreGeneration,
     cpu_backend: Arc<CpuBackend>,
     shader_executor: Arc<dyn NativeShaderExecutor>,
+    ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
     metadata_enabled: bool,
     diffusion_enabled: bool,
 }
@@ -4168,6 +4169,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4198,6 +4200,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4227,6 +4230,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4261,6 +4265,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4292,6 +4297,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4328,6 +4334,7 @@ impl NativeImageExecutor {
             handle_store_generation: crate::NativeHandleStoreGeneration::new()?,
             cpu_backend,
             shader_executor: default_native_shader_executor(),
+            ltxv_preprocess_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4363,6 +4370,14 @@ impl NativeImageExecutor {
         self
     }
 
+    pub fn with_ltxv_preprocess_service(
+        mut self,
+        service: Arc<dyn NativeLtxvPreprocessService>,
+    ) -> Self {
+        self.ltxv_preprocess_service = Some(service);
+        self
+    }
+
     fn execution_configuration_token(
         &self,
         plan: &CompiledPlan,
@@ -4378,7 +4393,18 @@ impl NativeImageExecutor {
             .map(NativeProviderRegistryPin::identity_sha256)
             .unwrap_or_else(|| "local".to_owned());
         let shader_identity = self.shader_executor.configuration_identity();
-        format!("{configuration_token}:provider={provider_identity}:shader={shader_identity}")
+        let ltxv_identity = self
+            .ltxv_preprocess_service
+            .as_deref()
+            .map(|service| service.identity().configuration_sha256());
+        match ltxv_identity {
+            Some(ltxv_identity) => format!(
+                "{configuration_token}:provider={provider_identity}:shader={shader_identity}:ltxv={ltxv_identity}"
+            ),
+            None => format!(
+                "{configuration_token}:provider={provider_identity}:shader={shader_identity}"
+            ),
+        }
     }
 
     pub fn execute_blocking(
@@ -4457,6 +4483,9 @@ impl NativeImageExecutor {
         .with_backend("cpu")?
         .with_dtype_policy("f32")?
         .with_configuration_token(configuration_token)?;
+        if let Some(ltxv_preprocess_service) = &self.ltxv_preprocess_service {
+            engine = engine.with_ltxv_preprocess_service(ltxv_preprocess_service.clone());
+        }
         if let Some(event_bus) = event_bus {
             engine = engine.with_event_bus(event_bus);
         }
@@ -7494,6 +7523,30 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct IdentityLtxvPreprocessService {
+        identity: comfy_nodes::NativeLtxvPreprocessServiceIdentity,
+    }
+
+    impl NativeLtxvPreprocessService for IdentityLtxvPreprocessService {
+        fn identity(&self) -> &comfy_nodes::NativeLtxvPreprocessServiceIdentity {
+            &self.identity
+        }
+
+        fn preprocess_image(
+            &self,
+            image: &ImageTensor,
+            _compression: u8,
+            _context: &ExecutionContext<'_>,
+        ) -> futures::future::BoxFuture<
+            'static,
+            Result<ImageTensor, comfy_nodes::NativeLtxvPreprocessServiceError>,
+        > {
+            let image = image.clone();
+            Box::pin(async move { Ok(image) })
+        }
+    }
+
     fn native(value: Value) -> NativeValue {
         match value {
             Value::Null => NativeValue::Primitive {
@@ -7681,6 +7734,22 @@ mod tests {
             changed.execution_configuration_token(&plan, "balanced"),
             first_identity
         );
+
+        let (ltxv_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let ltxv = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(ltxv_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")))
+        .with_ltxv_preprocess_service(Arc::new(IdentityLtxvPreprocessService {
+            identity: comfy_nodes::NativeLtxvPreprocessServiceIdentity::checked("d".repeat(64))?,
+        }));
+        let ltxv_identity = ltxv.execution_configuration_token(&plan, "balanced");
+        assert!(ltxv_identity.ends_with(&format!(":ltxv={}", "d".repeat(64))));
+        assert_ne!(ltxv_identity, first_identity);
         Ok(())
     }
 

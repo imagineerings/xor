@@ -1620,6 +1620,56 @@ pub trait NativePreparedEffectService: Send + Sync + fmt::Debug {
     fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeLtxvPreprocessServiceIdentity {
+    configuration_sha256: String,
+}
+
+impl NativeLtxvPreprocessServiceIdentity {
+    pub fn checked(
+        configuration_sha256: impl Into<String>,
+    ) -> Result<Self, NativeNodeContractError> {
+        let configuration_sha256 = configuration_sha256.into();
+        if !valid_sha256(&configuration_sha256) {
+            return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+        }
+        Ok(Self {
+            configuration_sha256,
+        })
+    }
+
+    pub fn configuration_sha256(&self) -> &str {
+        &self.configuration_sha256
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum NativeLtxvPreprocessServiceError {
+    #[error("native LTXV preprocessing service is unavailable")]
+    Unavailable,
+    #[error("native LTXV preprocessing request was cancelled")]
+    Cancelled,
+    #[error("native LTXV preprocessing service is busy")]
+    Busy,
+    #[error("native LTXV preprocessing request is invalid")]
+    InvalidRequest,
+    #[error("native LTXV preprocessing exhausted its reviewed resources")]
+    ResourceExhausted,
+    #[error("native LTXV preprocessing failed: {0}")]
+    Execution(String),
+}
+
+pub trait NativeLtxvPreprocessService: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeLtxvPreprocessServiceIdentity;
+
+    fn preprocess_image(
+        &self,
+        image: &ImageTensor,
+        compression: u8,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<ImageTensor, NativeLtxvPreprocessServiceError>>;
+}
+
 #[derive(Debug, Error)]
 pub enum NativeShaderServiceError {
     #[error("native shader execution service is unavailable")]
@@ -1712,6 +1762,7 @@ pub struct NativeNodeServices {
     effects: Option<Arc<dyn NativePreparedEffectService>>,
     compute: Option<NativeNodeComputeSession>,
     shader: Option<Arc<dyn NativeShaderExecutor>>,
+    ltxv_preprocess: Option<Arc<dyn NativeLtxvPreprocessService>>,
     provider_execution: Option<NativeProviderExecutionIdentity>,
 }
 
@@ -1764,6 +1815,7 @@ impl NativeNodeServices {
             effects,
             compute,
             shader: None,
+            ltxv_preprocess: None,
             provider_execution: None,
         })
     }
@@ -1771,6 +1823,17 @@ impl NativeNodeServices {
     pub fn with_shader(mut self, shader: Arc<dyn NativeShaderExecutor>) -> Self {
         self.shader = Some(shader);
         self
+    }
+
+    pub fn with_ltxv_preprocess(
+        mut self,
+        service: Arc<dyn NativeLtxvPreprocessService>,
+    ) -> Result<Self, NativeNodeContractError> {
+        NativeLtxvPreprocessServiceIdentity::checked(
+            service.identity().configuration_sha256().to_owned(),
+        )?;
+        self.ltxv_preprocess = Some(service);
+        Ok(self)
     }
 
     pub fn with_provider_execution(
@@ -1869,6 +1932,15 @@ impl NativeNodeContext {
             .provider_execution
             .as_ref()
             .ok_or(NativeNodeContractError::InvalidNodeContext)
+    }
+
+    pub fn ltxv_preprocess_service(
+        &self,
+    ) -> Result<&dyn NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError> {
+        self.services
+            .ltxv_preprocess
+            .as_deref()
+            .ok_or(NativeLtxvPreprocessServiceError::Unavailable)
     }
 
     pub fn execute_shader(
@@ -2766,6 +2838,37 @@ mod tests {
     #[derive(Debug)]
     struct TestShaderExecutor;
 
+    #[derive(Debug)]
+    struct TestLtxvPreprocessService {
+        identity: NativeLtxvPreprocessServiceIdentity,
+        compression: AtomicU64,
+    }
+
+    impl NativeLtxvPreprocessService for TestLtxvPreprocessService {
+        fn identity(&self) -> &NativeLtxvPreprocessServiceIdentity {
+            &self.identity
+        }
+
+        fn preprocess_image(
+            &self,
+            image: &ImageTensor,
+            compression: u8,
+            context: &ExecutionContext<'_>,
+        ) -> BoxFuture<'static, Result<ImageTensor, NativeLtxvPreprocessServiceError>> {
+            self.compression
+                .store(u64::from(compression), Ordering::SeqCst);
+            let image = image.clone();
+            let cancelled = context.cancellation.is_cancelled();
+            Box::pin(async move {
+                if cancelled {
+                    Err(NativeLtxvPreprocessServiceError::Cancelled)
+                } else {
+                    Ok(image)
+                }
+            })
+        }
+    }
+
     impl NativeShaderExecutor for TestShaderExecutor {
         fn configuration_identity(&self) -> String {
             "test-shader-v1".to_owned()
@@ -3556,6 +3659,87 @@ mod tests {
                 NativeNodeServices::checked(None, None, Some(compute))?,
             ),
             Err(NativeNodeContractError::InvalidComputeSession)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn ltxv_preprocess_service_requires_checked_identity_and_preserves_context_authority()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert!(NativeLtxvPreprocessServiceIdentity::checked("not-a-digest").is_err());
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(0x521));
+        let attempt_id = AttemptId(Uuid::from_u128(0x522));
+        let node_id = NodeId::from("ltxv-preprocess");
+        let compute = NativeNodeComputeSession::checked(
+            NativeNodeServiceIdentity::checked(
+                Uuid::from_u128(0x523),
+                attempt_id,
+                node_id.clone(),
+            )?,
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let service = Arc::new(TestLtxvPreprocessService {
+            identity: NativeLtxvPreprocessServiceIdentity::checked("a".repeat(64))?,
+            compression: AtomicU64::new(0),
+        });
+        let services = NativeNodeServices::checked(None, None, Some(compute.clone()))?
+            .with_ltxv_preprocess(service.clone())?;
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x524, 0x525)?,
+                attempt_id,
+            )),
+            services,
+        )?;
+        let image = ImageTensor::from_f32(
+            &backend,
+            &compute.execution_context(&context)?,
+            1,
+            1,
+            1,
+            1,
+            &[0.5],
+        )?;
+        let returned =
+            futures::executor::block_on(context.ltxv_preprocess_service()?.preprocess_image(
+                &image,
+                35,
+                &compute.execution_context(&context)?,
+            ))?;
+        assert_eq!(returned.tensor().storage_id(), image.tensor().storage_id());
+        assert_eq!(service.compression.load(Ordering::SeqCst), 35);
+        assert_eq!(
+            context
+                .ltxv_preprocess_service()?
+                .identity()
+                .configuration_sha256(),
+            "a".repeat(64)
+        );
+
+        let unavailable = NativeNodeContext::new(
+            prompt_id,
+            attempt_id,
+            NodeId::from("ltxv-unavailable"),
+            CancellationToken::default(),
+            authority.authorize_workspace(1024)?,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x526, 0x527)?,
+                attempt_id,
+            )),
+        )?;
+        assert!(matches!(
+            unavailable.ltxv_preprocess_service(),
+            Err(NativeLtxvPreprocessServiceError::Unavailable)
         ));
         Ok(())
     }

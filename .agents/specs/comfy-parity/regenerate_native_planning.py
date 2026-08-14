@@ -11271,6 +11271,56 @@ def native_video_codec_ltxv_thread_service_foundation_task(
     )
 
 
+def native_video_codec_ltxv_node_service_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ltxv-node-service-foundation",
+        "Inject retained LTXV preprocessing into native node services",
+        [28, 29, 31, 32, 34, 35, 37, 41, 42],
+        [17, 18, 19, 25, 27, 28, 31, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One domain-neutral Send plus Sync LTXV IMAGE preprocessing service port carries the retained codec-thread proxy through NativeNodeServices, ExecutionEngine, and NativeImageExecutor without moving native state across threads. The exact service configuration digest partitions runtime cache identity while every request preserves caller stream, scratch, and cancellation. No package discovery, worker startup, node implementation, codec duplication, media handle, effect, persistence, recovery, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-node-service/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused service-port tests prove checked identity, typed absence, exact IMAGE projection, preserved caller authority, runtime proxy error mapping, executor propagation, and cache-identity drift. Ownership and the source-bound fixture reject unsafe Send or Sync, a second codec owner, installed package or numerical codec evidence, worker provisioning, an LTXV node implementation, media handles, effects, persistence, recovery, or publication claims.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "29.3", "29.4", "31.5", "31.6", "32.1", "34.4", "35.3", "35.5", "37.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13567,8 +13617,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ltxv_tensor_preprocess_foundation["id"])
         )
     )
+    video_codec_ltxv_node_service_foundation = (
+        native_video_codec_ltxv_node_service_foundation_task(
+            str(video_codec_ltxv_thread_service_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_ltxv_thread_service_foundation["id"])
+        str(video_codec_ltxv_node_service_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13705,6 +13760,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_h264_mp4_decode_foundation,
         video_codec_ltxv_tensor_preprocess_foundation,
         video_codec_ltxv_thread_service_foundation,
+        video_codec_ltxv_node_service_foundation,
         video_foundation,
             detection_foundation,
         ]
