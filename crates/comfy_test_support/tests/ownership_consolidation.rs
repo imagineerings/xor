@@ -15095,6 +15095,84 @@ fn val_ownership_native_video_codec_ltxv_h264_mp4_decode_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_ltxv_tensor_preprocess_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeLtxvH264PreprocessLimits",
+        "pub(crate) enum NativeVideoCodecLtxvPreprocessError",
+        "pub(crate) fn preprocess_image",
+        "preprocess_ltxv_image_with_round_trip",
+        "source_compatible_ltxv_rgb8_frame",
+        "Rgb8ImageTensor::from_logical_chw",
+        "encode_rgb8_frame",
+        "open_first_h264_video_stream",
+        "decode_first_rgb8_frame",
+        "retained_ltxv_preprocess_bypasses_or_quantizes_crops_and_stacks_in_order",
+        "retained_ltxv_preprocess_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "LTXV tensor preprocess lacks {required}"
+        );
+    }
+    for forbidden in [
+        "pub fn frame_ptr",
+        "pub fn packet_ptr",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "LTXV tensor preprocess exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-source-compatible-ltxv-tensor-preprocess",
+        "compression_zero_fresh_stack_without_codec_calls",
+        "crop_bottom_and_right_to_even",
+        "production_h264_or_pyav_color_numeric_oracle",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "LTXV tensor preprocess fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some(
+                        "native_video_reviewed_codec_registry_ltxv_tensor_preprocess_composition",
+                    )
+            })
+        })
+        .ok_or("missing LTXV tensor preprocess ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

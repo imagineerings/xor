@@ -3,8 +3,8 @@ use crate::{
     native_video_codec_abi as abi,
 };
 use comfy_tensor::{
-    CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext,
-    Rgb8ImageTensor, TensorDescriptor, TensorError,
+    CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor,
+    Layout, Rgb8ImageTensor, TensorDescriptor, TensorError, ViewAccess,
 };
 use comfy_types::{CancellationError, CancellationToken};
 use std::{
@@ -261,6 +261,84 @@ impl NativeLtxvH264DecodeLimits {
 
 #[allow(
     dead_code,
+    reason = "consumed by the following native LTXVPreprocess node adapter"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeLtxvH264PreprocessLimits {
+    maximum_batch: u64,
+    maximum_output_elements: usize,
+    encode: NativeLtxvH264EncodeLimits,
+    demux: NativeLtxvH264DemuxLimits,
+    decode: NativeLtxvH264DecodeLimits,
+}
+
+impl NativeLtxvH264PreprocessLimits {
+    #[allow(
+        dead_code,
+        reason = "constructed by the following native LTXVPreprocess node adapter"
+    )]
+    pub(crate) fn checked(
+        maximum_batch: u64,
+        maximum_output_elements: usize,
+        encode: NativeLtxvH264EncodeLimits,
+        demux: NativeLtxvH264DemuxLimits,
+        decode: NativeLtxvH264DecodeLimits,
+    ) -> Result<Self, NativeVideoCodecLtxvPreprocessError> {
+        if maximum_batch == 0 || maximum_output_elements == 0 {
+            return Err(NativeVideoCodecLtxvPreprocessError::InvalidLimits);
+        }
+        Ok(Self {
+            maximum_batch,
+            maximum_output_elements,
+            encode,
+            demux,
+            decode,
+        })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "returned through the following native LTXVPreprocess node adapter"
+)]
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecLtxvPreprocessError {
+    #[error("native LTXV preprocessing was cancelled")]
+    Cancelled,
+    #[error("native LTXV preprocessing received invalid resource limits")]
+    InvalidLimits,
+    #[error("native LTXV preprocessing compression must be in the inclusive range 0 through 100")]
+    InvalidCompression,
+    #[error(
+        "native LTXV preprocessing requires a nonempty CPU F32 BHWC image and RGB channels for compression"
+    )]
+    InvalidInput,
+    #[error("native LTXV preprocessing exceeded its reviewed output bounds")]
+    ResourceExhausted,
+    #[error("native LTXV preprocessing tensor operation failed: {0}")]
+    Tensor(#[source] TensorError),
+    #[error("native LTXV preprocessing encode failed: {0}")]
+    Encode(#[source] NativeVideoCodecLtxvEncodeError),
+    #[error("native LTXV preprocessing demux failed: {0}")]
+    Demux(#[source] NativeVideoCodecLtxvDemuxError),
+    #[error("native LTXV preprocessing decode failed: {0}")]
+    Decode(#[source] NativeVideoCodecLtxvDecodeError),
+}
+
+impl From<CancellationError> for NativeVideoCodecLtxvPreprocessError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
+}
+
+impl From<TensorError> for NativeVideoCodecLtxvPreprocessError {
+    fn from(error: TensorError) -> Self {
+        map_ltxv_preprocess_tensor_error(error)
+    }
+}
+
+#[allow(
+    dead_code,
     reason = "returned through the following source-compatible LTXV tensor adapter"
 )]
 #[derive(Debug, Error)]
@@ -394,6 +472,38 @@ impl NativeLtxvH264Codec {
             height,
         })
     }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following native LTXVPreprocess node adapter"
+    )]
+    pub(crate) fn preprocess_image(
+        &self,
+        image: &ImageTensor,
+        compression: u8,
+        limits: NativeLtxvH264PreprocessLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<ImageTensor, NativeVideoCodecLtxvPreprocessError> {
+        preprocess_ltxv_image_with_round_trip(
+            image,
+            compression,
+            limits,
+            backend,
+            context,
+            &mut |frame, backend, context| {
+                let encoded = self
+                    .encode_rgb8_frame(frame, compression, limits.encode, backend, context)
+                    .map_err(NativeVideoCodecLtxvPreprocessError::Encode)?;
+                let demux = encoded
+                    .open_first_h264_video_stream(limits.demux, backend, context)
+                    .map_err(NativeVideoCodecLtxvPreprocessError::Demux)?;
+                demux
+                    .decode_first_rgb8_frame(limits.decode, backend, context)
+                    .map_err(NativeVideoCodecLtxvPreprocessError::Decode)
+            },
+        )
+    }
 }
 
 impl<'codec> NativeLtxvH264Mp4<'codec> {
@@ -480,6 +590,180 @@ impl NativeLtxvH264Demux<'_, '_> {
         )?;
         context.check().map_err(map_ltxv_decode_tensor_error)?;
         Ok(rgb)
+    }
+}
+
+fn preprocess_ltxv_image_with_round_trip(
+    image: &ImageTensor,
+    compression: u8,
+    limits: NativeLtxvH264PreprocessLimits,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    round_trip: &mut impl FnMut(
+        &Rgb8ImageTensor,
+        &CpuBackend,
+        &ExecutionContext<'_>,
+    ) -> Result<Rgb8ImageTensor, NativeVideoCodecLtxvPreprocessError>,
+) -> Result<ImageTensor, NativeVideoCodecLtxvPreprocessError> {
+    context.check()?;
+    if compression > 100 {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidCompression);
+    }
+    let (batch, input_height, input_width, channels) = image
+        .dimensions()
+        .map_err(map_ltxv_preprocess_tensor_error)?;
+    if batch == 0 || batch > limits.maximum_batch || (compression != 0 && channels != 3) {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+    }
+    let (output_height, output_width) = if compression == 0 {
+        (input_height, input_width)
+    } else {
+        (input_height / 2 * 2, input_width / 2 * 2)
+    };
+    if output_height == 0 || output_width == 0 {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+    }
+    let output_elements = batch
+        .checked_mul(output_height)
+        .and_then(|value| value.checked_mul(output_width))
+        .and_then(|value| value.checked_mul(channels))
+        .and_then(|value| usize::try_from(value).ok())
+        .filter(|value| *value <= limits.maximum_output_elements)
+        .ok_or(NativeVideoCodecLtxvPreprocessError::ResourceExhausted)?;
+    let mut output = backend
+        .workspace_vec::<f32>(context, output_elements)
+        .map_err(map_ltxv_preprocess_tensor_error)?;
+
+    if compression == 0 {
+        let input = image
+            .as_f32_slice()
+            .map_err(map_ltxv_preprocess_tensor_error)?;
+        if input.len() != output_elements {
+            return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+        }
+        for (index, value) in input.iter().copied().enumerate() {
+            if index & 0xffff == 0 {
+                context.check()?;
+            }
+            output
+                .try_push(value)
+                .map_err(map_ltxv_preprocess_tensor_error)?;
+        }
+    } else {
+        for batch_index in 0..batch {
+            context.check()?;
+            let frame = source_compatible_ltxv_rgb8_frame(
+                image,
+                batch_index,
+                output_height,
+                output_width,
+                backend,
+                context,
+            )?;
+            let decoded = round_trip(&frame, backend, context)?;
+            if decoded
+                .dimensions()
+                .map_err(map_ltxv_preprocess_tensor_error)?
+                != (output_height, output_width)
+            {
+                return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+            }
+            let decoded = decoded
+                .as_u8_slice()
+                .map_err(map_ltxv_preprocess_tensor_error)?;
+            let expected_frame_elements = usize::try_from(
+                output_height
+                    .checked_mul(output_width)
+                    .and_then(|value| value.checked_mul(3))
+                    .ok_or(NativeVideoCodecLtxvPreprocessError::ResourceExhausted)?,
+            )
+            .map_err(|_| NativeVideoCodecLtxvPreprocessError::ResourceExhausted)?;
+            if decoded.len() != expected_frame_elements {
+                return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+            }
+            for (index, value) in decoded.iter().copied().enumerate() {
+                if index & 0xffff == 0 {
+                    context.check()?;
+                }
+                output
+                    .try_push(f32::from(value) / 255.0)
+                    .map_err(map_ltxv_preprocess_tensor_error)?;
+            }
+        }
+    }
+
+    context.check()?;
+    let image = ImageTensor::from_f32(
+        backend,
+        context,
+        batch,
+        output_height,
+        output_width,
+        channels,
+        &output,
+    )
+    .map_err(map_ltxv_preprocess_tensor_error)?;
+    context.check()?;
+    Ok(image)
+}
+
+fn source_compatible_ltxv_rgb8_frame(
+    image: &ImageTensor,
+    batch_index: u64,
+    height: u64,
+    width: u64,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<Rgb8ImageTensor, NativeVideoCodecLtxvPreprocessError> {
+    let descriptor = image.tensor().descriptor();
+    let [batch, input_height, input_width, channels] = descriptor.shape() else {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+    };
+    let [batch_stride, height_stride, width_stride, channel_stride] = descriptor.strides() else {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+    };
+    if batch_index >= *batch
+        || *channels != 3
+        || height == 0
+        || width == 0
+        || height > *input_height
+        || width > *input_width
+        || *batch_stride < 0
+    {
+        return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
+    }
+    let batch_offset = u64::try_from(*batch_stride)
+        .ok()
+        .and_then(|stride| stride.checked_mul(batch_index))
+        .and_then(|offset| descriptor.offset_elements().checked_add(offset))
+        .ok_or(NativeVideoCodecLtxvPreprocessError::ResourceExhausted)?;
+    let frame_descriptor = TensorDescriptor::new_strided(
+        vec![3, height, width],
+        vec![*channel_stride, *height_stride, *width_stride],
+        batch_offset,
+        DType::F32,
+        Layout::Strided,
+        DeviceId::CPU,
+        descriptor.stream(),
+    )
+    .map_err(map_ltxv_preprocess_tensor_error)?;
+    let frame = image
+        .tensor()
+        .view(frame_descriptor, ViewAccess::ReadOnly)
+        .map_err(map_ltxv_preprocess_tensor_error)?;
+    Rgb8ImageTensor::from_logical_chw(backend, context, &frame)
+        .map_err(map_ltxv_preprocess_tensor_error)
+}
+
+fn map_ltxv_preprocess_tensor_error(error: TensorError) -> NativeVideoCodecLtxvPreprocessError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecLtxvPreprocessError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeVideoCodecLtxvPreprocessError::ResourceExhausted
+        }
+        error => NativeVideoCodecLtxvPreprocessError::Tensor(error),
     }
 }
 
@@ -6409,6 +6693,191 @@ mod tests {
 
     fn decode_limits() -> Result<NativeLtxvH264DecodeLimits, NativeVideoCodecLtxvDecodeError> {
         NativeLtxvH264DecodeLimits::checked(8, 8, 2, 2, 4, 12, 1_024)
+    }
+
+    fn preprocess_limits(
+        maximum_batch: u64,
+        maximum_output_elements: usize,
+    ) -> Result<NativeLtxvH264PreprocessLimits, Box<dyn std::error::Error>> {
+        Ok(NativeLtxvH264PreprocessLimits::checked(
+            maximum_batch,
+            maximum_output_elements,
+            NativeLtxvH264EncodeLimits::checked(1_024, 64, 1_024, 8)?,
+            NativeLtxvH264DemuxLimits::checked(1_024, 64, 1_024, 1)?,
+            decode_limits()?,
+        )?)
+    }
+
+    fn preprocess_test_image(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<ImageTensor, TensorError> {
+        let mut values = vec![0.0_f32; 2 * 3 * 3 * 3];
+        let first = [
+            0.0, 0.1, 0.5, 1.0, 1.1, -0.1, 9.0, 9.0, 9.0, 0.25, 0.5, 0.75, 0.9, 0.999, 1.01, 9.0,
+            9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0,
+        ];
+        values[..first.len()].copy_from_slice(&first);
+        for (index, value) in values[first.len()..].iter_mut().enumerate() {
+            *value = f32::from(u8::try_from(index + 11).unwrap_or(0)) / 255.0;
+        }
+        ImageTensor::from_f32(backend, context, 2, 3, 3, 3, &values)
+    }
+
+    #[test]
+    fn retained_ltxv_preprocess_bypasses_or_quantizes_crops_and_stacks_in_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 1024 * 1024)?;
+        let image = preprocess_test_image(&backend, &context)?;
+        let source_id = image.tensor().tensor_id();
+        let source_values = image.as_f32_slice()?.to_vec();
+        let mut bypass_calls = 0;
+        let bypass = preprocess_ltxv_image_with_round_trip(
+            &image,
+            0,
+            preprocess_limits(2, 54)?,
+            &backend,
+            &context,
+            &mut |_, _, _| {
+                bypass_calls += 1;
+                Err(NativeVideoCodecLtxvPreprocessError::InvalidInput)
+            },
+        )?;
+        assert_eq!(bypass_calls, 0);
+        assert_ne!(bypass.tensor().tensor_id(), source_id);
+        assert_eq!(bypass.as_f32_slice()?, source_values);
+
+        let rgba_values = [-0.25, 0.0, 1.0, 1.25, 0.1, 0.2, 0.3, 0.4];
+        let rgba = ImageTensor::from_f32(&backend, &context, 1, 1, 2, 4, &rgba_values)?;
+        let rgba_bypass = preprocess_ltxv_image_with_round_trip(
+            &rgba,
+            0,
+            preprocess_limits(1, rgba_values.len())?,
+            &backend,
+            &context,
+            &mut |_, _, _| Err(NativeVideoCodecLtxvPreprocessError::InvalidInput),
+        )?;
+        assert_eq!(rgba_bypass.dimensions()?, (1, 1, 2, 4));
+        assert_eq!(rgba_bypass.as_f32_slice()?, rgba_values);
+
+        let mut encoded_frames = Vec::new();
+        let compressed = preprocess_ltxv_image_with_round_trip(
+            &image,
+            35,
+            preprocess_limits(2, 24)?,
+            &backend,
+            &context,
+            &mut |frame, _, _| {
+                encoded_frames.push(frame.as_u8_slice()?.to_vec());
+                Ok(frame.clone())
+            },
+        )?;
+        assert_eq!(compressed.dimensions()?, (2, 2, 2, 3));
+        assert_eq!(
+            encoded_frames.first().map(Vec::as_slice),
+            Some([0, 25, 127, 255, 24, 231, 63, 127, 191, 229, 254, 1].as_slice())
+        );
+        assert_eq!(
+            encoded_frames.get(1).map(Vec::as_slice),
+            Some([11, 12, 13, 14, 15, 16, 20, 21, 22, 23, 24, 25].as_slice())
+        );
+        let expected = encoded_frames
+            .iter()
+            .flatten()
+            .map(|value| f32::from(*value) / 255.0)
+            .collect::<Vec<_>>();
+        assert_eq!(compressed.as_f32_slice()?, expected);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn retained_ltxv_preprocess_failure_cancellation_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 1024 * 1024)?;
+        let image = preprocess_test_image(&backend, &context)?;
+        let mut calls = 0;
+        assert!(matches!(
+            preprocess_ltxv_image_with_round_trip(
+                &image,
+                101,
+                preprocess_limits(2, 24)?,
+                &backend,
+                &context,
+                &mut |frame, _, _| {
+                    calls += 1;
+                    Ok(frame.clone())
+                },
+            ),
+            Err(NativeVideoCodecLtxvPreprocessError::InvalidCompression)
+        ));
+        assert_eq!(calls, 0);
+        assert!(matches!(
+            preprocess_ltxv_image_with_round_trip(
+                &image,
+                35,
+                preprocess_limits(2, 23)?,
+                &backend,
+                &context,
+                &mut |frame, _, _| Ok(frame.clone()),
+            ),
+            Err(NativeVideoCodecLtxvPreprocessError::ResourceExhausted)
+        ));
+
+        calls = 0;
+        assert!(matches!(
+            preprocess_ltxv_image_with_round_trip(
+                &image,
+                35,
+                preprocess_limits(2, 24)?,
+                &backend,
+                &context,
+                &mut |frame, _, _| {
+                    calls += 1;
+                    if calls == 2 {
+                        Err(NativeVideoCodecLtxvPreprocessError::InvalidInput)
+                    } else {
+                        Ok(frame.clone())
+                    }
+                },
+            ),
+            Err(NativeVideoCodecLtxvPreprocessError::InvalidInput)
+        ));
+        assert_eq!(calls, 2);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        let (cancel_backend, cancel_context) = avio_context(&cancelled, 1024 * 1024)?;
+        let cancel_image = preprocess_test_image(&cancel_backend, &cancel_context)?;
+        assert!(matches!(
+            preprocess_ltxv_image_with_round_trip(
+                &cancel_image,
+                35,
+                preprocess_limits(2, 24)?,
+                &cancel_backend,
+                &cancel_context,
+                &mut |frame, _, _| {
+                    cancelled.cancel();
+                    Ok(frame.clone())
+                },
+            ),
+            Err(NativeVideoCodecLtxvPreprocessError::Cancelled)
+        ));
+        assert_eq!(cancel_context.scratch.in_use_bytes(), 0);
+
+        let retry = preprocess_ltxv_image_with_round_trip(
+            &image,
+            35,
+            preprocess_limits(2, 24)?,
+            &backend,
+            &context,
+            &mut |frame, _, _| Ok(frame.clone()),
+        )?;
+        assert_eq!(retry.dimensions()?, (2, 2, 2, 3));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        Ok(())
     }
 
     #[test]

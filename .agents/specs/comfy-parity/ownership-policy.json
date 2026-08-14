@@ -14735,6 +14735,95 @@
       "decision_reason": "The consumed retained demux is the sole first-frame H.264 decoder owner. It preserves packet ownership across bounded send/receive transitions, converts only the controlled YUV420P frame into caller-accounted RGB8, and publishes no native pointer, general media, cache, effect, persistence, recovery, or output authority."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_ltxv_tensor_preprocess_composition",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::preprocess_image",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeLtxvH264PreprocessLimits",
+        "NativeVideoCodecLtxvPreprocessError",
+        "NativeLtxvH264Codec::preprocess_image",
+        "preprocess_ltxv_image_with_round_trip"
+      ],
+      "allowed_adapters": [
+        "the canonical IMAGE owner supplies checked CPU F32 BHWC tensors, read-only views, source-compatible RGB8 conversion, workspace, and final tensor allocation",
+        "the retained LTXV codec owner supplies the exact bounded encode, borrowed demux, and first-frame decode operations without exposing native sessions",
+        "the following node adapter may resolve the retained codec and consume only the final IMAGE tensor; it cannot repeat preprocessing or access native pointers"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::preprocess_image",
+          "role": "canonical_service",
+          "symbol": "preprocess_image",
+          "pattern": "pub\\(crate\\) fn preprocess_image\\("
+        }
+      ],
+      "call_symbols": [
+        "preprocess_image"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-tensor-preprocess-composes-canonical-crop-conversion-and-codec-chain",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "preprocess_image[\\s\\S]*encode_rgb8_frame[\\s\\S]*open_first_h264_video_stream[\\s\\S]*decode_first_rgb8_frame"
+        },
+        {
+          "name": "ltxv-tensor-preprocess-bounds-batch-cancellation-and-final-tensor",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "maximum_batch[\\s\\S]*maximum_output_elements[\\s\\S]*source_compatible_ltxv_rgb8_frame[\\s\\S]*Rgb8ImageTensor::from_logical_chw[\\s\\S]*ImageTensor::from_f32"
+        },
+        {
+          "name": "ltxv-tensor-preprocess-tests-source-semantics-failure-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_ltxv_preprocess_bypasses_or_quantizes_crops_and_stacks_in_order[\\s\\S]*retained_ltxv_preprocess_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "ltxv-tensor-preprocess-fixture-bounds-codec-numeric-and-publication-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json",
+          "pattern": "synthetic-source-compatible-ltxv-tensor-preprocess[\\s\\S]*compression_zero_fresh_stack_without_codec_calls[\\s\\S]*production_h264_or_pyav_color_numeric_oracle[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation"
+      ],
+      "production_consumers": [
+        "the following retained codec-thread service and LTXVPreprocess node adapter"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One thread-affine retained codec owner composes the source-compatible LTXV IMAGE transformation. It preserves compression-zero fresh-stack behavior, serially bounds compressed frames, delegates native sessions to their existing owners, and publishes only one final canonical tensor after all cancellation checks."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [

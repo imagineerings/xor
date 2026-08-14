@@ -11165,6 +11165,55 @@ def native_video_codec_ltxv_h264_mp4_decode_foundation_task(
     )
 
 
+def native_video_codec_ltxv_tensor_preprocess_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation",
+        "Apply retained LTXV H.264 preprocessing to IMAGE tensors",
+        [28, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained LTXV H.264 codec composes the completed bounded encode, borrowed demux, and first-frame decode owners into one source-compatible CPU F32 BHWC IMAGE preprocessing operation. Compression zero produces the node's fresh stacked result without cropping or native calls; compression 1 through 100 processes frames serially with exact bottom-right even cropping, canonical source byte conversion, decoded RGB normalization, aggregate bounds, and one final publication after cancellation checks. No new FFI, tensor primitive, media payload, effect, cache, persistence, recovery, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-decode/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused composition tests prove a fresh compression-zero stack with no codec calls, exact serial crop and source byte conversion for compressed batches, decoded byte normalization, checked aggregate limits, cancellation and failure atomicity, zero scratch residue, and clean retry. The fixture records source and prerequisite digests and explicitly claims no licensed or installed FFmpeg package, valid production MP4 oracle, numerical H.264 or PyAV color parity, arbitrary dtype or device support, general video decode, media payload, effect, cache, persistence, recovery, or publication evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "34.4", "35.3", "35.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13451,8 +13500,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ltxv_h264_mp4_demux_foundation["id"])
         )
     )
+    video_codec_ltxv_tensor_preprocess_foundation = (
+        native_video_codec_ltxv_tensor_preprocess_foundation_task(
+            str(video_codec_ltxv_h264_mp4_decode_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_ltxv_h264_mp4_decode_foundation["id"])
+        str(video_codec_ltxv_tensor_preprocess_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13587,6 +13641,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_h264_mp4_encode_foundation,
         video_codec_ltxv_h264_mp4_demux_foundation,
         video_codec_ltxv_h264_mp4_decode_foundation,
+        video_codec_ltxv_tensor_preprocess_foundation,
         video_foundation,
             detection_foundation,
         ]
