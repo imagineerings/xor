@@ -11992,6 +11992,105 @@
       "decision_reason": "The frame-interpolation module owns only FILM's bounded pyramid-level schedule. It delegates every tensor equation and warp to existing canonical owners and returns invocation-local outputs for later fusion."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_sequence_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_film_sequence",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_film_sequence",
+        "NativeFrameInterpolationModel::film_pair_multi_timestep_from_pyramids",
+        "film_finalize_sequence_output"
+      ],
+      "allowed_adapters": [
+        "the canonical invocation plan owns output count and timesteps while the retained FILM pair owner owns flow and synthesis equations",
+        "rife_sequence_frame is the existing family-neutral checked BHWC-frame to contiguous NCHW adapter despite its historical name",
+        "adjacent endpoint image and feature pyramids are moved only through invocation-local variables and cannot enter NativeCache, the retained model, payload, handle, effect, or publication state",
+        "later FILM OOM downgrade execution may consume this happy-path sequence owner but cannot duplicate its endpoint cache or ordering"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_film_sequence",
+          "role": "canonical",
+          "symbol": "interpolate_film_sequence",
+          "pattern": "pub fn interpolate_film_sequence\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_finalize_sequence_output",
+          "role": "canonical_implementation",
+          "symbol": "film_finalize_sequence_output",
+          "pattern": "^fn film_finalize_sequence_output\\("
+        }
+      ],
+      "call_symbols": [
+        "interpolate_film_sequence",
+        "film_pair_multi_timestep_from_pyramids",
+        "film_finalize_sequence_output"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-sequence-validates-profile-bhwc-placement-and-canonical-plan",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn interpolate_film_sequence[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*FILM sequence input must be BHWC RGB[\\s\\S]*self\\.dtype[\\s\\S]*self\\.stream[\\s\\S]*FrameInterpolationInvocationPlan::checked[\\s\\S]*plan\\.is_bypass"
+        },
+        {
+          "name": "film-sequence-computes-each-endpoint-pyramids-once-and-moves-adjacent-cache",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn interpolate_film_sequence[\\s\\S]*first_images[\\s\\S]*first_features[\\s\\S]*for pair in 0\\.\\.pair_count[\\s\\S]*second_images[\\s\\S]*second_features[\\s\\S]*film_pair_multi_timestep_from_pyramids[\\s\\S]*first_images = second_images[\\s\\S]*first_features = second_features"
+        },
+        {
+          "name": "film-sequence-preserves-endpoint-midpoint-order-and-final-bhwc-clamp",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn interpolate_film_sequence[\\s\\S]*output_tensors\\.push\\(first_frame\\.clone\\(\\)\\)[\\s\\S]*output_tensors\\.push\\(self\\.film_pair_multi_timestep_from_pyramids[\\s\\S]*output_tensors\\.push\\(second_frame\\)[\\s\\S]*film_finalize_sequence_output[\\s\\S]*fn film_finalize_sequence_output[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*tensor_permute_exact_native[\\s\\S]*clone_with_context_exact_native[\\s\\S]*clamp_with_context_exact_native"
+        },
+        {
+          "name": "film-sequence-reduced-oracle-proves-order-count-storage-immutability-and-cancellation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_sequence_finalization_preserves_endpoints_midpoints_and_failure_atomicity[\\s\\S]*\\[7, 1, 1, 3\\][\\s\\S]*0\\.0_f32, 0\\.01, 0\\.02[\\s\\S]*0\\.6, 0\\.61, 0\\.62[\\s\\S]*StateMismatch[\\s\\S]*source_bytes[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-sequence-fixture-separates-adjacent-cache-from-production-parity-oom-downgrade-codecs-native-cache-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json",
+          "pattern": "(?=[\\s\\S]*FrameInterpolate.execute)(?=[\\s\\S]*adjacent_reuse)(?=[\\s\\S]*expected_rgb_frames)(?=[\\s\\S]*production_dense_weight_numeric_parity)(?=[\\s\\S]*multi_to_single_oom_downgrade)(?=[\\s\\S]*native_cache_or_persistent_feature_state)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-sequence-execution-foundation"
+      ],
+      "production_consumers": [
+        "native FILM OOM downgrade and video execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeFrameInterpolationModel remains the sole retained FILM owner and composes adjacent pairs using one invocation-local endpoint pyramid cache. Canonical planning, pair synthesis, tensor layout, storage, workspace, and cancellation owners retain their mechanics, and no persistent cache or publication state is introduced."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_subtree_feature_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_subtree_features",
       "owner_files": [

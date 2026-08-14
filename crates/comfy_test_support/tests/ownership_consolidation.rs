@@ -14470,6 +14470,62 @@ fn val_ownership_native_film_multi_timestep_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_film_sequence_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn interpolate_film_sequence(",
+        "fn film_pair_multi_timestep_from_pyramids(",
+        "fn film_finalize_sequence_output(",
+        "first_images = second_images",
+        "first_features = second_features",
+        "output_tensors.push(first_frame.clone())",
+        "output_tensors.push(second_frame)",
+        "clone_with_context_exact_native(",
+        "film_sequence_finalization_preserves_endpoints_midpoints_and_failure_atomicity",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained FILM sequence execution lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json",
+    ))?;
+    assert!(fixture.contains("FrameInterpolate.execute"));
+    assert!(fixture.contains("adjacent_reuse"));
+    assert!(fixture.contains("[7, 1, 1, 3]"));
+    assert!(fixture.contains("[0.6, 0.61, 0.62]"));
+    assert!(fixture.contains("\"production_dense_weight_numeric_parity\": false"));
+    assert!(fixture.contains("\"multi_to_single_oom_downgrade\": false"));
+    assert!(fixture.contains("\"native_cache_or_persistent_feature_state\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_sequence_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-film-sequence-execution-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_pyramid_algebra_foundation_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

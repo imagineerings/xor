@@ -26,7 +26,9 @@ use comfy_tensor::{
         average_pool_2d_tensor_with_context_exact_native,
         grid_sample_tensor_with_context_exact_native, interpolate_tensor_with_context_exact_native,
     },
-    generated_storage_dtype_device_01::contiguous_with_context_exact_native,
+    generated_storage_dtype_device_01::{
+        clone_with_context_exact_native, contiguous_with_context_exact_native,
+    },
 };
 use comfy_types::CancellationError;
 use sha2::{Digest, Sha256};
@@ -779,10 +781,42 @@ impl NativeFrameInterpolationModel {
             film_image_pyramid_with_context_exact_native(backend, second, 7, context)?;
         let second_features =
             self.film_feature_pyramid_from_images(backend, &second_images, context)?;
+        self.film_pair_multi_timestep_from_pyramids(
+            backend,
+            &first_images,
+            &first_features,
+            &second_images,
+            &second_features,
+            timesteps,
+            context,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn film_pair_multi_timestep_from_pyramids(
+        &self,
+        backend: &CpuBackend,
+        first_images: &[Tensor],
+        first_features: &[Tensor],
+        second_images: &[Tensor],
+        second_features: &[Tensor],
+        timesteps: &[f32],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if first_images.len() != 7
+            || first_features.len() != 7
+            || second_images.len() != 7
+            || second_features.len() != 7
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM pair synthesis requires seven endpoint pyramid levels",
+            ));
+        }
         let forward_residuals =
-            self.film_residual_flow_pyramid(backend, &first_features, &second_features, context)?;
+            self.film_residual_flow_pyramid(backend, first_features, second_features, context)?;
         let backward_residuals =
-            self.film_residual_flow_pyramid(backend, &second_features, &first_features, context)?;
+            self.film_residual_flow_pyramid(backend, second_features, first_features, context)?;
         let forward_flows = film_flow_pyramid_synthesis_with_context_exact_native(
             backend,
             &forward_residuals,
@@ -828,6 +862,96 @@ impl NativeFrameInterpolationModel {
             self.dtype,
             context,
         )
+    }
+
+    pub fn interpolate_film_sequence(
+        &self,
+        backend: &CpuBackend,
+        images: &Tensor,
+        multiplier: u64,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM sequence execution requires a FILM checkpoint",
+            ));
+        }
+        let descriptor = images.descriptor();
+        let shape = descriptor.shape();
+        if shape.len() != 4
+            || shape.get(1) == Some(&0)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) != Some(&3)
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM sequence input must be BHWC RGB",
+            ));
+        }
+        if descriptor.dtype() != self.dtype
+            || descriptor.device() != DeviceId::CPU
+            || descriptor.stream() != self.stream
+            || descriptor.stream() != context.stream
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+        let frame_count = *shape.first().ok_or(FrameInterpolationError::Overflow)?;
+        let height = *shape.get(1).ok_or(FrameInterpolationError::Overflow)?;
+        let width = *shape.get(2).ok_or(FrameInterpolationError::Overflow)?;
+        let plan = FrameInterpolationInvocationPlan::checked(
+            &self.profile,
+            frame_count,
+            multiplier,
+            height,
+            width,
+            context.cancellation,
+        )?;
+        if plan.is_bypass() {
+            context.cancellation.check()?;
+            return Ok(images.clone());
+        }
+
+        let pair_count = frame_count.saturating_sub(1);
+        let output_tensor_capacity = pair_count
+            .checked_mul(2)
+            .and_then(|count| count.checked_add(1))
+            .and_then(|count| usize::try_from(count).ok())
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let mut output_tensors = Vec::new();
+        output_tensors
+            .try_reserve_exact(output_tensor_capacity)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+
+        let first_frame = rife_sequence_frame(backend, images, 0, context)?;
+        output_tensors.push(first_frame.clone());
+        let mut first_images =
+            film_image_pyramid_with_context_exact_native(backend, &first_frame, 7, context)?;
+        let mut first_features =
+            self.film_feature_pyramid_from_images(backend, &first_images, context)?;
+        for pair in 0..pair_count {
+            context.cancellation.check()?;
+            let second_frame = rife_sequence_frame(backend, images, pair + 1, context)?;
+            let second_images =
+                film_image_pyramid_with_context_exact_native(backend, &second_frame, 7, context)?;
+            let second_features =
+                self.film_feature_pyramid_from_images(backend, &second_images, context)?;
+            output_tensors.push(self.film_pair_multi_timestep_from_pyramids(
+                backend,
+                &first_images,
+                &first_features,
+                &second_images,
+                &second_features,
+                plan.timesteps(),
+                context,
+            )?);
+            output_tensors.push(second_frame);
+            first_images = second_images;
+            first_features = second_features;
+        }
+        if output_tensors.len() != output_tensor_capacity {
+            return Err(FrameInterpolationError::StateMismatch);
+        }
+        film_finalize_sequence_output(backend, &output_tensors, plan.output_frame_count(), context)
     }
 
     pub fn interpolate_rife_pair(
@@ -1482,6 +1606,52 @@ fn contiguous_narrow(
         ),
         context,
     )
+}
+
+fn film_finalize_sequence_output(
+    backend: &CpuBackend,
+    output_tensors: &[Tensor],
+    output_frame_count: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if output_tensors.is_empty() || output_frame_count == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM sequence output is empty",
+        ));
+    }
+    let output = execution_result(
+        torch_cat_with_context_exact_native(backend, output_tensors, 0, context),
+        context,
+    )?;
+    if output.descriptor().shape().first() != Some(&output_frame_count) {
+        return Err(FrameInterpolationError::StateMismatch);
+    }
+    let output = execution_result(
+        tensor_permute_exact_native(&output, &[0, 2, 3, 1], context.cancellation),
+        context,
+    )?;
+    let output = execution_result(
+        clone_with_context_exact_native(
+            backend,
+            &output,
+            MemoryFormatReference::Layout(Layout::Contiguous),
+            context,
+        ),
+        context,
+    )?;
+    let output = execution_result(
+        clamp_with_context_exact_native(
+            backend,
+            &output,
+            Some(Scalar::Float(0.0)),
+            Some(Scalar::Float(1.0)),
+            context,
+        ),
+        context,
+    )?;
+    context.cancellation.check()?;
+    Ok(output)
 }
 
 fn rife_sequence_frame(
@@ -3403,6 +3573,88 @@ mod tests {
                 DType::F32,
                 &cancelled_context,
             ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn film_sequence_finalization_preserves_endpoints_midpoints_and_failure_atomicity()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let tensor = |batch: u64, values: &[f32]| {
+            tensor_from_f32(
+                &backend,
+                &[batch, 3, 1, 1],
+                values,
+                DType::F32,
+                DeviceId::CPU,
+                &context,
+            )
+            .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        };
+        let tensors = vec![
+            tensor(1, &[0.0, 0.01, 0.02])?,
+            tensor(2, &[0.1, 0.11, 0.12, 0.2, 0.21, 0.22])?,
+            tensor(1, &[0.3, 0.31, 0.32])?,
+            tensor(2, &[0.4, 0.41, 0.42, 0.5, 0.51, 0.52])?,
+            tensor(1, &[0.6, 0.61, 0.62])?,
+        ];
+        let source_bytes = tensors
+            .iter()
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let output = film_finalize_sequence_output(&backend, &tensors, 7, &context)?;
+        assert_eq!(output.descriptor().shape(), &[7, 1, 1, 3]);
+        for (linear, expected) in [
+            0.0_f32, 0.01, 0.02, 0.1, 0.11, 0.12, 0.2, 0.21, 0.22, 0.3, 0.31, 0.32, 0.4, 0.41,
+            0.42, 0.5, 0.51, 0.52, 0.6, 0.61, 0.62,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let linear = u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?;
+            let actual = match DType::F32.decode_scalar(output.linear_element_bytes(linear)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert!((actual - expected).abs() <= f32::EPSILON);
+        }
+        for (source, bytes) in tensors.iter().zip(source_bytes) {
+            assert_eq!(source.contiguous_bytes()?, bytes);
+        }
+        assert!(matches!(
+            film_finalize_sequence_output(&backend, &tensors, 6, &context),
+            Err(FrameInterpolationError::StateMismatch)
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_finalize_sequence_output(&backend, &tensors, 7, &cancelled_context),
             Err(FrameInterpolationError::Cancelled)
         ));
         assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);

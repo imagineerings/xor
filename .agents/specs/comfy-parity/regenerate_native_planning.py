@@ -10277,6 +10277,43 @@ def native_film_multi_timestep_foundation_task(dependency: str) -> dict[str, obj
     )
 
 
+def native_film_sequence_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-sequence-execution-foundation",
+        "Execute FILM sequences with adjacent feature reuse",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model executes a bounded BHWC FILM sequence through the canonical invocation plan. It converts each endpoint to NCHW once, computes each frame's image and feature pyramids once, moves the second endpoint pyramids into the next pair's first-endpoint cache, delegates every pair to retained multi-timestep synthesis, preserves source endpoint-midpoint ordering, and emits one fresh contiguous clamped BHWC result. The cache is invocation-local Rust state, never NativeCache or retained model state; source OOM downgrade policy remains a later leaf.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced finalization oracle proves two pairs at multiplier three preserve seven exact endpoint/midpoint RGB frames in BHWC order, return fresh storage, leave source tensors immutable, reject a mismatched frame count, honor pre-cancellation, and release scratch. Production ownership evidence proves each next endpoint image and feature pyramid is computed once then moved into the following pair, exact output-count preflight, final concatenate-permute-clone-clamp ordering, and explicit absence of licensed production-weight numeric parity, multi-to-single OOM downgrade, codecs, handles, NativeCache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12526,8 +12563,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_multi_timestep_foundation = native_film_multi_timestep_foundation_task(
         str(film_fusion_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_sequence_foundation = native_film_sequence_foundation_task(
         str(film_multi_timestep_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_sequence_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12643,6 +12683,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_pyramid_algebra_foundation,
         film_fusion_foundation,
         film_multi_timestep_foundation,
+        film_sequence_foundation,
         video_foundation,
             detection_foundation,
         ]
