@@ -15068,6 +15068,113 @@
       "decision_reason": "One checked domain-neutral port moves only canonical IMAGE values and caller execution authority across the retained codec thread boundary. Runtime adapters preserve one service identity through node context and cache configuration without owning codec loading, package provisioning, a node implementation, media state, effects, persistence, recovery, or publication."
     },
     {
+      "concern": "native_video_reviewed_codec_service_ltxv_node_runtime_adapter",
+      "canonical_owner": "comfy_nodes::generated_video_preprocessors_01::LtxvPreprocessNode",
+      "owner_files": [
+        "crates/comfy_nodes/src/families/video_preprocessors_01.rs"
+      ],
+      "owner_symbols": [
+        "LtxvPreprocessNode",
+        "NATIVE_NODE_BINDINGS",
+        "LTXVPreprocess"
+      ],
+      "allowed_adapters": [
+        "NativeLtxvPreprocessService remains the sole domain-neutral IMAGE preprocessing port and supplies its behavior-bearing configuration digest",
+        "NativeHandleStore remains the sole IMAGE payload resolution and publication owner; this node only resolves one input and publishes one completed output",
+        "NativeNodeComputeSession remains the sole caller backend, stream, scratch, and cancellation projection",
+        "the later generated video-preprocessors closure task may reconcile this early executable slice without duplicating its service call or node implementation",
+        "worker package provisioning remains a separate process-local owner and may inject the service but cannot alter node semantics"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/families/video_preprocessors_01.rs",
+          "qualified": "comfy_nodes::generated_video_preprocessors_01::LtxvPreprocessNode",
+          "role": "canonical_implementation",
+          "symbol": "LtxvPreprocessNode"
+        }
+      ],
+      "call_symbols": [
+        "ltxv_preprocess_service",
+        "preprocess_image"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_nodes/src/families/video_preprocessors_01.rs"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-node-binds-the-exact-source-schema-and-service-identity-cache",
+          "path": "crates/comfy_nodes/src/families/video_preprocessors_01.rs",
+          "pattern": "LTXVPreprocess[\\s\\S]*img_compression[\\s\\S]*output_image[\\s\\S]*SERVICE_ARTIFACT[\\s\\S]*configuration_sha256"
+        },
+        {
+          "name": "ltxv-node-resolves-one-image-delegates-once-and-publishes-after-cancellation",
+          "path": "crates/comfy_nodes/src/families/video_preprocessors_01.rs",
+          "pattern": "resolve\\(input_handle[\\s\\S]*ltxv_preprocess_service[\\s\\S]*preprocess_image\\(input_image, compression[\\s\\S]*check_cancellation\\(&context\\)[\\s\\S]*publish\\("
+        },
+        {
+          "name": "ltxv-node-exhaustively-maps-service-errors",
+          "path": "crates/comfy_nodes/src/families/video_preprocessors_01.rs",
+          "pattern": "NativeLtxvPreprocessServiceError::Cancelled[\\s\\S]*NativeLtxvPreprocessServiceError::Unavailable[\\s\\S]*NativeLtxvPreprocessServiceError::Busy[\\s\\S]*NativeLtxvPreprocessServiceError::ResourceExhausted[\\s\\S]*NativeLtxvPreprocessServiceError::InvalidRequest[\\s\\S]*NativeLtxvPreprocessServiceError::Execution"
+        },
+        {
+          "name": "ltxv-node-tests-schema-delegation-failure-cancellation-and-retry",
+          "path": "crates/comfy_nodes/src/families/video_preprocessors_01.rs",
+          "pattern": "ltxv_preprocess_descriptor_and_fixture_match_source[\\s\\S]*ltxv_preprocess_delegates_once_and_publishes_a_fresh_handle[\\s\\S]*ltxv_preprocess_rejects_bounds_and_maps_service_failures_atomically"
+        },
+        {
+          "name": "ltxv-node-fixture-bounds-production-and-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/nodes/video-preprocessors-comfy-node-0372/fixture.json",
+          "pattern": "COMFY-NODE-0372[\\s\\S]*input_identity_plus_ltxv_service_configuration_sha256[\\s\\S]*worker_codec_package_provisioning[\\s\\S]*real_h264_numeric_oracle[\\s\\S]*external_output_publication"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-node-adapter-foundation"
+      ],
+      "production_consumers": [
+        "the generated native implementation registry and LTXVPreprocess workflow execution"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D8",
+        "D17",
+        "D18",
+        "D19",
+        "D20",
+        "D25",
+        "D27",
+        "D28",
+        "D31",
+        "D36",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-NODE-001",
+        "VAL-NODE-002",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One early executable node slice owns the exact LTXVPreprocess descriptor, typed input parsing, injected-service delegation, cache dependency, failure mapping, and failure-atomic IMAGE publication. It consumes the existing port and canonical handle/compute owners without duplicating codec execution, package provisioning, media state, effects, persistence, recovery, or external output publication."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [

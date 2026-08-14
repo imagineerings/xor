@@ -15372,6 +15372,84 @@ fn val_ownership_native_video_codec_ltxv_node_service_001() -> Result<(), Box<dy
 }
 
 #[test]
+fn val_ownership_native_video_codec_ltxv_node_adapter_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let node =
+        fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_preprocessors_01.rs"))?;
+    for required in [
+        "pub const NODE_DESCRIPTOR_IDS: &[&str] = &[\"LTXVPreprocess\"]",
+        "const FEATURE_ID: &str = \"COMFY-NODE-0372\"",
+        ".ltxv_preprocess_service()",
+        ".preprocess_image(input_image, compression, &execution_context)",
+        "service.identity().configuration_sha256()",
+        "NativeTensorPayload::from_image(NativeTensorRole::Image, output_image)",
+        "ltxv_preprocess_delegates_once_and_publishes_a_fresh_handle",
+        "ltxv_preprocess_rejects_bounds_and_maps_service_failures_atomically",
+    ] {
+        assert!(
+            node.contains(required),
+            "LTXV node adapter lacks {required}"
+        );
+    }
+    assert_eq!(
+        node.matches("impl NativeNode for LtxvPreprocessNode")
+            .count(),
+        1
+    );
+    for forbidden in [
+        "load_certified_video_codec_closure",
+        "bind_certified_video_codec_abi",
+        "admit_ltxv_h264",
+        "unsafe impl Send",
+        "unsafe impl Sync",
+        "NativePreparedEffectRequest",
+    ] {
+        assert!(
+            !node.contains(forbidden),
+            "LTXV node adapter owns forbidden authority {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/nodes/video-preprocessors-comfy-node-0372/fixture.json",
+    ))?;
+    for required in [
+        "COMFY-NODE-0372",
+        "input_identity_plus_ltxv_service_configuration_sha256",
+        "worker_codec_package_provisioning",
+        "real_h264_numeric_oracle",
+        "external_output_publication",
+    ] {
+        assert!(fixture.contains(required));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_service_ltxv_node_runtime_adapter")
+            })
+        })
+        .ok_or("missing LTXV node-adapter ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-node-adapter-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
