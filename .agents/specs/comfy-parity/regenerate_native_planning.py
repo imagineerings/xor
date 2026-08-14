@@ -10064,6 +10064,43 @@ def native_film_subtree_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_film_feature_pyramid_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-feature-pyramid-foundation",
+        "Compose retained FILM feature pyramids",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model composes FILM FeatureExtractor output from the canonical seven-level image pyramid and retained SubTreeExtractor. Each output preserves the current subtree root and concatenates older diagonal subtree levels in source order through the canonical tensor concatenation owner, releases obsolete sub-pyramids after their final consumer, and retains no features, workspace, cache, handles, codecs, effects, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-subtree/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced composition oracle proves four output levels with exact diagonal values [0], [10,1], [20,11,2], and [30,21,12], level-zero source aliasing, fresh concatenated storage, immutable source tensors, canonical channel-axis order, production rejection of non-FILM profiles, pre-cancellation, backend-capacity failure with zero scratch residue, and explicit absence of licensed production-weight numeric parity, FILM flow estimation or fusion, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12293,8 +12330,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_subtree_foundation = native_film_subtree_foundation_task(
         str(film_image_pyramid_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_feature_pyramid_foundation = native_film_feature_pyramid_foundation_task(
         str(film_subtree_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_feature_pyramid_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12402,9 +12442,10 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             film_tensor_average_pool_foundation,
             film_warp_foundation,
             film_padded_convolution_foundation,
-            film_image_pyramid_foundation,
-            film_subtree_foundation,
-            video_foundation,
+        film_image_pyramid_foundation,
+        film_subtree_foundation,
+        film_feature_pyramid_foundation,
+        video_foundation,
             detection_foundation,
         ]
         + nodes

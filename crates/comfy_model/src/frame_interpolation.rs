@@ -533,6 +533,37 @@ impl NativeFrameInterpolationModel {
         )
     }
 
+    pub fn film_feature_pyramid(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM feature extraction requires a FILM checkpoint",
+            ));
+        }
+        let image_pyramid =
+            film_image_pyramid_with_context_exact_native(backend, input, 7, context)?;
+        let mut sub_pyramids = Vec::new();
+        sub_pyramids
+            .try_reserve_exact(image_pyramid.len())
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        for (index, image) in image_pyramid.iter().enumerate() {
+            context.cancellation.check()?;
+            let pooling_levels = image_pyramid.len().saturating_sub(index).min(4);
+            sub_pyramids.push(self.film_subtree_features(
+                backend,
+                image,
+                pooling_levels,
+                context,
+            )?);
+        }
+        compose_film_feature_pyramid(backend, sub_pyramids, 4, context)
+    }
+
     pub fn interpolate_rife_pair(
         &self,
         backend: &CpuBackend,
@@ -1593,6 +1624,86 @@ fn film_average_pool_configuration() -> AveragePoolConfiguration {
     }
 }
 
+fn compose_film_feature_pyramid(
+    backend: &CpuBackend,
+    sub_pyramids: Vec<Vec<Tensor>>,
+    sublevels: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Tensor>, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if sub_pyramids.is_empty()
+        || sub_pyramids.len() > 7
+        || !(1..=4).contains(&sublevels)
+        || sub_pyramids
+            .iter()
+            .any(|pyramid| pyramid.len() != sublevels)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM feature sub-pyramids are invalid",
+        ));
+    }
+    let mut sub_pyramids = sub_pyramids.into_iter().map(Some).collect::<Vec<_>>();
+    let mut feature_pyramid = Vec::new();
+    feature_pyramid
+        .try_reserve_exact(sub_pyramids.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    for index in 0..sub_pyramids.len() {
+        context.cancellation.check()?;
+        let input_count = index
+            .checked_add(1)
+            .ok_or(FrameInterpolationError::Overflow)?
+            .min(sublevels);
+        let mut inputs = Vec::new();
+        inputs
+            .try_reserve_exact(input_count)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        inputs.push(
+            sub_pyramids
+                .get(index)
+                .and_then(Option::as_ref)
+                .and_then(|pyramid| pyramid.first())
+                .ok_or(FrameInterpolationError::StateMismatch)?
+                .clone(),
+        );
+        for level in 1..input_count {
+            context.cancellation.check()?;
+            let source_index = index
+                .checked_sub(level)
+                .ok_or(FrameInterpolationError::Overflow)?;
+            inputs.push(
+                sub_pyramids
+                    .get(source_index)
+                    .and_then(Option::as_ref)
+                    .and_then(|pyramid| pyramid.get(level))
+                    .ok_or(FrameInterpolationError::StateMismatch)?
+                    .clone(),
+            );
+        }
+        let features = if inputs.len() == 1 {
+            inputs.pop().ok_or(FrameInterpolationError::StateMismatch)?
+        } else {
+            execution_result(
+                torch_cat_with_context_exact_native(backend, &inputs, 1, context),
+                context,
+            )?
+        };
+        feature_pyramid.push(features);
+        if index >= sublevels.saturating_sub(1) {
+            let released_index = index
+                .checked_sub(sublevels.saturating_sub(1))
+                .ok_or(FrameInterpolationError::Overflow)?;
+            let released = sub_pyramids
+                .get_mut(released_index)
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            if released.take().is_none() {
+                return Err(FrameInterpolationError::StateMismatch);
+            }
+        }
+    }
+    context.cancellation.check()?;
+    Ok(feature_pyramid)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn film_subtree_features_from_weights(
     backend: &CpuBackend,
@@ -2206,6 +2317,144 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_feature_pyramid_concatenates_source_diagonals_and_releases_inputs()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let mut sub_pyramids = Vec::new();
+        for pyramid_index in 0..4_usize {
+            let mut pyramid = Vec::new();
+            for level in 0..3_usize {
+                let value = pyramid_index
+                    .checked_mul(10)
+                    .and_then(|value| value.checked_add(level))
+                    .ok_or(FrameInterpolationError::Overflow)? as f32;
+                pyramid.push(
+                    tensor_from_f32(
+                        &backend,
+                        &[1, 1, 1, 1],
+                        &[value],
+                        DType::F32,
+                        DeviceId::CPU,
+                        &context,
+                    )
+                    .map_err(|error| FrameInterpolationError::Execution(error.to_string()))?,
+                );
+            }
+            sub_pyramids.push(pyramid);
+        }
+        let source = sub_pyramids.clone();
+        let source_bytes = source
+            .iter()
+            .flat_map(|pyramid| pyramid.iter())
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        let features = compose_film_feature_pyramid(&backend, sub_pyramids, 3, &context)?;
+        assert_eq!(features.len(), 4);
+        let expected = [
+            vec![0.0_f32],
+            vec![10.0_f32, 1.0],
+            vec![20.0_f32, 11.0, 2.0],
+            vec![30.0_f32, 21.0, 12.0],
+        ];
+        for (index, expected_values) in expected.iter().enumerate() {
+            let feature = features
+                .get(index)
+                .ok_or(FrameInterpolationError::StateMismatch)?;
+            assert_eq!(
+                feature.descriptor().shape(),
+                &[
+                    1,
+                    u64::try_from(expected_values.len())
+                        .map_err(|_| FrameInterpolationError::Overflow)?,
+                    1,
+                    1
+                ]
+            );
+            for (linear, expected_value) in expected_values.iter().enumerate() {
+                let actual = match DType::F32.decode_scalar(feature.linear_element_bytes(
+                    u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?,
+                )?)? {
+                    DecodedScalar::Real(value) => value as f32,
+                    _ => return Err(FrameInterpolationError::StateMismatch),
+                };
+                assert_eq!(actual, *expected_value);
+            }
+        }
+        assert_eq!(features[0].storage_id(), source[0][0].storage_id());
+        for (index, feature) in features.iter().enumerate().skip(1) {
+            assert!(
+                source[index]
+                    .iter()
+                    .all(|tensor| tensor.storage_id() != feature.storage_id())
+            );
+        }
+        for (tensor, expected_bytes) in source
+            .iter()
+            .flat_map(|pyramid| pyramid.iter())
+            .zip(source_bytes)
+        {
+            assert_eq!(tensor.contiguous_bytes()?, expected_bytes);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let (constrained_backend, constrained_authority) = CpuWorkspaceAuthority::create_backend(1)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let constrained_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: constrained_authority
+                .authorize_workspace(1)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            compose_film_feature_pyramid(
+                &constrained_backend,
+                source.clone(),
+                3,
+                &constrained_context,
+            ),
+            Err(FrameInterpolationError::Execution(_))
+        ));
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+
+        let rife = NativeFrameInterpolationModel::reduced_rife_test_fixture(&backend, &context)?;
+        assert!(matches!(
+            rife.film_feature_pyramid(&backend, &source[0][0], &context),
+            Err(FrameInterpolationError::InvalidInvocation(_))
+        ));
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            compose_film_feature_pyramid(&backend, source, 3, &cancelled_context,),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_subtree_executes_two_convolutions_and_conditional_pooling()

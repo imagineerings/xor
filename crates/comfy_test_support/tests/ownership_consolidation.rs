@@ -14201,6 +14201,59 @@ fn val_ownership_native_film_subtree_foundation_001() -> Result<(), Box<dyn std:
 }
 
 #[test]
+fn val_ownership_native_film_feature_pyramid_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_feature_pyramid(",
+        "fn compose_film_feature_pyramid(",
+        "film_image_pyramid_with_context_exact_native(backend, input, 7, context)",
+        "self.film_subtree_features(",
+        "torch_cat_with_context_exact_native(backend, &inputs, 1, context)",
+        "released.take().is_none()",
+        "film_feature_pyramid_concatenates_source_diagonals_and_releases_inputs",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained FILM feature pyramid lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid/manifest.json",
+    ))?;
+    assert!(fixture.contains("FeatureExtractor.forward"));
+    assert!(fixture.contains("[30.0, 21.0, 12.0]"));
+    assert!(fixture.contains("\"level_zero_aliases_source\": true"));
+    assert!(fixture.contains("\"production_dense_weight_numeric_parity\": false"));
+    assert!(fixture.contains("\"flow_estimator_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some(
+                        "native_rife_frame_interpolation_film_subtree_feature_pyramid_composition",
+                    )
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some("comfy-parity-native-film-feature-pyramid-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_image_pyramid_foundation_001() -> Result<(), Box<dyn std::error::Error>>
 {
     let root = repository_root()?;

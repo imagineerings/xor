@@ -11635,6 +11635,98 @@
       "decision_reason": "The existing retained interpolation model remains the sole FILM checkpoint owner and executes the exact subtree schedule over borrowed tensors. Reduced weights exist only inside the source-fingerprinted oracle and do not form a publishable model or second graph owner."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_subtree_feature_pyramid_composition",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_feature_pyramid",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::film_feature_pyramid",
+        "compose_film_feature_pyramid"
+      ],
+      "allowed_adapters": [
+        "FILM image-pyramid and subtree owners produce attempt-local inputs from the sole retained checkpoint",
+        "compose_film_feature_pyramid is the private source-order diagonal composer shared with the reduced oracle",
+        "torch_cat_with_context_exact_native remains the sole channel concatenation, allocation, storage, cancellation, and publication owner",
+        "future FILM flow and fusion execution may consume returned features but cannot retain them in the model resource, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_feature_pyramid",
+          "role": "canonical",
+          "symbol": "film_feature_pyramid",
+          "pattern": "pub fn film_feature_pyramid\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::compose_film_feature_pyramid",
+          "role": "canonical_implementation",
+          "symbol": "compose_film_feature_pyramid",
+          "pattern": "^fn compose_film_feature_pyramid\\("
+        }
+      ],
+      "call_symbols": [
+        "film_feature_pyramid",
+        "compose_film_feature_pyramid"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-feature-pyramid-binds-retained-film-image-and-subtree-owners",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn film_feature_pyramid[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*film_image_pyramid_with_context_exact_native\\(backend, input, 7[\\s\\S]*self\\.film_subtree_features[\\s\\S]*compose_film_feature_pyramid"
+        },
+        {
+          "name": "film-feature-pyramid-concatenates-current-root-and-prior-diagonals-then-releases",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn compose_film_feature_pyramid[\\s\\S]*for index in 0\\.\\.sub_pyramids\\.len\\(\\)[\\s\\S]*pyramid\\.first\\(\\)[\\s\\S]*for level in 1\\.\\.input_count[\\s\\S]*index\\.checked_sub\\(level\\)[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &inputs, 1[\\s\\S]*released\\.take\\(\\)"
+        },
+        {
+          "name": "film-feature-pyramid-reduced-oracle-proves-order-aliases-immutability-and-failure-atomicity",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_feature_pyramid_concatenates_source_diagonals_and_releases_inputs[\\s\\S]*vec!\\[10\\.0_f32, 1\\.0\\][\\s\\S]*vec!\\[30\\.0_f32, 21\\.0, 12\\.0\\][\\s\\S]*create_backend\\(1\\)[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-feature-pyramid-fixture-separates-composition-from-production-weights-flow-fusion-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-feature-pyramid/manifest.json",
+          "pattern": "(?=[\\s\\S]*FeatureExtractor.forward)(?=[\\s\\S]*expected_outputs)(?=[\\s\\S]*production_dense_weight_numeric_parity)(?=[\\s\\S]*flow_estimator_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-feature-pyramid-foundation"
+      ],
+      "production_consumers": [
+        "future retained native FILM flow, fusion, and sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The retained interpolation model composes FILM features without creating a second checkpoint or tensor owner. Diagonal concatenation delegates to the canonical tensor facade, and all feature tensors remain invocation-local and are released after their final source consumer."
+    },
+    {
       "concern": "native_rife_frame_interpolation_sequence_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
       "owner_files": [
