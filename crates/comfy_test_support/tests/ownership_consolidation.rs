@@ -14410,6 +14410,66 @@ fn val_ownership_native_film_fusion_foundation_001() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn val_ownership_native_film_multi_timestep_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn interpolate_film_pair_multi_timestep(",
+        "fn film_feature_pyramid_from_images(",
+        "fn film_synthesize_timesteps_from_pyramids(",
+        "1.0_f32 - timestep",
+        "&forward_warped",
+        "&backward_warped",
+        "&backward_scaled",
+        "&forward_scaled",
+        "film_fusion_from_weights(",
+        "film_multi_timestep_synthesis_reuses_flows_and_orders_outputs",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained FILM multi-timestep synthesis lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json",
+    ))?;
+    assert!(fixture.contains("FILM.forward"));
+    assert!(fixture.contains("[0.25, 0.75]"));
+    assert!(fixture.contains("[3.5, 7.0, 10.5]"));
+    assert!(fixture.contains("[2.5, 5.0, 7.5]"));
+    assert!(fixture.contains("\"production_dense_weight_numeric_parity\": false"));
+    assert!(fixture.contains("\"adjacent_pair_sequence_reuse\": false"));
+    assert!(fixture.contains("\"effect_or_publication_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some(
+                        "native_rife_frame_interpolation_film_fusion_multi_timestep_pair_synthesis",
+                    )
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-film-multi-timestep-synthesis-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_pyramid_algebra_foundation_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

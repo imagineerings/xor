@@ -10241,6 +10241,42 @@ def native_film_fusion_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_film_multi_timestep_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-multi-timestep-synthesis-foundation",
+        "Synthesize retained FILM multi-timestep pairs",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model executes a batch-one FILM pair for a bounded set of timesteps. It constructs each endpoint image and feature pyramid once, predicts and synthesizes forward and backward flow once, scales backward flow by t and forward flow by one minus t, warps the source-aligned pyramids, concatenates warped targets before scaled flows in the source order, delegates every timestep to the retained fusion graph, and concatenates the attempt-local RGB results. Canonical tensor, warp, flow, fusion, storage, workspace, stream, and cancellation owners retain their mechanics; adjacent-pair sequence reuse remains a later leaf.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight oracle reuses five forward/backward flow and target levels at t=0.25 and t=0.75, proving backward t plus forward one-minus-t scaling, source concatenation order, timestep output order, exact RGB values [3.5,7,10.5] then [2.5,5,7.5], fresh output storage, immutable inputs, pre-cancellation, and zero scratch residue. Production ownership evidence proves each endpoint image and feature pyramid plus both directions of flow are computed once per pair and explicitly excludes licensed production-weight numeric parity, adjacent-pair sequence caching, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12487,8 +12523,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_fusion_foundation = native_film_fusion_foundation_task(
         str(film_pyramid_algebra_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_multi_timestep_foundation = native_film_multi_timestep_foundation_task(
         str(film_fusion_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_multi_timestep_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12603,6 +12642,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_flow_estimator_foundation,
         film_pyramid_algebra_foundation,
         film_fusion_foundation,
+        film_multi_timestep_foundation,
         video_foundation,
             detection_foundation,
         ]

@@ -548,6 +548,20 @@ impl NativeFrameInterpolationModel {
         }
         let image_pyramid =
             film_image_pyramid_with_context_exact_native(backend, input, 7, context)?;
+        self.film_feature_pyramid_from_images(backend, &image_pyramid, context)
+    }
+
+    fn film_feature_pyramid_from_images(
+        &self,
+        backend: &CpuBackend,
+        image_pyramid: &[Tensor],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<Tensor>, FrameInterpolationError> {
+        if image_pyramid.len() != 7 {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM feature extraction requires seven image levels",
+            ));
+        }
         let mut sub_pyramids = Vec::new();
         sub_pyramids
             .try_reserve_exact(image_pyramid.len())
@@ -704,6 +718,116 @@ impl NativeFrameInterpolationModel {
             }
         }
         film_fusion_from_weights(backend, pyramid, &self.weights, context)
+    }
+
+    pub fn interpolate_film_pair_multi_timestep(
+        &self,
+        backend: &CpuBackend,
+        first: &Tensor,
+        second: &Tensor,
+        timesteps: &[f32],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM pair execution requires a FILM checkpoint",
+            ));
+        }
+        if timesteps.is_empty()
+            || timesteps.len()
+                > usize::try_from(MAXIMUM_INTERPOLATION_MULTIPLIER - 1)
+                    .map_err(|_| FrameInterpolationError::Overflow)?
+            || timesteps
+                .iter()
+                .any(|timestep| !timestep.is_finite() || !(0.0..=1.0).contains(timestep))
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM timesteps must be a nonempty bounded finite unit interval",
+            ));
+        }
+        let first_descriptor = first.descriptor();
+        let second_descriptor = second.descriptor();
+        let shape = first_descriptor.shape();
+        if shape.len() != 4
+            || shape.first() != Some(&1)
+            || shape.get(1) != Some(&3)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) == Some(&0)
+            || second_descriptor.shape() != shape
+        {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM pair inputs must be matching batch-one NCHW RGB tensors",
+            ));
+        }
+        for descriptor in [first_descriptor, second_descriptor] {
+            if descriptor.dtype() != self.dtype
+                || descriptor.device() != DeviceId::CPU
+                || descriptor.stream() != self.stream
+                || descriptor.stream() != context.stream
+                || !descriptor.is_contiguous()?
+            {
+                return Err(FrameInterpolationError::Placement);
+            }
+        }
+
+        let first_images =
+            film_image_pyramid_with_context_exact_native(backend, first, 7, context)?;
+        let first_features =
+            self.film_feature_pyramid_from_images(backend, &first_images, context)?;
+        let second_images =
+            film_image_pyramid_with_context_exact_native(backend, second, 7, context)?;
+        let second_features =
+            self.film_feature_pyramid_from_images(backend, &second_images, context)?;
+        let forward_residuals =
+            self.film_residual_flow_pyramid(backend, &first_features, &second_features, context)?;
+        let backward_residuals =
+            self.film_residual_flow_pyramid(backend, &second_features, &first_features, context)?;
+        let forward_flows = film_flow_pyramid_synthesis_with_context_exact_native(
+            backend,
+            &forward_residuals,
+            context,
+        )?;
+        let backward_flows = film_flow_pyramid_synthesis_with_context_exact_native(
+            backend,
+            &backward_residuals,
+            context,
+        )?;
+        let first_warp_targets = film_concatenate_pyramids_with_context_exact_native(
+            backend,
+            first_images
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            first_features
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            context,
+        )?;
+        let second_warp_targets = film_concatenate_pyramids_with_context_exact_native(
+            backend,
+            second_images
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            second_features
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            context,
+        )?;
+        film_synthesize_timesteps_from_pyramids(
+            backend,
+            &first_warp_targets,
+            &second_warp_targets,
+            forward_flows
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            backward_flows
+                .get(..5)
+                .ok_or(FrameInterpolationError::StateMismatch)?,
+            timesteps,
+            &self.weights,
+            self.dtype,
+            context,
+        )
     }
 
     pub fn interpolate_rife_pair(
@@ -2079,6 +2203,93 @@ fn film_convolution_from_weights(
     film_conv_2d_with_context_exact_native(backend, input, weight, bias, activation, context)
 }
 
+#[allow(clippy::too_many_arguments)]
+fn film_synthesize_timesteps_from_pyramids(
+    backend: &CpuBackend,
+    first_warp_targets: &[Tensor],
+    second_warp_targets: &[Tensor],
+    forward_flows: &[Tensor],
+    backward_flows: &[Tensor],
+    timesteps: &[f32],
+    weights: &BTreeMap<String, Tensor>,
+    dtype: DType,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if first_warp_targets.len() != 5
+        || second_warp_targets.len() != 5
+        || forward_flows.len() != 5
+        || backward_flows.len() != 5
+        || timesteps.is_empty()
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM timestep synthesis requires five aligned levels",
+        ));
+    }
+    let mut results = Vec::new();
+    results
+        .try_reserve_exact(timesteps.len())
+        .map_err(|_| FrameInterpolationError::Overflow)?;
+    for &timestep in timesteps {
+        context.cancellation.check()?;
+        if !timestep.is_finite() || !(0.0..=1.0).contains(&timestep) {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM timestep is outside the finite unit interval",
+            ));
+        }
+        let timestep_tensor = constant_tensor(backend, &[1], timestep, dtype, context)?;
+        let inverse_timestep_tensor =
+            constant_tensor(backend, &[1], 1.0_f32 - timestep, dtype, context)?;
+        let backward_scaled = film_multiply_pyramid_with_context_exact_native(
+            backend,
+            backward_flows,
+            &timestep_tensor,
+            context,
+        )?;
+        let forward_scaled = film_multiply_pyramid_with_context_exact_native(
+            backend,
+            forward_flows,
+            &inverse_timestep_tensor,
+            context,
+        )?;
+        let forward_warped = film_warp_pyramid_with_context_exact_native(
+            backend,
+            first_warp_targets,
+            &backward_scaled,
+            context,
+        )?;
+        let backward_warped = film_warp_pyramid_with_context_exact_native(
+            backend,
+            second_warp_targets,
+            &forward_scaled,
+            context,
+        )?;
+        let warped = film_concatenate_pyramids_with_context_exact_native(
+            backend,
+            &forward_warped,
+            &backward_warped,
+            context,
+        )?;
+        let flows = film_concatenate_pyramids_with_context_exact_native(
+            backend,
+            &backward_scaled,
+            &forward_scaled,
+            context,
+        )?;
+        let aligned =
+            film_concatenate_pyramids_with_context_exact_native(backend, &warped, &flows, context)?;
+        results.push(film_fusion_from_weights(
+            backend, &aligned, weights, context,
+        )?);
+    }
+    let output = execution_result(
+        torch_cat_with_context_exact_native(backend, &results, 0, context),
+        context,
+    )?;
+    context.cancellation.check()?;
+    Ok(output)
+}
+
 fn film_upsample_double_to_residual(
     backend: &CpuBackend,
     flow: &Tensor,
@@ -2907,6 +3118,114 @@ fn valid_sha256(value: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn reduced_film_fusion_weights(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        pyramid_channels: usize,
+        initial_channels: &[usize],
+        joined_channels: &[usize],
+    ) -> Result<BTreeMap<String, Tensor>, FrameInterpolationError> {
+        let tensor = |shape: &[u64], values: &[f32]| {
+            tensor_from_f32(backend, shape, values, DType::F32, DeviceId::CPU, context)
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        };
+        let joined_channel_count = pyramid_channels
+            .checked_add(1)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let joined_channel_count_u64 =
+            u64::try_from(joined_channel_count).map_err(|_| FrameInterpolationError::Overflow)?;
+        let mut weights = BTreeMap::new();
+        for convolution in 0..4_usize {
+            let first_input_channels = if convolution == 0 {
+                pyramid_channels
+            } else {
+                1
+            };
+            let mut first_weight = vec![
+                0.0_f32;
+                first_input_channels
+                    .checked_mul(4)
+                    .ok_or(FrameInterpolationError::Overflow)?
+            ];
+            let selected = if convolution == 0 {
+                initial_channels
+            } else {
+                &[0_usize]
+            };
+            for &channel in selected {
+                let index = channel
+                    .checked_mul(4)
+                    .ok_or(FrameInterpolationError::Overflow)?;
+                *first_weight
+                    .get_mut(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            }
+            weights.insert(
+                format!("fuse.convs.{convolution}.0.conv.weight"),
+                tensor(
+                    &[
+                        1,
+                        u64::try_from(first_input_channels)
+                            .map_err(|_| FrameInterpolationError::Overflow)?,
+                        2,
+                        2,
+                    ],
+                    &first_weight,
+                )?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.0.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+
+            let mut joined_weight = vec![
+                0.0_f32;
+                joined_channel_count
+                    .checked_mul(9)
+                    .ok_or(FrameInterpolationError::Overflow)?
+            ];
+            for &channel in joined_channels {
+                let index = channel
+                    .checked_mul(9)
+                    .and_then(|index| index.checked_add(4))
+                    .ok_or(FrameInterpolationError::Overflow)?;
+                *joined_weight
+                    .get_mut(index)
+                    .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            }
+            weights.insert(
+                format!("fuse.convs.{convolution}.1.conv.weight"),
+                tensor(&[1, joined_channel_count_u64, 3, 3], &joined_weight)?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.1.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+
+            let mut final_weight = vec![0.0_f32; 9];
+            *final_weight
+                .get_mut(4)
+                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            weights.insert(
+                format!("fuse.convs.{convolution}.2.conv.weight"),
+                tensor(&[1, 1, 3, 3], &final_weight)?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.2.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+        }
+        weights.insert(
+            "fuse.output_conv.weight".into(),
+            tensor(&[3, 1, 1, 1], &[1.0, 2.0, 3.0])?,
+        );
+        weights.insert(
+            "fuse.output_conv.bias".into(),
+            tensor(&[3], &[0.0, 0.0, 0.0])?,
+        );
+        Ok(weights)
+    }
+
     #[test]
     fn film_fusion_executes_nearest_coarse_to_fine_convolution_schedule()
     -> Result<(), FrameInterpolationError> {
@@ -2942,58 +3261,7 @@ mod tests {
             .iter()
             .map(Tensor::contiguous_bytes)
             .collect::<Result<Vec<_>, _>>()?;
-        let mut weights = BTreeMap::new();
-        for convolution in 0..4_usize {
-            let mut first_weight = vec![0.0_f32; 4];
-            *first_weight
-                .first_mut()
-                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
-            weights.insert(
-                format!("fuse.convs.{convolution}.0.conv.weight"),
-                tensor(&[1, 1, 2, 2], &first_weight)?,
-            );
-            weights.insert(
-                format!("fuse.convs.{convolution}.0.conv.bias"),
-                tensor(&[1], &[0.0])?,
-            );
-
-            let mut joined_weight = vec![0.0_f32; 18];
-            *joined_weight
-                .get_mut(4)
-                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
-            *joined_weight
-                .get_mut(13)
-                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
-            weights.insert(
-                format!("fuse.convs.{convolution}.1.conv.weight"),
-                tensor(&[1, 2, 3, 3], &joined_weight)?,
-            );
-            weights.insert(
-                format!("fuse.convs.{convolution}.1.conv.bias"),
-                tensor(&[1], &[0.0])?,
-            );
-
-            let mut final_weight = vec![0.0_f32; 9];
-            *final_weight
-                .get_mut(4)
-                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
-            weights.insert(
-                format!("fuse.convs.{convolution}.2.conv.weight"),
-                tensor(&[1, 1, 3, 3], &final_weight)?,
-            );
-            weights.insert(
-                format!("fuse.convs.{convolution}.2.conv.bias"),
-                tensor(&[1], &[0.0])?,
-            );
-        }
-        weights.insert(
-            "fuse.output_conv.weight".into(),
-            tensor(&[3, 1, 1, 1], &[1.0, 2.0, 3.0])?,
-        );
-        weights.insert(
-            "fuse.output_conv.bias".into(),
-            tensor(&[3], &[0.0, 0.0, 0.0])?,
-        );
+        let weights = reduced_film_fusion_weights(&backend, &context, 1, &[0], &[0, 1])?;
 
         let output = film_fusion_from_weights(&backend, &pyramid, &weights, &context)?;
         assert_eq!(output.descriptor().shape(), &[1, 3, 16, 16]);
@@ -3028,6 +3296,113 @@ mod tests {
         };
         assert!(matches!(
             film_fusion_from_weights(&backend, &pyramid, &weights, &cancelled_context),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn film_multi_timestep_synthesis_reuses_flows_and_orders_outputs()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(2 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let tensor = |shape: &[u64], values: &[f32]| {
+            tensor_from_f32(&backend, shape, values, DType::F32, DeviceId::CPU, &context)
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        };
+        let first_warp_targets = (0..5)
+            .map(|_| tensor(&[1, 1, 1, 1], &[10.0]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let second_warp_targets = (0..5)
+            .map(|_| tensor(&[1, 1, 1, 1], &[20.0]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let forward_flows = (0..5)
+            .map(|_| tensor(&[1, 2, 1, 1], &[4.0, 0.0]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let backward_flows = (0..5)
+            .map(|_| tensor(&[1, 2, 1, 1], &[2.0, 0.0]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let source_bytes = first_warp_targets
+            .iter()
+            .chain(&second_warp_targets)
+            .chain(&forward_flows)
+            .chain(&backward_flows)
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        let weights = reduced_film_fusion_weights(&backend, &context, 6, &[2, 4], &[6])?;
+
+        let output = film_synthesize_timesteps_from_pyramids(
+            &backend,
+            &first_warp_targets,
+            &second_warp_targets,
+            &forward_flows,
+            &backward_flows,
+            &[0.25, 0.75],
+            &weights,
+            DType::F32,
+            &context,
+        )?;
+        assert_eq!(output.descriptor().shape(), &[2, 3, 1, 1]);
+        for (linear, expected) in [3.5_f32, 7.0, 10.5, 2.5, 5.0, 7.5].into_iter().enumerate() {
+            let linear = u64::try_from(linear).map_err(|_| FrameInterpolationError::Overflow)?;
+            let actual = match DType::F32.decode_scalar(output.linear_element_bytes(linear)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        assert_ne!(
+            output.storage_id(),
+            first_warp_targets
+                .first()
+                .ok_or(FrameInterpolationError::StateMismatch)?
+                .storage_id()
+        );
+        for (source, bytes) in first_warp_targets
+            .iter()
+            .chain(&second_warp_targets)
+            .chain(&forward_flows)
+            .chain(&backward_flows)
+            .zip(source_bytes)
+        {
+            assert_eq!(source.contiguous_bytes()?, bytes);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_synthesize_timesteps_from_pyramids(
+                &backend,
+                &first_warp_targets,
+                &second_warp_targets,
+                &forward_flows,
+                &backward_flows,
+                &[0.25, 0.75],
+                &weights,
+                DType::F32,
+                &cancelled_context,
+            ),
             Err(FrameInterpolationError::Cancelled)
         ));
         assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);

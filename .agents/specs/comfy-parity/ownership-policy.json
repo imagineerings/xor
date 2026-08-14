@@ -11538,6 +11538,104 @@
       "decision_reason": "NativeFrameInterpolationModel remains the sole retained FILM checkpoint owner and executes the source fusion graph over borrowed aligned pyramids. Canonical tensor and FILM convolution owners retain every numerical and allocation mechanism, and fusion intermediates remain invocation-local."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_fusion_multi_timestep_pair_synthesis",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_film_pair_multi_timestep",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_film_pair_multi_timestep",
+        "NativeFrameInterpolationModel::film_feature_pyramid_from_images",
+        "film_synthesize_timesteps_from_pyramids"
+      ],
+      "allowed_adapters": [
+        "the retained FILM image, feature, flow-estimator, flow-synthesis, pyramid-algebra, warp, and fusion owners remain the sole implementations of their equations and weights",
+        "film_synthesize_timesteps_from_pyramids is the private attempt-local graph shared by retained production orchestration and the reduced exact-weight oracle",
+        "later adjacent-pair sequence execution may reuse endpoint features across pairs but cannot retain them in the model, NativeCache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_film_pair_multi_timestep",
+          "role": "canonical",
+          "symbol": "interpolate_film_pair_multi_timestep",
+          "pattern": "pub fn interpolate_film_pair_multi_timestep\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_synthesize_timesteps_from_pyramids",
+          "role": "canonical_implementation",
+          "symbol": "film_synthesize_timesteps_from_pyramids",
+          "pattern": "^fn film_synthesize_timesteps_from_pyramids\\("
+        }
+      ],
+      "call_symbols": [
+        "interpolate_film_pair_multi_timestep",
+        "film_feature_pyramid_from_images",
+        "film_synthesize_timesteps_from_pyramids"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-multi-timestep-production-validates-profile-pair-and-bounded-timesteps",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn interpolate_film_pair_multi_timestep[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*MAXIMUM_INTERPOLATION_MULTIPLIER[\\s\\S]*matching batch-one NCHW RGB tensors[\\s\\S]*self\\.dtype[\\s\\S]*self\\.stream"
+        },
+        {
+          "name": "film-multi-timestep-reuses-endpoint-image-feature-and-bidirectional-flow-computation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn interpolate_film_pair_multi_timestep[\\s\\S]*first_images[\\s\\S]*film_feature_pyramid_from_images[\\s\\S]*second_images[\\s\\S]*film_feature_pyramid_from_images[\\s\\S]*forward_residuals[\\s\\S]*backward_residuals[\\s\\S]*forward_flows[\\s\\S]*backward_flows[\\s\\S]*film_synthesize_timesteps_from_pyramids"
+        },
+        {
+          "name": "film-multi-timestep-scales-warps-aligns-fuses-and-concatenates-in-source-order",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn film_synthesize_timesteps_from_pyramids[\\s\\S]*1\\.0_f32 - timestep[\\s\\S]*backward_scaled[\\s\\S]*forward_scaled[\\s\\S]*forward_warped[\\s\\S]*backward_warped[\\s\\S]*&forward_warped, &backward_warped[\\s\\S]*&backward_scaled, &forward_scaled[\\s\\S]*film_fusion_from_weights[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &results, 0, context\\)"
+        },
+        {
+          "name": "film-multi-timestep-reduced-oracle-proves-values-order-storage-immutability-and-cancellation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_multi_timestep_synthesis_reuses_flows_and_orders_outputs[\\s\\S]*\\[0\\.25, 0\\.75\\][\\s\\S]*\\[3\\.5_f32, 7\\.0, 10\\.5, 2\\.5, 5\\.0, 7\\.5\\][\\s\\S]*assert_ne![\\s\\S]*source_bytes[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-multi-timestep-fixture-separates-pair-synthesis-from-production-parity-sequence-codecs-cache-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-multi-timestep/manifest.json",
+          "pattern": "(?=[\\s\\S]*FILM.forward)(?=[\\s\\S]*timesteps)(?=[\\s\\S]*expected_rgb_batch)(?=[\\s\\S]*production_dense_weight_numeric_parity)(?=[\\s\\S]*adjacent_pair_sequence_reuse)(?=[\\s\\S]*codec_or_container_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-multi-timestep-synthesis-foundation"
+      ],
+      "production_consumers": [
+        "native FILM adjacent-pair sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeFrameInterpolationModel remains the sole retained FILM checkpoint owner and composes already-owned image, feature, flow, warp, and fusion graphs once per pair. Every timestep tensor and result remains invocation-local, and adjacent-pair sequence reuse remains outside this leaf."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_image_pyramid_execution",
       "canonical_owner": "comfy_model::frame_interpolation::film_image_pyramid_with_context_exact_native",
       "owner_files": [
