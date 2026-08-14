@@ -14359,6 +14359,57 @@ fn val_ownership_native_film_flow_estimator_foundation_001()
 }
 
 #[test]
+fn val_ownership_native_film_fusion_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    for required in [
+        "pub fn film_fuse_pyramid(",
+        "fn film_fusion_from_weights(",
+        "fn film_interpolate_nearest(",
+        "fn film_convolution_from_weights(",
+        "for convolution in 0..4_usize",
+        "InterpolateMode::Nearest",
+        "fuse.output_conv",
+        "film_fusion_executes_nearest_coarse_to_fine_convolution_schedule",
+    ] {
+        assert!(
+            model.contains(required),
+            "retained FILM fusion graph lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion/manifest.json",
+    ))?;
+    assert!(fixture.contains("Fusion.forward"));
+    assert!(fixture.contains("groups_coarse_to_fine"));
+    assert!(fixture.contains("[15.0, 30.0, 45.0]"));
+    assert!(fixture.contains("\"production_dense_weight_numeric_parity\": false"));
+    assert!(fixture.contains("\"multi_timestep_or_sequence_execution\": false"));
+    assert!(fixture.contains("\"effect_or_publication_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_rife_frame_interpolation_film_fusion_execution")
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str() == Some("comfy-parity-native-film-fusion-foundation")
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_pyramid_algebra_foundation_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

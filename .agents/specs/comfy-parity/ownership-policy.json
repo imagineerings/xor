@@ -11438,6 +11438,106 @@
       "decision_reason": "The frame-interpolation module owns only FILM's source residual-flow accumulation schedule and delegates all tensor equations and allocation. Synthesized flows remain attempt-local inputs to later flow and fusion execution."
     },
     {
+      "concern": "native_rife_frame_interpolation_film_fusion_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_fuse_pyramid",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::film_fuse_pyramid",
+        "film_fusion_from_weights",
+        "film_interpolate_nearest",
+        "film_convolution_from_weights"
+      ],
+      "allowed_adapters": [
+        "film_fusion_from_weights is the private graph shared by the retained production method and reduced exact-weight oracle",
+        "canonical nearest interpolation, concatenation, FILM convolution, activation, storage, stream, workspace, and cancellation owners retain their mechanics",
+        "later FILM multi-timestep execution may provide aligned attempt-local pyramids but cannot copy fusion weights or retain intermediates in the model, cache, payload, handle, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::film_fuse_pyramid",
+          "role": "canonical",
+          "symbol": "film_fuse_pyramid",
+          "pattern": "pub fn film_fuse_pyramid\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::film_fusion_from_weights",
+          "role": "canonical_implementation",
+          "symbol": "film_fusion_from_weights",
+          "pattern": "^fn film_fusion_from_weights\\("
+        }
+      ],
+      "call_symbols": [
+        "film_fuse_pyramid",
+        "film_fusion_from_weights",
+        "film_interpolate_nearest",
+        "film_convolution_from_weights"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "film-fusion-production-method-binds-sole-retained-film-weight-owner",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "pub fn film_fuse_pyramid[\\s\\S]*self\\.profile != FrameInterpolationProfile::Film[\\s\\S]*self\\.dtype[\\s\\S]*self\\.stream[\\s\\S]*film_fusion_from_weights\\(backend, pyramid, &self\\.weights, context\\)"
+        },
+        {
+          "name": "film-fusion-executes-five-level-nearest-coarse-to-fine-retained-convolution-schedule",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn film_fusion_from_weights[\\s\\S]*pyramid\\.len\\(\\) != 5[\\s\\S]*pyramid\\.last\\(\\)[\\s\\S]*for convolution in 0\\.\\.4_usize[\\s\\S]*film_interpolate_nearest[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.0\\.conv[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.2\\.conv[\\s\\S]*fuse\\.output_conv"
+        },
+        {
+          "name": "film-fusion-delegates-source-nearest-and-padded-convolution-owners",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn film_interpolate_nearest[\\s\\S]*InterpolateMode::Nearest[\\s\\S]*align_corners: None[\\s\\S]*fn film_convolution_from_weights[\\s\\S]*film_conv_2d_with_context_exact_native"
+        },
+        {
+          "name": "film-fusion-reduced-oracle-proves-values-storage-immutability-and-cancellation",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "film_fusion_executes_nearest_coarse_to_fine_convolution_schedule[\\s\\S]*\\[15\\.0_f32, 30\\.0, 45\\.0\\][\\s\\S]*assert_ne![\\s\\S]*source_bytes[\\s\\S]*film_fusion_from_weights[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "film-fusion-fixture-separates-reduced-graph-from-production-parity-sequence-codecs-cache-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion/manifest.json",
+          "pattern": "(?=[\\s\\S]*Fusion.forward)(?=[\\s\\S]*groups_coarse_to_fine)(?=[\\s\\S]*expected_rgb)(?=[\\s\\S]*production_dense_weight_numeric_parity)(?=[\\s\\S]*multi_timestep_or_sequence_execution)(?=[\\s\\S]*codec_or_container_execution)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-film-fusion-foundation"
+      ],
+      "production_consumers": [
+        "native FILM multi-timestep and sequence execution"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeFrameInterpolationModel remains the sole retained FILM checkpoint owner and executes the source fusion graph over borrowed aligned pyramids. Canonical tensor and FILM convolution owners retain every numerical and allocation mechanism, and fusion intermediates remain invocation-local."
+    },
+    {
       "concern": "native_rife_frame_interpolation_film_image_pyramid_execution",
       "canonical_owner": "comfy_model::frame_interpolation::film_image_pyramid_with_context_exact_native",
       "owner_files": [

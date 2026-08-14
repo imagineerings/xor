@@ -680,6 +680,32 @@ impl NativeFrameInterpolationModel {
         Ok(residuals)
     }
 
+    pub fn film_fuse_pyramid(
+        &self,
+        backend: &CpuBackend,
+        pyramid: &[Tensor],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, FrameInterpolationError> {
+        context.cancellation.check()?;
+        if self.profile != FrameInterpolationProfile::Film {
+            return Err(FrameInterpolationError::InvalidInvocation(
+                "FILM fusion requires a FILM checkpoint",
+            ));
+        }
+        for level in pyramid {
+            let descriptor = level.descriptor();
+            if descriptor.dtype() != self.dtype
+                || descriptor.device() != DeviceId::CPU
+                || descriptor.stream() != self.stream
+                || descriptor.stream() != context.stream
+                || !descriptor.is_contiguous()?
+            {
+                return Err(FrameInterpolationError::Placement);
+            }
+        }
+        film_fusion_from_weights(backend, pyramid, &self.weights, context)
+    }
+
     pub fn interpolate_rife_pair(
         &self,
         backend: &CpuBackend,
@@ -1903,6 +1929,156 @@ pub fn film_warp_pyramid_with_context_exact_native(
     Ok(output)
 }
 
+fn film_fusion_from_weights(
+    backend: &CpuBackend,
+    pyramid: &[Tensor],
+    weights: &BTreeMap<String, Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    context.cancellation.check()?;
+    if pyramid.len() != 5 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM fusion requires five pyramid levels",
+        ));
+    }
+    let reference = pyramid
+        .first()
+        .ok_or(FrameInterpolationError::StateMismatch)?
+        .descriptor();
+    let reference_shape = reference.shape();
+    if reference_shape.len() != 4
+        || reference_shape.first() == Some(&0)
+        || reference_shape.get(1) == Some(&0)
+        || reference_shape.get(2) == Some(&0)
+        || reference_shape.get(3) == Some(&0)
+    {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM fusion levels must be nonempty NCHW tensors",
+        ));
+    }
+    for level in pyramid.iter().skip(1) {
+        let descriptor = level.descriptor();
+        let shape = descriptor.shape();
+        if shape.len() != 4
+            || shape.first() != reference_shape.first()
+            || shape.get(1) == Some(&0)
+            || shape.get(2) == Some(&0)
+            || shape.get(3) == Some(&0)
+            || descriptor.dtype() != reference.dtype()
+            || descriptor.device() != reference.device()
+            || descriptor.stream() != reference.stream()
+            || !descriptor.is_contiguous()?
+        {
+            return Err(FrameInterpolationError::Placement);
+        }
+    }
+    if reference.device() != DeviceId::CPU || reference.stream() != context.stream {
+        return Err(FrameInterpolationError::Placement);
+    }
+
+    let mut net = pyramid
+        .last()
+        .ok_or(FrameInterpolationError::StateMismatch)?
+        .clone();
+    for convolution in 0..4_usize {
+        context.cancellation.check()?;
+        let level_index = 3_usize
+            .checked_sub(convolution)
+            .ok_or(FrameInterpolationError::Overflow)?;
+        let level = pyramid
+            .get(level_index)
+            .ok_or(FrameInterpolationError::StateMismatch)?;
+        let shape = level.descriptor().shape();
+        let height = usize::try_from(*shape.get(2).ok_or(FrameInterpolationError::StateMismatch)?)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let width = usize::try_from(*shape.get(3).ok_or(FrameInterpolationError::StateMismatch)?)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        net = film_interpolate_nearest(backend, &net, height, width, context)?;
+        net = film_convolution_from_weights(
+            backend,
+            &format!("fuse.convs.{convolution}.0.conv"),
+            &net,
+            false,
+            weights,
+            context,
+        )?;
+        net = execution_result(
+            torch_cat_with_context_exact_native(backend, &[level.clone(), net], 1, context),
+            context,
+        )?;
+        net = film_convolution_from_weights(
+            backend,
+            &format!("fuse.convs.{convolution}.1.conv"),
+            &net,
+            true,
+            weights,
+            context,
+        )?;
+        net = film_convolution_from_weights(
+            backend,
+            &format!("fuse.convs.{convolution}.2.conv"),
+            &net,
+            true,
+            weights,
+            context,
+        )?;
+    }
+    let output =
+        film_convolution_from_weights(backend, "fuse.output_conv", &net, false, weights, context)?;
+    if output.descriptor().shape().get(1) != Some(&3) {
+        return Err(FrameInterpolationError::StateMismatch);
+    }
+    context.cancellation.check()?;
+    Ok(output)
+}
+
+fn film_interpolate_nearest(
+    backend: &CpuBackend,
+    input: &Tensor,
+    height: usize,
+    width: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    if height == 0 || width == 0 {
+        return Err(FrameInterpolationError::InvalidInvocation(
+            "FILM fusion interpolation extent is zero",
+        ));
+    }
+    execution_result(
+        interpolate_tensor_with_context_exact_native(
+            backend,
+            input,
+            &InterpolateConfiguration {
+                output_size: Some(vec![height, width]),
+                scale_factor: None,
+                mode: InterpolateMode::Nearest,
+                align_corners: None,
+                recompute_scale_factor: None,
+                antialias: false,
+            },
+            context,
+        ),
+        context,
+    )
+}
+
+fn film_convolution_from_weights(
+    backend: &CpuBackend,
+    prefix: &str,
+    input: &Tensor,
+    activation: bool,
+    weights: &BTreeMap<String, Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, FrameInterpolationError> {
+    let weight = weights
+        .get(&format!("{prefix}.weight"))
+        .ok_or(FrameInterpolationError::StateMismatch)?;
+    let bias = weights
+        .get(&format!("{prefix}.bias"))
+        .ok_or(FrameInterpolationError::StateMismatch)?;
+    film_conv_2d_with_context_exact_native(backend, input, weight, bias, activation, context)
+}
+
 fn film_upsample_double_to_residual(
     backend: &CpuBackend,
     flow: &Tensor,
@@ -2730,6 +2906,133 @@ fn valid_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn film_fusion_executes_nearest_coarse_to_fine_convolution_schedule()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
+
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(2 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let tensor = |shape: &[u64], values: &[f32]| {
+            tensor_from_f32(&backend, shape, values, DType::F32, DeviceId::CPU, &context)
+                .map_err(|error| FrameInterpolationError::Execution(error.to_string()))
+        };
+        let pyramid = [1.0_f32, 2.0, 3.0, 4.0, 5.0]
+            .into_iter()
+            .zip([16_u64, 8, 4, 2, 1])
+            .map(|(value, extent)| {
+                let element_count = usize::try_from(extent)
+                    .ok()
+                    .and_then(|extent| extent.checked_mul(extent))
+                    .ok_or(FrameInterpolationError::Overflow)?;
+                tensor(&[1, 1, extent, extent], &vec![value; element_count])
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let source_bytes = pyramid
+            .iter()
+            .map(Tensor::contiguous_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut weights = BTreeMap::new();
+        for convolution in 0..4_usize {
+            let mut first_weight = vec![0.0_f32; 4];
+            *first_weight
+                .first_mut()
+                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            weights.insert(
+                format!("fuse.convs.{convolution}.0.conv.weight"),
+                tensor(&[1, 1, 2, 2], &first_weight)?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.0.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+
+            let mut joined_weight = vec![0.0_f32; 18];
+            *joined_weight
+                .get_mut(4)
+                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            *joined_weight
+                .get_mut(13)
+                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            weights.insert(
+                format!("fuse.convs.{convolution}.1.conv.weight"),
+                tensor(&[1, 2, 3, 3], &joined_weight)?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.1.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+
+            let mut final_weight = vec![0.0_f32; 9];
+            *final_weight
+                .get_mut(4)
+                .ok_or(FrameInterpolationError::StateMismatch)? = 1.0;
+            weights.insert(
+                format!("fuse.convs.{convolution}.2.conv.weight"),
+                tensor(&[1, 1, 3, 3], &final_weight)?,
+            );
+            weights.insert(
+                format!("fuse.convs.{convolution}.2.conv.bias"),
+                tensor(&[1], &[0.0])?,
+            );
+        }
+        weights.insert(
+            "fuse.output_conv.weight".into(),
+            tensor(&[3, 1, 1, 1], &[1.0, 2.0, 3.0])?,
+        );
+        weights.insert(
+            "fuse.output_conv.bias".into(),
+            tensor(&[3], &[0.0, 0.0, 0.0])?,
+        );
+
+        let output = film_fusion_from_weights(&backend, &pyramid, &weights, &context)?;
+        assert_eq!(output.descriptor().shape(), &[1, 3, 16, 16]);
+        for (linear, expected) in [(0_u64, 15.0_f32), (256, 30.0), (512, 45.0)] {
+            let actual = match DType::F32.decode_scalar(output.linear_element_bytes(linear)?)? {
+                DecodedScalar::Real(value) => value as f32,
+                _ => return Err(FrameInterpolationError::StateMismatch),
+            };
+            assert_eq!(actual, expected);
+        }
+        assert_ne!(
+            output.storage_id(),
+            pyramid
+                .first()
+                .ok_or(FrameInterpolationError::StateMismatch)?
+                .storage_id()
+        );
+        for (level, bytes) in pyramid.iter().zip(source_bytes) {
+            assert_eq!(level.contiguous_bytes()?, bytes);
+        }
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(2 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            film_fusion_from_weights(&backend, &pyramid, &weights, &cancelled_context),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
 
     #[test]
     fn film_pyramid_algebra_delegates_concat_broadcast_multiply_and_warp()

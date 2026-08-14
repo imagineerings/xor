@@ -10205,6 +10205,42 @@ def native_film_pyramid_algebra_foundation_task(dependency: str) -> dict[str, ob
     )
 
 
+def native_film_fusion_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-film-fusion-foundation",
+        "Execute the retained FILM fusion graph",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FORMAT-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained frame-interpolation model executes FILM Fusion from its admitted checkpoint tensors. It consumes five borrowed aligned pyramid levels, starts at the coarsest level, applies four source-ordered nearest-resize plus nonactivated two-by-two and activated joined three-by-three convolution stages, and finishes with the retained one-by-one RGB output projection. All intermediate pyramids and outputs remain attempt-local, while canonical interpolation, concatenation, convolution, activation, storage, workspace, stream, and cancellation owners retain their mechanics.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-pyramid-algebra/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-fusion",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted reduced exact-weight graph proves pyramid values 1/2/3/4/5 traverse all four nearest coarse-to-fine fusion groups to exact RGB values 15/30/45 with fresh output storage, immutable inputs, pre-cancellation and zero scratch residue. Production ownership evidence binds the exact retained fuse.convs.0..3 and fuse.output_conv tensors and explicitly excludes licensed production-weight numeric parity, feature or flow duplication, multi-timestep orchestration, codecs, handles, cache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.3", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12448,8 +12484,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_pyramid_algebra_foundation = native_film_pyramid_algebra_foundation_task(
         str(film_flow_estimator_foundation["id"])
     )
-    video_foundation = native_video_execution_foundation_task(
+    film_fusion_foundation = native_film_fusion_foundation_task(
         str(film_pyramid_algebra_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(film_fusion_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12563,6 +12602,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_flow_pyramid_synthesis_foundation,
         film_flow_estimator_foundation,
         film_pyramid_algebra_foundation,
+        film_fusion_foundation,
         video_foundation,
             detection_foundation,
         ]
