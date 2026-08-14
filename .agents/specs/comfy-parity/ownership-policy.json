@@ -14553,6 +14553,95 @@
       "decision_reason": "The retained LTXV pair is the sole owner of libx264 one-frame execution. It consumes canonical RGB8 and bounded AVIO adapters, keeps every native object and staged byte private, and proves exact option, packet, cancellation, cleanup, and scratch-accounting behavior without claiming decoder or media publication authority."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_reopen",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Mp4::open_first_h264_video_stream",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeLtxvH264DemuxLimits",
+        "NativeLtxvH264Demux",
+        "NativeLtxvH264Mp4::open_first_h264_video_stream",
+        "open_first_ltxv_h264_stream_with_check"
+      ],
+      "allowed_adapters": [
+        "the retained LTXV encoder result supplies only its own opaque workspace-backed staged MP4 and exact originating codec owner",
+        "the canonical bounded memory AVIO owner supplies lifetime-bound borrowed input callbacks without a whole-input Arc or Vec copy",
+        "the reviewed retained binding supplies libavformat auto-probe and stream-selection calls plus the exact admitted H.264 decoder identity",
+        "the following packet decoder may consume this attempt-local demux session inside the same sole FFI owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Demux",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeLtxvH264Demux"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_context",
+        "avformat_open_input",
+        "av_find_best_stream",
+        "avformat_close_input"
+      ],
+      "required_mappings": [
+        {
+          "name": "ltxv-h264-demux-borrows-only-retained-staged-input",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeLtxvH264Mp4<'codec>[\\s\\S]*open_first_h264_video_stream[\\s\\S]*open_bounded_avio_borrowed_input"
+        },
+        {
+          "name": "ltxv-h264-demux-proves-single-stream-and-admitted-decoder",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "open_first_ltxv_h264_stream_with_check[\\s\\S]*stream_count != 1[\\s\\S]*av_find_best_stream[\\s\\S]*expected_decoder"
+        },
+        {
+          "name": "ltxv-h264-demux-tests-borrowing-drift-cancellation-and-cleanup",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_ltxv_mp4_demux_borrows_bytes_and_selects_first_h264_video_stream[\\s\\S]*retained_ltxv_mp4_demux_rejects_stream_drift_and_cancellation_atomically"
+        },
+        {
+          "name": "ltxv-h264-demux-fixture-bounds-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json",
+          "pattern": "synthetic-retained-ltxv-h264-mp4-demux[\\s\\S]*native_demux_call_choreography_executed[\\s\\S]*packet_decode_executed[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation"
+      ],
+      "production_consumers": [
+        "the following bounded retained H.264 first-frame decoder"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-MEDIA-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One retained attempt-local owner reopens only the canonical staged LTXV MP4 through borrowed bounded AVIO, executes native container probing, binds the exact single stream to the admitted decoder, and preserves reverse cleanup and scratch accounting without claiming packet decode, RGB, media, or publication authority."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [

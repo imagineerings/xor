@@ -132,6 +132,7 @@ impl NativeLtxvH264EncodeLimits {
     reason = "consumed by the following retained H.264 decode leaf"
 )]
 pub(crate) struct NativeLtxvH264Mp4<'codec> {
+    codec: &'codec NativeLtxvH264Codec,
     output: NativeVideoCodecMemoryOutput<'codec>,
 }
 
@@ -146,6 +147,96 @@ impl NativeLtxvH264Mp4<'_> {
             return Err(NativeVideoCodecLtxvEncodeError::EmptyOutput);
         }
         Ok(bytes)
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained H.264 decode leaf"
+)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct NativeLtxvH264DemuxLimits {
+    maximum_input_bytes: usize,
+    avio_buffer_bytes: usize,
+    maximum_native_session_bytes: u64,
+    maximum_streams: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained H.264 decode leaf"
+)]
+impl NativeLtxvH264DemuxLimits {
+    pub(crate) fn checked(
+        maximum_input_bytes: usize,
+        avio_buffer_bytes: usize,
+        maximum_native_session_bytes: u64,
+        maximum_streams: usize,
+    ) -> Result<Self, NativeVideoCodecLtxvDemuxError> {
+        if maximum_input_bytes == 0
+            || avio_buffer_bytes == 0
+            || maximum_native_session_bytes == 0
+            || maximum_streams == 0
+        {
+            return Err(NativeVideoCodecLtxvDemuxError::InvalidLimits);
+        }
+        Ok(Self {
+            maximum_input_bytes,
+            avio_buffer_bytes,
+            maximum_native_session_bytes,
+            maximum_streams,
+        })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained H.264 decode leaf"
+)]
+pub(crate) struct NativeLtxvH264Demux<'codec, 'bytes> {
+    format: NativeLtxvInputFormatContext,
+    input: NativeVideoCodecMemoryInput<'codec, 'bytes>,
+    _native_session_workspace: CpuWorkspaceLease,
+    video_stream_index: i32,
+    codec: &'codec NativeLtxvH264Codec,
+    _thread_bound: PhantomData<std::rc::Rc<()>>,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained H.264 decode leaf"
+)]
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecLtxvDemuxError {
+    #[error("native LTXV H.264 MP4 demux was cancelled")]
+    Cancelled,
+    #[error("native LTXV H.264 MP4 demux received invalid resource limits")]
+    InvalidLimits,
+    #[error("native LTXV H.264 MP4 input was empty")]
+    EmptyInput,
+    #[error("native LTXV H.264 MP4 format allocation failed")]
+    NativeAllocation,
+    #[error("native LTXV H.264 MP4 resources were exhausted during {phase}")]
+    ResourceExhausted { phase: &'static str },
+    #[error("native LTXV H.264 MP4 open failed with status {status}")]
+    OpenFailed { status: i32 },
+    #[error("native LTXV H.264 MP4 declared too many streams")]
+    StreamLimitExceeded,
+    #[error("native LTXV H.264 MP4 contained no video stream")]
+    MissingVideoStream,
+    #[error("the first native LTXV video stream was not H.264")]
+    UnexpectedVideoCodec,
+    #[error("native LTXV H.264 MP4 open replaced the retained memory input")]
+    InputContextMismatch,
+    #[error(transparent)]
+    Io(#[from] NativeVideoCodecIoError),
+    #[error("native LTXV H.264 demux tensor operation failed: {0}")]
+    Tensor(#[source] TensorError),
+}
+
+impl From<CancellationError> for NativeVideoCodecLtxvDemuxError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
     }
 }
 
@@ -201,7 +292,74 @@ impl NativeLtxvH264Codec {
         if output.staged_bytes()?.is_empty() {
             return Err(NativeVideoCodecLtxvEncodeError::EmptyOutput);
         }
-        Ok(NativeLtxvH264Mp4 { output })
+        Ok(NativeLtxvH264Mp4 {
+            codec: self,
+            output,
+        })
+    }
+}
+
+impl<'codec> NativeLtxvH264Mp4<'codec> {
+    #[allow(
+        dead_code,
+        reason = "consumed by the following retained H.264 decode leaf"
+    )]
+    pub(crate) fn open_first_h264_video_stream<'bytes>(
+        &'bytes self,
+        limits: NativeLtxvH264DemuxLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeLtxvH264Demux<'codec, 'bytes>, NativeVideoCodecLtxvDemuxError> {
+        let bytes = self.output.staged_bytes()?;
+        if bytes.is_empty() {
+            return Err(NativeVideoCodecLtxvDemuxError::EmptyInput);
+        }
+        context.check().map_err(map_ltxv_demux_tensor_error)?;
+        let native_session_workspace = backend
+            .reserve_workspace(context, limits.maximum_native_session_bytes)
+            .map_err(map_ltxv_demux_tensor_error)?;
+        let input = self.codec.binding.open_bounded_avio_borrowed_input(
+            bytes,
+            limits.maximum_input_bytes,
+            limits.avio_buffer_bytes,
+            backend,
+            context,
+        )?;
+        let functions = NativeLtxvH264DemuxFunctions::from_codec(self.codec);
+        let (format, video_stream_index) = open_first_ltxv_h264_stream_with_check(
+            &input,
+            self.codec.decoder,
+            limits.maximum_streams,
+            &functions,
+            &mut || context.cancellation.check(),
+        )?;
+        context.check().map_err(map_ltxv_demux_tensor_error)?;
+        Ok(NativeLtxvH264Demux {
+            format,
+            input,
+            _native_session_workspace: native_session_workspace,
+            video_stream_index,
+            codec: self.codec,
+            _thread_bound: PhantomData,
+        })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained H.264 decode leaf"
+)]
+fn map_ltxv_demux_tensor_error(error: TensorError) -> NativeVideoCodecLtxvDemuxError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecLtxvDemuxError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeVideoCodecLtxvDemuxError::ResourceExhausted {
+                phase: "authorize demux workspace",
+            }
+        }
+        error => NativeVideoCodecLtxvDemuxError::Tensor(error),
     }
 }
 
@@ -366,9 +524,11 @@ impl NativeVideoCodecBinding {
         buffer_bytes: usize,
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
-    ) -> Result<NativeVideoCodecMemoryInput<'binding>, NativeVideoCodecIoError> {
+    ) -> Result<NativeVideoCodecMemoryInput<'binding, 'static>, NativeVideoCodecIoError> {
         let state = NativeVideoCodecInputState {
-            bytes,
+            bytes: NonNull::new(bytes.as_ptr().cast_mut())
+                .ok_or(NativeVideoCodecIoError::InvalidBounds)?,
+            byte_length: bytes.len(),
             position: 0,
             maximum_position: maximum_input_bytes,
             cancellation: context.cancellation.clone(),
@@ -376,9 +536,10 @@ impl NativeVideoCodecBinding {
             #[cfg(test)]
             panic_on_next_callback: false,
         };
-        if state.bytes.len() > maximum_input_bytes {
+        if state.byte_length > maximum_input_bytes {
             return Err(NativeVideoCodecIoError::InvalidBounds);
         }
+        let owner = NativeVideoCodecInputOwner::Owned(bytes);
         let functions = NativeVideoCodecAvioFunctions::from_binding(self);
         let avio = allocate_native_video_codec_avio(
             self,
@@ -393,7 +554,57 @@ impl NativeVideoCodecBinding {
             context,
             &mut || context.cancellation.check(),
         )?;
-        Ok(NativeVideoCodecMemoryInput { avio })
+        Ok(NativeVideoCodecMemoryInput {
+            avio,
+            _owner: owner,
+        })
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following retained H.264 decode leaf"
+    )]
+    pub(crate) fn open_bounded_avio_borrowed_input<'binding, 'bytes>(
+        &'binding self,
+        bytes: &'bytes [u8],
+        maximum_input_bytes: usize,
+        buffer_bytes: usize,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryInput<'binding, 'bytes>, NativeVideoCodecIoError> {
+        let state = NativeVideoCodecInputState {
+            bytes: NonNull::new(bytes.as_ptr().cast_mut())
+                .ok_or(NativeVideoCodecIoError::InvalidBounds)?,
+            byte_length: bytes.len(),
+            position: 0,
+            maximum_position: maximum_input_bytes,
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            #[cfg(test)]
+            panic_on_next_callback: false,
+        };
+        if state.byte_length > maximum_input_bytes {
+            return Err(NativeVideoCodecIoError::InvalidBounds);
+        }
+        let owner = NativeVideoCodecInputOwner::Borrowed(bytes);
+        let functions = NativeVideoCodecAvioFunctions::from_binding(self);
+        let avio = allocate_native_video_codec_avio(
+            self,
+            state,
+            functions,
+            buffer_bytes,
+            false,
+            Some(native_video_codec_input_read),
+            None,
+            Some(native_video_codec_input_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryInput {
+            avio,
+            _owner: owner,
+        })
     }
 
     #[allow(
@@ -518,8 +729,14 @@ impl NativeVideoCodecAvioFunctions {
     dead_code,
     reason = "consumed by the following bounded codec operation"
 )]
+enum NativeVideoCodecInputOwner<'bytes> {
+    Owned(Arc<[u8]>),
+    Borrowed(&'bytes [u8]),
+}
+
 struct NativeVideoCodecInputState {
-    bytes: Arc<[u8]>,
+    bytes: NonNull<u8>,
+    byte_length: usize,
     position: usize,
     maximum_position: usize,
     cancellation: CancellationToken,
@@ -555,8 +772,9 @@ struct NativeVideoCodecAvio<'binding, State> {
     dead_code,
     reason = "consumed by the following bounded codec operation"
 )]
-pub(crate) struct NativeVideoCodecMemoryInput<'binding> {
+pub(crate) struct NativeVideoCodecMemoryInput<'binding, 'bytes> {
     avio: NativeVideoCodecAvio<'binding, NativeVideoCodecInputState>,
+    _owner: NativeVideoCodecInputOwner<'bytes>,
 }
 
 #[allow(
@@ -567,7 +785,7 @@ pub(crate) struct NativeVideoCodecMemoryOutput<'binding> {
     avio: NativeVideoCodecAvio<'binding, NativeVideoCodecOutputState>,
 }
 
-impl NativeVideoCodecMemoryInput<'_> {
+impl NativeVideoCodecMemoryInput<'_, '_> {
     #[allow(
         dead_code,
         reason = "consumed by the following bounded codec operation"
@@ -782,12 +1000,12 @@ unsafe extern "C" fn native_video_codec_input_read(
         if destination.is_null() || requested <= 0 {
             return Err(NativeVideoCodecIoCallbackFailure::InvalidArgument);
         }
-        if state.position >= state.bytes.len() {
+        if state.position >= state.byte_length {
             return Ok(abi::AV_ERROR_END_OF_FILE);
         }
         let requested = usize::try_from(requested)
             .map_err(|_| NativeVideoCodecIoCallbackFailure::InvalidArgument)?;
-        let count = requested.min(state.bytes.len() - state.position);
+        let count = requested.min(state.byte_length - state.position);
         unsafe {
             std::ptr::copy_nonoverlapping(
                 state.bytes.as_ptr().add(state.position),
@@ -880,7 +1098,7 @@ unsafe extern "C" fn native_video_codec_input_seek(
         &state.cancellation,
         &mut state.failure,
         &mut state.position,
-        state.bytes.len(),
+        state.byte_length,
         state.maximum_position,
         offset,
         whence,
@@ -982,6 +1200,169 @@ fn record_callback_failure(
         NativeVideoCodecIoCallbackFailure::InvalidArgument => abi::AV_ERROR_INVALID_ARGUMENT,
         NativeVideoCodecIoCallbackFailure::OutputLimit => abi::AV_ERROR_NO_SPACE,
         NativeVideoCodecIoCallbackFailure::ResourceExhausted => abi::AV_ERROR_OUT_OF_MEMORY,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct NativeLtxvH264DemuxFunctions {
+    av_find_best_stream: abi::AvFindBestStream,
+    avformat_alloc_context: abi::AvformatAllocContext,
+    avformat_close_input: abi::AvformatCloseInput,
+    avformat_free_context: abi::AvformatFreeContext,
+    avformat_open_input: abi::AvformatOpenInput,
+}
+
+impl NativeLtxvH264DemuxFunctions {
+    #[allow(
+        dead_code,
+        reason = "consumed by the following retained H.264 decode leaf"
+    )]
+    fn from_codec(codec: &NativeLtxvH264Codec) -> Self {
+        let symbols = &codec.binding._symbols.avformat;
+        Self {
+            av_find_best_stream: symbols.av_find_best_stream,
+            avformat_alloc_context: symbols.avformat_alloc_context,
+            avformat_close_input: symbols.avformat_close_input,
+            avformat_free_context: symbols.avformat_free_context,
+            avformat_open_input: symbols.avformat_open_input,
+        }
+    }
+}
+
+enum NativeLtxvInputFormatCleanup {
+    Allocated(abi::AvformatFreeContext),
+    Opened(abi::AvformatCloseInput),
+}
+
+struct NativeLtxvInputFormatContext {
+    pointer: Option<NonNull<abi::AvFormatContext>>,
+    cleanup: NativeLtxvInputFormatCleanup,
+}
+
+impl NativeLtxvInputFormatContext {
+    fn pointer(&self) -> Result<NonNull<abi::AvFormatContext>, NativeVideoCodecLtxvDemuxError> {
+        self.pointer
+            .ok_or(NativeVideoCodecLtxvDemuxError::NativeAllocation)
+    }
+}
+
+impl Drop for NativeLtxvInputFormatContext {
+    fn drop(&mut self) {
+        let Some(pointer) = self.pointer.take() else {
+            return;
+        };
+        match self.cleanup {
+            NativeLtxvInputFormatCleanup::Allocated(free) => unsafe { free(pointer.as_ptr()) },
+            NativeLtxvInputFormatCleanup::Opened(close) => {
+                let mut pointer = pointer.as_ptr();
+                unsafe { close(std::ptr::addr_of_mut!(pointer)) };
+                if !pointer.is_null() {
+                    eprintln!("native LTXV MP4 input cleanup did not clear its format pointer");
+                }
+            }
+        }
+    }
+}
+
+fn open_first_ltxv_h264_stream_with_check<'binding, 'bytes>(
+    input: &NativeVideoCodecMemoryInput<'binding, 'bytes>,
+    expected_decoder: NonNull<abi::AvCodec>,
+    maximum_streams: usize,
+    functions: &NativeLtxvH264DemuxFunctions,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<(NativeLtxvInputFormatContext, i32), NativeVideoCodecLtxvDemuxError> {
+    check_cancellation()?;
+    let format_pointer = unsafe { (functions.avformat_alloc_context)() };
+    let mut format = NativeLtxvInputFormatContext {
+        pointer: Some(
+            NonNull::new(format_pointer).ok_or(NativeVideoCodecLtxvDemuxError::NativeAllocation)?,
+        ),
+        cleanup: NativeLtxvInputFormatCleanup::Allocated(functions.avformat_free_context),
+    };
+    check_cancellation()?;
+    let mut format_pointer = format.pointer()?;
+    unsafe { format_pointer.as_mut().io_context = input.context_ptr() };
+    let mut raw_format = format_pointer.as_ptr();
+    check_cancellation()?;
+    let open_status = unsafe {
+        (functions.avformat_open_input)(
+            std::ptr::addr_of_mut!(raw_format),
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+        )
+    };
+    format.pointer = NonNull::new(raw_format);
+    if open_status >= 0 && format.pointer.is_some() {
+        format.cleanup = NativeLtxvInputFormatCleanup::Opened(functions.avformat_close_input);
+    }
+    let post_open_cancellation = check_cancellation();
+    let callback_status = input.check_callback_status();
+    if format.pointer.is_none() {
+        if let Err(error) = post_open_cancellation {
+            return Err(error.into());
+        }
+        callback_status?;
+        return Err(map_ltxv_demux_open_status(open_status));
+    }
+    post_open_cancellation?;
+    callback_status?;
+    if open_status < 0 {
+        return Err(map_ltxv_demux_open_status(open_status));
+    }
+
+    let format_pointer = format.pointer()?;
+    if unsafe { format_pointer.as_ref().io_context } != input.context_ptr() {
+        return Err(NativeVideoCodecLtxvDemuxError::InputContextMismatch);
+    }
+    let stream_count = usize::try_from(unsafe { format_pointer.as_ref().stream_count })
+        .map_err(|_| NativeVideoCodecLtxvDemuxError::StreamLimitExceeded)?;
+    if stream_count > maximum_streams {
+        return Err(NativeVideoCodecLtxvDemuxError::StreamLimitExceeded);
+    }
+    if stream_count != 1 {
+        return Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream);
+    }
+    let streams = unsafe { format_pointer.as_ref().streams };
+    if streams.is_null() {
+        return Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream);
+    }
+    let Some(stream) = NonNull::new(unsafe { *streams }) else {
+        return Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream);
+    };
+    if unsafe { stream.as_ref().codec_parameters }.is_null() {
+        return Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream);
+    }
+    let stream_index = unsafe { stream.as_ref().index };
+    if stream_index < 0 {
+        return Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream);
+    }
+    check_cancellation()?;
+    let mut decoder = std::ptr::null();
+    let selected_stream = unsafe {
+        (functions.av_find_best_stream)(
+            format_pointer.as_ptr(),
+            abi::AV_MEDIA_TYPE_VIDEO,
+            -1,
+            -1,
+            std::ptr::addr_of_mut!(decoder),
+            0,
+        )
+    };
+    check_cancellation()?;
+    if selected_stream != stream_index || decoder != expected_decoder.as_ptr() {
+        return Err(NativeVideoCodecLtxvDemuxError::UnexpectedVideoCodec);
+    }
+    Ok((format, stream_index))
+}
+
+fn map_ltxv_demux_open_status(status: i32) -> NativeVideoCodecLtxvDemuxError {
+    if status == abi::AV_ERROR_OUT_OF_MEMORY {
+        NativeVideoCodecLtxvDemuxError::ResourceExhausted {
+            phase: "open MP4 input",
+        }
+    } else {
+        NativeVideoCodecLtxvDemuxError::OpenFailed { status }
     }
 }
 
@@ -2971,7 +3352,7 @@ mod tests {
         process::Command,
         sync::{
             Mutex,
-            atomic::{AtomicBool, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
     };
 
@@ -2983,6 +3364,7 @@ mod tests {
     struct MockAvIoContext {
         prefix: abi::AvIoContext,
         opaque: *mut c_void,
+        read_packet: Option<abi::AvIoReadPacket>,
         write_packet: Option<abi::AvIoWritePacket>,
     }
 
@@ -3018,7 +3400,7 @@ mod tests {
         _buffer_size: i32,
         _write: i32,
         opaque: *mut c_void,
-        _read: Option<abi::AvIoReadPacket>,
+        read_packet: Option<abi::AvIoReadPacket>,
         write_packet: Option<abi::AvIoWritePacket>,
         _seek: Option<abi::AvIoSeek>,
     ) -> *mut abi::AvIoContext {
@@ -3032,6 +3414,7 @@ mod tests {
                 buffer,
             },
             opaque,
+            read_packet,
             write_packet,
         });
         Box::into_raw(context).cast()
@@ -3706,6 +4089,348 @@ mod tests {
             close_order()?,
             ["swscale", "swresample", "avutil", "avformat", "avcodec"]
         );
+        Ok(())
+    }
+
+    static DEMUX_EVENTS: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+    static DEMUX_MODE: AtomicUsize = AtomicUsize::new(0);
+    static DEMUX_READ_BYTES: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+    static DEMUX_DECODER: std::sync::atomic::AtomicPtr<abi::AvCodec> =
+        std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+    #[allow(
+        clippy::vec_box,
+        reason = "the mock exposes stable stream and codec-parameter addresses through FFI"
+    )]
+    #[repr(C)]
+    struct MockDemuxFormat {
+        prefix: abi::AvFormatContext,
+        parameters: Vec<Box<u8>>,
+        streams: Vec<Box<abi::AvStream>>,
+        stream_pointers: Vec<*mut abi::AvStream>,
+    }
+
+    fn record_demux_event(event: &'static str) {
+        match DEMUX_EVENTS.lock() {
+            Ok(mut events) => events.push(event),
+            Err(_) => std::process::abort(),
+        }
+    }
+
+    fn reset_demux_fixture(mode: usize) -> Result<(), Box<dyn std::error::Error>> {
+        DEMUX_MODE.store(mode, Ordering::Release);
+        DEMUX_EVENTS
+            .lock()
+            .map_err(|_| "demux event mutex was poisoned")?
+            .clear();
+        DEMUX_READ_BYTES
+            .lock()
+            .map_err(|_| "demux read mutex was poisoned")?
+            .clear();
+        Ok(())
+    }
+
+    unsafe extern "C" fn mock_demux_format_alloc() -> *mut abi::AvFormatContext {
+        record_demux_event("format_alloc");
+        let allocation = Box::new(MockDemuxFormat {
+            prefix: abi::AvFormatContext {
+                class: std::ptr::null(),
+                input_format: std::ptr::null(),
+                output_format: std::ptr::null(),
+                private_data: std::ptr::null_mut(),
+                io_context: std::ptr::null_mut(),
+                context_flags: 0,
+                stream_count: 0,
+                streams: std::ptr::null_mut(),
+            },
+            parameters: Vec::new(),
+            streams: Vec::new(),
+            stream_pointers: Vec::new(),
+        });
+        Box::into_raw(allocation).cast()
+    }
+
+    unsafe extern "C" fn mock_demux_format_open(
+        format: *mut *mut abi::AvFormatContext,
+        _url: *const std::ffi::c_char,
+        _input_format: *const abi::AvInputFormat,
+        _options: *mut *mut abi::AvDictionary,
+    ) -> i32 {
+        record_demux_event("format_open");
+        if format.is_null() || unsafe { (*format).is_null() } {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let format_pointer = unsafe { *format };
+        let io_context = unsafe { (*format_pointer).io_context }.cast::<MockAvIoContext>();
+        if io_context.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let mut bytes = [0_u8; 3];
+        let read = unsafe { (*io_context).read_packet };
+        let Some(read) = read else {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        };
+        let read_count = unsafe { read((*io_context).opaque, bytes.as_mut_ptr(), 3) };
+        if read_count != 3 {
+            return read_count.min(abi::AV_ERROR_INVALID_ARGUMENT);
+        }
+        match DEMUX_READ_BYTES.lock() {
+            Ok(mut observed) => observed.extend_from_slice(&bytes),
+            Err(_) => std::process::abort(),
+        }
+
+        if DEMUX_MODE.load(Ordering::Acquire) == 3 {
+            unsafe { mock_demux_format_close(format) };
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let allocation = unsafe { &mut *format_pointer.cast::<MockDemuxFormat>() };
+        let mode = DEMUX_MODE.load(Ordering::Acquire);
+        let stream_count = if mode == 1 {
+            0
+        } else if mode == 4 {
+            2
+        } else {
+            1
+        };
+        for index in 0..stream_count {
+            let mut parameters = Box::new(0_u8);
+            let parameters_pointer = std::ptr::addr_of_mut!(*parameters).cast();
+            let mut stream = Box::new(abi::AvStream {
+                class: std::ptr::null(),
+                index,
+                identifier: 0,
+                codec_parameters: parameters_pointer,
+                private_data: std::ptr::null_mut(),
+                time_base: ltxv_frame_time_base(),
+            });
+            allocation
+                .stream_pointers
+                .push(std::ptr::addr_of_mut!(*stream));
+            allocation.parameters.push(parameters);
+            allocation.streams.push(stream);
+        }
+        allocation.prefix.stream_count =
+            u32::try_from(allocation.stream_pointers.len()).unwrap_or(u32::MAX);
+        allocation.prefix.streams = allocation.stream_pointers.as_mut_ptr();
+        0
+    }
+
+    unsafe extern "C" fn mock_demux_format_close(format: *mut *mut abi::AvFormatContext) {
+        record_demux_event("format_close");
+        if format.is_null() {
+            return;
+        }
+        let pointer = unsafe { *format };
+        if !pointer.is_null() {
+            drop(unsafe { Box::from_raw(pointer.cast::<MockDemuxFormat>()) });
+            unsafe { *format = std::ptr::null_mut() };
+        }
+    }
+
+    unsafe extern "C" fn mock_demux_format_free(format: *mut abi::AvFormatContext) {
+        record_demux_event("format_free");
+        if !format.is_null() {
+            drop(unsafe { Box::from_raw(format.cast::<MockDemuxFormat>()) });
+        }
+    }
+
+    unsafe extern "C" fn mock_demux_find_best_stream(
+        _format: *mut abi::AvFormatContext,
+        media_type: i32,
+        _wanted_stream: i32,
+        _related_stream: i32,
+        decoder: *mut *const abi::AvCodec,
+        _flags: i32,
+    ) -> i32 {
+        record_demux_event("find_stream");
+        if media_type != abi::AV_MEDIA_TYPE_VIDEO || decoder.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        let selected = if DEMUX_MODE.load(Ordering::Acquire) == 2 {
+            NonNull::<u16>::dangling().as_ptr().cast()
+        } else {
+            DEMUX_DECODER.load(Ordering::Acquire)
+        };
+        unsafe { *decoder = selected };
+        0
+    }
+
+    fn mock_demux_functions() -> NativeLtxvH264DemuxFunctions {
+        NativeLtxvH264DemuxFunctions {
+            av_find_best_stream: mock_demux_find_best_stream,
+            avformat_alloc_context: mock_demux_format_alloc,
+            avformat_close_input: mock_demux_format_close,
+            avformat_free_context: mock_demux_format_free,
+            avformat_open_input: mock_demux_format_open,
+        }
+    }
+
+    fn mock_borrowed_input<'bytes, 'context>(
+        bytes: &'bytes [u8],
+        backend: &CpuBackend,
+        context: &'context ExecutionContext<'_>,
+    ) -> Result<NativeVideoCodecMemoryInput<'context, 'bytes>, NativeVideoCodecIoError> {
+        let state = NativeVideoCodecInputState {
+            bytes: NonNull::new(bytes.as_ptr().cast_mut())
+                .ok_or(NativeVideoCodecIoError::InvalidBounds)?,
+            byte_length: bytes.len(),
+            position: 0,
+            maximum_position: bytes.len(),
+            cancellation: context.cancellation.clone(),
+            failure: None,
+            panic_on_next_callback: false,
+        };
+        let avio = allocate_native_video_codec_avio_inner(
+            state,
+            mock_avio_functions(),
+            64,
+            false,
+            Some(native_video_codec_input_read),
+            None,
+            Some(native_video_codec_input_seek),
+            backend,
+            context,
+            &mut || context.cancellation.check(),
+        )?;
+        Ok(NativeVideoCodecMemoryInput {
+            avio,
+            _owner: NativeVideoCodecInputOwner::Borrowed(bytes),
+        })
+    }
+
+    #[test]
+    fn retained_ltxv_mp4_demux_borrows_bytes_and_selects_first_h264_video_stream()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        reset_demux_fixture(0)?;
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let decoder = NonNull::<abi::AvCodec>::dangling();
+        DEMUX_DECODER.store(decoder.as_ptr(), Ordering::Release);
+        let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+        let (format, stream_index) = open_first_ltxv_h264_stream_with_check(
+            &input,
+            decoder,
+            4,
+            &mock_demux_functions(),
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(stream_index, 0);
+        assert_eq!(
+            *DEMUX_READ_BYTES
+                .lock()
+                .map_err(|_| "demux read mutex was poisoned")?,
+            b"MP4"
+        );
+        drop(format);
+        drop(input);
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        assert_eq!(
+            *DEMUX_EVENTS
+                .lock()
+                .map_err(|_| "demux event mutex was poisoned")?,
+            ["format_alloc", "format_open", "find_stream", "format_close"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_ltxv_mp4_demux_rejects_stream_drift_and_cancellation_atomically()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let decoder = NonNull::<abi::AvCodec>::dangling();
+        DEMUX_DECODER.store(decoder.as_ptr(), Ordering::Release);
+        for (mode, expected) in [(1, "missing"), (2, "codec"), (3, "open")] {
+            reset_demux_fixture(mode)?;
+            let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+            let result = open_first_ltxv_h264_stream_with_check(
+                &input,
+                decoder,
+                4,
+                &mock_demux_functions(),
+                &mut || cancellation.check(),
+            );
+            match expected {
+                "missing" => assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecLtxvDemuxError::MissingVideoStream)
+                )),
+                "codec" => assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecLtxvDemuxError::UnexpectedVideoCodec)
+                )),
+                _ => assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecLtxvDemuxError::OpenFailed { .. })
+                )),
+            }
+            drop(input);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
+
+        reset_demux_fixture(4)?;
+        let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+        assert!(matches!(
+            open_first_ltxv_h264_stream_with_check(
+                &input,
+                decoder,
+                1,
+                &mock_demux_functions(),
+                &mut || cancellation.check(),
+            ),
+            Err(NativeVideoCodecLtxvDemuxError::StreamLimitExceeded)
+        ));
+        drop(input);
+
+        let successful_checks = {
+            reset_demux_fixture(0)?;
+            let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+            let mut checks = 0;
+            let (format, _) = open_first_ltxv_h264_stream_with_check(
+                &input,
+                decoder,
+                4,
+                &mock_demux_functions(),
+                &mut || {
+                    checks += 1;
+                    Ok(())
+                },
+            )?;
+            drop(format);
+            drop(input);
+            checks
+        };
+        for cancelled_check in 1..=successful_checks {
+            reset_demux_fixture(0)?;
+            let input = mock_borrowed_input(b"MP4", &backend, &context)?;
+            let mut checks = 0;
+            assert!(matches!(
+                open_first_ltxv_h264_stream_with_check(
+                    &input,
+                    decoder,
+                    4,
+                    &mock_demux_functions(),
+                    &mut || {
+                        checks += 1;
+                        if checks == cancelled_check {
+                            Err(CancellationError)
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Err(NativeVideoCodecLtxvDemuxError::Cancelled)
+            ));
+            drop(input);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
         Ok(())
     }
 
@@ -4439,8 +5164,11 @@ mod tests {
     fn bounded_video_codec_avio_callbacks_enforce_read_write_seek_and_limits()
     -> Result<(), Box<dyn std::error::Error>> {
         let cancellation = CancellationToken::default();
+        let input_bytes: Arc<[u8]> = Arc::from([1_u8, 2, 3, 4]);
         let mut input = NativeVideoCodecInputState {
-            bytes: Arc::from([1_u8, 2, 3, 4]),
+            bytes: NonNull::new(input_bytes.as_ptr().cast_mut())
+                .ok_or("input bytes were unexpectedly empty")?,
+            byte_length: input_bytes.len(),
             position: 0,
             maximum_position: 8,
             cancellation: cancellation.clone(),
@@ -4596,8 +5324,11 @@ mod tests {
     fn bounded_video_codec_avio_cancellation_and_panics_are_latched()
     -> Result<(), Box<dyn std::error::Error>> {
         let cancellation = CancellationToken::default();
+        let input_bytes: Arc<[u8]> = Arc::from([1_u8]);
         let mut input = NativeVideoCodecInputState {
-            bytes: Arc::from([1_u8]),
+            bytes: NonNull::new(input_bytes.as_ptr().cast_mut())
+                .ok_or("input bytes were unexpectedly empty")?,
+            byte_length: input_bytes.len(),
             position: 0,
             maximum_position: 1,
             cancellation: cancellation.clone(),

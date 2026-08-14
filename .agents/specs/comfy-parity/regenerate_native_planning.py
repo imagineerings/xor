@@ -11063,6 +11063,56 @@ def native_video_codec_ltxv_h264_mp4_encode_foundation_task(
     )
 
 
+def native_video_codec_ltxv_h264_mp4_demux_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ltxv-h264-mp4-demux-foundation",
+        "Reopen retained LTXV H.264 MP4 streams",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained LTXV H.264 owner reopens only its own opaque staged MP4 through lifetime-bound borrowed memory AVIO, executes bounded libavformat auto-probe and header parsing, requires the exact single stream and already admitted H.264 decoder, and retains one private attempt-local demux session. The encoded allocation is never copied into an Arc, format cleanup precedes AVIO cleanup, caller scratch and cancellation bound every observable phase, and no packet decode, RGB result, media payload, cache, effect, persistence, recovery, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-demux/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Exact-signature fixtures and focused tests prove zero-copy borrowed staged input, format allocation and auto-probe, retained AVIO identity, exact single-stream and admitted-decoder selection, input and stream bounds, callback and cancellation precedence, allocated-versus-opened cleanup, format-before-AVIO drop order, zero scratch residue, and clean retry. The fixture records reviewed source and prerequisite digests and explicitly claims no licensed or installed FFmpeg package, valid production MP4 oracle, packet decode, RGB result, numerical H.264 parity, media payload, effect, cache, persistence, recovery, or publication evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.5", "31.6", "32.1", "35.3", "35.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13339,8 +13389,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ltxv_h264_admission_foundation["id"])
         )
     )
+    video_codec_ltxv_h264_mp4_demux_foundation = (
+        native_video_codec_ltxv_h264_mp4_demux_foundation_task(
+            str(video_codec_ltxv_h264_mp4_encode_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_ltxv_h264_mp4_encode_foundation["id"])
+        str(video_codec_ltxv_h264_mp4_demux_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13473,6 +13528,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_bounded_memory_avio_foundation,
         video_codec_ltxv_h264_admission_foundation,
         video_codec_ltxv_h264_mp4_encode_foundation,
+        video_codec_ltxv_h264_mp4_demux_foundation,
         video_foundation,
             detection_foundation,
         ]
