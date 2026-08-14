@@ -10862,6 +10862,48 @@ def native_video_codec_symbol_binding_foundation_task(
     )
 
 
+def native_video_codec_data_plane_abi_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-data-plane-abi-foundation",
+        "Own reviewed FFmpeg 7.1 video data-plane layouts",
+        [28, 31, 32, 41, 42],
+        [17, 19, 27, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The private native video codec ABI owner extends the exact reviewed FFmpeg 7.1 x86_64 GNU contract with only the AVFrame, AVPacket, AVStream, AVFormatContext, and AVIOContext prefixes and constants needed by the first bounded in-memory video data plane. Every prefix remains allocation-opaque and may only describe FFmpeg-owned objects. The existing 54-symbol catalog is unchanged, and this prerequisite loads no library, resolves no address, invokes no native function, probes no codec, allocates no media, and owns no controller, effect, cache, persistence, recovery, or publication state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "The signed-source manifest and warnings-denied C verifier prove every admitted prefix size, alignment, and field offset plus exact media, codec, pixel-format, timestamp, seek, option, scaling, and error constants against the official FFmpeg 7.1 headers. Rust tests prove the same contract and preserve exact 54-symbol catalog equality. Mutation and ownership evidence reject target, archive, header, layout, constant, or symbol-count drift; full-struct allocation from a prefix; a second ABI owner; raw public pointers; and every loader, lookup, probe, codec, media, effect, cache, persistence, recovery, or publication claim. The fixture explicitly claims no licensed or installed FFmpeg package and no runtime or numerical codec evidence.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.6", "32.1", "41.4", "41.5", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13118,8 +13160,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_callable_symbol_certification_foundation["id"])
         )
     )
+    video_codec_data_plane_abi_foundation = (
+        native_video_codec_data_plane_abi_foundation_task(
+            str(video_codec_symbol_binding_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_symbol_binding_foundation["id"])
+        str(video_codec_data_plane_abi_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13248,6 +13295,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_reviewed_abi_foundation,
         video_codec_callable_symbol_certification_foundation,
         video_codec_symbol_binding_foundation,
+        video_codec_data_plane_abi_foundation,
         video_foundation,
             detection_foundation,
         ]

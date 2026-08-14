@@ -35,14 +35,12 @@ macro_rules! opaque_ffi_type {
 opaque_ffi_type!(AvCodec);
 opaque_ffi_type!(AvCodecContext);
 opaque_ffi_type!(AvCodecParameters);
+opaque_ffi_type!(AvBufferRef);
+opaque_ffi_type!(AvClass);
 opaque_ffi_type!(AvDictionary);
-opaque_ffi_type!(AvFormatContext);
-opaque_ffi_type!(AvFrame);
 opaque_ffi_type!(AvInputFormat);
-opaque_ffi_type!(AvIoContext);
 opaque_ffi_type!(AvOutputFormat);
-opaque_ffi_type!(AvPacket);
-opaque_ffi_type!(AvStream);
+opaque_ffi_type!(AvPacketSideData);
 opaque_ffi_type!(SwrContext);
 opaque_ffi_type!(SwsContext);
 opaque_ffi_type!(SwsFilter);
@@ -74,6 +72,85 @@ pub(crate) struct AvChannelLayout {
     pub(crate) channel_count: c_int,
     pub(crate) data: AvChannelLayoutData,
     pub(crate) opaque: *mut c_void,
+}
+
+pub(crate) const AV_NUM_DATA_POINTERS: usize = 8;
+pub(crate) const AV_MEDIA_TYPE_VIDEO: c_int = 0;
+pub(crate) const AV_CODEC_ID_H264: c_int = 27;
+pub(crate) const AV_CODEC_ID_VP9: c_int = 167;
+pub(crate) const AV_CODEC_ID_AV1: c_int = 225;
+pub(crate) const AV_CODEC_ID_AAC: c_int = 86_018;
+pub(crate) const AV_PIXEL_FORMAT_YUV420P: c_int = 0;
+pub(crate) const AV_PIXEL_FORMAT_RGB24: c_int = 2;
+pub(crate) const AV_NO_PRESENTATION_TIMESTAMP: i64 = i64::MIN;
+pub(crate) const AV_SEEK_SIZE: c_int = 0x1_0000;
+pub(crate) const AV_FORMAT_FLAG_CUSTOM_IO: c_int = 0x0080;
+pub(crate) const AV_CODEC_FLAG_GLOBAL_HEADER: c_int = 1 << 22;
+pub(crate) const AV_OPTION_SEARCH_CHILDREN: c_int = 1;
+pub(crate) const SWS_BILINEAR: c_int = 2;
+pub(crate) const AV_ERROR_TRY_AGAIN: c_int = -11;
+pub(crate) const AV_ERROR_OUT_OF_MEMORY: c_int = -12;
+pub(crate) const AV_ERROR_INVALID_ARGUMENT: c_int = -22;
+pub(crate) const AV_ERROR_END_OF_FILE: c_int = -541_478_725;
+pub(crate) const AV_ERROR_EXIT: c_int = -1_414_092_869;
+
+// These reviewed prefixes are only for accessing objects allocated by FFmpeg;
+// their Rust size is intentionally not the complete public C struct size.
+#[repr(C)]
+pub(crate) struct AvFrame {
+    pub(crate) data: [*mut u8; AV_NUM_DATA_POINTERS],
+    pub(crate) line_size: [c_int; AV_NUM_DATA_POINTERS],
+    pub(crate) extended_data: *mut *mut u8,
+    pub(crate) width: c_int,
+    pub(crate) height: c_int,
+    pub(crate) sample_count: c_int,
+    pub(crate) format: c_int,
+    pub(crate) key_frame: c_int,
+    pub(crate) picture_type: c_int,
+    pub(crate) sample_aspect_ratio: AvRational,
+    pub(crate) presentation_timestamp: i64,
+}
+
+#[repr(C)]
+pub(crate) struct AvPacket {
+    pub(crate) buffer: *mut AvBufferRef,
+    pub(crate) presentation_timestamp: i64,
+    pub(crate) decoding_timestamp: i64,
+    pub(crate) data: *mut u8,
+    pub(crate) size: c_int,
+    pub(crate) stream_index: c_int,
+    pub(crate) flags: c_int,
+    pub(crate) side_data: *mut AvPacketSideData,
+    pub(crate) side_data_count: c_int,
+    pub(crate) duration: i64,
+}
+
+#[repr(C)]
+pub(crate) struct AvStream {
+    pub(crate) class: *const AvClass,
+    pub(crate) index: c_int,
+    pub(crate) identifier: c_int,
+    pub(crate) codec_parameters: *mut AvCodecParameters,
+    pub(crate) private_data: *mut c_void,
+    pub(crate) time_base: AvRational,
+}
+
+#[repr(C)]
+pub(crate) struct AvFormatContext {
+    pub(crate) class: *const AvClass,
+    pub(crate) input_format: *const AvInputFormat,
+    pub(crate) output_format: *const AvOutputFormat,
+    pub(crate) private_data: *mut c_void,
+    pub(crate) io_context: *mut AvIoContext,
+    pub(crate) context_flags: c_int,
+    pub(crate) stream_count: c_uint,
+    pub(crate) streams: *mut *mut AvStream,
+}
+
+#[repr(C)]
+pub(crate) struct AvIoContext {
+    pub(crate) class: *const AvClass,
+    pub(crate) buffer: *mut u8,
 }
 
 pub(crate) type AvIoReadPacket = unsafe extern "C" fn(*mut c_void, *mut u8, c_int) -> c_int;
@@ -380,5 +457,191 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(manifest_symbols, symbols);
         }
+    }
+
+    #[test]
+    fn ffmpeg_7_1_data_plane_prefixes_and_constants_are_exact() {
+        assert_eq!(mem::size_of::<AvFrame>(), 144);
+        assert_eq!(mem::align_of::<AvFrame>(), 8);
+        assert_eq!(mem::offset_of!(AvFrame, data), 0);
+        assert_eq!(mem::offset_of!(AvFrame, line_size), 64);
+        assert_eq!(mem::offset_of!(AvFrame, extended_data), 96);
+        assert_eq!(mem::offset_of!(AvFrame, width), 104);
+        assert_eq!(mem::offset_of!(AvFrame, height), 108);
+        assert_eq!(mem::offset_of!(AvFrame, sample_count), 112);
+        assert_eq!(mem::offset_of!(AvFrame, format), 116);
+        assert_eq!(mem::offset_of!(AvFrame, key_frame), 120);
+        assert_eq!(mem::offset_of!(AvFrame, picture_type), 124);
+        assert_eq!(mem::offset_of!(AvFrame, sample_aspect_ratio), 128);
+        assert_eq!(mem::offset_of!(AvFrame, presentation_timestamp), 136);
+
+        assert_eq!(mem::size_of::<AvPacket>(), 72);
+        assert_eq!(mem::align_of::<AvPacket>(), 8);
+        assert_eq!(mem::offset_of!(AvPacket, buffer), 0);
+        assert_eq!(mem::offset_of!(AvPacket, presentation_timestamp), 8);
+        assert_eq!(mem::offset_of!(AvPacket, decoding_timestamp), 16);
+        assert_eq!(mem::offset_of!(AvPacket, data), 24);
+        assert_eq!(mem::offset_of!(AvPacket, size), 32);
+        assert_eq!(mem::offset_of!(AvPacket, stream_index), 36);
+        assert_eq!(mem::offset_of!(AvPacket, flags), 40);
+        assert_eq!(mem::offset_of!(AvPacket, side_data), 48);
+        assert_eq!(mem::offset_of!(AvPacket, side_data_count), 56);
+        assert_eq!(mem::offset_of!(AvPacket, duration), 64);
+
+        assert_eq!(mem::size_of::<AvStream>(), 40);
+        assert_eq!(mem::align_of::<AvStream>(), 8);
+        assert_eq!(mem::offset_of!(AvStream, class), 0);
+        assert_eq!(mem::offset_of!(AvStream, index), 8);
+        assert_eq!(mem::offset_of!(AvStream, identifier), 12);
+        assert_eq!(mem::offset_of!(AvStream, codec_parameters), 16);
+        assert_eq!(mem::offset_of!(AvStream, private_data), 24);
+        assert_eq!(mem::offset_of!(AvStream, time_base), 32);
+
+        assert_eq!(mem::size_of::<AvFormatContext>(), 56);
+        assert_eq!(mem::align_of::<AvFormatContext>(), 8);
+        assert_eq!(mem::offset_of!(AvFormatContext, class), 0);
+        assert_eq!(mem::offset_of!(AvFormatContext, input_format), 8);
+        assert_eq!(mem::offset_of!(AvFormatContext, output_format), 16);
+        assert_eq!(mem::offset_of!(AvFormatContext, private_data), 24);
+        assert_eq!(mem::offset_of!(AvFormatContext, io_context), 32);
+        assert_eq!(mem::offset_of!(AvFormatContext, context_flags), 40);
+        assert_eq!(mem::offset_of!(AvFormatContext, stream_count), 44);
+        assert_eq!(mem::offset_of!(AvFormatContext, streams), 48);
+
+        assert_eq!(mem::size_of::<AvIoContext>(), 16);
+        assert_eq!(mem::align_of::<AvIoContext>(), 8);
+        assert_eq!(mem::offset_of!(AvIoContext, class), 0);
+        assert_eq!(mem::offset_of!(AvIoContext, buffer), 8);
+
+        assert_eq!(AV_NUM_DATA_POINTERS, 8);
+        assert_eq!(AV_MEDIA_TYPE_VIDEO, 0);
+        assert_eq!(AV_CODEC_ID_H264, 27);
+        assert_eq!(AV_CODEC_ID_VP9, 167);
+        assert_eq!(AV_CODEC_ID_AV1, 225);
+        assert_eq!(AV_CODEC_ID_AAC, 86_018);
+        assert_eq!(AV_PIXEL_FORMAT_YUV420P, 0);
+        assert_eq!(AV_PIXEL_FORMAT_RGB24, 2);
+        assert_eq!(AV_NO_PRESENTATION_TIMESTAMP, i64::MIN);
+        assert_eq!(AV_SEEK_SIZE, 0x1_0000);
+        assert_eq!(AV_FORMAT_FLAG_CUSTOM_IO, 0x0080);
+        assert_eq!(AV_CODEC_FLAG_GLOBAL_HEADER, 1 << 22);
+        assert_eq!(AV_OPTION_SEARCH_CHILDREN, 1);
+        assert_eq!(SWS_BILINEAR, 2);
+        assert_eq!(AV_ERROR_TRY_AGAIN, -11);
+        assert_eq!(AV_ERROR_OUT_OF_MEMORY, -12);
+        assert_eq!(AV_ERROR_INVALID_ARGUMENT, -22);
+        assert_eq!(AV_ERROR_END_OF_FILE, -541_478_725);
+        assert_eq!(AV_ERROR_EXIT, -1_414_092_869);
+        assert_eq!(
+            video_codec_library_contracts()
+                .iter()
+                .map(|(_, _, symbols)| symbols.len())
+                .sum::<usize>(),
+            54
+        );
+    }
+
+    #[test]
+    fn data_plane_manifest_matches_compiled_prefix_contract() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json"
+        ))
+        .expect("reviewed data-plane ABI manifest must be valid JSON");
+        assert_eq!(
+            manifest["source"]["archive_sha256"],
+            FFMPEG_7_1_SOURCE_ARCHIVE_SHA256
+        );
+        assert_eq!(manifest["target"], "x86_64-unknown-linux-gnu");
+        assert_eq!(
+            manifest["source"]["signature_sha256"],
+            "9bd1689dce76b109034dcc4765a406e84e8799a2fd857b000c0a4d9744b70617"
+        );
+        assert_eq!(
+            manifest["source"]["headers"],
+            serde_json::json!({
+                "libavcodec/avcodec.h": {"bytes": 114986, "sha256": "d6dbc9694974237888592f71020092c4594511e762d609b0076a90e9696ad1b1"},
+                "libavcodec/codec.h": {"bytes": 13314, "sha256": "681a5a4551b370e3e6b98ea0101aaf12e73419e96f1096a7377633a8d2ec1340"},
+                "libavcodec/codec_id.h": {"bytes": 18054, "sha256": "de6a2924c58f83da84058fabc715b8838321518cbabc8458b15cb83d202fe14a"},
+                "libavcodec/packet.h": {"bytes": 30025, "sha256": "219679e1ffe55fd22bc81b151fce8315372c87028fea87780be686f2b38f305f"},
+                "libavformat/avformat.h": {"bytes": 119096, "sha256": "6171ac10e35a67fe04aa8ddfbf84263def2d7ae9159019dd71e5597be5dd3944"},
+                "libavformat/avio.h": {"bytes": 31142, "sha256": "b1a25f1465b87b62bf2797870c39fbbf81d2e1b4513ac34a66d57963e8facb6f"},
+                "libavutil/error.h": {"bytes": 5555, "sha256": "bcf4f7e69c7e0d658ad6e81611810f7cf1f0b8334ebe948d27e518c459e4104c"},
+                "libavutil/frame.h": {"bytes": 41581, "sha256": "8218f0295206a6543e7d3974a6fcb1f22100a273b09234d0cb84c60cd1638e75"},
+                "libavutil/mathematics.h": {"bytes": 9563, "sha256": "64fac2eb3a42fd3788f5585ac8e65c7d5cd82711730d1f030042ba0a62fe1a62"},
+                "libavutil/opt.h": {"bytes": 47084, "sha256": "c6aec0aade9cb55696bd10a47294e43a38900208ba060d9f37e32348cf5f1fbf"},
+                "libavutil/pixfmt.h": {"bytes": 41991, "sha256": "ace2ebcf84a382269c21ad7a050d69ab293b0dbceab350ac7f728a1b37dc0336"},
+                "libavutil/version_major.h": {"bytes": 999, "sha256": "de46b2654c135c2d87631e955419a19f5ea315af9788d7aee08344215f198a50"},
+                "libswscale/swscale.h": {"bytes": 16928, "sha256": "42ab58ed743efc74ba2152a049b521d41a0fae31595a9b9c6858742391570ca4"}
+            })
+        );
+        assert_eq!(manifest["contract"]["symbol_count"], 54);
+        assert_eq!(manifest["prefixes"]["AVFrame"]["size"], 144);
+        assert_eq!(manifest["prefixes"]["AVFrame"]["alignment"], 8);
+        assert_eq!(manifest["prefixes"]["AVPacket"]["size"], 72);
+        assert_eq!(manifest["prefixes"]["AVPacket"]["alignment"], 8);
+        assert_eq!(manifest["prefixes"]["AVStream"]["size"], 40);
+        assert_eq!(manifest["prefixes"]["AVStream"]["alignment"], 8);
+        assert_eq!(manifest["prefixes"]["AVFormatContext"]["size"], 56);
+        assert_eq!(manifest["prefixes"]["AVFormatContext"]["alignment"], 8);
+        assert_eq!(manifest["prefixes"]["AVIOContext"]["size"], 16);
+        assert_eq!(manifest["prefixes"]["AVIOContext"]["alignment"], 8);
+        assert_eq!(
+            manifest["prefixes"]["AVFrame"]["offsets"],
+            serde_json::json!({
+                "data": 0, "linesize": 64, "extended_data": 96, "width": 104,
+                "height": 108, "nb_samples": 112, "format": 116, "key_frame": 120,
+                "pict_type": 124, "sample_aspect_ratio": 128, "pts": 136
+            })
+        );
+        assert_eq!(
+            manifest["prefixes"]["AVPacket"]["offsets"],
+            serde_json::json!({
+                "buf": 0, "pts": 8, "dts": 16, "data": 24, "size": 32,
+                "stream_index": 36, "flags": 40, "side_data": 48,
+                "side_data_elems": 56, "duration": 64
+            })
+        );
+        assert_eq!(
+            manifest["prefixes"]["AVStream"]["offsets"],
+            serde_json::json!({
+                "av_class": 0, "index": 8, "id": 12, "codecpar": 16,
+                "priv_data": 24, "time_base": 32
+            })
+        );
+        assert_eq!(
+            manifest["prefixes"]["AVFormatContext"]["offsets"],
+            serde_json::json!({
+                "av_class": 0, "iformat": 8, "oformat": 16, "priv_data": 24,
+                "pb": 32, "ctx_flags": 40, "nb_streams": 44, "streams": 48
+            })
+        );
+        assert_eq!(
+            manifest["prefixes"]["AVIOContext"]["offsets"],
+            serde_json::json!({"av_class": 0, "buffer": 8})
+        );
+        assert_eq!(
+            manifest["constants"],
+            serde_json::json!({
+                "AV_NUM_DATA_POINTERS": AV_NUM_DATA_POINTERS,
+                "AVMEDIA_TYPE_VIDEO": AV_MEDIA_TYPE_VIDEO,
+                "AV_CODEC_ID_H264": AV_CODEC_ID_H264,
+                "AV_CODEC_ID_VP9": AV_CODEC_ID_VP9,
+                "AV_CODEC_ID_AV1": AV_CODEC_ID_AV1,
+                "AV_CODEC_ID_AAC": AV_CODEC_ID_AAC,
+                "AV_PIX_FMT_YUV420P": AV_PIXEL_FORMAT_YUV420P,
+                "AV_PIX_FMT_RGB24": AV_PIXEL_FORMAT_RGB24,
+                "AV_NOPTS_VALUE": AV_NO_PRESENTATION_TIMESTAMP,
+                "AVSEEK_SIZE": AV_SEEK_SIZE,
+                "AVFMT_FLAG_CUSTOM_IO": AV_FORMAT_FLAG_CUSTOM_IO,
+                "AV_CODEC_FLAG_GLOBAL_HEADER": AV_CODEC_FLAG_GLOBAL_HEADER,
+                "AV_OPT_SEARCH_CHILDREN": AV_OPTION_SEARCH_CHILDREN,
+                "SWS_BILINEAR": SWS_BILINEAR,
+                "AVERROR_EAGAIN": AV_ERROR_TRY_AGAIN,
+                "AVERROR_ENOMEM": AV_ERROR_OUT_OF_MEMORY,
+                "AVERROR_EINVAL": AV_ERROR_INVALID_ARGUMENT,
+                "AVERROR_EOF": AV_ERROR_END_OF_FILE,
+                "AVERROR_EXIT": AV_ERROR_EXIT
+            })
+        );
     }
 }

@@ -14602,6 +14602,103 @@ fn val_ownership_native_video_codec_symbol_binding_001() -> Result<(), Box<dyn s
 }
 
 #[test]
+fn val_ownership_native_video_codec_data_plane_abi_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "pub(crate) struct AvFrame",
+        "pub(crate) struct AvPacket",
+        "pub(crate) struct AvStream",
+        "pub(crate) struct AvFormatContext",
+        "pub(crate) struct AvIoContext",
+        "AV_CODEC_ID_H264",
+        "AV_FORMAT_FLAG_CUSTOM_IO",
+        "AV_ERROR_END_OF_FILE",
+        "ffmpeg_7_1_data_plane_prefixes_and_constants_are_exact",
+        "data_plane_manifest_matches_compiled_prefix_contract",
+    ] {
+        assert!(abi.contains(required), "data-plane ABI lacks {required}");
+    }
+    for forbidden in [
+        "pub struct AvFrame",
+        "pub struct AvPacket",
+        "dlmopen",
+        "dlsym",
+        "avcodec_open2(",
+        "avcodec_send_frame(",
+        "NativeVideoPayload",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !abi.contains(forbidden),
+            "data-plane ABI contains forbidden {forbidden}"
+        );
+    }
+
+    let verifier = fs::read_to_string(
+        root.join("crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c"),
+    )?;
+    for required in [
+        "SimAvFramePrefix",
+        "SimAvPacketPrefix",
+        "SimAvStreamPrefix",
+        "SimAvFormatContextPrefix",
+        "SimAvIoContextPrefix",
+        "FIELD_OFFSET(AVFrame",
+        "FIELD_OFFSET(AVIOContext",
+        "_Static_assert(AV_CODEC_ID_H264 == 27",
+        "_Static_assert(AVERROR_EXIT == -1414092869",
+    ] {
+        assert!(
+            verifier.contains(required),
+            "data-plane C verifier lacks {required}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json"),
+    )?;
+    for required in [
+        "official-source-reviewed-prefix-only-data-plane-abi",
+        "opaque_allocation_through_ffmpeg_only",
+        "reviewed_symbol_count_unchanged",
+        "full_struct_allocation_from_prefix_forbidden",
+        "raw_public_pointer_projection_forbidden",
+        "native_library_loaded_by_this_leaf",
+        "codec_or_media_executed",
+        "numeric_codec_oracle",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "data-plane ABI fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_data_plane_abi_layouts")
+            })
+        })
+        .ok_or("missing native video data-plane ABI ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-data-plane-abi-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

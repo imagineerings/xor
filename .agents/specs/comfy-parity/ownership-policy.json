@@ -14123,7 +14123,8 @@
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-reviewed-abi-foundation",
         "comfy-parity-native-video-codec-callable-symbol-certification-foundation",
-        "comfy-parity-native-video-codec-symbol-binding-foundation"
+        "comfy-parity-native-video-codec-symbol-binding-foundation",
+        "comfy-parity-native-video-codec-data-plane-abi-foundation"
       ],
       "production_consumers": [
         "native video codec trust catalog",
@@ -14149,6 +14150,110 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One private source-verified ABI module owns exact FFmpeg 7.1 declarations and public by-value layouts for the reviewed x86_64 GNU boundary. Trust consumes its symbol projection, while the loader and later callable adapter remain separate unsafe owners. Declaration evidence alone cannot claim runtime availability or codec behavior."
+    },
+    {
+      "concern": "native_video_reviewed_codec_data_plane_abi_layouts",
+      "canonical_owner": "comfy_runtime::native_video_codec_abi::{AvFrame,AvPacket,AvStream,AvFormatContext,AvIoContext}",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_abi.rs",
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+        "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c"
+      ],
+      "owner_symbols": [
+        "AvFrame",
+        "AvPacket",
+        "AvStream",
+        "AvFormatContext",
+        "AvIoContext"
+      ],
+      "allowed_adapters": [
+        "later bounded native video codec operations may dereference only these reviewed FFmpeg-owned prefixes through the private native_video_codec_ffi owner",
+        "the prefixes are allocation-opaque and may never be allocated, copied as complete FFmpeg objects, serialized, or projected as public raw pointers",
+        "the reviewed 54-symbol catalog remains unchanged and this declaration leaf owns no loader, address lookup, native invocation, codec capability, media allocation, controller, effect, cache, persistence, recovery, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvFrame",
+          "role": "abi_boundary",
+          "symbol": "AvFrame"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvPacket",
+          "role": "abi_boundary",
+          "symbol": "AvPacket"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvStream",
+          "role": "abi_boundary",
+          "symbol": "AvStream"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvFormatContext",
+          "role": "abi_boundary",
+          "symbol": "AvFormatContext"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvIoContext",
+          "role": "abi_boundary",
+          "symbol": "AvIoContext"
+        }
+      ],
+      "call_symbols": [],
+      "required_mappings": [
+        {
+          "name": "video-codec-data-plane-rust-prefixes-and-constants-match-reviewed-contract",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "AvFrame[\\s\\S]*AvPacket[\\s\\S]*AvStream[\\s\\S]*AvFormatContext[\\s\\S]*AvIoContext[\\s\\S]*ffmpeg_7_1_data_plane_prefixes_and_constants_are_exact[\\s\\S]*data_plane_manifest_matches_compiled_prefix_contract"
+        },
+        {
+          "name": "video-codec-data-plane-c-verifier-checks-prefixes-and-operational-constants",
+          "path": "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+          "pattern": "SimAvFramePrefix[\\s\\S]*SimAvPacketPrefix[\\s\\S]*SimAvStreamPrefix[\\s\\S]*SimAvFormatContextPrefix[\\s\\S]*SimAvIoContextPrefix[\\s\\S]*AV_CODEC_ID_H264[\\s\\S]*AVERROR_EXIT"
+        },
+        {
+          "name": "video-codec-data-plane-manifest-binds-official-source-target-prefixes-and-unchanged-symbol-count",
+          "path": "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+          "pattern": "(?=[\\s\\S]*ffmpeg-7.1-x86_64-gnu-data-plane-v1)(?=[\\s\\S]*40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6)(?=[\\s\\S]*prefix_only)(?=[\\s\\S]*symbol_count)(?=[\\s\\S]*AVFrame)(?=[\\s\\S]*AVIOContext)"
+        },
+        {
+          "name": "video-codec-data-plane-fixture-forbids-runtime-codec-and-public-pointer-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+          "pattern": "official-source-reviewed-prefix-only-data-plane-abi[\\s\\S]*opaque_allocation_through_ffmpeg_only[\\s\\S]*full_struct_allocation_from_prefix_forbidden[\\s\\S]*raw_public_pointer_projection_forbidden[\\s\\S]*native_library_loaded_by_this_leaf[\\s\\S]*codec_or_media_executed"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-data-plane-abi-foundation"
+      ],
+      "production_consumers": [
+        "later bounded native FFmpeg AVIO and codec operations"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D19",
+        "D27",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One private source-verified ABI owner defines only the FFmpeg-owned prefixes and constants needed for the first bounded video data plane. Prefix evidence enables later checked dereferences without treating a Rust prefix as a complete allocatable C object or broadening loader and codec ownership."
     },
     {
       "concern": "native_video_reviewed_codec_symbol_binding",
