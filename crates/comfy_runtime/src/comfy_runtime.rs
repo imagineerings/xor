@@ -43,6 +43,7 @@ pub mod native_ffi_npu;
 pub mod native_ffi_rocm;
 #[cfg(feature = "xpu")]
 pub mod native_ffi_xpu;
+mod native_video_codec_abi;
 pub mod native_video_codec_ffi;
 pub mod output_committer;
 pub mod permissions;

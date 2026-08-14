@@ -10725,6 +10725,52 @@ def native_video_codec_retained_loader_foundation_task(
     )
 
 
+def native_video_codec_reviewed_abi_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-reviewed-abi-foundation",
+        "Own reviewed FFmpeg 7.1 C ABI declarations",
+        [28, 31, 32, 41, 42],
+        [17, 19, 27, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One private native video codec ABI owner binds the signature-verified official FFmpeg 7.1 source archive to exact x86_64 GNU C declarations, five library release versions, opaque pointer types, callback signatures, AVRational and AVChannelLayout layouts, and the complete initial 54-symbol catalog. The trust catalog delegates its name and ABI-major projection to this owner. This declaration leaf does not load a library, resolve or retain an address, invoke a version function, probe an encoder, call a codec, allocate media, or own controller, effect, cache, persistence, recovery, or publication state.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_backend_rocm/src/abi.rs",
+            "crates/comfy_backend_rocm/build.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "The reviewed manifest records the official archive, detached signature, release-key fingerprint, exact header hashes and lengths, compiler target, five release-version triples, all 54 typed declarations, and the C layout probe. Rust and C checks prove exact symbol-set delegation, function and callback signatures, pointer representation, AVRational and AVChannelLayout size, alignment, and offsets. Ownership evidence rejects duplicate symbol contracts plus every loader, dlsym, dladdr, raw-address, transmute, runtime function invocation, encoder probe, codec, media, effect, cache, persistence, recovery, and publication path. The fixture explicitly claims no licensed FFmpeg binary or production package and no runtime ABI availability.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.6", "32.1", "41.4", "41.5", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12966,8 +13012,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_dependency_closure_foundation["id"])
         )
     )
+    video_codec_reviewed_abi_foundation = (
+        native_video_codec_reviewed_abi_foundation_task(
+            str(video_codec_retained_loader_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_retained_loader_foundation["id"])
+        str(video_codec_reviewed_abi_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13093,6 +13144,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_dependency_contract_foundation,
         video_codec_dependency_closure_foundation,
         video_codec_retained_loader_foundation,
+        video_codec_reviewed_abi_foundation,
         video_foundation,
             detection_foundation,
         ]

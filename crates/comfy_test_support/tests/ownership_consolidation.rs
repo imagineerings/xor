@@ -14314,6 +14314,105 @@ fn val_ownership_native_video_codec_retained_loader_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "FFMPEG_7_1_SOURCE_ARCHIVE_SHA256",
+        "FFMPEG_7_1_RELEASE_SIGNING_KEY_FINGERPRINT",
+        "FFMPEG_7_1_AVCODEC_VERSION",
+        "pub(crate) struct AvRational",
+        "pub(crate) struct AvChannelLayout",
+        "pub(crate) type AvIoReadPacket",
+        "pub(crate) type AvcodecVersion",
+        "pub(crate) type SwscaleVersion",
+        "pub(crate) fn video_codec_library_contracts()",
+        "assert_eq!(symbols.len(), 54)",
+        "reviewed_manifest_matches_compiled_abi_contract",
+    ] {
+        assert!(
+            abi.contains(required),
+            "reviewed FFmpeg ABI lacks {required}"
+        );
+    }
+    for forbidden in [
+        "dlmopen",
+        "dlopen",
+        "dlsym",
+        "dladdr",
+        "transmute",
+        "find_encoder(\"",
+        "NativeCache",
+        "OutputCommitter",
+        "NativeStoredPayload",
+    ] {
+        assert!(
+            !abi.contains(forbidden),
+            "reviewed FFmpeg ABI contains forbidden {forbidden}"
+        );
+    }
+
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    assert!(trust.contains("native_video_codec_abi::video_codec_library_contracts"));
+    assert!(!trust.contains("const VIDEO_CODEC_AVCODEC_SYMBOLS"));
+
+    let verifier =
+        fs::read_to_string(root.join("crates/comfy_runtime/abi/video-codec/verify-bindings.c"))?;
+    for required in [
+        "_Static_assert(sizeof(AVRational) == 8",
+        "_Static_assert(sizeof(AVChannelLayout) == 24",
+        "TYPE_MATCH(avcodec_version",
+        "TYPE_MATCH(swscale_version",
+    ] {
+        assert!(
+            verifier.contains(required),
+            "reviewed FFmpeg C verifier lacks {required}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json"),
+    )?;
+    for required in [
+        "official-source-reviewed-declaration-only-abi",
+        "reviewed_typed_c_declarations",
+        "native_library_loaded_by_this_leaf",
+        "runtime_symbol_address_resolved",
+        "runtime_version_checked",
+        "encoder_availability_probed",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "reviewed FFmpeg ABI fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_abi_declarations")
+            })
+        })
+        .ok_or("missing reviewed FFmpeg ABI ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-reviewed-abi-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

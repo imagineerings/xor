@@ -42,6 +42,7 @@ use crate::{
     AuthorizedCapabilities, CapabilitySet, PermissionError, PermissionPolicy,
     PermissionPolicyGeneration,
     native_ffi_elf::{NativeElfInspectionError, inspect_elf64_dynamic_contract},
+    native_video_codec_abi::video_codec_library_contracts,
 };
 
 pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
@@ -4763,16 +4764,6 @@ fn validate_video_codec_dependency_contract_envelope(
     Ok(())
 }
 
-fn video_codec_library_contracts() -> [(&'static str, u16, &'static [&'static str]); 5] {
-    [
-        ("avcodec", 61, &VIDEO_CODEC_AVCODEC_SYMBOLS),
-        ("avformat", 61, &VIDEO_CODEC_AVFORMAT_SYMBOLS),
-        ("avutil", 59, &VIDEO_CODEC_AVUTIL_SYMBOLS),
-        ("swresample", 5, &VIDEO_CODEC_SWRESAMPLE_SYMBOLS),
-        ("swscale", 8, &VIDEO_CODEC_SWSCALE_SYMBOLS),
-    ]
-}
-
 fn video_codec_expected_filename(identity: &str, major: u16, target: &str) -> String {
     if target.ends_with("windows-msvc") {
         format!("{identity}-{major}.dll")
@@ -4816,62 +4807,6 @@ fn video_codec_symbol_valid(value: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
-
-const VIDEO_CODEC_AVCODEC_SYMBOLS: [&str; 14] = [
-    "av_packet_alloc",
-    "av_packet_free",
-    "av_packet_unref",
-    "avcodec_alloc_context3",
-    "avcodec_find_decoder",
-    "avcodec_find_encoder_by_name",
-    "avcodec_free_context",
-    "avcodec_open2",
-    "avcodec_parameters_from_context",
-    "avcodec_parameters_to_context",
-    "avcodec_receive_frame",
-    "avcodec_receive_packet",
-    "avcodec_send_frame",
-    "avcodec_send_packet",
-];
-const VIDEO_CODEC_AVFORMAT_SYMBOLS: [&str; 14] = [
-    "av_find_best_stream",
-    "av_interleaved_write_frame",
-    "av_read_frame",
-    "av_write_trailer",
-    "avformat_alloc_context",
-    "avformat_alloc_output_context2",
-    "avformat_close_input",
-    "avformat_find_stream_info",
-    "avformat_free_context",
-    "avformat_new_stream",
-    "avformat_open_input",
-    "avformat_write_header",
-    "avio_alloc_context",
-    "avio_context_free",
-];
-const VIDEO_CODEC_AVUTIL_SYMBOLS: [&str; 13] = [
-    "av_channel_layout_default",
-    "av_channel_layout_uninit",
-    "av_dict_free",
-    "av_dict_set",
-    "av_frame_alloc",
-    "av_frame_free",
-    "av_frame_get_buffer",
-    "av_frame_make_writable",
-    "av_free",
-    "av_malloc",
-    "av_opt_set",
-    "av_opt_set_int",
-    "av_rescale_q",
-];
-const VIDEO_CODEC_SWRESAMPLE_SYMBOLS: [&str; 5] = [
-    "swr_alloc",
-    "swr_alloc_set_opts2",
-    "swr_convert",
-    "swr_free",
-    "swr_init",
-];
-const VIDEO_CODEC_SWSCALE_SYMBOLS: [&str; 3] = ["sws_freeContext", "sws_getContext", "sws_scale"];
 
 pub fn cudart_exact_native<'a>(
     certification: &'a CertifiedNativeFfi,

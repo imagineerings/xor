@@ -6940,7 +6940,8 @@
         "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; the sealed-package adapter may consume the separate canonical ELF inspector but cannot authorize observed dependencies, load libraries, probe encoder availability, expose function pointers, or execute codecs",
         "the video codec dependency-contract verifier authenticates a separately domain-separated exact primary-catalog, provenance, SONAME, digest, ABI, sponsor, consumer-edge, system-policy, and encoder-provider addendum and retains only non-callable registry configuration; later closure code alone may capture and certify those declared images",
         "the video codec dependency-closure certifier consumes the exact certified primary package and verified contract, reuses canonical capture and ELF inspection, issues only dependency certificates, retains every sealed image, and exposes no loader path, address, probe, codec, media, effect, cache, persistence, recovery, or publication capability",
-        "the focused video codec loader consumes the opaque certified closure by value, retains all certificates and sealed descriptors beyond every handle, and cannot issue or fabricate certification"
+        "the focused video codec loader consumes the opaque certified closure by value, retains all certificates and sealed descriptors beyond every handle, and cannot issue or fabricate certification",
+        "the reviewed video codec ABI owner supplies the exact FFmpeg 7.1 library, ABI-major, and symbol-name projection consumed by the trust catalog while owning no certificate, loader, address, callable table, probe, or codec execution"
       ],
       "definitions": [
         {
@@ -7094,6 +7095,11 @@
           "name": "video-codec-retained-loader-consumes-certificates-without-self-certification",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
           "pattern": "pub struct NativeVideoCodecLoad[\\s\\S]*closure: CertifiedVideoCodecDependencyClosure[\\s\\S]*pub fn load_certified_video_codec_closure"
+        },
+        {
+          "name": "video-codec-trust-catalog-delegates-reviewed-abi-symbol-contract",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "native_video_codec_abi::video_codec_library_contracts[\\s\\S]*validate_video_codec_catalog_envelope[\\s\\S]*video_codec_library_contracts\\(\\)"
         }
       ],
       "known_open_reasons": [],
@@ -7112,6 +7118,7 @@
         "comfy-parity-native-video-codec-dependency-contract-foundation",
         "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
         "comfy-parity-native-video-codec-retained-loader-foundation",
+        "comfy-parity-native-video-codec-reviewed-abi-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
@@ -14006,6 +14013,105 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One focused GNU/Linux adapter owns unsafe loading and live namespace binding for the exact certified video-codec closure. Trust retains certificates and sealed images, the static ELF owner retains pre-load parsing, and later ABI or codec adapters cannot load ambient libraries or expose unchecked handles."
+    },
+    {
+      "concern": "native_video_reviewed_codec_abi_declarations",
+      "canonical_owner": "comfy_runtime::native_video_codec_abi",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_abi.rs",
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+        "crates/comfy_runtime/abi/video-codec/verify-bindings.c"
+      ],
+      "owner_symbols": [
+        "video_codec_library_contracts",
+        "AvRational",
+        "AvChannelLayout"
+      ],
+      "allowed_adapters": [
+        "comfy_runtime::trust consumes only the exact library, ABI-major, and symbol-name projection when verifying catalogs and issuing certificates",
+        "comfy_runtime::native_video_codec_ffi may later consume the private typed declarations only after exact certificate and retained-provider proof",
+        "the declaration owner retains no loaded library, raw handle, address, function table, runtime version result, encoder capability, codec state, media value, cache, effect, persistence, recovery, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::video_codec_library_contracts",
+          "role": "canonical_signed_abi_declaration",
+          "symbol": "video_codec_library_contracts",
+          "pattern": "^pub\\(crate\\) fn video_codec_library_contracts\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvRational",
+          "role": "abi_boundary",
+          "symbol": "AvRational"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvChannelLayout",
+          "role": "abi_boundary",
+          "symbol": "AvChannelLayout"
+        }
+      ],
+      "call_symbols": [
+        "video_codec_library_contracts"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-codec-reviewed-abi-binds-official-source-signature-headers-versions-and-layouts",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "FFMPEG_7_1_SOURCE_ARCHIVE_SHA256[\\s\\S]*FFMPEG_7_1_RELEASE_SIGNING_KEY_FINGERPRINT[\\s\\S]*FFMPEG_7_1_AVCODEC_VERSION[\\s\\S]*AvRational[\\s\\S]*AvChannelLayout[\\s\\S]*video_codec_library_contracts"
+        },
+        {
+          "name": "video-codec-reviewed-abi-c-verifier-checks-signatures-and-public-layouts",
+          "path": "crates/comfy_runtime/abi/video-codec/verify-bindings.c",
+          "pattern": "_Static_assert\\(sizeof\\(AVRational\\)[\\s\\S]*_Static_assert\\(sizeof\\(AVChannelLayout\\)[\\s\\S]*TYPE_MATCH\\(avcodec_version[\\s\\S]*TYPE_MATCH\\(swscale_version"
+        },
+        {
+          "name": "video-codec-reviewed-abi-manifest-is-declaration-only-and-source-verified",
+          "path": "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+          "pattern": "official_release_signature_verified[\\s\\S]*reviewed_typed_declarations[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*runtime_version_checked[\\s\\S]*codec_execution"
+        },
+        {
+          "name": "video-codec-reviewed-abi-tests-exact-layout-symbol-count-and-trust-delegation",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "ffmpeg_7_1_reviewed_abi_contract_is_exact[\\s\\S]*symbols.len\\(\\), 54[\\s\\S]*reviewed_manifest_matches_compiled_abi_contract"
+        },
+        {
+          "name": "video-codec-reviewed-abi-fixture-forbids-runtime-and-codec-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-reviewed-abi/manifest.json",
+          "pattern": "official-source-reviewed-declaration-only-abi[\\s\\S]*reviewed_typed_c_declarations[\\s\\S]*native_library_loaded_by_this_leaf[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*encoder_availability_probed[\\s\\S]*codec_execution"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-reviewed-abi-foundation"
+      ],
+      "production_consumers": [
+        "native video codec trust catalog",
+        "later retained FFmpeg typed symbol binding"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D19",
+        "D27",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One private source-verified ABI module owns exact FFmpeg 7.1 declarations and public by-value layouts for the reviewed x86_64 GNU boundary. Trust consumes its symbol projection, while the loader and later callable adapter remain separate unsafe owners. Declaration evidence alone cannot claim runtime availability or codec behavior."
     },
     {
       "concern": "native_vision_model_architectures",
