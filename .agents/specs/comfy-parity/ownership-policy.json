@@ -6827,6 +6827,91 @@
       "decision_reason": "NativeCache and CacheKey alone own bounded execution-result caching, canonical identity dimensions, LRU transitions, and invalidation. ExecutionEngine and NativeExecutionController share that owner; model parsing and backend allocation caches remain separate canonical domains."
     },
     {
+      "concern": "native_execution_elf_dynamic_contract_inspection",
+      "canonical_owner": "comfy_runtime::native_ffi_elf::inspect_elf64_dynamic_contract",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_ffi_elf.rs"
+      ],
+      "owner_symbols": [
+        "NativeElfDynamicContract",
+        "inspect_elf64_dynamic_contract"
+      ],
+      "allowed_adapters": [
+        "native_ffi_rocm supplies its exact x86_64 machine contract and consumes the inspected SONAME, exports, and dependency names before registry certification and its focused unsafe loader",
+        "comfy_runtime::trust supplies the signed video target, catalog filename, and required-symbol subset and retains the inspected metadata with the sealed five-library package",
+        "the inspector records DT_NEEDED names but never authorizes dependencies, resolves runtime addresses, issues certificates, probes encoders, or executes codecs"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
+          "qualified": "comfy_runtime::native_ffi_elf::inspect_elf64_dynamic_contract",
+          "role": "canonical",
+          "symbol": "inspect_elf64_dynamic_contract"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
+          "qualified": "comfy_runtime::native_ffi_elf::NativeElfDynamicContract",
+          "role": "boundary_dto",
+          "symbol": "NativeElfDynamicContract"
+        }
+      ],
+      "call_symbols": [
+        "inspect_elf64_dynamic_contract"
+      ],
+      "required_mappings": [
+        {
+          "name": "shared-elf-owner-binds-loader-consumed-machine-dynamic-symbol-and-search-path-contract",
+          "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
+          "pattern": "pub\\(crate\\) fn inspect_elf64_dynamic_contract[\\s\\S]*expected_machine[\\s\\S]*PT_DYNAMIC[\\s\\S]*DT_STRTAB[\\s\\S]*DT_SYMTAB[\\s\\S]*RPATH and RUNPATH are forbidden[\\s\\S]*NativeElfDynamicContract"
+        },
+        {
+          "name": "rocm-delegates-production-elf-inspection-to-shared-owner",
+          "path": "crates/comfy_runtime/src/native_ffi_rocm.rs",
+          "pattern": "inspect_elf64_dynamic_contract\\(image\\.bytes\\(\\), 62, cancellation\\)[\\s\\S]*dynamic\\.soname\\(\\)[\\s\\S]*dynamic\\.needed\\(\\)[\\s\\S]*dynamic\\.symbols\\(\\)"
+        },
+        {
+          "name": "video-package-inspection-binds-target-soname-and-signed-symbol-subset-before-sealing",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "pub fn capture_and_inspect_video_codec_package[\\s\\S]*expected_machine[\\s\\S]*inspect_elf64_dynamic_contract[\\s\\S]*dynamic\\.soname\\(\\) != Some\\(expected\\.filename\\(\\)\\)[\\s\\S]*!dynamic\\.symbols\\(\\)\\.contains[\\s\\S]*captured[\\s\\S]*\\.seal"
+        },
+        {
+          "name": "video-elf-inspection-fixture-separates-static-structure-from-load-certification-and-execution",
+          "path": "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+          "pattern": "synthetic-structural-elf-contract[\\s\\S]*needed_names_authorized[\\s\\S]*licensed_ffmpeg_binary[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*ffi_certificate_issued_by_inspection[\\s\\S]*codec_execution"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-elf-inspection-foundation"
+      ],
+      "production_consumers": [
+        "ROCm retained native-library certification",
+        "sealed native video codec package inspection"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 36",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D28",
+        "D31",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "A single bounded parser owns successful loader-consumed ELF64 machine, dynamic-table, SONAME, exported-symbol, dependency-name, and embedded-search-path inspection. Backend and codec adapters provide signed expectations and consume immutable results; neither duplicates the parser nor turns static bytes into runtime availability, dependency authorization, a certificate, or an unsafe loader capability."
+    },
+    {
       "concern": "native_ffi_certification",
       "canonical_owner": "comfy_runtime::NativeFfiRegistry",
       "owner_files": [
@@ -6844,7 +6929,7 @@
         "comfy_backend_metal owns reviewed Apple framework, Objective-C ABI, layout, target, and device observations plus the focused unsafe calls, but remains unbound and cannot issue or fabricate a certificate",
         "MLU and DirectML owned execution sessions consume only unsafe or opaque retained certificate projections, never call NativeFfiRegistry, and cannot turn ABI observations, package receipts, feature compilation, or native handles into availability",
         "Task 59 cudart_exact_native consumes a registry-issued certificate for the exact CUDA-runtime library and host-registration symbols; it cannot construct a certificate, claim device availability, or expose an unchecked raw handle",
-        "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; it cannot capture or load libraries, probe encoder availability, expose function pointers, or execute codecs"
+        "the video codec catalog verifier authenticates one canonical FFmpeg 7.1 ABI catalog and maps its complete target-specific library set through NativeFfiRegistry; the sealed-package adapter may consume the separate canonical ELF inspector but cannot authorize observed dependencies, load libraries, probe encoder availability, expose function pointers, or execute codecs"
       ],
       "definitions": [
         {
@@ -6875,7 +6960,7 @@
         {
           "name": "rocm-runtime-consumes-registry-certificates-before-retained-descriptor-load",
           "path": "crates/comfy_runtime/src/native_ffi_rocm.rs",
-          "pattern": "(?=[\\s\\S]*NativeFfiRegistry)(?=[\\s\\S]*CancellationToken)(?=[\\s\\S]*BackendLoader::load)(?=[\\s\\S]*elf64_dynamic_contract)(?=[\\s\\S]*PT_DYNAMIC)(?=[\\s\\S]*TRUSTED_SYSTEM_ELF_DEPENDENCIES)(?=[\\s\\S]*registry[\\s\\S]*\\.authorize\\()(?=[\\s\\S]*\\.seal_with_check\\()(?=[\\s\\S]*remap_to_retained_descriptors)"
+          "pattern": "(?=[\\s\\S]*NativeFfiRegistry)(?=[\\s\\S]*CancellationToken)(?=[\\s\\S]*BackendLoader::load)(?=[\\s\\S]*inspect_elf64_dynamic_contract)(?=[\\s\\S]*TRUSTED_SYSTEM_ELF_DEPENDENCIES)(?=[\\s\\S]*registry[\\s\\S]*\\.authorize\\()(?=[\\s\\S]*\\.seal_with_check\\()(?=[\\s\\S]*remap_to_retained_descriptors)"
         },
         {
           "name": "rocm-runtime-certification-failure-and-race-tests",
@@ -6961,6 +7046,7 @@
         "comfy-parity-mlu-directml-execution-ownership-reconciliation",
         "comfy-parity-native-video-codec-ffi-certification-foundation",
         "comfy-parity-native-video-codec-package-capture-foundation",
+        "comfy-parity-native-video-codec-elf-inspection-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"

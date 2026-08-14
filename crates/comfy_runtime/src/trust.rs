@@ -41,6 +41,7 @@ use std::io::{Seek, SeekFrom, Write};
 use crate::{
     AuthorizedCapabilities, CapabilitySet, PermissionError, PermissionPolicy,
     PermissionPolicyGeneration,
+    native_ffi_elf::{NativeElfInspectionError, inspect_elf64_dynamic_contract},
 };
 
 pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
@@ -729,7 +730,6 @@ pub(crate) struct CapturedNativeLibraryImage {
 }
 
 impl CapturedNativeLibraryImage {
-    #[cfg(any(test, feature = "rocm"))]
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -3365,6 +3365,46 @@ pub struct CapturedVideoCodecPackage {
     _sealed_images: BTreeMap<String, RetainedNativeLibraryImage>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VideoCodecElfLibraryIdentity {
+    soname: String,
+    exported_symbols: BTreeSet<String>,
+    needed_libraries: BTreeSet<String>,
+}
+
+impl VideoCodecElfLibraryIdentity {
+    pub fn soname(&self) -> &str {
+        &self.soname
+    }
+
+    pub fn exported_symbols(&self) -> &BTreeSet<String> {
+        &self.exported_symbols
+    }
+
+    pub fn needed_libraries(&self) -> &BTreeSet<String> {
+        &self.needed_libraries
+    }
+}
+
+pub struct InspectedVideoCodecPackage {
+    captured: CapturedVideoCodecPackage,
+    elf_libraries: BTreeMap<String, VideoCodecElfLibraryIdentity>,
+}
+
+impl InspectedVideoCodecPackage {
+    pub fn target(&self) -> &str {
+        self.captured.target()
+    }
+
+    pub fn libraries(&self) -> &BTreeMap<String, VideoCodecFfiLibraryIdentity> {
+        self.captured.libraries()
+    }
+
+    pub fn elf_libraries(&self) -> &BTreeMap<String, VideoCodecElfLibraryIdentity> {
+        &self.elf_libraries
+    }
+}
+
 impl CapturedVideoCodecPackage {
     pub fn target(&self) -> &str {
         &self.target
@@ -3387,6 +3427,10 @@ pub enum VideoCodecPackageCaptureError {
     ContractMismatch { identity: String },
     #[error("video codec package image {identity} could not be captured: {reason}")]
     InvalidImage { identity: String, reason: String },
+    #[error("video codec package image {identity} is not an admitted ELF object: {reason}")]
+    InvalidElf { identity: String, reason: String },
+    #[error("video codec package image {identity} does not export required symbol {symbol}")]
+    MissingSymbol { identity: String, symbol: String },
 }
 
 pub fn capture_video_codec_package(
@@ -3394,6 +3438,40 @@ pub fn capture_video_codec_package(
     paths: BTreeMap<String, PathBuf>,
     cancellation: &CancellationToken,
 ) -> Result<CapturedVideoCodecPackage, VideoCodecPackageCaptureError> {
+    capture_video_codec_package_internal(catalog, paths, None, cancellation)
+        .map(|(captured, _)| captured)
+}
+
+pub fn capture_and_inspect_video_codec_package(
+    catalog: &VerifiedVideoCodecFfiCatalog,
+    paths: BTreeMap<String, PathBuf>,
+    cancellation: &CancellationToken,
+) -> Result<InspectedVideoCodecPackage, VideoCodecPackageCaptureError> {
+    let expected_machine = match catalog.target() {
+        "x86_64-unknown-linux-gnu" => 62,
+        "aarch64-unknown-linux-gnu" => 183,
+        _ => return Err(VideoCodecPackageCaptureError::UnsupportedPlatform),
+    };
+    let (captured, elf_libraries) =
+        capture_video_codec_package_internal(catalog, paths, Some(expected_machine), cancellation)?;
+    Ok(InspectedVideoCodecPackage {
+        captured,
+        elf_libraries,
+    })
+}
+
+fn capture_video_codec_package_internal(
+    catalog: &VerifiedVideoCodecFfiCatalog,
+    paths: BTreeMap<String, PathBuf>,
+    expected_machine: Option<u16>,
+    cancellation: &CancellationToken,
+) -> Result<
+    (
+        CapturedVideoCodecPackage,
+        BTreeMap<String, VideoCodecElfLibraryIdentity>,
+    ),
+    VideoCodecPackageCaptureError,
+> {
     cancellation
         .check()
         .map_err(|_| VideoCodecPackageCaptureError::Cancelled)?;
@@ -3407,6 +3485,7 @@ pub fn capture_video_codec_package(
     }
 
     let mut sealed_images = BTreeMap::new();
+    let mut elf_libraries = BTreeMap::new();
     for (identity, expected) in &catalog.libraries {
         cancellation
             .check()
@@ -3426,6 +3505,53 @@ pub fn capture_video_codec_package(
                 identity: identity.clone(),
             });
         }
+        if let Some(expected_machine) = expected_machine {
+            let dynamic =
+                inspect_elf64_dynamic_contract(captured.bytes(), expected_machine, cancellation)
+                    .map_err(|error| match error {
+                        NativeElfInspectionError::Cancelled(_) => {
+                            VideoCodecPackageCaptureError::Cancelled
+                        }
+                        NativeElfInspectionError::Invalid(reason) => {
+                            VideoCodecPackageCaptureError::InvalidElf {
+                                identity: identity.clone(),
+                                reason,
+                            }
+                        }
+                    })?;
+            if dynamic.soname() != Some(expected.filename()) {
+                return Err(VideoCodecPackageCaptureError::ContractMismatch {
+                    identity: identity.clone(),
+                });
+            }
+            let required_symbols = catalog
+                .registry
+                .required_symbols_for(
+                    identity,
+                    &video_codec_abi_version(expected.abi_major()),
+                    VIDEO_CODEC_FFI_UNSAFE_OWNER,
+                )
+                .map_err(|_| VideoCodecPackageCaptureError::ContractMismatch {
+                    identity: identity.clone(),
+                })?;
+            if let Some(symbol) = required_symbols
+                .iter()
+                .find(|symbol| !dynamic.symbols().contains(*symbol))
+            {
+                return Err(VideoCodecPackageCaptureError::MissingSymbol {
+                    identity: identity.clone(),
+                    symbol: symbol.clone(),
+                });
+            }
+            elf_libraries.insert(
+                identity.clone(),
+                VideoCodecElfLibraryIdentity {
+                    soname: expected.filename().to_owned(),
+                    exported_symbols: dynamic.symbols().clone(),
+                    needed_libraries: dynamic.needed().clone(),
+                },
+            );
+        }
         let retained = captured
             .seal(&format!("video-codec-{identity}"), cancellation)
             .map_err(|error| map_video_codec_image_error(identity, error))?;
@@ -3434,11 +3560,14 @@ pub fn capture_video_codec_package(
     cancellation
         .check()
         .map_err(|_| VideoCodecPackageCaptureError::Cancelled)?;
-    Ok(CapturedVideoCodecPackage {
-        target: catalog.target.clone(),
-        libraries: catalog.libraries.clone(),
-        _sealed_images: sealed_images,
-    })
+    Ok((
+        CapturedVideoCodecPackage {
+            target: catalog.target.clone(),
+            libraries: catalog.libraries.clone(),
+            _sealed_images: sealed_images,
+        },
+        elf_libraries,
+    ))
 }
 
 fn map_video_codec_image_error(
@@ -5084,11 +5213,21 @@ mod tests {
         let directory = tempfile::tempdir()?;
         let mut paths = BTreeMap::new();
         let mut digests = BTreeMap::new();
-        for (identity, abi_major, _) in video_codec_library_contracts() {
+        for (identity, abi_major, symbols) in video_codec_library_contracts() {
             let filename =
                 video_codec_expected_filename(identity, abi_major, "x86_64-unknown-linux-gnu");
-            let path = directory.path().join(filename);
-            let bytes = format!("fixture-{identity}-{abi_major}").into_bytes();
+            let path = directory.path().join(&filename);
+            let symbols = symbols
+                .iter()
+                .map(|symbol| (*symbol).to_owned())
+                .collect::<BTreeSet<_>>();
+            let bytes = crate::native_ffi_elf::tests::fixture(
+                62,
+                &symbols,
+                &["libc.so.6"],
+                None,
+                &filename,
+            );
             std::fs::write(&path, &bytes)?;
             digests.insert(identity.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
             paths.insert(identity.to_owned(), path);
@@ -5105,6 +5244,21 @@ mod tests {
         let captured = capture_video_codec_package(&verified, paths.clone(), &cancellation)?;
         assert_eq!(captured.target(), "x86_64-unknown-linux-gnu");
         assert_eq!(captured.libraries(), verified.libraries());
+        let inspected =
+            capture_and_inspect_video_codec_package(&verified, paths.clone(), &cancellation)?;
+        assert_eq!(inspected.target(), "x86_64-unknown-linux-gnu");
+        assert_eq!(inspected.elf_libraries().len(), 5);
+        for (identity, library) in inspected.elf_libraries() {
+            let expected = verified
+                .libraries()
+                .get(identity)
+                .ok_or_else(|| io::Error::other("inspected library is not in the catalog"))?;
+            assert_eq!(library.soname(), expected.filename());
+            assert_eq!(
+                library.needed_libraries(),
+                &BTreeSet::from(["libc.so.6".to_owned()])
+            );
+        }
 
         let mut missing = paths.clone();
         missing.remove("avcodec");
@@ -5125,9 +5279,61 @@ mod tests {
             .ok_or_else(|| io::Error::other("fixture avutil path is missing"))?;
         std::fs::write(avutil, b"changed")?;
         assert!(matches!(
-            capture_video_codec_package(&verified, paths, &cancellation),
+            capture_video_codec_package(&verified, paths.clone(), &cancellation),
             Err(VideoCodecPackageCaptureError::ContractMismatch { identity })
                 if identity == "avutil"
+        ));
+
+        let (identity, abi_major, required) = video_codec_library_contracts()
+            .into_iter()
+            .find(|(identity, _, _)| *identity == "avcodec")
+            .ok_or_else(|| io::Error::other("fixture avcodec contract is missing"))?;
+        let mut incomplete_symbols = required
+            .iter()
+            .map(|symbol| (*symbol).to_owned())
+            .collect::<BTreeSet<_>>();
+        let missing_symbol = incomplete_symbols
+            .iter()
+            .next()
+            .cloned()
+            .ok_or_else(|| io::Error::other("fixture avcodec symbol set is empty"))?;
+        incomplete_symbols.remove(&missing_symbol);
+        let filename =
+            video_codec_expected_filename(identity, abi_major, "x86_64-unknown-linux-gnu");
+        let avcodec = paths
+            .get(identity)
+            .ok_or_else(|| io::Error::other("fixture avcodec path is missing"))?;
+        let incomplete_elf = crate::native_ffi_elf::tests::fixture(
+            62,
+            &incomplete_symbols,
+            &["libc.so.6"],
+            None,
+            &filename,
+        );
+        std::fs::write(avcodec, &incomplete_elf)?;
+        let mut incomplete_digests = digests;
+        incomplete_digests.insert(
+            identity.to_owned(),
+            format!("{:x}", Sha256::digest(&incomplete_elf)),
+        );
+        let (catalog_bytes, signature_receipt, verification_key) =
+            signed_video_codec_catalog_with_digests(&key_pair, &incomplete_digests)?;
+        let verified_incomplete = verify_video_codec_ffi_catalog(
+            &catalog_bytes,
+            &signature_receipt,
+            &verification_key,
+            &cancellation,
+        )?;
+        assert!(matches!(
+            capture_and_inspect_video_codec_package(
+                &verified_incomplete,
+                paths,
+                &cancellation,
+            ),
+            Err(VideoCodecPackageCaptureError::MissingSymbol {
+                identity: rejected_identity,
+                symbol: rejected_symbol,
+            }) if rejected_identity == identity && rejected_symbol == missing_symbol
         ));
         Ok(())
     }

@@ -10522,6 +10522,44 @@ def native_video_codec_package_capture_foundation_task(dependency: str) -> dict[
     )
 
 
+def native_video_codec_elf_inspection_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-elf-inspection-foundation",
+        "Inspect sealed native video codec ELF contracts",
+        [28, 31, 32, 35, 36, 42],
+        [17, 28, 31, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One canonical bounded ELF64 dynamic-contract inspector validates the loader-consumed machine, dynamic table, SONAME, exported symbols, dependency names, and absence of embedded search paths. ROCm delegates its existing certification inspection to this shared owner, while video package capture derives an inspected sealed package only when all five catalog images have the target machine, exact filename SONAME, and complete signed symbol subset. The inspected result records dependency names but does not authorize them, load a library, resolve a runtime address, issue an FFI certificate, probe an encoder, or execute a codec.",
+        [
+            "crates/comfy_runtime/src/native_ffi_rocm.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ffi-certification/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-package-capture/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_runtime/src/native_ffi_rocm.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Synthetic source-fingerprinted ELF fixtures prove x86_64 and AArch64 machine binding, exact SONAME, complete exported-symbol and DT_NEEDED projection, RPATH/RUNPATH rejection, cancellation, missing-symbol rejection, and one five-library inspected sealed package. ROCm production no longer owns a second ELF parser. The fixture explicitly records that dependencies are observed but not authorized and that no licensed FFmpeg binary, host-library probe, loader call, symbol address, registry certificate, encoder availability, or codec execution is claimed.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "31.6", "32.1", "35.6", "36.4", "42.2"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -12738,8 +12776,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ffi_certification_foundation["id"])
         )
     )
+    video_codec_elf_inspection_foundation = (
+        native_video_codec_elf_inspection_foundation_task(
+            str(video_codec_package_capture_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_package_capture_foundation["id"])
+        str(video_codec_elf_inspection_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12860,6 +12903,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_plan_foundation,
         video_codec_ffi_certification_foundation,
         video_codec_package_capture_foundation,
+        video_codec_elf_inspection_foundation,
         video_foundation,
             detection_foundation,
         ]

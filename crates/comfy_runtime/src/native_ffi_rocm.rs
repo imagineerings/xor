@@ -1,6 +1,7 @@
 use crate::{
     CertifiedNativeFfi, NativeFfiContract, NativeFfiRegistry, RocmPackageVerificationKey,
     TrustError,
+    native_ffi_elf::{NativeElfDynamicContract, inspect_elf64_dynamic_contract},
     trust::{
         CapturedNativeLibraryImage, NativeLibraryImageError, RetainedNativeLibraryImage,
         capture_native_library_image_with_check,
@@ -36,8 +37,8 @@ use std::fs::OpenOptions;
 
 const ROCM_ABI_VERSION: &str = "6.1.0";
 const ROCM_UNSAFE_OWNER: &str = "comfy_backend_rocm::loader";
+#[cfg(test)]
 const CANCELLATION_CHUNK_BYTES: usize = 64 * 1024;
-const MAX_ELF_TABLE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_ROCM_FFI_CONTRACT_CATALOG_BYTES: usize = 1024 * 1024;
 const MAX_ROCM_FFI_CONTRACTS: usize = 256;
 const MAX_ROCM_FFI_SYMBOLS_PER_CONTRACT: usize = 4096;
@@ -320,11 +321,13 @@ fn valid_lower_hex_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
 }
 
+#[cfg(test)]
 struct CancellableChunks<'a> {
     chunks: std::slice::Chunks<'a, u8>,
     cancellation: &'a CancellationToken,
 }
 
+#[cfg(test)]
 impl<'a> CancellableChunks<'a> {
     fn new(bytes: &'a [u8], chunk_size: usize, cancellation: &'a CancellationToken) -> Self {
         Self {
@@ -334,6 +337,7 @@ impl<'a> CancellableChunks<'a> {
     }
 }
 
+#[cfg(test)]
 impl<'a> Iterator for CancellableChunks<'a> {
     type Item = Result<&'a [u8], CancellationError>;
 
@@ -455,13 +459,7 @@ struct RocmCertificationRetention {
 struct InspectedCandidate {
     input: CandidateInput,
     image: CapturedNativeLibraryImage,
-    dynamic: ElfDynamicContract,
-}
-
-struct ElfDynamicContract {
-    symbols: BTreeSet<String>,
-    needed: BTreeSet<String>,
-    soname: Option<String>,
+    dynamic: NativeElfDynamicContract,
 }
 
 const TRUSTED_SYSTEM_ELF_DEPENDENCIES: &[&str] = &[
@@ -595,14 +593,15 @@ fn prepare_certified_load(
         })
         .map_err(|error| map_native_library_image_error(&candidate.library_id, error))?;
         check_rocm_cancellation(cancellation)?;
-        let dynamic = elf64_dynamic_contract(image.bytes(), cancellation).map_err(|reason| {
-            RocmCertificationError::InvalidElf {
-                library_id: candidate.library_id.clone(),
-                reason,
-            }
-        })?;
+        let dynamic =
+            inspect_elf64_dynamic_contract(image.bytes(), 62, cancellation).map_err(|error| {
+                RocmCertificationError::InvalidElf {
+                    library_id: candidate.library_id.clone(),
+                    reason: error.to_string(),
+                }
+            })?;
         let expected_soname = candidate_soname(&candidate)?;
-        if dynamic.soname.as_deref() != Some(expected_soname) {
+        if dynamic.soname() != Some(expected_soname) {
             return Err(RocmCertificationError::InvalidIdentity {
                 library_id: candidate.library_id.clone(),
                 reason: format!(
@@ -611,7 +610,7 @@ fn prepare_certified_load(
             });
         }
         for dependency_soname in dynamic
-            .needed
+            .needed()
             .iter()
             .filter(|dependency| !TRUSTED_SYSTEM_ELF_DEPENDENCIES.contains(&dependency.as_str()))
         {
@@ -693,7 +692,7 @@ fn prepare_certified_load(
             .input
             .required_symbols
             .iter()
-            .find(|symbol| !candidate.dynamic.symbols.contains(*symbol))
+            .find(|symbol| !candidate.dynamic.symbols().contains(*symbol))
         {
             return Err(RocmCertificationError::MissingSymbol {
                 library_id: candidate.input.library_id.clone(),
@@ -705,7 +704,7 @@ fn prepare_certified_load(
                 &candidate.input.library_id,
                 candidate.image.digest_sha256(),
                 &candidate.input.abi_version,
-                &candidate.dynamic.symbols,
+                candidate.dynamic.symbols(),
             )
             .map_err(|error| RocmCertificationError::Registry {
                 library_id: candidate.input.library_id.clone(),
@@ -966,380 +965,25 @@ fn hex_sha256(bytes: &[u8], cancellation: &CancellationToken) -> Result<String, 
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-#[derive(Clone, Copy)]
-struct ElfProgramHeader {
-    kind: u32,
-    file_offset: usize,
-    virtual_address: u64,
-    file_size: usize,
-    memory_size: u64,
-}
+#[cfg(test)]
+type ElfDynamicContract = NativeElfDynamicContract;
 
+#[cfg(test)]
 fn elf64_dynamic_contract(
     bytes: &[u8],
     cancellation: &CancellationToken,
 ) -> Result<ElfDynamicContract, String> {
-    check_rocm_cancellation(cancellation).map_err(|error| error.to_string())?;
-    if bytes.get(0..4) != Some(b"\x7fELF")
-        || bytes.get(4) != Some(&2)
-        || bytes.get(5) != Some(&1)
-        || bytes.get(6) != Some(&1)
-    {
-        return Err("expected a little-endian ELF64 object".to_owned());
-    }
-    if read_u16(bytes, 16)? != 3 || read_u16(bytes, 18)? != 62 {
-        return Err("expected an x86_64 shared object".to_owned());
-    }
-    let program_offset = usize::try_from(read_u64(bytes, 32)?)
-        .map_err(|_| "program table offset exceeds address space".to_owned())?;
-    let program_entry_size = usize::from(read_u16(bytes, 54)?);
-    let program_count = usize::from(read_u16(bytes, 56)?);
-    if program_entry_size < 56 || program_count == 0 {
-        return Err("ELF program table is absent or malformed".to_owned());
-    }
-    let program_table_size = program_entry_size
-        .checked_mul(program_count)
-        .ok_or_else(|| "ELF program table size overflowed".to_owned())?;
-    checked_range(bytes, program_offset, program_table_size)?;
-    let mut programs = Vec::with_capacity(program_count);
-    for index in 0..program_count {
-        check_rocm_cancellation(cancellation).map_err(|error| error.to_string())?;
-        let offset = program_offset
-            .checked_add(
-                index
-                    .checked_mul(program_entry_size)
-                    .ok_or_else(|| "ELF program offset overflowed".to_owned())?,
-            )
-            .ok_or_else(|| "ELF program offset overflowed".to_owned())?;
-        let header = checked_slice(bytes, offset, program_entry_size)?;
-        let file_offset = usize::try_from(read_u64(header, 8)?)
-            .map_err(|_| "program file offset exceeds address space".to_owned())?;
-        let file_size = usize::try_from(read_u64(header, 32)?)
-            .map_err(|_| "program file size exceeds address space".to_owned())?;
-        let memory_size = read_u64(header, 40)?;
-        if u64::try_from(file_size).unwrap_or(u64::MAX) > memory_size {
-            return Err("program file size exceeds its memory size".to_owned());
-        }
-        checked_range(bytes, file_offset, file_size)?;
-        programs.push(ElfProgramHeader {
-            kind: read_u32(header, 0)?,
-            file_offset,
-            virtual_address: read_u64(header, 16)?,
-            file_size,
-            memory_size,
-        });
-    }
-    if !programs.iter().any(|program| program.kind == 1) {
-        return Err("ELF object has no loadable segment".to_owned());
-    }
-    let dynamic_segments = programs
-        .iter()
-        .filter(|program| program.kind == 2)
-        .copied()
-        .collect::<Vec<_>>();
-    if dynamic_segments.len() != 1 {
-        return Err("ELF object must have exactly one PT_DYNAMIC segment".to_owned());
-    }
-    let dynamic_segment = dynamic_segments[0];
-    if dynamic_segment.file_size == 0
-        || dynamic_segment.file_size > MAX_ELF_TABLE_BYTES
-        || dynamic_segment.file_size % 16 != 0
-    {
-        return Err("PT_DYNAMIC has an invalid bounded size".to_owned());
-    }
-    let dynamic_is_loaded = programs
-        .iter()
-        .filter(|program| program.kind == 1)
-        .any(|program| {
-            contains_virtual_range(
-                *program,
-                dynamic_segment.virtual_address,
-                dynamic_segment.file_size,
-            )
-        });
-    if !dynamic_is_loaded {
-        return Err("PT_DYNAMIC is not contained in a loadable segment".to_owned());
-    }
-    let dynamic_table = checked_slice(
-        bytes,
-        dynamic_segment.file_offset,
-        dynamic_segment.file_size,
-    )?;
-    let mut string_address = None;
-    let mut string_size = None;
-    let mut symbol_address = None;
-    let mut symbol_entry_size = None;
-    let mut needed_offsets = Vec::new();
-    let mut soname_offset = None;
-    let mut found_null = false;
-    for entry in CancellableChunks::new(dynamic_table, 16, cancellation) {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let tag = read_i64(entry, 0)?;
-        let value = read_u64(entry, 8)?;
-        match tag {
-            0 => {
-                found_null = true;
-                break;
-            }
-            1 => needed_offsets.push(value),
-            5 => assign_once(&mut string_address, value, "DT_STRTAB")?,
-            6 => assign_once(&mut symbol_address, value, "DT_SYMTAB")?,
-            10 => assign_once(&mut string_size, value, "DT_STRSZ")?,
-            11 => assign_once(&mut symbol_entry_size, value, "DT_SYMENT")?,
-            14 => assign_once(&mut soname_offset, value, "DT_SONAME")?,
-            15 | 29 => {
-                return Err(
-                    "ELF RPATH and RUNPATH are forbidden for certified libraries".to_owned(),
-                );
-            }
-            _ => {}
-        }
-    }
-    if !found_null {
-        return Err("PT_DYNAMIC has no terminating DT_NULL entry".to_owned());
-    }
-    let string_address = string_address.ok_or_else(|| "PT_DYNAMIC has no DT_STRTAB".to_owned())?;
-    let string_size =
-        usize::try_from(string_size.ok_or_else(|| "PT_DYNAMIC has no DT_STRSZ".to_owned())?)
-            .map_err(|_| "dynamic string-table size exceeds address space".to_owned())?;
-    if string_size == 0 || string_size > MAX_ELF_TABLE_BYTES {
-        return Err("dynamic string table has an invalid bounded size".to_owned());
-    }
-    let symbol_address = symbol_address.ok_or_else(|| "PT_DYNAMIC has no DT_SYMTAB".to_owned())?;
-    let symbol_entry_size =
-        usize::try_from(symbol_entry_size.ok_or_else(|| "PT_DYNAMIC has no DT_SYMENT".to_owned())?)
-            .map_err(|_| "dynamic-symbol entry size exceeds address space".to_owned())?;
-    if symbol_entry_size != 24 {
-        return Err("DT_SYMENT does not match the ELF64 symbol size".to_owned());
-    }
-    let string_offset = virtual_to_file_offset(&programs, string_address, string_size)?;
-    let strings = checked_slice(bytes, string_offset, string_size)?;
-
-    let section_offset = usize::try_from(read_u64(bytes, 40)?)
-        .map_err(|_| "section table offset exceeds address space".to_owned())?;
-    let section_entry_size = usize::from(read_u16(bytes, 58)?);
-    let section_count = usize::from(read_u16(bytes, 60)?);
-    if section_entry_size < 64 || section_count == 0 {
-        return Err("ELF section table is absent or malformed".to_owned());
-    }
-    let section_table_size = section_entry_size
-        .checked_mul(section_count)
-        .ok_or_else(|| "ELF section table size overflowed".to_owned())?;
-    checked_range(bytes, section_offset, section_table_size)?;
-    let section = |index: usize| -> Result<&[u8], String> {
-        if index >= section_count {
-            return Err("ELF section link is out of bounds".to_owned());
-        }
-        let offset = section_offset
-            .checked_add(
-                index
-                    .checked_mul(section_entry_size)
-                    .ok_or_else(|| "ELF section offset overflowed".to_owned())?,
-            )
-            .ok_or_else(|| "ELF section offset overflowed".to_owned())?;
-        checked_slice(bytes, offset, section_entry_size)
-    };
-    let mut symbols = BTreeSet::new();
-    let mut matched_dynamic_symbols = false;
-    for index in 0..section_count {
-        check_rocm_cancellation(cancellation).map_err(|error| error.to_string())?;
-        let header = section(index)?;
-        if read_u32(header, 4)? != 11 {
-            continue;
-        }
-        let symbol_offset = usize::try_from(read_u64(header, 24)?)
-            .map_err(|_| "dynamic-symbol offset exceeds address space".to_owned())?;
-        let symbol_size = usize::try_from(read_u64(header, 32)?)
-            .map_err(|_| "dynamic-symbol size exceeds address space".to_owned())?;
-        let string_index = usize::try_from(read_u32(header, 40)?)
-            .map_err(|_| "string-table index exceeds address space".to_owned())?;
-        let section_symbol_entry_size = usize::try_from(read_u64(header, 56)?)
-            .map_err(|_| "dynamic-symbol entry size exceeds address space".to_owned())?;
-        if section_symbol_entry_size != symbol_entry_size
-            || symbol_size == 0
-            || symbol_size > MAX_ELF_TABLE_BYTES
-            || symbol_size % section_symbol_entry_size != 0
-        {
-            return Err("dynamic-symbol table has an invalid entry size".to_owned());
-        }
-        let symbol_virtual_address = read_u64(header, 16)?;
-        let string_header = section(string_index)?;
-        if read_u32(string_header, 4)? != 3 || read_u64(string_header, 16)? != string_address {
-            return Err("dynamic-symbol table does not link to a string table".to_owned());
-        }
-        let section_string_offset = usize::try_from(read_u64(string_header, 24)?)
-            .map_err(|_| "string-table offset exceeds address space".to_owned())?;
-        let section_string_size = usize::try_from(read_u64(string_header, 32)?)
-            .map_err(|_| "string-table size exceeds address space".to_owned())?;
-        if symbol_virtual_address != symbol_address
-            || symbol_offset != virtual_to_file_offset(&programs, symbol_address, symbol_size)?
-            || section_string_offset != string_offset
-            || section_string_size != string_size
-            || read_u64(header, 8)? & 2 == 0
-        {
-            continue;
-        }
-        if matched_dynamic_symbols {
-            return Err(
-                "multiple sections claim the loader-consumed dynamic-symbol table".to_owned(),
-            );
-        }
-        matched_dynamic_symbols = true;
-        let table = checked_slice(bytes, symbol_offset, symbol_size)?;
-        for entry in CancellableChunks::new(table, section_symbol_entry_size, cancellation) {
-            let entry = entry.map_err(|error| error.to_string())?;
-            let name_offset = usize::try_from(read_u32(entry, 0)?)
-                .map_err(|_| "symbol name offset exceeds address space".to_owned())?;
-            let section_index = read_u16(entry, 6)?;
-            if name_offset == 0 || section_index == 0 {
-                continue;
-            }
-            let name = dynamic_string(strings, name_offset, cancellation)?;
-            if !name.is_empty() {
-                symbols.insert(name.to_owned());
-            }
-        }
-    }
-    if !matched_dynamic_symbols {
-        return Err(
-            "ELF object has no section matching the loader-consumed dynamic-symbol table"
-                .to_owned(),
-        );
-    }
-    let mut needed = BTreeSet::new();
-    for offset in needed_offsets {
-        let offset = usize::try_from(offset)
-            .map_err(|_| "DT_NEEDED string offset exceeds address space".to_owned())?;
-        needed.insert(dynamic_string(strings, offset, cancellation)?.to_owned());
-    }
-    let soname = soname_offset
-        .map(|offset| {
-            usize::try_from(offset)
-                .map_err(|_| "DT_SONAME string offset exceeds address space".to_owned())
-                .and_then(|offset| {
-                    dynamic_string(strings, offset, cancellation).map(ToOwned::to_owned)
-                })
-        })
-        .transpose()?;
-    check_rocm_cancellation(cancellation).map_err(|error| error.to_string())?;
-    Ok(ElfDynamicContract {
-        symbols,
-        needed,
-        soname,
-    })
+    inspect_elf64_dynamic_contract(bytes, 62, cancellation).map_err(|error| error.to_string())
 }
 
-fn assign_once(slot: &mut Option<u64>, value: u64, name: &str) -> Result<(), String> {
-    if slot.replace(value).is_some() {
-        Err(format!("PT_DYNAMIC contains duplicate {name}"))
-    } else {
-        Ok(())
-    }
-}
-
-fn contains_virtual_range(program: ElfProgramHeader, address: u64, length: usize) -> bool {
-    let Ok(length) = u64::try_from(length) else {
-        return false;
-    };
-    let Some(range_end) = address.checked_add(length) else {
-        return false;
-    };
-    let Some(program_end) = program.virtual_address.checked_add(program.memory_size) else {
-        return false;
-    };
-    address >= program.virtual_address && range_end <= program_end
-}
-
-fn virtual_to_file_offset(
-    programs: &[ElfProgramHeader],
-    address: u64,
-    length: usize,
-) -> Result<usize, String> {
-    let mut resolved = None;
-    for program in programs.iter().filter(|program| program.kind == 1) {
-        if !contains_virtual_range(*program, address, length) {
-            continue;
-        }
-        let delta = usize::try_from(address - program.virtual_address)
-            .map_err(|_| "virtual-address delta exceeds address space".to_owned())?;
-        let end = delta
-            .checked_add(length)
-            .ok_or_else(|| "virtual-address range overflowed".to_owned())?;
-        if end > program.file_size {
-            continue;
-        }
-        let offset = program
-            .file_offset
-            .checked_add(delta)
-            .ok_or_else(|| "mapped file offset overflowed".to_owned())?;
-        if resolved.is_some_and(|prior| prior != offset) {
-            return Err("virtual address maps ambiguously to multiple file offsets".to_owned());
-        }
-        resolved = Some(offset);
-    }
-    resolved.ok_or_else(|| "dynamic virtual address is not file-backed by PT_LOAD".to_owned())
-}
-
-fn dynamic_string<'a>(
-    strings: &'a [u8],
-    offset: usize,
-    cancellation: &CancellationToken,
-) -> Result<&'a str, String> {
-    let suffix = strings
-        .get(offset..)
-        .ok_or_else(|| "dynamic string is outside the string table".to_owned())?;
-    let mut end = None;
-    for (chunk_index, chunk) in
-        CancellableChunks::new(suffix, CANCELLATION_CHUNK_BYTES, cancellation).enumerate()
-    {
-        let chunk = chunk.map_err(|error| error.to_string())?;
-        if let Some(position) = chunk.iter().position(|byte| *byte == 0) {
-            end = Some(
-                chunk_index
-                    .checked_mul(CANCELLATION_CHUNK_BYTES)
-                    .and_then(|start| start.checked_add(position))
-                    .ok_or_else(|| "dynamic string length overflowed".to_owned())?,
-            );
-            break;
-        }
-    }
-    let end = end.ok_or_else(|| "dynamic string is not NUL terminated".to_owned())?;
-    std::str::from_utf8(&suffix[..end]).map_err(|_| "dynamic string is not UTF-8".to_owned())
-}
-
-fn checked_range(bytes: &[u8], offset: usize, length: usize) -> Result<(), String> {
-    offset
-        .checked_add(length)
-        .filter(|end| *end <= bytes.len())
-        .map(|_| ())
-        .ok_or_else(|| "ELF range is out of bounds".to_owned())
-}
-
-fn checked_slice(bytes: &[u8], offset: usize, length: usize) -> Result<&[u8], String> {
-    checked_range(bytes, offset, length)?;
-    Ok(&bytes[offset..offset + length])
-}
-
-fn read_u16(bytes: &[u8], offset: usize) -> Result<u16, String> {
-    let value = checked_slice(bytes, offset, 2)?;
-    Ok(u16::from_le_bytes([value[0], value[1]]))
-}
-
-fn read_u32(bytes: &[u8], offset: usize) -> Result<u32, String> {
-    let value = checked_slice(bytes, offset, 4)?;
-    Ok(u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
-}
-
+#[cfg(test)]
 fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, String> {
-    let value = checked_slice(bytes, offset, 8)?;
+    let end = offset
+        .checked_add(8)
+        .filter(|end| *end <= bytes.len())
+        .ok_or_else(|| "ELF range is out of bounds".to_owned())?;
+    let value = &bytes[offset..end];
     Ok(u64::from_le_bytes([
-        value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7],
-    ]))
-}
-
-fn read_i64(bytes: &[u8], offset: usize) -> Result<i64, String> {
-    let value = checked_slice(bytes, offset, 8)?;
-    Ok(i64::from_le_bytes([
         value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7],
     ]))
 }

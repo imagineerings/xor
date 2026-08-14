@@ -13839,6 +13839,101 @@ fn val_ownership_native_video_codec_package_capture_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_native_video_codec_elf_inspection_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let elf = fs::read_to_string(root.join("crates/comfy_runtime/src/native_ffi_elf.rs"))?;
+    for required in [
+        "pub(crate) struct NativeElfDynamicContract",
+        "pub(crate) fn inspect_elf64_dynamic_contract(",
+        "expected_machine",
+        "PT_DYNAMIC",
+        "RPATH and RUNPATH are forbidden",
+        "elf_inspection_binds_machine_soname_symbols_and_dependencies",
+        "elf_inspection_rejects_embedded_search_paths_and_cancellation",
+    ] {
+        assert!(elf.contains(required), "native ELF owner lacks {required}");
+    }
+    let rocm = fs::read_to_string(root.join("crates/comfy_runtime/src/native_ffi_rocm.rs"))?;
+    assert!(rocm.contains("inspect_elf64_dynamic_contract(image.bytes(), 62, cancellation)"));
+    assert!(!rocm.contains("fn contains_virtual_range("));
+
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "pub struct InspectedVideoCodecPackage",
+        "pub struct VideoCodecElfLibraryIdentity",
+        "pub fn capture_and_inspect_video_codec_package(",
+        "dynamic.soname() != Some(expected.filename())",
+        "!dynamic.symbols().contains(*symbol)",
+        "needed_libraries: dynamic.needed().clone()",
+    ] {
+        assert!(
+            trust.contains(required),
+            "video ELF adapter lacks {required}"
+        );
+    }
+    let boundary_start = trust
+        .find("pub struct InspectedVideoCodecPackage")
+        .ok_or("video ELF inspection boundary is missing")?;
+    let boundary_end = trust
+        .find("pub struct NativeVideoCodecLibraryObservation")
+        .ok_or("video ELF inspection boundary end is missing")?;
+    let boundary = trust
+        .get(boundary_start..boundary_end)
+        .ok_or("video ELF inspection boundary range is invalid")?;
+    for forbidden in [
+        "dlopen",
+        "dlsym",
+        "LoadLibrary",
+        "GetProcAddress",
+        ".authorize(",
+    ] {
+        assert!(
+            !boundary.contains(forbidden),
+            "video ELF inspection boundary contains forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-structural-elf-contract",
+        "needed_names_authorized",
+        "licensed_ffmpeg_binary",
+        "native_library_loaded",
+        "runtime_symbol_address_resolved",
+        "ffi_certificate_issued_by_inspection",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video ELF fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_execution_elf_dynamic_contract_inspection")
+            })
+        })
+        .ok_or("missing native ELF inspection ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::native_ffi_elf::inspect_elf64_dynamic_contract")
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

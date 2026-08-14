@@ -32,6 +32,7 @@ pub mod native_execution_controller;
 pub mod native_ffi_cuda;
 #[cfg(feature = "directml")]
 pub mod native_ffi_directml;
+mod native_ffi_elf;
 #[cfg(feature = "metal")]
 pub mod native_ffi_metal;
 #[cfg(feature = "mlu")]
