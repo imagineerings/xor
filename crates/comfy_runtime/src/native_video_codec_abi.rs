@@ -282,6 +282,17 @@ pub(crate) fn video_codec_library_contracts() -> [(&'static str, u16, &'static [
     ]
 }
 
+pub(crate) fn video_codec_symbol_version_namespace(identity: &str) -> Option<&'static str> {
+    match identity {
+        "avcodec" => Some("LIBAVCODEC_61"),
+        "avformat" => Some("LIBAVFORMAT_61"),
+        "avutil" => Some("LIBAVUTIL_59"),
+        "swresample" => Some("LIBSWRESAMPLE_5"),
+        "swscale" => Some("LIBSWSCALE_8"),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,6 +356,11 @@ mod tests {
         assert_eq!(manifest["contract"]["function_count"], 54);
         for (identity, abi_major, symbols) in video_codec_library_contracts() {
             assert_eq!(manifest["libraries"][identity]["abi_major"], abi_major);
+            assert_eq!(
+                manifest["libraries"][identity]["symbol_version_namespace"],
+                video_codec_symbol_version_namespace(identity)
+                    .expect("reviewed library must have a symbol-version namespace")
+            );
             let manifest_symbols = manifest["libraries"][identity]["symbols"]
                 .as_array()
                 .expect("library symbols must be an array")

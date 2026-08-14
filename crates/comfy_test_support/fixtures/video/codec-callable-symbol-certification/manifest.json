@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "truth_mode": "synthetic-static-callable-export-certification",
+  "target": "x86_64-unknown-linux-gnu",
+  "source": {
+    "profile": "ffmpeg-7.1",
+    "archive_sha256": "40973d44970dbc83ef302b0609f2e74982be2d85916dd2ee7472d30678a7abe6",
+    "release_signature_sha256": "9bd1689dce76b109034dcc4765a406e84e8799a2fd857b000c0a4d9744b70617",
+    "signing_key_fingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8"
+  },
+  "prerequisites": {
+    "compiled_abi_manifest_sha256": "cefc4429df3abe09508a4f6c91ba2c749580109fab52f3f79e9db7a998b4bb76",
+    "reviewed_abi_manifest_sha256": "9283b05888da51e0fa42adfa5e92bc6fac88d663b2b5b6901097937ef6730442",
+    "elf_inspection_manifest_sha256": "cba3dc9db253c0b0d996888fb497d54a6c85d0b1b0b729c015e7c8ba4005af0c",
+    "inspected_certification_manifest_sha256": "71209c54b52ae1c18df0407a367869edea8306bfe8147953916c96f15a9fe883",
+    "dependency_closure_manifest_sha256": "7bd2f550fa0896f3c0c724259fa5ea0fc3a37ae29a2abb3b385d1970ed709e01"
+  },
+  "contract": {
+    "required_symbol_count": 54,
+    "binding": "STB_GLOBAL",
+    "type": "STT_FUNC",
+    "visibility": "STV_DEFAULT",
+    "definition": "defined-nonzero-executable-segment",
+    "version_namespaces": {
+      "avcodec": "LIBAVCODEC_61",
+      "avformat": "LIBAVFORMAT_61",
+      "avutil": "LIBAVUTIL_59",
+      "swresample": "LIBSWRESAMPLE_5",
+      "swscale": "LIBSWSCALE_8"
+    },
+    "version_visibility": "default",
+    "definitions_per_required_name": 1
+  },
+  "negative_matrix": [
+    "local-binding",
+    "weak-binding",
+    "hidden-visibility",
+    "protected-visibility",
+    "undefined",
+    "object",
+    "tls",
+    "notype",
+    "gnu-ifunc",
+    "zero-value",
+    "non-executable-value",
+    "unversioned",
+    "hidden-version",
+    "wrong-version",
+    "duplicate-name",
+    "ambiguous-definition",
+    "malformed-version-table",
+    "cancelled-inspection"
+  ],
+  "claims": {
+    "synthetic_elf_only": true,
+    "licensed_ffmpeg_binary": false,
+    "installed_ffmpeg_package": false,
+    "native_library_loaded": false,
+    "dlsym_called": false,
+    "runtime_symbol_address_resolved": false,
+    "native_function_invoked": false,
+    "encoder_availability_probed": false,
+    "codec_execution": false,
+    "media_allocation": false,
+    "effect_or_publication": false,
+    "cache_or_persistence": false
+  }
+}

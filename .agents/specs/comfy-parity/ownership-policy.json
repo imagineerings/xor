@@ -6840,6 +6840,7 @@
         "native_ffi_rocm supplies its exact x86_64 machine contract and consumes the inspected SONAME, exports, and dependency names before registry certification and its focused unsafe loader",
         "comfy_runtime::trust supplies the signed video target, catalog filename, and required-symbol subset and retains the inspected metadata with the sealed five-library package",
         "the video codec dependency-closure certifier reuses this parser for every signed dependency image, rejects duplicate DT_NEEDED names, and compares the complete normalized observed graph to the signed contract before registry certification",
+        "the video codec callable-export certifier consumes the parser's exact binding, type, visibility, value, executable-segment, and GNU version projections and admits only one reviewed global default-version function definition per required symbol",
         "the inspector records DT_NEEDED names but never authorizes dependencies, resolves runtime addresses, issues certificates, probes encoders, or executes codecs"
       ],
       "definitions": [
@@ -6877,6 +6878,16 @@
           "pattern": "pub fn capture_and_inspect_video_codec_package[\\s\\S]*expected_machine[\\s\\S]*inspect_elf64_dynamic_contract[\\s\\S]*dynamic\\.soname\\(\\) != Some\\(expected\\.filename\\(\\)\\)[\\s\\S]*!dynamic\\.symbols\\(\\)\\.contains[\\s\\S]*captured[\\s\\S]*\\.seal"
         },
         {
+          "name": "video-codec-callable-export-certification-reuses-exact-elf-symbol-metadata",
+          "path": "crates/comfy_runtime/src/trust.rs",
+          "pattern": "checked_video_codec_callable_symbols[\\s\\S]*symbol_identities\\(\\)[\\s\\S]*binding != 1[\\s\\S]*kind != 2[\\s\\S]*visibility != 0[\\s\\S]*!admitted\\.executable[\\s\\S]*!version\\.is_default[\\s\\S]*expected_version_namespace"
+        },
+        {
+          "name": "shared-elf-owner-preserves-gnu-callable-export-metadata-without-authorizing-it",
+          "path": "crates/comfy_runtime/src/native_ffi_elf.rs",
+          "pattern": "NativeElfSymbolIdentity[\\s\\S]*binding[\\s\\S]*visibility[\\s\\S]*executable[\\s\\S]*NativeElfSymbolVersion[\\s\\S]*DT_VERSYM[\\s\\S]*DT_VERDEF[\\s\\S]*symbol_identities"
+        },
+        {
           "name": "video-elf-inspection-fixture-separates-static-structure-from-load-certification-and-execution",
           "path": "crates/comfy_test_support/fixtures/video/codec-elf-inspection/manifest.json",
           "pattern": "synthetic-structural-elf-contract[\\s\\S]*needed_names_authorized[\\s\\S]*licensed_ffmpeg_binary[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*ffi_certificate_issued_by_inspection[\\s\\S]*codec_execution"
@@ -6891,7 +6902,8 @@
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-elf-inspection-foundation",
-        "comfy-parity-native-video-codec-dependency-closure-certification-foundation"
+        "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
+        "comfy-parity-native-video-codec-callable-symbol-certification-foundation"
       ],
       "production_consumers": [
         "ROCm retained native-library certification",
@@ -7099,7 +7111,7 @@
         {
           "name": "video-codec-trust-catalog-delegates-reviewed-abi-symbol-contract",
           "path": "crates/comfy_runtime/src/trust.rs",
-          "pattern": "native_video_codec_abi::video_codec_library_contracts[\\s\\S]*validate_video_codec_catalog_envelope[\\s\\S]*video_codec_library_contracts\\(\\)"
+          "pattern": "(?=[\\s\\S]*video_codec_library_contracts)(?=[\\s\\S]*validate_video_codec_catalog_envelope[\\s\\S]*video_codec_library_contracts\\(\\))"
         }
       ],
       "known_open_reasons": [],
@@ -7119,6 +7131,7 @@
         "comfy-parity-native-video-codec-dependency-closure-certification-foundation",
         "comfy-parity-native-video-codec-retained-loader-foundation",
         "comfy-parity-native-video-codec-reviewed-abi-foundation",
+        "comfy-parity-native-video-codec-callable-symbol-certification-foundation",
         "comfy-parity-security-platform",
         "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-b088976a05ab",
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
@@ -14024,6 +14037,7 @@
       ],
       "owner_symbols": [
         "video_codec_library_contracts",
+        "video_codec_symbol_version_namespace",
         "AvRational",
         "AvChannelLayout"
       ],
@@ -14042,6 +14056,13 @@
         },
         {
           "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::video_codec_symbol_version_namespace",
+          "role": "canonical_signed_abi_declaration",
+          "symbol": "video_codec_symbol_version_namespace",
+          "pattern": "^pub\\(crate\\) fn video_codec_symbol_version_namespace\\("
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
           "qualified": "comfy_runtime::native_video_codec_abi::AvRational",
           "role": "abi_boundary",
           "symbol": "AvRational"
@@ -14054,7 +14075,8 @@
         }
       ],
       "call_symbols": [
-        "video_codec_library_contracts"
+        "video_codec_library_contracts",
+        "video_codec_symbol_version_namespace"
       ],
       "required_mappings": [
         {
@@ -14073,6 +14095,11 @@
           "pattern": "official_release_signature_verified[\\s\\S]*reviewed_typed_declarations[\\s\\S]*native_library_loaded[\\s\\S]*runtime_symbol_address_resolved[\\s\\S]*runtime_version_checked[\\s\\S]*codec_execution"
         },
         {
+          "name": "video-codec-reviewed-abi-owns-exact-default-gnu-version-namespaces",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "video_codec_symbol_version_namespace[\\s\\S]*LIBAVCODEC_61[\\s\\S]*LIBAVFORMAT_61[\\s\\S]*LIBAVUTIL_59[\\s\\S]*LIBSWRESAMPLE_5[\\s\\S]*LIBSWSCALE_8"
+        },
+        {
           "name": "video-codec-reviewed-abi-tests-exact-layout-symbol-count-and-trust-delegation",
           "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
           "pattern": "ffmpeg_7_1_reviewed_abi_contract_is_exact[\\s\\S]*symbols.len\\(\\), 54[\\s\\S]*reviewed_manifest_matches_compiled_abi_contract"
@@ -14086,7 +14113,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-reviewed-abi-foundation"
+        "comfy-parity-native-video-codec-reviewed-abi-foundation",
+        "comfy-parity-native-video-codec-callable-symbol-certification-foundation"
       ],
       "production_consumers": [
         "native video codec trust catalog",

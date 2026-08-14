@@ -42,7 +42,7 @@ use crate::{
     AuthorizedCapabilities, CapabilitySet, PermissionError, PermissionPolicy,
     PermissionPolicyGeneration,
     native_ffi_elf::{NativeElfInspectionError, inspect_elf64_dynamic_contract},
-    native_video_codec_abi::video_codec_library_contracts,
+    native_video_codec_abi::{video_codec_library_contracts, video_codec_symbol_version_namespace},
 };
 
 pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
@@ -3547,7 +3547,29 @@ pub struct CapturedVideoCodecPackage {
 pub struct VideoCodecElfLibraryIdentity {
     soname: String,
     exported_symbols: BTreeSet<String>,
+    callable_symbols: BTreeMap<String, VideoCodecCallableElfSymbolIdentity>,
     needed_libraries: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VideoCodecCallableElfSymbolIdentity {
+    value: u64,
+    size: u64,
+    version_namespace: String,
+}
+
+impl VideoCodecCallableElfSymbolIdentity {
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
+    }
+
+    pub fn version_namespace(&self) -> &str {
+        &self.version_namespace
+    }
 }
 
 impl VideoCodecElfLibraryIdentity {
@@ -3557,6 +3579,10 @@ impl VideoCodecElfLibraryIdentity {
 
     pub fn exported_symbols(&self) -> &BTreeSet<String> {
         &self.exported_symbols
+    }
+
+    pub fn callable_symbols(&self) -> &BTreeMap<String, VideoCodecCallableElfSymbolIdentity> {
+        &self.callable_symbols
     }
 
     pub fn needed_libraries(&self) -> &BTreeSet<String> {
@@ -3747,6 +3773,8 @@ pub enum VideoCodecPackageCaptureError {
     InvalidElf { identity: String, reason: String },
     #[error("video codec package image {identity} does not export required symbol {symbol}")]
     MissingSymbol { identity: String, symbol: String },
+    #[error("video codec package image {identity} has a non-callable required symbol {symbol}")]
+    InvalidCallableSymbol { identity: String, symbol: String },
 }
 
 pub fn capture_video_codec_package(
@@ -3859,11 +3887,14 @@ fn capture_video_codec_package_internal(
                     symbol: symbol.clone(),
                 });
             }
+            let callable_symbols =
+                checked_video_codec_callable_symbols(identity, &required_symbols, &dynamic)?;
             elf_libraries.insert(
                 identity.clone(),
                 VideoCodecElfLibraryIdentity {
                     soname: expected.filename().to_owned(),
                     exported_symbols: dynamic.symbols().clone(),
+                    callable_symbols,
                     needed_libraries: dynamic.needed().clone(),
                 },
             );
@@ -3885,6 +3916,63 @@ fn capture_video_codec_package_internal(
         },
         elf_libraries,
     ))
+}
+
+fn checked_video_codec_callable_symbols(
+    identity: &str,
+    required_symbols: &BTreeSet<String>,
+    dynamic: &crate::native_ffi_elf::NativeElfDynamicContract,
+) -> Result<BTreeMap<String, VideoCodecCallableElfSymbolIdentity>, VideoCodecPackageCaptureError> {
+    let expected_version_namespace =
+        video_codec_symbol_version_namespace(identity).ok_or_else(|| {
+            VideoCodecPackageCaptureError::ContractMismatch {
+                identity: identity.to_owned(),
+            }
+        })?;
+    let mut callable_symbols = BTreeMap::new();
+    for symbol in required_symbols {
+        let identities = dynamic.symbol_identities().get(symbol).ok_or_else(|| {
+            VideoCodecPackageCaptureError::MissingSymbol {
+                identity: identity.to_owned(),
+                symbol: symbol.clone(),
+            }
+        })?;
+        let [admitted] = identities.as_slice() else {
+            return Err(VideoCodecPackageCaptureError::InvalidCallableSymbol {
+                identity: identity.to_owned(),
+                symbol: symbol.clone(),
+            });
+        };
+        let Some(version) = admitted.version.as_ref() else {
+            return Err(VideoCodecPackageCaptureError::InvalidCallableSymbol {
+                identity: identity.to_owned(),
+                symbol: symbol.clone(),
+            });
+        };
+        if admitted.binding != 1
+            || admitted.kind != 2
+            || admitted.visibility != 0
+            || admitted.section_index == 0
+            || admitted.value == 0
+            || !admitted.executable
+            || !version.is_default
+            || version.name != expected_version_namespace
+        {
+            return Err(VideoCodecPackageCaptureError::InvalidCallableSymbol {
+                identity: identity.to_owned(),
+                symbol: symbol.clone(),
+            });
+        }
+        callable_symbols.insert(
+            symbol.clone(),
+            VideoCodecCallableElfSymbolIdentity {
+                value: admitted.value,
+                size: admitted.size,
+                version_namespace: version.name.clone(),
+            },
+        );
+    }
+    Ok(callable_symbols)
 }
 
 fn map_video_codec_image_error(
@@ -4242,7 +4330,7 @@ pub fn certify_inspected_video_codec_package(
             identity,
             expected.digest_sha256(),
             &video_codec_abi_version(expected.abi_major()),
-            elf.exported_symbols(),
+            &elf.callable_symbols().keys().cloned().collect(),
         )?;
         certificates.insert(identity.clone(), certificate);
     }
@@ -4322,7 +4410,7 @@ fn certify_video_codec_dependency_closure_with_limits(
             identity,
             library.digest_sha256(),
             &video_codec_abi_version(library.abi_major()),
-            elf.exported_symbols(),
+            &elf.callable_symbols().keys().cloned().collect(),
         )?;
         if primary.certificates().get(identity) != Some(&expected_certificate) {
             return Err(VideoCodecDependencyClosureError::ContractMismatch);
@@ -4396,6 +4484,7 @@ fn certify_video_codec_dependency_closure_with_limits(
             VideoCodecElfLibraryIdentity {
                 soname: expected.filename().to_owned(),
                 exported_symbols: dynamic.symbols().clone(),
+                callable_symbols: BTreeMap::new(),
                 needed_libraries: dynamic.needed().clone(),
             },
         );
@@ -6558,6 +6647,92 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    fn video_codec_callable_exports_require_exact_global_function_versions()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let required = BTreeSet::from(["avcodec_version".to_owned()]);
+        let bytes = crate::native_ffi_elf::tests::fixture(
+            62,
+            &required,
+            &["libc.so.6"],
+            None,
+            "libavcodec.so.61",
+        );
+        let valid = inspect_elf64_dynamic_contract(&bytes, 62, &CancellationToken::default())?;
+        let admitted = checked_video_codec_callable_symbols("avcodec", &required, &valid)?;
+        assert_eq!(admitted.len(), 1);
+        assert_eq!(
+            admitted
+                .get("avcodec_version")
+                .map(VideoCodecCallableElfSymbolIdentity::version_namespace),
+            Some("LIBAVCODEC_61")
+        );
+
+        let mutations: [fn(&mut crate::native_ffi_elf::NativeElfSymbolIdentity); 13] = [
+            |identity| identity.binding = 0,
+            |identity| identity.binding = 2,
+            |identity| identity.kind = 0,
+            |identity| identity.kind = 1,
+            |identity| identity.kind = 6,
+            |identity| identity.kind = 10,
+            |identity| identity.visibility = 1,
+            |identity| identity.visibility = 2,
+            |identity| identity.visibility = 3,
+            |identity| identity.section_index = 0,
+            |identity| identity.value = 0,
+            |identity| identity.executable = false,
+            |identity| identity.version = None,
+        ];
+        for mutate in mutations {
+            let mut changed = valid.clone();
+            let identity = changed
+                .symbol_identities
+                .get_mut("avcodec_version")
+                .and_then(|identities| identities.first_mut())
+                .ok_or("fixture callable identity is missing")?;
+            mutate(identity);
+            assert!(matches!(
+                checked_video_codec_callable_symbols("avcodec", &required, &changed),
+                Err(VideoCodecPackageCaptureError::InvalidCallableSymbol { .. })
+            ));
+        }
+
+        for (version_name, is_default) in [("LIBAVCODEC_60", true), ("LIBAVCODEC_61", false)] {
+            let mut changed = valid.clone();
+            let version = changed
+                .symbol_identities
+                .get_mut("avcodec_version")
+                .and_then(|identities| identities.first_mut())
+                .and_then(|identity| identity.version.as_mut())
+                .ok_or("fixture symbol version is missing")?;
+            version.name = version_name.to_owned();
+            version.is_default = is_default;
+            assert!(matches!(
+                checked_video_codec_callable_symbols("avcodec", &required, &changed),
+                Err(VideoCodecPackageCaptureError::InvalidCallableSymbol { .. })
+            ));
+        }
+
+        let mut duplicate = valid.clone();
+        let identity = duplicate
+            .symbol_identities
+            .get("avcodec_version")
+            .and_then(|identities| identities.first())
+            .cloned()
+            .ok_or("fixture callable identity is missing")?;
+        duplicate
+            .symbol_identities
+            .get_mut("avcodec_version")
+            .ok_or("fixture callable identity vector is missing")?
+            .push(identity);
+        assert!(matches!(
+            checked_video_codec_callable_symbols("avcodec", &required, &duplicate),
+            Err(VideoCodecPackageCaptureError::InvalidCallableSymbol { .. })
+        ));
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
     fn video_codec_package_capture_seals_exact_catalog_images()
     -> Result<(), Box<dyn std::error::Error>> {
         let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
@@ -6605,7 +6780,30 @@ mod tests {
                 .libraries()
                 .get(identity)
                 .ok_or_else(|| io::Error::other("inspected library is not in the catalog"))?;
+            let expected_symbols = video_codec_library_contracts()
+                .into_iter()
+                .find(|(expected_identity, _, _)| expected_identity == identity)
+                .map(|(_, _, symbols)| {
+                    symbols
+                        .iter()
+                        .map(|symbol| (*symbol).to_owned())
+                        .collect::<BTreeSet<_>>()
+                })
+                .ok_or_else(|| io::Error::other("reviewed symbol contract is missing"))?;
             assert_eq!(library.soname(), expected.filename());
+            assert_eq!(
+                library
+                    .callable_symbols()
+                    .keys()
+                    .cloned()
+                    .collect::<BTreeSet<_>>(),
+                expected_symbols
+            );
+            assert!(library.callable_symbols().values().all(|symbol| {
+                symbol.value() != 0
+                    && symbol.version_namespace()
+                        == video_codec_symbol_version_namespace(identity).unwrap_or_default()
+            }));
             assert_eq!(
                 library.needed_libraries(),
                 &BTreeSet::from(["libc.so.6".to_owned()])

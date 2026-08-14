@@ -14413,6 +14413,111 @@ fn val_ownership_native_video_codec_reviewed_abi_001() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn val_ownership_native_video_codec_callable_symbol_certification_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let elf = fs::read_to_string(root.join("crates/comfy_runtime/src/native_ffi_elf.rs"))?;
+    for required in [
+        "pub(crate) struct NativeElfSymbolIdentity",
+        "pub(crate) struct NativeElfSymbolVersion",
+        "symbol_identities",
+        "DT_VERSYM",
+        "DT_VERDEF",
+        "version_definition_count",
+        "elf_inspection_preserves_non_callable_and_hidden_version_metadata",
+    ] {
+        assert!(
+            elf.contains(required),
+            "callable ELF owner lacks {required}"
+        );
+    }
+
+    let trust = fs::read_to_string(root.join("crates/comfy_runtime/src/trust.rs"))?;
+    for required in [
+        "fn checked_video_codec_callable_symbols(",
+        "admitted.binding != 1",
+        "admitted.kind != 2",
+        "admitted.visibility != 0",
+        "!admitted.executable",
+        "!version.is_default",
+        "video_codec_callable_exports_require_exact_global_function_versions",
+    ] {
+        assert!(
+            trust.contains(required),
+            "video codec callable certification lacks {required}"
+        );
+    }
+    for forbidden in ["dlsym(", "dladdr(", "transmute(", "find_encoder(\""] {
+        assert!(
+            !elf.contains(forbidden),
+            "static callable ELF owner contains forbidden {forbidden}"
+        );
+    }
+
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "pub(crate) fn video_codec_symbol_version_namespace(",
+        "LIBAVCODEC_61",
+        "LIBAVFORMAT_61",
+        "LIBAVUTIL_59",
+        "LIBSWRESAMPLE_5",
+        "LIBSWSCALE_8",
+    ] {
+        assert!(abi.contains(required), "reviewed ABI lacks {required}");
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-callable-symbol-certification/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-static-callable-export-certification",
+        "STB_GLOBAL",
+        "STT_FUNC",
+        "STV_DEFAULT",
+        "gnu-ifunc",
+        "native_library_loaded",
+        "dlsym_called",
+        "native_function_invoked",
+        "codec_execution",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "callable symbol fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    for concern_name in [
+        "native_execution_elf_dynamic_contract_inspection",
+        "native_video_reviewed_codec_abi_declarations",
+    ] {
+        let concern = policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|concerns| {
+                concerns.iter().find(|concern| {
+                    concern.get("concern").and_then(serde_json::Value::as_str) == Some(concern_name)
+                })
+            })
+            .ok_or("missing callable export ownership concern")?;
+        assert!(
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| {
+                    task.as_str()
+                        == Some(
+                            "comfy-parity-native-video-codec-callable-symbol-certification-foundation",
+                        )
+                }))
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

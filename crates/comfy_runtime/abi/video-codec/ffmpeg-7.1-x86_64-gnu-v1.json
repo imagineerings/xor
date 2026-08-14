@@ -50,6 +50,7 @@
   "libraries": {
     "avcodec": {
       "abi_major": 61,
+      "symbol_version_namespace": "LIBAVCODEC_61",
       "release_version": "61.19.100",
       "symbols": [
         "av_packet_alloc", "av_packet_free", "av_packet_unref", "avcodec_alloc_context3",
@@ -61,6 +62,7 @@
     },
     "avformat": {
       "abi_major": 61,
+      "symbol_version_namespace": "LIBAVFORMAT_61",
       "release_version": "61.7.100",
       "symbols": [
         "av_find_best_stream", "av_interleaved_write_frame", "av_read_frame", "av_write_trailer",
@@ -72,6 +74,7 @@
     },
     "avutil": {
       "abi_major": 59,
+      "symbol_version_namespace": "LIBAVUTIL_59",
       "release_version": "59.39.100",
       "symbols": [
         "av_channel_layout_default", "av_channel_layout_uninit", "av_dict_free", "av_dict_set",
@@ -81,11 +84,13 @@
     },
     "swresample": {
       "abi_major": 5,
+      "symbol_version_namespace": "LIBSWRESAMPLE_5",
       "release_version": "5.3.100",
       "symbols": ["swr_alloc", "swr_alloc_set_opts2", "swr_convert", "swr_free", "swr_init", "swresample_version"]
     },
     "swscale": {
       "abi_major": 8,
+      "symbol_version_namespace": "LIBSWSCALE_8",
       "release_version": "8.3.100",
       "symbols": ["sws_freeContext", "sws_getContext", "sws_scale", "swscale_version"]
     }
