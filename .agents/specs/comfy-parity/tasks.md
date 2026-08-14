@@ -8205,7 +8205,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: TASK408 VIDEO OUTPUT MEDIA IDENTITY 2026-08-13 PASS. NativeOutputEffectRequest now carries a checked portable NativeOutputMediaKind plus canonical media type, validates extension-kind-type triples, and binds both fields into its v2 request digest. Existing constructors preserve image preview behavior and infer canonical video/webm or video/mp4 identities without moving effect, path, recovery, or publication authority out of the runtime and OutputCommitter. Focused WEBM/MP4/mismatch and ownership tests passed; the complete comfy_nodes all-target suite passed 109/109; locked compile, planning 4/4, formatting, policy JSON, and diff integrity passed.
 
-- [ ] 411. Project typed native video output commits and recovery
+- [x] 411. Project typed native video output commits and recovery
   - _id: comfy-parity-native-video-output-projection-foundation
   - Outcome: The native prepared-output boundary carries checked media kind and type through worker proposals, OutputCommitter projection metadata, preview/output events, and committed-receipt recovery. Versioned metadata upgrades legacy v1 PNG receipts without weakening the authoritative output transaction or path owner.
   - Wave: 238
@@ -8223,7 +8223,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-CANCEL-001, VAL-RECOVERY-005, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_nodes -p comfy_runtime -p comfy_test_support; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_runtime --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_runtime -p comfy_test_support
   - Done when: Focused tests prove video/webm worker round-trip, typed preview and output projection, v2 committed-receipt recovery, strict media/extension collision rejection, legacy v1 image/png recovery compatibility, cancellation-safe final-only publication, and no second filesystem, journal, cache, codec, or recovery owner.
 
-- [ ] 412. Admit retained FILM and RIFE checkpoint state
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 966ffcee preserved typed worker proposals, video preview/output projection, v2 receipt recovery, and v1 PNG fallback. Fresh worker-round-trip and typed-video projection tests plus exact ownership passed; the receipt-reconciliation test reproduced only the established host filesystem Bad-file-descriptor baseline in both managed and escalated runs.
+
+- [x] 412. Admit retained FILM and RIFE checkpoint state
   - _id: comfy-parity-native-frame-interpolation-model-foundation
   - Outcome: One immutable NativeFrameInterpolationModel owns source-order FILM/RIFE detection, collision-safe RIFE checkpoint normalization, complete closed state manifests, artifact/content semantic identity, and alias-aware residency. It retains weights only and does not execute interpolation, cache pair features, resolve handles, or publish output.
   - Wave: 239
@@ -8241,7 +8243,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: Source-fingerprinted tests prove FILM marker precedence and its exact 82-tensor fixed manifest; sequential module/flownet stripping, raw block remap, teacher/caltime filtering, collision rejection, checkpoint-derived RIFE configuration and its exact 158-tensor manifest; strict shape/dtype/device/stream/state rejection; content-sensitive identity, alias-aware residency, cancellation, and no execution/payload/cache/publication facade.
 
-- [ ] 413. Seal retained FILM and RIFE resources behind INTERP_MODEL handles
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fd828e49 closed FILM/RIFE checkpoint admission, state identity, and residency. Fresh frame-interpolation model tests and exact ownership passed under the consolidated locked all-target compilation.
+
+- [x] 413. Seal retained FILM and RIFE resources behind INTERP_MODEL handles
   - _id: comfy-parity-native-frame-interpolation-resource-foundation
   - Outcome: NativeModelPayload is the sole sealed INTERP_MODEL resource adapter for NativeFrameInterpolationModel. NativeStoredModelPayload admits that role only through the concrete accessor while preserving exact artifact/execution identity, backing/tensor residency, and every existing non-interpolation role boundary.
   - Wave: 240
@@ -8259,7 +8263,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_nodes -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_nodes --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_nodes -p comfy_test_support
   - Done when: Focused tests prove FILM/RIFE role, identifier, format, artifact and execution digests; concrete accessor closure; legacy model/clip/VAE negative accessors; exact owned/backing/tensor accounting with StorageId alias deduplication; cancellation-safe validation; stored INTERP_MODEL admission; and rejection of metadata-only, cross-role, malformed, or forged resources without cache, execution, or publication state.
 
-- [ ] 414. Plan bounded FILM and RIFE interpolation invocations
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 852e88aa sealed concrete INTERP_MODEL resources and preserved identity and alias-aware residency. Fresh frame-interpolation model tests and exact resource ownership passed under the consolidated locked all-target compilation.
+
+- [x] 414. Plan bounded FILM and RIFE interpolation invocations
   - _id: comfy-parity-native-frame-interpolation-invocation-foundation
   - Outcome: FrameInterpolationInvocationPlan is the sole checked owner of source endpoint/midpoint counts, exact timestep order, FILM/RIFE alignment, reflection-padding admission, result-size overflow protection, bypass semantics, and the attempt-local multi-to-single plus persistent batch-halving OOM state. It executes no model equations and retains no image, feature, grid, cache, handle, or output state.
   - Wave: 241
@@ -8277,7 +8283,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: Focused tests prove N<2 and multiplier<2 bypass; multiplier 2..16; `(N-1)*multiplier+1` endpoint ordering and `(N-1)*(multiplier-1)` work count; exact `j/multiplier` timesteps; FILM alignment one; RIFE reflection padding to 64 and unrepresentable small-extent rejection; overflow and cancellation; multi-path disable on OOM; persistent floor-halving single batches and terminal batch-one OOM; and absence of model math, cache, handle, or publication ownership.
 
-- [ ] 415. Publish bounded tensor grid sampling for model execution
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a3306289 added bounded FILM/RIFE invocation planning, ordering, padding, overflow, and OOM-downgrade state. Fresh 20/20 model tests and exact invocation ownership passed.
+
+- [x] 415. Publish bounded tensor grid sampling for model execution
   - _id: comfy-parity-native-tensor-grid-sample-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning grid-sample adapter over its existing normalized-coordinate, padding, and interpolation equations. The CPU path decodes F16/BF16/F32 input and F32 grids into caller-authorized workspace, publishes one fresh backend-accounted tensor in the input dtype, and adds no second sampling equation, allocator, workspace, cancellation, model, cache, or publication owner.
   - Wave: 242
@@ -8295,7 +8303,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_tensor -p comfy_test_support; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_tensor -p comfy_test_support
   - Done when: Focused tests prove canonical bilinear center sampling for F16, BF16, and F32 input; F32 accumulation and output-dtype rounding; exact dtype/device/stream/shape preservation; fresh nonaliasing StorageId; unchanged inputs; pre-cancellation; caller-workspace exhaustion before publication; backend-memory convergence; and delegation to the existing GridGeometry and checked boundary-weight owners without an ordinary heap result vector.
 
-- [ ] 416. Publish bounded tensor interpolation for model execution
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 706bd987 added bounded dtype-preserving tensor grid sampling. Fresh spatial tensor tests passed 13/13 and the exact grid-sample ownership witness passed.
+
+- [x] 416. Publish bounded tensor interpolation for model execution
   - _id: comfy-parity-native-tensor-interpolate-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning interpolation adapter over its existing size, scale, rank, coordinate, and separable-weight plan. The CPU path decodes F16/BF16/F32 input and accumulates output in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without a second interpolation equation, allocator, workspace, cancellation, model, cache, or publication owner.
   - Wave: 243
@@ -8313,7 +8323,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_tensor -p comfy_test_support; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_tensor -p comfy_test_support
   - Done when: Focused tests prove canonical bilinear interpolation for F16, BF16, and F32 input; F32 accumulation and output-dtype rounding; exact dtype/device/stream/shape preservation; fresh nonaliasing StorageId; unchanged input; pre-cancellation; caller-workspace exhaustion before publication; backend-memory convergence; and delegation to the existing InterpolatePlan and checked boundary-weight owners without an ordinary heap result vector.
 
-- [ ] 417. Publish bounded low-precision tensor arithmetic for RIFE execution
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a34d6ca0 added bounded dtype-preserving tensor interpolation. Fresh spatial tensor tests passed 13/13 and the exact interpolation ownership witness passed.
+
+- [x] 417. Publish bounded low-precision tensor arithmetic for RIFE execution
   - _id: comfy-parity-native-rife-tensor-arithmetic-foundation
   - Outcome: The canonical elementwise and activation owners expose bounded F16/BF16/F32 broadcast add, multiply, tensor-weighted lerp, and LeakyReLU Tensor adapters needed by RIFE. NativeModule routes immutable LeakyReLU through that activation owner without changing parameters, generation, prefetch, or semantic identity; no model-local equation, host-result Vec, allocator, workspace, cache, or publication owner is introduced.
   - Wave: 244
@@ -8331,7 +8343,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FAMILY-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_tensor -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_tensor -p comfy_model -p comfy_test_support
   - Done when: Focused tests prove exact broadcast channel/scalar residual arithmetic and tensor-weighted lerp; F16/BF16/F32 output rounding; dtype/device/stream/shape preservation; fresh nonaliasing storage; immutable input and NativeModule state; pre-cancellation; one-byte-short caller-workspace failure before publication; backend-memory convergence; and delegation to DType encoding plus the sole LeakyReLU scalar equation.
 
-- [ ] 418. Execute retained RIFE interpolation pairs
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit f7c8126a added bounded dtype-preserving RIFE arithmetic. The fresh exact arithmetic test and exact ownership witness passed.
+
+- [x] 418. Execute retained RIFE interpolation pairs
   - _id: comfy-parity-native-rife-execution-foundation
   - Outcome: NativeFrameInterpolationModel is the sole retained RIFE execution owner. It composes the admitted head and five IFBlocks from immutable checkpoint tensors, delegates convolution, interpolation, grid sampling, concatenation, pixel shuffle, residual arithmetic, sigmoid, and lerp to their canonical Tensor owners, and returns only a fresh attempt-local interpolated pair without retaining features, flows, grids, output, cache, handles, or publication state.
   - Wave: 245
@@ -8349,7 +8363,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight oracle runs both head branches and all five scale-16/8/4/2/1 IFBlocks at padded 64x64 geometry. It proves exact zero-flow border warp identity, beta residual order, channel splits, flow refinement, mask sigmoid and midpoint lerp; fresh output storage; unchanged retained digest/residency and inputs; typed profile/timestep/shape/placement rejection; pre-cancellation and caller-workspace failure with zero scratch residue; and explicitly makes no licensed-checkpoint, full-production-numeric, FILM, pair-cache, handle, output-effect, or publication claim.
 
-- [ ] 419. Execute bounded RIFE frame sequences
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 3e284d3e executed retained RIFE pairs with bounded canonical operators. Fresh frame-interpolation model tests passed 20/20 and the exact RIFE execution ownership witness passed.
+
+- [x] 419. Execute bounded RIFE frame sequences
   - _id: comfy-parity-native-rife-sequence-execution-foundation
   - Outcome: NativeFrameInterpolationModel remains the sole retained RIFE owner while one sequence method plans BHWC endpoints and source timesteps, applies canonical reflection padding, reuses each adjacent frame head projection attempt-locally, delegates every midpoint to the retained pair graph, crops and clamps through canonical Tensor owners, and returns one fresh ordered BHWC sequence without retaining features, grids, outputs, cache, handles, codec state, or publication state.
   - Wave: 246
@@ -8367,7 +8383,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight oracle executes a two-frame 64x63 BHWC sequence at multiplier two. It proves reflection padding to 64x64 and exact crop-back, endpoint/midpoint ordering and values, final BHWC clamp, fresh output storage, immutable source and retained digest/residency, adjacent head-feature carry within the attempt, pre-cancellation, caller-workspace cleanup, and explicit absence of FILM, codecs, handles, cache, output effects, and publication.
 
-- [ ] 420. Publish bounded tensor average pooling for FILM pyramids
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 944e5a1e executed bounded RIFE sequences with endpoint ordering and attempt-local state. Fresh frame-interpolation model tests passed 20/20 and the exact sequence ownership witness passed.
+
+- [x] 420. Publish bounded tensor average pooling for FILM pyramids
   - _id: comfy-parity-native-film-tensor-average-pool-foundation
   - Outcome: The canonical spatial functional owner exposes one tensor-returning AvgPool2d adapter over its existing AveragePoolGeometry traversal. It decodes F16, BF16, or F32 input and accumulates the FILM pyramid result in caller-authorized F32 workspace before publishing one fresh backend-accounted tensor in the input dtype, without adding a second pooling equation, allocator, workspace, model, cache, codec, or publication owner.
   - Wave: 247
@@ -8385,7 +8403,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_tensor -p comfy_test_support; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_tensor -p comfy_test_support
   - Done when: A source-fingerprinted tensor fixture proves exact 4-by-4 to 2-by-2 FILM pyramid averaging for F16, BF16, and F32 input, F32 accumulation and output-dtype rounding, exact dtype/device/stream/shape preservation, fresh nonaliasing storage, immutable input, pre-cancellation, one-byte-short caller-workspace failure before publication, backend-memory convergence, and delegation to the existing AveragePoolGeometry connection/divisor owner. It explicitly makes no FILM checkpoint, flow, fusion, frame-sequence, codec, handle, cache, effect, or publication claim.
 
-- [ ] 421. Execute bounded FILM pixel-center warps
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 32c58cb7 added bounded dtype-preserving average pooling. Fresh spatial tensor tests passed 13/13 and the exact FILM pooling ownership witness passed.
+
+- [x] 421. Execute bounded FILM pixel-center warps
   - _id: comfy-parity-native-film-warp-foundation
   - Outcome: The frame-interpolation owner constructs FILM's F32 pixel-center base grid and source flow normalization in caller-authorized workspace, then delegates bilinear border sampling with align_corners false to the canonical tensor grid-sample owner. It preserves F16, BF16, or F32 input dtype and publishes one fresh attempt-local tensor without adding a second sampler, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
   - Wave: 248
@@ -8403,7 +8423,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted analytic two-by-two oracle proves FILM pixel-center coordinates, two-over-width and two-over-height flow normalization, bilinear border sampling with align_corners false, a half-pixel horizontal displacement, F16/BF16/F32 output dtype preservation, fresh nonaliasing storage, immutable image and flow inputs, pre-cancellation, caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM pyramid/fusion graph, RIFE grid semantics, codecs, handles, cache, effects, or publication.
 
-- [ ] 422. Execute bounded FILM padded convolutions
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 48f3405a added bounded FILM pixel-center warping. Fresh frame-interpolation model tests passed 20/20 and the exact warp ownership witness passed.
+
+- [x] 422. Execute bounded FILM padded convolutions
   - _id: comfy-parity-native-film-padded-convolution-foundation
   - Outcome: The frame-interpolation owner exposes one borrowed-weight FILM convolution adapter. It applies source-specific right and bottom zero padding before even kernels, symmetric convolution padding for odd kernels, optional LeakyReLU with slope 0.2, and delegates all padding, convolution, activation, allocation, storage, stream, workspace, and cancellation mechanics to their canonical owners without retaining invocation state or adding a second graph, codec, cache, handle, or publication owner.
   - Wave: 249
@@ -8421,7 +8443,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted analytic oracle proves two-by-two right/bottom zero padding and same-extent convolution, three-by-three symmetric padding, optional LeakyReLU slope 0.2, F16/BF16/F32 output dtype preservation, fresh nonaliasing storage, immutable input/weight/bias tensors, pre-cancellation, caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM pyramid/flow/fusion graph, codecs, handles, cache, effects, or publication.
 
-- [ ] 423. Execute bounded FILM image pyramids
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 1cda1d78 added bounded source-ordered FILM padded convolution. Fresh frame-interpolation model tests passed 20/20 and the exact convolution ownership witness passed.
+
+- [x] 423. Execute bounded FILM image pyramids
   - _id: comfy-parity-native-film-image-pyramid-foundation
   - Outcome: The frame-interpolation owner composes FILM's bounded image pyramid by preserving level zero as the borrowed input and repeatedly delegating two-by-two stride-two average pooling to the canonical tensor owner. The helper returns only attempt-local tensor views and fresh pooled levels, validates the production seven-level extent before allocation, and adds no second pooling equation, retained graph, allocator, workspace, codec, cache, handle, or publication owner.
   - Wave: 250
@@ -8439,7 +8463,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced oracle proves a four-by-four, three-level image pyramid with exact repeated two-by-two averages, production seven-level minimum extents, F16/BF16/F32 output dtype preservation, level-zero input aliasing, fresh nonaliasing pooled storage, immutable input, invalid level and extent rejection, pre-cancellation, one-byte-short caller-workspace failure with zero scratch residue, and explicit absence of a licensed checkpoint, FILM feature/flow/fusion execution, codecs, handles, cache, effects, or publication.
 
-- [ ] 424. Execute retained FILM subtree features
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit b834570f executed bounded FILM image pyramids. Fresh frame-interpolation model tests passed 20/20 and the exact image-pyramid ownership witness passed.
+
+- [x] 424. Execute retained FILM subtree features
   - _id: comfy-parity-native-film-subtree-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM SubTreeExtractor features from its admitted checkpoint tensors. Each of four levels applies the source's two padded three-by-three convolutions with LeakyReLU, doubles channels from the closed base width, and conditionally delegates two-by-two average pooling through the requested subtree depth without copying weights or retaining features, workspace, cache, handles, codecs, effects, or publication state.
   - Wave: 251
@@ -8457,7 +8483,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight graph proves four ordered subtree outputs, two distinct convolution scales per level, channel widths 1/2/4/8, pooling through only the first three levels, exact first values 6/126/1836/11016, fresh output storage, immutable input and weights, pre-cancellation, one-byte-short caller-workspace failure with zero scratch residue, and production API rejection of non-FILM profiles or placement. The fixture explicitly separates this homomorph from absent licensed production-weight numeric parity, feature-diagonal concatenation, flow, fusion, codecs, handles, cache, effects, and publication.
 
-- [ ] 425. Compose retained FILM feature pyramids
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit e4758f6b executed retained FILM subtree features. Fresh frame-interpolation model tests passed 20/20 and the exact subtree ownership witness passed.
+
+- [x] 425. Compose retained FILM feature pyramids
   - _id: comfy-parity-native-film-feature-pyramid-foundation
   - Outcome: The sole retained frame-interpolation model composes FILM FeatureExtractor output from the canonical seven-level image pyramid and retained SubTreeExtractor. Each output preserves the current subtree root and concatenates older diagonal subtree levels in source order through the canonical tensor concatenation owner, releases obsolete sub-pyramids after their final consumer, and retains no features, workspace, cache, handles, codecs, effects, or publication state.
   - Wave: 252
@@ -8475,7 +8503,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced composition oracle proves four output levels with exact diagonal values [0], [10,1], [20,11,2], and [30,21,12], level-zero source aliasing, fresh concatenated storage, immutable source tensors, canonical channel-axis order, production rejection of non-FILM profiles, pre-cancellation, backend-capacity failure with zero scratch residue, and explicit absence of licensed production-weight numeric parity, FILM flow estimation or fusion, codecs, handles, cache, effects, or publication.
 
-- [ ] 426. Synthesize bounded FILM flow pyramids
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fa0df7d6 composed retained FILM feature pyramids. Fresh frame-interpolation model tests passed 20/20 and the exact feature-pyramid ownership witness passed.
+
+- [x] 426. Synthesize bounded FILM flow pyramids
   - _id: comfy-parity-native-film-flow-pyramid-synthesis-foundation
   - Outcome: The frame-interpolation owner synthesizes FILM accumulated flow pyramids from borrowed residual flows in source fine-to-coarse order. It aliases the coarsest residual, repeatedly delegates exact-size bilinear interpolation, doubles the upsampled flow, adds the next residual through canonical tensor arithmetic, reverses the attempt-local outputs back to fine-to-coarse order, and creates no predictor, retained graph, allocator, cache, handle, codec, effect, or publication owner.
   - Wave: 253
@@ -8493,7 +8523,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted analytic oracle proves three residual levels with constant fine/middle/coarse values 100/10/1 synthesize exact fine-to-coarse flow values 124/12/1, exact output extents, coarsest source aliasing, fresh finer storage, immutable residuals, pre-cancellation with zero scratch residue, and explicit absence of production checkpoint weights, flow predictor execution, feature warping, fusion, codecs, handles, cache, effects, or publication.
 
-- [ ] 427. Execute retained FILM flow estimators
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit fc2c33d3 synthesized bounded FILM flow pyramids. Fresh model tests passed 20/20; the ownership witness was updated for the later helper extraction and now passes while checking both delegation and canonical interpolation.
+
+- [x] 427. Execute retained FILM flow estimators
   - _id: comfy-parity-native-film-flow-estimator-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM PyramidFlowEstimator from its admitted checkpoint tensors. It validates exact seven-level feature channels and geometry, predicts the deepest residual through the shared five-convolution estimator, reuses that estimator for levels five through three, routes levels two through zero through the three specialized predictors, upsamples and doubles accumulated flow, warps the second features, and returns source-ordered attempt-local residuals without retaining flows, features, workspace, cache, handles, codecs, effects, or publication state.
   - Wave: 254
@@ -8511,7 +8543,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight predictor proves concatenated scalar features 1/2 pass through three three-by-three activated convolutions, one activated one-by-one bottleneck, and one nonactivated two-channel output to exact values 6/12 with fresh output storage and immutable inputs. Production ownership evidence proves the shared levels 6/5/4/3 and specialized levels 2/1/0 routes, exact channel preflight, warp-and-residual accumulation, non-FILM rejection, cancellation checkpoints, and explicit absence of licensed production-weight numeric parity, flow synthesis duplication, fusion, codecs, handles, cache, effects, or publication.
 
-- [ ] 428. Execute bounded FILM pyramid algebra
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit b947f85c executed retained FILM flow estimators. Fresh frame-interpolation model tests passed 20/20 and the exact estimator ownership witness passed.
+
+- [x] 428. Execute bounded FILM pyramid algebra
   - _id: comfy-parity-native-film-pyramid-algebra-foundation
   - Outcome: The frame-interpolation owner exposes FILM's three bounded pyramid adapters: pairwise image/feature channel concatenation, per-batch scalar multiplication through an unsqueezed broadcast view, and pairwise feature warping by delegated FILM flow. Every output is attempt-local and every tensor equation, allocation, storage, stream, workspace, and cancellation boundary remains owned by canonical tensor or FILM warp primitives; no retained graph, allocator, cache, handle, codec, effect, or publication owner is added.
   - Wave: 255
@@ -8529,7 +8563,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted analytic oracle proves pairwise channel values [1,2], per-batch scalar multiplication values 0.5/1.5, zero-flow warp identity values 1/3, fresh nonaliasing outputs, immutable source pyramids, pre-cancellation with zero scratch residue, bounded equal-length validation, and explicit absence of checkpoint weights, flow prediction or synthesis duplication, fusion, codecs, handles, cache, effects, or publication.
 
-- [ ] 429. Execute the retained FILM fusion graph
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit ab21bf9c executed bounded FILM pyramid algebra through canonical tensor owners. Fresh frame-interpolation model tests passed 20/20 and the exact algebra ownership witness passed.
+
+- [x] 429. Execute the retained FILM fusion graph
   - _id: comfy-parity-native-film-fusion-foundation
   - Outcome: The sole retained frame-interpolation model executes FILM Fusion from its admitted checkpoint tensors. It consumes five borrowed aligned pyramid levels, starts at the coarsest level, applies four source-ordered nearest-resize plus nonactivated two-by-two and activated joined three-by-three convolution stages, and finishes with the retained one-by-one RGB output projection. All intermediate pyramids and outputs remain attempt-local, while canonical interpolation, concatenation, convolution, activation, storage, workspace, stream, and cancellation owners retain their mechanics.
   - Wave: 256
@@ -8547,7 +8583,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight graph proves pyramid values 1/2/3/4/5 traverse all four nearest coarse-to-fine fusion groups to exact RGB values 15/30/45 with fresh output storage, immutable inputs, pre-cancellation and zero scratch residue. Production ownership evidence binds the exact retained fuse.convs.0..3 and fuse.output_conv tensors and explicitly excludes licensed production-weight numeric parity, feature or flow duplication, multi-timestep orchestration, codecs, handles, cache, effects, or publication.
 
-- [ ] 430. Synthesize retained FILM multi-timestep pairs
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit a804c02b executed the retained FILM fusion graph. Fresh frame-interpolation model tests passed 20/20 and the exact fusion ownership witness passed.
+
+- [x] 430. Synthesize retained FILM multi-timestep pairs
   - _id: comfy-parity-native-film-multi-timestep-synthesis-foundation
   - Outcome: The sole retained frame-interpolation model executes a batch-one FILM pair for a bounded set of timesteps. It constructs each endpoint image and feature pyramid once, predicts and synthesizes forward and backward flow once, scales backward flow by t and forward flow by one minus t, warps the source-aligned pyramids, concatenates warped targets before scaled flows in the source order, delegates every timestep to the retained fusion graph, and concatenates the attempt-local RGB results. Canonical tensor, warp, flow, fusion, storage, workspace, stream, and cancellation owners retain their mechanics; adjacent-pair sequence reuse remains a later leaf.
   - Wave: 257
@@ -8565,7 +8603,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced exact-weight oracle reuses five forward/backward flow and target levels at t=0.25 and t=0.75, proving backward t plus forward one-minus-t scaling, source concatenation order, timestep output order, exact RGB values [3.5,7,10.5] then [2.5,5,7.5], fresh output storage, immutable inputs, pre-cancellation, and zero scratch residue. Production ownership evidence proves each endpoint image and feature pyramid plus both directions of flow are computed once per pair and explicitly excludes licensed production-weight numeric parity, adjacent-pair sequence caching, codecs, handles, cache, effects, or publication.
 
-- [ ] 431. Execute FILM sequences with adjacent feature reuse
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit debba377 synthesized retained FILM multi-timestep pairs with shared pair state. Fresh frame-interpolation model tests passed 20/20 and the exact multi-timestep ownership witness passed.
+
+- [x] 431. Execute FILM sequences with adjacent feature reuse
   - _id: comfy-parity-native-film-sequence-execution-foundation
   - Outcome: The sole retained frame-interpolation model executes a bounded BHWC FILM sequence through the canonical invocation plan. It converts each endpoint to NCHW once, computes each frame's image and feature pyramids once, moves the second endpoint pyramids into the next pair's first-endpoint cache, delegates every pair to retained multi-timestep synthesis, preserves source endpoint-midpoint ordering, and emits one fresh contiguous clamped BHWC result. The cache is invocation-local Rust state, never NativeCache or retained model state; source OOM downgrade policy remains a later leaf.
   - Wave: 258
@@ -8583,7 +8623,9 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-MODEL-FORMAT-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_test_support
   - Done when: A source-fingerprinted reduced finalization oracle proves two pairs at multiplier three preserve seven exact endpoint/midpoint RGB frames in BHWC order, return fresh storage, leave source tensors immutable, reject a mismatched frame count, honor pre-cancellation, and release scratch. Production ownership evidence proves each next endpoint image and feature pyramid is computed once then moved into the following pair, exact output-count preflight, final concatenate-permute-clone-clamp ordering, and explicit absence of licensed production-weight numeric parity, multi-to-single OOM downgrade, codecs, handles, NativeCache, effects, or publication.
 
-- [ ] 432. Preserve typed frame-interpolation resource exhaustion
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 37b34e82 executed FILM sequences with adjacent attempt-local feature reuse. Fresh frame-interpolation model tests passed 20/20 and the exact sequence ownership witness passed.
+
+- [x] 432. Preserve typed frame-interpolation resource exhaustion
   - _id: comfy-parity-native-frame-interpolation-resource-exhaustion-foundation
   - Outcome: The frame-interpolation owner preserves typed tensor allocation, backend-resource, and workspace-authorization exhaustion through its execution adapter instead of erasing those failures into generic strings. Canonical spatial and shape-layout tensor adapters expose TensorError through their standard Error source chain, NativeOps preserves typed spatial tensor failures, and classification downcasts only typed errors; cancellation remains dominant, ordinary execution failures remain non-retryable, and no message matching, allocator, retry loop, cache, handle, effect, or publication owner is introduced.
   - Wave: 259
@@ -8600,6 +8642,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_tensor -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_tensor -p comfy_test_support
   - _Validation: VAL-MEDIA-001, VAL-TENSOR-001, VAL-DEVICE-001, VAL-CANCEL-001, VAL-MEMORY-001, VAL-OWNERSHIP-001; commands: cargo check --locked -p comfy_model -p comfy_tensor -p comfy_test_support; cargo test --locked -p comfy_model --all-targets; cargo test --locked -p comfy_tensor --all-targets; cargo test --locked -p comfy_test_support --all-targets; ./script/clippy -p comfy_model -p comfy_tensor -p comfy_test_support
   - Done when: A source-fingerprinted typed oracle proves AllocationFailed, ResourceLimitExceeded, and WorkspaceAuthorizationExceeded map to ResourceExhausted through spatial, shape-layout, and immutable-module adapters; ShapeOverflow remains Execution; cancellation dominates exhaustion; six existing constrained-workspace graph tests now require ResourceExhausted and zero scratch residue. Ownership evidence rejects error-string matching and explicitly excludes fallback retries, codecs, handles, NativeCache, effects, or publication.
+
+  - _validation_evidence: POST-TASK411-432-CONSOLIDATED-REVALIDATION 2026-08-14. Commit 4000bb17 preserved typed allocation, resource-limit, and workspace exhaustion without message matching. Fresh 20/20 model tests and the exact resource-exhaustion ownership witness passed; locked all-target compilation and model Clippy were green.
 
 - [ ] 433. Implement native video codecs, transforms, effects, and frame interpolation
   - _id: comfy-parity-native-video-execution-foundation

@@ -14261,7 +14261,8 @@ fn val_ownership_native_film_flow_pyramid_synthesis_foundation_001()
     for required in [
         "pub fn film_flow_pyramid_synthesis_with_context_exact_native(",
         "residual_pyramid.iter().rev().skip(1)",
-        "interpolate_bilinear(backend, &flow, height, width, context)",
+        "film_upsample_double_to_residual(backend, &flow, residual, context)",
+        "interpolate_bilinear(backend, flow, height, width, context)",
         "Scalar::Float(2.0)",
         "real_add_with_context_exact_native(backend, &flow, residual, context)",
         "flow_pyramid.reverse()",
