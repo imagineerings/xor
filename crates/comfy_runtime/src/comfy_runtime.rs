@@ -45,6 +45,7 @@ pub mod native_ffi_rocm;
 pub mod native_ffi_xpu;
 mod native_video_codec_abi;
 pub mod native_video_codec_ffi;
+pub(crate) mod native_video_codec_service;
 pub mod output_committer;
 pub mod permissions;
 pub mod persistence;

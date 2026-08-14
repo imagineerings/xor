@@ -11214,6 +11214,63 @@ def native_video_codec_ltxv_tensor_preprocess_foundation_task(
     )
 
 
+def native_video_codec_ltxv_thread_service_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-ltxv-thread-service-foundation",
+        "Retain LTXV H.264 preprocessing on one codec thread",
+        [28, 29, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-MEDIA-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One bounded Send plus Sync proxy owns a named OS thread that alone consumes an already certified video dependency closure, loads and binds its isolated libraries, admits the exact LTXV H.264 codec pair, serializes caller-authorized IMAGE preprocessing, and destroys every intentionally thread-bound native object on that same thread. The source compression-zero adapter also accepts zero spatial dimensions without entering native code. No package discovery, node or executor injection, cache, media handle, effect, persistence, recovery, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_types/src/cancellation.rs",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-tensor-preprocess/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused injected-thread tests prove startup publication, Send plus Sync proxying, capacity-one backpressure, serial request order, caller scratch and cancellation transfer, same-thread fake-resource destruction, request-local failure and retry, shutdown and join, and configuration identity drift. The compression-zero regression proves fresh zero-spatial tensors without codec calls. Ownership and fixtures explicitly reject unsafe Send or Sync, raw native projection, installed FFmpeg evidence, real numeric H.264 parity, package provisioning, node or controller wiring, cache, media, persistence, recovery, and publication claims.",
+        [dependency],
+        locked=True,
+        criterion_ids=["28.6", "29.3", "29.4", "31.5", "31.6", "32.1", "34.4", "35.3", "35.5", "41.4", "41.5", "42.2", "42.4"],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13505,8 +13562,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ltxv_h264_mp4_decode_foundation["id"])
         )
     )
+    video_codec_ltxv_thread_service_foundation = (
+        native_video_codec_ltxv_thread_service_foundation_task(
+            str(video_codec_ltxv_tensor_preprocess_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_ltxv_tensor_preprocess_foundation["id"])
+        str(video_codec_ltxv_thread_service_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13642,6 +13704,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_h264_mp4_demux_foundation,
         video_codec_ltxv_h264_mp4_decode_foundation,
         video_codec_ltxv_tensor_preprocess_foundation,
+        video_codec_ltxv_thread_service_foundation,
         video_foundation,
             detection_foundation,
         ]

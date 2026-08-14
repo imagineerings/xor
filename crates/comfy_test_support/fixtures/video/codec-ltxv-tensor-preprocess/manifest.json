@@ -12,9 +12,10 @@
     "codec_ltxv_h264_mp4_decode_manifest_sha256": "029b1eb31589abda84346a505c361a8fe6830bbb1d3b7a8dbf2a6f57c7c8a227"
   },
   "contract": {
-    "canonical_input": "nonempty CPU F32 BHWC IMAGE tensor",
+    "canonical_input": "nonempty-batch CPU F32 BHWC IMAGE tensor",
     "compression_range": [0, 100],
     "compression_zero_fresh_stack_without_codec_calls": true,
+    "compression_zero_accepts_zero_spatial_dimensions": true,
     "compressed_input_requires_rgb": true,
     "crop_origin": "top-left",
     "crop_bottom_and_right_to_even": true,

@@ -15135,6 +15135,7 @@ fn val_ownership_native_video_codec_ltxv_tensor_preprocess_001()
     for required in [
         "synthetic-source-compatible-ltxv-tensor-preprocess",
         "compression_zero_fresh_stack_without_codec_calls",
+        "compression_zero_accepts_zero_spatial_dimensions",
         "crop_bottom_and_right_to_even",
         "production_h264_or_pyav_color_numeric_oracle",
         "media_payload_or_handle_published",
@@ -15167,6 +15168,90 @@ fn val_ownership_native_video_codec_ltxv_tensor_preprocess_001()
             .is_some_and(|tasks| tasks.iter().any(|task| {
                 task.as_str()
                     == Some("comfy-parity-native-video-codec-ltxv-tensor-preprocess-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_ltxv_thread_service_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "pub(crate) struct NativeLtxvCodecThreadIdentity",
+        "pub(crate) enum NativeLtxvCodecThreadError",
+        "pub(crate) struct NativeLtxvCodecThreadService",
+        "pub(crate) struct NativeLtxvCodecRequestProxy",
+        "start_ltxv_codec_thread",
+        "load_certified_video_codec_closure",
+        "bind_certified_video_codec_abi",
+        ".admit_ltxv_h264",
+        "mpsc::sync_channel(1)",
+        ".try_send(request)",
+        "validate_scratch_reservation",
+        "process_ltxv_codec_request",
+        "runner.join()",
+        "retained_ltxv_codec_thread_is_send_sync_serial_and_thread_affine",
+        "retained_ltxv_codec_thread_bounds_queue_cancellation_failure_and_retry",
+        "retained_ltxv_codec_thread_startup_and_identity_fail_closed",
+    ] {
+        assert!(
+            service.contains(required),
+            "retained LTXV codec thread service lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send",
+        "unsafe impl Sync",
+        "Arc<NativeLtxvH264Codec>",
+        "NativeStoredPayload",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !service.contains(forbidden),
+            "retained LTXV codec thread service exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture =
+        fs::read_to_string(root.join(
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+        ))?;
+    for required in [
+        "synthetic-retained-ltxv-codec-thread-service",
+        "load_bind_admit_and_preprocess_execute_on_one_named_thread",
+        "proxy_is_send_and_sync",
+        "actual_dlmopen_bind_or_codec_admission_executed",
+        "node_executor_controller_or_worker_injection",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "retained LTXV codec thread fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_ltxv_thread_service")
+            })
+        })
+        .ok_or("missing retained LTXV codec thread ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-ltxv-thread-service-foundation")
             }))
     );
     Ok(())

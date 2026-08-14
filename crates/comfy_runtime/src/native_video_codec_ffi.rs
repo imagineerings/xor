@@ -54,6 +54,23 @@ pub struct NativeVideoCodecRuntimeVersions {
 }
 
 impl NativeVideoCodecRuntimeVersions {
+    #[cfg(test)]
+    pub(crate) const fn from_components(
+        avcodec: u32,
+        avformat: u32,
+        avutil: u32,
+        swresample: u32,
+        swscale: u32,
+    ) -> Self {
+        Self {
+            avcodec,
+            avformat,
+            avutil,
+            swresample,
+            swscale,
+        }
+    }
+
     pub fn avcodec(&self) -> u32 {
         self.avcodec
     }
@@ -294,6 +311,28 @@ impl NativeLtxvH264PreprocessLimits {
             demux,
             decode,
         })
+    }
+
+    pub(crate) fn configuration_values(&self) -> [u64; 17] {
+        [
+            self.maximum_batch,
+            u64::try_from(self.maximum_output_elements).unwrap_or(u64::MAX),
+            u64::try_from(self.encode.maximum_output_bytes).unwrap_or(u64::MAX),
+            u64::try_from(self.encode.avio_buffer_bytes).unwrap_or(u64::MAX),
+            self.encode.maximum_native_session_bytes,
+            u64::try_from(self.encode.maximum_packet_iterations).unwrap_or(u64::MAX),
+            u64::try_from(self.demux.maximum_input_bytes).unwrap_or(u64::MAX),
+            u64::try_from(self.demux.avio_buffer_bytes).unwrap_or(u64::MAX),
+            self.demux.maximum_native_session_bytes,
+            u64::try_from(self.demux.maximum_streams).unwrap_or(u64::MAX),
+            u64::try_from(self.decode.maximum_packet_iterations).unwrap_or(u64::MAX),
+            u64::try_from(self.decode.maximum_receive_iterations).unwrap_or(u64::MAX),
+            self.decode.maximum_width,
+            self.decode.maximum_height,
+            self.decode.maximum_pixels,
+            u64::try_from(self.decode.maximum_output_bytes).unwrap_or(u64::MAX),
+            self.decode.maximum_native_session_bytes,
+        ]
     }
 }
 
@@ -620,7 +659,7 @@ fn preprocess_ltxv_image_with_round_trip(
     } else {
         (input_height / 2 * 2, input_width / 2 * 2)
     };
-    if output_height == 0 || output_width == 0 {
+    if compression != 0 && (output_height == 0 || output_width == 0) {
         return Err(NativeVideoCodecLtxvPreprocessError::InvalidInput);
     }
     let output_elements = batch
@@ -6760,6 +6799,18 @@ mod tests {
         )?;
         assert_eq!(rgba_bypass.dimensions()?, (1, 1, 2, 4));
         assert_eq!(rgba_bypass.as_f32_slice()?, rgba_values);
+
+        let zero_spatial = ImageTensor::from_f32(&backend, &context, 2, 0, 3, 4, &[])?;
+        let zero_spatial_bypass = preprocess_ltxv_image_with_round_trip(
+            &zero_spatial,
+            0,
+            preprocess_limits(2, 1)?,
+            &backend,
+            &context,
+            &mut |_, _, _| Err(NativeVideoCodecLtxvPreprocessError::InvalidInput),
+        )?;
+        assert_eq!(zero_spatial_bypass.dimensions()?, (2, 0, 3, 4));
+        assert!(zero_spatial_bypass.as_f32_slice()?.is_empty());
 
         let mut encoded_frames = Vec::new();
         let compressed = preprocess_ltxv_image_with_round_trip(
