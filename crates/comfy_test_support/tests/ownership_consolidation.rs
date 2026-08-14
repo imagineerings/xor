@@ -15450,6 +15450,78 @@ fn val_ownership_native_video_codec_ltxv_node_adapter_001() -> Result<(), Box<dy
 }
 
 #[test]
+fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    for required in [
+        "pub const NODE_DESCRIPTOR_IDS: &[&str] = &[\"CreateVideo\"]",
+        "const FEATURE_ID: &str = \"COMFY-NODE-0124\"",
+        "exact_positive_f64_fraction(fps)",
+        "NativeVideoPayload::checked(",
+        "NativeStoredPayload::Video(Arc::new(video))",
+        "create_video_publishes_exact_component_aliases",
+        "create_video_rejects_invalid_inputs_and_cancellation_without_publication",
+    ] {
+        assert!(node.contains(required), "CreateVideo node lacks {required}");
+    }
+    assert_eq!(
+        node.matches("impl NativeNode for CreateVideoNode").count(),
+        1
+    );
+    for forbidden in [
+        "load_certified_video_codec_closure",
+        "bind_certified_video_codec_abi",
+        "encode_rgb8_frame",
+        "avformat_",
+        "NativePreparedEffectRequest",
+        "std::fs",
+        "File::",
+    ] {
+        assert!(
+            !node.contains(forbidden),
+            "CreateVideo node owns forbidden authority {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json"),
+    )?;
+    for required in [
+        "COMFY-NODE-0124",
+        "exact_reduced_Fraction_of_the_f64_input",
+        "VIDEO_aliases_the_immutable_IMAGE_frames_and_optional_AUDIO_waveform",
+        "codec_or_container_execution",
+        "media_bytes_or_external_publication",
+    ] {
+        assert!(fixture.contains(required));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_service_noncodec_video_component_create_node_runtime_adapter")
+            })
+        })
+        .ok_or("missing CreateVideo ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-component-create-node-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let execution = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;

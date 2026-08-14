@@ -11389,6 +11389,65 @@ def native_video_codec_ltxv_node_adapter_foundation_task(
     )
 
 
+def native_video_component_create_node_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-component-create-node-foundation",
+        "Create canonical video components as a native node",
+        [6, 7, 34, 35, 37, 41, 42],
+        [8, 20, 25, 28, 31, 36, 39, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-NODE-001",
+            "VAL-NODE-002",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The exact CreateVideo native node resolves one canonical IMAGE batch and optional AUDIO payload, converts the source fps float into its exact reduced Python-Fraction identity, admits only source bit depths 8 or 10, and publishes one canonical VIDEO payload that aliases the immutable component tensors without codec, path, effect, or persistence authority.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0124/fixture.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-bound tests prove the exact descriptor/defaults, exact finite fps-to-reduced-rational conversion, IMAGE and optional AUDIO component retention, 8/10-bit identity, semantic digest and alias-aware residency, malformed input and cancellation rejection, final-only VIDEO publication, and clean retry. The fixture explicitly claims no codec, container, file, effect, cache owner, persistence, recovery, or external output publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "6.1",
+            "6.2",
+            "6.3",
+            "6.4",
+            "7.1",
+            "7.5",
+            "34.4",
+            "35.3",
+            "35.5",
+            "37.5",
+            "41.3",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_nodes"],
+    )
+
+
 def native_image_source_compatibility_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-image-source-compatibility-foundation",
@@ -13695,8 +13754,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_ltxv_node_service_foundation["id"])
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_component_create_node_foundation = native_video_component_create_node_foundation_task(
         str(video_codec_ltxv_node_adapter_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_component_create_node_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -13835,6 +13897,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_ltxv_thread_service_foundation,
         video_codec_ltxv_node_service_foundation,
         video_codec_ltxv_node_adapter_foundation,
+        video_component_create_node_foundation,
         video_foundation,
             detection_foundation,
         ]
