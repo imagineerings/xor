@@ -10314,6 +10314,53 @@ def native_film_sequence_foundation_task(dependency: str) -> dict[str, object]:
     )
 
 
+def native_frame_interpolation_resource_exhaustion_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolation-resource-exhaustion-foundation",
+        "Preserve typed frame-interpolation resource exhaustion",
+        [31, 34, 35, 36, 41],
+        [25, 28, 31, 34, 36, 41],
+        [
+            "VAL-MEDIA-001",
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The frame-interpolation owner preserves typed tensor allocation, backend-resource, and workspace-authorization exhaustion through its execution adapter instead of erasing those failures into generic strings. Canonical spatial and shape-layout tensor adapters expose TensorError through their standard Error source chain, NativeOps preserves typed spatial tensor failures, and classification downcasts only typed errors; cancellation remains dominant, ordinary execution failures remain non-retryable, and no message matching, allocator, retry loop, cache, handle, effect, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/film-sequence/manifest.json",
+        ],
+        [
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "A source-fingerprinted typed oracle proves AllocationFailed, ResourceLimitExceeded, and WorkspaceAuthorizationExceeded map to ResourceExhausted through spatial, shape-layout, and immutable-module adapters; ShapeOverflow remains Execution; cancellation dominates exhaustion; six existing constrained-workspace graph tests now require ResourceExhausted and zero scratch residue. Ownership evidence rejects error-string matching and explicitly excludes fallback retries, codecs, handles, NativeCache, effects, or publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=["31.6", "34.4", "34.6", "35.3", "35.5", "35.6", "36.4", "41.2"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12566,8 +12613,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     film_sequence_foundation = native_film_sequence_foundation_task(
         str(film_multi_timestep_foundation["id"])
     )
+    frame_interpolation_resource_exhaustion_foundation = (
+        native_frame_interpolation_resource_exhaustion_foundation_task(
+            str(film_sequence_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(film_sequence_foundation["id"])
+        str(frame_interpolation_resource_exhaustion_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -12684,6 +12736,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         film_fusion_foundation,
         film_multi_timestep_foundation,
         film_sequence_foundation,
+        frame_interpolation_resource_exhaustion_foundation,
         video_foundation,
             detection_foundation,
         ]

@@ -38,8 +38,8 @@ pub const MAX_POOL_2D_OPERATION_ID: &str = "COMFY-TENSOR-OP-1F9D23F3B331";
 
 #[derive(Clone, Debug, Error, PartialEq)]
 pub enum SpatialFunctionalKernelError {
-    #[error(transparent)]
-    Tensor(TensorError),
+    #[error("{0}")]
+    Tensor(#[source] TensorError),
     #[error("spatial functional kernel execution was cancelled")]
     Cancelled,
     #[error("operation {operation} is unavailable for device {device:?}")]

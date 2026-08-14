@@ -43,8 +43,8 @@ pub enum TorchSplitSpec<'a> {
 
 #[derive(Debug, Error)]
 pub enum ShapeLayoutTransformPartTwoError {
-    #[error(transparent)]
-    Tensor(#[from] TensorError),
+    #[error("{0}")]
+    Tensor(#[from] #[source] TensorError),
     #[error("shape/layout-transform part-two execution was cancelled")]
     Cancelled,
     #[error("operation {operation} is unavailable for device {device:?}")]

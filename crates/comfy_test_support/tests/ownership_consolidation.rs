@@ -14526,6 +14526,96 @@ fn val_ownership_native_film_sequence_foundation_001() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn val_ownership_native_frame_interpolation_resource_exhaustion_foundation_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let model = fs::read_to_string(root.join("crates/comfy_model/src/frame_interpolation.rs"))?;
+    let native_ops = fs::read_to_string(root.join("crates/comfy_model/src/native_ops.rs"))?;
+    let spatial = fs::read_to_string(
+        root.join("crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs"),
+    )?;
+    let shape_part_two =
+        fs::read_to_string(root.join("crates/comfy_tensor/src/ops/shape_layout_transform_02.rs"))?;
+    let shape_part_three =
+        fs::read_to_string(root.join("crates/comfy_tensor/src/ops/shape_layout_transform_03.rs"))?;
+    for required in [
+        "FrameInterpolationError::ResourceExhausted",
+        "fn execution_result<",
+        "fn error_chain_is_resource_exhaustion(",
+        "downcast_ref::<TensorError>()",
+        "TensorError::AllocationFailed",
+        "TensorError::ResourceLimitExceeded",
+        "TensorError::WorkspaceAuthorizationExceeded",
+        "frame_interpolation_classifies_typed_resource_exhaustion_without_message_matching",
+    ] {
+        assert!(
+            model.contains(required),
+            "frame-interpolation typed exhaustion boundary lacks {required}"
+        );
+    }
+    let classifier = model
+        .split("fn error_chain_is_resource_exhaustion(")
+        .nth(1)
+        .and_then(|tail| tail.split("\nfn ").next())
+        .ok_or("resource-exhaustion classifier body is unavailable")?;
+    assert!(!classifier.contains("to_string"));
+    assert!(!classifier.contains("contains("));
+    assert!(
+        native_ops
+            .contains("SpatialFunctionalKernelError::Tensor(error) => Self::Workspace(error)")
+    );
+    assert!(native_ops.contains("#[source]\n        TensorError"));
+    for adapter in [&spatial, &shape_part_two, &shape_part_three] {
+        assert!(
+            adapter.contains("Tensor(#[from] #[source] TensorError)")
+                || adapter.contains("Tensor(#[source] TensorError)")
+        );
+    }
+    assert!(
+        model
+            .matches("FrameInterpolationError::ResourceExhausted(_)")
+            .count()
+            >= 7
+    );
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json",
+    ))?;
+    assert!(fixture.contains("OOM_EXCEPTION"));
+    assert!(fixture.contains("typed_resource_exhaustion"));
+    assert!(fixture.contains("SpatialFunctionalKernelError::Tensor"));
+    assert!(fixture.contains("NativeOpsError::Workspace"));
+    assert!(fixture.contains("\"error_message_matching\": false"));
+    assert!(fixture.contains("\"retry_or_fallback_execution\": false"));
+    assert!(fixture.contains("\"effect_or_publication_execution\": false"));
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    assert!(
+        policy
+            .get("concerns")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|concerns| concerns.iter().any(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some(
+                        "native_rife_frame_interpolation_resource_exhaustion_classification",
+                    )
+                    && concern
+                        .get("consolidation_tasks")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|tasks| {
+                            tasks.iter().any(|task| {
+                                task.as_str()
+                                    == Some(
+                                        "comfy-parity-native-frame-interpolation-resource-exhaustion-foundation",
+                                    )
+                            })
+                        })
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_film_pyramid_algebra_foundation_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

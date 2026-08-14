@@ -33,6 +33,7 @@ use comfy_tensor::{
 use comfy_types::CancellationError;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
+use std::error::Error as StdError;
 use thiserror::Error;
 
 const FILM_MARKER: &str = "extract.extract_sublevels.convs.0.0.conv.weight";
@@ -95,6 +96,8 @@ pub enum FrameInterpolationError {
     Tensor(#[from] TensorError),
     #[error("frame interpolation operation was cancelled")]
     Cancelled,
+    #[error("frame interpolation execution exhausted a bounded resource: {0}")]
+    ResourceExhausted(String),
     #[error("frame interpolation execution failed: {0}")]
     Execution(String),
     #[cfg(any(test, feature = "test-support"))]
@@ -1518,17 +1521,42 @@ impl NativeFrameInterpolationModel {
     }
 }
 
-fn execution_result<T, E: std::fmt::Display>(
+fn execution_result<T, E: StdError + 'static>(
     result: Result<T, E>,
     context: &ExecutionContext<'_>,
 ) -> Result<T, FrameInterpolationError> {
     result.map_err(|error| {
         if context.cancellation.is_cancelled() {
             FrameInterpolationError::Cancelled
+        } else if error_chain_is_resource_exhaustion(&error) {
+            FrameInterpolationError::ResourceExhausted(error.to_string())
         } else {
             FrameInterpolationError::Execution(error.to_string())
         }
     })
+}
+
+fn error_chain_is_resource_exhaustion(error: &(dyn StdError + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if error
+            .downcast_ref::<TensorError>()
+            .is_some_and(tensor_error_is_resource_exhaustion)
+        {
+            return true;
+        }
+        current = error.source();
+    }
+    false
+}
+
+fn tensor_error_is_resource_exhaustion(error: &TensorError) -> bool {
+    matches!(
+        error,
+        TensorError::AllocationFailed { .. }
+            | TensorError::ResourceLimitExceeded { .. }
+            | TensorError::WorkspaceAuthorizationExceeded { .. }
+    )
 }
 
 fn validate_rife_image(
@@ -3662,6 +3690,73 @@ mod tests {
     }
 
     #[test]
+    fn frame_interpolation_classifies_typed_resource_exhaustion_without_message_matching()
+    -> Result<(), FrameInterpolationError> {
+        use comfy_tensor::{CpuWorkspaceAuthority, ExecutionContext};
+
+        let (_, authority) = CpuWorkspaceAuthority::create_backend(1 << 20)
+            .map_err(|_| FrameInterpolationError::Overflow)?;
+        let cancellation = CancellationToken::default();
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        for error in [
+            TensorError::AllocationFailed {
+                requested: 64,
+                reason: "fixture".into(),
+            },
+            TensorError::ResourceLimitExceeded {
+                resource: "fixture",
+                limit: 1,
+            },
+            TensorError::WorkspaceAuthorizationExceeded {
+                requested: 64,
+                authorized: 32,
+                in_use: 0,
+            },
+        ] {
+            assert!(matches!(
+                execution_result::<(), _>(Err(error), &context),
+                Err(FrameInterpolationError::ResourceExhausted(_))
+            ));
+        }
+        assert!(matches!(
+            execution_result::<(), _>(Err(TensorError::ShapeOverflow), &context),
+            Err(FrameInterpolationError::Execution(_))
+        ));
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority
+                .authorize_workspace(1 << 20)
+                .map_err(|_| FrameInterpolationError::Overflow)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            execution_result::<(), _>(
+                Err(TensorError::WorkspaceAuthorizationExceeded {
+                    requested: 64,
+                    authorized: 32,
+                    in_use: 0,
+                }),
+                &cancelled_context,
+            ),
+            Err(FrameInterpolationError::Cancelled)
+        ));
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn film_pyramid_algebra_delegates_concat_broadcast_multiply_and_warp()
     -> Result<(), FrameInterpolationError> {
         use comfy_tensor::{CpuWorkspaceAuthority, DecodedScalar, ExecutionContext};
@@ -4090,7 +4185,7 @@ mod tests {
                 3,
                 &constrained_context,
             ),
-            Err(FrameInterpolationError::Execution(_))
+            Err(FrameInterpolationError::ResourceExhausted(_))
         ));
         assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
 
@@ -4255,7 +4350,7 @@ mod tests {
                 &weights,
                 &constrained_context,
             ),
-            Err(FrameInterpolationError::Execution(_))
+            Err(FrameInterpolationError::ResourceExhausted(_))
         ));
         assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
         assert_eq!(input.contiguous_bytes()?, input_bytes);
@@ -4356,15 +4451,20 @@ mod tests {
                 rng_phase: None,
                 cancellation: &cancellation,
             };
-            assert!(matches!(
-                film_image_pyramid_with_context_exact_native(
-                    &backend,
-                    &input,
-                    3,
-                    &constrained_context,
+            let constrained_error = film_image_pyramid_with_context_exact_native(
+                &backend,
+                &input,
+                3,
+                &constrained_context,
+            )
+            .expect_err("the constrained FILM image pyramid must fail");
+            assert!(
+                matches!(
+                    constrained_error,
+                    FrameInterpolationError::ResourceExhausted(_)
                 ),
-                Err(FrameInterpolationError::Execution(_))
-            ));
+                "unexpected constrained FILM image-pyramid error: {constrained_error:?}"
+            );
             assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
             assert_eq!(input.contiguous_bytes()?, input_bytes);
         }
@@ -4488,17 +4588,22 @@ mod tests {
                 rng_phase: None,
                 cancellation: &cancellation,
             };
-            assert!(matches!(
-                film_conv_2d_with_context_exact_native(
-                    &backend,
-                    &input,
-                    &weight,
-                    &bias,
-                    false,
-                    &constrained_context,
+            let constrained_error = film_conv_2d_with_context_exact_native(
+                &backend,
+                &input,
+                &weight,
+                &bias,
+                false,
+                &constrained_context,
+            )
+            .expect_err("the constrained FILM convolution must fail");
+            assert!(
+                matches!(
+                    constrained_error,
+                    FrameInterpolationError::ResourceExhausted(_)
                 ),
-                Err(FrameInterpolationError::Execution(_))
-            ));
+                "unexpected constrained FILM convolution error: {constrained_error:?}"
+            );
             assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
             assert_eq!(input.contiguous_bytes()?, input_bytes);
             assert_eq!(weight.contiguous_bytes()?, weight_bytes);
@@ -4624,7 +4729,7 @@ mod tests {
             };
             assert!(matches!(
                 film_warp_with_context_exact_native(&backend, &input, &flow, &constrained_context),
-                Err(FrameInterpolationError::Execution(_))
+                Err(FrameInterpolationError::ResourceExhausted(_))
             ));
             assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
             assert_eq!(input.contiguous_bytes()?, input_bytes);
@@ -5019,7 +5124,7 @@ mod tests {
         };
         assert!(matches!(
             model.interpolate_rife_pair(&backend, &first, &second, 0.5, &constrained_context),
-            Err(FrameInterpolationError::Execution(_))
+            Err(FrameInterpolationError::ResourceExhausted(_))
         ));
         assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
         assert_eq!(model.semantic_state_digest_sha256(), digest);

@@ -71,8 +71,12 @@ pub enum NativeOpsError {
     Functional(#[from] FunctionalError),
     #[error(transparent)]
     Quantization(#[from] crate::QuantizationError),
-    #[error(transparent)]
-    Workspace(#[from] TensorError),
+    #[error("{0}")]
+    Workspace(
+        #[from]
+        #[source]
+        TensorError,
+    ),
     #[error(transparent)]
     Module(NeuralNetworkModuleError),
     #[error(transparent)]
@@ -132,6 +136,7 @@ impl From<SpatialFunctionalKernelError> for NativeOpsError {
     fn from(error: SpatialFunctionalKernelError) -> Self {
         match error {
             SpatialFunctionalKernelError::Cancelled => Self::Cancelled,
+            SpatialFunctionalKernelError::Tensor(error) => Self::Workspace(error),
             error => Self::InvalidOwned(error.to_string()),
         }
     }

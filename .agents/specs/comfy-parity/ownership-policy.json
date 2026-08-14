@@ -12274,6 +12274,123 @@
       "decision_reason": "The retained interpolation model composes FILM features without creating a second checkpoint or tensor owner. Diagonal concatenation delegates to the canonical tensor facade, and all feature tensors remain invocation-local and are released after their final source consumer."
     },
     {
+      "concern": "native_rife_frame_interpolation_resource_exhaustion_classification",
+      "canonical_owner": "comfy_model::frame_interpolation::execution_result",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "FrameInterpolationError::ResourceExhausted",
+        "execution_result",
+        "error_chain_is_resource_exhaustion"
+      ],
+      "allowed_adapters": [
+        "canonical TensorError remains the sole allocator, backend-resource, and workspace-exhaustion taxonomy owner",
+        "spatial and shape-layout adapters expose canonical TensorError through Error::source while NativeOps preserves the typed spatial tensor variant as Workspace",
+        "execution_result may traverse the standard Error source chain and downcast TensorError but cannot inspect error messages",
+        "later frame-interpolation fallback policy may branch on ResourceExhausted but cannot duplicate classification or open a private allocator, workspace, cache, handle, effect, or publication owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::execution_result",
+          "role": "canonical",
+          "symbol": "execution_result",
+          "pattern": "^fn execution_result<"
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::error_chain_is_resource_exhaustion",
+          "role": "canonical_implementation",
+          "symbol": "error_chain_is_resource_exhaustion",
+          "pattern": "^fn error_chain_is_resource_exhaustion\\("
+        }
+      ],
+      "call_symbols": [
+        "execution_result",
+        "error_chain_is_resource_exhaustion"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-execution-preserves-cancellation-before-typed-exhaustion-and-generic-failure",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn execution_result[\\s\\S]*context\\.cancellation\\.is_cancelled\\(\\)[\\s\\S]*FrameInterpolationError::Cancelled[\\s\\S]*error_chain_is_resource_exhaustion[\\s\\S]*FrameInterpolationError::ResourceExhausted[\\s\\S]*FrameInterpolationError::Execution"
+        },
+        {
+          "name": "frame-interpolation-exhaustion-classifier-downcasts-only-canonical-tensor-variants",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn error_chain_is_resource_exhaustion[\\s\\S]*downcast_ref::<TensorError>[\\s\\S]*error\\.source\\(\\)[\\s\\S]*fn tensor_error_is_resource_exhaustion[\\s\\S]*TensorError::AllocationFailed[\\s\\S]*TensorError::ResourceLimitExceeded[\\s\\S]*TensorError::WorkspaceAuthorizationExceeded"
+        },
+        {
+          "name": "native-ops-preserves-spatial-tensor-errors-as-typed-workspace-errors",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "SpatialFunctionalKernelError::Tensor\\(error\\) => Self::Workspace\\(error\\)"
+        },
+        {
+          "name": "native-ops-workspace-error-exposes-canonical-tensor-source",
+          "path": "crates/comfy_model/src/native_ops.rs",
+          "pattern": "Workspace\\([\\s\\S]*\\#\\[source\\][\\s\\S]*TensorError"
+        },
+        {
+          "name": "spatial-functional-tensor-error-is-a-standard-source",
+          "path": "crates/comfy_tensor/src/ops/spatial_functional_kernel_01.rs",
+          "pattern": "Tensor\\(\\#\\[source\\] TensorError\\)"
+        },
+        {
+          "name": "shape-layout-part-two-tensor-error-is-a-standard-source",
+          "path": "crates/comfy_tensor/src/ops/shape_layout_transform_02.rs",
+          "pattern": "Tensor\\(\\#\\[from\\] \\#\\[source\\] TensorError\\)"
+        },
+        {
+          "name": "shape-layout-part-three-tensor-error-is-a-standard-source",
+          "path": "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+          "pattern": "Tensor\\(\\#\\[from\\] \\#\\[source\\] TensorError\\)"
+        },
+        {
+          "name": "frame-interpolation-typed-oracle-proves-resource-nonresource-cancellation-and-cleanup",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "frame_interpolation_classifies_typed_resource_exhaustion_without_message_matching[\\s\\S]*TensorError::AllocationFailed[\\s\\S]*TensorError::ResourceLimitExceeded[\\s\\S]*TensorError::WorkspaceAuthorizationExceeded[\\s\\S]*TensorError::ShapeOverflow[\\s\\S]*FrameInterpolationError::Execution[\\s\\S]*FrameInterpolationError::Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+        },
+        {
+          "name": "frame-interpolation-resource-exhaustion-fixture-excludes-message-matching-retry-codecs-cache-and-publication",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json",
+          "pattern": "(?=[\\s\\S]*OOM_EXCEPTION)(?=[\\s\\S]*typed_resource_exhaustion)(?=[\\s\\S]*error_message_matching)(?=[\\s\\S]*retry_or_fallback_execution)(?=[\\s\\S]*allocator_or_workspace_owner)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-resource-exhaustion-foundation"
+      ],
+      "production_consumers": [
+        "native frame-interpolation OOM fallback policy"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The frame-interpolation execution adapter preserves canonical typed tensor exhaustion while retaining cancellation priority and generic non-retryable failures. It introduces no message matching, retry, allocation, cache, or publication authority."
+    },
+    {
       "concern": "native_rife_frame_interpolation_sequence_execution",
       "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_rife_sequence",
       "owner_files": [
