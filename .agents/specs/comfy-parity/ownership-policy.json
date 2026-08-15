@@ -14646,6 +14646,107 @@
       "decision_reason": "One thread-bound suite extends the existing retained LTXV owner with exact ordinary-video encoder and decoder registry authority, proves every descriptor against the same retained avcodec image, and is exercised by the existing codec thread without creating a second loader, namespace, pointer owner, or media facade."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_vp9_webm_encode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_rgb8_frame",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeVp9WebmEncodeLimits",
+        "NativeVp9Webm",
+        "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
+        "encode_rgb8_frame_with_check",
+        "drain_rgb8_encode_packets"
+      ],
+      "allowed_adapters": [
+        "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
+        "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
+        "the canonical RGB8 image tensor supplies checked contiguous CPU HWC bytes without a duplicate input allocation",
+        "a following codec-thread batch bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVp9Webm",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVp9Webm"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_output_context2",
+        "avformat_new_stream",
+        "avcodec_alloc_context3",
+        "avcodec_open2",
+        "avformat_write_header",
+        "sws_scale",
+        "avcodec_send_frame",
+        "avcodec_receive_packet",
+        "av_interleaved_write_frame",
+        "av_write_trailer"
+      ],
+      "required_mappings": [
+        {
+          "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_vp9_rgb8_frame[\\s\\S]*vpx_vp9_encoder[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_rgb8_frame_with_check"
+        },
+        {
+          "name": "vp9-webm-encode-pins-source-profile-and-rational-rate",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "vp9_webm[\\s\\S]*c\"webm\"[\\s\\S]*pixel_format[\\s\\S]*yuv420p[\\s\\S]*c\"framerate\"[\\s\\S]*c\"b\"[\\s\\S]*c\"crf\""
+        },
+        {
+          "name": "vp9-webm-encode-bounds-drain-cancellation-and-raii",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+        },
+        {
+          "name": "vp9-webm-encode-tests-profile-bounds-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup[\\s\\S]*retained_vp9_webm_encode_validates_bounds_cancellation_and_retry"
+        },
+        {
+          "name": "vp9-webm-encode-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+          "pattern": "synthetic-retained-vp9-webm-one-frame-encode[\\s\\S]*native_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_or_libvpx_package[\\s\\S]*numeric_vp9_swscale_or_byte_identity_oracle[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-vp9-webm-encode-foundation"
+      ],
+      "production_consumers": [
+        "the following bounded codec-thread tensor-batch and SaveWEBM adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One retained suite method owns the exact one-frame RGB8 VP9/WebM native session. It reuses the reviewed ABI and bounded AVIO/RAII owners, preserves exact source options and rational timing, and returns only opaque attempt-local bytes without claiming real-package numeric evidence or node and effect authority."
+    },
+    {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::encode_rgb8_frame",
       "owner_files": [
@@ -14656,7 +14757,7 @@
         "NativeLtxvH264Mp4",
         "NativeLtxvH264Codec::encode_rgb8_frame",
         "encode_ltxv_h264_rgb8_with_check",
-        "drain_ltxv_h264_packets"
+        "drain_rgb8_encode_packets"
       ],
       "allowed_adapters": [
         "the admitted retained LTXV pair supplies the exact private libx264 encoder descriptor and typed FFmpeg function table",
@@ -14698,7 +14799,7 @@
         {
           "name": "ltxv-h264-encode-bounds-drain-cancellation-and-raii",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "maximum_packet_iterations[\\s\\S]*drain_ltxv_h264_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
         },
         {
           "name": "ltxv-h264-encode-tests-call-order-failure-cancellation-and-cleanup",

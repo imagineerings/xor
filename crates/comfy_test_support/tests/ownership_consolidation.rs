@@ -14959,6 +14959,82 @@ fn val_ownership_native_video_codec_suite_admission_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_native_video_codec_vp9_webm_encode_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeVp9WebmEncodeLimits",
+        "pub(crate) struct NativeVp9Webm",
+        "pub(crate) fn encode_vp9_rgb8_frame",
+        "self.vpx_vp9_encoder",
+        "open_bounded_avio_output",
+        "NativeRgb8EncodeProfile::vp9_webm",
+        "c\"webm\"",
+        "c\"yuv420p\"",
+        "c\"framerate\"",
+        "c\"b\"",
+        "drain_rgb8_encode_packets",
+        "retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup",
+        "retained_vp9_webm_encode_validates_bounds_cancellation_and_retry",
+    ] {
+        assert!(ffi.contains(required), "VP9 WebM encode lacks {required}");
+    }
+    for forbidden in [
+        "pub fn vpx_vp9_encoder_ptr",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+        "unsafe impl Send for NativeVp9Webm",
+        "unsafe impl Sync for NativeVp9Webm",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "VP9 WebM encode exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-retained-vp9-webm-one-frame-encode",
+        "native_encode_call_choreography_executed",
+        "bounded_staged_output_produced",
+        "licensed_or_installed_ffmpeg_or_libvpx_package",
+        "numeric_vp9_swscale_or_byte_identity_oracle",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VP9 WebM encode fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_vp9_webm_encode")
+            })
+        })
+        .ok_or("missing VP9 WebM encode ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-vp9-webm-encode-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
@@ -14972,7 +15048,7 @@ fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
         "c\"mp4\"",
         "c\"yuv420p\"",
         "c\"veryfast\"",
-        "drain_ltxv_h264_packets",
+        "drain_rgb8_encode_packets",
         "retained_ltxv_h264_mp4_encode_uses_exact_options_packets_and_cleanup",
         "retained_ltxv_h264_mp4_encode_failure_and_cancellation_are_atomic",
     ] {
