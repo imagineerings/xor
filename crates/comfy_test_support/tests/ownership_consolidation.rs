@@ -15520,6 +15520,127 @@ fn val_ownership_native_video_codec_vp9_webm_alpha_001() -> Result<(), Box<dyn s
 }
 
 #[test]
+fn val_ownership_native_video_codec_av1_webm_sequence_encode_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    for (path, digest) in [
+        (
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "bb61bec6fa7e300f2730f1df7ad88abafabdb21f0942b5a61f9dfde3f7ffc9f6",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+            "cb989b103743491f19d41a7f451bac06c055496a9ff2cf3d37b12d92b133192d",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
+            "77f5613573c64754138c793d669c928fb066fc988093177e3c98011ece8d6c58",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
+            "766d286761651abd80698aa986cb79e2c5022d432573f13e949c851ad10b05c1",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c",
+            "975602dca9a40e53498f07c085466af346a3e26fd45de79ca119725437f295a0",
+        ),
+    ] {
+        assert_eq!(file_sha256(&root.join(path))?, digest);
+    }
+
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "AV_PIXEL_FORMAT_YUV420P10LE: c_int = 62",
+        "av1_webm_manifest_matches_compiled_pixel_format",
+    ] {
+        assert!(abi.contains(required), "AV1 WebM ABI lacks {required}");
+    }
+
+    let overlay = fs::read_to_string(root.join(
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+    ))?;
+    for required in [
+        "ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1",
+        "\"symbol_count\": 54",
+        "\"new_symbols\": 0",
+        "\"AV_PIX_FMT_RGB24\": 2",
+        "\"AV_PIX_FMT_YUV420P10LE\": 62",
+    ] {
+        assert!(
+            overlay.contains(required),
+            "AV1 WebM overlay lacks {required}"
+        );
+    }
+
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeAv1Webm",
+        "pub(crate) enum NativeVideoCodecAv1EncodeError",
+        "encode_av1_webm_batch_with_metadata",
+        "svt_av1_encoder",
+        "fn av1_webm",
+        "destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P10LE",
+        "destination_pixel_format_name: c\"yuv420p10le\"",
+        "source_compatible_av1_rgb8_frame",
+        "retained_av1_webm_sequence_uses_exact_profile_metadata_and_discards_alpha",
+        "retained_av1_webm_staging_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(ffi.contains(required), "AV1 WebM FFI lacks {required}");
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeAv1Webm",
+        "unsafe impl Sync for NativeAv1Webm",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "AV1 WebM owner exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-av1-webm-sequence-encode/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-source-compatible-av1-webm-sequence-execution",
+        "provider_proved_libsvtav1_reaches_retained_session",
+        "source_rgb_quantization_and_rgba_alpha_discard_are_exact_signature_tested",
+        "playable_webm_or_decoded_numeric_av1_color_or_ten_bit_oracle",
+        "codec_actor_or_portable_output_tensor_reachable",
+        "json_serialization_node_effect_path_ui_or_output_committer_reachable",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "AV1 WebM fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .count();
+    assert_eq!(mapped_concerns, 2);
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

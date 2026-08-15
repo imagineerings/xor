@@ -10961,6 +10961,85 @@ def native_video_codec_vp9_webm_alpha_foundation_task(
     )
 
 
+def native_video_codec_av1_webm_sequence_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation",
+        "Encode bounded opaque AV1 WebM IMAGE sequences",
+        [28, 29, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained native codec suite executes bounded AV1 WebM IMAGE sequences through its provider-proved libsvtav1 descriptor. It stages the first three channels of canonical CPU F32 BHWC input as packed RGB8, compiler-verifies YUV420P10LE, preserves exact floating CRF text and ordered container metadata, applies preset 6 and the required global-header contract, and returns attempt-local encoded bytes after one flush and trailer. Actor transport, installed codec or playable numeric evidence, alpha preservation, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-av1-pixel-format-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-av1-webm-sequence-encode/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Compiler, Rust, and exact-signature retained-session tests prove YUV420P10LE=62 without changing the reviewed 54-symbol or historical prefix contracts; exact libsvtav1, WebM, RGB24-to-YUV420P10LE, zero-bit-rate, floating CRF, preset 6, global-header, metadata, frame-order, flush, and trailer behavior; source-compatible alpha discard for four-channel input; bounded staging, cancellation dominance, reverse cleanup, zero scratch, and clean retry; and unchanged VP9 and H.264 behavior. The fixture explicitly excludes actor transport, installed codecs, playable or decoded numeric AV1 evidence, AAC/audio, JSON, nodes, effects, paths, handles, cache, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "28.6",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14473,8 +14552,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_vp9_webm_container_metadata_foundation["id"])
         )
     )
+    video_codec_av1_webm_sequence_foundation = (
+        native_video_codec_av1_webm_sequence_foundation_task(
+            str(video_codec_vp9_webm_alpha_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_vp9_webm_alpha_foundation["id"])
+        str(video_codec_av1_webm_sequence_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14624,6 +14708,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_vp9_webm_crf_foundation,
         video_codec_vp9_webm_container_metadata_foundation,
         video_codec_vp9_webm_alpha_foundation,
+        video_codec_av1_webm_sequence_foundation,
         video_foundation,
         detection_foundation,
         ]

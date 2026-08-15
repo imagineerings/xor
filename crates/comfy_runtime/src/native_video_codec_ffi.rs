@@ -398,6 +398,85 @@ impl From<CancellationError> for NativeVideoCodecVp9EncodeError {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained AV1 codec-thread bridge"
+)]
+pub(crate) struct NativeAv1Webm<'suite> {
+    _suite: PhantomData<&'suite NativeVideoCodecSuite>,
+    output: NativeVideoCodecMemoryOutput<'suite>,
+    width: i32,
+    height: i32,
+    frame_rate: abi::AvRational,
+    frame_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following retained AV1 codec-thread bridge"
+)]
+impl NativeAv1Webm<'_> {
+    pub(crate) fn encoded_bytes(&self) -> Result<&[u8], NativeVideoCodecAv1EncodeError> {
+        let bytes = self.output.staged_bytes()?;
+        if bytes.is_empty() {
+            return Err(NativeVideoCodecAv1EncodeError::EmptyOutput);
+        }
+        Ok(bytes)
+    }
+
+    pub(crate) fn dimensions(&self) -> (i32, i32) {
+        (self.width, self.height)
+    }
+
+    pub(crate) fn frame_rate(&self) -> (i32, i32) {
+        (self.frame_rate.numerator, self.frame_rate.denominator)
+    }
+
+    pub(crate) fn frame_count(&self) -> usize {
+        self.frame_count
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "returned through the following retained AV1 codec-thread bridge"
+)]
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecAv1EncodeError {
+    #[error("native AV1 WebM encoding was cancelled")]
+    Cancelled,
+    #[error("native AV1 WebM encoding received an invalid IMAGE batch")]
+    InvalidBatch,
+    #[error("native AV1 WebM encoding received invalid resource limits")]
+    InvalidLimits,
+    #[error("native AV1 WebM encoding requires CRF in the source range 0 through 63")]
+    InvalidCrf,
+    #[error("native AV1 WebM encoding received an invalid frame rate")]
+    InvalidFrameRate,
+    #[error("native AV1 WebM allocation failed during {phase}")]
+    NativeAllocation { phase: &'static str },
+    #[error("native AV1 WebM resources were exhausted during {phase}")]
+    ResourceExhausted { phase: &'static str },
+    #[error("native AV1 WebM operation {phase} failed with status {status}")]
+    NativeCall { phase: &'static str, status: i32 },
+    #[error("native AV1 WebM codec options were not fully consumed")]
+    UnconsumedCodecOptions,
+    #[error("native AV1 WebM packet draining exceeded its checked iteration limit")]
+    PacketIterationLimit,
+    #[error("native AV1 WebM encoding produced no bytes")]
+    EmptyOutput,
+    #[error(transparent)]
+    Io(#[from] NativeVideoCodecIoError),
+    #[error("native AV1 WebM tensor operation failed: {0}")]
+    Tensor(#[source] TensorError),
+}
+
+impl From<CancellationError> for NativeVideoCodecAv1EncodeError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
+}
+
 #[derive(Debug, Error)]
 pub(crate) enum NativeVideoCodecSuiteAdmissionError {
     #[error("native video codec-suite admission was cancelled")]
@@ -1070,6 +1149,72 @@ impl NativeVideoCodecSuite {
             has_alpha: channels == 4,
         })
     }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following retained AV1 codec-thread bridge"
+    )]
+    pub(crate) fn encode_av1_webm_batch_with_metadata<'suite>(
+        &'suite self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        crf: NativeVideoCrf,
+        limits: NativeVp9WebmBatchLimits,
+        metadata: &NativeVideoContainerMetadata,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeAv1Webm<'suite>, NativeVideoCodecAv1EncodeError> {
+        let (frame_count, width, height, _) =
+            validate_vp9_image_batch(images, limits, context).map_err(map_vp9_to_av1_error)?;
+        let frame_rate = checked_vp9_frame_rate(frame_rate).map_err(map_vp9_to_av1_error)?;
+        context.check().map_err(map_av1_tensor_error)?;
+        let _native_session_workspace = backend
+            .reserve_workspace(context, limits.session.maximum_native_session_bytes)
+            .map_err(map_av1_tensor_error)?;
+        let mut output = self.ltxv_h264.binding.open_bounded_avio_output(
+            limits.session.maximum_output_bytes,
+            limits.session.avio_buffer_bytes,
+            backend,
+            context,
+        )?;
+        let functions = NativeLtxvH264EncodeFunctions::from_codec(&self.ltxv_h264);
+        let mut provide_frame = |frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| {
+            let frame = source_compatible_av1_rgb8_frame(images, frame_index, backend, context)?;
+            consume(&frame)
+        };
+        encode_rgb8_frames_with_metadata_check(
+            NativeRgb8EncodeProfile::av1_webm(frame_rate, crf),
+            self.svt_av1_encoder,
+            frame_count,
+            width,
+            height,
+            limits.session.maximum_packet_iterations,
+            &functions,
+            &mut output,
+            metadata,
+            &mut provide_frame,
+            &mut || context.cancellation.check(),
+        )
+        .map_err(map_av1_session_error)?;
+        context.check().map_err(map_av1_tensor_error)?;
+        if output.staged_bytes()?.is_empty() {
+            return Err(NativeVideoCodecAv1EncodeError::EmptyOutput);
+        }
+        Ok(NativeAv1Webm {
+            _suite: PhantomData,
+            output,
+            width,
+            height,
+            frame_rate,
+            frame_count,
+        })
+    }
 }
 
 impl<'codec> NativeLtxvH264Mp4<'codec> {
@@ -1567,6 +1712,72 @@ fn source_compatible_vp9_rgba8_frame(
     Ok(bytes)
 }
 
+fn source_compatible_av1_rgb8_frame(
+    images: &ImageTensor,
+    frame_index: usize,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<u8>, NativeVideoCodecLtxvEncodeError> {
+    context.check().map_err(map_av1_staging_tensor_error)?;
+    let [frame_count, height, width, channels] = images.tensor().descriptor().shape() else {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    };
+    if !matches!(*channels, 3 | 4) {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    }
+    let frame_count =
+        usize::try_from(*frame_count).map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    if frame_index >= frame_count {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    }
+    let pixels = height
+        .checked_mul(*width)
+        .and_then(|pixels| usize::try_from(pixels).ok())
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let source_channels =
+        usize::try_from(*channels).map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let source_frame_elements = pixels
+        .checked_mul(source_channels)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let output_frame_elements = pixels
+        .checked_mul(3)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let start = frame_index
+        .checked_mul(source_frame_elements)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let end = start
+        .checked_add(source_frame_elements)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let input = images
+        .as_f32_slice()
+        .map_err(map_av1_staging_tensor_error)?
+        .get(start..end)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let mut bytes = backend
+        .workspace_vec(context, output_frame_elements)
+        .map_err(map_av1_staging_tensor_error)?;
+    for (pixel_index, pixel) in input.chunks_exact(source_channels).enumerate() {
+        if pixel_index & 0x3fff == 0 {
+            context.check().map_err(map_av1_staging_tensor_error)?;
+        }
+        for value in pixel
+            .get(..3)
+            .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?
+        {
+            bytes
+                .try_push((*value * 255.0).clamp(0.0, 255.0) as u8)
+                .map_err(map_av1_staging_tensor_error)?;
+        }
+    }
+    if !input.chunks_exact(source_channels).remainder().is_empty()
+        || bytes.len() != output_frame_elements
+    {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    }
+    context.check().map_err(map_av1_staging_tensor_error)?;
+    Ok(bytes)
+}
+
 fn map_vp9_staging_tensor_error(error: TensorError) -> NativeVideoCodecLtxvEncodeError {
     match error {
         TensorError::Cancelled => NativeVideoCodecLtxvEncodeError::Cancelled,
@@ -1575,6 +1786,20 @@ fn map_vp9_staging_tensor_error(error: TensorError) -> NativeVideoCodecLtxvEncod
         | TensorError::WorkspaceAuthorizationExceeded { .. } => {
             NativeVideoCodecLtxvEncodeError::ResourceExhausted {
                 phase: "stage VP9 RGB frame",
+            }
+        }
+        error => NativeVideoCodecLtxvEncodeError::Tensor(error),
+    }
+}
+
+fn map_av1_staging_tensor_error(error: TensorError) -> NativeVideoCodecLtxvEncodeError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecLtxvEncodeError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeVideoCodecLtxvEncodeError::ResourceExhausted {
+                phase: "stage AV1 RGB frame",
             }
         }
         error => NativeVideoCodecLtxvEncodeError::Tensor(error),
@@ -1668,6 +1893,86 @@ fn map_vp9_session_error(error: NativeVideoCodecLtxvEncodeError) -> NativeVideoC
         NativeVideoCodecLtxvEncodeError::EmptyOutput => NativeVideoCodecVp9EncodeError::EmptyOutput,
         NativeVideoCodecLtxvEncodeError::Io(error) => NativeVideoCodecVp9EncodeError::Io(error),
         NativeVideoCodecLtxvEncodeError::Tensor(error) => map_vp9_tensor_error(error),
+    }
+}
+
+fn map_av1_tensor_error(error: TensorError) -> NativeVideoCodecAv1EncodeError {
+    match error {
+        TensorError::Cancelled => NativeVideoCodecAv1EncodeError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeVideoCodecAv1EncodeError::ResourceExhausted {
+                phase: "authorize AV1 WebM workspace",
+            }
+        }
+        error => NativeVideoCodecAv1EncodeError::Tensor(error),
+    }
+}
+
+fn map_av1_session_error(error: NativeVideoCodecLtxvEncodeError) -> NativeVideoCodecAv1EncodeError {
+    match error {
+        NativeVideoCodecLtxvEncodeError::Cancelled => NativeVideoCodecAv1EncodeError::Cancelled,
+        NativeVideoCodecLtxvEncodeError::InvalidInput => {
+            NativeVideoCodecAv1EncodeError::InvalidBatch
+        }
+        NativeVideoCodecLtxvEncodeError::InvalidLimits => {
+            NativeVideoCodecAv1EncodeError::InvalidLimits
+        }
+        NativeVideoCodecLtxvEncodeError::InvalidCrf => NativeVideoCodecAv1EncodeError::InvalidCrf,
+        NativeVideoCodecLtxvEncodeError::NativeAllocation { phase } => {
+            NativeVideoCodecAv1EncodeError::NativeAllocation { phase }
+        }
+        NativeVideoCodecLtxvEncodeError::ResourceExhausted { phase } => {
+            NativeVideoCodecAv1EncodeError::ResourceExhausted { phase }
+        }
+        NativeVideoCodecLtxvEncodeError::NativeCall { phase, status } => {
+            NativeVideoCodecAv1EncodeError::NativeCall { phase, status }
+        }
+        NativeVideoCodecLtxvEncodeError::UnconsumedCodecOptions => {
+            NativeVideoCodecAv1EncodeError::UnconsumedCodecOptions
+        }
+        NativeVideoCodecLtxvEncodeError::PacketIterationLimit => {
+            NativeVideoCodecAv1EncodeError::PacketIterationLimit
+        }
+        NativeVideoCodecLtxvEncodeError::EmptyOutput => NativeVideoCodecAv1EncodeError::EmptyOutput,
+        NativeVideoCodecLtxvEncodeError::Io(error) => NativeVideoCodecAv1EncodeError::Io(error),
+        NativeVideoCodecLtxvEncodeError::Tensor(error) => map_av1_tensor_error(error),
+    }
+}
+
+fn map_vp9_to_av1_error(error: NativeVideoCodecVp9EncodeError) -> NativeVideoCodecAv1EncodeError {
+    match error {
+        NativeVideoCodecVp9EncodeError::Cancelled => NativeVideoCodecAv1EncodeError::Cancelled,
+        NativeVideoCodecVp9EncodeError::InvalidInput
+        | NativeVideoCodecVp9EncodeError::InvalidBatch => {
+            NativeVideoCodecAv1EncodeError::InvalidBatch
+        }
+        NativeVideoCodecVp9EncodeError::InvalidLimits => {
+            NativeVideoCodecAv1EncodeError::InvalidLimits
+        }
+        NativeVideoCodecVp9EncodeError::InvalidCrf => NativeVideoCodecAv1EncodeError::InvalidCrf,
+        NativeVideoCodecVp9EncodeError::InvalidFrameRate => {
+            NativeVideoCodecAv1EncodeError::InvalidFrameRate
+        }
+        NativeVideoCodecVp9EncodeError::NativeAllocation { phase } => {
+            NativeVideoCodecAv1EncodeError::NativeAllocation { phase }
+        }
+        NativeVideoCodecVp9EncodeError::ResourceExhausted { phase } => {
+            NativeVideoCodecAv1EncodeError::ResourceExhausted { phase }
+        }
+        NativeVideoCodecVp9EncodeError::NativeCall { phase, status } => {
+            NativeVideoCodecAv1EncodeError::NativeCall { phase, status }
+        }
+        NativeVideoCodecVp9EncodeError::UnconsumedCodecOptions => {
+            NativeVideoCodecAv1EncodeError::UnconsumedCodecOptions
+        }
+        NativeVideoCodecVp9EncodeError::PacketIterationLimit => {
+            NativeVideoCodecAv1EncodeError::PacketIterationLimit
+        }
+        NativeVideoCodecVp9EncodeError::EmptyOutput => NativeVideoCodecAv1EncodeError::EmptyOutput,
+        NativeVideoCodecVp9EncodeError::Io(error) => NativeVideoCodecAv1EncodeError::Io(error),
+        NativeVideoCodecVp9EncodeError::Tensor(error) => map_av1_tensor_error(error),
     }
 }
 
@@ -3253,6 +3558,7 @@ fn check_ltxv_decode_status(
 enum NativeRgb8CodecKind {
     LtxvH264,
     Vp9,
+    Av1,
 }
 
 #[derive(Clone, Copy)]
@@ -3331,12 +3637,44 @@ impl NativeRgb8EncodeProfile {
         }
     }
 
+    fn av1_webm(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
+        Self {
+            kind: NativeRgb8CodecKind::Av1,
+            container: c"webm",
+            frame_time_base: abi::AvRational {
+                numerator: frame_rate.denominator,
+                denominator: frame_rate.numerator,
+            },
+            frame_rate: Some(frame_rate),
+            crf: NativeRgb8Crf::SourceFloat(crf),
+            source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
+            destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P10LE,
+            destination_pixel_format_name: c"yuv420p10le",
+            source_channels: 3,
+        }
+    }
+
     fn is_vp9(self) -> bool {
         matches!(self.kind, NativeRgb8CodecKind::Vp9)
     }
 
-    fn phase(self, h264: &'static str, vp9: &'static str) -> &'static str {
-        if self.is_vp9() { vp9 } else { h264 }
+    fn is_av1(self) -> bool {
+        matches!(self.kind, NativeRgb8CodecKind::Av1)
+    }
+
+    fn is_webm(self) -> bool {
+        matches!(
+            self.kind,
+            NativeRgb8CodecKind::Vp9 | NativeRgb8CodecKind::Av1
+        )
+    }
+
+    fn phase(self, h264: &'static str, vp9: &'static str, av1: &'static str) -> &'static str {
+        match self.kind {
+            NativeRgb8CodecKind::LtxvH264 => h264,
+            NativeRgb8CodecKind::Vp9 => vp9,
+            NativeRgb8CodecKind::Av1 => av1,
+        }
     }
 }
 
@@ -3464,7 +3802,11 @@ fn encode_rgb8_frames_with_metadata_check(
         profile.container.as_ptr(),
         std::ptr::null(),
     ));
-    let allocate_format_phase = profile.phase("allocate MP4 format", "allocate WebM format");
+    let allocate_format_phase = profile.phase(
+        "allocate MP4 format",
+        "allocate VP9 WebM format",
+        "allocate AV1 WebM format",
+    );
     check_ltxv_native_status(allocate_format_phase, format_status)?;
     let mut format = NativeLtxvFormatContext {
         pointer: NonNull::new(format_pointer).ok_or(
@@ -3476,7 +3818,7 @@ fn encode_rgb8_frames_with_metadata_check(
     };
     unsafe { format.pointer.as_mut().io_context = output.context_ptr() };
 
-    if !profile.is_vp9() && !metadata.entries().is_empty() {
+    if !profile.is_webm() && !metadata.entries().is_empty() {
         return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
     }
     for (key, value) in metadata.entries() {
@@ -3502,7 +3844,11 @@ fn encode_rgb8_frames_with_metadata_check(
         format.pointer.as_ptr(),
         encoder.as_ptr(),
     ));
-    let allocate_stream_phase = profile.phase("allocate MP4 stream", "allocate WebM stream");
+    let allocate_stream_phase = profile.phase(
+        "allocate MP4 stream",
+        "allocate VP9 WebM stream",
+        "allocate AV1 WebM stream",
+    );
     let mut stream =
         NonNull::new(stream_pointer).ok_or(NativeVideoCodecLtxvEncodeError::NativeAllocation {
             phase: allocate_stream_phase,
@@ -3511,7 +3857,8 @@ fn encode_rgb8_frames_with_metadata_check(
         return Err(NativeVideoCodecLtxvEncodeError::NativeAllocation {
             phase: profile.phase(
                 "allocate MP4 stream parameters",
-                "allocate WebM stream parameters",
+                "allocate VP9 WebM stream parameters",
+                "allocate AV1 WebM stream parameters",
             ),
         });
     }
@@ -3520,7 +3867,11 @@ fn encode_rgb8_frames_with_metadata_check(
     let codec = NativeLtxvCodecContext {
         pointer: NonNull::new(codec_pointer).ok_or(
             NativeVideoCodecLtxvEncodeError::NativeAllocation {
-                phase: profile.phase("allocate libx264 context", "allocate libvpx-vp9 context"),
+                phase: profile.phase(
+                    "allocate libx264 context",
+                    "allocate libvpx-vp9 context",
+                    "allocate libsvtav1 context",
+                ),
             },
         )?,
         free: functions.avcodec_free_context,
@@ -3579,7 +3930,7 @@ fn encode_rgb8_frames_with_metadata_check(
             0,
         )),
     )?;
-    if profile.is_vp9() {
+    if profile.is_webm() {
         check_ltxv_native_status(
             "set zero bit rate",
             checked_native_call!((functions.av_opt_set_int)(
@@ -3589,7 +3940,8 @@ fn encode_rgb8_frames_with_metadata_check(
                 0,
             )),
         )?;
-    } else {
+    }
+    if !profile.is_vp9() {
         check_ltxv_native_status(
             "set global header",
             checked_native_call!((functions.av_opt_set_int)(
@@ -3624,7 +3976,7 @@ fn encode_rgb8_frames_with_metadata_check(
             0,
         )),
     )?;
-    if !profile.is_vp9() {
+    if matches!(profile.kind, NativeRgb8CodecKind::LtxvH264) {
         check_ltxv_native_status(
             "set preset option",
             checked_native_call!((functions.av_dict_set)(
@@ -3634,9 +3986,23 @@ fn encode_rgb8_frames_with_metadata_check(
                 0,
             )),
         )?;
+    } else if profile.is_av1() {
+        check_ltxv_native_status(
+            "set preset option",
+            checked_native_call!((functions.av_dict_set)(
+                std::ptr::addr_of_mut!(dictionary.pointer),
+                c"preset".as_ptr(),
+                c"6".as_ptr(),
+                0,
+            )),
+        )?;
     }
     check_ltxv_native_status(
-        profile.phase("open libx264 encoder", "open libvpx-vp9 encoder"),
+        profile.phase(
+            "open libx264 encoder",
+            "open libvpx-vp9 encoder",
+            "open libsvtav1 encoder",
+        ),
         checked_native_call!((functions.avcodec_open2)(
             codec.pointer.as_ptr(),
             encoder.as_ptr(),
@@ -3661,7 +4027,11 @@ fn encode_rgb8_frames_with_metadata_check(
     ));
     output.check_callback_status()?;
     check_ltxv_native_status(
-        profile.phase("write MP4 header", "write WebM header"),
+        profile.phase(
+            "write MP4 header",
+            "write VP9 WebM header",
+            "write AV1 WebM header",
+        ),
         header_status,
     )?;
 
@@ -3789,7 +4159,11 @@ fn encode_rgb8_frames_with_metadata_check(
         }
     }
     check_ltxv_native_status(
-        profile.phase("flush libx264 encoder", "flush libvpx-vp9 encoder"),
+        profile.phase(
+            "flush libx264 encoder",
+            "flush libvpx-vp9 encoder",
+            "flush libsvtav1 encoder",
+        ),
         checked_native_call!((functions.avcodec_send_frame)(
             codec.pointer.as_ptr(),
             std::ptr::null(),
@@ -3811,7 +4185,11 @@ fn encode_rgb8_frames_with_metadata_check(
         checked_native_call!((functions.av_write_trailer)(format.pointer.as_ptr()));
     output.check_callback_status()?;
     check_ltxv_native_status(
-        profile.phase("write MP4 trailer", "write WebM trailer"),
+        profile.phase(
+            "write MP4 trailer",
+            "write VP9 WebM trailer",
+            "write AV1 WebM trailer",
+        ),
         trailer_status,
     )?;
     check_cancellation()?;
@@ -3946,7 +4324,7 @@ fn drain_rgb8_encode_packets_inner(
                 check_cancellation()?;
                 output.check_callback_status()?;
                 check_ltxv_native_status(
-                    profile.phase("mux H.264 packet", "mux VP9 packet"),
+                    profile.phase("mux H.264 packet", "mux VP9 packet", "mux AV1 packet"),
                     mux_status,
                 )?;
             }
@@ -3954,14 +4332,21 @@ fn drain_rgb8_encode_packets_inner(
             abi::AV_ERROR_END_OF_FILE => return Ok(()),
             abi::AV_ERROR_TRY_AGAIN => {
                 return Err(NativeVideoCodecLtxvEncodeError::NativeCall {
-                    phase: profile
-                        .phase("drain flushed H.264 packets", "drain flushed VP9 packets"),
+                    phase: profile.phase(
+                        "drain flushed H.264 packets",
+                        "drain flushed VP9 packets",
+                        "drain flushed AV1 packets",
+                    ),
                     status,
                 });
             }
             status => {
                 return check_ltxv_native_status(
-                    profile.phase("receive H.264 packet", "receive VP9 packet"),
+                    profile.phase(
+                        "receive H.264 packet",
+                        "receive VP9 packet",
+                        "receive AV1 packet",
+                    ),
                     status,
                 );
             }
@@ -8670,6 +9055,164 @@ mod tests {
         };
         let staged = source_compatible_vp9_rgba8_frame(&images, 0, &backend, &retry_context)?;
         assert_eq!(&*staged, &[127; 16]);
+        drop(staged);
+        assert_eq!(retry_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn retained_av1_webm_sequence_uses_exact_profile_metadata_and_discards_alpha()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        reset_encode_fixture()?;
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 256 * 1024)?;
+        let values = [
+            -1.0, 0.0, 0.5, 0.0, 1.0, 0.25, 0.75, 1.0, 2.0, 0.5, 0.0, 0.25, 0.0, 1.0, 2.0, 0.75,
+            0.5, 0.25, 1.0, 0.0, 0.0, 0.5, 2.0, 0.5, 1.0, 0.0, 0.25, 0.0, 0.75, 0.5, 1.0, 0.25,
+        ];
+        let images = ImageTensor::from_f32(&backend, &context, 2, 2, 2, 4, &values)?;
+        let session = NativeVp9WebmEncodeLimits::checked(64, 64, 1, 16)?;
+        let limits = NativeVp9WebmBatchLimits::checked(session, 2, 4)?;
+        let (frame_count, width, height, channels) =
+            validate_vp9_image_batch(&images, limits, &context)?;
+        assert_eq!((frame_count, width, height, channels), (2, 2, 2, 4));
+        let first = source_compatible_av1_rgb8_frame(&images, 0, &backend, &context)?;
+        assert_eq!(
+            &*first,
+            &[0, 0, 127, 255, 63, 191, 255, 127, 0, 0, 255, 255]
+        );
+        drop(first);
+        let second = source_compatible_av1_rgb8_frame(&images, 1, &backend, &context)?;
+        assert_eq!(
+            &*second,
+            &[127, 63, 255, 0, 127, 255, 255, 0, 63, 191, 127, 255]
+        );
+        drop(second);
+        let metadata = NativeVideoContainerMetadata::checked(
+            vec![("prompt".to_owned(), "av1".to_owned())],
+            NativeVideoContainerMetadataLimits::checked(1, 16, 16, 32)?,
+        )?;
+        let mut output = mock_encode_output(&backend, &context, 64)?;
+        let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
+            .ok_or("mock encoder allocation failed")?;
+        let mut provide_frame = |frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| {
+            let frame = source_compatible_av1_rgb8_frame(&images, frame_index, &backend, &context)?;
+            consume(&frame)
+        };
+        encode_rgb8_frames_with_metadata_check(
+            NativeRgb8EncodeProfile::av1_webm(
+                checked_vp9_frame_rate((2_997, 125))?,
+                NativeVideoCrf::checked(31.5)?,
+            ),
+            encoder,
+            frame_count,
+            width,
+            height,
+            session.maximum_packet_iterations,
+            &mock_encode_functions(),
+            &mut output,
+            &metadata,
+            &mut provide_frame,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(output.staged_bytes()?, b"HPPT");
+        drop(output);
+        drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        let events = take_encode_events()?;
+        assert!(events.iter().any(|event| event == "format_alloc:webm"));
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "option:pixel_format=yuv420p10le")
+        );
+        assert!(events.iter().any(|event| event == "option:b=0"));
+        assert!(events.iter().any(|event| {
+            event == &format!("option:flags={}", abi::AV_CODEC_FLAG_GLOBAL_HEADER)
+        }));
+        assert!(events.iter().any(|event| event == "dict:crf=31.5"));
+        assert!(events.iter().any(|event| event == "dict:preset=6"));
+        assert!(events.iter().any(|event| event == "sws_alloc:2->62"));
+        let metadata_index = events
+            .iter()
+            .position(|event| event == "metadata:prompt=av1:flags=0")
+            .ok_or("AV1 metadata was not attached")?;
+        let stream_index = events
+            .iter()
+            .position(|event| event == "stream_alloc")
+            .ok_or("AV1 stream was not allocated")?;
+        assert!(metadata_index < stream_index);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.as_str() == "send_flush")
+                .count(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_av1_webm_staging_failure_cancellation_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4096)?;
+        let construction_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let images =
+            ImageTensor::from_f32(&backend, &construction_context, 1, 2, 2, 4, &[0.5; 16])?;
+        assert_eq!(construction_context.scratch.in_use_bytes(), 0);
+
+        let constrained_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(8)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            source_compatible_av1_rgb8_frame(&images, 0, &backend, &constrained_context),
+            Err(NativeVideoCodecLtxvEncodeError::ResourceExhausted {
+                phase: "stage AV1 RGB frame"
+            })
+        ));
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(64)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            source_compatible_av1_rgb8_frame(&images, 0, &backend, &cancelled_context),
+            Err(NativeVideoCodecLtxvEncodeError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+        let retry_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(64)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let staged = source_compatible_av1_rgb8_frame(&images, 0, &backend, &retry_context)?;
+        assert_eq!(&*staged, &[127; 12]);
         drop(staged);
         assert_eq!(retry_context.scratch.in_use_bytes(), 0);
         Ok(())

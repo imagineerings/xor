@@ -14290,7 +14290,9 @@
         "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
         "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
         "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
-        "crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c"
+        "crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c",
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+        "crates/comfy_runtime/abi/video-codec/verify-av1-pixel-format-bindings.c"
       ],
       "owner_symbols": [
         "AvFrame",
@@ -14300,7 +14302,8 @@
         "AvFormatContextMetadataProjection",
         "AvIoContext",
         "AV_PIXEL_FORMAT_RGBA",
-        "AV_PIXEL_FORMAT_YUVA420P"
+        "AV_PIXEL_FORMAT_YUVA420P",
+        "AV_PIXEL_FORMAT_YUV420P10LE"
       ],
       "allowed_adapters": [
         "later bounded native video codec operations may dereference only these reviewed FFmpeg-owned prefixes through the private native_video_codec_ffi owner",
@@ -14386,6 +14389,16 @@
           "name": "video-codec-vp9-alpha-overlay-preserves-symbol-and-prefix-contracts",
           "path": "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json",
           "pattern": "ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1[\\s\\S]*symbol_count[\\s\\S]*new_symbols[\\s\\S]*AV_PIX_FMT_RGBA[\\s\\S]*AV_PIX_FMT_YUVA420P"
+        },
+        {
+          "name": "video-codec-av1-pixel-format-is-supplementary-and-compiler-verified",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "AV_PIXEL_FORMAT_YUV420P10LE[\\s\\S]*av1_webm_manifest_matches_compiled_pixel_format"
+        },
+        {
+          "name": "video-codec-av1-overlay-preserves-symbol-and-prefix-contracts",
+          "path": "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+          "pattern": "ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1[\\s\\S]*symbol_count[\\s\\S]*new_symbols[\\s\\S]*AV_PIX_FMT_RGB24[\\s\\S]*AV_PIX_FMT_YUV420P10LE"
         }
       ],
       "known_open_reasons": [],
@@ -14394,7 +14407,8 @@
         "comfy-parity-native-video-codec-data-plane-abi-foundation",
         "comfy-parity-native-video-codec-bounded-memory-avio-foundation",
         "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation",
+        "comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation"
       ],
       "production_consumers": [
         "bounded native FFmpeg memory AVIO",
@@ -14861,6 +14875,114 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One retained suite owner covers the checked one-frame RGB regression and canonical F32 IMAGE batch sessions for opaque RGB and source alpha RGBA. It reuses one reviewed ABI and bounded AVIO/RAII boundary, stages one clamped packed frame at a time, and returns only opaque attempt-local bytes while explicitly excluding real-package numeric and publication claims."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_av1_webm_encode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_av1_webm_batch_with_metadata",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeAv1Webm",
+        "NativeVideoCodecAv1EncodeError",
+        "NativeVideoCodecSuite::encode_av1_webm_batch_with_metadata",
+        "NativeRgb8EncodeProfile::av1_webm",
+        "source_compatible_av1_rgb8_frame"
+      ],
+      "allowed_adapters": [
+        "the retained video codec suite supplies the exact private provider-proved libsvtav1 descriptor and typed FFmpeg function table",
+        "the canonical bounded memory AVIO and shared RGB encode state machine own the attempt-local WebM sink, packet protocol, and reverse native cleanup",
+        "the canonical IMAGE tensor supplies contiguous CPU F32 BHWC values while the source adapter stages only the first three channels in one caller-authorized workspace frame",
+        "the bounded ordered metadata and checked source CRF owners are reused without duplicating JSON, cache, effect, path, handle, persistence, recovery, or publication authority",
+        "the following retained codec-thread bridge may copy final bytes into portable accounted storage but may not move native owners across threads"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeAv1Webm",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeAv1Webm"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_output_context2",
+        "av_dict_set",
+        "avformat_new_stream",
+        "avcodec_alloc_context3",
+        "avcodec_open2",
+        "avformat_write_header",
+        "av_frame_make_writable",
+        "sws_scale",
+        "avcodec_send_frame",
+        "avcodec_receive_packet",
+        "av_interleaved_write_frame",
+        "av_write_trailer"
+      ],
+      "required_mappings": [
+        {
+          "name": "av1-webm-encode-uses-provider-proved-suite-and-source-profile",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_av1_webm_batch_with_metadata[\\s\\S]*svt_av1_encoder[\\s\\S]*av1_webm[\\s\\S]*AV_PIXEL_FORMAT_RGB24[\\s\\S]*AV_PIXEL_FORMAT_YUV420P10LE[\\s\\S]*c\"yuv420p10le\""
+        },
+        {
+          "name": "av1-webm-encode-preserves-crf-preset-global-header-and-metadata",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeRgb8CodecKind::Av1[\\s\\S]*write_python_float[\\s\\S]*c\"preset\"[\\s\\S]*c\"6\"[\\s\\S]*AV_CODEC_FLAG_GLOBAL_HEADER[\\s\\S]*set WebM container metadata"
+        },
+        {
+          "name": "av1-webm-encode-discards-source-alpha-with-bounded-staging",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "source_compatible_av1_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel.get\\(\\.\\.3\\)[\\s\\S]*stage AV1 RGB frame"
+        },
+        {
+          "name": "av1-webm-tests-profile-metadata-alpha-discard-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_av1_webm_sequence_uses_exact_profile_metadata_and_discards_alpha[\\s\\S]*retained_av1_webm_staging_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "av1-webm-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-av1-webm-sequence-encode/manifest.json",
+          "pattern": "synthetic-source-compatible-av1-webm-sequence-execution[\\s\\S]*provider_proved_libsvtav1_reaches_retained_session[\\s\\S]*playable_webm_or_decoded_numeric_av1_color_or_ten_bit_oracle[\\s\\S]*codec_actor_or_portable_output_tensor_reachable"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-av1-webm-sequence-encode-foundation"
+      ],
+      "production_consumers": [
+        "the following retained AV1 codec-thread bridge and SaveWEBM adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One retained suite method executes the provider-proved SVT-AV1 WebM sequence profile through the existing bounded AVIO and shared packet state machine. It stages only source RGB, preserves metadata and source CRF text, returns attempt-local bytes, and leaves actor, node, effect, cache, path, persistence, recovery, and publication ownership to later adapters."
     },
     {
       "concern": "native_video_reviewed_codec_registry_vp9_webm_thread_bridge",
