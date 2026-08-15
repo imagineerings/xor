@@ -2,8 +2,9 @@ use crate::{
     CertifiedVideoCodecDependencyClosure, NativeLtxvH264PreprocessLimits,
     NativeVideoCodecBindingError, NativeVideoCodecLoadError, NativeVideoCodecLtxvAdmissionError,
     NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite,
-    NativeVideoCodecSuiteAdmissionError, NativeVideoCodecVp9EncodeError, NativeVp9WebmBatchLimits,
-    bind_certified_video_codec_abi, load_certified_video_codec_closure,
+    NativeVideoCodecSuiteAdmissionError, NativeVideoCodecVp9EncodeError,
+    NativeVideoContainerMetadata, NativeVp9WebmBatchLimits, bind_certified_video_codec_abi,
+    load_certified_video_codec_closure,
 };
 use comfy_media::NativeVideoCrf;
 use comfy_nodes::{
@@ -26,7 +27,7 @@ use std::{
 use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
-const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v4";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v5";
 
 #[allow(
     dead_code,
@@ -122,6 +123,7 @@ enum NativeVideoCodecThreadOperation {
         frame_rate: (u64, u64),
         crf: NativeVideoCrf,
         limits: NativeVp9WebmBatchLimits,
+        metadata: NativeVideoContainerMetadata,
     },
 }
 
@@ -312,12 +314,32 @@ impl NativeLtxvCodecRequestProxy {
         limits: NativeVp9WebmBatchLimits,
         context: &ExecutionContext<'_>,
     ) -> BoxFuture<'static, Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError>> {
+        self.encode_vp9_webm_batch_with_metadata(
+            images,
+            frame_rate,
+            crf,
+            limits,
+            NativeVideoContainerMetadata::empty(),
+            context,
+        )
+    }
+
+    pub(crate) fn encode_vp9_webm_batch_with_metadata(
+        &self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        crf: NativeVideoCrf,
+        limits: NativeVp9WebmBatchLimits,
+        metadata: NativeVideoContainerMetadata,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError>> {
         let result = self.submit(
             NativeVideoCodecThreadOperation::EncodeVp9Webm {
                 images: images.clone(),
                 frame_rate,
                 crf,
                 limits,
+                metadata,
             },
             context,
         );
@@ -564,8 +586,9 @@ fn process_video_codec_request(
             frame_rate,
             crf,
             limits,
+            metadata,
         } => NativeVideoCodecThreadOutput::Vp9Webm(process_vp9_webm_request(
-            codec, backend, &context, &images, frame_rate, crf, limits,
+            codec, backend, &context, &images, frame_rate, crf, limits, &metadata,
         )?),
     };
     context
@@ -583,12 +606,15 @@ fn process_vp9_webm_request(
     frame_rate: (u64, u64),
     crf: NativeVideoCrf,
     limits: NativeVp9WebmBatchLimits,
+    metadata: &NativeVideoContainerMetadata,
 ) -> Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError> {
     context
         .check()
         .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
     let encoded = codec
-        .encode_vp9_webm_batch(images, frame_rate, crf, limits, backend, context)
+        .encode_vp9_webm_batch_with_metadata(
+            images, frame_rate, crf, limits, metadata, backend, context,
+        )
         .map_err(map_vp9_thread_encode_error)?;
     context
         .check()
@@ -1089,7 +1115,17 @@ mod tests {
                             NativeVideoCodecThreadOperation::Preprocess { image, .. } => {
                                 Ok(NativeVideoCodecThreadOutput::Image(image))
                             }
-                            NativeVideoCodecThreadOperation::EncodeVp9Webm { .. } => {
+                            NativeVideoCodecThreadOperation::EncodeVp9Webm { metadata, .. } => {
+                                let entries = metadata.entries();
+                                if entries.len() != 3
+                                    || entries[0].0.as_bytes() != b"prompt"
+                                    || entries[0].1.as_bytes() != b"first"
+                                    || entries[1].0.as_bytes() != b"workflow"
+                                    || entries[2].0.as_bytes() != b"prompt"
+                                    || entries[2].1.as_bytes() != b"last"
+                                {
+                                    return Err(NativeLtxvCodecThreadError::StatePoisoned);
+                                }
                                 let encoded = materialize_owned_vp9_webm(
                                     &actor_backend,
                                     &context,
@@ -1116,11 +1152,20 @@ mod tests {
 
         let session_limits = NativeVp9WebmEncodeLimits::checked(1024, 256, 1024, 32)?;
         let batch_limits = NativeVp9WebmBatchLimits::checked(session_limits, 4, 1024)?;
-        let encoded = block_on(proxy.encode_vp9_webm_batch(
+        let metadata = NativeVideoContainerMetadata::checked(
+            vec![
+                ("prompt".to_owned(), "first".to_owned()),
+                ("workflow".to_owned(), "{}".to_owned()),
+                ("prompt".to_owned(), "last".to_owned()),
+            ],
+            crate::NativeVideoContainerMetadataLimits::checked(3, 16, 16, 64)?,
+        )?;
+        let encoded = block_on(proxy.encode_vp9_webm_batch_with_metadata(
             &image,
             (2997, 125),
             NativeVideoCrf::checked(31.5)?,
             batch_limits,
+            metadata,
             &context,
         ))?;
         assert_eq!(encoded.encoded_bytes()?, b"HPPPT");

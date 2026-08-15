@@ -150,6 +150,13 @@ pub(crate) struct AvFormatContext {
 }
 
 #[repr(C)]
+pub(crate) struct AvFormatContextMetadataProjection {
+    pub(crate) prefix: AvFormatContext,
+    pub(crate) opaque_stream_groups_through_data_codec_id: [u8; 136],
+    pub(crate) metadata: *mut AvDictionary,
+}
+
+#[repr(C)]
 pub(crate) struct AvIoContext {
     pub(crate) class: *const AvClass,
     pub(crate) buffer: *mut u8,
@@ -510,6 +517,17 @@ mod tests {
         assert_eq!(mem::offset_of!(AvFormatContext, stream_count), 44);
         assert_eq!(mem::offset_of!(AvFormatContext, streams), 48);
 
+        assert_eq!(mem::size_of::<AvFormatContextMetadataProjection>(), 200);
+        assert_eq!(mem::align_of::<AvFormatContextMetadataProjection>(), 8);
+        assert_eq!(
+            mem::offset_of!(AvFormatContextMetadataProjection, prefix),
+            0
+        );
+        assert_eq!(
+            mem::offset_of!(AvFormatContextMetadataProjection, metadata),
+            192
+        );
+
         assert_eq!(mem::size_of::<AvIoContext>(), 16);
         assert_eq!(mem::align_of::<AvIoContext>(), 8);
         assert_eq!(mem::offset_of!(AvIoContext, class), 0);
@@ -647,6 +665,42 @@ mod tests {
                 "AVERROR_ENOSPC": AV_ERROR_NO_SPACE,
                 "AVERROR_EOF": AV_ERROR_END_OF_FILE,
                 "AVERROR_EXIT": AV_ERROR_EXIT
+            })
+        );
+    }
+
+    #[test]
+    fn ffmpeg_7_1_container_metadata_projection_is_exact() {
+        assert_eq!(mem::size_of::<AvFormatContext>(), 56);
+        assert_eq!(mem::offset_of!(AvFormatContext, streams), 48);
+        assert_eq!(mem::size_of::<AvFormatContextMetadataProjection>(), 200);
+        assert_eq!(mem::align_of::<AvFormatContextMetadataProjection>(), 8);
+        assert_eq!(
+            mem::offset_of!(AvFormatContextMetadataProjection, metadata),
+            192
+        );
+    }
+
+    #[test]
+    fn container_metadata_manifest_matches_compiled_projection_contract() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json"
+        ))
+        .expect("reviewed container metadata ABI manifest must be valid JSON");
+        assert_eq!(
+            manifest["source"]["archive_sha256"],
+            FFMPEG_7_1_SOURCE_ARCHIVE_SHA256
+        );
+        assert_eq!(manifest["target"], "x86_64-unknown-linux-gnu");
+        assert_eq!(manifest["contract"]["symbol_count"], 54);
+        assert_eq!(
+            manifest["projection"],
+            serde_json::json!({
+                "type": "AVFormatContext",
+                "size": 200,
+                "alignment": 8,
+                "metadata_offset": 192,
+                "historical_prefix_size": 56
             })
         );
     }

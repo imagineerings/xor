@@ -10811,6 +10811,77 @@ def native_video_codec_vp9_webm_crf_foundation_task(
     )
 
 
+def native_video_codec_vp9_webm_container_metadata_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
+        "Attach bounded VP9 WebM container metadata",
+        [28, 29, 31, 32, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One supplementary compiler-verified FFmpeg 7.1 projection exposes only AVFormatContext.metadata while preserving the historical 56-byte data-plane prefix. A bounded ordered pre-serialized metadata value crosses the sole retained codec actor and attaches with flags zero before VP9 WebM stream and header creation; format-context RAII owns all partial and complete native dictionaries. JSON serialization, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Compiler, Rust, exact-signature session, and actor tests prove offset 192 with a 200-byte projection and unchanged historical prefix/symbol set; bounded insertion order and duplicate overwrite; pre-stream/header flags-zero attachment; typed ENOMEM/native failure, cancellation dominance, format-owned single cleanup, zero scratch, portable actor output, and clean retry. The fixture explicitly excludes installed codec packages, playable or numeric WebM evidence, Python JSON serialization, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.4",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "35.3",
+            "35.5",
+            "35.6",
+            "41.2",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14313,8 +14384,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_vp9_webm_thread_bridge_foundation["id"])
         )
     )
+    video_codec_vp9_webm_container_metadata_foundation = (
+        native_video_codec_vp9_webm_container_metadata_foundation_task(
+            str(video_codec_vp9_webm_crf_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_vp9_webm_crf_foundation["id"])
+        str(video_codec_vp9_webm_container_metadata_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14462,6 +14538,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_vp9_webm_sequence_encode_foundation,
         video_codec_vp9_webm_thread_bridge_foundation,
         video_codec_vp9_webm_crf_foundation,
+        video_codec_vp9_webm_container_metadata_foundation,
         video_foundation,
         detection_foundation,
         ]

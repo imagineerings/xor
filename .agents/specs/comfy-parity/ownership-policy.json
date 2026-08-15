@@ -14286,13 +14286,16 @@
       "owner_files": [
         "crates/comfy_runtime/src/native_video_codec_abi.rs",
         "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
-        "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c"
+        "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+        "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+        "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c"
       ],
       "owner_symbols": [
         "AvFrame",
         "AvPacket",
         "AvStream",
         "AvFormatContext",
+        "AvFormatContextMetadataProjection",
         "AvIoContext"
       ],
       "allowed_adapters": [
@@ -14327,6 +14330,12 @@
         },
         {
           "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "qualified": "comfy_runtime::native_video_codec_abi::AvFormatContextMetadataProjection",
+          "role": "abi_boundary",
+          "symbol": "AvFormatContextMetadataProjection"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
           "qualified": "comfy_runtime::native_video_codec_abi::AvIoContext",
           "role": "abi_boundary",
           "symbol": "AvIoContext"
@@ -14353,13 +14362,24 @@
           "name": "video-codec-data-plane-fixture-forbids-runtime-codec-and-public-pointer-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-data-plane-abi/manifest.json",
           "pattern": "official-source-reviewed-prefix-only-data-plane-abi[\\s\\S]*opaque_allocation_through_ffmpeg_only[\\s\\S]*full_struct_allocation_from_prefix_forbidden[\\s\\S]*raw_public_pointer_projection_forbidden[\\s\\S]*native_library_loaded_by_this_leaf[\\s\\S]*codec_or_media_executed"
+        },
+        {
+          "name": "video-codec-container-metadata-overlay-preserves-historical-prefix",
+          "path": "crates/comfy_runtime/src/native_video_codec_abi.rs",
+          "pattern": "AvFormatContextMetadataProjection[\\s\\S]*opaque_stream_groups_through_data_codec_id[\\s\\S]*metadata[\\s\\S]*ffmpeg_7_1_container_metadata_projection_is_exact[\\s\\S]*container_metadata_manifest_matches_compiled_projection_contract"
+        },
+        {
+          "name": "video-codec-container-metadata-overlay-is-compiler-and-manifest-verified",
+          "path": "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
+          "pattern": "SimAvFormatContextMetadataProjection[\\s\\S]*metadata[\\s\\S]*192[\\s\\S]*200"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-data-plane-abi-foundation",
-        "comfy-parity-native-video-codec-bounded-memory-avio-foundation"
+        "comfy-parity-native-video-codec-bounded-memory-avio-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation"
       ],
       "production_consumers": [
         "bounded native FFmpeg memory AVIO",
@@ -14683,17 +14703,22 @@
         "NativeRgb8Crf",
         "NativeVp9WebmEncodeLimits",
         "NativeVp9WebmBatchLimits",
+        "NativeVideoContainerMetadataLimits",
+        "NativeVideoContainerMetadata",
         "NativeVp9Webm",
         "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
         "NativeVideoCodecSuite::encode_vp9_webm_batch",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
         "encode_rgb8_frame_with_check",
         "encode_rgb8_frames_with_check",
+        "encode_rgb8_frames_with_metadata_check",
         "drain_rgb8_encode_packets"
       ],
       "allowed_adapters": [
         "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
         "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
         "the canonical IMAGE tensor supplies checked contiguous CPU F32 BHWC values and the source-specific batch adapter clamps and stages exactly one RGB8 frame at a time",
+        "the bounded ordered pre-serialized metadata owner supplies only safe C strings and the format context owns every attached native dictionary entry",
         "the retained owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
       ],
       "definitions": [
@@ -14706,6 +14731,7 @@
       ],
       "call_symbols": [
         "avformat_alloc_output_context2",
+        "av_dict_set",
         "avformat_new_stream",
         "avcodec_alloc_context3",
         "avcodec_open2",
@@ -14747,6 +14773,21 @@
           "name": "vp9-webm-encode-fixture-bounds-evidence-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
           "pattern": "synthetic-retained-vp9-webm-one-frame-encode[\\s\\S]*native_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_or_libvpx_package[\\s\\S]*numeric_vp9_swscale_or_byte_identity_oracle[\\s\\S]*media_payload_or_handle_published"
+        },
+        {
+          "name": "vp9-webm-container-metadata-is-bounded-ordered-and-preheader",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeVideoContainerMetadataLimits[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*av_dict_set[\\s\\S]*avformat_new_stream"
+        },
+        {
+          "name": "vp9-webm-container-metadata-tests-cleanup-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader[\\s\\S]*retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "vp9-webm-container-metadata-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+          "pattern": "synthetic-source-compatible-vp9-webm-container-metadata[\\s\\S]*bounded_ordered_metadata_reaches_real_session_and_actor[\\s\\S]*python_json_serialization_owned[\\s\\S]*node_effect_path_or_output_committer_reachable"
         }
       ],
       "known_open_reasons": [],
@@ -14755,7 +14796,8 @@
         "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
         "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
         "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation"
       ],
       "production_consumers": [
         "the following SaveWEBM metadata, effect, and node adapters"
@@ -14798,6 +14840,7 @@
         "NativeVideoCodecThreadOperation",
         "NativeVideoCodecThreadOutput",
         "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
         "process_vp9_webm_request",
         "materialize_owned_vp9_webm"
       ],
@@ -14823,8 +14866,10 @@
       ],
       "call_symbols": [
         "NativeVideoCodecSuite::encode_vp9_webm_batch",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
         "CpuBackend::upload_bytes",
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata"
       ],
       "required_mappings": [
         {
@@ -14856,13 +14901,19 @@
           "name": "vp9-webm-thread-bridge-fixture-bounds-evidence-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
           "pattern": "synthetic-retained-vp9-webm-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*prompt_or_extra_metadata_supported[\\s\\S]*media_payload_or_handle_published"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-carries-owned-ordered-container-metadata",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation"
       ],
       "production_consumers": [
         "the following reviewed container-metadata and SaveWEBM prepared-effect adapters"

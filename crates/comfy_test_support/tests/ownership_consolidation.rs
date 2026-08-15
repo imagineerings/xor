@@ -15247,7 +15247,7 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
         "NativeVideoCrf",
         "crf.bits() != 31.5_f64.to_bits()",
         "NativeVideoCrf::checked(31.5)",
-        "sim.comfy.video-codec-thread.v4",
+        "sim.comfy.video-codec-thread.v5",
     ] {
         assert!(service.contains(required), "VP9 CRF actor lacks {required}");
     }
@@ -15273,6 +15273,112 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
         root.join(".agents/specs/comfy-parity/ownership-policy.json"),
     )?)?;
     let task_id = "comfy-parity-native-video-codec-vp9-webm-crf-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .count();
+    assert_eq!(mapped_concerns, 3);
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    assert_eq!(
+        file_sha256(&root.join(
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json"
+        ))?,
+        "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec"
+    );
+    assert_eq!(
+        file_sha256(
+            &root.join("crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c")
+        )?,
+        "bb61bec6fa7e300f2730f1df7ad88abafabdb21f0942b5a61f9dfde3f7ffc9f6"
+    );
+
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "struct AvFormatContextMetadataProjection",
+        "opaque_stream_groups_through_data_codec_id: [u8; 136]",
+        "ffmpeg_7_1_container_metadata_projection_is_exact",
+        "container_metadata_manifest_matches_compiled_projection_contract",
+    ] {
+        assert!(
+            abi.contains(required),
+            "container metadata ABI lacks {required}"
+        );
+    }
+
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "struct NativeVideoContainerMetadataLimits",
+        "struct NativeVideoContainerMetadata",
+        "encode_vp9_webm_batch_with_metadata",
+        "encode_rgb8_frames_with_metadata_check",
+        "set WebM container metadata",
+        "retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader",
+        "retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "container metadata FFI lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send",
+        "unsafe impl Sync",
+        "av_dict_free)(metadata_pointer",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "container metadata FFI exposes forbidden {forbidden}"
+        );
+    }
+
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "sim.comfy.video-codec-thread.v5",
+        "metadata: NativeVideoContainerMetadata",
+        "encode_vp9_webm_batch_with_metadata",
+        "metadata.entries()",
+    ] {
+        assert!(
+            service.contains(required),
+            "metadata actor lacks {required}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-source-compatible-vp9-webm-container-metadata",
+        "historical_data_plane_contract_unchanged",
+        "bounded_ordered_metadata_reaches_real_session_and_actor",
+        "python_json_serialization_owned",
+        "node_effect_path_or_output_committer_reachable",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "metadata fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation";
     let mapped_concerns = policy
         .get("concerns")
         .and_then(serde_json::Value::as_array)

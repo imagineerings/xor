@@ -10,7 +10,7 @@ use comfy_tensor::{
 use comfy_types::{CancellationError, CancellationToken};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    ffi::c_void,
+    ffi::{CString, c_void},
     io::{self, Write},
     marker::PhantomData,
     path::PathBuf,
@@ -145,6 +145,123 @@ pub(crate) struct NativeVp9WebmBatchLimits {
     session: NativeVp9WebmEncodeLimits,
     maximum_frames: usize,
     maximum_pixels_per_frame: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(
+    dead_code,
+    reason = "constructed by the following SaveWEBM prepared-effect adapter"
+)]
+pub(crate) struct NativeVideoContainerMetadataLimits {
+    maximum_entries: usize,
+    maximum_key_bytes: usize,
+    maximum_value_bytes: usize,
+    maximum_aggregate_bytes: usize,
+}
+
+impl NativeVideoContainerMetadataLimits {
+    #[allow(
+        dead_code,
+        reason = "constructed by the following SaveWEBM prepared-effect adapter"
+    )]
+    pub(crate) fn checked(
+        maximum_entries: usize,
+        maximum_key_bytes: usize,
+        maximum_value_bytes: usize,
+        maximum_aggregate_bytes: usize,
+    ) -> Result<Self, NativeVideoContainerMetadataError> {
+        if maximum_entries == 0
+            || maximum_key_bytes == 0
+            || maximum_value_bytes == 0
+            || maximum_aggregate_bytes == 0
+        {
+            return Err(NativeVideoContainerMetadataError::InvalidLimits);
+        }
+        Ok(Self {
+            maximum_entries,
+            maximum_key_bytes,
+            maximum_value_bytes,
+            maximum_aggregate_bytes,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct NativeVideoContainerMetadata {
+    entries: Vec<(CString, CString)>,
+}
+
+impl NativeVideoContainerMetadata {
+    #[allow(
+        dead_code,
+        reason = "constructed by the following SaveWEBM prepared-effect adapter"
+    )]
+    pub(crate) fn checked(
+        entries: Vec<(String, String)>,
+        limits: NativeVideoContainerMetadataLimits,
+    ) -> Result<Self, NativeVideoContainerMetadataError> {
+        if entries.len() > limits.maximum_entries {
+            return Err(NativeVideoContainerMetadataError::LimitExceeded);
+        }
+        let mut aggregate_bytes = 0_usize;
+        let mut checked_entries = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key_bytes = key.as_bytes();
+            let value_bytes = value.as_bytes();
+            if key_bytes.is_empty() {
+                return Err(NativeVideoContainerMetadataError::EmptyKey);
+            }
+            if key_bytes.contains(&0) || value_bytes.contains(&0) {
+                return Err(NativeVideoContainerMetadataError::EmbeddedNul);
+            }
+            if key_bytes.len() > limits.maximum_key_bytes
+                || value_bytes.len() > limits.maximum_value_bytes
+            {
+                return Err(NativeVideoContainerMetadataError::LimitExceeded);
+            }
+            aggregate_bytes = aggregate_bytes
+                .checked_add(key_bytes.len())
+                .and_then(|bytes| bytes.checked_add(1))
+                .and_then(|bytes| bytes.checked_add(value_bytes.len()))
+                .and_then(|bytes| bytes.checked_add(1))
+                .filter(|bytes| *bytes <= limits.maximum_aggregate_bytes)
+                .ok_or(NativeVideoContainerMetadataError::LimitExceeded)?;
+            let key =
+                CString::new(key).map_err(|_| NativeVideoContainerMetadataError::EmbeddedNul)?;
+            let value =
+                CString::new(value).map_err(|_| NativeVideoContainerMetadataError::EmbeddedNul)?;
+            checked_entries.push((key, value));
+        }
+        Ok(Self {
+            entries: checked_entries,
+        })
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub(crate) fn entries(&self) -> &[(CString, CString)] {
+        &self.entries
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[allow(
+    dead_code,
+    reason = "returned to the following SaveWEBM prepared-effect adapter"
+)]
+pub(crate) enum NativeVideoContainerMetadataError {
+    #[error("native video container metadata limits are invalid")]
+    InvalidLimits,
+    #[error("native video container metadata keys cannot be empty")]
+    EmptyKey,
+    #[error("native video container metadata contains an embedded NUL byte")]
+    EmbeddedNul,
+    #[error("native video container metadata exceeds its checked limits")]
+    LimitExceeded,
 }
 
 #[allow(
@@ -858,6 +975,31 @@ impl NativeVideoCodecSuite {
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeVp9Webm<'suite>, NativeVideoCodecVp9EncodeError> {
+        self.encode_vp9_webm_batch_with_metadata(
+            images,
+            frame_rate,
+            crf,
+            limits,
+            &NativeVideoContainerMetadata::empty(),
+            backend,
+            context,
+        )
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the retained codec-thread metadata bridge"
+    )]
+    pub(crate) fn encode_vp9_webm_batch_with_metadata<'suite>(
+        &'suite self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        crf: NativeVideoCrf,
+        limits: NativeVp9WebmBatchLimits,
+        metadata: &NativeVideoContainerMetadata,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeVp9Webm<'suite>, NativeVideoCodecVp9EncodeError> {
         let (frame_count, width, height) = validate_vp9_image_batch(images, limits, context)?;
         let frame_rate = checked_vp9_frame_rate(frame_rate)?;
         context.check().map_err(map_vp9_tensor_error)?;
@@ -881,7 +1023,7 @@ impl NativeVideoCodecSuite {
             let frame = source_compatible_vp9_rgb8_frame(images, frame_index, backend, context)?;
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
-        encode_rgb8_frames_with_check(
+        encode_rgb8_frames_with_metadata_check(
             NativeRgb8EncodeProfile::vp9_webm(frame_rate, crf),
             self.vpx_vp9_encoder,
             frame_count,
@@ -890,6 +1032,7 @@ impl NativeVideoCodecSuite {
             limits.session.maximum_packet_iterations,
             &functions,
             &mut output,
+            metadata,
             &mut provide_frame,
             &mut || context.cancellation.check(),
         )
@@ -3170,6 +3313,38 @@ fn encode_rgb8_frames_with_check(
     ) -> Result<(), NativeVideoCodecLtxvEncodeError>,
     check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
+    encode_rgb8_frames_with_metadata_check(
+        profile,
+        encoder,
+        frame_count,
+        width,
+        height,
+        maximum_packet_iterations,
+        functions,
+        output,
+        &NativeVideoContainerMetadata::empty(),
+        provide_frame,
+        check_cancellation,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn encode_rgb8_frames_with_metadata_check(
+    profile: NativeRgb8EncodeProfile,
+    encoder: NonNull<abi::AvCodec>,
+    frame_count: usize,
+    width: i32,
+    height: i32,
+    maximum_packet_iterations: usize,
+    functions: &NativeLtxvH264EncodeFunctions,
+    output: &mut NativeVideoCodecMemoryOutput<'_>,
+    metadata: &NativeVideoContainerMetadata,
+    provide_frame: &mut impl FnMut(
+        usize,
+        &mut dyn FnMut(&[u8]) -> Result<(), NativeVideoCodecLtxvEncodeError>,
+    ) -> Result<(), NativeVideoCodecLtxvEncodeError>,
+    check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+) -> Result<(), NativeVideoCodecLtxvEncodeError> {
     if frame_count == 0 {
         return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
     }
@@ -3201,6 +3376,28 @@ fn encode_rgb8_frames_with_check(
         free: functions.avformat_free_context,
     };
     unsafe { format.pointer.as_mut().io_context = output.context_ptr() };
+
+    if !profile.is_vp9() && !metadata.entries().is_empty() {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    }
+    for (key, value) in metadata.entries() {
+        let metadata_pointer = unsafe {
+            let projection = format
+                .pointer
+                .as_ptr()
+                .cast::<abi::AvFormatContextMetadataProjection>();
+            std::ptr::addr_of_mut!((*projection).metadata)
+        };
+        check_ltxv_native_status(
+            "set WebM container metadata",
+            checked_native_call!((functions.av_dict_set)(
+                metadata_pointer,
+                key.as_ptr(),
+                value.as_ptr(),
+                0,
+            )),
+        )?;
+    }
 
     let stream_pointer = checked_native_call!((functions.avformat_new_stream)(
         format.pointer.as_ptr(),
@@ -6746,6 +6943,8 @@ mod tests {
     #[repr(C)]
     struct MockEncodeFormat {
         prefix: abi::AvFormatContext,
+        opaque_stream_groups_through_data_codec_id: [u8; 136],
+        metadata: *mut abi::AvDictionary,
         stream: *mut abi::AvStream,
         parameters: *mut u8,
     }
@@ -6816,6 +7015,8 @@ mod tests {
                 stream_count: 0,
                 streams: std::ptr::null_mut(),
             },
+            opaque_stream_groups_through_data_codec_id: [0; 136],
+            metadata: std::ptr::null_mut(),
             stream: std::ptr::null_mut(),
             parameters: std::ptr::null_mut(),
         });
@@ -6824,17 +7025,21 @@ mod tests {
     }
 
     unsafe extern "C" fn mock_encode_format_free(format: *mut abi::AvFormatContext) {
-        record_encode_event("format_free");
         if format.is_null() {
             return;
         }
         let allocation = unsafe { Box::from_raw(format.cast::<MockEncodeFormat>()) };
+        if !allocation.metadata.is_null() {
+            record_encode_event("format_metadata_free");
+            drop(unsafe { Box::from_raw(allocation.metadata.cast::<u8>()) });
+        }
         if !allocation.stream.is_null() {
             drop(unsafe { Box::from_raw(allocation.stream) });
         }
         if !allocation.parameters.is_null() {
             drop(unsafe { Box::from_raw(allocation.parameters) });
         }
+        record_encode_event("format_free");
     }
 
     unsafe extern "C" fn mock_encode_new_stream(
@@ -6912,12 +7117,22 @@ mod tests {
         dictionary: *mut *mut abi::AvDictionary,
         name: *const std::ffi::c_char,
         value: *const std::ffi::c_char,
-        _flags: i32,
+        flags: i32,
     ) -> i32 {
         let name = unsafe { std::ffi::CStr::from_ptr(name) }.to_string_lossy();
         let value = unsafe { std::ffi::CStr::from_ptr(value) }.to_string_lossy();
-        record_encode_event(format!("dict:{name}={value}"));
+        if name == "crf" || name == "preset" {
+            record_encode_event(format!("dict:{name}={value}"));
+        } else {
+            record_encode_event(format!("metadata:{name}={value}:flags={flags}"));
+        }
         if dictionary.is_null() {
+            return abi::AV_ERROR_INVALID_ARGUMENT;
+        }
+        if name == "fail_oom" {
+            return abi::AV_ERROR_OUT_OF_MEMORY;
+        }
+        if name == "fail_invalid" {
             return abi::AV_ERROR_INVALID_ARGUMENT;
         }
         if unsafe { (*dictionary).is_null() } {
@@ -7504,6 +7719,322 @@ mod tests {
             assert_eq!(context.scratch.in_use_bytes(), 0);
         }
         drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        Ok(())
+    }
+
+    #[test]
+    fn retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        let limits = NativeVideoContainerMetadataLimits::checked(3, 16, 32, 64)?;
+        let metadata = NativeVideoContainerMetadata::checked(
+            vec![
+                ("prompt".to_owned(), "first".to_owned()),
+                ("workflow".to_owned(), "{}".to_owned()),
+                ("prompt".to_owned(), "last".to_owned()),
+            ],
+            limits,
+        )?;
+        assert_eq!(metadata.entries().len(), 3);
+        assert!(matches!(
+            NativeVideoContainerMetadataLimits::checked(0, 1, 1, 1),
+            Err(NativeVideoContainerMetadataError::InvalidLimits)
+        ));
+        for (entries, expected) in [
+            (
+                vec![(String::new(), String::new())],
+                NativeVideoContainerMetadataError::EmptyKey,
+            ),
+            (
+                vec![("embedded\0key".to_owned(), String::new())],
+                NativeVideoContainerMetadataError::EmbeddedNul,
+            ),
+            (
+                vec![("key".to_owned(), "embedded\0value".to_owned())],
+                NativeVideoContainerMetadataError::EmbeddedNul,
+            ),
+            (
+                vec![("key-that-is-too-long".to_owned(), String::new())],
+                NativeVideoContainerMetadataError::LimitExceeded,
+            ),
+            (
+                vec![(
+                    "key".to_owned(),
+                    "value-that-is-far-too-long-for-the-limit".to_owned(),
+                )],
+                NativeVideoContainerMetadataError::LimitExceeded,
+            ),
+        ] {
+            assert_eq!(
+                NativeVideoContainerMetadata::checked(entries, limits),
+                Err(expected)
+            );
+        }
+        assert!(matches!(
+            NativeVideoContainerMetadata::checked(
+                vec![
+                    ("a".to_owned(), String::new()),
+                    ("b".to_owned(), String::new()),
+                    ("c".to_owned(), String::new()),
+                    ("d".to_owned(), String::new()),
+                ],
+                limits,
+            ),
+            Err(NativeVideoContainerMetadataError::LimitExceeded)
+        ));
+        assert!(matches!(
+            NativeVideoContainerMetadata::checked(
+                vec![("prompt".to_owned(), "first".to_owned())],
+                NativeVideoContainerMetadataLimits::checked(1, 16, 32, 4)?,
+            ),
+            Err(NativeVideoContainerMetadataError::LimitExceeded)
+        ));
+
+        reset_encode_fixture()?;
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let mut output = mock_encode_output(&backend, &context, 64)?;
+        let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
+            .ok_or("mock encoder allocation failed")?;
+        let mut provide_frame = |_frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| { consume(&[1_u8; 12]) };
+        encode_rgb8_frames_with_metadata_check(
+            NativeRgb8EncodeProfile::vp9_webm(
+                checked_vp9_frame_rate((2_997, 125))?,
+                NativeVideoCrf::checked(31.5)?,
+            ),
+            encoder,
+            1,
+            2,
+            2,
+            8,
+            &mock_encode_functions(),
+            &mut output,
+            &metadata,
+            &mut provide_frame,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(output.staged_bytes()?, b"HPT");
+        drop(output);
+        drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        let events = take_encode_events()?;
+        let metadata_events = events
+            .iter()
+            .filter(|event| event.starts_with("metadata:"))
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            metadata_events,
+            [
+                "metadata:prompt=first:flags=0",
+                "metadata:workflow={}:flags=0",
+                "metadata:prompt=last:flags=0",
+            ]
+        );
+        let last_metadata = events
+            .iter()
+            .rposition(|event| event.starts_with("metadata:"))
+            .ok_or("metadata event missing")?;
+        let stream = events
+            .iter()
+            .position(|event| event == "stream_alloc")
+            .ok_or("stream allocation event missing")?;
+        let header = events
+            .iter()
+            .position(|event| event == "header")
+            .ok_or("header event missing")?;
+        assert!(last_metadata < stream && stream < header);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.as_str() == "format_metadata_free")
+                .count(),
+            1
+        );
+        assert_eq!(events.last().map(String::as_str), Some("format_free"));
+        Ok(())
+    }
+
+    #[test]
+    fn retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        let limits = NativeVideoContainerMetadataLimits::checked(3, 32, 32, 96)?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
+        let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
+            .ok_or("mock encoder allocation failed")?;
+        let profile = NativeRgb8EncodeProfile::vp9_webm(
+            checked_vp9_frame_rate((2_997, 125))?,
+            NativeVideoCrf::checked(31.5)?,
+        );
+
+        for key in ["fail_oom", "fail_invalid"] {
+            reset_encode_fixture()?;
+            let metadata = NativeVideoContainerMetadata::checked(
+                vec![
+                    ("prompt".to_owned(), "first".to_owned()),
+                    (key.to_owned(), "value".to_owned()),
+                ],
+                limits,
+            )?;
+            let mut output = mock_encode_output(&backend, &context, 64)?;
+            let mut provide_frame = |_frame_index: usize,
+                                     consume: &mut dyn FnMut(
+                &[u8],
+            ) -> Result<
+                (),
+                NativeVideoCodecLtxvEncodeError,
+            >| { consume(&[1_u8; 12]) };
+            let result = encode_rgb8_frames_with_metadata_check(
+                profile,
+                encoder,
+                1,
+                2,
+                2,
+                8,
+                &mock_encode_functions(),
+                &mut output,
+                &metadata,
+                &mut provide_frame,
+                &mut || cancellation.check(),
+            );
+            if key == "fail_oom" {
+                assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecLtxvEncodeError::ResourceExhausted {
+                        phase: "set WebM container metadata"
+                    })
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecLtxvEncodeError::NativeCall {
+                        phase: "set WebM container metadata",
+                        status: abi::AV_ERROR_INVALID_ARGUMENT
+                    })
+                ));
+            }
+            drop(output);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+            let events = take_encode_events()?;
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event.as_str() == "format_metadata_free")
+                    .count(),
+                1
+            );
+            assert_eq!(events.last().map(String::as_str), Some("format_free"));
+        }
+
+        let metadata = NativeVideoContainerMetadata::checked(
+            vec![("prompt".to_owned(), "value".to_owned())],
+            limits,
+        )?;
+        reset_encode_fixture()?;
+        let mut successful_output = mock_encode_output(&backend, &context, 64)?;
+        let mut successful_checks = 0;
+        let mut provide_frame = |_frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| { consume(&[1_u8; 12]) };
+        encode_rgb8_frames_with_metadata_check(
+            profile,
+            encoder,
+            1,
+            2,
+            2,
+            8,
+            &mock_encode_functions(),
+            &mut successful_output,
+            &metadata,
+            &mut provide_frame,
+            &mut || {
+                successful_checks += 1;
+                Ok(())
+            },
+        )?;
+        drop(successful_output);
+
+        for cancelled_check in 1..=successful_checks {
+            reset_encode_fixture()?;
+            let mut output = mock_encode_output(&backend, &context, 64)?;
+            let mut checks = 0;
+            let mut provide_frame = |_frame_index: usize,
+                                     consume: &mut dyn FnMut(
+                &[u8],
+            ) -> Result<
+                (),
+                NativeVideoCodecLtxvEncodeError,
+            >| { consume(&[1_u8; 12]) };
+            assert!(matches!(
+                encode_rgb8_frames_with_metadata_check(
+                    profile,
+                    encoder,
+                    1,
+                    2,
+                    2,
+                    8,
+                    &mock_encode_functions(),
+                    &mut output,
+                    &metadata,
+                    &mut provide_frame,
+                    &mut || {
+                        checks += 1;
+                        if checks == cancelled_check {
+                            Err(CancellationError)
+                        } else {
+                            Ok(())
+                        }
+                    },
+                ),
+                Err(NativeVideoCodecLtxvEncodeError::Cancelled)
+            ));
+            drop(output);
+            assert_eq!(context.scratch.in_use_bytes(), 0);
+        }
+
+        reset_encode_fixture()?;
+        let mut retry_output = mock_encode_output(&backend, &context, 64)?;
+        let mut provide_frame = |_frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| { consume(&[1_u8; 12]) };
+        encode_rgb8_frames_with_metadata_check(
+            profile,
+            encoder,
+            1,
+            2,
+            2,
+            8,
+            &mock_encode_functions(),
+            &mut retry_output,
+            &metadata,
+            &mut provide_frame,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(retry_output.staged_bytes()?, b"HPT");
+        drop(retry_output);
+        drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        assert_eq!(context.scratch.in_use_bytes(), 0);
         Ok(())
     }
 
