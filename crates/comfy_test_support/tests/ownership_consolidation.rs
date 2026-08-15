@@ -15928,6 +15928,86 @@ fn val_ownership_native_video_codec_av1_webm_sequence_encode_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_h264_mp4_sequence_encode_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeH264Mp4SequenceLimits",
+        "pub(crate) struct NativeH264Mp4",
+        "pub(crate) enum NativeVideoCodecH264EncodeError",
+        "pub(crate) fn encode_h264_mp4_batch",
+        "self.ltxv_h264.encoder",
+        "NativeRgb8EncodeProfile::component_h264",
+        "source_compatible_h264_rgb8_frame",
+        "retained_h264_mp4_sequence_uses_exact_rate_order_and_single_session",
+        "retained_h264_mp4_sequence_later_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "H.264 MP4 sequence FFI lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeH264Mp4",
+        "unsafe impl Sync for NativeH264Mp4",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "H.264 MP4 sequence owner exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-source-compatible-component-h264-mp4-sequence-execution",
+        "provider_proved_libx264_reaches_the_shared_retained_sequence_loop",
+        "ordinary_profile_has_no_ltxv_crf_or_preset",
+        "playable_mp4_or_decoded_numeric_h264_color_oracle",
+        "encoded_backing_trim_load_video_handle_cache_persistence_recovery_or_publication_owned",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "H.264 MP4 sequence fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_h264_mp4_sequence_encode")
+            })
+        })
+        .ok_or("missing H.264 MP4 sequence ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_h264_mp4_batch")
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

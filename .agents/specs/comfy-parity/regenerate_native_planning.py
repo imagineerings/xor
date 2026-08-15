@@ -11253,6 +11253,73 @@ def native_video_save_webm_node_foundation_task(dependency: str) -> dict[str, ob
     )
 
 
+def native_video_codec_h264_mp4_sequence_encode_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation",
+        "Encode bounded 8-bit component IMAGE sequences to H.264 MP4",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained video codec suite encodes one bounded nonempty contiguous CPU F32 BHWC IMAGE sequence with three or four channels into one attempt-local in-memory H.264 MP4. It clamps and truncates the first three channels to packed RGB8, discards alpha, preserves the checked reduced frame rate and source order, drains packets after every frame, flushes once, and uses the ordinary provider-proved libx264 profile without LTXV-specific CRF or preset options. Ten-bit video, audio, metadata, actor transport, nodes, encoded backing, slicing, effects, handles, caches, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-mp4-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused exact-signature tests prove one retained MP4/libx264 session, RGB24-to-YUV420P staging with alpha discard, exact reduced rate and PTS order, absence of LTXV CRF and preset options, per-frame draining, one terminal flush and trailer, bounded later-frame failure and cancellation rollback, reverse cleanup, zero scratch after result drop, and clean same-suite retry. The fixture explicitly excludes installed or playable codec evidence, PyAV default-encoder or byte identity, ten-bit and AAC paths, metadata, actor/node/backing/slice/effect reachability, publication, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "28.6",
+            "31.5",
+            "31.6",
+            "32.1",
+            "35.3",
+            "35.5",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14783,8 +14850,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     video_save_webm_node_foundation = native_video_save_webm_node_foundation_task(
         str(video_codec_webm_node_service_foundation["id"])
     )
+    video_codec_h264_mp4_sequence_encode_foundation = (
+        native_video_codec_h264_mp4_sequence_encode_foundation_task(
+            str(video_save_webm_node_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_save_webm_node_foundation["id"])
+        str(video_codec_h264_mp4_sequence_encode_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14938,6 +15010,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_av1_webm_thread_bridge_foundation,
         video_codec_webm_node_service_foundation,
         video_save_webm_node_foundation,
+        video_codec_h264_mp4_sequence_encode_foundation,
         video_foundation,
         detection_foundation,
         ]

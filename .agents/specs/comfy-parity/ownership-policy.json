@@ -14891,6 +14891,105 @@
       "decision_reason": "One capacity-one retained codec actor carries AV1 requests to the sole native owner thread, drops every borrowed AV1 WebM owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable ten-bit non-alpha bytes with scratch converged."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_h264_mp4_sequence_encode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_h264_mp4_batch",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeH264Mp4SequenceLimits",
+        "NativeH264Mp4",
+        "NativeVideoCodecH264EncodeError",
+        "NativeVideoCodecSuite::encode_h264_mp4_batch",
+        "NativeRgb8EncodeProfile::component_h264",
+        "source_compatible_h264_rgb8_frame"
+      ],
+      "allowed_adapters": [
+        "the retained video codec suite supplies the exact private provider-proved libx264 descriptor and typed FFmpeg function table",
+        "the canonical bounded memory AVIO and shared RGB sequence state machine own the attempt-local MP4 sink, packet protocol, and reverse native cleanup",
+        "the canonical IMAGE tensor supplies contiguous CPU F32 BHWC values while the source adapter stages only the first three channels in one caller-authorized workspace frame",
+        "the following retained codec-thread bridge may copy final bytes into portable accounted storage but may not move native owners across threads"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeH264Mp4",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeH264Mp4"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_output_context2",
+        "avformat_new_stream",
+        "avcodec_alloc_context3",
+        "avcodec_open2",
+        "avformat_write_header",
+        "av_frame_make_writable",
+        "sws_scale",
+        "avcodec_send_frame",
+        "avcodec_receive_packet",
+        "av_interleaved_write_frame",
+        "av_write_trailer"
+      ],
+      "required_mappings": [
+        {
+          "name": "h264-mp4-sequence-uses-provider-proved-suite-and-ordinary-profile",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_h264_mp4_batch[\\s\\S]*ltxv_h264\\.encoder[\\s\\S]*component_h264[\\s\\S]*AV_PIXEL_FORMAT_RGB24[\\s\\S]*AV_PIXEL_FORMAT_YUV420P"
+        },
+        {
+          "name": "h264-mp4-sequence-discards-alpha-with-bounded-staging",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "source_compatible_h264_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel.get\\(\\.\\.3\\)[\\s\\S]*stage H\\.264 RGB frame"
+        },
+        {
+          "name": "h264-mp4-sequence-tests-rate-options-order-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_h264_mp4_sequence_uses_exact_rate_order_and_single_session[\\s\\S]*retained_h264_mp4_sequence_later_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "h264-mp4-sequence-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json",
+          "pattern": "synthetic-source-compatible-component-h264-mp4-sequence-execution[\\s\\S]*ordinary_profile_has_no_ltxv_crf_or_preset[\\s\\S]*playable_mp4_or_decoded_numeric_h264_color_oracle[\\s\\S]*encoded_backing_trim_load_video_handle_cache_persistence_recovery_or_publication_owned"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation"
+      ],
+      "production_consumers": [
+        "the following retained H.264 codec-thread bridge and encoded-backing video adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One retained suite method executes the provider-proved ordinary 8-bit H.264 MP4 sequence profile through the existing bounded AVIO and shared packet state machine. It stages only source RGB, preserves exact rate and frame order, omits LTXV-specific options, returns attempt-local bytes, and leaves actor, encoded backing, audio, ten-bit, node, effect, cache, path, persistence, recovery, and publication ownership to later adapters."
+    },
+    {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_admission",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecBinding::admit_ltxv_h264",
       "owner_files": [
