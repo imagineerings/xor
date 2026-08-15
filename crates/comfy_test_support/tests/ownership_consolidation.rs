@@ -15455,7 +15455,8 @@ fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn 
     let root = repository_root()?;
     let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
     for required in [
-        "pub const NODE_DESCRIPTOR_IDS: &[&str] = &[\"CreateVideo\", \"GetVideoComponents\"]",
+        "\"CreateVideo\",",
+        "\"GetVideoComponents\",",
         "const FEATURE_ID: &str = \"COMFY-NODE-0124\"",
         "exact_positive_f64_fraction(fps)",
         "NativeVideoPayload::checked(",
@@ -15580,6 +15581,87 @@ fn val_ownership_native_video_component_extract_node_001() -> Result<(), Box<dyn
             .and_then(serde_json::Value::as_array)
             .is_some_and(|tasks| tasks.iter().any(|task| {
                 task.as_str() == Some("comfy-parity-native-video-component-extract-node-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_frame_interpolate_node_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    for required in [
+        "const INTERPOLATE_CLASS_TYPE: &str = \"FrameInterpolate\"",
+        "const INTERPOLATE_FEATURE_ID: &str = \"COMFY-NODE-0190\"",
+        "impl NativeNode for FrameInterpolateNode",
+        "interpolation_outcome(parsed.images.clone())",
+        ".frame_interpolation_resource()",
+        ".interpolate_sequence(",
+        "rollback_interpolation_output(context, &output_handle)",
+        "frame_interpolate_descriptor_fixture_and_cache_match_source",
+        "frame_interpolate_bypass_returns_exact_input_handle_without_compute",
+        "frame_interpolate_executes_reduced_rife_and_publishes_canonical_image",
+        "frame_interpolate_rejects_invalid_requests_and_cancellation_atomically",
+        "frame_interpolate_maps_exhaustion_rolls_back_late_cancellation_and_retries",
+    ] {
+        assert!(
+            node.contains(required),
+            "FrameInterpolate node lacks {required}"
+        );
+    }
+    assert_eq!(
+        node.matches("impl NativeNode for FrameInterpolateNode")
+            .count(),
+        1
+    );
+    for forbidden in [
+        "load_certified_video_codec_closure",
+        "bind_certified_video_codec_abi",
+        "NativePreparedEffectRequest",
+        "ProgressBar",
+        "tqdm",
+        "std::fs",
+        "File::",
+    ] {
+        assert!(
+            !node.contains(forbidden),
+            "FrameInterpolate node owns forbidden authority {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json"),
+    )?;
+    for required in [
+        "COMFY-NODE-0190",
+        "identity_preserving_bypass",
+        "retained_frame_interpolation_delegation",
+        "model_loader_or_checkpoint_acquisition",
+        "progress_event_parity",
+        "external_media_publication",
+    ] {
+        assert!(fixture.contains(required));
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_frame_interpolation_node_runtime_adapter")
+            })
+        })
+        .ok_or("missing FrameInterpolate ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-frame-interpolate-node-foundation")
             }))
     );
     Ok(())

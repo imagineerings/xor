@@ -10409,6 +10409,82 @@ def native_frame_interpolation_sequence_fallback_foundation_task(
     )
 
 
+def native_frame_interpolate_node_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-frame-interpolate-node-foundation",
+        "Execute the source-exact FrameInterpolate native node",
+        [6, 7, 31, 34, 35, 36, 41, 42, 44],
+        [8, 18, 20, 25, 28, 31, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-DEVICE-001",
+            "VAL-MODEL-FAMILY-001",
+            "VAL-NODE-001",
+            "VAL-NODE-002",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The exact FrameInterpolate native node resolves canonical INTERP_MODEL and IMAGE handles, preserves the source identity bypass for batches below two without compute or publication, and otherwise bridges the canonical CPU F32 BHWC IMAGE to the retained model dtype before delegating once to the completed frame-interpolation sequence owner. It converts only the complete clamped result back to canonical CPU F32 IMAGE and publishes it atomically. The adapter introduces no checkpoint loader, model equation, retry scheduler, allocator, codec, effect, progress, cache, persistence, recovery, or external publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/film_net.py",
+            "projects/comfy/ComfyUI/comfy_extras/frame_interpolation_models/ifnet.py",
+            "projects/comfy/ComfyUI/comfy/model_management.py",
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/ops/comfy_operator_indirection_01.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+            "crates/comfy_test_support/fixtures/models/frame-interpolation/resource-exhaustion/manifest.json",
+        ],
+        [
+            "crates/comfy_nodes/Cargo.toml",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Source-bound tests prove the exact descriptor, unnamed-source-output projection to the stable native `images` port, schema range, presentation and cache policy; exact-handle bypass after both inputs pass integrity resolution; one real reduced retained RIFE execution with canonical dtype, layout, stream, ordering and fresh output storage; invalid channels, multiplier and handles; typed terminal resource exhaustion; cancellation priority; final-only publication and cleanup; immutable input/model identity; and clean retry. The fixture explicitly excludes COMFY-NODE-0191 loading, licensed checkpoint or accelerator numeric evidence, progress callbacks, codec/container/file/effect authority, persistent cache or recovery ownership, and external publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "6.1",
+            "6.2",
+            "6.3",
+            "6.6",
+            "7.1",
+            "7.4",
+            "7.5",
+            "31.6",
+            "34.2",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "36.4",
+            "36.6",
+            "41.5",
+            "42.2",
+            "42.4",
+            "44.1",
+            "44.3",
+            "44.4",
+            "44.6",
+        ],
+        registered_source_edits=["comfy_nodes"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -13883,8 +13959,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(frame_interpolation_resource_exhaustion_foundation["id"]),
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    frame_interpolate_node_foundation = native_frame_interpolate_node_foundation_task(
         str(frame_interpolation_sequence_fallback_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(frame_interpolate_node_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14026,6 +14105,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_component_create_node_foundation,
         video_component_extract_node_foundation,
         frame_interpolation_sequence_fallback_foundation,
+        frame_interpolate_node_foundation,
         video_foundation,
         detection_foundation,
         ]
@@ -14758,6 +14838,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                 special[row["feature_id"]].append(
                     "comfy-parity-graph-context-menu-surfaces"
                 )
+    special["COMFY-NODE-0190"].append(
+        "comfy-parity-native-frame-interpolate-node-foundation"
+    )
     return tasks, {feature_id: sorted(set(task_ids)) for feature_id, task_ids in sorted(special.items())}
 
 

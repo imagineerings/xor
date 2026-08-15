@@ -15484,6 +15484,116 @@
       "decision_reason": "One exact source node resolves a materialized VIDEO once, publishes canonical IMAGE and optional AUDIO aliases, projects rational fps and bit depth, and owns only bounded U8 or strided frame adaptation plus output-only typed-null compatibility. General codecs, file demux, slicing, effects, persistence, recovery, and external publication remain separate."
     },
     {
+      "concern": "native_frame_interpolation_node_runtime_adapter",
+      "canonical_owner": "comfy_nodes::generated_video_01::FrameInterpolateNode",
+      "owner_files": [
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "owner_symbols": [
+        "FrameInterpolateNode",
+        "execute_frame_interpolate",
+        "interpolation_model_failure",
+        "rollback_interpolation_output"
+      ],
+      "allowed_adapters": [
+        "NativeHandleStore remains the sole INTERP_MODEL and IMAGE integrity, resolution, publication, and revocation owner; the source bypass returns the admitted input handle without mutating the store",
+        "NativeFrameInterpolationModel::interpolate_sequence remains the sole FILM and RIFE dispatch, equation, padding, timestep, fallback, and typed terminal-exhaustion owner",
+        "canonical tensor cast and ImageTensor owners retain dtype, storage, layout, stream, workspace, and allocation authority",
+        "the node adapter owns only exact schema parsing, input projection, one retained-model delegation, typed failure mapping, and final-only IMAGE publication",
+        "checkpoint loading, model mutation, accelerator placement, progress, codec, container, effect, cache persistence, recovery, and external publication owners remain separate"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "qualified": "comfy_nodes::generated_video_01::FrameInterpolateNode",
+          "role": "canonical_implementation",
+          "symbol": "FrameInterpolateNode",
+          "pattern": "struct FrameInterpolateNode"
+        }
+      ],
+      "call_symbols": [
+        "NativeFrameInterpolationModel::interpolate_sequence",
+        "cast_to_with_context_exact_native",
+        "NativeTensorPayload::from_image"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "required_mappings": [
+        {
+          "name": "frame-interpolate-binds-the-exact-source-schema-presentation-and-output-ordinal",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "FrameInterpolate[\\s\\S]*interp_model[\\s\\S]*images[\\s\\S]*multiplier[\\s\\S]*Run Frame Interpolation Model[\\s\\S]*frame interpolation[\\s\\S]*images"
+        },
+        {
+          "name": "frame-interpolate-preserves-source-handle-identity-bypass-after-integrity-resolution",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "resolve\\([\\s\\S]*parsed.interp_model[\\s\\S]*resolve\\([\\s\\S]*parsed.images[\\s\\S]*frame_count < 2[\\s\\S]*interpolation_outcome\\(parsed.images.clone\\(\\)\\)"
+        },
+        {
+          "name": "frame-interpolate-delegates-dtype-stream-and-sequence-execution-to-canonical-owners",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "frame_interpolation_resource[\\s\\S]*model.stream\\(\\)[\\s\\S]*cast_to_with_context_exact_native[\\s\\S]*model.dtype\\(\\)[\\s\\S]*interpolate_sequence[\\s\\S]*DType::F32[\\s\\S]*NativeTensorPayload::from_image"
+        },
+        {
+          "name": "frame-interpolate-maps-typed-terminal-failures-and-revokes-late-output",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "FrameInterpolationError::ResourceExhausted[\\s\\S]*frame_interpolation_resource_exhausted[\\s\\S]*rollback_interpolation_output[\\s\\S]*CancellationToken::default\\(\\)[\\s\\S]*revoke"
+        },
+        {
+          "name": "frame-interpolate-tests-source-descriptor-identity-bypass-real-delegation-and-atomic-rejection",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "frame_interpolate_descriptor_fixture_and_cache_match_source[\\s\\S]*frame_interpolate_bypass_returns_exact_input_handle_without_compute[\\s\\S]*frame_interpolate_executes_reduced_rife_and_publishes_canonical_image[\\s\\S]*frame_interpolate_rejects_invalid_requests_and_cancellation_atomically[\\s\\S]*frame_interpolate_maps_exhaustion_rolls_back_late_cancellation_and_retries"
+        },
+        {
+          "name": "frame-interpolate-fixture-bounds-positive-and-negative-evidence",
+          "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json",
+          "pattern": "COMFY-NODE-0190[\\s\\S]*identity_preserving_bypass[\\s\\S]*retained_frame_interpolation_delegation[\\s\\S]*model_loader_or_checkpoint_acquisition[\\s\\S]*progress_event_parity[\\s\\S]*external_media_publication"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-frame-interpolate-node-foundation"
+      ],
+      "production_consumers": [
+        "the generated native implementation registry, pre-admitted FrameInterpolate workflow execution, and later video-family reconciliation"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41",
+        "Requirement 42",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D18",
+        "D20",
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-NODE-002",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One exact source node validates both required handles, preserves the under-two-frame source identity bypass, delegates non-bypass execution once to the retained model and canonical tensor owners, and publishes only a complete canonical IMAGE with cancellation rollback. Loading, model math, fallback scheduling, progress, codecs, effects, cache persistence, recovery, and external output remain separate owners."
+    },
+    {
       "concern": "native_video_reviewed_codec_symbol_binding",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::bind_certified_video_codec_abi",
       "owner_files": [
