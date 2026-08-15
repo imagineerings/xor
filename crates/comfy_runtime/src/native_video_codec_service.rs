@@ -27,7 +27,7 @@ use std::{
 use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
-const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v5";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v6";
 
 #[allow(
     dead_code,
@@ -144,6 +144,7 @@ pub(crate) struct NativeOwnedVp9Webm {
     height: i32,
     frame_rate: (i32, i32),
     frame_count: usize,
+    has_alpha: bool,
 }
 
 #[allow(
@@ -169,6 +170,10 @@ impl NativeOwnedVp9Webm {
 
     pub(crate) fn frame_count(&self) -> usize {
         self.frame_count
+    }
+
+    pub(crate) fn has_alpha(&self) -> bool {
+        self.has_alpha
     }
 }
 
@@ -622,6 +627,7 @@ fn process_vp9_webm_request(
     let (width, height) = encoded.dimensions();
     let frame_rate = encoded.frame_rate();
     let frame_count = encoded.frame_count();
+    let has_alpha = encoded.has_alpha();
     let encoded_bytes = encoded
         .encoded_bytes()
         .map_err(map_vp9_thread_encode_error)?;
@@ -633,6 +639,7 @@ fn process_vp9_webm_request(
         height,
         frame_rate,
         frame_count,
+        has_alpha,
     )?;
     drop(encoded);
     context
@@ -650,6 +657,7 @@ fn materialize_owned_vp9_webm(
     height: i32,
     frame_rate: (i32, i32),
     frame_count: usize,
+    has_alpha: bool,
 ) -> Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError> {
     context
         .check()
@@ -672,6 +680,7 @@ fn materialize_owned_vp9_webm(
         height,
         frame_rate,
         frame_count,
+        has_alpha,
     })
 }
 
@@ -1082,7 +1091,9 @@ mod tests {
         assert_send_sync::<NativeOwnedVp9Webm>();
 
         let cancellation = CancellationToken::default();
-        let (backend, image, scratch) = test_image_and_context(&cancellation)?;
+        let (backend, _image, scratch) = test_image_and_context(&cancellation)?;
+        let image_context = request_context(scratch.clone(), &cancellation);
+        let image = ImageTensor::from_f32(&backend, &image_context, 1, 2, 2, 4, &[0.5; 16])?;
         let events = Arc::new(Mutex::new(Vec::new()));
         let actor_backend = backend.clone();
         let service = start_ltxv_codec_thread({
@@ -1115,7 +1126,14 @@ mod tests {
                             NativeVideoCodecThreadOperation::Preprocess { image, .. } => {
                                 Ok(NativeVideoCodecThreadOutput::Image(image))
                             }
-                            NativeVideoCodecThreadOperation::EncodeVp9Webm { metadata, .. } => {
+                            NativeVideoCodecThreadOperation::EncodeVp9Webm {
+                                images,
+                                metadata,
+                                ..
+                            } => {
+                                if !matches!(images.dimensions(), Ok((_, _, _, 4))) {
+                                    return Err(NativeLtxvCodecThreadError::StatePoisoned);
+                                }
                                 let entries = metadata.entries();
                                 if entries.len() != 3
                                     || entries[0].0.as_bytes() != b"prompt"
@@ -1134,6 +1152,7 @@ mod tests {
                                     2,
                                     (125, 2997),
                                     3,
+                                    true,
                                 )?;
                                 Ok(NativeVideoCodecThreadOutput::Vp9Webm(encoded))
                             }
@@ -1172,6 +1191,7 @@ mod tests {
         assert_eq!(encoded.dimensions(), (2, 2));
         assert_eq!(encoded.frame_rate(), (125, 2997));
         assert_eq!(encoded.frame_count(), 3);
+        assert!(encoded.has_alpha());
         assert_eq!(
             encoded.content_sha256(),
             <[u8; 32]>::from(Sha256::digest(b"HPPPT"))
@@ -1203,7 +1223,7 @@ mod tests {
         let baseline = backend.memory_snapshot().current_bytes;
 
         let encoded =
-            materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3)?;
+            materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3, false)?;
         assert_eq!(scratch.in_use_bytes(), 0);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
         drop(encoded);
@@ -1221,6 +1241,7 @@ mod tests {
                 2,
                 (125, 2997),
                 3,
+                false,
             ),
             Err(NativeLtxvCodecThreadError::Cancelled)
         ));
@@ -1240,13 +1261,15 @@ mod tests {
                 2,
                 (125, 2997),
                 3,
+                false,
             ),
             Err(NativeLtxvCodecThreadError::ResourceExhausted)
         ));
         assert_eq!(constrained_backend.memory_snapshot().current_bytes, 0);
         assert_eq!(constrained_scratch.in_use_bytes(), 0);
 
-        let retry = materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3)?;
+        let retry =
+            materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3, false)?;
         assert_eq!(retry.encoded_bytes()?, b"HPPPT");
         assert_eq!(scratch.in_use_bytes(), 0);
         Ok(())

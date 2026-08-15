@@ -323,6 +323,7 @@ pub(crate) struct NativeVp9Webm<'suite> {
     height: i32,
     frame_rate: abi::AvRational,
     frame_count: usize,
+    has_alpha: bool,
 }
 
 #[allow(
@@ -348,6 +349,10 @@ impl NativeVp9Webm<'_> {
 
     pub(crate) fn frame_count(&self) -> usize {
         self.frame_count
+    }
+
+    pub(crate) fn has_alpha(&self) -> bool {
+        self.has_alpha
     }
 }
 
@@ -959,6 +964,7 @@ impl NativeVideoCodecSuite {
             height,
             frame_rate,
             frame_count: 1,
+            has_alpha: false,
         })
     }
 
@@ -1000,7 +1006,8 @@ impl NativeVideoCodecSuite {
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeVp9Webm<'suite>, NativeVideoCodecVp9EncodeError> {
-        let (frame_count, width, height) = validate_vp9_image_batch(images, limits, context)?;
+        let (frame_count, width, height, channels) =
+            validate_vp9_image_batch(images, limits, context)?;
         let frame_rate = checked_vp9_frame_rate(frame_rate)?;
         context.check().map_err(map_vp9_tensor_error)?;
         let _native_session_workspace = backend
@@ -1020,11 +1027,23 @@ impl NativeVideoCodecSuite {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| {
-            let frame = source_compatible_vp9_rgb8_frame(images, frame_index, backend, context)?;
-            consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
+            if channels == 3 {
+                let frame =
+                    source_compatible_vp9_rgb8_frame(images, frame_index, backend, context)?;
+                consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
+            } else {
+                let frame =
+                    source_compatible_vp9_rgba8_frame(images, frame_index, backend, context)?;
+                consume(&frame)
+            }
+        };
+        let profile = if channels == 4 {
+            NativeRgb8EncodeProfile::vp9_webm_alpha(frame_rate, crf)
+        } else {
+            NativeRgb8EncodeProfile::vp9_webm(frame_rate, crf)
         };
         encode_rgb8_frames_with_metadata_check(
-            NativeRgb8EncodeProfile::vp9_webm(frame_rate, crf),
+            profile,
             self.vpx_vp9_encoder,
             frame_count,
             width,
@@ -1048,6 +1067,7 @@ impl NativeVideoCodecSuite {
             height,
             frame_rate,
             frame_count,
+            has_alpha: channels == 4,
         })
     }
 }
@@ -1409,7 +1429,7 @@ fn validate_vp9_image_batch(
     images: &ImageTensor,
     limits: NativeVp9WebmBatchLimits,
     context: &ExecutionContext<'_>,
-) -> Result<(usize, i32, i32), NativeVideoCodecVp9EncodeError> {
+) -> Result<(usize, i32, i32, i32), NativeVideoCodecVp9EncodeError> {
     let descriptor = images.tensor().descriptor();
     if descriptor.stream() != context.stream {
         return Err(NativeVideoCodecVp9EncodeError::InvalidBatch);
@@ -1417,7 +1437,7 @@ fn validate_vp9_image_batch(
     let [frame_count, height, width, channels] = descriptor.shape() else {
         return Err(NativeVideoCodecVp9EncodeError::InvalidBatch);
     };
-    if *channels != 3 {
+    if !matches!(*channels, 3 | 4) {
         return Err(NativeVideoCodecVp9EncodeError::InvalidBatch);
     }
     let frame_count = usize::try_from(*frame_count)
@@ -1438,7 +1458,11 @@ fn validate_vp9_image_batch(
         .ok()
         .filter(|value| *value > 0)
         .ok_or(NativeVideoCodecVp9EncodeError::InvalidBatch)?;
-    Ok((frame_count, width, height))
+    let channels = i32::try_from(*channels)
+        .ok()
+        .filter(|channels| matches!(*channels, 3 | 4))
+        .ok_or(NativeVideoCodecVp9EncodeError::InvalidBatch)?;
+    Ok((frame_count, width, height, channels))
 }
 
 fn source_compatible_vp9_rgb8_frame(
@@ -1495,6 +1519,52 @@ fn source_compatible_vp9_rgb8_frame(
         .upload_bytes(descriptor, &bytes, context)
         .map_err(map_vp9_staging_tensor_error)?;
     Rgb8ImageTensor::from_tensor(tensor).map_err(map_vp9_staging_tensor_error)
+}
+
+fn source_compatible_vp9_rgba8_frame(
+    images: &ImageTensor,
+    frame_index: usize,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<CpuWorkspaceVec<u8>, NativeVideoCodecLtxvEncodeError> {
+    context.check().map_err(map_vp9_staging_tensor_error)?;
+    let [frame_count, height, width, 4] = images.tensor().descriptor().shape() else {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    };
+    let frame_count =
+        usize::try_from(*frame_count).map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    if frame_index >= frame_count {
+        return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+    }
+    let frame_elements = height
+        .checked_mul(*width)
+        .and_then(|pixels| pixels.checked_mul(4))
+        .and_then(|elements| usize::try_from(elements).ok())
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let start = frame_index
+        .checked_mul(frame_elements)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let end = start
+        .checked_add(frame_elements)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let input = images
+        .as_f32_slice()
+        .map_err(map_vp9_staging_tensor_error)?
+        .get(start..end)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let mut bytes = backend
+        .workspace_vec(context, frame_elements)
+        .map_err(map_vp9_staging_tensor_error)?;
+    for (index, value) in input.iter().copied().enumerate() {
+        if index & 0xffff == 0 {
+            context.check().map_err(map_vp9_staging_tensor_error)?;
+        }
+        bytes
+            .try_push((value * 255.0).clamp(0.0, 255.0) as u8)
+            .map_err(map_vp9_staging_tensor_error)?;
+    }
+    context.check().map_err(map_vp9_staging_tensor_error)?;
+    Ok(bytes)
 }
 
 fn map_vp9_staging_tensor_error(error: TensorError) -> NativeVideoCodecLtxvEncodeError {
@@ -3202,6 +3272,10 @@ struct NativeRgb8EncodeProfile {
     frame_time_base: abi::AvRational,
     frame_rate: Option<abi::AvRational>,
     crf: NativeRgb8Crf,
+    source_pixel_format: i32,
+    destination_pixel_format: i32,
+    destination_pixel_format_name: &'static std::ffi::CStr,
+    source_channels: i32,
 }
 
 #[allow(
@@ -3216,6 +3290,10 @@ impl NativeRgb8EncodeProfile {
             frame_time_base: ltxv_frame_time_base(),
             frame_rate: None,
             crf: NativeRgb8Crf::Integer(crf),
+            source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
+            destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P,
+            destination_pixel_format_name: c"yuv420p",
+            source_channels: 3,
         }
     }
 
@@ -3229,6 +3307,27 @@ impl NativeRgb8EncodeProfile {
             },
             frame_rate: Some(frame_rate),
             crf: NativeRgb8Crf::SourceFloat(crf),
+            source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
+            destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P,
+            destination_pixel_format_name: c"yuv420p",
+            source_channels: 3,
+        }
+    }
+
+    fn vp9_webm_alpha(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
+        Self {
+            kind: NativeRgb8CodecKind::Vp9,
+            container: c"webm",
+            frame_time_base: abi::AvRational {
+                numerator: frame_rate.denominator,
+                denominator: frame_rate.numerator,
+            },
+            frame_rate: Some(frame_rate),
+            crf: NativeRgb8Crf::SourceFloat(crf),
+            source_pixel_format: abi::AV_PIXEL_FORMAT_RGBA,
+            destination_pixel_format: abi::AV_PIXEL_FORMAT_YUVA420P,
+            destination_pixel_format_name: c"yuva420p",
+            source_channels: 4,
         }
     }
 
@@ -3443,7 +3542,7 @@ fn encode_rgb8_frames_with_metadata_check(
         checked_native_call!((functions.av_opt_set)(
             codec.pointer.as_ptr().cast(),
             c"pixel_format".as_ptr(),
-            c"yuv420p".as_ptr(),
+            profile.destination_pixel_format_name.as_ptr(),
             0,
         )),
     )?;
@@ -3578,7 +3677,7 @@ fn encode_rgb8_frames_with_metadata_check(
     unsafe {
         frame.pointer.as_mut().width = width;
         frame.pointer.as_mut().height = height;
-        frame.pointer.as_mut().format = abi::AV_PIXEL_FORMAT_YUV420P;
+        frame.pointer.as_mut().format = profile.destination_pixel_format;
         frame.pointer.as_mut().presentation_timestamp = 0;
     }
     check_ltxv_native_status(
@@ -3599,10 +3698,10 @@ fn encode_rgb8_frames_with_metadata_check(
     let sws_pointer = checked_native_call!((functions.sws_get_context)(
         width,
         height,
-        abi::AV_PIXEL_FORMAT_RGB24,
+        profile.source_pixel_format,
         width,
         height,
-        abi::AV_PIXEL_FORMAT_YUV420P,
+        profile.destination_pixel_format,
         abi::SWS_BILINEAR,
         std::ptr::null_mut(),
         std::ptr::null_mut(),
@@ -3617,7 +3716,7 @@ fn encode_rgb8_frames_with_metadata_check(
         free: functions.sws_free_context,
     };
     let source_stride = width
-        .checked_mul(3)
+        .checked_mul(profile.source_channels)
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
     let mut source_line_size = [0_i32; abi::AV_NUM_DATA_POINTERS];
     source_line_size[0] = source_stride;
@@ -3635,7 +3734,9 @@ fn encode_rgb8_frames_with_metadata_check(
             let expected_bytes = usize::try_from(width)
                 .ok()
                 .and_then(|width| width.checked_mul(usize::try_from(height).ok()?))
-                .and_then(|pixels| pixels.checked_mul(3))
+                .and_then(|pixels| {
+                    pixels.checked_mul(usize::try_from(profile.source_channels).ok()?)
+                })
                 .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
             if input.len() != expected_bytes {
                 return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
@@ -7305,16 +7406,16 @@ mod tests {
     unsafe extern "C" fn mock_encode_sws_get(
         _source_width: i32,
         _source_height: i32,
-        _source_format: i32,
+        source_format: i32,
         _destination_width: i32,
         _destination_height: i32,
-        _destination_format: i32,
+        destination_format: i32,
         _flags: i32,
         _source_filter: *mut abi::SwsFilter,
         _destination_filter: *mut abi::SwsFilter,
         _parameters: *const f64,
     ) -> *mut abi::SwsContext {
-        record_encode_event("sws_alloc");
+        record_encode_event(format!("sws_alloc:{source_format}->{destination_format}"));
         Box::into_raw(Box::new(0_u8)).cast()
     }
 
@@ -8339,7 +8440,9 @@ mod tests {
         let images = ImageTensor::from_f32(&backend, &context, 3, 2, 2, 3, &values)?;
         let session = NativeVp9WebmEncodeLimits::checked(64, 64, 1, 16)?;
         let limits = NativeVp9WebmBatchLimits::checked(session, 3, 4)?;
-        let (frame_count, width, height) = validate_vp9_image_batch(&images, limits, &context)?;
+        let (frame_count, width, height, channels) =
+            validate_vp9_image_batch(&images, limits, &context)?;
+        assert_eq!(channels, 3);
         let mut output = mock_encode_output(&backend, &context, 64)?;
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
@@ -8419,6 +8522,160 @@ mod tests {
     }
 
     #[test]
+    fn retained_vp9_webm_alpha_batch_preserves_rgba_profile_and_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        reset_encode_fixture()?;
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 256 * 1024)?;
+        let mut values = Vec::new();
+        for _pixel in 0..4 {
+            values.extend_from_slice(&[-1.0, 0.0, 0.5, 2.0]);
+        }
+        for _pixel in 0..4 {
+            values.extend_from_slice(&[1.0, 0.25, 0.75, 0.0]);
+        }
+        let images = ImageTensor::from_f32(&backend, &context, 2, 2, 2, 4, &values)?;
+        let session = NativeVp9WebmEncodeLimits::checked(64, 64, 1, 16)?;
+        let limits = NativeVp9WebmBatchLimits::checked(session, 2, 4)?;
+        let (frame_count, width, height, channels) =
+            validate_vp9_image_batch(&images, limits, &context)?;
+        assert_eq!(channels, 4);
+        let metadata = NativeVideoContainerMetadata::checked(
+            vec![("prompt".to_owned(), "alpha".to_owned())],
+            NativeVideoContainerMetadataLimits::checked(1, 16, 16, 32)?,
+        )?;
+        let mut output = mock_encode_output(&backend, &context, 64)?;
+        let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
+            .ok_or("mock encoder allocation failed")?;
+        let mut provide_frame = |frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| {
+            let frame =
+                source_compatible_vp9_rgba8_frame(&images, frame_index, &backend, &context)?;
+            consume(&frame)
+        };
+        encode_rgb8_frames_with_metadata_check(
+            NativeRgb8EncodeProfile::vp9_webm_alpha(
+                checked_vp9_frame_rate((2_997, 125))?,
+                NativeVideoCrf::checked(31.5)?,
+            ),
+            encoder,
+            frame_count,
+            width,
+            height,
+            session.maximum_packet_iterations,
+            &mock_encode_functions(),
+            &mut output,
+            &metadata,
+            &mut provide_frame,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(output.staged_bytes()?, b"HPPT");
+        drop(output);
+        drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        let events = take_encode_events()?;
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "option:pixel_format=yuva420p")
+        );
+        assert!(events.iter().any(|event| event == "sws_alloc:26->33"));
+        assert!(events.iter().any(|event| {
+            event == "rgb:[0, 0, 127, 255, 0, 0, 127, 255, 0, 0, 127, 255, 0, 0, 127, 255]"
+        }));
+        assert!(events.iter().any(|event| {
+            event == "rgb:[255, 63, 191, 0, 255, 63, 191, 0, 255, 63, 191, 0, 255, 63, 191, 0]"
+        }));
+        let metadata_index = events
+            .iter()
+            .position(|event| event == "metadata:prompt=alpha:flags=0")
+            .ok_or("alpha metadata was not attached")?;
+        let stream_index = events
+            .iter()
+            .position(|event| event == "stream_alloc")
+            .ok_or("alpha stream was not allocated")?;
+        assert!(metadata_index < stream_index);
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.as_str() == "frame_writable")
+                .count(),
+            2
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.as_str() == "send_flush")
+                .count(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_vp9_webm_alpha_staging_cancellation_and_retry_are_atomic()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(4096)?;
+        let construction_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let images =
+            ImageTensor::from_f32(&backend, &construction_context, 1, 2, 2, 4, &[0.5; 16])?;
+        assert_eq!(construction_context.scratch.in_use_bytes(), 0);
+
+        let constrained_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(8)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            source_compatible_vp9_rgba8_frame(&images, 0, &backend, &constrained_context,),
+            Err(NativeVideoCodecLtxvEncodeError::ResourceExhausted { .. })
+        ));
+        assert_eq!(constrained_context.scratch.in_use_bytes(), 0);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(64)?,
+            rng_phase: None,
+            cancellation: &cancelled,
+        };
+        assert!(matches!(
+            source_compatible_vp9_rgba8_frame(&images, 0, &backend, &cancelled_context),
+            Err(NativeVideoCodecLtxvEncodeError::Cancelled)
+        ));
+        assert_eq!(cancelled_context.scratch.in_use_bytes(), 0);
+
+        let retry_context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(64)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let staged = source_compatible_vp9_rgba8_frame(&images, 0, &backend, &retry_context)?;
+        assert_eq!(&*staged, &[127; 16]);
+        drop(staged);
+        assert_eq!(retry_context.scratch.in_use_bytes(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn retained_vp9_webm_batch_encode_validates_bounds_and_global_protocol()
     -> Result<(), Box<dyn std::error::Error>> {
         let _test_serial_guard = TEST_SERIAL
@@ -8446,8 +8703,13 @@ mod tests {
             Err(NativeVideoCodecVp9EncodeError::InvalidBatch)
         ));
         let four_channel = ImageTensor::from_f32(&backend, &context, 1, 2, 2, 4, &[0.5; 16])?;
+        assert_eq!(
+            validate_vp9_image_batch(&four_channel, limits, &context)?,
+            (1, 2, 2, 4)
+        );
+        let one_channel = ImageTensor::from_f32(&backend, &context, 1, 2, 2, 1, &[0.5; 4])?;
         assert!(matches!(
-            validate_vp9_image_batch(&four_channel, limits, &context),
+            validate_vp9_image_batch(&one_channel, limits, &context),
             Err(NativeVideoCodecVp9EncodeError::InvalidBatch)
         ));
 

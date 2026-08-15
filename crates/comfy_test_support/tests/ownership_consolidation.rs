@@ -13638,7 +13638,7 @@ fn val_ownership_native_video_codec_plan_foundation_001() -> Result<(), Box<dyn 
             .get("required_mappings")
             .and_then(serde_json::Value::as_array)
             .map(Vec::len),
-        Some(4)
+        Some(5)
     );
     Ok(())
 }
@@ -14906,7 +14906,7 @@ fn val_ownership_native_video_codec_suite_admission_001() -> Result<(), Box<dyn 
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.ltxv-codec-thread.v2",
+        "sim.comfy.video-codec-thread.v6",
         ".admit_ltxv_h264(&startup_cancellation)",
         ".admit_video_suite(&startup_cancellation)",
         "codec: &NativeVideoCodecSuite",
@@ -15247,7 +15247,7 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
         "NativeVideoCrf",
         "crf.bits() != 31.5_f64.to_bits()",
         "NativeVideoCrf::checked(31.5)",
-        "sim.comfy.video-codec-thread.v5",
+        "sim.comfy.video-codec-thread.v6",
     ] {
         assert!(service.contains(required), "VP9 CRF actor lacks {required}");
     }
@@ -15348,7 +15348,7 @@ fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v5",
+        "sim.comfy.video-codec-thread.v6",
         "metadata: NativeVideoContainerMetadata",
         "encode_vp9_webm_batch_with_metadata",
         "metadata.entries()",
@@ -15379,6 +15379,130 @@ fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
         root.join(".agents/specs/comfy-parity/ownership-policy.json"),
     )?)?;
     let task_id = "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .count();
+    assert_eq!(mapped_concerns, 3);
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_vp9_webm_alpha_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    for (path, digest) in [
+        (
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "c5d4780cac865e9dd327f42f80278e6cfd4d85a94cbdd48cafbc981872b440ec",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/verify-data-plane-bindings.c",
+            "bb61bec6fa7e300f2730f1df7ad88abafabdb21f0942b5a61f9dfde3f7ffc9f6",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-container-metadata-v1.json",
+            "cb989b103743491f19d41a7f451bac06c055496a9ff2cf3d37b12d92b133192d",
+        ),
+        (
+            "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
+            "77f5613573c64754138c793d669c928fb066fc988093177e3c98011ece8d6c58",
+        ),
+    ] {
+        assert_eq!(file_sha256(&root.join(path))?, digest);
+    }
+
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    for required in [
+        "AV_PIXEL_FORMAT_RGBA: c_int = 26",
+        "AV_PIXEL_FORMAT_YUVA420P: c_int = 33",
+        "vp9_webm_alpha_manifest_matches_compiled_pixel_formats",
+    ] {
+        assert!(abi.contains(required), "VP9 alpha ABI lacks {required}");
+    }
+
+    let overlay = fs::read_to_string(
+        root.join("crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1.json"),
+    )?;
+    for required in [
+        "ffmpeg-7.1-x86_64-gnu-vp9-alpha-v1",
+        "\"symbol_count\": 54",
+        "\"new_symbols\": 0",
+        "\"AV_PIX_FMT_RGBA\": 26",
+        "\"AV_PIX_FMT_YUVA420P\": 33",
+    ] {
+        assert!(
+            overlay.contains(required),
+            "VP9 alpha overlay lacks {required}"
+        );
+    }
+
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "fn vp9_webm_alpha",
+        "source_pixel_format: abi::AV_PIXEL_FORMAT_RGBA",
+        "destination_pixel_format: abi::AV_PIXEL_FORMAT_YUVA420P",
+        "destination_pixel_format_name: c\"yuva420p\"",
+        "source_compatible_vp9_rgba8_frame",
+        "retained_vp9_webm_alpha_batch_preserves_rgba_profile_and_order",
+        "retained_vp9_webm_alpha_staging_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(ffi.contains(required), "VP9 alpha FFI lacks {required}");
+    }
+
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "sim.comfy.video-codec-thread.v6",
+        "has_alpha: bool",
+        "pub(crate) fn has_alpha",
+        "encoded.has_alpha()",
+        "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv",
+    ] {
+        assert!(
+            service.contains(required),
+            "VP9 alpha actor lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeVp9Webm",
+        "unsafe impl Sync for NativeVp9Webm",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden) && !service.contains(forbidden),
+            "VP9 alpha owner exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-source-compatible-vp9-webm-alpha-execution",
+        "source_rgba_quantization_and_profile_reach_retained_session",
+        "rgb_profile_is_regression_preserved",
+        "playable_webm_or_decoded_numeric_alpha_or_color_oracle",
+        "json_serialization_node_effect_path_ui_or_output_committer_reachable",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VP9 alpha fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-codec-vp9-webm-alpha-foundation";
     let mapped_concerns = policy
         .get("concerns")
         .and_then(serde_json::Value::as_array)
@@ -15721,7 +15845,7 @@ fn val_ownership_native_video_codec_ltxv_thread_service_001()
         "mpsc::sync_channel(1)",
         ".try_send(request)",
         "validate_scratch_reservation",
-        "process_ltxv_codec_request",
+        "process_video_codec_request",
         "runner.join()",
         "retained_ltxv_codec_thread_is_send_sync_serial_and_thread_affine",
         "retained_ltxv_codec_thread_bounds_queue_cancellation_failure_and_retry",
