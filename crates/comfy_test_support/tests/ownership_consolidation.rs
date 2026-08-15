@@ -14866,6 +14866,99 @@ fn val_ownership_native_video_codec_ltxv_h264_admission_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_suite_admission_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeVideoCodecSuite",
+        "pub(crate) fn admit_video_suite(",
+        "has_exact_video_codec_suite_dependency_contract",
+        "admit_video_suite_with_check",
+        "c\"aac\"",
+        "c\"libsvtav1\"",
+        "c\"libvpx-vp9\"",
+        "abi::AV_CODEC_ID_AAC",
+        "abi::AV_CODEC_ID_VP9",
+        "abi::AV_CODEC_ID_AV1",
+        "prove_codec_descriptor_provider",
+        "retained_video_codec_suite_admission_uses_exact_registered_codec_set",
+        "retained_video_codec_suite_admission_rejects_each_missing_descriptor",
+        "retained_video_codec_suite_admission_rejects_wrong_descriptor_provider",
+        "retained_video_codec_suite_admission_cancellation_is_atomic_and_retryable",
+    ] {
+        assert!(ffi.contains(required), "video codec suite lacks {required}");
+    }
+    for forbidden in [
+        "pub fn aac_encoder_ptr",
+        "pub fn av1_decoder_ptr",
+        "unsafe impl Send for NativeVideoCodecSuite",
+        "unsafe impl Sync for NativeVideoCodecSuite",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "video codec suite exposes forbidden {forbidden}"
+        );
+    }
+
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "sim.comfy.ltxv-codec-thread.v2",
+        ".admit_ltxv_h264(&startup_cancellation)",
+        ".admit_video_suite(&startup_cancellation)",
+        "codec: &NativeVideoCodecSuite",
+    ] {
+        assert!(
+            service.contains(required),
+            "video codec suite service integration lacks {required}"
+        );
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-retained-native-video-codec-suite-admission",
+        "one_binding_and_loaded_namespace_retained",
+        "codec_thread_service_retains_the_suite",
+        "codec_context_format_frame_packet_or_avio_allocated",
+        "mux_demux_encode_or_decode_executed",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "video codec suite fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_suite_admission")
+            })
+        })
+        .ok_or("missing video codec suite admission ownership concern")?;
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str() == Some("comfy-parity-native-video-codec-suite-admission-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

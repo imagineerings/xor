@@ -1,8 +1,9 @@
 use crate::{
-    CertifiedVideoCodecDependencyClosure, NativeLtxvH264Codec, NativeLtxvH264PreprocessLimits,
+    CertifiedVideoCodecDependencyClosure, NativeLtxvH264PreprocessLimits,
     NativeVideoCodecBindingError, NativeVideoCodecLoadError, NativeVideoCodecLtxvAdmissionError,
-    NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions,
-    bind_certified_video_codec_abi, load_certified_video_codec_closure,
+    NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite,
+    NativeVideoCodecSuiteAdmissionError, bind_certified_video_codec_abi,
+    load_certified_video_codec_closure,
 };
 use comfy_nodes::{
     NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
@@ -23,7 +24,7 @@ use std::{
 use thiserror::Error;
 
 const LTXV_CODEC_THREAD_NAME: &str = "comfy-ltxv-codec";
-const LTXV_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.ltxv-codec-thread.v1";
+const LTXV_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.ltxv-codec-thread.v2";
 
 #[allow(
     dead_code,
@@ -87,6 +88,8 @@ pub(crate) enum NativeLtxvCodecThreadError {
     Binding(#[source] Box<NativeVideoCodecBindingError>),
     #[error("native LTXV codec admission failed: {0}")]
     Admission(#[source] Box<NativeVideoCodecLtxvAdmissionError>),
+    #[error("native video codec-suite admission failed: {0}")]
+    SuiteAdmission(#[source] Box<NativeVideoCodecSuiteAdmissionError>),
     #[error("native LTXV preprocessing failed: {0}")]
     Preprocess(#[source] Box<NativeVideoCodecLtxvPreprocessError>),
 }
@@ -164,6 +167,9 @@ impl NativeLtxvCodecThreadService {
             let codec = binding
                 .admit_ltxv_h264(&startup_cancellation)
                 .map_err(|error| NativeLtxvCodecThreadError::Admission(Box::new(error)))?;
+            let codec = codec
+                .admit_video_suite(&startup_cancellation)
+                .map_err(|error| NativeLtxvCodecThreadError::SuiteAdmission(Box::new(error)))?;
             startup_cancellation
                 .check()
                 .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
@@ -402,6 +408,7 @@ fn map_ltxv_node_service_error(
         | NativeLtxvCodecThreadError::Load(_)
         | NativeLtxvCodecThreadError::Binding(_)
         | NativeLtxvCodecThreadError::Admission(_)
+        | NativeLtxvCodecThreadError::SuiteAdmission(_)
         | NativeLtxvCodecThreadError::Preprocess(_)) => {
             NativeLtxvPreprocessServiceError::Execution(error.to_string())
         }
@@ -409,7 +416,7 @@ fn map_ltxv_node_service_error(
 }
 
 fn process_ltxv_codec_request(
-    codec: &NativeLtxvH264Codec,
+    codec: &NativeVideoCodecSuite,
     backend: &CpuBackend,
     limits: NativeLtxvH264PreprocessLimits,
     request: NativeLtxvCodecThreadInvocation,

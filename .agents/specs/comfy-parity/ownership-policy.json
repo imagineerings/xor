@@ -14554,6 +14554,98 @@
       "decision_reason": "One retained operation-scoped owner converts the exact typed FFmpeg binding into the concrete libx264 encoder and H.264 decoder authority required by LTXV. It invokes only bounded registry lookups, proves retained avcodec descriptor provenance, and keeps all pointers private until the following session owns codec allocation and execution."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_suite_admission",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecSuite",
+        "NativeLtxvH264Codec::admit_video_suite",
+        "admit_video_suite_with_check",
+        "has_exact_video_codec_suite_dependency_contract"
+      ],
+      "allowed_adapters": [
+        "the signed trust closure remains the sole exact encoder-provider, dependency-certificate, and avcodec-edge authority",
+        "the retained LTXV pair remains the sole binding and loaded-namespace owner while the suite adds private ordinary-video descriptor witnesses",
+        "the retained codec thread owns and destroys the suite on its native thread and delegates existing LTXV preprocessing without a second loader or namespace",
+        "later bounded MP4 and WebM sessions may borrow only the private typed suite authority and may not expose a pointer, path, boolean facade, handle, cache, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVideoCodecSuite"
+        }
+      ],
+      "call_symbols": [
+        "avcodec_find_encoder_by_name",
+        "avcodec_find_decoder"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-codec-suite-validates-exact-signed-provider-contract",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "has_exact_video_codec_suite_dependency_contract[\\s\\S]*aac[\\s\\S]*avcodec[\\s\\S]*libsvtav1[\\s\\S]*svtav1[\\s\\S]*libvpx-vp9[\\s\\S]*vpx[\\s\\S]*libx264[\\s\\S]*x264"
+        },
+        {
+          "name": "video-codec-suite-invokes-exact-registry-set-and-provider-proofs",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "admit_video_suite_with_check[\\s\\S]*c\"aac\"[\\s\\S]*c\"libsvtav1\"[\\s\\S]*c\"libvpx-vp9\"[\\s\\S]*AV_CODEC_ID_AAC[\\s\\S]*AV_CODEC_ID_VP9[\\s\\S]*AV_CODEC_ID_AV1[\\s\\S]*prove_codec_descriptor_provider"
+        },
+        {
+          "name": "video-codec-suite-is-retained-by-existing-thread-service",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "admit_ltxv_h264[\\s\\S]*admit_video_suite[\\s\\S]*process_ltxv_codec_request\\([\\s\\S]*NativeVideoCodecSuite"
+        },
+        {
+          "name": "video-codec-suite-tests-success-missing-provider-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_video_codec_suite_admission_uses_exact_registered_codec_set[\\s\\S]*retained_video_codec_suite_admission_rejects_each_missing_descriptor[\\s\\S]*retained_video_codec_suite_admission_rejects_wrong_descriptor_provider[\\s\\S]*retained_video_codec_suite_admission_cancellation_is_atomic_and_retryable"
+        },
+        {
+          "name": "video-codec-suite-fixture-bounds-nonexecution-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
+          "pattern": "synthetic-retained-native-video-codec-suite-admission[\\s\\S]*one_binding_and_loaded_namespace_retained[\\s\\S]*codec_context_format_frame_packet_or_avio_allocated[\\s\\S]*mux_demux_encode_or_decode_executed[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-suite-admission-foundation"
+      ],
+      "production_consumers": [
+        "the retained LTXV codec thread service and following bounded ordinary MP4 and WebM sessions"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One thread-bound suite extends the existing retained LTXV owner with exact ordinary-video encoder and decoder registry authority, proves every descriptor against the same retained avcodec image, and is exercised by the existing codec thread without creating a second loader, namespace, pointer owner, or media facade."
+    },
+    {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::encode_rgb8_frame",
       "owner_files": [

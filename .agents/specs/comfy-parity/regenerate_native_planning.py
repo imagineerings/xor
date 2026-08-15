@@ -10485,6 +10485,66 @@ def native_frame_interpolate_node_foundation_task(dependency: str) -> dict[str, 
     )
 
 
+def native_video_codec_suite_admission_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-suite-admission-foundation",
+        "Admit the retained native video codec suite",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One thread-affine NativeVideoCodecSuite retains the existing admitted libx264/H.264 pair and the same certified binding while invoking exact registry admission for AAC, SVT-AV1, and VP9 encoders plus AAC, VP9, and AV1 decoders. Every descriptor is non-null, provider-proved against the retained avcodec image, and private to the sole FFI owner. The retained LTXV codec thread now owns this suite and delegates its completed preprocessing path through it; no second loader, binding, namespace, codec context, media payload, effect, cache, persistence, recovery, or publication owner is introduced.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-contract/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-dependency-closure/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-symbol-binding/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Exact-signature tests prove the fixed encoder and decoder lookup set, exact signed encoder-provider contract, retained avcodec descriptor provenance, missing-entry and wrong-provider rejection, cancellation at every lookup/proof boundary, reverse cleanup, clean retry, one suite/binding/load lifetime, and unchanged serial same-thread LTXV service execution. The fixture explicitly excludes installed or licensed codec packages, context/frame/packet/format/AVIO allocation, codec execution or numeric media evidence, handles, effects, cache, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.6",
+            "31.5",
+            "31.6",
+            "32.1",
+            "35.3",
+            "35.5",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -13962,8 +14022,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     frame_interpolate_node_foundation = native_frame_interpolate_node_foundation_task(
         str(frame_interpolation_sequence_fallback_foundation["id"])
     )
+    video_codec_suite_admission_foundation = (
+        native_video_codec_suite_admission_foundation_task(
+            str(frame_interpolate_node_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(frame_interpolate_node_foundation["id"])
+        str(video_codec_suite_admission_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14106,6 +14171,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_component_extract_node_foundation,
         frame_interpolation_sequence_fallback_foundation,
         frame_interpolate_node_foundation,
+        video_codec_suite_admission_foundation,
         video_foundation,
         detection_foundation,
         ]

@@ -106,6 +106,44 @@ pub struct NativeLtxvH264Codec {
     decoder: NonNull<abi::AvCodec>,
 }
 
+pub(crate) struct NativeVideoCodecSuite {
+    ltxv_h264: NativeLtxvH264Codec,
+    #[allow(dead_code, reason = "consumed by the bounded AAC MP4 session")]
+    aac_encoder: NonNull<abi::AvCodec>,
+    #[allow(dead_code, reason = "consumed by the bounded AV1 WebM session")]
+    svt_av1_encoder: NonNull<abi::AvCodec>,
+    #[allow(dead_code, reason = "consumed by the bounded VP9 WebM session")]
+    vpx_vp9_encoder: NonNull<abi::AvCodec>,
+    #[allow(dead_code, reason = "consumed by the bounded AAC decode session")]
+    aac_decoder: NonNull<abi::AvCodec>,
+    #[allow(dead_code, reason = "consumed by the bounded VP9 decode session")]
+    vp9_decoder: NonNull<abi::AvCodec>,
+    #[allow(dead_code, reason = "consumed by the bounded AV1 decode session")]
+    av1_decoder: NonNull<abi::AvCodec>,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum NativeVideoCodecSuiteAdmissionError {
+    #[error("native video codec-suite admission was cancelled")]
+    Cancelled,
+    #[error("native video codec-suite admission is unsupported for this target")]
+    UnsupportedTarget,
+    #[error("the retained native video codec-suite dependency contract is incomplete")]
+    InvalidDependencyContract,
+    #[error("the retained FFmpeg registry has no `{encoder}` encoder")]
+    MissingEncoder { encoder: &'static str },
+    #[error("the retained FFmpeg registry has no `{decoder}` decoder")]
+    MissingDecoder { decoder: &'static str },
+    #[error("the `{codec}` codec descriptor came from the wrong loaded image")]
+    DescriptorProviderMismatch { codec: &'static str },
+}
+
+impl From<CancellationError> for NativeVideoCodecSuiteAdmissionError {
+    fn from(_: CancellationError) -> Self {
+        Self::Cancelled
+    }
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the following retained H.264 decode leaf"
@@ -465,6 +503,37 @@ impl NativeLtxvH264Codec {
         self.binding.runtime_versions()
     }
 
+    pub(crate) fn admit_video_suite(
+        self,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeVideoCodecSuite, NativeVideoCodecSuiteAdmissionError> {
+        if !cfg!(all(
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_env = "gnu"
+        )) {
+            return Err(NativeVideoCodecSuiteAdmissionError::UnsupportedTarget);
+        }
+        if !has_exact_video_codec_suite_dependency_contract(&self.binding) {
+            return Err(NativeVideoCodecSuiteAdmissionError::InvalidDependencyContract);
+        }
+        let descriptors = admit_video_suite_with_check(
+            &self.binding._symbols,
+            &self.binding.load.loaded,
+            || cancellation.check(),
+        )?;
+        cancellation.check()?;
+        Ok(NativeVideoCodecSuite {
+            ltxv_h264: self,
+            aac_encoder: descriptors.aac_encoder,
+            svt_av1_encoder: descriptors.svt_av1_encoder,
+            vpx_vp9_encoder: descriptors.vpx_vp9_encoder,
+            aac_decoder: descriptors.aac_decoder,
+            vp9_decoder: descriptors.vp9_decoder,
+            av1_decoder: descriptors.av1_decoder,
+        })
+    }
+
     #[allow(
         dead_code,
         reason = "consumed by the following retained H.264 decode leaf"
@@ -542,6 +611,32 @@ impl NativeLtxvH264Codec {
                     .map_err(NativeVideoCodecLtxvPreprocessError::Decode)
             },
         )
+    }
+}
+
+impl NativeVideoCodecSuite {
+    pub(crate) fn target(&self) -> &str {
+        self.ltxv_h264.target()
+    }
+
+    pub(crate) fn primary_catalog_sha256(&self) -> &str {
+        self.ltxv_h264.primary_catalog_sha256()
+    }
+
+    pub(crate) fn runtime_versions(&self) -> NativeVideoCodecRuntimeVersions {
+        self.ltxv_h264.runtime_versions()
+    }
+
+    pub(crate) fn preprocess_image(
+        &self,
+        image: &ImageTensor,
+        compression: u8,
+        limits: NativeLtxvH264PreprocessLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<ImageTensor, NativeVideoCodecLtxvPreprocessError> {
+        self.ltxv_h264
+            .preprocess_image(image, compression, limits, backend, context)
     }
 }
 
@@ -3203,6 +3298,141 @@ fn has_exact_ltxv_h264_dependency_contract(binding: &NativeVideoCodecBinding) ->
             .any(|library| library.identity == "x264")
 }
 
+fn has_exact_video_codec_suite_dependency_contract(binding: &NativeVideoCodecBinding) -> bool {
+    let closure = &binding.load.closure;
+    let expected_providers = BTreeMap::from([
+        ("aac".to_owned(), "avcodec".to_owned()),
+        ("libsvtav1".to_owned(), "svtav1".to_owned()),
+        ("libvpx-vp9".to_owned(), "vpx".to_owned()),
+        ("libx264".to_owned(), "x264".to_owned()),
+    ]);
+    if closure.encoder_providers() != &expected_providers {
+        return false;
+    }
+    for dependency in ["svtav1", "vpx", "x264"] {
+        if !closure.dependencies().contains_key(dependency)
+            || !closure.dependency_certificates().contains_key(dependency)
+            || !closure
+                .edges()
+                .iter()
+                .any(|edge| edge.consumer() == "avcodec" && edge.dependency() == dependency)
+            || !binding
+                .load
+                .loaded
+                .libraries
+                .iter()
+                .any(|library| library.identity == dependency)
+        {
+            return false;
+        }
+    }
+    binding
+        .load
+        .loaded
+        .libraries
+        .iter()
+        .any(|library| library.identity == "avcodec")
+}
+
+struct NativeVideoCodecSuiteDescriptors {
+    aac_encoder: NonNull<abi::AvCodec>,
+    svt_av1_encoder: NonNull<abi::AvCodec>,
+    vpx_vp9_encoder: NonNull<abi::AvCodec>,
+    aac_decoder: NonNull<abi::AvCodec>,
+    vp9_decoder: NonNull<abi::AvCodec>,
+    av1_decoder: NonNull<abi::AvCodec>,
+}
+
+fn admit_video_suite_with_check(
+    symbols: &NativeVideoCodecSymbols,
+    loaded: &LoadedVideoCodecLibraries,
+    mut check_cancellation: impl FnMut() -> Result<(), CancellationError>,
+) -> Result<NativeVideoCodecSuiteDescriptors, NativeVideoCodecSuiteAdmissionError> {
+    fn encoder(
+        symbols: &NativeVideoCodecSymbols,
+        loaded: &LoadedVideoCodecLibraries,
+        name: &'static std::ffi::CStr,
+        identity: &'static str,
+        check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+    ) -> Result<NonNull<abi::AvCodec>, NativeVideoCodecSuiteAdmissionError> {
+        check_cancellation()?;
+        let descriptor = unsafe { (symbols.avcodec.avcodec_find_encoder_by_name)(name.as_ptr()) };
+        check_cancellation()?;
+        let descriptor = NonNull::new(descriptor.cast_mut())
+            .ok_or(NativeVideoCodecSuiteAdmissionError::MissingEncoder { encoder: identity })?;
+        prove_codec_descriptor_provider(loaded, descriptor).map_err(|_| {
+            NativeVideoCodecSuiteAdmissionError::DescriptorProviderMismatch { codec: identity }
+        })?;
+        check_cancellation()?;
+        Ok(descriptor)
+    }
+
+    fn decoder(
+        symbols: &NativeVideoCodecSymbols,
+        loaded: &LoadedVideoCodecLibraries,
+        codec_id: std::ffi::c_int,
+        identity: &'static str,
+        check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
+    ) -> Result<NonNull<abi::AvCodec>, NativeVideoCodecSuiteAdmissionError> {
+        check_cancellation()?;
+        let descriptor = unsafe { (symbols.avcodec.avcodec_find_decoder)(codec_id) };
+        check_cancellation()?;
+        let descriptor = NonNull::new(descriptor.cast_mut())
+            .ok_or(NativeVideoCodecSuiteAdmissionError::MissingDecoder { decoder: identity })?;
+        prove_codec_descriptor_provider(loaded, descriptor).map_err(|_| {
+            NativeVideoCodecSuiteAdmissionError::DescriptorProviderMismatch { codec: identity }
+        })?;
+        check_cancellation()?;
+        Ok(descriptor)
+    }
+
+    let aac_encoder = encoder(symbols, loaded, c"aac", "aac", &mut check_cancellation)?;
+    let svt_av1_encoder = encoder(
+        symbols,
+        loaded,
+        c"libsvtav1",
+        "libsvtav1",
+        &mut check_cancellation,
+    )?;
+    let vpx_vp9_encoder = encoder(
+        symbols,
+        loaded,
+        c"libvpx-vp9",
+        "libvpx-vp9",
+        &mut check_cancellation,
+    )?;
+    let aac_decoder = decoder(
+        symbols,
+        loaded,
+        abi::AV_CODEC_ID_AAC,
+        "aac",
+        &mut check_cancellation,
+    )?;
+    let vp9_decoder = decoder(
+        symbols,
+        loaded,
+        abi::AV_CODEC_ID_VP9,
+        "vp9",
+        &mut check_cancellation,
+    )?;
+    let av1_decoder = decoder(
+        symbols,
+        loaded,
+        abi::AV_CODEC_ID_AV1,
+        "av1",
+        &mut check_cancellation,
+    )?;
+    check_cancellation()?;
+    Ok(NativeVideoCodecSuiteDescriptors {
+        aac_encoder,
+        svt_av1_encoder,
+        vpx_vp9_encoder,
+        aac_decoder,
+        vp9_decoder,
+        av1_decoder,
+    })
+}
+
 fn admit_ltxv_h264_with_check(
     symbols: &NativeVideoCodecSymbols,
     loaded: &LoadedVideoCodecLibraries,
@@ -4377,10 +4607,12 @@ mod tests {
     }
 
     #[derive(Clone, Copy)]
-    enum MissingLtxvDescriptor {
+    enum MissingCodecDescriptor {
         None,
-        Encoder,
-        Decoder,
+        LtxvEncoder,
+        H264Decoder,
+        SuiteEncoder(&'static str),
+        SuiteDecoder(std::ffi::c_int),
     }
 
     #[allow(
@@ -4389,7 +4621,7 @@ mod tests {
     )]
     fn binding_fixture(
         changed_version: Option<(&str, u32)>,
-        missing_ltxv_descriptor: MissingLtxvDescriptor,
+        missing_codec_descriptor: MissingCodecDescriptor,
     ) -> Result<BindingFixture, Box<dyn std::error::Error>> {
         use std::fmt::Write as _;
 
@@ -4426,8 +4658,19 @@ mod tests {
             if identity == "avcodec" {
                 source.push_str(
                     "struct AVCodec { unsigned int witness; };\n\
+                     static int same(const char *left, const char *right) {\n\
+                         if (left == 0 || right == 0) return 0;\n\
+                         while (*left != '\\0' && *left == *right) { ++left; ++right; }\n\
+                         return *left == *right;\n\
+                     }\n\
                      static const struct AVCodec ltxv_encoder = { 1u };\n\
-                     static const struct AVCodec h264_decoder = { 2u };\n",
+                     static const struct AVCodec h264_decoder = { 2u };\n\
+                     static const struct AVCodec aac_encoder = { 3u };\n\
+                     static const struct AVCodec svt_av1_encoder = { 4u };\n\
+                     static const struct AVCodec vpx_vp9_encoder = { 5u };\n\
+                     static const struct AVCodec aac_decoder = { 6u };\n\
+                     static const struct AVCodec vp9_decoder = { 7u };\n\
+                     static const struct AVCodec av1_decoder = { 8u };\n",
                 );
             }
             for symbol in symbols {
@@ -4437,26 +4680,44 @@ mod tests {
                         "unsigned int {symbol}(void) {{ return {actual_version}u; }}"
                     )?;
                 } else if *symbol == "avcodec_find_encoder_by_name" {
-                    let return_expression = match missing_ltxv_descriptor {
-                        MissingLtxvDescriptor::Encoder => "0",
-                        MissingLtxvDescriptor::None | MissingLtxvDescriptor::Decoder => {
-                            "name != 0 && name[0] == 'l' && name[1] == 'i' && name[2] == 'b' && name[3] == 'x' && name[4] == '2' && name[5] == '6' && name[6] == '4' && name[7] == '\\0' ? &ltxv_encoder : 0"
-                        }
+                    let missing = match missing_codec_descriptor {
+                        MissingCodecDescriptor::LtxvEncoder => Some("libx264"),
+                        MissingCodecDescriptor::SuiteEncoder(name) => Some(name),
+                        MissingCodecDescriptor::None
+                        | MissingCodecDescriptor::H264Decoder
+                        | MissingCodecDescriptor::SuiteDecoder(_) => None,
                     };
+                    let missing = missing.unwrap_or("");
                     writeln!(
                         source,
-                        "const struct AVCodec *{symbol}(const char *name) {{ return {return_expression}; }}"
+                        "const struct AVCodec *{symbol}(const char *name) {{\n\
+                         if (name == 0 || same(name, \"{missing}\")) return 0;\n\
+                         if (same(name, \"libx264\")) return &ltxv_encoder;\n\
+                         if (same(name, \"aac\")) return &aac_encoder;\n\
+                         if (same(name, \"libsvtav1\")) return &svt_av1_encoder;\n\
+                         if (same(name, \"libvpx-vp9\")) return &vpx_vp9_encoder;\n\
+                         return 0;\n\
+                         }}"
                     )?;
                 } else if *symbol == "avcodec_find_decoder" {
-                    let return_expression = match missing_ltxv_descriptor {
-                        MissingLtxvDescriptor::Decoder => "0",
-                        MissingLtxvDescriptor::None | MissingLtxvDescriptor::Encoder => {
-                            "codec_id == 27 ? &h264_decoder : 0"
-                        }
+                    let missing = match missing_codec_descriptor {
+                        MissingCodecDescriptor::H264Decoder => Some(abi::AV_CODEC_ID_H264),
+                        MissingCodecDescriptor::SuiteDecoder(codec_id) => Some(codec_id),
+                        MissingCodecDescriptor::None
+                        | MissingCodecDescriptor::LtxvEncoder
+                        | MissingCodecDescriptor::SuiteEncoder(_) => None,
                     };
+                    let missing = missing.unwrap_or(-1);
                     writeln!(
                         source,
-                        "const struct AVCodec *{symbol}(int codec_id) {{ return {return_expression}; }}"
+                        "const struct AVCodec *{symbol}(int codec_id) {{\n\
+                         if (codec_id == {missing}) return 0;\n\
+                         if (codec_id == 27) return &h264_decoder;\n\
+                         if (codec_id == 86018) return &aac_decoder;\n\
+                         if (codec_id == 167) return &vp9_decoder;\n\
+                         if (codec_id == 225) return &av1_decoder;\n\
+                         return 0;\n\
+                         }}"
                     )?;
                 } else {
                     writeln!(source, "void {symbol}(void) {{}}")?;
@@ -4731,7 +4992,7 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         reset_close_order()?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         let (symbols, versions) = bind_video_codec_projection_with_check(
@@ -4760,7 +5021,7 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         reset_close_order()?;
-        let fixture = binding_fixture(Some(("avformat", 0x3d0765)), MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(Some(("avformat", 0x3d0765)), MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         assert!(matches!(
@@ -4777,7 +5038,7 @@ mod tests {
         );
 
         reset_close_order()?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         let mut wrong_projection = fixture.binding_projection;
@@ -4808,7 +5069,7 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         reset_close_order()?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         let cancellation = CancellationToken::default();
@@ -4848,7 +5109,7 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         reset_close_order()?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         let (symbols, _) = bind_video_codec_projection_with_check(
@@ -4874,8 +5135,8 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         for (missing, expected_encoder_error) in [
-            (MissingLtxvDescriptor::Encoder, true),
-            (MissingLtxvDescriptor::Decoder, false),
+            (MissingCodecDescriptor::LtxvEncoder, true),
+            (MissingCodecDescriptor::H264Decoder, false),
         ] {
             reset_close_order()?;
             let fixture = binding_fixture(None, missing)?;
@@ -4917,7 +5178,7 @@ mod tests {
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
         reset_close_order()?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         let mut loaded =
             load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
         let (symbols, _) = bind_video_codec_projection_with_check(
@@ -4950,7 +5211,7 @@ mod tests {
         let _test_serial_guard = TEST_SERIAL
             .lock()
             .map_err(|_| "video codec loader test mutex was poisoned")?;
-        let fixture = binding_fixture(None, MissingLtxvDescriptor::None)?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
         for cancellation_check in 1..=9 {
             reset_close_order()?;
             let loaded = load_video_codec_projection(
@@ -4991,6 +5252,202 @@ mod tests {
             || Ok(()),
         )?;
         admit_ltxv_h264_with_check(&symbols, &loaded, || Ok(()))?;
+        drop(symbols);
+        drop(loaded);
+        assert_eq!(
+            close_order()?,
+            ["swscale", "swresample", "avutil", "avformat", "avcodec"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_video_codec_suite_admission_uses_exact_registered_codec_set()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec loader test mutex was poisoned")?;
+        reset_close_order()?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
+        let loaded =
+            load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
+        let (symbols, _) = bind_video_codec_projection_with_check(
+            &loaded,
+            &fixture.binding_projection,
+            || Ok(()),
+        )?;
+        let descriptors = admit_video_suite_with_check(&symbols, &loaded, || Ok(()))?;
+        let pointers = [
+            descriptors.aac_encoder,
+            descriptors.svt_av1_encoder,
+            descriptors.vpx_vp9_encoder,
+            descriptors.aac_decoder,
+            descriptors.vp9_decoder,
+            descriptors.av1_decoder,
+        ]
+        .map(NonNull::as_ptr)
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        assert_eq!(pointers.len(), 6);
+        drop(symbols);
+        drop(loaded);
+        assert_eq!(
+            close_order()?,
+            ["swscale", "swresample", "avutil", "avformat", "avcodec"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_video_codec_suite_admission_rejects_each_missing_descriptor()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec loader test mutex was poisoned")?;
+        for (missing, missing_identity, encoder) in [
+            (MissingCodecDescriptor::SuiteEncoder("aac"), "aac", true),
+            (
+                MissingCodecDescriptor::SuiteEncoder("libsvtav1"),
+                "libsvtav1",
+                true,
+            ),
+            (
+                MissingCodecDescriptor::SuiteEncoder("libvpx-vp9"),
+                "libvpx-vp9",
+                true,
+            ),
+            (
+                MissingCodecDescriptor::SuiteDecoder(abi::AV_CODEC_ID_AAC),
+                "aac",
+                false,
+            ),
+            (
+                MissingCodecDescriptor::SuiteDecoder(abi::AV_CODEC_ID_VP9),
+                "vp9",
+                false,
+            ),
+            (
+                MissingCodecDescriptor::SuiteDecoder(abi::AV_CODEC_ID_AV1),
+                "av1",
+                false,
+            ),
+        ] {
+            reset_close_order()?;
+            let fixture = binding_fixture(None, missing)?;
+            let loaded = load_video_codec_projection(
+                &fixture.load_projection,
+                &CancellationToken::default(),
+            )?;
+            let (symbols, _) = bind_video_codec_projection_with_check(
+                &loaded,
+                &fixture.binding_projection,
+                || Ok(()),
+            )?;
+            let result = admit_video_suite_with_check(&symbols, &loaded, || Ok(()));
+            if encoder {
+                assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecSuiteAdmissionError::MissingEncoder { encoder })
+                        if encoder == missing_identity
+                ));
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(NativeVideoCodecSuiteAdmissionError::MissingDecoder { decoder })
+                        if decoder == missing_identity
+                ));
+            }
+            drop(symbols);
+            drop(loaded);
+            assert_eq!(
+                close_order()?,
+                ["swscale", "swresample", "avutil", "avformat", "avcodec"]
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn retained_video_codec_suite_admission_rejects_wrong_descriptor_provider()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec loader test mutex was poisoned")?;
+        reset_close_order()?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
+        let mut loaded =
+            load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
+        let (symbols, _) = bind_video_codec_projection_with_check(
+            &loaded,
+            &fixture.binding_projection,
+            || Ok(()),
+        )?;
+        loaded
+            .libraries
+            .iter_mut()
+            .find(|library| library.identity == "avcodec")
+            .ok_or("fixture retained avcodec image is missing")?
+            .path = PathBuf::from("/wrong/retained/avcodec");
+        assert!(matches!(
+            admit_video_suite_with_check(&symbols, &loaded, || Ok(())),
+            Err(NativeVideoCodecSuiteAdmissionError::DescriptorProviderMismatch { codec: "aac" })
+        ));
+        drop(symbols);
+        drop(loaded);
+        assert_eq!(
+            close_order()?,
+            ["swscale", "swresample", "avutil", "avformat", "avcodec"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_video_codec_suite_admission_cancellation_is_atomic_and_retryable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec loader test mutex was poisoned")?;
+        let fixture = binding_fixture(None, MissingCodecDescriptor::None)?;
+        for cancellation_check in 1..=19 {
+            reset_close_order()?;
+            let loaded = load_video_codec_projection(
+                &fixture.load_projection,
+                &CancellationToken::default(),
+            )?;
+            let (symbols, _) = bind_video_codec_projection_with_check(
+                &loaded,
+                &fixture.binding_projection,
+                || Ok(()),
+            )?;
+            let cancellation = CancellationToken::default();
+            let mut checks = 0;
+            assert!(matches!(
+                admit_video_suite_with_check(&symbols, &loaded, || {
+                    checks += 1;
+                    if checks == cancellation_check {
+                        cancellation.cancel();
+                    }
+                    cancellation.check()
+                }),
+                Err(NativeVideoCodecSuiteAdmissionError::Cancelled)
+            ));
+            drop(symbols);
+            drop(loaded);
+            assert_eq!(
+                close_order()?,
+                ["swscale", "swresample", "avutil", "avformat", "avcodec"]
+            );
+        }
+
+        reset_close_order()?;
+        let loaded =
+            load_video_codec_projection(&fixture.load_projection, &CancellationToken::default())?;
+        let (symbols, _) = bind_video_codec_projection_with_check(
+            &loaded,
+            &fixture.binding_projection,
+            || Ok(()),
+        )?;
+        admit_video_suite_with_check(&symbols, &loaded, || Ok(()))?;
         drop(symbols);
         drop(loaded);
         assert_eq!(
