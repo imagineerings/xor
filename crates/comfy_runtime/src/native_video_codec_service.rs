@@ -2,15 +2,16 @@ use crate::{
     CertifiedVideoCodecDependencyClosure, NativeLtxvH264PreprocessLimits,
     NativeVideoCodecBindingError, NativeVideoCodecLoadError, NativeVideoCodecLtxvAdmissionError,
     NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite,
-    NativeVideoCodecSuiteAdmissionError, bind_certified_video_codec_abi,
-    load_certified_video_codec_closure,
+    NativeVideoCodecSuiteAdmissionError, NativeVideoCodecVp9EncodeError, NativeVp9WebmBatchLimits,
+    bind_certified_video_codec_abi, load_certified_video_codec_closure,
 };
 use comfy_nodes::{
     NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
     NativeLtxvPreprocessServiceIdentity,
 };
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, ImageTensor, ScratchReservation, StreamId, TensorError,
+    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ScratchReservation, StreamId,
+    Tensor, TensorDescriptor, TensorError,
 };
 use comfy_types::CancellationToken;
 use futures::channel::oneshot;
@@ -23,12 +24,12 @@ use std::{
 };
 use thiserror::Error;
 
-const LTXV_CODEC_THREAD_NAME: &str = "comfy-ltxv-codec";
-const LTXV_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.ltxv-codec-thread.v2";
+const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v3";
 
 #[allow(
     dead_code,
-    reason = "constructed by the following native LTXVPreprocess node-service adapter"
+    reason = "constructed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct NativeLtxvCodecThreadIdentity {
@@ -40,7 +41,7 @@ pub(crate) struct NativeLtxvCodecThreadIdentity {
 
 #[allow(
     dead_code,
-    reason = "consumed by the following native LTXVPreprocess node-service adapter"
+    reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 impl NativeLtxvCodecThreadIdentity {
     pub(crate) fn target(&self) -> &str {
@@ -62,29 +63,29 @@ impl NativeLtxvCodecThreadIdentity {
 
 #[allow(
     dead_code,
-    reason = "returned through the following native LTXVPreprocess node-service adapter"
+    reason = "returned through the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 #[derive(Debug, Error)]
 pub(crate) enum NativeLtxvCodecThreadError {
-    #[error("native LTXV codec thread startup or request was cancelled")]
+    #[error("native video codec thread startup or request was cancelled")]
     Cancelled,
-    #[error("native LTXV codec thread could not be spawned: {0}")]
+    #[error("native video codec thread could not be spawned: {0}")]
     ThreadSpawn(#[source] io::Error),
-    #[error("native LTXV codec thread stopped before completing the operation")]
+    #[error("native video codec thread stopped before completing the operation")]
     ThreadStopped,
-    #[error("native LTXV codec thread panicked")]
+    #[error("native video codec thread panicked")]
     ThreadPanicked,
-    #[error("native LTXV codec thread state was poisoned")]
+    #[error("native video codec thread state was poisoned")]
     StatePoisoned,
-    #[error("native LTXV codec request queue is full")]
+    #[error("native video codec request queue is full")]
     Busy,
-    #[error("native LTXV codec request carried scratch from the wrong backend: {0}")]
+    #[error("native video codec request carried scratch from the wrong backend: {0}")]
     InvalidScratch(#[source] Box<TensorError>),
-    #[error("native LTXV codec request exhausted its reviewed resources")]
+    #[error("native video codec request exhausted its reviewed resources")]
     ResourceExhausted,
-    #[error("native LTXV codec loading failed: {0}")]
+    #[error("native video codec loading failed: {0}")]
     Load(#[source] Box<NativeVideoCodecLoadError>),
-    #[error("native LTXV codec ABI binding failed: {0}")]
+    #[error("native video codec ABI binding failed: {0}")]
     Binding(#[source] Box<NativeVideoCodecBindingError>),
     #[error("native LTXV codec admission failed: {0}")]
     Admission(#[source] Box<NativeVideoCodecLtxvAdmissionError>),
@@ -92,19 +93,80 @@ pub(crate) enum NativeLtxvCodecThreadError {
     SuiteAdmission(#[source] Box<NativeVideoCodecSuiteAdmissionError>),
     #[error("native LTXV preprocessing failed: {0}")]
     Preprocess(#[source] Box<NativeVideoCodecLtxvPreprocessError>),
+    #[error("native VP9 WebM encoding failed: {0}")]
+    Vp9Encode(#[source] Box<NativeVideoCodecVp9EncodeError>),
+    #[error("native VP9 WebM owned-byte materialization failed: {0}")]
+    EncodedOutput(#[source] Box<TensorError>),
 }
 
 struct NativeLtxvCodecThreadRequest {
     invocation: NativeLtxvCodecThreadInvocation,
-    response: oneshot::Sender<Result<ImageTensor, NativeLtxvCodecThreadError>>,
+    response: oneshot::Sender<Result<NativeVideoCodecThreadOutput, NativeLtxvCodecThreadError>>,
 }
 
 struct NativeLtxvCodecThreadInvocation {
-    image: ImageTensor,
-    compression: u8,
+    operation: NativeVideoCodecThreadOperation,
     stream: StreamId,
     scratch: ScratchReservation,
     cancellation: CancellationToken,
+}
+
+enum NativeVideoCodecThreadOperation {
+    Preprocess {
+        image: ImageTensor,
+        compression: u8,
+    },
+    EncodeVp9Webm {
+        images: ImageTensor,
+        frame_rate: (u64, u64),
+        crf: u8,
+        limits: NativeVp9WebmBatchLimits,
+    },
+}
+
+enum NativeVideoCodecThreadOutput {
+    Image(ImageTensor),
+    Vp9Webm(NativeOwnedVp9Webm),
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following SaveWEBM prepared-effect adapter"
+)]
+#[derive(Debug)]
+pub(crate) struct NativeOwnedVp9Webm {
+    bytes: Tensor,
+    content_sha256: [u8; 32],
+    width: i32,
+    height: i32,
+    frame_rate: (i32, i32),
+    frame_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following SaveWEBM prepared-effect adapter"
+)]
+impl NativeOwnedVp9Webm {
+    pub(crate) fn encoded_bytes(&self) -> Result<&[u8], TensorError> {
+        self.bytes.contiguous_bytes()
+    }
+
+    pub(crate) fn dimensions(&self) -> (i32, i32) {
+        (self.width, self.height)
+    }
+
+    pub(crate) fn content_sha256(&self) -> [u8; 32] {
+        self.content_sha256
+    }
+
+    pub(crate) fn frame_rate(&self) -> (i32, i32) {
+        self.frame_rate
+    }
+
+    pub(crate) fn frame_count(&self) -> usize {
+        self.frame_count
+    }
 }
 
 struct NativeLtxvCodecThreadInner {
@@ -116,7 +178,7 @@ struct NativeLtxvCodecThreadInner {
 
 #[allow(
     dead_code,
-    reason = "consumed by the following native LTXVPreprocess node-service adapter"
+    reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 pub(crate) struct NativeLtxvCodecThreadService {
     inner: Arc<NativeLtxvCodecThreadInner>,
@@ -124,7 +186,7 @@ pub(crate) struct NativeLtxvCodecThreadService {
 
 #[allow(
     dead_code,
-    reason = "consumed by the following native LTXVPreprocess node-service adapter"
+    reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 #[derive(Clone)]
 pub(crate) struct NativeLtxvCodecRequestProxy {
@@ -142,7 +204,7 @@ impl fmt::Debug for NativeLtxvCodecRequestProxy {
 
 #[allow(
     dead_code,
-    reason = "consumed by the following native LTXVPreprocess node-service adapter"
+    reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 impl NativeLtxvCodecThreadService {
     pub(crate) fn start(
@@ -183,7 +245,7 @@ impl NativeLtxvCodecThreadService {
                 runtime_versions: codec.runtime_versions(),
             };
             let processor = move |request: NativeLtxvCodecThreadInvocation| {
-                process_ltxv_codec_request(&codec, &backend, limits, request)
+                process_video_codec_request(&codec, &backend, limits, request)
             };
             Ok((identity, processor))
         })
@@ -203,14 +265,14 @@ impl NativeLtxvCodecThreadService {
 impl Drop for NativeLtxvCodecThreadService {
     fn drop(&mut self) {
         if let Err(error) = self.inner.close() {
-            eprintln!("native LTXV codec service cleanup failed: {error}");
+            eprintln!("native video codec service cleanup failed: {error}");
         }
     }
 }
 
 #[allow(
     dead_code,
-    reason = "consumed by the following native LTXVPreprocess node-service adapter"
+    reason = "consumed by the native LTXVPreprocess adapter and VP9 owned-byte bridge"
 )]
 impl NativeLtxvCodecRequestProxy {
     pub(crate) fn identity(&self) -> &NativeLtxvCodecThreadIdentity {
@@ -223,6 +285,57 @@ impl NativeLtxvCodecRequestProxy {
         compression: u8,
         context: &ExecutionContext<'_>,
     ) -> BoxFuture<'static, Result<ImageTensor, NativeLtxvCodecThreadError>> {
+        let result = self.submit(
+            NativeVideoCodecThreadOperation::Preprocess {
+                image: image.clone(),
+                compression,
+            },
+            context,
+        );
+        async move {
+            match result.await? {
+                NativeVideoCodecThreadOutput::Image(image) => Ok(image),
+                NativeVideoCodecThreadOutput::Vp9Webm(_) => {
+                    Err(NativeLtxvCodecThreadError::StatePoisoned)
+                }
+            }
+        }
+        .boxed()
+    }
+
+    pub(crate) fn encode_vp9_webm_batch(
+        &self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        crf: u8,
+        limits: NativeVp9WebmBatchLimits,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError>> {
+        let result = self.submit(
+            NativeVideoCodecThreadOperation::EncodeVp9Webm {
+                images: images.clone(),
+                frame_rate,
+                crf,
+                limits,
+            },
+            context,
+        );
+        async move {
+            match result.await? {
+                NativeVideoCodecThreadOutput::Vp9Webm(encoded) => Ok(encoded),
+                NativeVideoCodecThreadOutput::Image(_) => {
+                    Err(NativeLtxvCodecThreadError::StatePoisoned)
+                }
+            }
+        }
+        .boxed()
+    }
+
+    fn submit(
+        &self,
+        operation: NativeVideoCodecThreadOperation,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeVideoCodecThreadOutput, NativeLtxvCodecThreadError>> {
         if context.cancellation.check().is_err() {
             return async { Err(NativeLtxvCodecThreadError::Cancelled) }.boxed();
         }
@@ -244,8 +357,7 @@ impl NativeLtxvCodecRequestProxy {
         let (response, receiver) = oneshot::channel();
         let request = NativeLtxvCodecThreadRequest {
             invocation: NativeLtxvCodecThreadInvocation {
-                image: image.clone(),
-                compression,
+                operation,
                 stream: context.stream,
                 scratch: context.scratch.clone(),
                 cancellation: cancellation.clone(),
@@ -316,7 +428,7 @@ impl NativeLtxvCodecThreadInner {
 impl Drop for NativeLtxvCodecThreadInner {
     fn drop(&mut self) {
         if let Err(error) = self.close() {
-            eprintln!("native LTXV codec thread cleanup failed: {error}");
+            eprintln!("native video codec thread cleanup failed: {error}");
         }
     }
 }
@@ -328,17 +440,19 @@ where
     Factory: FnOnce() -> Result<(NativeLtxvCodecThreadIdentity, Processor), NativeLtxvCodecThreadError>
         + Send
         + 'static,
-    Processor: FnMut(NativeLtxvCodecThreadInvocation) -> Result<ImageTensor, NativeLtxvCodecThreadError>
+    Processor: FnMut(
+            NativeLtxvCodecThreadInvocation,
+        ) -> Result<NativeVideoCodecThreadOutput, NativeLtxvCodecThreadError>
         + 'static,
 {
     let (sender, receiver) = mpsc::sync_channel(1);
     let (ready_sender, ready_receiver) = mpsc::sync_channel(1);
     let runner = thread::Builder::new()
-        .name(LTXV_CODEC_THREAD_NAME.to_owned())
+        .name(VIDEO_CODEC_THREAD_NAME.to_owned())
         .spawn(move || match factory() {
             Ok((identity, mut processor)) => {
                 if ready_sender.send(Ok(identity)).is_err() {
-                    eprintln!("native LTXV codec thread readiness receiver was dropped");
+                    eprintln!("native video codec thread readiness receiver was dropped");
                     return;
                 }
                 while let Ok(request) = receiver.recv() {
@@ -348,13 +462,13 @@ where
                     } = request;
                     let result = processor(invocation);
                     if response.send(result).is_err() {
-                        eprintln!("native LTXV codec request receiver was dropped");
+                        eprintln!("native video codec request receiver was dropped");
                     }
                 }
             }
             Err(error) => {
                 if ready_sender.send(Err(error)).is_err() {
-                    eprintln!("native LTXV codec thread startup error receiver was dropped");
+                    eprintln!("native video codec thread startup error receiver was dropped");
                 }
             }
         })
@@ -363,7 +477,7 @@ where
         Ok(Ok(identity)) => identity,
         Ok(Err(error)) => {
             if runner.join().is_err() {
-                eprintln!("native LTXV codec thread panicked after reporting startup failure");
+                eprintln!("native video codec thread panicked after reporting startup failure");
             }
             return Err(error);
         }
@@ -409,18 +523,20 @@ fn map_ltxv_node_service_error(
         | NativeLtxvCodecThreadError::Binding(_)
         | NativeLtxvCodecThreadError::Admission(_)
         | NativeLtxvCodecThreadError::SuiteAdmission(_)
-        | NativeLtxvCodecThreadError::Preprocess(_)) => {
+        | NativeLtxvCodecThreadError::Preprocess(_)
+        | NativeLtxvCodecThreadError::Vp9Encode(_)
+        | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
             NativeLtxvPreprocessServiceError::Execution(error.to_string())
         }
     }
 }
 
-fn process_ltxv_codec_request(
+fn process_video_codec_request(
     codec: &NativeVideoCodecSuite,
     backend: &CpuBackend,
     limits: NativeLtxvH264PreprocessLimits,
     request: NativeLtxvCodecThreadInvocation,
-) -> Result<ImageTensor, NativeLtxvCodecThreadError> {
+) -> Result<NativeVideoCodecThreadOutput, NativeLtxvCodecThreadError> {
     request
         .cancellation
         .check()
@@ -434,19 +550,126 @@ fn process_ltxv_codec_request(
         rng_phase: None,
         cancellation: &request.cancellation,
     };
-    let output = codec
-        .preprocess_image(
-            &request.image,
-            request.compression,
+    let output = match request.operation {
+        NativeVideoCodecThreadOperation::Preprocess { image, compression } => {
+            NativeVideoCodecThreadOutput::Image(
+                codec
+                    .preprocess_image(&image, compression, limits, backend, &context)
+                    .map_err(map_ltxv_thread_preprocess_error)?,
+            )
+        }
+        NativeVideoCodecThreadOperation::EncodeVp9Webm {
+            images,
+            frame_rate,
+            crf,
             limits,
-            backend,
-            &context,
-        )
-        .map_err(map_ltxv_thread_preprocess_error)?;
+        } => NativeVideoCodecThreadOutput::Vp9Webm(process_vp9_webm_request(
+            codec, backend, &context, &images, frame_rate, crf, limits,
+        )?),
+    };
     context
         .check()
         .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
     Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_vp9_webm_request(
+    codec: &NativeVideoCodecSuite,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    images: &ImageTensor,
+    frame_rate: (u64, u64),
+    crf: u8,
+    limits: NativeVp9WebmBatchLimits,
+) -> Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError> {
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    let encoded = codec
+        .encode_vp9_webm_batch(images, frame_rate, crf, limits, backend, context)
+        .map_err(map_vp9_thread_encode_error)?;
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    let (width, height) = encoded.dimensions();
+    let frame_rate = encoded.frame_rate();
+    let frame_count = encoded.frame_count();
+    let encoded_bytes = encoded
+        .encoded_bytes()
+        .map_err(map_vp9_thread_encode_error)?;
+    let output = materialize_owned_vp9_webm(
+        backend,
+        context,
+        encoded_bytes,
+        width,
+        height,
+        frame_rate,
+        frame_count,
+    )?;
+    drop(encoded);
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    Ok(output)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn materialize_owned_vp9_webm(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    encoded_bytes: &[u8],
+    width: i32,
+    height: i32,
+    frame_rate: (i32, i32),
+    frame_count: usize,
+) -> Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError> {
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    let byte_length = u64::try_from(encoded_bytes.len())
+        .map_err(|_| NativeLtxvCodecThreadError::ResourceExhausted)?;
+    let descriptor =
+        TensorDescriptor::contiguous(vec![byte_length], DType::U8, DeviceId::CPU, context.stream)
+            .map_err(map_vp9_output_tensor_error)?;
+    let (bytes, _) = backend
+        .upload_bytes(descriptor, encoded_bytes, context)
+        .map_err(map_vp9_output_tensor_error)?;
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    Ok(NativeOwnedVp9Webm {
+        bytes,
+        content_sha256: Sha256::digest(encoded_bytes).into(),
+        width,
+        height,
+        frame_rate,
+        frame_count,
+    })
+}
+
+fn map_vp9_thread_encode_error(
+    error: NativeVideoCodecVp9EncodeError,
+) -> NativeLtxvCodecThreadError {
+    match error {
+        NativeVideoCodecVp9EncodeError::Cancelled => NativeLtxvCodecThreadError::Cancelled,
+        NativeVideoCodecVp9EncodeError::ResourceExhausted { .. } => {
+            NativeLtxvCodecThreadError::ResourceExhausted
+        }
+        error => NativeLtxvCodecThreadError::Vp9Encode(Box::new(error)),
+    }
+}
+
+fn map_vp9_output_tensor_error(error: TensorError) -> NativeLtxvCodecThreadError {
+    match error {
+        TensorError::Cancelled => NativeLtxvCodecThreadError::Cancelled,
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            NativeLtxvCodecThreadError::ResourceExhausted
+        }
+        error => NativeLtxvCodecThreadError::EncodedOutput(Box::new(error)),
+    }
 }
 
 fn map_ltxv_thread_preprocess_error(
@@ -466,7 +689,7 @@ fn video_codec_thread_base_identity(
     limits: NativeLtxvH264PreprocessLimits,
 ) -> String {
     let mut digest = Sha256::new();
-    hash_identity_field(&mut digest, LTXV_CODEC_THREAD_IDENTITY_VERSION.as_bytes());
+    hash_identity_field(&mut digest, VIDEO_CODEC_THREAD_IDENTITY_VERSION.as_bytes());
     hash_identity_field(&mut digest, closure.target().as_bytes());
     hash_identity_field(&mut digest, closure.primary_catalog_sha256().as_bytes());
     hash_identity_field(&mut digest, closure.source_archive_sha256().as_bytes());
@@ -530,6 +753,7 @@ fn hash_identity_field(digest: &mut Sha256, value: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NativeVp9WebmEncodeLimits;
     use comfy_tensor::{BackendWorkspaceAuthority, DType, DeviceId, Layout, TensorDescriptor};
     use futures::executor::block_on;
     use std::{
@@ -609,7 +833,14 @@ mod tests {
                             .lock()
                             .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?
                             .push(("request", thread::current().id()));
-                        Ok(request.image)
+                        match request.operation {
+                            NativeVideoCodecThreadOperation::Preprocess { image, .. } => {
+                                Ok(NativeVideoCodecThreadOutput::Image(image))
+                            }
+                            NativeVideoCodecThreadOperation::EncodeVp9Webm { .. } => {
+                                Err(NativeLtxvCodecThreadError::StatePoisoned)
+                            }
+                        }
                     },
                 ))
             }
@@ -658,12 +889,22 @@ mod tests {
                     test_identity("bounded"),
                     move |request: NativeLtxvCodecThreadInvocation| {
                         calls.fetch_add(1, Ordering::AcqRel);
-                        if request.compression == 99 {
+                        let NativeLtxvCodecThreadInvocation {
+                            operation,
+                            cancellation,
+                            ..
+                        } = request;
+                        let NativeVideoCodecThreadOperation::Preprocess { image, compression } =
+                            operation
+                        else {
+                            return Err(NativeLtxvCodecThreadError::StatePoisoned);
+                        };
+                        if compression == 99 {
                             return Err(NativeLtxvCodecThreadError::ResourceExhausted);
                         }
-                        if request.compression == 98 {
-                            request.cancellation.cancel();
-                            return Ok(request.image);
+                        if compression == 98 {
+                            cancellation.cancel();
+                            return Ok(NativeVideoCodecThreadOutput::Image(image));
                         }
                         let (started_lock, started_condition) = &*started;
                         let mut is_started = started_lock
@@ -681,11 +922,10 @@ mod tests {
                                 .wait(released)
                                 .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?;
                         }
-                        request
-                            .cancellation
+                        cancellation
                             .check()
                             .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
-                        Ok(request.image)
+                        Ok(NativeVideoCodecThreadOutput::Image(image))
                     },
                 ))
             }
@@ -802,6 +1042,160 @@ mod tests {
             NativeLtxvPreprocessServiceError::Execution(message)
                 if message.contains("synthetic spawn failure")
         ));
+    }
+
+    #[test]
+    fn retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv()
+    -> Result<(), Box<dyn std::error::Error>> {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<NativeLtxvCodecRequestProxy>();
+        assert_send_sync::<NativeOwnedVp9Webm>();
+
+        let cancellation = CancellationToken::default();
+        let (backend, image, scratch) = test_image_and_context(&cancellation)?;
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let actor_backend = backend.clone();
+        let service = start_ltxv_codec_thread({
+            let events = events.clone();
+            move || {
+                events
+                    .lock()
+                    .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?
+                    .push(("start", thread::current().id()));
+                Ok((
+                    test_identity("vp9-owned-bridge"),
+                    move |request: NativeLtxvCodecThreadInvocation| {
+                        events
+                            .lock()
+                            .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?
+                            .push(("request", thread::current().id()));
+                        let NativeLtxvCodecThreadInvocation {
+                            operation,
+                            stream,
+                            scratch,
+                            cancellation,
+                        } = request;
+                        let context = ExecutionContext {
+                            stream,
+                            scratch,
+                            rng_phase: None,
+                            cancellation: &cancellation,
+                        };
+                        match operation {
+                            NativeVideoCodecThreadOperation::Preprocess { image, .. } => {
+                                Ok(NativeVideoCodecThreadOutput::Image(image))
+                            }
+                            NativeVideoCodecThreadOperation::EncodeVp9Webm { .. } => {
+                                let encoded = materialize_owned_vp9_webm(
+                                    &actor_backend,
+                                    &context,
+                                    b"HPPPT",
+                                    2,
+                                    2,
+                                    (125, 2997),
+                                    3,
+                                )?;
+                                Ok(NativeVideoCodecThreadOutput::Vp9Webm(encoded))
+                            }
+                        }
+                    },
+                ))
+            }
+        })?;
+        let proxy = service.proxy();
+        let context = request_context(scratch.clone(), &cancellation);
+        let preprocessed = block_on(proxy.preprocess_image(&image, 0, &context))?;
+        assert_eq!(
+            preprocessed.tensor().storage_id(),
+            image.tensor().storage_id()
+        );
+
+        let session_limits = NativeVp9WebmEncodeLimits::checked(1024, 256, 1024, 32)?;
+        let batch_limits = NativeVp9WebmBatchLimits::checked(session_limits, 4, 1024)?;
+        let encoded =
+            block_on(proxy.encode_vp9_webm_batch(&image, (2997, 125), 32, batch_limits, &context))?;
+        assert_eq!(encoded.encoded_bytes()?, b"HPPPT");
+        assert_eq!(encoded.dimensions(), (2, 2));
+        assert_eq!(encoded.frame_rate(), (125, 2997));
+        assert_eq!(encoded.frame_count(), 3);
+        assert_eq!(
+            encoded.content_sha256(),
+            <[u8; 32]>::from(Sha256::digest(b"HPPPT"))
+        );
+        assert_eq!(scratch.in_use_bytes(), 0);
+        drop(encoded);
+        service.shutdown()?;
+
+        let events = events
+            .lock()
+            .map_err(|_| "thread event mutex was poisoned")?;
+        let actor_thread = events.first().ok_or("missing actor start event")?.1;
+        assert_ne!(actor_thread, thread::current().id());
+        assert_eq!(
+            events.iter().filter(|event| event.0 == "request").count(),
+            2
+        );
+        assert!(events.iter().all(|event| event.1 == actor_thread));
+        Ok(())
+    }
+
+    #[test]
+    fn owned_vp9_output_materialization_is_accounted_atomic_and_retryable()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = BackendWorkspaceAuthority::create_backend(1024)?;
+        let scratch = authority.authorize_workspace(1024)?;
+        let context = request_context(scratch.clone(), &cancellation);
+        let baseline = backend.memory_snapshot().current_bytes;
+
+        let encoded =
+            materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3)?;
+        assert_eq!(scratch.in_use_bytes(), 0);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
+        drop(encoded);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+
+        let cancelled = CancellationToken::default();
+        cancelled.cancel();
+        let cancelled_context = request_context(scratch.clone(), &cancelled);
+        assert!(matches!(
+            materialize_owned_vp9_webm(
+                &backend,
+                &cancelled_context,
+                b"HPPPT",
+                2,
+                2,
+                (125, 2997),
+                3,
+            ),
+            Err(NativeLtxvCodecThreadError::Cancelled)
+        ));
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+        assert_eq!(scratch.in_use_bytes(), 0);
+
+        let (constrained_backend, constrained_authority) =
+            BackendWorkspaceAuthority::create_backend(8)?;
+        let constrained_scratch = constrained_authority.authorize_workspace(8)?;
+        let constrained_context = request_context(constrained_scratch.clone(), &cancellation);
+        assert!(matches!(
+            materialize_owned_vp9_webm(
+                &constrained_backend,
+                &constrained_context,
+                b"HPPPT",
+                2,
+                2,
+                (125, 2997),
+                3,
+            ),
+            Err(NativeLtxvCodecThreadError::ResourceExhausted)
+        ));
+        assert_eq!(constrained_backend.memory_snapshot().current_bytes, 0);
+        assert_eq!(constrained_scratch.in_use_bytes(), 0);
+
+        let retry = materialize_owned_vp9_webm(&backend, &context, b"HPPPT", 2, 2, (125, 2997), 3)?;
+        assert_eq!(retry.encoded_bytes()?, b"HPPPT");
+        assert_eq!(scratch.in_use_bytes(), 0);
+        Ok(())
     }
 
     struct ThreadBoundDrop {

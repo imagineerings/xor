@@ -15117,6 +15117,94 @@ fn val_ownership_native_video_codec_vp9_webm_batch_encode_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_vp9_webm_thread_bridge_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "pub(crate) struct NativeOwnedVp9Webm",
+        "enum NativeVideoCodecThreadOperation",
+        "EncodeVp9Webm",
+        "pub(crate) fn encode_vp9_webm_batch",
+        "process_vp9_webm_request",
+        "materialize_owned_vp9_webm",
+        "TensorDescriptor::contiguous",
+        "DType::U8",
+        "DeviceId::CPU",
+        "upload_bytes",
+        "drop(encoded)",
+        "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv",
+        "owned_vp9_output_materialization_is_accounted_atomic_and_retryable",
+    ] {
+        assert!(
+            service.contains(required),
+            "VP9 thread bridge lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeOwnedVp9Webm",
+        "unsafe impl Sync for NativeOwnedVp9Webm",
+        "CpuWorkspaceVec<u8>",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !service.contains(forbidden),
+            "VP9 thread bridge exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-retained-vp9-webm-owned-tensor-thread-bridge",
+        "one_deliberate_post_encode_copy_observed",
+        "native_or_workspace_owner_crosses_thread_response",
+        "prompt_or_extra_metadata_supported",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VP9 thread fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_vp9_webm_thread_bridge")
+            })
+        })
+        .ok_or("missing VP9 WebM thread bridge ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some(
+            "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+        )
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

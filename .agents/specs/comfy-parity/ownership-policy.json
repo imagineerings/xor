@@ -14685,7 +14685,7 @@
         "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
         "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
         "the canonical IMAGE tensor supplies checked contiguous CPU F32 BHWC values and the source-specific batch adapter clamps and stages exactly one RGB8 frame at a time",
-        "a following owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
+        "the retained owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
       ],
       "definitions": [
         {
@@ -14739,10 +14739,11 @@
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation"
       ],
       "production_consumers": [
-        "the following owned-byte codec-thread and SaveWEBM adapters"
+        "the following SaveWEBM metadata, effect, and node adapters"
       ],
       "requirements": [
         "Requirement 28",
@@ -14770,6 +14771,111 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One retained suite owner covers both the checked one-frame RGB8 regression and the canonical F32 IMAGE batch session. It reuses one reviewed ABI and bounded AVIO/RAII boundary, stages one clamped RGB8 frame at a time, and returns only opaque attempt-local bytes while explicitly excluding real-package numeric, thread-transfer, and publication claims."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_vp9_webm_thread_bridge",
+      "canonical_owner": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_service.rs"
+      ],
+      "owner_symbols": [
+        "NativeOwnedVp9Webm",
+        "NativeVideoCodecThreadOperation",
+        "NativeVideoCodecThreadOutput",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+        "process_vp9_webm_request",
+        "materialize_owned_vp9_webm"
+      ],
+      "allowed_adapters": [
+        "the existing retained codec-thread service remains the sole channel, thread, suite, load, bind, admission, and shutdown owner",
+        "the bounded VP9 WebM IMAGE-sequence primitive supplies attempt-local staged bytes only while its suite borrow and AVIO owners remain on the actor thread",
+        "the canonical CPU backend uploader owns the single exact-length U8 Tensor copy and persistent backend allocation accounting",
+        "a following SaveWEBM adapter may borrow the portable Tensor bytes and checked metadata but may not treat this result as a stored payload, handle, cache entry, effect, path, persistence, recovery, or publication owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeOwnedVp9Webm",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeOwnedVp9Webm"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+          "role": "canonical_service",
+          "symbol": "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecSuite::encode_vp9_webm_batch",
+        "CpuBackend::upload_bytes",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+      ],
+      "required_mappings": [
+        {
+          "name": "vp9-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-drops-native-session-before-portable-response",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "process_vp9_webm_request[\\s\\S]*encode_vp9_webm_batch[\\s\\S]*encoded_bytes[\\s\\S]*materialize_owned_vp9_webm[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-materializes-exact-accounted-u8-tensor",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "materialize_owned_vp9_webm[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-tests-affinity-accounting-failure-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv[\\s\\S]*owned_vp9_output_materialization_is_accounted_atomic_and_retryable"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+          "pattern": "synthetic-retained-vp9-webm-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*prompt_or_extra_metadata_supported[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation"
+      ],
+      "production_consumers": [
+        "the following reviewed container-metadata and SaveWEBM prepared-effect adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One capacity-one retained codec actor serializes both LTXV and VP9 work, keeps every borrowed native owner thread-local, and performs one checked exact-length CPU U8 Tensor copy before returning portable bytes and immutable metadata with scratch already converged."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
@@ -15193,7 +15299,7 @@
         {
           "name": "ltxv-thread-service-loads-binds-admits-and-retains-only-inside-the-actor",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeLtxvCodecThreadService[\\s\\S]*start_ltxv_codec_thread[\\s\\S]*load_certified_video_codec_closure[\\s\\S]*bind_certified_video_codec_abi[\\s\\S]*admit_ltxv_h264[\\s\\S]*process_ltxv_codec_request"
+          "pattern": "NativeLtxvCodecThreadService[\\s\\S]*start_ltxv_codec_thread[\\s\\S]*load_certified_video_codec_closure[\\s\\S]*bind_certified_video_codec_abi[\\s\\S]*admit_ltxv_h264[\\s\\S]*process_video_codec_request"
         },
         {
           "name": "ltxv-thread-service-bounds-requests-and-preserves-caller-authority",

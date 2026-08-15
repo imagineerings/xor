@@ -10677,6 +10677,75 @@ def native_video_codec_vp9_webm_sequence_encode_foundation_task(
     )
 
 
+def native_video_codec_vp9_webm_thread_bridge_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
+        "Return owned VP9 WebM bytes from the retained codec thread",
+        [28, 29, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole retained native video codec actor accepts checked VP9 IMAGE-batch requests, executes the completed bounded WebM session on its codec-owning thread, copies the exact staged bytes once into a contiguous CPU U8 tensor, and drops every borrowed FFmpeg and AVIO owner before returning only portable bytes, dimensions, frame rate, frame count, and content digest. Caller scratch converges before the response; prompt and extra metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused actor and tensor-materialization tests prove one shared bounded codec thread, exact owned CPU U8 bytes and checked metadata, a single deliberate post-encode copy, actor-local FFmpeg teardown before response, zero scratch on success and failure, backend-resident allocation accounting, typed cancellation, exhaustion, queue and shutdown behavior, and clean retry. The fixture explicitly excludes installed codec packages, playable or numeric WebM evidence, prompt or extra metadata, alpha, AV1, AAC/audio, nodes, effects, paths, handles, cache, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14169,8 +14238,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_vp9_webm_encode_foundation["id"])
         )
     )
+    video_codec_vp9_webm_thread_bridge_foundation = (
+        native_video_codec_vp9_webm_thread_bridge_foundation_task(
+            str(video_codec_vp9_webm_sequence_encode_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_vp9_webm_sequence_encode_foundation["id"])
+        str(video_codec_vp9_webm_thread_bridge_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14316,6 +14390,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_suite_admission_foundation,
         video_codec_vp9_webm_encode_foundation,
         video_codec_vp9_webm_sequence_encode_foundation,
+        video_codec_vp9_webm_thread_bridge_foundation,
         video_foundation,
         detection_foundation,
         ]
