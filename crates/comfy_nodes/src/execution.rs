@@ -3,13 +3,15 @@ use crate::{
     NativeStoredPayload, NativeStoredPayloadError,
 };
 use comfy_media::{
-    MetadataWritePolicy, PngError, PngLimits, encode_png_frame_with_policy_and_context,
+    MetadataWritePolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf,
+    NativeVideoPixelFormat, PngError, PngLimits, encode_png_frame_with_policy_and_context,
 };
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS, MAX_SHADER_PASSES,
-    NativeShaderError, NativeShaderExecutor, NativeShaderRequest, NativeShaderResult,
-    RetryRngPolicy, RngAlgorithm, RngError, RngProfileVersion, RngStream, RngStreamAddress,
-    RngTransaction, ScratchBindingIdentity, ScratchReservation, StreamId, TensorError,
+    CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS,
+    MAX_SHADER_PASSES, NativeShaderError, NativeShaderExecutor, NativeShaderRequest,
+    NativeShaderResult, RetryRngPolicy, RngAlgorithm, RngError, RngProfileVersion, RngStream,
+    RngStreamAddress, RngTransaction, ScratchBindingIdentity, ScratchReservation, StreamId, Tensor,
+    TensorError,
 };
 use comfy_types::{ApiPrompt, AttemptId, CancellationToken, NodeId, PromptId};
 use futures::future::BoxFuture;
@@ -1670,6 +1672,285 @@ pub trait NativeLtxvPreprocessService: Send + Sync + fmt::Debug {
     ) -> BoxFuture<'static, Result<ImageTensor, NativeLtxvPreprocessServiceError>>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeWebmEncodeServiceIdentity {
+    configuration_sha256: String,
+}
+
+impl NativeWebmEncodeServiceIdentity {
+    pub fn checked(
+        configuration_sha256: impl Into<String>,
+    ) -> Result<Self, NativeNodeContractError> {
+        let configuration_sha256 = configuration_sha256.into();
+        if !valid_sha256(&configuration_sha256) {
+            return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+        }
+        Ok(Self {
+            configuration_sha256,
+        })
+    }
+
+    pub fn configuration_sha256(&self) -> &str {
+        &self.configuration_sha256
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum NativeWebmEncodeServiceError {
+    #[error("native WebM encoding service is unavailable")]
+    Unavailable,
+    #[error("native WebM encoding request was cancelled")]
+    Cancelled,
+    #[error("native WebM encoding service is busy")]
+    Busy,
+    #[error("native WebM encoding request is invalid")]
+    InvalidRequest,
+    #[error("native WebM encoding exhausted its reviewed resources")]
+    ResourceExhausted,
+    #[error("native WebM encoder returned an invalid result projection")]
+    InvalidProjection,
+    #[error("native WebM encoding failed: {0}")]
+    Execution(String),
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeWebmEncodeRequest {
+    images: ImageTensor,
+    codec: NativeVideoCodec,
+    frame_rate: (u64, u64),
+    crf: NativeVideoCrf,
+    metadata: Vec<(String, String)>,
+}
+
+impl NativeWebmEncodeRequest {
+    pub fn checked(
+        images: ImageTensor,
+        codec: NativeVideoCodec,
+        frame_rate: (u64, u64),
+        crf: NativeVideoCrf,
+        metadata: Vec<(String, String)>,
+    ) -> Result<Self, NativeWebmEncodeServiceError> {
+        let (frame_count, height, width, channels) = images
+            .dimensions()
+            .map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?;
+        if codec == NativeVideoCodec::H264
+            || frame_count == 0
+            || height == 0
+            || width == 0
+            || !matches!(channels, 3 | 4)
+            || frame_rate.0 == 0
+            || frame_rate.1 == 0
+            || frame_rate.0 > i32::MAX as u64
+            || frame_rate.1 > i32::MAX as u64
+            || gcd_u64(frame_rate.0, frame_rate.1) != 1
+            || metadata
+                .iter()
+                .any(|(key, value)| key.is_empty() || key.contains('\0') || value.contains('\0'))
+        {
+            return Err(NativeWebmEncodeServiceError::InvalidRequest);
+        }
+        Ok(Self {
+            images,
+            codec,
+            frame_rate,
+            crf,
+            metadata,
+        })
+    }
+
+    pub fn images(&self) -> &ImageTensor {
+        &self.images
+    }
+
+    pub const fn codec(&self) -> NativeVideoCodec {
+        self.codec
+    }
+
+    pub const fn frame_rate(&self) -> (u64, u64) {
+        self.frame_rate
+    }
+
+    pub const fn crf(&self) -> NativeVideoCrf {
+        self.crf
+    }
+
+    pub fn metadata(&self) -> &[(String, String)] {
+        &self.metadata
+    }
+
+    pub fn into_parts(
+        self,
+    ) -> (
+        ImageTensor,
+        NativeVideoCodec,
+        (u64, u64),
+        NativeVideoCrf,
+        Vec<(String, String)>,
+    ) {
+        (
+            self.images,
+            self.codec,
+            self.frame_rate,
+            self.crf,
+            self.metadata,
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct NativeEncodedWebm {
+    bytes: Tensor,
+    content_sha256: [u8; 32],
+    codec: NativeVideoCodec,
+    dimensions: (u64, u64),
+    frame_rate: (u64, u64),
+    frame_count: u64,
+    pixel_format: NativeVideoPixelFormat,
+    bit_depth: NativeVideoBitDepth,
+    has_alpha: bool,
+}
+
+impl NativeEncodedWebm {
+    #[allow(clippy::too_many_arguments)]
+    pub fn checked(
+        bytes: Tensor,
+        content_sha256: [u8; 32],
+        codec: NativeVideoCodec,
+        dimensions: (u64, u64),
+        frame_rate: (u64, u64),
+        frame_count: u64,
+        pixel_format: NativeVideoPixelFormat,
+        bit_depth: NativeVideoBitDepth,
+        has_alpha: bool,
+    ) -> Result<Self, NativeWebmEncodeServiceError> {
+        let descriptor = bytes.descriptor();
+        let actual_content_sha256: [u8; 32] = Sha256::digest(
+            bytes
+                .contiguous_bytes()
+                .map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?,
+        )
+        .into();
+        let projection_is_valid = descriptor.dtype() == DType::U8
+            && descriptor.device() == DeviceId::CPU
+            && descriptor.shape().len() == 1
+            && descriptor.shape().first().copied().unwrap_or(0) > 0
+            && descriptor
+                .is_contiguous()
+                .map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?
+            && dimensions.0 > 0
+            && dimensions.1 > 0
+            && frame_rate.0 > 0
+            && frame_rate.1 > 0
+            && gcd_u64(frame_rate.0, frame_rate.1) == 1
+            && frame_count > 0
+            && actual_content_sha256 == content_sha256
+            && match codec {
+                NativeVideoCodec::Vp9 => {
+                    bit_depth == NativeVideoBitDepth::Eight
+                        && matches!(
+                            (pixel_format, has_alpha),
+                            (NativeVideoPixelFormat::Yuv420p, false)
+                                | (NativeVideoPixelFormat::Yuva420p, true)
+                        )
+                }
+                NativeVideoCodec::Av1 => {
+                    bit_depth == NativeVideoBitDepth::Ten
+                        && pixel_format == NativeVideoPixelFormat::Yuv420p10le
+                        && !has_alpha
+                }
+                NativeVideoCodec::H264 => false,
+            };
+        if !projection_is_valid {
+            return Err(NativeWebmEncodeServiceError::InvalidProjection);
+        }
+        Ok(Self {
+            bytes,
+            content_sha256,
+            codec,
+            dimensions,
+            frame_rate,
+            frame_count,
+            pixel_format,
+            bit_depth,
+            has_alpha,
+        })
+    }
+
+    pub fn bytes(&self) -> &Tensor {
+        &self.bytes
+    }
+
+    pub const fn content_sha256(&self) -> [u8; 32] {
+        self.content_sha256
+    }
+
+    pub const fn codec(&self) -> NativeVideoCodec {
+        self.codec
+    }
+
+    pub const fn dimensions(&self) -> (u64, u64) {
+        self.dimensions
+    }
+
+    pub const fn frame_rate(&self) -> (u64, u64) {
+        self.frame_rate
+    }
+
+    pub const fn frame_count(&self) -> u64 {
+        self.frame_count
+    }
+
+    pub const fn pixel_format(&self) -> NativeVideoPixelFormat {
+        self.pixel_format
+    }
+
+    pub const fn bit_depth(&self) -> NativeVideoBitDepth {
+        self.bit_depth
+    }
+
+    pub const fn has_alpha(&self) -> bool {
+        self.has_alpha
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(
+        self,
+    ) -> (
+        Tensor,
+        [u8; 32],
+        NativeVideoCodec,
+        (u64, u64),
+        (u64, u64),
+        u64,
+        NativeVideoPixelFormat,
+        NativeVideoBitDepth,
+        bool,
+    ) {
+        (
+            self.bytes,
+            self.content_sha256,
+            self.codec,
+            self.dimensions,
+            self.frame_rate,
+            self.frame_count,
+            self.pixel_format,
+            self.bit_depth,
+            self.has_alpha,
+        )
+    }
+}
+
+pub trait NativeWebmEncodeService: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeWebmEncodeServiceIdentity;
+
+    #[allow(clippy::too_many_arguments)]
+    fn encode_webm(
+        &self,
+        request: NativeWebmEncodeRequest,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeEncodedWebm, NativeWebmEncodeServiceError>>;
+}
+
 #[derive(Debug, Error)]
 pub enum NativeShaderServiceError {
     #[error("native shader execution service is unavailable")]
@@ -1763,6 +2044,7 @@ pub struct NativeNodeServices {
     compute: Option<NativeNodeComputeSession>,
     shader: Option<Arc<dyn NativeShaderExecutor>>,
     ltxv_preprocess: Option<Arc<dyn NativeLtxvPreprocessService>>,
+    webm_encode: Option<Arc<dyn NativeWebmEncodeService>>,
     provider_execution: Option<NativeProviderExecutionIdentity>,
 }
 
@@ -1816,6 +2098,7 @@ impl NativeNodeServices {
             compute,
             shader: None,
             ltxv_preprocess: None,
+            webm_encode: None,
             provider_execution: None,
         })
     }
@@ -1833,6 +2116,17 @@ impl NativeNodeServices {
             service.identity().configuration_sha256().to_owned(),
         )?;
         self.ltxv_preprocess = Some(service);
+        Ok(self)
+    }
+
+    pub fn with_webm_encode(
+        mut self,
+        service: Arc<dyn NativeWebmEncodeService>,
+    ) -> Result<Self, NativeNodeContractError> {
+        NativeWebmEncodeServiceIdentity::checked(
+            service.identity().configuration_sha256().to_owned(),
+        )?;
+        self.webm_encode = Some(service);
         Ok(self)
     }
 
@@ -1941,6 +2235,15 @@ impl NativeNodeContext {
             .ltxv_preprocess
             .as_deref()
             .ok_or(NativeLtxvPreprocessServiceError::Unavailable)
+    }
+
+    pub fn webm_encode_service(
+        &self,
+    ) -> Result<&dyn NativeWebmEncodeService, NativeWebmEncodeServiceError> {
+        self.services
+            .webm_encode
+            .as_deref()
+            .ok_or(NativeWebmEncodeServiceError::Unavailable)
     }
 
     pub fn execute_shader(
@@ -2687,6 +2990,15 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn gcd_u64(mut left: u64, mut right: u64) -> u64 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
 fn output_request_digest(
     namespace: NativeOutputNamespace,
     filename_prefix: &str,
@@ -2844,6 +3156,13 @@ mod tests {
         compression: AtomicU64,
     }
 
+    #[derive(Debug)]
+    struct TestWebmEncodeService {
+        identity: NativeWebmEncodeServiceIdentity,
+        backend: Arc<CpuBackend>,
+        metadata: Mutex<Vec<(String, String)>>,
+    }
+
     impl NativeLtxvPreprocessService for TestLtxvPreprocessService {
         fn identity(&self) -> &NativeLtxvPreprocessServiceIdentity {
             &self.identity
@@ -2866,6 +3185,53 @@ mod tests {
                     Ok(image)
                 }
             })
+        }
+    }
+
+    impl NativeWebmEncodeService for TestWebmEncodeService {
+        fn identity(&self) -> &NativeWebmEncodeServiceIdentity {
+            &self.identity
+        }
+
+        fn encode_webm(
+            &self,
+            request: NativeWebmEncodeRequest,
+            context: &ExecutionContext<'_>,
+        ) -> BoxFuture<'static, Result<NativeEncodedWebm, NativeWebmEncodeServiceError>> {
+            let (images, codec, frame_rate, _crf, metadata) = request.into_parts();
+            *self.metadata.lock().expect("test metadata mutex poisoned") = metadata;
+            let result = (|| {
+                context
+                    .check()
+                    .map_err(|_| NativeWebmEncodeServiceError::Cancelled)?;
+                let (frame_count, height, width, _) = images
+                    .dimensions()
+                    .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                let encoded = b"HPPPT";
+                let descriptor = comfy_tensor::TensorDescriptor::contiguous(
+                    vec![encoded.len() as u64],
+                    DType::U8,
+                    DeviceId::CPU,
+                    context.stream,
+                )
+                .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                let (bytes, _) = self
+                    .backend
+                    .upload_bytes(descriptor, encoded, context)
+                    .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                NativeEncodedWebm::checked(
+                    bytes,
+                    Sha256::digest(encoded).into(),
+                    codec,
+                    (width, height),
+                    frame_rate,
+                    frame_count,
+                    NativeVideoPixelFormat::Yuv420p,
+                    NativeVideoBitDepth::Eight,
+                    false,
+                )
+            })();
+            Box::pin(async move { result })
         }
     }
 
@@ -3740,6 +4106,151 @@ mod tests {
         assert!(matches!(
             unavailable.ltxv_preprocess_service(),
             Err(NativeLtxvPreprocessServiceError::Unavailable)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn webm_encode_service_requires_checked_identity_and_validates_portable_contract()
+    -> Result<(), Box<dyn std::error::Error>> {
+        assert!(NativeWebmEncodeServiceIdentity::checked("not-a-digest").is_err());
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let backend = Arc::new(backend);
+        let scratch = authority.authorize_workspace(1024 * 1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(0x531));
+        let attempt_id = AttemptId(Uuid::from_u128(0x532));
+        let node_id = NodeId::from("webm-encode");
+        let compute = NativeNodeComputeSession::checked(
+            NativeNodeServiceIdentity::checked(
+                Uuid::from_u128(0x533),
+                attempt_id,
+                node_id.clone(),
+            )?,
+            backend.clone(),
+            StreamId::DEFAULT,
+            &scratch,
+        )?;
+        let service = Arc::new(TestWebmEncodeService {
+            identity: NativeWebmEncodeServiceIdentity::checked("b".repeat(64))?,
+            backend: backend.clone(),
+            metadata: Mutex::new(Vec::new()),
+        });
+        let services = NativeNodeServices::checked(None, None, Some(compute.clone()))?
+            .with_webm_encode(service.clone())?;
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id,
+            CancellationToken::default(),
+            scratch,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x534, 0x535)?,
+                attempt_id,
+            )),
+            services,
+        )?;
+        let execution = compute.execution_context(&context)?;
+        let image = ImageTensor::from_f32(&backend, &execution, 1, 1, 1, 3, &[0.25, 0.5, 0.75])?;
+        let input_storage = image.tensor().storage_id();
+        let metadata = vec![
+            ("prompt".to_owned(), "first".to_owned()),
+            ("workflow".to_owned(), "{}".to_owned()),
+            ("prompt".to_owned(), "last".to_owned()),
+        ];
+        let request = NativeWebmEncodeRequest::checked(
+            image,
+            NativeVideoCodec::Vp9,
+            (125, 2_997),
+            NativeVideoCrf::checked(31.5)?,
+            metadata.clone(),
+        )?;
+        assert_eq!(request.images().tensor().storage_id(), input_storage);
+        assert_eq!(request.crf().bits(), 31.5_f64.to_bits());
+        let result = futures::executor::block_on(
+            context
+                .webm_encode_service()?
+                .encode_webm(request, &execution),
+        )?;
+        assert_eq!(result.bytes().contiguous_bytes()?, b"HPPPT");
+        assert_eq!(result.codec(), NativeVideoCodec::Vp9);
+        assert_eq!(result.pixel_format(), NativeVideoPixelFormat::Yuv420p);
+        assert_eq!(result.bit_depth(), NativeVideoBitDepth::Eight);
+        assert!(!result.has_alpha());
+        assert!(matches!(
+            NativeEncodedWebm::checked(
+                result.bytes().clone(),
+                [0; 32],
+                NativeVideoCodec::Vp9,
+                (1, 1),
+                (125, 2_997),
+                1,
+                NativeVideoPixelFormat::Yuv420p,
+                NativeVideoBitDepth::Eight,
+                false,
+            ),
+            Err(NativeWebmEncodeServiceError::InvalidProjection)
+        ));
+        assert!(matches!(
+            NativeEncodedWebm::checked(
+                result.bytes().clone(),
+                result.content_sha256(),
+                NativeVideoCodec::Av1,
+                (1, 1),
+                (125, 2_997),
+                1,
+                NativeVideoPixelFormat::Yuv420p10le,
+                NativeVideoBitDepth::Ten,
+                true,
+            ),
+            Err(NativeWebmEncodeServiceError::InvalidProjection)
+        ));
+        assert_eq!(
+            *service
+                .metadata
+                .lock()
+                .expect("test metadata mutex poisoned"),
+            metadata
+        );
+
+        let invalid_codec_image =
+            ImageTensor::from_f32(&backend, &execution, 1, 1, 1, 3, &[0.0, 0.0, 0.0])?;
+        let unreduced_rate_image = invalid_codec_image.clone();
+        for invalid in [
+            NativeWebmEncodeRequest::checked(
+                invalid_codec_image,
+                NativeVideoCodec::H264,
+                (1, 1),
+                NativeVideoCrf::checked(1.0)?,
+                Vec::new(),
+            ),
+            NativeWebmEncodeRequest::checked(
+                unreduced_rate_image,
+                NativeVideoCodec::Vp9,
+                (2, 2),
+                NativeVideoCrf::checked(1.0)?,
+                Vec::new(),
+            ),
+        ] {
+            assert!(matches!(
+                invalid,
+                Err(NativeWebmEncodeServiceError::InvalidRequest)
+            ));
+        }
+
+        let unavailable = NativeNodeContext::new(
+            prompt_id,
+            attempt_id,
+            NodeId::from("webm-unavailable"),
+            CancellationToken::default(),
+            authority.authorize_workspace(1024)?,
+            Arc::new(TestHandleStore::new(
+                store_identity(0x536, 0x537)?,
+                attempt_id,
+            )),
+        )?;
+        assert!(matches!(
+            unavailable.webm_encode_service(),
+            Err(NativeWebmEncodeServiceError::Unavailable)
         ));
         Ok(())
     }

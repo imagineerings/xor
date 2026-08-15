@@ -15224,6 +15224,125 @@
       "decision_reason": "One capacity-one retained codec actor carries AV1 requests to the sole native owner thread, drops every borrowed AV1 WebM owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable ten-bit non-alpha bytes with scratch converged."
     },
     {
+      "concern": "native_video_reviewed_codec_service_webm_node_injection",
+      "canonical_owner": "comfy_nodes::execution::NativeWebmEncodeService",
+      "owner_files": [
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_nodes/src/comfy_nodes.rs",
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_runtime/src/native_execution_controller.rs",
+        "crates/comfy_runtime/src/comfy_runtime.rs"
+      ],
+      "owner_symbols": [
+        "NativeWebmEncodeServiceIdentity",
+        "NativeWebmEncodeRequest",
+        "NativeEncodedWebm",
+        "NativeWebmEncodeServiceError",
+        "NativeWebmEncodeService",
+        "NativeWebmCodecRequestService",
+        "ExecutionEngine::with_webm_encode_service",
+        "NativeImageExecutor::with_webm_encode_service"
+      ],
+      "allowed_adapters": [
+        "the existing retained codec proxy remains the sole VP9 and AV1 actor transport and native lifetime adapter",
+        "the canonical WebM batch session and metadata limit types expose only deterministic configuration values for service identity",
+        "NativeNodeServices and ExecutionEngine carry the checked service Arc without owning codec state",
+        "NativeImageExecutor appends the checked WebM configuration digest to execution cache identity",
+        "the following SaveWEBM adapter may consume portable bytes and owns JSON effects paths rollback and publication"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeWebmEncodeService",
+          "role": "canonical_service",
+          "symbol": "NativeWebmEncodeService"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeWebmCodecRequestService",
+          "role": "allowed_adapter",
+          "symbol": "NativeWebmCodecRequestService"
+        }
+      ],
+      "call_symbols": [
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
+        "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
+        "NativeNodeServices::with_webm_encode",
+        "ExecutionEngine::with_webm_encode_service",
+        "NativeImageExecutor::with_webm_encode_service"
+      ],
+      "required_mappings": [
+        {
+          "name": "webm-node-service-owns-checked-portable-contract",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeWebmEncodeServiceIdentity[\\s\\S]*NativeWebmEncodeRequest[\\s\\S]*NativeEncodedWebm[\\s\\S]*NativeWebmEncodeServiceError[\\s\\S]*trait NativeWebmEncodeService"
+        },
+        {
+          "name": "webm-node-service-moves-retained-actor-output-with-request-projection-checks",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeWebmCodecRequestService[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*encode_av1_webm_batch_with_metadata[\\s\\S]*into_parts[\\s\\S]*checked_webm_service_result"
+        },
+        {
+          "name": "webm-node-service-identity-binds-actor-and-all-limit-values",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "sim.comfy.webm-node-service.v1[\\s\\S]*configuration_sha256[\\s\\S]*batch_limits_configuration_u64[\\s\\S]*metadata_limits_configuration_u64"
+        },
+        {
+          "name": "webm-node-service-propagates-through-engine-and-cache-identity",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "webm_encode_service[\\s\\S]*with_webm_encode_service[\\s\\S]*:webm="
+        },
+        {
+          "name": "webm-node-service-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
+          "pattern": "synthetic-retained-webm-node-service[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*save_webm_node_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-webm-node-service-foundation"
+      ],
+      "production_consumers": [
+        "the following SaveWEBM prepared-effect and COMFY-NODE-0602 adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D31",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-NODE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One checked WebM service maps portable node requests onto the sole retained VP9 and AV1 actor, moves its already-accounted Tensor without another byte copy, validates every result projection, carries the service through native execution, and partitions cache identity by actor and all configured bounds."
+    },
+    {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::encode_rgb8_frame",
       "owner_files": [

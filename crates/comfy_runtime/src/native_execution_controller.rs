@@ -56,10 +56,11 @@ use comfy_nodes::{
     NativeNodeBindingDisposition, NativeNodeContractError, NativeNodePresentation,
     NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputSchemaMetadata, NativePortCardinality,
     NativePrimitive, NativePrimitiveType, NativeResolvedPayload, NativeStoredModelPayload,
-    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType, NodeDescriptor,
-    NodeRegistry, PortDescriptor, generated_family_node_bindings, native_diffusion_descriptors,
-    native_image_descriptors, native_source_type_projection, native_text_generation_transaction,
-    native_value_type_for_output_schema, native_value_types_for_input_schema,
+    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType, NativeWebmEncodeService,
+    NodeDescriptor, NodeRegistry, PortDescriptor, generated_family_node_bindings,
+    native_diffusion_descriptors, native_image_descriptors, native_source_type_projection,
+    native_text_generation_transaction, native_value_type_for_output_schema,
+    native_value_types_for_input_schema,
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
@@ -4123,6 +4124,7 @@ pub struct NativeImageExecutor {
     cpu_backend: Arc<CpuBackend>,
     shader_executor: Arc<dyn NativeShaderExecutor>,
     ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
+    webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
     metadata_enabled: bool,
     diffusion_enabled: bool,
 }
@@ -4170,6 +4172,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4201,6 +4204,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4231,6 +4235,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4266,6 +4271,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4298,6 +4304,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4335,6 +4342,7 @@ impl NativeImageExecutor {
             cpu_backend,
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4378,6 +4386,11 @@ impl NativeImageExecutor {
         self
     }
 
+    pub fn with_webm_encode_service(mut self, service: Arc<dyn NativeWebmEncodeService>) -> Self {
+        self.webm_encode_service = Some(service);
+        self
+    }
+
     fn execution_configuration_token(
         &self,
         plan: &CompiledPlan,
@@ -4397,14 +4410,21 @@ impl NativeImageExecutor {
             .ltxv_preprocess_service
             .as_deref()
             .map(|service| service.identity().configuration_sha256());
-        match ltxv_identity {
-            Some(ltxv_identity) => format!(
-                "{configuration_token}:provider={provider_identity}:shader={shader_identity}:ltxv={ltxv_identity}"
-            ),
-            None => format!(
-                "{configuration_token}:provider={provider_identity}:shader={shader_identity}"
-            ),
+        let webm_identity = self
+            .webm_encode_service
+            .as_deref()
+            .map(|service| service.identity().configuration_sha256());
+        let mut configuration_token =
+            format!("{configuration_token}:provider={provider_identity}:shader={shader_identity}");
+        if let Some(ltxv_identity) = ltxv_identity {
+            configuration_token.push_str(":ltxv=");
+            configuration_token.push_str(ltxv_identity);
         }
+        if let Some(webm_identity) = webm_identity {
+            configuration_token.push_str(":webm=");
+            configuration_token.push_str(webm_identity);
+        }
+        configuration_token
     }
 
     pub fn execute_blocking(
@@ -4485,6 +4505,9 @@ impl NativeImageExecutor {
         .with_configuration_token(configuration_token)?;
         if let Some(ltxv_preprocess_service) = &self.ltxv_preprocess_service {
             engine = engine.with_ltxv_preprocess_service(ltxv_preprocess_service.clone());
+        }
+        if let Some(webm_encode_service) = &self.webm_encode_service {
+            engine = engine.with_webm_encode_service(webm_encode_service.clone());
         }
         if let Some(event_bus) = event_bus {
             engine = engine.with_event_bus(event_bus);
@@ -7547,6 +7570,28 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct IdentityWebmEncodeService {
+        identity: comfy_nodes::NativeWebmEncodeServiceIdentity,
+    }
+
+    impl NativeWebmEncodeService for IdentityWebmEncodeService {
+        fn identity(&self) -> &comfy_nodes::NativeWebmEncodeServiceIdentity {
+            &self.identity
+        }
+
+        fn encode_webm(
+            &self,
+            _request: comfy_nodes::NativeWebmEncodeRequest,
+            _context: &ExecutionContext<'_>,
+        ) -> futures::future::BoxFuture<
+            'static,
+            Result<comfy_nodes::NativeEncodedWebm, comfy_nodes::NativeWebmEncodeServiceError>,
+        > {
+            Box::pin(async { Err(comfy_nodes::NativeWebmEncodeServiceError::Unavailable) })
+        }
+    }
+
     fn native(value: Value) -> NativeValue {
         match value {
             Value::Null => NativeValue::Primitive {
@@ -7750,6 +7795,42 @@ mod tests {
         let ltxv_identity = ltxv.execution_configuration_token(&plan, "balanced");
         assert!(ltxv_identity.ends_with(&format!(":ltxv={}", "d".repeat(64))));
         assert_ne!(ltxv_identity, first_identity);
+
+        let (webm_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let webm = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(webm_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")))
+        .with_webm_encode_service(Arc::new(IdentityWebmEncodeService {
+            identity: comfy_nodes::NativeWebmEncodeServiceIdentity::checked("e".repeat(64))?,
+        }));
+        let webm_identity = webm.execution_configuration_token(&plan, "balanced");
+        assert!(webm_identity.ends_with(&format!(":webm={}", "e".repeat(64))));
+        assert_ne!(webm_identity, first_identity);
+
+        let (both_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let both = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(both_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")))
+        .with_ltxv_preprocess_service(Arc::new(IdentityLtxvPreprocessService {
+            identity: comfy_nodes::NativeLtxvPreprocessServiceIdentity::checked("d".repeat(64))?,
+        }))
+        .with_webm_encode_service(Arc::new(IdentityWebmEncodeService {
+            identity: comfy_nodes::NativeWebmEncodeServiceIdentity::checked("e".repeat(64))?,
+        }));
+        assert!(
+            both.execution_configuration_token(&plan, "balanced")
+                .ends_with(&format!(":ltxv={}:webm={}", "d".repeat(64), "e".repeat(64)))
+        );
         Ok(())
     }
 

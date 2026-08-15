@@ -184,6 +184,16 @@ impl NativeVideoContainerMetadataLimits {
             maximum_aggregate_bytes,
         })
     }
+
+    #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+    pub(crate) const fn configuration_values(self) -> (usize, usize, usize, usize) {
+        (
+            self.maximum_entries,
+            self.maximum_key_bytes,
+            self.maximum_value_bytes,
+            self.maximum_aggregate_bytes,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -204,7 +214,10 @@ impl NativeVideoContainerMetadata {
             return Err(NativeVideoContainerMetadataError::LimitExceeded);
         }
         let mut aggregate_bytes = 0_usize;
-        let mut checked_entries = Vec::with_capacity(entries.len());
+        let mut checked_entries = Vec::new();
+        checked_entries
+            .try_reserve_exact(entries.len())
+            .map_err(|_| NativeVideoContainerMetadataError::AllocationFailed)?;
         for (key, value) in entries {
             let key_bytes = key.as_bytes();
             let value_bytes = value.as_bytes();
@@ -262,6 +275,8 @@ pub(crate) enum NativeVideoContainerMetadataError {
     EmbeddedNul,
     #[error("native video container metadata exceeds its checked limits")]
     LimitExceeded,
+    #[error("native video container metadata allocation failed")]
+    AllocationFailed,
 }
 
 #[allow(
@@ -282,6 +297,18 @@ impl NativeVp9WebmBatchLimits {
             maximum_frames,
             maximum_pixels_per_frame,
         })
+    }
+
+    pub(crate) const fn configuration_values(self) -> (usize, usize, u64, usize, usize, u64) {
+        let session = self.session.configuration_values();
+        (
+            session.0,
+            session.1,
+            session.2,
+            session.3,
+            self.maximum_frames,
+            self.maximum_pixels_per_frame,
+        )
     }
 }
 
@@ -309,6 +336,15 @@ impl NativeVp9WebmEncodeLimits {
             maximum_native_session_bytes,
             maximum_packet_iterations,
         })
+    }
+
+    const fn configuration_values(self) -> (usize, usize, u64, usize) {
+        (
+            self.maximum_output_bytes,
+            self.avio_buffer_bytes,
+            self.maximum_native_session_bytes,
+            self.maximum_packet_iterations,
+        )
     }
 }
 

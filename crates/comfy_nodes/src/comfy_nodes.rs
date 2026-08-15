@@ -23,9 +23,9 @@ pub use execution::{
     NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION, NATIVE_STRUCTURED_VALUE_SCHEMA_VERSION,
     NATIVE_TEXT_GENERATION_RNG_PHASE, NativeAssetReadRequest, NativeAssetReference,
     NativeAssetResolver, NativeAssetServiceError, NativeCacheDependencies, NativeCachePolicy,
-    NativeDynamicInputDescriptor, NativeEffectClass, NativeEffectServiceError, NativeHandleKind,
-    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
-    NativeImagePreviewError, NativeInputDescriptor, NativeLtxvPreprocessService,
+    NativeDynamicInputDescriptor, NativeEffectClass, NativeEffectServiceError, NativeEncodedWebm,
+    NativeHandleKind, NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity,
+    NativeHandleType, NativeImagePreviewError, NativeInputDescriptor, NativeLtxvPreprocessService,
     NativeLtxvPreprocessServiceError, NativeLtxvPreprocessServiceIdentity, NativeNode,
     NativeNodeBinding, NativeNodeBindingDisposition, NativeNodeBindingsFactory,
     NativeNodeComputeSession, NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor,
@@ -36,7 +36,9 @@ pub use execution::{
     NativePreparedEffectService, NativePreparedImagePreview, NativePrimitive, NativePrimitiveType,
     NativeProviderExecutionIdentity, NativeResolvedAsset, NativeResolvedPayload,
     NativeResolvedPayloadRetention, NativeStructuredValue, NativeTypeUnion, NativeValue,
-    NativeValueType, native_text_generation_transaction, native_value_matches_input_schema,
+    NativeValueType, NativeWebmEncodeRequest, NativeWebmEncodeService,
+    NativeWebmEncodeServiceError, NativeWebmEncodeServiceIdentity,
+    native_text_generation_transaction, native_value_matches_input_schema,
     validate_generated_family_bindings,
 };
 pub use object_info::{

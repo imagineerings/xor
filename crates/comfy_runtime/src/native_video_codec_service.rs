@@ -6,10 +6,11 @@ use crate::{
     NativeVideoCodecVp9EncodeError, NativeVideoContainerMetadata, NativeVp9WebmBatchLimits,
     bind_certified_video_codec_abi, load_certified_video_codec_closure,
 };
-use comfy_media::{NativeVideoBitDepth, NativeVideoCrf, NativeVideoPixelFormat};
+use comfy_media::{NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf, NativeVideoPixelFormat};
 use comfy_nodes::{
-    NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
-    NativeLtxvPreprocessServiceIdentity,
+    NativeEncodedWebm, NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
+    NativeLtxvPreprocessServiceIdentity, NativeWebmEncodeRequest, NativeWebmEncodeService,
+    NativeWebmEncodeServiceError, NativeWebmEncodeServiceIdentity,
 };
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ScratchReservation, StreamId,
@@ -28,6 +29,8 @@ use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
 const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v7";
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1";
 
 #[allow(
     dead_code,
@@ -185,6 +188,19 @@ impl NativeOwnedVp9Webm {
     pub(crate) fn has_alpha(&self) -> bool {
         self.has_alpha
     }
+
+    #[allow(clippy::type_complexity)]
+    fn into_parts(self) -> (Tensor, [u8; 32], i32, i32, (i32, i32), usize, bool) {
+        (
+            self.bytes,
+            self.content_sha256,
+            self.width,
+            self.height,
+            self.frame_rate,
+            self.frame_count,
+            self.has_alpha,
+        )
+    }
 }
 
 #[allow(
@@ -237,6 +253,18 @@ impl NativeOwnedAv1Webm {
     pub(crate) const fn pixel_format(&self) -> NativeVideoPixelFormat {
         NativeVideoPixelFormat::Yuv420p10le
     }
+
+    #[allow(clippy::type_complexity)]
+    fn into_parts(self) -> (Tensor, [u8; 32], i32, i32, (i32, i32), usize) {
+        (
+            self.bytes,
+            self.content_sha256,
+            self.width,
+            self.height,
+            self.frame_rate,
+            self.frame_count,
+        )
+    }
 }
 
 struct NativeLtxvCodecThreadInner {
@@ -261,6 +289,50 @@ pub(crate) struct NativeLtxvCodecThreadService {
 #[derive(Clone)]
 pub(crate) struct NativeLtxvCodecRequestProxy {
     inner: Arc<NativeLtxvCodecThreadInner>,
+}
+
+#[derive(Clone, Debug)]
+#[allow(
+    dead_code,
+    reason = "constructed by the following SaveWEBM node adapter"
+)]
+pub(crate) struct NativeWebmCodecRequestService {
+    proxy: NativeLtxvCodecRequestProxy,
+    batch_limits: NativeVp9WebmBatchLimits,
+    metadata_limits: crate::NativeVideoContainerMetadataLimits,
+    identity: NativeWebmEncodeServiceIdentity,
+}
+
+#[allow(
+    dead_code,
+    reason = "constructed by the following SaveWEBM node adapter"
+)]
+impl NativeWebmCodecRequestService {
+    pub(crate) fn checked(
+        proxy: NativeLtxvCodecRequestProxy,
+        batch_limits: NativeVp9WebmBatchLimits,
+        metadata_limits: crate::NativeVideoContainerMetadataLimits,
+    ) -> Result<Self, NativeWebmEncodeServiceError> {
+        let mut digest = Sha256::new();
+        digest.update(WEBM_NODE_SERVICE_IDENTITY_VERSION.as_bytes());
+        digest.update([0]);
+        digest.update(proxy.identity().configuration_sha256().as_bytes());
+        for value in batch_limits_configuration_u64(batch_limits)? {
+            digest.update(value.to_be_bytes());
+        }
+        for value in metadata_limits_configuration_u64(metadata_limits)? {
+            digest.update(value.to_be_bytes());
+        }
+        let configuration_sha256 = format!("{:x}", digest.finalize());
+        let identity = NativeWebmEncodeServiceIdentity::checked(configuration_sha256)
+            .map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?;
+        Ok(Self {
+            proxy,
+            batch_limits,
+            metadata_limits,
+            identity,
+        })
+    }
 }
 
 impl fmt::Debug for NativeLtxvCodecRequestProxy {
@@ -526,6 +598,191 @@ impl NativeLtxvPreprocessService for NativeLtxvCodecRequestProxy {
     }
 }
 
+impl NativeWebmEncodeService for NativeWebmCodecRequestService {
+    fn identity(&self) -> &NativeWebmEncodeServiceIdentity {
+        &self.identity
+    }
+
+    fn encode_webm(
+        &self,
+        request: NativeWebmEncodeRequest,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeEncodedWebm, NativeWebmEncodeServiceError>> {
+        let (images, codec, frame_rate, crf, metadata) = request.into_parts();
+        let dimensions = match images.dimensions() {
+            Ok((frame_count, height, width, _)) => (frame_count, width, height),
+            Err(_) => {
+                return async { Err(NativeWebmEncodeServiceError::InvalidRequest) }.boxed();
+            }
+        };
+        let metadata = match NativeVideoContainerMetadata::checked(metadata, self.metadata_limits) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                return async move { Err(map_webm_metadata_service_error(error)) }.boxed();
+            }
+        };
+        let stream = context.stream;
+        let result = match codec {
+            NativeVideoCodec::Vp9 => self
+                .proxy
+                .encode_vp9_webm_batch_with_metadata(
+                    &images,
+                    frame_rate,
+                    crf,
+                    self.batch_limits,
+                    metadata,
+                    context,
+                )
+                .map(|result| result.map(WebmActorOutput::Vp9))
+                .boxed(),
+            NativeVideoCodec::Av1 => self
+                .proxy
+                .encode_av1_webm_batch_with_metadata(
+                    &images,
+                    frame_rate,
+                    crf,
+                    self.batch_limits,
+                    metadata,
+                    context,
+                )
+                .map(|result| result.map(WebmActorOutput::Av1))
+                .boxed(),
+            NativeVideoCodec::H264 => {
+                return async { Err(NativeWebmEncodeServiceError::InvalidRequest) }.boxed();
+            }
+        };
+        async move {
+            let output = result.await.map_err(map_webm_node_service_error)?;
+            let encoded = match output {
+                WebmActorOutput::Vp9(output) => {
+                    let (bytes, digest, width, height, output_rate, frame_count, has_alpha) =
+                        output.into_parts();
+                    checked_webm_service_result(
+                        bytes,
+                        digest,
+                        NativeVideoCodec::Vp9,
+                        width,
+                        height,
+                        output_rate,
+                        frame_count,
+                        if has_alpha {
+                            NativeVideoPixelFormat::Yuva420p
+                        } else {
+                            NativeVideoPixelFormat::Yuv420p
+                        },
+                        NativeVideoBitDepth::Eight,
+                        has_alpha,
+                        dimensions,
+                        frame_rate,
+                        stream,
+                    )?
+                }
+                WebmActorOutput::Av1(output) => {
+                    let (bytes, digest, width, height, output_rate, frame_count) =
+                        output.into_parts();
+                    checked_webm_service_result(
+                        bytes,
+                        digest,
+                        NativeVideoCodec::Av1,
+                        width,
+                        height,
+                        output_rate,
+                        frame_count,
+                        NativeVideoPixelFormat::Yuv420p10le,
+                        NativeVideoBitDepth::Ten,
+                        false,
+                        dimensions,
+                        frame_rate,
+                        stream,
+                    )?
+                }
+            };
+            Ok(encoded)
+        }
+        .boxed()
+    }
+}
+
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+enum WebmActorOutput {
+    Vp9(NativeOwnedVp9Webm),
+    Av1(NativeOwnedAv1Webm),
+}
+
+#[allow(clippy::too_many_arguments)]
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+fn checked_webm_service_result(
+    bytes: Tensor,
+    content_sha256: [u8; 32],
+    codec: NativeVideoCodec,
+    width: i32,
+    height: i32,
+    frame_rate: (i32, i32),
+    frame_count: usize,
+    pixel_format: NativeVideoPixelFormat,
+    bit_depth: NativeVideoBitDepth,
+    has_alpha: bool,
+    expected: (u64, u64, u64),
+    expected_frame_rate: (u64, u64),
+    expected_stream: StreamId,
+) -> Result<NativeEncodedWebm, NativeWebmEncodeServiceError> {
+    let width =
+        u64::try_from(width).map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?;
+    let height =
+        u64::try_from(height).map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?;
+    let frame_rate = (
+        u64::try_from(frame_rate.0).map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?,
+        u64::try_from(frame_rate.1).map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?,
+    );
+    let frame_count =
+        u64::try_from(frame_count).map_err(|_| NativeWebmEncodeServiceError::InvalidProjection)?;
+    if (frame_count, width, height) != expected
+        || frame_rate != expected_frame_rate
+        || bytes.descriptor().stream() != expected_stream
+    {
+        return Err(NativeWebmEncodeServiceError::InvalidProjection);
+    }
+    NativeEncodedWebm::checked(
+        bytes,
+        content_sha256,
+        codec,
+        (width, height),
+        frame_rate,
+        frame_count,
+        pixel_format,
+        bit_depth,
+        has_alpha,
+    )
+}
+
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+fn batch_limits_configuration_u64(
+    limits: NativeVp9WebmBatchLimits,
+) -> Result<[u64; 6], NativeWebmEncodeServiceError> {
+    let values = limits.configuration_values();
+    Ok([
+        u64::try_from(values.0).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        u64::try_from(values.1).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        values.2,
+        u64::try_from(values.3).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        u64::try_from(values.4).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        values.5,
+    ])
+}
+
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+fn metadata_limits_configuration_u64(
+    limits: crate::NativeVideoContainerMetadataLimits,
+) -> Result<[u64; 4], NativeWebmEncodeServiceError> {
+    let values = limits.configuration_values();
+    Ok([
+        u64::try_from(values.0).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        u64::try_from(values.1).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        u64::try_from(values.2).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+        u64::try_from(values.3).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+    ])
+}
+
 impl NativeLtxvCodecThreadInner {
     fn close(&self) -> Result<(), NativeLtxvCodecThreadError> {
         let sender = self
@@ -651,6 +908,51 @@ fn map_ltxv_node_service_error(
         | NativeLtxvCodecThreadError::Av1Encode(_)
         | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
             NativeLtxvPreprocessServiceError::Execution(error.to_string())
+        }
+    }
+}
+
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+fn map_webm_metadata_service_error(
+    error: crate::NativeVideoContainerMetadataError,
+) -> NativeWebmEncodeServiceError {
+    match error {
+        crate::NativeVideoContainerMetadataError::LimitExceeded
+        | crate::NativeVideoContainerMetadataError::AllocationFailed => {
+            NativeWebmEncodeServiceError::ResourceExhausted
+        }
+        crate::NativeVideoContainerMetadataError::InvalidLimits
+        | crate::NativeVideoContainerMetadataError::EmptyKey
+        | crate::NativeVideoContainerMetadataError::EmbeddedNul => {
+            NativeWebmEncodeServiceError::InvalidRequest
+        }
+    }
+}
+
+#[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
+fn map_webm_node_service_error(error: NativeLtxvCodecThreadError) -> NativeWebmEncodeServiceError {
+    match error {
+        NativeLtxvCodecThreadError::Cancelled => NativeWebmEncodeServiceError::Cancelled,
+        NativeLtxvCodecThreadError::Busy => NativeWebmEncodeServiceError::Busy,
+        NativeLtxvCodecThreadError::InvalidScratch(_) => {
+            NativeWebmEncodeServiceError::InvalidRequest
+        }
+        NativeLtxvCodecThreadError::ResourceExhausted => {
+            NativeWebmEncodeServiceError::ResourceExhausted
+        }
+        NativeLtxvCodecThreadError::ThreadStopped
+        | NativeLtxvCodecThreadError::ThreadPanicked
+        | NativeLtxvCodecThreadError::StatePoisoned => NativeWebmEncodeServiceError::Unavailable,
+        error @ (NativeLtxvCodecThreadError::ThreadSpawn(_)
+        | NativeLtxvCodecThreadError::Load(_)
+        | NativeLtxvCodecThreadError::Binding(_)
+        | NativeLtxvCodecThreadError::Admission(_)
+        | NativeLtxvCodecThreadError::SuiteAdmission(_)
+        | NativeLtxvCodecThreadError::Preprocess(_)
+        | NativeLtxvCodecThreadError::Vp9Encode(_)
+        | NativeLtxvCodecThreadError::Av1Encode(_)
+        | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
+            NativeWebmEncodeServiceError::Execution(error.to_string())
         }
     }
 }
@@ -1291,7 +1593,7 @@ mod tests {
         let cancellation = CancellationToken::default();
         let (backend, _image, scratch) = test_image_and_context(&cancellation)?;
         let image_context = request_context(scratch.clone(), &cancellation);
-        let image = ImageTensor::from_f32(&backend, &image_context, 1, 2, 2, 4, &[0.5; 16])?;
+        let image = ImageTensor::from_f32(&backend, &image_context, 3, 2, 2, 4, &[0.5; 48])?;
         let events = Arc::new(Mutex::new(Vec::new()));
         let actor_backend = backend.clone();
         let service = start_ltxv_codec_thread({
@@ -1348,7 +1650,7 @@ mod tests {
                                     b"HPPPT",
                                     2,
                                     2,
-                                    (125, 2997),
+                                    (2997, 125),
                                     3,
                                     true,
                                 )?;
@@ -1376,7 +1678,7 @@ mod tests {
                                     b"HA1T",
                                     2,
                                     2,
-                                    (125, 2997),
+                                    (2997, 125),
                                     3,
                                 )?;
                                 Ok(NativeVideoCodecThreadOutput::Av1Webm(encoded))
@@ -1414,7 +1716,7 @@ mod tests {
         ))?;
         assert_eq!(encoded.encoded_bytes()?, b"HPPPT");
         assert_eq!(encoded.dimensions(), (2, 2));
-        assert_eq!(encoded.frame_rate(), (125, 2997));
+        assert_eq!(encoded.frame_rate(), (2997, 125));
         assert_eq!(encoded.frame_count(), 3);
         assert!(encoded.has_alpha());
         assert_eq!(
@@ -1441,7 +1743,7 @@ mod tests {
         ))?;
         assert_eq!(av1.encoded_bytes()?, b"HA1T");
         assert_eq!(av1.dimensions(), (2, 2));
-        assert_eq!(av1.frame_rate(), (125, 2997));
+        assert_eq!(av1.frame_rate(), (2997, 125));
         assert_eq!(av1.frame_count(), 3);
         assert!(!av1.has_alpha());
         assert_eq!(av1.bit_depth(), NativeVideoBitDepth::Ten);
@@ -1452,6 +1754,65 @@ mod tests {
         );
         assert_eq!(scratch.in_use_bytes(), 0);
         drop(av1);
+
+        let metadata_limits = crate::NativeVideoContainerMetadataLimits::checked(3, 16, 16, 64)?;
+        let webm_service =
+            NativeWebmCodecRequestService::checked(proxy.clone(), batch_limits, metadata_limits)?;
+        let same_webm_service =
+            NativeWebmCodecRequestService::checked(proxy.clone(), batch_limits, metadata_limits)?;
+        let changed_webm_service = NativeWebmCodecRequestService::checked(
+            proxy.clone(),
+            batch_limits,
+            crate::NativeVideoContainerMetadataLimits::checked(4, 16, 16, 64)?,
+        )?;
+        assert_eq!(
+            NativeWebmEncodeService::identity(&webm_service),
+            NativeWebmEncodeService::identity(&same_webm_service)
+        );
+        assert_ne!(
+            NativeWebmEncodeService::identity(&webm_service),
+            NativeWebmEncodeService::identity(&changed_webm_service)
+        );
+        let vp9_request = NativeWebmEncodeRequest::checked(
+            image.clone(),
+            NativeVideoCodec::Vp9,
+            (2997, 125),
+            NativeVideoCrf::checked(31.5)?,
+            vec![
+                ("prompt".to_owned(), "first".to_owned()),
+                ("workflow".to_owned(), "{}".to_owned()),
+                ("prompt".to_owned(), "last".to_owned()),
+            ],
+        )?;
+        let vp9_result = block_on(webm_service.encode_webm(vp9_request, &context))?;
+        assert_eq!(vp9_result.bytes().contiguous_bytes()?, b"HPPPT");
+        assert_eq!(vp9_result.codec(), NativeVideoCodec::Vp9);
+        assert_eq!(vp9_result.dimensions(), (2, 2));
+        assert_eq!(vp9_result.frame_rate(), (2997, 125));
+        assert_eq!(vp9_result.frame_count(), 3);
+        assert_eq!(vp9_result.pixel_format(), NativeVideoPixelFormat::Yuva420p);
+        assert!(vp9_result.has_alpha());
+
+        let av1_request = NativeWebmEncodeRequest::checked(
+            image.clone(),
+            NativeVideoCodec::Av1,
+            (2997, 125),
+            NativeVideoCrf::checked(31.5)?,
+            vec![
+                ("prompt".to_owned(), "av1".to_owned()),
+                ("workflow".to_owned(), "{}".to_owned()),
+            ],
+        )?;
+        let av1_result = block_on(webm_service.encode_webm(av1_request, &context))?;
+        assert_eq!(av1_result.bytes().contiguous_bytes()?, b"HA1T");
+        assert_eq!(av1_result.codec(), NativeVideoCodec::Av1);
+        assert_eq!(av1_result.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            av1_result.pixel_format(),
+            NativeVideoPixelFormat::Yuv420p10le
+        );
+        assert!(!av1_result.has_alpha());
+        assert_eq!(scratch.in_use_bytes(), 0);
         service.shutdown()?;
 
         let events = events
@@ -1461,7 +1822,7 @@ mod tests {
         assert_ne!(actor_thread, thread::current().id());
         assert_eq!(
             events.iter().filter(|event| event.0 == "request").count(),
-            3
+            5
         );
         assert!(events.iter().all(|event| event.1 == actor_thread));
         Ok(())

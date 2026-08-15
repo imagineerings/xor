@@ -12,7 +12,7 @@ use comfy_nodes::{
     NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency,
     NativePreparedEffectKind, NativePreparedEffectService, NativeProviderExecutionIdentity,
     NativeResidentAllocationId, NativeResolvedPayload, NativeResolvedPayloadRetention,
-    NativeStoredPayload, NativeStructuredValue, NativeValue, NodeRegistry,
+    NativeStoredPayload, NativeStructuredValue, NativeValue, NativeWebmEncodeService, NodeRegistry,
 };
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
@@ -2227,6 +2227,7 @@ pub struct ExecutionEngine {
     compute_backend: Option<Arc<CpuBackend>>,
     shader_executor: Option<Arc<dyn NativeShaderExecutor>>,
     ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
+    webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
     asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
@@ -2281,6 +2282,7 @@ impl ExecutionEngine {
             compute_backend: None,
             shader_executor: None,
             ltxv_preprocess_service: None,
+            webm_encode_service: None,
             asset_resolvers: None,
             handle_store_generation,
         })
@@ -2316,6 +2318,11 @@ impl ExecutionEngine {
         service: Arc<dyn NativeLtxvPreprocessService>,
     ) -> Self {
         self.ltxv_preprocess_service = Some(service);
+        self
+    }
+
+    pub fn with_webm_encode_service(mut self, service: Arc<dyn NativeWebmEncodeService>) -> Self {
+        self.webm_encode_service = Some(service);
         self
     }
 
@@ -2693,6 +2700,11 @@ impl ExecutionEngine {
         if let Some(ltxv_preprocess) = &self.ltxv_preprocess_service {
             services = services
                 .with_ltxv_preprocess(ltxv_preprocess.clone())
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        }
+        if let Some(webm_encode) = &self.webm_encode_service {
+            services = services
+                .with_webm_encode(webm_encode.clone())
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         }
         if let Some(provider_execution) = &plan.provider_execution {

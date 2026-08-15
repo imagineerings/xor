@@ -11108,6 +11108,87 @@ def native_video_codec_av1_webm_thread_bridge_foundation_task(
     )
 
 
+def native_video_codec_webm_node_service_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-webm-node-service-foundation",
+        "Inject retained VP9/AV1 WebM encoding into native node execution",
+        [28, 29, 31, 32, 34, 35, 37, 41, 42],
+        [17, 18, 19, 25, 27, 28, 31, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "One checked Send+Sync WebM encoding service moves canonical IMAGE requests, VP9/AV1 codec identity, reduced frame rate, exact CRF bits, ordered serialized metadata, caller scratch, stream, and cancellation through the sole retained codec actor. NativeNodeServices, ExecutionEngine, and NativeImageExecutor carry the service without re-owning codec state; the existing exact-length CPU U8 Tensor crosses the portable boundary without another byte copy; and the actor plus all configured batch, session, and metadata limits bind execution/cache identity. JSON serialization, SaveWEBM descriptors, effects, paths, handles, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-ltxv-thread-service/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-av1-webm-thread-bridge/manifest.json",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused node-contract, actor-adapter, controller-identity, and ownership tests prove checked request/result identities; VP9 opaque/alpha and AV1 dispatch through the same retained actor; exact ordered metadata and fractional CRF carriage; digest, dimensions, rate, count, codec, pixel-format, bit-depth, alpha, and stream projection validation; no-copy Tensor ownership transfer; bounded metadata allocation, cancellation and resource-exhaustion atomicity, retry, and scratch convergence; exact engine/context propagation; and independent stable WebM cache identity. The fixture explicitly excludes installed codecs, playable or decoded numeric evidence, JSON construction, SaveWEBM nodes/effects/paths, handles, cache payloads, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "37.5",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14630,8 +14711,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_av1_webm_sequence_foundation["id"])
         )
     )
+    video_codec_webm_node_service_foundation = (
+        native_video_codec_webm_node_service_foundation_task(
+            str(video_codec_av1_webm_thread_bridge_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_av1_webm_thread_bridge_foundation["id"])
+        str(video_codec_webm_node_service_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14783,6 +14869,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_vp9_webm_alpha_foundation,
         video_codec_av1_webm_sequence_foundation,
         video_codec_av1_webm_thread_bridge_foundation,
+        video_codec_webm_node_service_foundation,
         video_foundation,
         detection_foundation,
         ]
