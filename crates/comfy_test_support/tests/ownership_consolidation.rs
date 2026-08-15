@@ -15035,6 +15035,88 @@ fn val_ownership_native_video_codec_vp9_webm_encode_001() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn val_ownership_native_video_codec_vp9_webm_batch_encode_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "pub(crate) struct NativeVp9WebmBatchLimits",
+        "pub(crate) fn encode_vp9_webm_batch",
+        "validate_vp9_image_batch",
+        "source_compatible_vp9_rgb8_frame",
+        "encode_rgb8_frames_with_check",
+        "av_frame_make_writable",
+        "presentation_timestamp = frame_timestamp",
+        "retained_vp9_webm_batch_encode_reuses_one_session_and_preserves_order",
+        "retained_vp9_webm_batch_encode_validates_bounds_and_global_protocol",
+        "retained_vp9_webm_batch_encode_failure_cancellation_and_retry_are_atomic",
+    ] {
+        assert!(
+            ffi.contains(required),
+            "VP9 WebM batch encode lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeVp9Webm",
+        "unsafe impl Sync for NativeVp9Webm",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "VP9 WebM batch encode exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-retained-vp9-webm-image-sequence-encode",
+        "native_multi_frame_encode_call_choreography_executed",
+        "bounded_single_container_staged_output_produced",
+        "licensed_or_installed_ffmpeg_or_libvpx_package",
+        "codec_thread_owned_byte_bridge_or_node_reachable",
+        "all_native_heap_allocations_intercepted",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VP9 WebM batch fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concern = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|concerns| {
+            concerns.iter().find(|concern| {
+                concern.get("concern").and_then(serde_json::Value::as_str)
+                    == Some("native_video_reviewed_codec_registry_vp9_webm_encode")
+            })
+        })
+        .ok_or("missing VP9 WebM encode ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_webm_batch")
+    );
+    assert!(
+        concern
+            .get("consolidation_tasks")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|tasks| tasks.iter().any(|task| {
+                task.as_str()
+                    == Some("comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation")
+            }))
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

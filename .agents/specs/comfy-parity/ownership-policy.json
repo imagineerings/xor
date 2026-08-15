@@ -121,6 +121,26 @@
       ],
       "required_mappings": [
         {
+          "name": "vp9-webm-batch-encode-stages-source-image-frames-in-order",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_vp9_webm_batch[\\s\\S]*validate_vp9_image_batch[\\s\\S]*source_compatible_vp9_rgb8_frame[\\s\\S]*encode_rgb8_frames_with_check"
+        },
+        {
+          "name": "vp9-webm-batch-encode-reuses-one-session-with-pts-and-final-flush",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "for frame_index in 0..frame_count[\\s\\S]*av_frame_make_writable[\\s\\S]*presentation_timestamp = frame_timestamp[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*send_frame[\\s\\S]*null"
+        },
+        {
+          "name": "vp9-webm-batch-encode-tests-order-bounds-failure-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_batch_encode_reuses_one_session_and_preserves_order[\\s\\S]*retained_vp9_webm_batch_encode_validates_bounds_and_global_protocol[\\s\\S]*retained_vp9_webm_batch_encode_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "vp9-webm-batch-encode-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+          "pattern": "synthetic-retained-vp9-webm-image-sequence-encode[\\s\\S]*native_multi_frame_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_or_libvpx_package[\\s\\S]*codec_thread_owned_byte_bridge_or_node_reachable[\\s\\S]*all_native_heap_allocations_intercepted"
+        },
+        {
           "name": "functional-kernels-use-canonical-device-cancellation-and-scalar-unary",
           "path": "crates/comfy_tensor/src/ops/activation_normalization_functional_01.rs",
           "pattern": "use crate::[\\s\\S]*DeviceId[\\s\\S]*UnaryOperation[\\s\\S]*apply_unary_scalar[\\s\\S]*comfy_types::CancellationToken"
@@ -14647,22 +14667,25 @@
     },
     {
       "concern": "native_video_reviewed_codec_registry_vp9_webm_encode",
-      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_rgb8_frame",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_webm_batch",
       "owner_files": [
         "crates/comfy_runtime/src/native_video_codec_ffi.rs"
       ],
       "owner_symbols": [
         "NativeVp9WebmEncodeLimits",
+        "NativeVp9WebmBatchLimits",
         "NativeVp9Webm",
         "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch",
         "encode_rgb8_frame_with_check",
+        "encode_rgb8_frames_with_check",
         "drain_rgb8_encode_packets"
       ],
       "allowed_adapters": [
         "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
         "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
-        "the canonical RGB8 image tensor supplies checked contiguous CPU HWC bytes without a duplicate input allocation",
-        "a following codec-thread batch bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
+        "the canonical IMAGE tensor supplies checked contiguous CPU F32 BHWC values and the source-specific batch adapter clamps and stages exactly one RGB8 frame at a time",
+        "a following owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
       ],
       "definitions": [
         {
@@ -14678,6 +14701,7 @@
         "avcodec_alloc_context3",
         "avcodec_open2",
         "avformat_write_header",
+        "av_frame_make_writable",
         "sws_scale",
         "avcodec_send_frame",
         "avcodec_receive_packet",
@@ -14714,10 +14738,11 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-vp9-webm-encode-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation"
       ],
       "production_consumers": [
-        "the following bounded codec-thread tensor-batch and SaveWEBM adapters"
+        "the following owned-byte codec-thread and SaveWEBM adapters"
       ],
       "requirements": [
         "Requirement 28",
@@ -14744,7 +14769,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "One retained suite method owns the exact one-frame RGB8 VP9/WebM native session. It reuses the reviewed ABI and bounded AVIO/RAII owners, preserves exact source options and rational timing, and returns only opaque attempt-local bytes without claiming real-package numeric evidence or node and effect authority."
+      "decision_reason": "One retained suite owner covers both the checked one-frame RGB8 regression and the canonical F32 IMAGE batch session. It reuses one reviewed ABI and bounded AVIO/RAII boundary, stages one clamped RGB8 frame at a time, and returns only opaque attempt-local bytes while explicitly excluding real-package numeric, thread-transfer, and publication claims."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",

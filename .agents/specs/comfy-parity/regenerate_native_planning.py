@@ -10612,6 +10612,71 @@ def native_video_codec_vp9_webm_encode_foundation_task(
     )
 
 
+def native_video_codec_vp9_webm_sequence_encode_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
+        "Encode bounded IMAGE sequences to VP9 WebM",
+        [28, 31, 32, 35, 41, 42],
+        [17, 18, 19, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "NativeVideoCodecSuite encodes one checked nonempty contiguous CPU F32 BHWC three-channel IMAGE batch into a single bounded in-memory VP9 WebM session. It clamps and truncates one frame at a time to source-compatible RGB8, reuses one YUV frame, conversion context, codec, packet, stream, format, and AVIO owner, assigns increasing frame PTS, drains packets after every frame, and flushes and writes the trailer exactly once. Prompt and extra metadata, alpha, AV1, AAC/audio, the owned codec-thread byte bridge, paths, effects, handles, publication, persistence, and recovery remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-v1.json",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-data-plane-v1.json",
+            "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-bounded-memory-avio/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_test_support/fixtures/video/codec-vp9-webm-sequence-encode/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Exact-signature tests prove one WebM/libvpx-vp9 session for the whole batch, source clamp-and-truncate RGB8 staging in frame order, one make-writable/convert/send/drain cycle per increasing PTS, one global packet bound, a single terminal flush and trailer, callback and cancellation precedence, later-frame native/resource failures, reverse cleanup, zero scratch residue, and clean retry. The fixture explicitly excludes installed or licensed codec packages, valid playable synthetic WebM, numeric VP9/swscale evidence, prompt or extra metadata, alpha, AV1, AAC/audio, codec-thread owned-byte transfer, node or effect reachability, handles, cache, persistence, recovery, and publication.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "28.6",
+            "31.5",
+            "31.6",
+            "32.1",
+            "35.3",
+            "35.5",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14099,8 +14164,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_suite_admission_foundation["id"])
         )
     )
+    video_codec_vp9_webm_sequence_encode_foundation = (
+        native_video_codec_vp9_webm_sequence_encode_foundation_task(
+            str(video_codec_vp9_webm_encode_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_vp9_webm_encode_foundation["id"])
+        str(video_codec_vp9_webm_sequence_encode_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14245,6 +14315,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         frame_interpolate_node_foundation,
         video_codec_suite_admission_foundation,
         video_codec_vp9_webm_encode_foundation,
+        video_codec_vp9_webm_sequence_encode_foundation,
         video_foundation,
         detection_foundation,
         ]
