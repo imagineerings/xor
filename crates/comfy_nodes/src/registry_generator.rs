@@ -612,27 +612,45 @@ impl NodeRegistry {
                 )
             })
             .is_some_and(|schema| {
-                self.source_schema(&identifier)
-                    .and_then(|catalog_schema| {
-                        catalog_schema
-                            .bind_execution_ports(
-                                &binding
-                                    .descriptor()
-                                    .inputs
-                                    .iter()
-                                    .map(|input| input.name.clone())
-                                    .collect::<Vec<_>>(),
-                                &schema.dynamic_inputs,
-                                &binding
-                                    .descriptor()
-                                    .outputs
-                                    .iter()
-                                    .map(|output| output.name.clone())
-                                    .collect::<Vec<_>>(),
-                            )
-                            .ok()
-                    })
-                    .is_none_or(|expected| expected != *schema)
+                let Some(catalog_schema) = self.source_schema(&identifier) else {
+                    return true;
+                };
+                let catalog_input_names = catalog_schema
+                    .inputs
+                    .iter()
+                    .map(|input| input.schema.name.clone())
+                    .collect::<Vec<_>>();
+                let Some(expected) = catalog_schema
+                    .bind_execution_ports(
+                        &catalog_input_names,
+                        &schema.dynamic_inputs,
+                        &binding
+                            .descriptor()
+                            .outputs
+                            .iter()
+                            .map(|output| output.name.clone())
+                            .collect::<Vec<_>>(),
+                    )
+                    .ok()
+                else {
+                    return true;
+                };
+                let catalog_input_names = catalog_input_names.into_iter().collect::<BTreeSet<_>>();
+                let supplemental_inputs_are_hidden =
+                    schema
+                        .inputs
+                        .iter()
+                        .filter(|input| !catalog_input_names.contains(&input.name))
+                        .all(|input| {
+                            binding.descriptor().inputs.iter().any(|descriptor| {
+                                descriptor.hidden && descriptor.name == input.name
+                            })
+                        });
+                let mut comparable = schema.clone();
+                comparable
+                    .inputs
+                    .retain(|input| catalog_input_names.contains(&input.name));
+                !supplemental_inputs_are_hidden || expected != comparable
             });
         let mismatch = if binding.feature_id() != catalog.feature_id {
             Some("feature_id")
