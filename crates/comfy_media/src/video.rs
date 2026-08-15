@@ -46,8 +46,32 @@ pub enum NativeVideoAudioLayout {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NativeVideoEncodeOptions {
     ComponentMp4 { metadata: NativeVideoMetadataPolicy },
-    WebmVp9 { crf: u8 },
-    WebmAv1 { crf: u8 },
+    WebmVp9 { crf: NativeVideoCrf },
+    WebmAv1 { crf: NativeVideoCrf },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct NativeVideoCrf {
+    bits: u64,
+}
+
+impl NativeVideoCrf {
+    pub fn checked(value: f64) -> Result<Self, NativeVideoCodecPlanError> {
+        if !value.is_finite() || !(0.0..=63.0).contains(&value) {
+            return Err(NativeVideoCodecPlanError::InvalidOptions);
+        }
+        Ok(Self {
+            bits: value.to_bits(),
+        })
+    }
+
+    pub const fn value(self) -> f64 {
+        f64::from_bits(self.bits)
+    }
+
+    pub const fn bits(self) -> u64 {
+        self.bits
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -137,7 +161,7 @@ pub struct NativeVideoEncodePlan {
     alpha: NativeVideoAlphaPolicy,
     audio: Option<NativeVideoAudioPlan>,
     metadata: NativeVideoMetadataPolicy,
-    crf: Option<u8>,
+    crf: Option<NativeVideoCrf>,
     preset: Option<u8>,
     max_encoded_bytes: u64,
 }
@@ -191,7 +215,7 @@ impl NativeVideoEncodePlan {
         self.metadata
     }
 
-    pub const fn crf(&self) -> Option<u8> {
+    pub const fn crf(&self) -> Option<NativeVideoCrf> {
         self.crf
     }
 
@@ -373,9 +397,9 @@ fn plan_audio(
 
 fn require_webm_options(
     video: &NativeVideoPayload,
-    crf: u8,
+    crf: NativeVideoCrf,
 ) -> Result<(), NativeVideoCodecPlanError> {
-    if crf > 63 || video.audio().is_some() {
+    if !(0.0..=63.0).contains(&crf.value()) || video.audio().is_some() {
         return Err(NativeVideoCodecPlanError::InvalidOptions);
     }
     Ok(())
@@ -509,6 +533,22 @@ mod tests {
     }
 
     #[test]
+    fn codec_crf_preserves_checked_source_float_bits() -> Result<(), Box<dyn Error>> {
+        for value in [0.0, -0.0, 0.125, 31.5, 63.0] {
+            let crf = NativeVideoCrf::checked(value)?;
+            assert_eq!(crf.bits(), value.to_bits());
+            assert_eq!(crf.value().to_bits(), value.to_bits());
+        }
+        for value in [f64::NEG_INFINITY, -0.01, 63.01, f64::INFINITY, f64::NAN] {
+            assert!(matches!(
+                NativeVideoCrf::checked(value),
+                Err(NativeVideoCodecPlanError::InvalidOptions)
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn codec_plan_preserves_source_profiles_without_executing_a_codec() -> Result<(), Box<dyn Error>>
     {
         let audio = NativeAudioPayload::checked(
@@ -544,7 +584,9 @@ mod tests {
 
         let vp9 = plan_native_video_encode(
             &video(3, NativeVideoBitDepth::Ten, None, true)?,
-            NativeVideoEncodeOptions::WebmVp9 { crf: 32 },
+            NativeVideoEncodeOptions::WebmVp9 {
+                crf: NativeVideoCrf::checked(32.0)?,
+            },
             limits()?,
             &CancellationToken::default(),
         )?;
@@ -552,11 +594,13 @@ mod tests {
         assert_eq!(vp9.pixel_format(), NativeVideoPixelFormat::Yuva420p);
         assert_eq!(vp9.output_bit_depth(), NativeVideoBitDepth::Eight);
         assert_eq!(vp9.alpha(), NativeVideoAlphaPolicy::Preserve);
-        assert_eq!(vp9.crf(), Some(32));
+        assert_eq!(vp9.crf(), Some(NativeVideoCrf::checked(32.0)?));
 
         let av1 = plan_native_video_encode(
             &video(4, NativeVideoBitDepth::Eight, None, false)?,
-            NativeVideoEncodeOptions::WebmAv1 { crf: 63 },
+            NativeVideoEncodeOptions::WebmAv1 {
+                crf: NativeVideoCrf::checked(63.0)?,
+            },
             limits()?,
             &CancellationToken::default(),
         )?;
@@ -582,7 +626,9 @@ mod tests {
         assert!(matches!(
             plan_native_video_encode(
                 &grayscale,
-                NativeVideoEncodeOptions::WebmVp9 { crf: 0 },
+                NativeVideoEncodeOptions::WebmVp9 {
+                    crf: NativeVideoCrf::checked(0.0)?,
+                },
                 limits()?,
                 &CancellationToken::default(),
             ),
@@ -594,7 +640,11 @@ mod tests {
         assert!(matches!(
             plan_native_video_encode(
                 &with_audio,
-                NativeVideoEncodeOptions::WebmVp9 { crf: 64 },
+                NativeVideoEncodeOptions::WebmVp9 {
+                    crf: NativeVideoCrf {
+                        bits: 64.0_f64.to_bits()
+                    },
+                },
                 limits()?,
                 &CancellationToken::default(),
             ),
@@ -603,7 +653,9 @@ mod tests {
         assert!(matches!(
             plan_native_video_encode(
                 &video(3, NativeVideoBitDepth::Eight, None, false)?,
-                NativeVideoEncodeOptions::WebmAv1 { crf: 1 },
+                NativeVideoEncodeOptions::WebmAv1 {
+                    crf: NativeVideoCrf::checked(1.0)?,
+                },
                 NativeVideoCodecLimits::checked(2, 64, 10, 128)?,
                 &CancellationToken::default(),
             ),

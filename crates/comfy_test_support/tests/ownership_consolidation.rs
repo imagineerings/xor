@@ -15205,6 +15205,91 @@ fn val_ownership_native_video_codec_vp9_webm_thread_bridge_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/video.rs"))?;
+    for required in [
+        "pub struct NativeVideoCrf",
+        "value.to_bits()",
+        "value.is_finite()",
+        "codec_crf_preserves_checked_source_float_bits",
+    ] {
+        assert!(
+            media.contains(required),
+            "VP9 CRF planning lacks {required}"
+        );
+    }
+
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "enum NativeRgb8Crf",
+        "NativeRgb8Crf::SourceFloat",
+        "write_python_float",
+        "retained_vp9_webm_crf_formats_source_float_without_integer_narrowing",
+        "dict:crf=31.5",
+    ] {
+        assert!(ffi.contains(required), "VP9 CRF FFI lacks {required}");
+    }
+    for forbidden in [
+        "crf.value() as u8",
+        "crf.value().round()",
+        "crf.value().trunc()",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "VP9 CRF FFI performs forbidden narrowing {forbidden}"
+        );
+    }
+
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "NativeVideoCrf",
+        "crf.bits() != 31.5_f64.to_bits()",
+        "NativeVideoCrf::checked(31.5)",
+        "sim.comfy.video-codec-thread.v4",
+    ] {
+        assert!(service.contains(required), "VP9 CRF actor lacks {required}");
+    }
+
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json"),
+    )?;
+    for required in [
+        "synthetic-source-compatible-vp9-webm-floating-crf",
+        "integer_narrowing",
+        "checked_f64_bits_preserved_through_plan_actor_and_ffi",
+        "licensed_or_installed_ffmpeg_or_libvpx_package",
+        "prompt_or_extra_metadata_supported",
+        "media_payload_handle_cache_persistence_recovery_or_publication_owned",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "VP9 CRF fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-codec-vp9-webm-crf-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .count();
+    assert_eq!(mapped_concerns, 3);
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;

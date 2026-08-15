@@ -13985,6 +13985,7 @@
         "crates/comfy_media/src/video.rs"
       ],
       "owner_symbols": [
+        "NativeVideoCrf",
         "NativeVideoCodecLimits",
         "NativeVideoEncodeOptions",
         "NativeVideoEncodePlan",
@@ -14010,12 +14011,18 @@
         }
       ],
       "call_symbols": [
+        "NativeVideoCrf",
         "NativeVideoCodecLimits",
         "NativeVideoEncodeOptions",
         "NativeVideoEncodePlan",
         "plan_native_video_encode"
       ],
       "required_mappings": [
+        {
+          "name": "video-codec-plan-preserves-checked-source-crf-bits",
+          "path": "crates/comfy_media/src/video.rs",
+          "pattern": "pub struct NativeVideoCrf[\\s\\S]*to_bits[\\s\\S]*codec_crf_preserves_checked_source_float_bits"
+        },
         {
           "name": "video-codec-plan-binds-closed-source-profiles",
           "path": "crates/comfy_media/src/video.rs",
@@ -14039,7 +14046,8 @@
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-video-codec-plan-foundation"
+        "comfy-parity-native-video-codec-plan-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
       ],
       "production_consumers": [
         "future certified native MP4/H.264 codec adapter",
@@ -14672,6 +14680,7 @@
         "crates/comfy_runtime/src/native_video_codec_ffi.rs"
       ],
       "owner_symbols": [
+        "NativeRgb8Crf",
         "NativeVp9WebmEncodeLimits",
         "NativeVp9WebmBatchLimits",
         "NativeVp9Webm",
@@ -14710,6 +14719,11 @@
       ],
       "required_mappings": [
         {
+          "name": "vp9-webm-encode-preserves-source-float-crf",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeRgb8Crf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
+        },
+        {
           "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
           "pattern": "encode_vp9_rgb8_frame[\\s\\S]*vpx_vp9_encoder[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_rgb8_frame_with_check"
@@ -14740,7 +14754,8 @@
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
         "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
       ],
       "production_consumers": [
         "the following SaveWEBM metadata, effect, and node adapters"
@@ -14813,6 +14828,11 @@
       ],
       "required_mappings": [
         {
+          "name": "vp9-webm-thread-bridge-carries-checked-source-crf-bits",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoCrf[\\s\\S]*crf.bits\\(\\)[\\s\\S]*NativeVideoCrf::checked\\(31.5\\)"
+        },
+        {
           "name": "vp9-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
           "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
@@ -14841,7 +14861,8 @@
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
       ],
       "production_consumers": [
         "the following reviewed container-metadata and SaveWEBM prepared-effect adapters"

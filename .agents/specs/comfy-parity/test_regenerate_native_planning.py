@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 613)
+        self.assertEqual(len(tasks), 614)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -431,6 +431,9 @@ class ValidationGenerationTests(unittest.TestCase):
         video_codec_vp9_webm_thread_bridge_foundation_id = (
             "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation"
         )
+        video_codec_vp9_webm_crf_foundation_id = (
+            "comfy-parity-native-video-codec-vp9-webm-crf-foundation"
+        )
         video_codec_plan_foundation_id = (
             "comfy-parity-native-video-codec-plan-foundation"
         )
@@ -747,7 +750,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_codec_vp9_webm_thread_bridge_foundation_id,
+            video_codec_vp9_webm_crf_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
@@ -1216,8 +1219,26 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            tasks_by_id[video_foundation_id]["dependencies"],
+            tasks_by_id[video_codec_vp9_webm_crf_foundation_id]["dependencies"],
             [video_codec_vp9_webm_thread_bridge_foundation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[video_codec_vp9_webm_crf_foundation_id]["writes"],
+            [
+                "crates/comfy_media/src/video.rs",
+                "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+                "crates/comfy_runtime/src/native_video_codec_service.rs",
+                "crates/comfy_test_support/fixtures/video/codec-vp9-webm-crf/manifest.json",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertEqual(
+            tasks_by_id[video_foundation_id]["dependencies"],
+            [video_codec_vp9_webm_crf_foundation_id],
         )
         self.assertNotIn("Cargo.toml", codec_callable_symbols["writes"])
         self.assertNotIn("Cargo.lock", codec_callable_symbols["writes"])
@@ -1581,7 +1602,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             tasks_by_id[video_foundation_id]["dependencies"],
-            [video_codec_vp9_webm_thread_bridge_foundation_id],
+            [video_codec_vp9_webm_crf_foundation_id],
         )
         self.assertIn(
             frame_interpolate_node_foundation_id,
@@ -1614,7 +1635,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_codec_vp9_webm_thread_bridge_foundation_id,
+            video_codec_vp9_webm_crf_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
@@ -2291,8 +2312,12 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_codec_vp9_webm_sequence_encode_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id],
+            waves[video_codec_vp9_webm_crf_foundation_id],
             waves[video_codec_vp9_webm_thread_bridge_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id],
+            waves[video_codec_vp9_webm_crf_foundation_id] + 1,
         )
         self.assertEqual(
             waves[frame_interpolation_sequence_fallback_foundation_id],

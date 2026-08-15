@@ -2,6 +2,7 @@ use crate::{
     CertifiedVideoCodecDependencyClosure, VIDEO_CODEC_FFI_UNSAFE_OWNER,
     native_video_codec_abi as abi,
 };
+use comfy_media::NativeVideoCrf;
 use comfy_tensor::{
     CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor,
     Layout, Rgb8ImageTensor, TensorDescriptor, TensorError, ViewAccess,
@@ -10,6 +11,7 @@ use comfy_types::{CancellationError, CancellationToken};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::c_void,
+    io::{self, Write},
     marker::PhantomData,
     path::PathBuf,
     ptr::NonNull,
@@ -799,12 +801,12 @@ impl NativeVideoCodecSuite {
         &'suite self,
         frame: &Rgb8ImageTensor,
         frame_rate: (u64, u64),
-        crf: u8,
+        crf: NativeVideoCrf,
         limits: NativeVp9WebmEncodeLimits,
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeVp9Webm<'suite>, NativeVideoCodecVp9EncodeError> {
-        let (input, width, height) = validate_vp9_rgb8_encode_input(frame, crf)?;
+        let (input, width, height) = validate_vp9_rgb8_encode_input(frame)?;
         let frame_rate = checked_vp9_frame_rate(frame_rate)?;
         context.check().map_err(map_vp9_tensor_error)?;
         let _native_session_workspace = backend
@@ -851,12 +853,12 @@ impl NativeVideoCodecSuite {
         &'suite self,
         images: &ImageTensor,
         frame_rate: (u64, u64),
-        crf: u8,
+        crf: NativeVideoCrf,
         limits: NativeVp9WebmBatchLimits,
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeVp9Webm<'suite>, NativeVideoCodecVp9EncodeError> {
-        let (frame_count, width, height) = validate_vp9_image_batch(images, crf, limits, context)?;
+        let (frame_count, width, height) = validate_vp9_image_batch(images, limits, context)?;
         let frame_rate = checked_vp9_frame_rate(frame_rate)?;
         context.check().map_err(map_vp9_tensor_error)?;
         let _native_session_workspace = backend
@@ -1238,7 +1240,6 @@ fn validate_ltxv_h264_encode_input(
 )]
 fn validate_vp9_rgb8_encode_input(
     frame: &Rgb8ImageTensor,
-    crf: u8,
 ) -> Result<(&[u8], i32, i32), NativeVideoCodecVp9EncodeError> {
     let (height, width) = frame.dimensions().map_err(map_vp9_tensor_error)?;
     let width = i32::try_from(width)
@@ -1249,9 +1250,6 @@ fn validate_vp9_rgb8_encode_input(
         .ok()
         .filter(|height| *height > 0)
         .ok_or(NativeVideoCodecVp9EncodeError::InvalidInput)?;
-    if crf > 63 {
-        return Err(NativeVideoCodecVp9EncodeError::InvalidCrf);
-    }
     let expected_bytes = usize::try_from(width)
         .ok()
         .and_then(|width| width.checked_mul(usize::try_from(height).ok()?))
@@ -1266,7 +1264,6 @@ fn validate_vp9_rgb8_encode_input(
 
 fn validate_vp9_image_batch(
     images: &ImageTensor,
-    crf: u8,
     limits: NativeVp9WebmBatchLimits,
     context: &ExecutionContext<'_>,
 ) -> Result<(usize, i32, i32), NativeVideoCodecVp9EncodeError> {
@@ -1277,12 +1274,8 @@ fn validate_vp9_image_batch(
     let [frame_count, height, width, channels] = descriptor.shape() else {
         return Err(NativeVideoCodecVp9EncodeError::InvalidBatch);
     };
-    if *channels != 3 || crf > 63 {
-        return if crf > 63 {
-            Err(NativeVideoCodecVp9EncodeError::InvalidCrf)
-        } else {
-            Err(NativeVideoCodecVp9EncodeError::InvalidBatch)
-        };
+    if *channels != 3 {
+        return Err(NativeVideoCodecVp9EncodeError::InvalidBatch);
     }
     let frame_count = usize::try_from(*frame_count)
         .ok()
@@ -3049,6 +3042,12 @@ enum NativeRgb8CodecKind {
     Vp9,
 }
 
+#[derive(Clone, Copy)]
+enum NativeRgb8Crf {
+    Integer(u8),
+    SourceFloat(NativeVideoCrf),
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the following codec-thread batch bridge"
@@ -3059,7 +3058,7 @@ struct NativeRgb8EncodeProfile {
     container: &'static std::ffi::CStr,
     frame_time_base: abi::AvRational,
     frame_rate: Option<abi::AvRational>,
-    crf: u8,
+    crf: NativeRgb8Crf,
 }
 
 #[allow(
@@ -3073,11 +3072,11 @@ impl NativeRgb8EncodeProfile {
             container: c"mp4",
             frame_time_base: ltxv_frame_time_base(),
             frame_rate: None,
-            crf,
+            crf: NativeRgb8Crf::Integer(crf),
         }
     }
 
-    fn vp9_webm(frame_rate: abi::AvRational, crf: u8) -> Self {
+    fn vp9_webm(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
         Self {
             kind: NativeRgb8CodecKind::Vp9,
             container: c"webm",
@@ -3086,7 +3085,7 @@ impl NativeRgb8EncodeProfile {
                 denominator: frame_rate.numerator,
             },
             frame_rate: Some(frame_rate),
-            crf,
+            crf: NativeRgb8Crf::SourceFloat(crf),
         }
     }
 
@@ -3310,9 +3309,16 @@ fn encode_rgb8_frames_with_check(
         pointer: std::ptr::null_mut(),
         free: functions.av_dict_free,
     };
-    let mut crf_bytes = [0_u8; 4];
-    let mut crf_cursor = 0;
-    write_decimal(u32::from(profile.crf), &mut crf_bytes, &mut crf_cursor)?;
+    let mut crf_bytes = [0_u8; 32];
+    match profile.crf {
+        NativeRgb8Crf::Integer(value) => {
+            let mut cursor = 0;
+            write_decimal(u32::from(value), &mut crf_bytes, &mut cursor)?;
+        }
+        NativeRgb8Crf::SourceFloat(value) => {
+            write_python_float(value.value(), &mut crf_bytes)?;
+        }
+    }
     check_ltxv_native_status(
         "set CRF option",
         checked_native_call!((functions.av_dict_set)(
@@ -3780,6 +3786,141 @@ fn write_decimal<const N: usize>(
         .get_mut(*cursor)
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
     *terminator = 0;
+    Ok(())
+}
+
+struct FixedByteWriter<'buffer> {
+    buffer: &'buffer mut [u8],
+    length: usize,
+}
+
+impl Write for FixedByteWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let end = self
+            .length
+            .checked_add(bytes.len())
+            .filter(|end| *end <= self.buffer.len())
+            .ok_or_else(|| io::Error::other("floating-point option exceeded its fixed buffer"))?;
+        self.buffer[self.length..end].copy_from_slice(bytes);
+        self.length = end;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn write_python_float(
+    value: f64,
+    buffer: &mut [u8; 32],
+) -> Result<(), NativeVideoCodecLtxvEncodeError> {
+    let mut serialized = [0_u8; 32];
+    let mut writer = FixedByteWriter {
+        buffer: &mut serialized,
+        length: 0,
+    };
+    serde_json::to_writer(&mut writer, &value)
+        .map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let serialized_length = writer.length;
+    let serialized = serialized
+        .get(..serialized_length)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    let mut length = serialized_length;
+    buffer
+        .get_mut(..length)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?
+        .copy_from_slice(serialized);
+
+    let sign_bytes = usize::from(serialized.first() == Some(&b'-'));
+    let fractional_digits = serialized.get(sign_bytes + 2..).filter(|_| {
+        serialized.get(sign_bytes) == Some(&b'0') && serialized.get(sign_bytes + 1) == Some(&b'.')
+    });
+    if !serialized.contains(&b'e')
+        && let Some(fractional_digits) = fractional_digits
+        && let Some(first_nonzero) = fractional_digits.iter().position(|digit| *digit != b'0')
+        && first_nonzero >= 4
+    {
+        let significant = fractional_digits
+            .get(first_nonzero..)
+            .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+        let mut cursor = 0;
+        if sign_bytes == 1 {
+            write_option_byte(buffer, &mut cursor, b'-')?;
+        }
+        let first = *significant
+            .first()
+            .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+        write_option_byte(buffer, &mut cursor, first)?;
+        if let Some(remaining) = significant
+            .get(1..)
+            .filter(|remaining| !remaining.is_empty())
+        {
+            write_option_byte(buffer, &mut cursor, b'.')?;
+            write_option_bytes(buffer, &mut cursor, remaining)?;
+        }
+        write_option_bytes(buffer, &mut cursor, b"e-")?;
+        let exponent = u32::try_from(first_nonzero + 1)
+            .map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+        if exponent < 10 {
+            write_option_byte(buffer, &mut cursor, b'0')?;
+        }
+        write_decimal(exponent, buffer, &mut cursor)?;
+        length = cursor;
+    }
+
+    if let Some(exponent) = buffer[..length].iter().position(|byte| *byte == b'e') {
+        let digit_start = exponent
+            .checked_add(2)
+            .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+        if buffer
+            .get(exponent + 1)
+            .is_some_and(|byte| matches!(byte, b'+' | b'-'))
+            && length.saturating_sub(digit_start) == 1
+        {
+            if length + 1 >= buffer.len() {
+                return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
+            }
+            buffer.copy_within(digit_start..length, digit_start + 1);
+            buffer[digit_start] = b'0';
+            length += 1;
+        }
+    }
+    let terminator = buffer
+        .get_mut(length)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    *terminator = 0;
+    Ok(())
+}
+
+fn write_option_byte<const N: usize>(
+    buffer: &mut [u8; N],
+    cursor: &mut usize,
+    byte: u8,
+) -> Result<(), NativeVideoCodecLtxvEncodeError> {
+    let slot = buffer
+        .get_mut(*cursor)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    *slot = byte;
+    *cursor = cursor
+        .checked_add(1)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    Ok(())
+}
+
+fn write_option_bytes<const N: usize>(
+    buffer: &mut [u8; N],
+    cursor: &mut usize,
+    bytes: &[u8],
+) -> Result<(), NativeVideoCodecLtxvEncodeError> {
+    let end = cursor
+        .checked_add(bytes.len())
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
+    buffer
+        .get_mut(*cursor..end)
+        .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?
+        .copy_from_slice(bytes);
+    *cursor = end;
     Ok(())
 }
 
@@ -7367,6 +7508,28 @@ mod tests {
     }
 
     #[test]
+    fn retained_vp9_webm_crf_formats_source_float_without_integer_narrowing()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for (value, expected) in [
+            (-0.0, "-0.0"),
+            (0.0, "0.0"),
+            (31.5, "31.5"),
+            (32.0, "32.0"),
+            (0.000_01, "1e-05"),
+            (0.000_000_1, "1e-07"),
+            (63.0, "63.0"),
+        ] {
+            let crf = NativeVideoCrf::checked(value)?;
+            assert_eq!(crf.bits(), value.to_bits());
+            let mut buffer = [0_u8; 32];
+            write_python_float(crf.value(), &mut buffer)?;
+            let rendered = std::ffi::CStr::from_bytes_until_nul(&buffer)?.to_str()?;
+            assert_eq!(rendered, expected);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup()
     -> Result<(), Box<dyn std::error::Error>> {
         let _test_serial_guard = TEST_SERIAL
@@ -7381,7 +7544,7 @@ mod tests {
             .ok_or("mock encoder allocation failed")?;
         let frame_rate = checked_vp9_frame_rate((2_997, 125))?;
         encode_rgb8_frame_with_check(
-            NativeRgb8EncodeProfile::vp9_webm(frame_rate, 32),
+            NativeRgb8EncodeProfile::vp9_webm(frame_rate, NativeVideoCrf::checked(31.5)?),
             encoder,
             &[1_u8; 12],
             2,
@@ -7407,7 +7570,7 @@ mod tests {
                     "option:b=0",
                 ]
         }));
-        assert!(events.iter().any(|event| event == "dict:crf=32"));
+        assert!(events.iter().any(|event| event == "dict:crf=31.5"));
         assert!(!events.iter().any(|event| event.starts_with("dict:preset=")));
         assert!(
             !events
@@ -7484,16 +7647,14 @@ mod tests {
         )?;
         let (tensor, _) = backend.upload_bytes(descriptor, &[1_u8; 45], &context)?;
         let image = Rgb8ImageTensor::from_tensor(tensor)?;
-        let (bytes, width, height) = validate_vp9_rgb8_encode_input(&image, 63)?;
+        let (bytes, width, height) = validate_vp9_rgb8_encode_input(&image)?;
         assert_eq!((bytes.len(), width, height), (45, 5, 3));
-        assert!(matches!(
-            validate_vp9_rgb8_encode_input(&image, 64),
-            Err(NativeVideoCodecVp9EncodeError::InvalidCrf)
-        ));
-
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
-        let profile = NativeRgb8EncodeProfile::vp9_webm(checked_vp9_frame_rate((2_997, 125))?, 63);
+        let profile = NativeRgb8EncodeProfile::vp9_webm(
+            checked_vp9_frame_rate((2_997, 125))?,
+            NativeVideoCrf::checked(63.0)?,
+        );
         reset_encode_fixture()?;
         *ENCODE_FAILURE_PHASE
             .lock()
@@ -7647,7 +7808,7 @@ mod tests {
         let images = ImageTensor::from_f32(&backend, &context, 3, 2, 2, 3, &values)?;
         let session = NativeVp9WebmEncodeLimits::checked(64, 64, 1, 16)?;
         let limits = NativeVp9WebmBatchLimits::checked(session, 3, 4)?;
-        let (frame_count, width, height) = validate_vp9_image_batch(&images, 32, limits, &context)?;
+        let (frame_count, width, height) = validate_vp9_image_batch(&images, limits, &context)?;
         let mut output = mock_encode_output(&backend, &context, 64)?;
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
@@ -7662,7 +7823,10 @@ mod tests {
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
         encode_rgb8_frames_with_check(
-            NativeRgb8EncodeProfile::vp9_webm(checked_vp9_frame_rate((2_997, 125))?, 32),
+            NativeRgb8EncodeProfile::vp9_webm(
+                checked_vp9_frame_rate((2_997, 125))?,
+                NativeVideoCrf::checked(32.0)?,
+            ),
             encoder,
             frame_count,
             width,
@@ -7745,7 +7909,6 @@ mod tests {
         assert!(matches!(
             validate_vp9_image_batch(
                 &images,
-                32,
                 NativeVp9WebmBatchLimits::checked(session, 2, 4)?,
                 &context,
             ),
@@ -7753,12 +7916,8 @@ mod tests {
         ));
         let four_channel = ImageTensor::from_f32(&backend, &context, 1, 2, 2, 4, &[0.5; 16])?;
         assert!(matches!(
-            validate_vp9_image_batch(&four_channel, 32, limits, &context),
+            validate_vp9_image_batch(&four_channel, limits, &context),
             Err(NativeVideoCodecVp9EncodeError::InvalidBatch)
-        ));
-        assert!(matches!(
-            validate_vp9_image_batch(&images, 64, limits, &context),
-            Err(NativeVideoCodecVp9EncodeError::InvalidCrf)
         ));
 
         reset_encode_fixture()?;
@@ -7777,7 +7936,10 @@ mod tests {
         };
         assert!(matches!(
             encode_rgb8_frames_with_check(
-                NativeRgb8EncodeProfile::vp9_webm(checked_vp9_frame_rate((2_997, 125))?, 32,),
+                NativeRgb8EncodeProfile::vp9_webm(
+                    checked_vp9_frame_rate((2_997, 125))?,
+                    NativeVideoCrf::checked(32.0)?,
+                ),
                 encoder,
                 3,
                 2,
@@ -7807,7 +7969,10 @@ mod tests {
         let images = ImageTensor::from_f32(&backend, &context, 3, 2, 2, 3, &[0.5; 36])?;
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
-        let profile = NativeRgb8EncodeProfile::vp9_webm(checked_vp9_frame_rate((2_997, 125))?, 32);
+        let profile = NativeRgb8EncodeProfile::vp9_webm(
+            checked_vp9_frame_rate((2_997, 125))?,
+            NativeVideoCrf::checked(32.0)?,
+        );
 
         reset_encode_fixture()?;
         *ENCODE_FAILURE_PHASE
