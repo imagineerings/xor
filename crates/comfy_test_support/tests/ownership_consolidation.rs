@@ -15406,6 +15406,92 @@ fn val_ownership_native_video_codec_webm_node_service_001() -> Result<(), Box<dy
 }
 
 #[test]
+fn val_ownership_native_video_save_webm_node_001() -> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/video.rs"))?;
+    for required in [
+        "pub fn source_rounded_millisecond_frame_rate",
+        ".round_ties_even()",
+        "source_webm_frame_rate_uses_python_ties_even_millisecond_rounding",
+    ] {
+        assert!(
+            media.contains(required),
+            "SaveWEBM media projection lacks {required}"
+        );
+    }
+    let family = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    for required in [
+        "const SAVE_WEBM_CLASS_TYPE: &str = \"SaveWEBM\"",
+        "const SAVE_WEBM_FEATURE_ID: &str = \"COMFY-NODE-0602\"",
+        "hidden_preserved_input(\"prompt\", \"PROMPT\")",
+        "hidden_preserved_input(\"extra_pnginfo\", \"EXTRA_PNGINFO\")",
+        "NativeWebmEncodeRequest::checked",
+        ".encode_webm(request, &execution)",
+        "NativeOutputEffectRequest::checked_media",
+        ".rollback_prepared(&prepared)",
+        "value: input_handle",
+        "save_webm_preserves_metadata_image_identity_and_prepares_video_output",
+        "save_webm_rejects_invalid_inputs_rolls_back_late_cancellation_and_retries",
+    ] {
+        assert!(family.contains(required), "SaveWEBM node lacks {required}");
+    }
+    for forbidden in ["std::process::Command", "pyo3"] {
+        assert!(
+            !family.contains(forbidden),
+            "SaveWEBM node exposes forbidden {forbidden}"
+        );
+    }
+    let fixture = fs::read_to_string(
+        root.join("crates/comfy_test_support/fixtures/nodes/video-comfy-node-0602/fixture.json"),
+    )?;
+    for required in [
+        "comfy-parity-native-video-save-webm-node-foundation",
+        "identity_preserving_IMAGE_output",
+        "output_committer_commit_and_recovery_owner",
+        "complete_process_heap_allocation_interception",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "SaveWEBM fixture lacks {required}"
+        );
+    }
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    let concern = concerns
+        .iter()
+        .find(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_video_save_webm_node_effect")
+        })
+        .ok_or("missing SaveWEBM ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_nodes::families::video_01::SaveWebmNode")
+    );
+    let task_id = "comfy-parity-native-video-save-webm-node-foundation";
+    assert_eq!(
+        concerns
+            .iter()
+            .filter(|concern| {
+                concern
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+            })
+            .count(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let media = fs::read_to_string(root.join("crates/comfy_media/src/video.rs"))?;

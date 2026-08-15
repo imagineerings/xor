@@ -11189,6 +11189,70 @@ def native_video_codec_webm_node_service_foundation_task(
     )
 
 
+def native_video_save_webm_node_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-save-webm-node-foundation",
+        "Prepare and publish native SaveWEBM output",
+        [28, 29, 31, 32, 34, 35, 37, 41, 42],
+        [17, 18, 19, 25, 27, 28, 31, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-NATIVE-E2E-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The source-exact experimental SaveWEBM node resolves one canonical IMAGE handle, applies Python ties-even millisecond frame-rate rounding, preserves floating CRF bits, serializes prompt then insertion-ordered extra_pnginfo metadata, and delegates VP9/AV1 encoding to the retained WebM node service. It copies the portable encoded Tensor once into one bounded Output/webm/video-webm prepared effect, returns the identical IMAGE handle with a PreviewVideo transaction projection, and reverses the prepared ticket on late cancellation or invalid completion. Codec lifetimes, output commit/recovery, paths, handles, caches, and persistence remain with their existing owners.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_io.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_ui.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_runtime/src/prompt_compiler.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+            "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
+        ],
+        [
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0602/fixture.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused media, node-family, and ownership tests prove exact ties-even source FPS projection; checked VP9/AV1 and fractional CRF carriage; prompt-first insertion-ordered JSON metadata including duplicate overwrite order; hidden prompt compiler bindings; identical IMAGE output identity and storage; one bounded WebM prepared request and PreviewVideo transaction projection; post-prepare cancellation rollback, zero partial handle publication, and clean retry. The fixture explicitly excludes installed codecs, playable or decoded numeric WebM evidence, filename counter byte identity, OutputCommitter commit/recovery ownership, cache persistence, and complete process-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "37.5",
+            "41.2",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_media", "comfy_nodes"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14716,8 +14780,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_av1_webm_thread_bridge_foundation["id"])
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_save_webm_node_foundation = native_video_save_webm_node_foundation_task(
         str(video_codec_webm_node_service_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_save_webm_node_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -14870,6 +14937,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_av1_webm_sequence_foundation,
         video_codec_av1_webm_thread_bridge_foundation,
         video_codec_webm_node_service_foundation,
+        video_save_webm_node_foundation,
         video_foundation,
         detection_foundation,
         ]
@@ -15604,6 +15672,9 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
                 )
     special["COMFY-NODE-0190"].append(
         "comfy-parity-native-frame-interpolate-node-foundation"
+    )
+    special["COMFY-NODE-0602"].append(
+        "comfy-parity-native-video-save-webm-node-foundation"
     )
     return tasks, {feature_id: sorted(set(task_ids)) for feature_id, task_ids in sorted(special.items())}
 

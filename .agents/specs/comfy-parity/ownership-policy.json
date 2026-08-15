@@ -9240,6 +9240,216 @@
       "decision_reason": "NativeModelPayload is the sole sealed INTERP_MODEL adapter. NativeStoredModelPayload only projects that concrete accessor into the existing handle store; neither layer owns interpolation equations, pair caches, execution, or publication."
     },
     {
+      "concern": "native_frame_interpolation_node_runtime_adapter",
+      "canonical_owner": "comfy_nodes::generated_video_01::FrameInterpolateNode",
+      "owner_files": [
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "owner_symbols": [
+        "FrameInterpolateNode",
+        "execute_frame_interpolate",
+        "interpolation_model_failure",
+        "rollback_interpolation_output"
+      ],
+      "allowed_adapters": [
+        "NativeHandleStore remains the sole INTERP_MODEL and IMAGE integrity, resolution, publication, and revocation owner; the source bypass returns the admitted input handle without mutating the store",
+        "NativeFrameInterpolationModel::interpolate_sequence remains the sole FILM and RIFE dispatch, equation, padding, timestep, fallback, and typed terminal-exhaustion owner",
+        "canonical tensor cast and ImageTensor owners retain dtype, storage, layout, stream, workspace, and allocation authority",
+        "the node adapter owns only exact schema parsing, input projection, one retained-model delegation, typed failure mapping, and final-only IMAGE publication",
+        "checkpoint loading, model mutation, accelerator placement, progress, codec, container, effect, cache persistence, recovery, and external publication owners remain separate"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "qualified": "comfy_nodes::generated_video_01::FrameInterpolateNode",
+          "role": "canonical_implementation",
+          "symbol": "FrameInterpolateNode",
+          "pattern": "struct FrameInterpolateNode"
+        }
+      ],
+      "call_symbols": [
+        "NativeFrameInterpolationModel::interpolate_sequence",
+        "cast_to_with_context_exact_native",
+        "NativeTensorPayload::from_image"
+      ],
+      "call_path_prefixes": [
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "required_mappings": [
+        {
+          "name": "frame-interpolate-binds-the-exact-source-schema-presentation-and-output-ordinal",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "FrameInterpolate[\\s\\S]*interp_model[\\s\\S]*images[\\s\\S]*multiplier[\\s\\S]*Run Frame Interpolation Model[\\s\\S]*frame interpolation[\\s\\S]*images"
+        },
+        {
+          "name": "frame-interpolate-preserves-source-handle-identity-bypass-after-integrity-resolution",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "resolve\\([\\s\\S]*parsed.interp_model[\\s\\S]*resolve\\([\\s\\S]*parsed.images[\\s\\S]*frame_count < 2[\\s\\S]*interpolation_outcome\\(parsed.images.clone\\(\\)\\)"
+        },
+        {
+          "name": "frame-interpolate-delegates-dtype-stream-and-sequence-execution-to-canonical-owners",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "frame_interpolation_resource[\\s\\S]*model.stream\\(\\)[\\s\\S]*cast_to_with_context_exact_native[\\s\\S]*model.dtype\\(\\)[\\s\\S]*interpolate_sequence[\\s\\S]*DType::F32[\\s\\S]*NativeTensorPayload::from_image"
+        },
+        {
+          "name": "frame-interpolate-maps-typed-terminal-failures-and-revokes-late-output",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "FrameInterpolationError::ResourceExhausted[\\s\\S]*frame_interpolation_resource_exhausted[\\s\\S]*rollback_interpolation_output[\\s\\S]*CancellationToken::default\\(\\)[\\s\\S]*revoke"
+        },
+        {
+          "name": "frame-interpolate-tests-source-descriptor-identity-bypass-real-delegation-and-atomic-rejection",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "frame_interpolate_descriptor_fixture_and_cache_match_source[\\s\\S]*frame_interpolate_bypass_returns_exact_input_handle_without_compute[\\s\\S]*frame_interpolate_executes_reduced_rife_and_publishes_canonical_image[\\s\\S]*frame_interpolate_rejects_invalid_requests_and_cancellation_atomically[\\s\\S]*frame_interpolate_maps_exhaustion_rolls_back_late_cancellation_and_retries"
+        },
+        {
+          "name": "frame-interpolate-fixture-bounds-positive-and-negative-evidence",
+          "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json",
+          "pattern": "COMFY-NODE-0190[\\s\\S]*identity_preserving_bypass[\\s\\S]*retained_frame_interpolation_delegation[\\s\\S]*model_loader_or_checkpoint_acquisition[\\s\\S]*progress_event_parity[\\s\\S]*external_media_publication"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-frame-interpolate-node-foundation"
+      ],
+      "production_consumers": [
+        "the generated native implementation registry, pre-admitted FrameInterpolate workflow execution, and later video-family reconciliation"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41",
+        "Requirement 42",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D18",
+        "D20",
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FAMILY-001",
+        "VAL-NODE-001",
+        "VAL-NODE-002",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One exact source node validates both required handles, preserves the under-two-frame source identity bypass, delegates non-bypass execution once to the retained model and canonical tensor owners, and publishes only a complete canonical IMAGE with cancellation rollback. Loading, model math, fallback scheduling, progress, codecs, effects, cache persistence, recovery, and external output remain separate owners."
+    },
+    {
+      "concern": "native_frame_interpolation_sequence_fallback_execution",
+      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
+      "owner_files": [
+        "crates/comfy_model/src/frame_interpolation.rs"
+      ],
+      "owner_symbols": [
+        "NativeFrameInterpolationModel::interpolate_sequence",
+        "execute_frame_interpolation_sequence_fallback",
+        "FrameInterpolationFallbackState"
+      ],
+      "allowed_adapters": [
+        "FrameInterpolationFallbackState remains the sole attempt-local multi-disable and persistent single-batch policy state",
+        "execution_result and FrameInterpolationError::ResourceExhausted remain the sole typed exhaustion classifier and branch value; fallback cannot inspect messages or reclassify errors",
+        "existing retained FILM and RIFE pair graphs own interpolation equations while the fallback scheduler owns only attempt order, same-chunk retry, floor halving, and cancellation priority",
+        "canonical tensor expansion, concatenation, layout, workspace, and backend owners remain authoritative; this scheduler cannot open a private allocator, cache, handle, effect, codec, persistence, recovery, or publication boundary"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
+          "role": "canonical",
+          "symbol": "interpolate_sequence",
+          "pattern": "pub fn interpolate_sequence\\("
+        },
+        {
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "qualified": "comfy_model::frame_interpolation::execute_frame_interpolation_sequence_fallback",
+          "role": "canonical_implementation",
+          "symbol": "execute_frame_interpolation_sequence_fallback",
+          "pattern": "^fn execute_frame_interpolation_sequence_fallback<"
+        }
+      ],
+      "call_symbols": [
+        "interpolate_sequence",
+        "execute_frame_interpolation_sequence_fallback",
+        "record_multi_timestep_oom",
+        "record_single_timestep_oom"
+      ],
+      "call_patterns": [],
+      "required_mappings": [
+        {
+          "name": "frame-interpolation-fallback-retries-only-typed-exhaustion-with-cancellation-priority",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "fn execute_frame_interpolation_sequence_fallback[\\s\\S]*FrameInterpolationError::ResourceExhausted[\\s\\S]*cancellation\\.check\\(\\)[\\s\\S]*record_multi_timestep_oom[\\s\\S]*record_single_timestep_oom[\\s\\S]*return Err\\(error\\)"
+        },
+        {
+          "name": "frame-interpolation-fallback-preserves-pinned-film-multi-element-scalarization-failure",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "matches!\\(profile, FrameInterpolationProfile::Film\\)[\\s\\S]*timesteps\\.len\\(\\) > 1[\\s\\S]*FILM source fallback cannot scalarize a multi-timestep batch"
+        },
+        {
+          "name": "rife-sequence-delegates-persistent-batches-and-source-ordered-timestep-tensors",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "interpolate_rife_sequence[\\s\\S]*FrameInterpolationFallbackState::for_plan\\(&plan, false\\)[\\s\\S]*execute_frame_interpolation_sequence_fallback[\\s\\S]*interpolate_rife_pair_with_features[\\s\\S]*rife_timestep_tensor"
+        },
+        {
+          "name": "frame-interpolation-fallback-oracle-proves-rife-halving-film-negative-cancellation-and-timestep-order",
+          "path": "crates/comfy_model/src/frame_interpolation.rs",
+          "pattern": "frame_interpolation_sequence_fallback_preserves_rife_halving_and_terminal_exhaustion[\\s\\S]*frame_interpolation_sequence_fallback_preserves_film_scalarization_failure[\\s\\S]*frame_interpolation_sequence_fallback_prioritizes_cancellation_and_never_retries_execution[\\s\\S]*rife_timestep_batches_preserve_source_order"
+        },
+        {
+          "name": "frame-interpolation-fallback-fixture-bounds-source-policy-and-excludes-foreign-authority",
+          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
+          "pattern": "(?=[\\s\\S]*multi_timestep_attempted_once)(?=[\\s\\S]*reduced_batch_persists_across_pairs)(?=[\\s\\S]*multi_element_fallback_halving)(?=[\\s\\S]*error_message_matching)(?=[\\s\\S]*allocator_or_workspace_owner)(?=[\\s\\S]*effect_or_publication_execution)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-frame-interpolation-sequence-fallback-foundation"
+      ],
+      "production_consumers": [
+        "the following FrameInterpolate native node adapter and later video-family integration"
+      ],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D18",
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "The retained model owns one source-fingerprinted fallback scheduler over existing FILM and RIFE equations. It branches only on the canonical typed exhaustion variant, preserves cancellation and the pinned FILM scalarization failure, keeps reduced RIFE batch state invocation-local, and introduces no parallel model, tensor, allocator, cache, handle, codec, effect, or publication owner."
+    },
+    {
       "concern": "native_image_to_tensor_conversion",
       "canonical_owner": "comfy_tensor::generated_external_tensor_kernel_01::to_tensor_with_context_exact_native",
       "owner_files": [
@@ -11602,9 +11812,30 @@
       "production_consumers": [
         "native FILM flow synthesis, fusion, and sequence execution"
       ],
-      "requirements": ["Requirement 31", "Requirement 34", "Requirement 35", "Requirement 36", "Requirement 41"],
-      "design": ["D25", "D28", "D31", "D34", "D36", "D41"],
-      "validation": ["VAL-MEDIA-001", "VAL-TENSOR-001", "VAL-DEVICE-001", "VAL-MODEL-FORMAT-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+      "requirements": [
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 36",
+        "Requirement 41"
+      ],
+      "design": [
+        "D25",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-TENSOR-001",
+        "VAL-DEVICE-001",
+        "VAL-MODEL-FORMAT-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
       "decision_reason": "The existing retained interpolation model remains the sole FILM checkpoint owner and executes the source shared and specialized flow predictors over borrowed feature pyramids. All predicted residuals and accumulated flows remain invocation-local."
     },
     {
@@ -12634,106 +12865,6 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "The frame-interpolation execution adapter preserves canonical typed tensor exhaustion while retaining cancellation priority and generic non-retryable failures. It introduces no message matching, retry, allocation, cache, or publication authority."
-    },
-    {
-      "concern": "native_frame_interpolation_sequence_fallback_execution",
-      "canonical_owner": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
-      "owner_files": [
-        "crates/comfy_model/src/frame_interpolation.rs"
-      ],
-      "owner_symbols": [
-        "NativeFrameInterpolationModel::interpolate_sequence",
-        "execute_frame_interpolation_sequence_fallback",
-        "FrameInterpolationFallbackState"
-      ],
-      "allowed_adapters": [
-        "FrameInterpolationFallbackState remains the sole attempt-local multi-disable and persistent single-batch policy state",
-        "execution_result and FrameInterpolationError::ResourceExhausted remain the sole typed exhaustion classifier and branch value; fallback cannot inspect messages or reclassify errors",
-        "existing retained FILM and RIFE pair graphs own interpolation equations while the fallback scheduler owns only attempt order, same-chunk retry, floor halving, and cancellation priority",
-        "canonical tensor expansion, concatenation, layout, workspace, and backend owners remain authoritative; this scheduler cannot open a private allocator, cache, handle, effect, codec, persistence, recovery, or publication boundary"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "qualified": "comfy_model::frame_interpolation::NativeFrameInterpolationModel::interpolate_sequence",
-          "role": "canonical",
-          "symbol": "interpolate_sequence",
-          "pattern": "pub fn interpolate_sequence\\("
-        },
-        {
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "qualified": "comfy_model::frame_interpolation::execute_frame_interpolation_sequence_fallback",
-          "role": "canonical_implementation",
-          "symbol": "execute_frame_interpolation_sequence_fallback",
-          "pattern": "^fn execute_frame_interpolation_sequence_fallback<"
-        }
-      ],
-      "call_symbols": [
-        "interpolate_sequence",
-        "execute_frame_interpolation_sequence_fallback",
-        "record_multi_timestep_oom",
-        "record_single_timestep_oom"
-      ],
-      "call_patterns": [],
-      "required_mappings": [
-        {
-          "name": "frame-interpolation-fallback-retries-only-typed-exhaustion-with-cancellation-priority",
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "fn execute_frame_interpolation_sequence_fallback[\\s\\S]*FrameInterpolationError::ResourceExhausted[\\s\\S]*cancellation\\.check\\(\\)[\\s\\S]*record_multi_timestep_oom[\\s\\S]*record_single_timestep_oom[\\s\\S]*return Err\\(error\\)"
-        },
-        {
-          "name": "frame-interpolation-fallback-preserves-pinned-film-multi-element-scalarization-failure",
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "matches!\\(profile, FrameInterpolationProfile::Film\\)[\\s\\S]*timesteps\\.len\\(\\) > 1[\\s\\S]*FILM source fallback cannot scalarize a multi-timestep batch"
-        },
-        {
-          "name": "rife-sequence-delegates-persistent-batches-and-source-ordered-timestep-tensors",
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "interpolate_rife_sequence[\\s\\S]*FrameInterpolationFallbackState::for_plan\\(&plan, false\\)[\\s\\S]*execute_frame_interpolation_sequence_fallback[\\s\\S]*interpolate_rife_pair_with_features[\\s\\S]*rife_timestep_tensor"
-        },
-        {
-          "name": "frame-interpolation-fallback-oracle-proves-rife-halving-film-negative-cancellation-and-timestep-order",
-          "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "frame_interpolation_sequence_fallback_preserves_rife_halving_and_terminal_exhaustion[\\s\\S]*frame_interpolation_sequence_fallback_preserves_film_scalarization_failure[\\s\\S]*frame_interpolation_sequence_fallback_prioritizes_cancellation_and_never_retries_execution[\\s\\S]*rife_timestep_batches_preserve_source_order"
-        },
-        {
-          "name": "frame-interpolation-fallback-fixture-bounds-source-policy-and-excludes-foreign-authority",
-          "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/sequence-fallback/manifest.json",
-          "pattern": "(?=[\\s\\S]*multi_timestep_attempted_once)(?=[\\s\\S]*reduced_batch_persists_across_pairs)(?=[\\s\\S]*multi_element_fallback_halving)(?=[\\s\\S]*error_message_matching)(?=[\\s\\S]*allocator_or_workspace_owner)(?=[\\s\\S]*effect_or_publication_execution)"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-native-frame-interpolation-sequence-fallback-foundation"
-      ],
-      "production_consumers": [
-        "the following FrameInterpolate native node adapter and later video-family integration"
-      ],
-      "requirements": [
-        "Requirement 31",
-        "Requirement 34",
-        "Requirement 35",
-        "Requirement 36",
-        "Requirement 41"
-      ],
-      "design": [
-        "D18",
-        "D25",
-        "D28",
-        "D31",
-        "D34",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-TENSOR-001",
-        "VAL-DEVICE-001",
-        "VAL-MODEL-FORMAT-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "The retained model owns one source-fingerprinted fallback scheduler over existing FILM and RIFE equations. It branches only on the canonical typed exhaustion variant, preserves cancellation and the pinned FILM scalarization failure, keeps reduced RIFE batch state invocation-local, and introduces no parallel model, tensor, allocator, cache, handle, codec, effect, or publication owner."
     },
     {
       "concern": "native_rife_frame_interpolation_sequence_execution",
@@ -14540,343 +14671,6 @@
       "decision_reason": "One private retained-binding adapter owns bounded seekable memory AVIO construction, callbacks, workspace leases, failure latching, cancellation, and exact reverse cleanup. Keeping the raw context and staged bytes crate-private prepares the first mux/demux data plane without creating a payload or a second loader, allocator, or publication owner."
     },
     {
-      "concern": "native_video_reviewed_codec_registry_ltxv_h264_admission",
-      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecBinding::admit_ltxv_h264",
-      "owner_files": [
-        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
-      ],
-      "owner_symbols": [
-        "NativeLtxvH264Codec",
-        "NativeVideoCodecBinding::admit_ltxv_h264",
-        "admit_ltxv_h264_with_check",
-        "prove_codec_descriptor_provider"
-      ],
-      "allowed_adapters": [
-        "the signed trust closure supplies the exact libx264-to-x264 implementation dependency and retained dependency certificate",
-        "the typed binding supplies the already certified avcodec registry lookup functions without reopening a library or resolving a second symbol table",
-        "the retained loader link map proves both registry descriptors originate in the exact retained avcodec image",
-        "the admitted pair is thread-bound executable authority for the following LTXV session and exposes no raw pointer, handle, path, boolean facade, payload, cache, effect, or publication state"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec",
-          "role": "sealed_lifecycle_projection",
-          "symbol": "NativeLtxvH264Codec"
-        }
-      ],
-      "call_symbols": [
-        "avcodec_find_encoder_by_name",
-        "avcodec_find_decoder"
-      ],
-      "required_mappings": [
-        {
-          "name": "ltxv-h264-admission-consumes-binding-and-exact-contract",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "admit_ltxv_h264[\\s\\S]*has_exact_ltxv_h264_dependency_contract[\\s\\S]*libx264[\\s\\S]*x264"
-        },
-        {
-          "name": "ltxv-h264-admission-invokes-only-exact-registry-pair",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "avcodec_find_encoder_by_name\\)\\(c\"libx264\"[\\s\\S]*avcodec_find_decoder\\)\\(abi::AV_CODEC_ID_H264"
-        },
-        {
-          "name": "ltxv-h264-admission-proves-retained-avcodec-provider",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "prove_codec_descriptor_provider[\\s\\S]*loaded_link_map[\\s\\S]*libc::dladdr1[\\s\\S]*information.dli_fname"
-        },
-        {
-          "name": "ltxv-h264-admission-tests-success-failure-cancellation-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "retained_ltxv_h264_admission_uses_exact_registered_codec_pair[\\s\\S]*retained_ltxv_h264_admission_rejects_missing_registry_entries[\\s\\S]*retained_ltxv_h264_admission_cancellation_is_atomic_and_retryable"
-        },
-        {
-          "name": "ltxv-h264-admission-fixture-forbids-codec-and-publication-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
-          "pattern": "synthetic-retained-ltxv-h264-codec-admission[\\s\\S]*native_registry_lookup_invoked[\\s\\S]*codec_context_or_format_allocated[\\s\\S]*codec_or_media_result_produced[\\s\\S]*media_payload_or_handle_published"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-ltxv-h264-admission-foundation"
-      ],
-      "production_consumers": [
-        "the following bounded LTXV H.264 MP4 memory session"
-      ],
-      "requirements": [
-        "Requirement 28",
-        "Requirement 31",
-        "Requirement 32",
-        "Requirement 35",
-        "Requirement 41",
-        "Requirement 42"
-      ],
-      "design": [
-        "D17",
-        "D18",
-        "D19",
-        "D27",
-        "D28",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-RUNTIME-TRUST-001",
-        "VAL-NATIVE-BOUNDARY-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "One retained operation-scoped owner converts the exact typed FFmpeg binding into the concrete libx264 encoder and H.264 decoder authority required by LTXV. It invokes only bounded registry lookups, proves retained avcodec descriptor provenance, and keeps all pointers private until the following session owns codec allocation and execution."
-    },
-    {
-      "concern": "native_video_reviewed_codec_registry_suite_admission",
-      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
-      "owner_files": [
-        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-        "crates/comfy_runtime/src/native_video_codec_service.rs"
-      ],
-      "owner_symbols": [
-        "NativeVideoCodecSuite",
-        "NativeLtxvH264Codec::admit_video_suite",
-        "admit_video_suite_with_check",
-        "has_exact_video_codec_suite_dependency_contract"
-      ],
-      "allowed_adapters": [
-        "the signed trust closure remains the sole exact encoder-provider, dependency-certificate, and avcodec-edge authority",
-        "the retained LTXV pair remains the sole binding and loaded-namespace owner while the suite adds private ordinary-video descriptor witnesses",
-        "the retained codec thread owns and destroys the suite on its native thread and delegates existing LTXV preprocessing without a second loader or namespace",
-        "later bounded MP4 and WebM sessions may borrow only the private typed suite authority and may not expose a pointer, path, boolean facade, handle, cache, effect, or publication state"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
-          "role": "sealed_lifecycle_projection",
-          "symbol": "NativeVideoCodecSuite"
-        }
-      ],
-      "call_symbols": [
-        "avcodec_find_encoder_by_name",
-        "avcodec_find_decoder"
-      ],
-      "required_mappings": [
-        {
-          "name": "video-codec-suite-validates-exact-signed-provider-contract",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "has_exact_video_codec_suite_dependency_contract[\\s\\S]*aac[\\s\\S]*avcodec[\\s\\S]*libsvtav1[\\s\\S]*svtav1[\\s\\S]*libvpx-vp9[\\s\\S]*vpx[\\s\\S]*libx264[\\s\\S]*x264"
-        },
-        {
-          "name": "video-codec-suite-invokes-exact-registry-set-and-provider-proofs",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "admit_video_suite_with_check[\\s\\S]*c\"aac\"[\\s\\S]*c\"libsvtav1\"[\\s\\S]*c\"libvpx-vp9\"[\\s\\S]*AV_CODEC_ID_AAC[\\s\\S]*AV_CODEC_ID_VP9[\\s\\S]*AV_CODEC_ID_AV1[\\s\\S]*prove_codec_descriptor_provider"
-        },
-        {
-          "name": "video-codec-suite-is-retained-by-existing-thread-service",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "admit_ltxv_h264[\\s\\S]*admit_video_suite[\\s\\S]*process_ltxv_codec_request\\([\\s\\S]*NativeVideoCodecSuite"
-        },
-        {
-          "name": "video-codec-suite-tests-success-missing-provider-cancellation-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "retained_video_codec_suite_admission_uses_exact_registered_codec_set[\\s\\S]*retained_video_codec_suite_admission_rejects_each_missing_descriptor[\\s\\S]*retained_video_codec_suite_admission_rejects_wrong_descriptor_provider[\\s\\S]*retained_video_codec_suite_admission_cancellation_is_atomic_and_retryable"
-        },
-        {
-          "name": "video-codec-suite-fixture-bounds-nonexecution-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
-          "pattern": "synthetic-retained-native-video-codec-suite-admission[\\s\\S]*one_binding_and_loaded_namespace_retained[\\s\\S]*codec_context_format_frame_packet_or_avio_allocated[\\s\\S]*mux_demux_encode_or_decode_executed[\\s\\S]*media_payload_or_handle_published"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-suite-admission-foundation"
-      ],
-      "production_consumers": [
-        "the retained LTXV codec thread service and following bounded ordinary MP4 and WebM sessions"
-      ],
-      "requirements": [
-        "Requirement 28",
-        "Requirement 31",
-        "Requirement 32",
-        "Requirement 35",
-        "Requirement 41",
-        "Requirement 42"
-      ],
-      "design": [
-        "D17",
-        "D18",
-        "D19",
-        "D27",
-        "D28",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-RUNTIME-TRUST-001",
-        "VAL-NATIVE-BOUNDARY-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "One thread-bound suite extends the existing retained LTXV owner with exact ordinary-video encoder and decoder registry authority, proves every descriptor against the same retained avcodec image, and is exercised by the existing codec thread without creating a second loader, namespace, pointer owner, or media facade."
-    },
-    {
-      "concern": "native_video_reviewed_codec_registry_vp9_webm_encode",
-      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_webm_batch",
-      "owner_files": [
-        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
-      ],
-      "owner_symbols": [
-        "NativeRgb8Crf",
-        "NativeVp9WebmEncodeLimits",
-        "NativeVp9WebmBatchLimits",
-        "NativeVideoContainerMetadataLimits",
-        "NativeVideoContainerMetadata",
-        "NativeRgb8EncodeProfile",
-        "NativeVp9Webm",
-        "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
-        "NativeVideoCodecSuite::encode_vp9_webm_batch",
-        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
-        "encode_rgb8_frame_with_check",
-        "encode_rgb8_frames_with_check",
-        "encode_rgb8_frames_with_metadata_check",
-        "source_compatible_vp9_rgba8_frame",
-        "drain_rgb8_encode_packets"
-      ],
-      "allowed_adapters": [
-        "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
-        "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
-        "the canonical IMAGE tensor supplies checked contiguous CPU F32 BHWC values and the source-specific batch adapter clamps and stages exactly one packed RGB or RGBA frame at a time",
-        "the bounded ordered pre-serialized metadata owner supplies only safe C strings and the format context owns every attached native dictionary entry",
-        "the retained owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVp9Webm",
-          "role": "sealed_lifecycle_projection",
-          "symbol": "NativeVp9Webm"
-        }
-      ],
-      "call_symbols": [
-        "avformat_alloc_output_context2",
-        "av_dict_set",
-        "avformat_new_stream",
-        "avcodec_alloc_context3",
-        "avcodec_open2",
-        "avformat_write_header",
-        "av_frame_make_writable",
-        "sws_scale",
-        "avcodec_send_frame",
-        "avcodec_receive_packet",
-        "av_interleaved_write_frame",
-        "av_write_trailer"
-      ],
-      "required_mappings": [
-        {
-          "name": "vp9-webm-encode-preserves-source-float-crf",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativeRgb8Crf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
-        },
-        {
-          "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "encode_vp9_rgb8_frame[\\s\\S]*vpx_vp9_encoder[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_rgb8_frame_with_check"
-        },
-        {
-          "name": "vp9-webm-encode-pins-source-profile-and-rational-rate",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "vp9_webm[\\s\\S]*c\"webm\"[\\s\\S]*pixel_format[\\s\\S]*yuv420p[\\s\\S]*c\"framerate\"[\\s\\S]*c\"b\"[\\s\\S]*c\"crf\""
-        },
-        {
-          "name": "vp9-webm-encode-bounds-drain-cancellation-and-raii",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
-        },
-        {
-          "name": "vp9-webm-encode-tests-profile-bounds-cancellation-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup[\\s\\S]*retained_vp9_webm_encode_validates_bounds_cancellation_and_retry"
-        },
-        {
-          "name": "vp9-webm-encode-fixture-bounds-evidence-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
-          "pattern": "synthetic-retained-vp9-webm-one-frame-encode[\\s\\S]*native_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_or_libvpx_package[\\s\\S]*numeric_vp9_swscale_or_byte_identity_oracle[\\s\\S]*media_payload_or_handle_published"
-        },
-        {
-          "name": "vp9-webm-container-metadata-is-bounded-ordered-and-preheader",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativeVideoContainerMetadataLimits[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*av_dict_set[\\s\\S]*avformat_new_stream"
-        },
-        {
-          "name": "vp9-webm-container-metadata-tests-cleanup-cancellation-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader[\\s\\S]*retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic"
-        },
-        {
-          "name": "vp9-webm-container-metadata-fixture-bounds-evidence-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
-          "pattern": "synthetic-source-compatible-vp9-webm-container-metadata[\\s\\S]*bounded_ordered_metadata_reaches_real_session_and_actor[\\s\\S]*python_json_serialization_owned[\\s\\S]*node_effect_path_or_output_committer_reachable"
-        },
-        {
-          "name": "vp9-webm-alpha-profile-is-derived-from-one-checked-channel-mode",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "vp9_webm_alpha[\\s\\S]*AV_PIXEL_FORMAT_RGBA[\\s\\S]*AV_PIXEL_FORMAT_YUVA420P[\\s\\S]*c\"yuva420p\"[\\s\\S]*source_channels"
-        },
-        {
-          "name": "vp9-webm-alpha-tests-source-bytes-metadata-order-cancellation-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "retained_vp9_webm_alpha_batch_preserves_rgba_profile_and_order[\\s\\S]*retained_vp9_webm_alpha_staging_cancellation_and_retry_are_atomic"
-        },
-        {
-          "name": "vp9-webm-alpha-fixture-bounds-evidence-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json",
-          "pattern": "synthetic-source-compatible-vp9-webm-alpha-execution[\\s\\S]*source_rgba_quantization_and_profile_reach_retained_session[\\s\\S]*playable_webm_or_decoded_numeric_alpha_or_color_oracle[\\s\\S]*json_serialization_node_effect_path_ui_or_output_committer_reachable"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation"
-      ],
-      "production_consumers": [
-        "the following SaveWEBM metadata, effect, and node adapters"
-      ],
-      "requirements": [
-        "Requirement 28",
-        "Requirement 31",
-        "Requirement 32",
-        "Requirement 35",
-        "Requirement 41",
-        "Requirement 42"
-      ],
-      "design": [
-        "D17",
-        "D18",
-        "D19",
-        "D27",
-        "D28",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-MEDIA-001",
-        "VAL-RUNTIME-TRUST-001",
-        "VAL-NATIVE-BOUNDARY-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "One retained suite owner covers the checked one-frame RGB regression and canonical F32 IMAGE batch sessions for opaque RGB and source alpha RGBA. It reuses one reviewed ABI and bounded AVIO/RAII boundary, stages one clamped packed frame at a time, and returns only opaque attempt-local bytes while explicitly excluding real-package numeric and publication claims."
-    },
-    {
       "concern": "native_video_reviewed_codec_registry_av1_webm_encode",
       "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_av1_webm_batch_with_metadata",
       "owner_files": [
@@ -14983,133 +14777,6 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One retained suite method executes the provider-proved SVT-AV1 WebM sequence profile through the existing bounded AVIO and shared packet state machine. It stages only source RGB, preserves metadata and source CRF text, returns attempt-local bytes, and leaves actor, node, effect, cache, path, persistence, recovery, and publication ownership to later adapters."
-    },
-    {
-      "concern": "native_video_reviewed_codec_registry_vp9_webm_thread_bridge",
-      "canonical_owner": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
-      "owner_files": [
-        "crates/comfy_runtime/src/native_video_codec_service.rs"
-      ],
-      "owner_symbols": [
-        "NativeOwnedVp9Webm",
-        "NativeVideoCodecThreadOperation",
-        "NativeVideoCodecThreadOutput",
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
-        "process_vp9_webm_request",
-        "materialize_owned_vp9_webm",
-        "materialize_owned_webm_bytes"
-      ],
-      "allowed_adapters": [
-        "the existing retained codec-thread service remains the sole channel, thread, suite, load, bind, admission, and shutdown owner",
-        "the bounded VP9 WebM IMAGE-sequence primitive supplies attempt-local staged bytes only while its suite borrow and AVIO owners remain on the actor thread",
-        "the canonical CPU backend uploader owns the single exact-length U8 Tensor copy and persistent backend allocation accounting",
-        "a following SaveWEBM adapter may borrow the portable Tensor bytes and checked metadata but may not treat this result as a stored payload, handle, cache entry, effect, path, persistence, recovery, or publication owner"
-      ],
-      "definitions": [
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "qualified": "comfy_runtime::native_video_codec_service::NativeOwnedVp9Webm",
-          "role": "sealed_lifecycle_projection",
-          "symbol": "NativeOwnedVp9Webm"
-        },
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
-          "role": "canonical_service",
-          "symbol": "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
-        }
-      ],
-      "call_symbols": [
-        "NativeVideoCodecSuite::encode_vp9_webm_batch",
-        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
-        "CpuBackend::upload_bytes",
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata"
-      ],
-      "required_mappings": [
-        {
-          "name": "vp9-webm-thread-bridge-carries-checked-source-crf-bits",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoCrf[\\s\\S]*crf.bits\\(\\)[\\s\\S]*NativeVideoCrf::checked\\(31.5\\)"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-drops-native-session-before-portable-response",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "process_vp9_webm_request[\\s\\S]*encode_vp9_webm_batch[\\s\\S]*encoded_bytes[\\s\\S]*materialize_owned_vp9_webm[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-materializes-exact-accounted-u8-tensor",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "materialize_owned_vp9_webm[\\s\\S]*materialize_owned_webm_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-tests-affinity-accounting-failure-and-retry",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv[\\s\\S]*owned_vp9_output_materialization_is_accounted_atomic_and_retryable"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-fixture-bounds-evidence-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
-          "pattern": "synthetic-retained-vp9-webm-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*prompt_or_extra_metadata_supported[\\s\\S]*media_payload_or_handle_published"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-carries-owned-ordered-container-metadata",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
-        },
-        {
-          "name": "vp9-webm-thread-bridge-carries-source-alpha-projection-without-a-second-actor",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v7[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
-        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation"
-      ],
-      "production_consumers": [
-        "the following reviewed container-metadata and SaveWEBM prepared-effect adapters"
-      ],
-      "requirements": [
-        "Requirement 28",
-        "Requirement 29",
-        "Requirement 31",
-        "Requirement 32",
-        "Requirement 34",
-        "Requirement 35",
-        "Requirement 41",
-        "Requirement 42"
-      ],
-      "design": [
-        "D17",
-        "D18",
-        "D19",
-        "D25",
-        "D27",
-        "D28",
-        "D36",
-        "D41"
-      ],
-      "validation": [
-        "VAL-TENSOR-001",
-        "VAL-MEDIA-001",
-        "VAL-RUNTIME-TRUST-001",
-        "VAL-NATIVE-BOUNDARY-001",
-        "VAL-CANCEL-001",
-        "VAL-MEMORY-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "One capacity-one retained codec actor serializes both LTXV and VP9 work, keeps every borrowed native owner thread-local, and performs one checked exact-length CPU U8 Tensor copy before returning portable bytes and immutable metadata with scratch already converged."
     },
     {
       "concern": "native_video_reviewed_codec_registry_av1_webm_thread_bridge",
@@ -15224,98 +14891,75 @@
       "decision_reason": "One capacity-one retained codec actor carries AV1 requests to the sole native owner thread, drops every borrowed AV1 WebM owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable ten-bit non-alpha bytes with scratch converged."
     },
     {
-      "concern": "native_video_reviewed_codec_service_webm_node_injection",
-      "canonical_owner": "comfy_nodes::execution::NativeWebmEncodeService",
+      "concern": "native_video_reviewed_codec_registry_ltxv_h264_admission",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecBinding::admit_ltxv_h264",
       "owner_files": [
-        "crates/comfy_nodes/src/execution.rs",
-        "crates/comfy_nodes/src/comfy_nodes.rs",
-        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-        "crates/comfy_runtime/src/native_video_codec_service.rs",
-        "crates/comfy_runtime/src/executor.rs",
-        "crates/comfy_runtime/src/native_execution_controller.rs",
-        "crates/comfy_runtime/src/comfy_runtime.rs"
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
       ],
       "owner_symbols": [
-        "NativeWebmEncodeServiceIdentity",
-        "NativeWebmEncodeRequest",
-        "NativeEncodedWebm",
-        "NativeWebmEncodeServiceError",
-        "NativeWebmEncodeService",
-        "NativeWebmCodecRequestService",
-        "ExecutionEngine::with_webm_encode_service",
-        "NativeImageExecutor::with_webm_encode_service"
+        "NativeLtxvH264Codec",
+        "NativeVideoCodecBinding::admit_ltxv_h264",
+        "admit_ltxv_h264_with_check",
+        "prove_codec_descriptor_provider"
       ],
       "allowed_adapters": [
-        "the existing retained codec proxy remains the sole VP9 and AV1 actor transport and native lifetime adapter",
-        "the canonical WebM batch session and metadata limit types expose only deterministic configuration values for service identity",
-        "NativeNodeServices and ExecutionEngine carry the checked service Arc without owning codec state",
-        "NativeImageExecutor appends the checked WebM configuration digest to execution cache identity",
-        "the following SaveWEBM adapter may consume portable bytes and owns JSON effects paths rollback and publication"
+        "the signed trust closure supplies the exact libx264-to-x264 implementation dependency and retained dependency certificate",
+        "the typed binding supplies the already certified avcodec registry lookup functions without reopening a library or resolving a second symbol table",
+        "the retained loader link map proves both registry descriptors originate in the exact retained avcodec image",
+        "the admitted pair is thread-bound executable authority for the following LTXV session and exposes no raw pointer, handle, path, boolean facade, payload, cache, effect, or publication state"
       ],
       "definitions": [
         {
-          "path": "crates/comfy_nodes/src/execution.rs",
-          "qualified": "comfy_nodes::execution::NativeWebmEncodeService",
-          "role": "canonical_service",
-          "symbol": "NativeWebmEncodeService"
-        },
-        {
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "qualified": "comfy_runtime::native_video_codec_service::NativeWebmCodecRequestService",
-          "role": "allowed_adapter",
-          "symbol": "NativeWebmCodecRequestService"
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeLtxvH264Codec"
         }
       ],
       "call_symbols": [
-        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
-        "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
-        "NativeNodeServices::with_webm_encode",
-        "ExecutionEngine::with_webm_encode_service",
-        "NativeImageExecutor::with_webm_encode_service"
+        "avcodec_find_encoder_by_name",
+        "avcodec_find_decoder"
       ],
       "required_mappings": [
         {
-          "name": "webm-node-service-owns-checked-portable-contract",
-          "path": "crates/comfy_nodes/src/execution.rs",
-          "pattern": "NativeWebmEncodeServiceIdentity[\\s\\S]*NativeWebmEncodeRequest[\\s\\S]*NativeEncodedWebm[\\s\\S]*NativeWebmEncodeServiceError[\\s\\S]*trait NativeWebmEncodeService"
+          "name": "ltxv-h264-admission-consumes-binding-and-exact-contract",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "admit_ltxv_h264[\\s\\S]*has_exact_ltxv_h264_dependency_contract[\\s\\S]*libx264[\\s\\S]*x264"
         },
         {
-          "name": "webm-node-service-moves-retained-actor-output-with-request-projection-checks",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeWebmCodecRequestService[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*encode_av1_webm_batch_with_metadata[\\s\\S]*into_parts[\\s\\S]*checked_webm_service_result"
+          "name": "ltxv-h264-admission-invokes-only-exact-registry-pair",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "avcodec_find_encoder_by_name\\)\\(c\"libx264\"[\\s\\S]*avcodec_find_decoder\\)\\(abi::AV_CODEC_ID_H264"
         },
         {
-          "name": "webm-node-service-identity-binds-actor-and-all-limit-values",
-          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.webm-node-service.v1[\\s\\S]*configuration_sha256[\\s\\S]*batch_limits_configuration_u64[\\s\\S]*metadata_limits_configuration_u64"
+          "name": "ltxv-h264-admission-proves-retained-avcodec-provider",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "prove_codec_descriptor_provider[\\s\\S]*loaded_link_map[\\s\\S]*libc::dladdr1[\\s\\S]*information.dli_fname"
         },
         {
-          "name": "webm-node-service-propagates-through-engine-and-cache-identity",
-          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "webm_encode_service[\\s\\S]*with_webm_encode_service[\\s\\S]*:webm="
+          "name": "ltxv-h264-admission-tests-success-failure-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_ltxv_h264_admission_uses_exact_registered_codec_pair[\\s\\S]*retained_ltxv_h264_admission_rejects_missing_registry_entries[\\s\\S]*retained_ltxv_h264_admission_cancellation_is_atomic_and_retryable"
         },
         {
-          "name": "webm-node-service-fixture-bounds-evidence-claims",
-          "path": "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
-          "pattern": "synthetic-retained-webm-node-service[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*save_webm_node_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
+          "name": "ltxv-h264-admission-fixture-forbids-codec-and-publication-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-ltxv-h264-admission/manifest.json",
+          "pattern": "synthetic-retained-ltxv-h264-codec-admission[\\s\\S]*native_registry_lookup_invoked[\\s\\S]*codec_context_or_format_allocated[\\s\\S]*codec_or_media_result_produced[\\s\\S]*media_payload_or_handle_published"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-webm-node-service-foundation"
+        "comfy-parity-native-video-codec-ltxv-h264-admission-foundation"
       ],
       "production_consumers": [
-        "the following SaveWEBM prepared-effect and COMFY-NODE-0602 adapters"
+        "the following bounded LTXV H.264 MP4 memory session"
       ],
       "requirements": [
         "Requirement 28",
-        "Requirement 29",
         "Requirement 31",
         "Requirement 32",
-        "Requirement 34",
         "Requirement 35",
-        "Requirement 37",
         "Requirement 41",
         "Requirement 42"
       ],
@@ -15323,24 +14967,19 @@
         "D17",
         "D18",
         "D19",
-        "D25",
         "D27",
         "D28",
-        "D31",
         "D36",
         "D41"
       ],
       "validation": [
-        "VAL-TENSOR-001",
-        "VAL-MEDIA-001",
         "VAL-RUNTIME-TRUST-001",
         "VAL-NATIVE-BOUNDARY-001",
-        "VAL-NODE-001",
         "VAL-CANCEL-001",
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "One checked WebM service maps portable node requests onto the sole retained VP9 and AV1 actor, moves its already-accounted Tensor without another byte copy, validates every result projection, carries the service through native execution, and partitions cache identity by actor and all configured bounds."
+      "decision_reason": "One retained operation-scoped owner converts the exact typed FFmpeg binding into the concrete libx264 encoder and H.264 decoder authority required by LTXV. It invokes only bounded registry lookups, proves retained avcodec descriptor provenance, and keeps all pointers private until the following session owns codec allocation and execution."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_mp4_encode",
@@ -15828,6 +15467,379 @@
       "decision_reason": "One bounded Send plus Sync proxy owns the channel and join lifecycle while one named OS thread alone creates, retains, invokes, and destroys the intentionally thread-bound native codec. The service preserves caller scratch and cancellation, publishes only canonical IMAGE results or typed errors, and introduces no unsafe, package provisioning, node, cache, media, persistence, recovery, or output authority."
     },
     {
+      "concern": "native_video_reviewed_codec_registry_suite_admission",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs"
+      ],
+      "owner_symbols": [
+        "NativeVideoCodecSuite",
+        "NativeLtxvH264Codec::admit_video_suite",
+        "admit_video_suite_with_check",
+        "has_exact_video_codec_suite_dependency_contract"
+      ],
+      "allowed_adapters": [
+        "the signed trust closure remains the sole exact encoder-provider, dependency-certificate, and avcodec-edge authority",
+        "the retained LTXV pair remains the sole binding and loaded-namespace owner while the suite adds private ordinary-video descriptor witnesses",
+        "the retained codec thread owns and destroys the suite on its native thread and delegates existing LTXV preprocessing without a second loader or namespace",
+        "later bounded MP4 and WebM sessions may borrow only the private typed suite authority and may not expose a pointer, path, boolean facade, handle, cache, effect, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVideoCodecSuite"
+        }
+      ],
+      "call_symbols": [
+        "avcodec_find_encoder_by_name",
+        "avcodec_find_decoder"
+      ],
+      "required_mappings": [
+        {
+          "name": "video-codec-suite-validates-exact-signed-provider-contract",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "has_exact_video_codec_suite_dependency_contract[\\s\\S]*aac[\\s\\S]*avcodec[\\s\\S]*libsvtav1[\\s\\S]*svtav1[\\s\\S]*libvpx-vp9[\\s\\S]*vpx[\\s\\S]*libx264[\\s\\S]*x264"
+        },
+        {
+          "name": "video-codec-suite-invokes-exact-registry-set-and-provider-proofs",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "admit_video_suite_with_check[\\s\\S]*c\"aac\"[\\s\\S]*c\"libsvtav1\"[\\s\\S]*c\"libvpx-vp9\"[\\s\\S]*AV_CODEC_ID_AAC[\\s\\S]*AV_CODEC_ID_VP9[\\s\\S]*AV_CODEC_ID_AV1[\\s\\S]*prove_codec_descriptor_provider"
+        },
+        {
+          "name": "video-codec-suite-is-retained-by-existing-thread-service",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "admit_ltxv_h264[\\s\\S]*admit_video_suite[\\s\\S]*process_ltxv_codec_request\\([\\s\\S]*NativeVideoCodecSuite"
+        },
+        {
+          "name": "video-codec-suite-tests-success-missing-provider-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_video_codec_suite_admission_uses_exact_registered_codec_set[\\s\\S]*retained_video_codec_suite_admission_rejects_each_missing_descriptor[\\s\\S]*retained_video_codec_suite_admission_rejects_wrong_descriptor_provider[\\s\\S]*retained_video_codec_suite_admission_cancellation_is_atomic_and_retryable"
+        },
+        {
+          "name": "video-codec-suite-fixture-bounds-nonexecution-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-suite-admission/manifest.json",
+          "pattern": "synthetic-retained-native-video-codec-suite-admission[\\s\\S]*one_binding_and_loaded_namespace_retained[\\s\\S]*codec_context_format_frame_packet_or_avio_allocated[\\s\\S]*mux_demux_encode_or_decode_executed[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-suite-admission-foundation"
+      ],
+      "production_consumers": [
+        "the retained LTXV codec thread service and following bounded ordinary MP4 and WebM sessions"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One thread-bound suite extends the existing retained LTXV owner with exact ordinary-video encoder and decoder registry authority, proves every descriptor against the same retained avcodec image, and is exercised by the existing codec thread without creating a second loader, namespace, pointer owner, or media facade."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_vp9_webm_encode",
+      "canonical_owner": "comfy_runtime::native_video_codec_ffi::NativeVideoCodecSuite::encode_vp9_webm_batch",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs"
+      ],
+      "owner_symbols": [
+        "NativeRgb8Crf",
+        "NativeVp9WebmEncodeLimits",
+        "NativeVp9WebmBatchLimits",
+        "NativeVideoContainerMetadataLimits",
+        "NativeVideoContainerMetadata",
+        "NativeRgb8EncodeProfile",
+        "NativeVp9Webm",
+        "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
+        "encode_rgb8_frame_with_check",
+        "encode_rgb8_frames_with_check",
+        "encode_rgb8_frames_with_metadata_check",
+        "source_compatible_vp9_rgba8_frame",
+        "drain_rgb8_encode_packets"
+      ],
+      "allowed_adapters": [
+        "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
+        "the canonical bounded memory AVIO owner supplies one attempt-local workspace-backed WebM sink and callback failure contract",
+        "the canonical IMAGE tensor supplies checked contiguous CPU F32 BHWC values and the source-specific batch adapter clamps and stages exactly one packed RGB or RGBA frame at a time",
+        "the bounded ordered pre-serialized metadata owner supplies only safe C strings and the format context owns every attached native dictionary entry",
+        "the retained owned-byte codec-thread bridge may call this primitive but may not expose native pointers, paths, handles, effects, cache, persistence, recovery, or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "qualified": "comfy_runtime::native_video_codec_ffi::NativeVp9Webm",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeVp9Webm"
+        }
+      ],
+      "call_symbols": [
+        "avformat_alloc_output_context2",
+        "av_dict_set",
+        "avformat_new_stream",
+        "avcodec_alloc_context3",
+        "avcodec_open2",
+        "avformat_write_header",
+        "av_frame_make_writable",
+        "sws_scale",
+        "avcodec_send_frame",
+        "avcodec_receive_packet",
+        "av_interleaved_write_frame",
+        "av_write_trailer"
+      ],
+      "required_mappings": [
+        {
+          "name": "vp9-webm-encode-preserves-source-float-crf",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeRgb8Crf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
+        },
+        {
+          "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "encode_vp9_rgb8_frame[\\s\\S]*vpx_vp9_encoder[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_rgb8_frame_with_check"
+        },
+        {
+          "name": "vp9-webm-encode-pins-source-profile-and-rational-rate",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "vp9_webm[\\s\\S]*c\"webm\"[\\s\\S]*pixel_format[\\s\\S]*yuv420p[\\s\\S]*c\"framerate\"[\\s\\S]*c\"b\"[\\s\\S]*c\"crf\""
+        },
+        {
+          "name": "vp9-webm-encode-bounds-drain-cancellation-and-raii",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+        },
+        {
+          "name": "vp9-webm-encode-tests-profile-bounds-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup[\\s\\S]*retained_vp9_webm_encode_validates_bounds_cancellation_and_retry"
+        },
+        {
+          "name": "vp9-webm-encode-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-encode/manifest.json",
+          "pattern": "synthetic-retained-vp9-webm-one-frame-encode[\\s\\S]*native_encode_call_choreography_executed[\\s\\S]*licensed_or_installed_ffmpeg_or_libvpx_package[\\s\\S]*numeric_vp9_swscale_or_byte_identity_oracle[\\s\\S]*media_payload_or_handle_published"
+        },
+        {
+          "name": "vp9-webm-container-metadata-is-bounded-ordered-and-preheader",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "NativeVideoContainerMetadataLimits[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*av_dict_set[\\s\\S]*avformat_new_stream"
+        },
+        {
+          "name": "vp9-webm-container-metadata-tests-cleanup-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader[\\s\\S]*retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "vp9-webm-container-metadata-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-container-metadata/manifest.json",
+          "pattern": "synthetic-source-compatible-vp9-webm-container-metadata[\\s\\S]*bounded_ordered_metadata_reaches_real_session_and_actor[\\s\\S]*python_json_serialization_owned[\\s\\S]*node_effect_path_or_output_committer_reachable"
+        },
+        {
+          "name": "vp9-webm-alpha-profile-is-derived-from-one-checked-channel-mode",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "vp9_webm_alpha[\\s\\S]*AV_PIXEL_FORMAT_RGBA[\\s\\S]*AV_PIXEL_FORMAT_YUVA420P[\\s\\S]*c\"yuva420p\"[\\s\\S]*source_channels"
+        },
+        {
+          "name": "vp9-webm-alpha-tests-source-bytes-metadata-order-cancellation-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+          "pattern": "retained_vp9_webm_alpha_batch_preserves_rgba_profile_and_order[\\s\\S]*retained_vp9_webm_alpha_staging_cancellation_and_retry_are_atomic"
+        },
+        {
+          "name": "vp9-webm-alpha-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-alpha/manifest.json",
+          "pattern": "synthetic-source-compatible-vp9-webm-alpha-execution[\\s\\S]*source_rgba_quantization_and_profile_reach_retained_session[\\s\\S]*playable_webm_or_decoded_numeric_alpha_or_color_oracle[\\s\\S]*json_serialization_node_effect_path_ui_or_output_committer_reachable"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-vp9-webm-encode-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-sequence-encode-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation"
+      ],
+      "production_consumers": [
+        "the following SaveWEBM metadata, effect, and node adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One retained suite owner covers the checked one-frame RGB regression and canonical F32 IMAGE batch sessions for opaque RGB and source alpha RGBA. It reuses one reviewed ABI and bounded AVIO/RAII boundary, stages one clamped packed frame at a time, and returns only opaque attempt-local bytes while explicitly excluding real-package numeric and publication claims."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_vp9_webm_thread_bridge",
+      "canonical_owner": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_service.rs"
+      ],
+      "owner_symbols": [
+        "NativeOwnedVp9Webm",
+        "NativeVideoCodecThreadOperation",
+        "NativeVideoCodecThreadOutput",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
+        "process_vp9_webm_request",
+        "materialize_owned_vp9_webm",
+        "materialize_owned_webm_bytes"
+      ],
+      "allowed_adapters": [
+        "the existing retained codec-thread service remains the sole channel, thread, suite, load, bind, admission, and shutdown owner",
+        "the bounded VP9 WebM IMAGE-sequence primitive supplies attempt-local staged bytes only while its suite borrow and AVIO owners remain on the actor thread",
+        "the canonical CPU backend uploader owns the single exact-length U8 Tensor copy and persistent backend allocation accounting",
+        "a following SaveWEBM adapter may borrow the portable Tensor bytes and checked metadata but may not treat this result as a stored payload, handle, cache entry, effect, path, persistence, recovery, or publication owner"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeOwnedVp9Webm",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeOwnedVp9Webm"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+          "role": "canonical_service",
+          "symbol": "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecSuite::encode_vp9_webm_batch",
+        "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
+        "CpuBackend::upload_bytes",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata"
+      ],
+      "required_mappings": [
+        {
+          "name": "vp9-webm-thread-bridge-carries-checked-source-crf-bits",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoCrf[\\s\\S]*crf.bits\\(\\)[\\s\\S]*NativeVideoCrf::checked\\(31.5\\)"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-drops-native-session-before-portable-response",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "process_vp9_webm_request[\\s\\S]*encode_vp9_webm_batch[\\s\\S]*encoded_bytes[\\s\\S]*materialize_owned_vp9_webm[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-materializes-exact-accounted-u8-tensor",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "materialize_owned_vp9_webm[\\s\\S]*materialize_owned_webm_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-tests-affinity-accounting-failure-and-retry",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv[\\s\\S]*owned_vp9_output_materialization_is_accounted_atomic_and_retryable"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-vp9-webm-thread-bridge/manifest.json",
+          "pattern": "synthetic-retained-vp9-webm-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*prompt_or_extra_metadata_supported[\\s\\S]*media_payload_or_handle_published"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-carries-owned-ordered-container-metadata",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
+        },
+        {
+          "name": "vp9-webm-thread-bridge-carries-source-alpha-projection-without-a-second-actor",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "sim.comfy.video-codec-thread.v7[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-vp9-webm-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-crf-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-container-metadata-foundation",
+        "comfy-parity-native-video-codec-vp9-webm-alpha-foundation"
+      ],
+      "production_consumers": [
+        "the following reviewed container-metadata and SaveWEBM prepared-effect adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One capacity-one retained codec actor serializes both LTXV and VP9 work, keeps every borrowed native owner thread-local, and performs one checked exact-length CPU U8 Tensor copy before returning portable bytes and immutable metadata with scratch already converged."
+    },
+    {
       "concern": "native_video_reviewed_codec_service_ltxv_node_injection",
       "canonical_owner": "comfy_nodes::execution::NativeLtxvPreprocessService",
       "owner_files": [
@@ -16274,114 +16286,123 @@
       "decision_reason": "One exact source node resolves a materialized VIDEO once, publishes canonical IMAGE and optional AUDIO aliases, projects rational fps and bit depth, and owns only bounded U8 or strided frame adaptation plus output-only typed-null compatibility. General codecs, file demux, slicing, effects, persistence, recovery, and external publication remain separate."
     },
     {
-      "concern": "native_frame_interpolation_node_runtime_adapter",
-      "canonical_owner": "comfy_nodes::generated_video_01::FrameInterpolateNode",
+      "concern": "native_video_reviewed_codec_service_webm_node_injection",
+      "canonical_owner": "comfy_nodes::execution::NativeWebmEncodeService",
       "owner_files": [
-        "crates/comfy_nodes/src/families/video_01.rs"
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_nodes/src/comfy_nodes.rs",
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_runtime/src/native_execution_controller.rs",
+        "crates/comfy_runtime/src/comfy_runtime.rs"
       ],
       "owner_symbols": [
-        "FrameInterpolateNode",
-        "execute_frame_interpolate",
-        "interpolation_model_failure",
-        "rollback_interpolation_output"
+        "NativeWebmEncodeServiceIdentity",
+        "NativeWebmEncodeRequest",
+        "NativeEncodedWebm",
+        "NativeWebmEncodeServiceError",
+        "NativeWebmEncodeService",
+        "NativeWebmCodecRequestService",
+        "ExecutionEngine::with_webm_encode_service",
+        "NativeImageExecutor::with_webm_encode_service"
       ],
       "allowed_adapters": [
-        "NativeHandleStore remains the sole INTERP_MODEL and IMAGE integrity, resolution, publication, and revocation owner; the source bypass returns the admitted input handle without mutating the store",
-        "NativeFrameInterpolationModel::interpolate_sequence remains the sole FILM and RIFE dispatch, equation, padding, timestep, fallback, and typed terminal-exhaustion owner",
-        "canonical tensor cast and ImageTensor owners retain dtype, storage, layout, stream, workspace, and allocation authority",
-        "the node adapter owns only exact schema parsing, input projection, one retained-model delegation, typed failure mapping, and final-only IMAGE publication",
-        "checkpoint loading, model mutation, accelerator placement, progress, codec, container, effect, cache persistence, recovery, and external publication owners remain separate"
+        "the existing retained codec proxy remains the sole VP9 and AV1 actor transport and native lifetime adapter",
+        "the canonical WebM batch session and metadata limit types expose only deterministic configuration values for service identity",
+        "NativeNodeServices and ExecutionEngine carry the checked service Arc without owning codec state",
+        "NativeImageExecutor appends the checked WebM configuration digest to execution cache identity",
+        "the following SaveWEBM adapter may consume portable bytes and owns JSON effects paths rollback and publication"
       ],
       "definitions": [
         {
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "qualified": "comfy_nodes::generated_video_01::FrameInterpolateNode",
-          "role": "canonical_implementation",
-          "symbol": "FrameInterpolateNode",
-          "pattern": "struct FrameInterpolateNode"
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeWebmEncodeService",
+          "role": "canonical_service",
+          "symbol": "NativeWebmEncodeService"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeWebmCodecRequestService",
+          "role": "allowed_adapter",
+          "symbol": "NativeWebmCodecRequestService"
         }
       ],
       "call_symbols": [
-        "NativeFrameInterpolationModel::interpolate_sequence",
-        "cast_to_with_context_exact_native",
-        "NativeTensorPayload::from_image"
-      ],
-      "call_path_prefixes": [
-        "crates/comfy_nodes/src/families/video_01.rs"
+        "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
+        "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
+        "NativeNodeServices::with_webm_encode",
+        "ExecutionEngine::with_webm_encode_service",
+        "NativeImageExecutor::with_webm_encode_service"
       ],
       "required_mappings": [
         {
-          "name": "frame-interpolate-binds-the-exact-source-schema-presentation-and-output-ordinal",
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "FrameInterpolate[\\s\\S]*interp_model[\\s\\S]*images[\\s\\S]*multiplier[\\s\\S]*Run Frame Interpolation Model[\\s\\S]*frame interpolation[\\s\\S]*images"
+          "name": "webm-node-service-owns-checked-portable-contract",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeWebmEncodeServiceIdentity[\\s\\S]*NativeWebmEncodeRequest[\\s\\S]*NativeEncodedWebm[\\s\\S]*NativeWebmEncodeServiceError[\\s\\S]*trait NativeWebmEncodeService"
         },
         {
-          "name": "frame-interpolate-preserves-source-handle-identity-bypass-after-integrity-resolution",
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "resolve\\([\\s\\S]*parsed.interp_model[\\s\\S]*resolve\\([\\s\\S]*parsed.images[\\s\\S]*frame_count < 2[\\s\\S]*interpolation_outcome\\(parsed.images.clone\\(\\)\\)"
+          "name": "webm-node-service-moves-retained-actor-output-with-request-projection-checks",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeWebmCodecRequestService[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*encode_av1_webm_batch_with_metadata[\\s\\S]*into_parts[\\s\\S]*checked_webm_service_result"
         },
         {
-          "name": "frame-interpolate-delegates-dtype-stream-and-sequence-execution-to-canonical-owners",
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "frame_interpolation_resource[\\s\\S]*model.stream\\(\\)[\\s\\S]*cast_to_with_context_exact_native[\\s\\S]*model.dtype\\(\\)[\\s\\S]*interpolate_sequence[\\s\\S]*DType::F32[\\s\\S]*NativeTensorPayload::from_image"
+          "name": "webm-node-service-identity-binds-actor-and-all-limit-values",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "sim.comfy.webm-node-service.v1[\\s\\S]*configuration_sha256[\\s\\S]*batch_limits_configuration_u64[\\s\\S]*metadata_limits_configuration_u64"
         },
         {
-          "name": "frame-interpolate-maps-typed-terminal-failures-and-revokes-late-output",
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "FrameInterpolationError::ResourceExhausted[\\s\\S]*frame_interpolation_resource_exhausted[\\s\\S]*rollback_interpolation_output[\\s\\S]*CancellationToken::default\\(\\)[\\s\\S]*revoke"
+          "name": "webm-node-service-propagates-through-engine-and-cache-identity",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "webm_encode_service[\\s\\S]*with_webm_encode_service[\\s\\S]*:webm="
         },
         {
-          "name": "frame-interpolate-tests-source-descriptor-identity-bypass-real-delegation-and-atomic-rejection",
-          "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "frame_interpolate_descriptor_fixture_and_cache_match_source[\\s\\S]*frame_interpolate_bypass_returns_exact_input_handle_without_compute[\\s\\S]*frame_interpolate_executes_reduced_rife_and_publishes_canonical_image[\\s\\S]*frame_interpolate_rejects_invalid_requests_and_cancellation_atomically[\\s\\S]*frame_interpolate_maps_exhaustion_rolls_back_late_cancellation_and_retries"
-        },
-        {
-          "name": "frame-interpolate-fixture-bounds-positive-and-negative-evidence",
-          "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json",
-          "pattern": "COMFY-NODE-0190[\\s\\S]*identity_preserving_bypass[\\s\\S]*retained_frame_interpolation_delegation[\\s\\S]*model_loader_or_checkpoint_acquisition[\\s\\S]*progress_event_parity[\\s\\S]*external_media_publication"
+          "name": "webm-node-service-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-webm-node-service/manifest.json",
+          "pattern": "synthetic-retained-webm-node-service[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*save_webm_node_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-frame-interpolate-node-foundation"
+        "comfy-parity-native-video-codec-webm-node-service-foundation"
       ],
       "production_consumers": [
-        "the generated native implementation registry, pre-admitted FrameInterpolate workflow execution, and later video-family reconciliation"
+        "the following SaveWEBM prepared-effect and COMFY-NODE-0602 adapters"
       ],
       "requirements": [
-        "Requirement 6",
-        "Requirement 7",
+        "Requirement 28",
+        "Requirement 29",
         "Requirement 31",
+        "Requirement 32",
         "Requirement 34",
         "Requirement 35",
-        "Requirement 36",
+        "Requirement 37",
         "Requirement 41",
-        "Requirement 42",
-        "Requirement 44"
+        "Requirement 42"
       ],
       "design": [
-        "D8",
+        "D17",
         "D18",
-        "D20",
+        "D19",
         "D25",
+        "D27",
         "D28",
         "D31",
-        "D34",
         "D36",
         "D41"
       ],
       "validation": [
         "VAL-TENSOR-001",
-        "VAL-DEVICE-001",
-        "VAL-MODEL-FAMILY-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
         "VAL-NODE-001",
-        "VAL-NODE-002",
         "VAL-CANCEL-001",
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "One exact source node validates both required handles, preserves the under-two-frame source identity bypass, delegates non-bypass execution once to the retained model and canonical tensor owners, and publishes only a complete canonical IMAGE with cancellation rollback. Loading, model math, fallback scheduling, progress, codecs, effects, cache persistence, recovery, and external output remain separate owners."
+      "decision_reason": "One checked WebM service maps portable node requests onto the sole retained VP9 and AV1 actor, moves its already-accounted Tensor without another byte copy, validates every result projection, carries the service through native execution, and partitions cache identity by actor and all configured bounds."
     },
     {
       "concern": "native_video_reviewed_codec_symbol_binding",
@@ -16478,6 +16499,115 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One focused thread-bound owner converts the exact certified and retained FFmpeg closure into a private typed 54-symbol table, proves every runtime provider and static address, and admits the exact five reviewed release versions. No downstream owner can gain raw handles, ambient lookup, unchecked addresses, or codec authority from metadata alone."
+    },
+    {
+      "concern": "native_video_save_webm_node_effect",
+      "canonical_owner": "comfy_nodes::families::video_01::SaveWebmNode",
+      "owner_files": [
+        "crates/comfy_media/src/video.rs",
+        "crates/comfy_nodes/src/families/video_01.rs"
+      ],
+      "owner_symbols": [
+        "source_rounded_millisecond_frame_rate",
+        "SaveWebmNode",
+        "execute_save_webm",
+        "save_webm_metadata"
+      ],
+      "allowed_adapters": [
+        "the canonical NativeWebmEncodeService owns retained VP9 and AV1 execution and returns portable encoded bytes",
+        "the canonical NativePreparedEffectService owns output proposal preparation rollback commit and recovery",
+        "the prompt compiler injects checked hidden PROMPT and EXTRA_PNGINFO values but owns no JSON serialization or codec behavior",
+        "the returned IMAGE handle aliases the exact input handle and adds no publication or store mutation",
+        "the residual video foundation may add unrelated general video codec decode slice and SaveVideo behavior but cannot duplicate SaveWEBM"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "qualified": "comfy_nodes::families::video_01::SaveWebmNode",
+          "role": "canonical_implementation",
+          "symbol": "SaveWebmNode"
+        },
+        {
+          "path": "crates/comfy_media/src/video.rs",
+          "qualified": "comfy_media::video::source_rounded_millisecond_frame_rate",
+          "role": "canonical",
+          "symbol": "source_rounded_millisecond_frame_rate"
+        }
+      ],
+      "call_symbols": [
+        "NativeWebmEncodeService::encode_webm",
+        "NativePreparedEffectService::prepare_output",
+        "NativePreparedEffectService::rollback_prepared"
+      ],
+      "required_mappings": [
+        {
+          "name": "save-webm-binds-exact-source-descriptor-and-hidden-metadata",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "SAVE_WEBM_CLASS_TYPE[\\s\\S]*COMFY-NODE-0602[\\s\\S]*hidden_preserved_input\\(\"prompt\"[\\s\\S]*hidden_preserved_input\\(\"extra_pnginfo\""
+        },
+        {
+          "name": "save-webm-delegates-codec-and-prepares-one-output-effect",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "execute_save_webm[\\s\\S]*NativeWebmEncodeRequest::checked[\\s\\S]*encode_webm[\\s\\S]*NativeOutputEffectRequest::checked_media[\\s\\S]*prepare_output"
+        },
+        {
+          "name": "save-webm-preserves-source-metadata-order-and-image-identity",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "save_webm_metadata[\\s\\S]*\"prompt\".to_owned\\(\\)[\\s\\S]*for \\(name, value\\) in extra_pnginfo[\\s\\S]*value: input_handle"
+        },
+        {
+          "name": "save-webm-rolls-back-late-cancellation-and-retries",
+          "path": "crates/comfy_nodes/src/families/video_01.rs",
+          "pattern": "check_save_webm_cancellation[\\s\\S]*rollback_prepared[\\s\\S]*save_webm_rejects_invalid_inputs_rolls_back_late_cancellation_and_retries"
+        },
+        {
+          "name": "save-webm-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0602/fixture.json",
+          "pattern": "comfy-parity-native-video-save-webm-node-foundation[\\s\\S]*identity_preserving_IMAGE_output[\\s\\S]*output_committer_commit_and_recovery_owner[\\s\\S]*complete_process_heap_allocation_interception"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-save-webm-node-foundation"
+      ],
+      "production_consumers": [
+        "native graph execution and the existing OutputCommitter transaction path"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D31",
+        "D34",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-NATIVE-E2E-001",
+        "VAL-NODE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-RECOVERY-005",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "SaveWebmNode alone owns the source float-to-rational projection, ordered hidden metadata serialization, portable WebM service invocation, prepared output transaction, exact IMAGE identity projection, and post-prepare rollback without duplicating codec actor or OutputCommitter ownership."
     },
     {
       "concern": "native_vision_model_architectures",

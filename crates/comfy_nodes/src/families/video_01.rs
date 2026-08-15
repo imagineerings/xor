@@ -1,13 +1,18 @@
 use crate::{
     NATIVE_NODE_CONTRACT_SCHEMA_VERSION, NativeCachePolicy, NativeEffectClass, NativeHandleKind,
     NativeHandleStoreError, NativeHandleType, NativeInputDescriptor, NativeNode, NativeNodeBinding,
-    NativeNodeBindingsFactory, NativeNodeContext, NativeNodeContractError, NativeNodeDescriptor,
-    NativeNodeFailure, NativeNodeFailureKind, NativeNodeOutcome, NativeNodePresentation,
-    NativeOpaqueHandle, NativeOutputDescriptor, NativePortCardinality, NativePrimitive,
-    NativePrimitiveType, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
-    built_in_source_schema,
+    NativeEffectServiceError, NativeInputSchemaMetadata, NativeNodeBindingsFactory, NativeNodeContext,
+    NativeNodeContractError, NativeNodeDescriptor, NativeNodeFailure, NativeNodeFailureKind,
+    NativeNodeOutcome, NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor,
+    NativeOutputEffectRequest, NativeOutputMediaKind, NativeOutputNamespace, NativeOutputShape,
+    NativePortCardinality, NativePrimitive, NativePrimitiveType, NativeStoredPayload,
+    NativeTypeUnion, NativeValue, NativeValueType, NativeWebmEncodeRequest,
+    NativeWebmEncodeServiceError, built_in_source_schema,
 };
-use comfy_media::{NativeVideoBitDepth, NativeVideoPayload};
+use comfy_media::{
+    NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf, NativeVideoPayload,
+    source_rounded_millisecond_frame_rate,
+};
 use comfy_model::FrameInterpolationError;
 use comfy_tensor::{
     DType, DeviceId, ImageTensor, Layout, MemoryFormatReference, NativeTensorPayload,
@@ -21,9 +26,15 @@ use comfy_tensor::{
 };
 use comfy_types::CancellationToken;
 use futures::future::BoxFuture;
+use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc};
 
-pub const NODE_DESCRIPTOR_IDS: &[&str] = &["CreateVideo", "GetVideoComponents", "FrameInterpolate"];
+pub const NODE_DESCRIPTOR_IDS: &[&str] = &[
+    "CreateVideo",
+    "GetVideoComponents",
+    "FrameInterpolate",
+    "SaveWEBM",
+];
 pub const NATIVE_NODE_BINDINGS: NativeNodeBindingsFactory = native_node_bindings;
 
 const CLASS_TYPE: &str = "CreateVideo";
@@ -38,13 +49,76 @@ const INTERPOLATE_CLASS_TYPE: &str = "FrameInterpolate";
 const INTERPOLATE_FEATURE_ID: &str = "COMFY-NODE-0190";
 const INTERPOLATE_IMPLEMENTATION_VERSION: &str = "source-e0b9dd6e-v1";
 const INTERPOLATE_CACHE_CHANGE_TOKEN: &str = "source-e0b9dd6e-frame-interpolate-v1";
+const SAVE_WEBM_CLASS_TYPE: &str = "SaveWEBM";
+const SAVE_WEBM_FEATURE_ID: &str = "COMFY-NODE-0602";
+const SAVE_WEBM_IMPLEMENTATION_VERSION: &str = "source-55496b10-v1";
+const SAVE_WEBM_CACHE_CHANGE_TOKEN: &str = "source-55496b10-save-webm-v1";
 
 fn native_node_bindings() -> Result<Vec<NativeNodeBinding>, NativeNodeContractError> {
     Ok(vec![
         native_node_binding()?,
         components_node_binding()?,
         interpolate_node_binding()?,
+        save_webm_node_binding()?,
     ])
+}
+
+fn save_webm_node_binding() -> Result<NativeNodeBinding, NativeNodeContractError> {
+    let mut source_schema = built_in_source_schema(SAVE_WEBM_CLASS_TYPE)
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?
+        .bind_execution_ports(
+            &[
+                "images".to_owned(),
+                "filename_prefix".to_owned(),
+                "codec".to_owned(),
+                "fps".to_owned(),
+                "crf".to_owned(),
+            ],
+            &[],
+            &["images".to_owned()],
+        )
+        .map_err(|error| NativeNodeContractError::InvalidSourceSchema(error.to_string()))?;
+    source_schema.inputs.extend([
+        NativeInputSchemaMetadata::compatibility("prompt", "PROMPT"),
+        NativeInputSchemaMetadata::compatibility("extra_pnginfo", "EXTRA_PNGINFO"),
+    ]);
+    Ok(NativeNodeBinding::Executable {
+        feature_id: SAVE_WEBM_FEATURE_ID.to_owned(),
+        descriptor: NativeNodeDescriptor {
+            schema_version: NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
+            class_type: SAVE_WEBM_CLASS_TYPE.to_owned(),
+            implementation_version: SAVE_WEBM_IMPLEMENTATION_VERSION.to_owned(),
+            source_schema: Some(source_schema),
+            inputs: vec![
+                handle_input("images", image_type()?, true)?,
+                primitive_input("filename_prefix", NativePrimitiveType::String, true)?,
+                primitive_input("codec", NativePrimitiveType::String, true)?,
+                primitive_input("fps", NativePrimitiveType::Number, true)?,
+                primitive_input("crf", NativePrimitiveType::Number, true)?,
+                hidden_preserved_input("prompt", "PROMPT")?,
+                hidden_preserved_input("extra_pnginfo", "EXTRA_PNGINFO")?,
+            ],
+            dynamic_inputs: Vec::new(),
+            outputs: vec![NativeOutputDescriptor {
+                name: "images".to_owned(),
+                produced_type: NativeValueType::Handle(image_type()?),
+                is_list: false,
+            }],
+            output_node: true,
+            effect: NativeEffectClass::WritesArtifact,
+            cache: NativeCachePolicy::Never,
+        },
+        presentation: NativeNodePresentation {
+            display_name: "Save WEBM".to_owned(),
+            category: "video".to_owned(),
+            description: String::new(),
+            output_names: vec!["images".to_owned()],
+            search_aliases: vec!["export webm".to_owned()],
+            is_deprecated: false,
+            is_experimental: true,
+        },
+        node: Arc::new(SaveWebmNode),
+    })
 }
 
 fn native_node_binding() -> Result<NativeNodeBinding, NativeNodeContractError> {
@@ -252,6 +326,23 @@ fn primitive_input(
         accepted_types: NativeTypeUnion::new([NativeValueType::Primitive(primitive_type)])?,
         required,
         hidden: false,
+        lazy: false,
+        cardinality: NativePortCardinality::Scalar,
+        allows_literal: true,
+    })
+}
+
+fn hidden_preserved_input(
+    name: &str,
+    type_name: &str,
+) -> Result<NativeInputDescriptor, NativeNodeContractError> {
+    Ok(NativeInputDescriptor {
+        name: name.to_owned(),
+        accepted_types: NativeTypeUnion::new([NativeValueType::NamedPreservedUnknown(
+            type_name.to_owned(),
+        )])?,
+        required: false,
+        hidden: true,
         lazy: false,
         cardinality: NativePortCardinality::Scalar,
         allows_literal: true,
@@ -539,6 +630,292 @@ impl NativeNode for FrameInterpolateNode {
     ) -> BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
         Box::pin(async move { execute_frame_interpolate(&context, &inputs) })
     }
+}
+
+#[derive(Debug)]
+struct SaveWebmNode;
+
+impl NativeNode for SaveWebmNode {
+    fn class_type(&self) -> &str {
+        SAVE_WEBM_CLASS_TYPE
+    }
+
+    fn implementation_version(&self) -> &str {
+        SAVE_WEBM_IMPLEMENTATION_VERSION
+    }
+
+    fn demanded_lazy_inputs(
+        &self,
+        context: &NativeNodeContext,
+        available_inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<std::collections::BTreeSet<String>, NativeNodeFailure> {
+        check_save_webm_cancellation(context)?;
+        save_webm_inputs(available_inputs)?;
+        Ok(std::collections::BTreeSet::new())
+    }
+
+    fn cache_change_token(
+        &self,
+        inputs: &BTreeMap<String, NativeValue>,
+    ) -> Result<String, NativeNodeFailure> {
+        save_webm_inputs(inputs)?;
+        Ok(SAVE_WEBM_CACHE_CHANGE_TOKEN.to_owned())
+    }
+
+    fn execute<'a>(
+        &'a self,
+        context: NativeNodeContext,
+        inputs: BTreeMap<String, NativeValue>,
+    ) -> BoxFuture<'a, Result<NativeNodeOutcome, NativeNodeFailure>> {
+        Box::pin(async move { execute_save_webm(&context, &inputs).await })
+    }
+}
+
+async fn execute_save_webm(
+    context: &NativeNodeContext,
+    inputs: &BTreeMap<String, NativeValue>,
+) -> Result<NativeNodeOutcome, NativeNodeFailure> {
+    check_save_webm_cancellation(context)?;
+    let parsed = save_webm_inputs(inputs)?;
+    let input_handle = parsed.images.clone();
+    let resolved = context
+        .handle_store()
+        .resolve(
+            parsed.images,
+            &image_type().map_err(|error| save_webm_invalid(error.to_string()))?,
+            &context.cancellation,
+        )
+        .map_err(save_webm_handle_failure)?;
+    let NativeStoredPayload::Tensor(payload) = resolved.as_ref() else {
+        return Err(save_webm_invalid(
+            "IMAGE handle does not contain a tensor payload",
+        ));
+    };
+    if payload.role() != NativeTensorRole::Image {
+        return Err(save_webm_invalid("IMAGE handle has the wrong tensor role"));
+    }
+    let images = payload
+        .image()
+        .ok_or_else(|| save_webm_invalid("IMAGE handle has no canonical ImageTensor"))?
+        .clone();
+    drop(resolved);
+
+    let metadata = save_webm_metadata(parsed.prompt, parsed.extra_pnginfo)?;
+    let request = NativeWebmEncodeRequest::checked(
+        images,
+        parsed.codec,
+        parsed.frame_rate,
+        parsed.crf,
+        metadata,
+    )
+    .map_err(save_webm_encode_failure)?;
+    let compute = context
+        .compute_session()
+        .map_err(|error| save_webm_service_failure(error.to_string()))?;
+    let execution = compute
+        .execution_context(context)
+        .map_err(|error| save_webm_service_failure(error.to_string()))?;
+    let encoded = context
+        .webm_encode_service()
+        .map_err(save_webm_encode_failure)?
+        .encode_webm(request, &execution)
+        .await
+        .map_err(save_webm_encode_failure)?;
+    check_save_webm_cancellation(context)?;
+
+    let encoded_bytes = encoded
+        .bytes()
+        .contiguous_bytes()
+        .map_err(save_webm_tensor_failure)?;
+    let mut output_bytes = Vec::new();
+    output_bytes
+        .try_reserve_exact(encoded_bytes.len())
+        .map_err(|error| save_webm_resource_failure(error.to_string()))?;
+    output_bytes.extend_from_slice(encoded_bytes);
+    let effects = context
+        .prepared_effects()
+        .map_err(save_webm_effect_failure)?;
+    let request = NativeOutputEffectRequest::checked_media(
+        NativeOutputNamespace::Output,
+        parsed.filename_prefix,
+        "webm",
+        "video/webm",
+        NativeOutputMediaKind::Video,
+        0,
+        NativeOutputShape::File,
+        Arc::from(output_bytes),
+        effects.maximum_output_bytes(),
+    )
+    .map_err(save_webm_effect_failure)?;
+    let prepared = effects
+        .prepare_output(request, &context.cancellation)
+        .map_err(save_webm_effect_failure)?;
+    let completion = (|| {
+        check_save_webm_cancellation(context)?;
+        let outcome = NativeNodeOutcome::Values {
+            outputs: vec![NativeValue::Handle {
+                value: input_handle,
+            }],
+            ui: Some(json!({
+                "images": [{
+                    "transaction_id": prepared.transaction_id(),
+                    "batch_index": 0,
+                    "type": "output",
+                }],
+                "animated": [true],
+            })),
+            effects: vec![prepared.clone()],
+        };
+        outcome
+            .validate()
+            .map_err(|error| save_webm_invalid(error.to_string()))?;
+        Ok(outcome)
+    })();
+    match completion {
+        Ok(outcome) => Ok(outcome),
+        Err(error) => {
+            effects
+                .rollback_prepared(&prepared)
+                .map_err(|rollback| save_webm_rollback_failure(rollback.to_string()))?;
+            Err(error)
+        }
+    }
+}
+
+struct SaveWebmInputs<'a> {
+    images: &'a NativeOpaqueHandle,
+    filename_prefix: &'a str,
+    codec: NativeVideoCodec,
+    frame_rate: (u64, u64),
+    crf: NativeVideoCrf,
+    prompt: Option<&'a Value>,
+    extra_pnginfo: Option<&'a Value>,
+}
+
+fn save_webm_inputs(
+    inputs: &BTreeMap<String, NativeValue>,
+) -> Result<SaveWebmInputs<'_>, NativeNodeFailure> {
+    if !(5..=7).contains(&inputs.len())
+        || inputs.keys().any(|name| {
+            !matches!(
+                name.as_str(),
+                "images"
+                    | "filename_prefix"
+                    | "codec"
+                    | "fps"
+                    | "crf"
+                    | "prompt"
+                    | "extra_pnginfo"
+            )
+        })
+    {
+        return Err(save_webm_invalid("received an unexpected input set"));
+    }
+    let images = interpolation_exact_handle(
+        inputs.get("images"),
+        NativeHandleKind::Image,
+        "IMAGE",
+        "images",
+    )
+    .map_err(|_| save_webm_invalid("images must be an exact IMAGE handle"))?;
+    let filename_prefix = match inputs.get("filename_prefix") {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::String(value),
+        }) => value.as_str(),
+        _ => return Err(save_webm_invalid("filename_prefix must be a string")),
+    };
+    let codec = match inputs.get("codec") {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::String(value),
+        }) if value == "vp9" => NativeVideoCodec::Vp9,
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::String(value),
+        }) if value == "av1" => NativeVideoCodec::Av1,
+        _ => return Err(save_webm_invalid("codec must be vp9 or av1")),
+    };
+    let fps = match inputs.get("fps") {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Number(value),
+        }) => *value,
+        _ => return Err(save_webm_invalid("fps must be a floating-point number")),
+    };
+    let frame_rate = source_rounded_millisecond_frame_rate(fps)
+        .map_err(|error| save_webm_invalid(error.to_string()))?;
+    let crf = match inputs.get("crf") {
+        Some(NativeValue::Primitive {
+            value: NativePrimitive::Number(value),
+        }) => NativeVideoCrf::checked(*value)
+            .map_err(|error| save_webm_invalid(error.to_string()))?,
+        _ => return Err(save_webm_invalid("crf must be a floating-point number")),
+    };
+    let prompt = optional_preserved_json(inputs.get("prompt"), "PROMPT", "prompt")?;
+    let extra_pnginfo =
+        optional_preserved_json(inputs.get("extra_pnginfo"), "EXTRA_PNGINFO", "extra_pnginfo")?;
+    if extra_pnginfo.is_some_and(|value| !value.is_object()) {
+        return Err(save_webm_invalid("extra_pnginfo must be a JSON object"));
+    }
+    Ok(SaveWebmInputs {
+        images,
+        filename_prefix,
+        codec,
+        frame_rate,
+        crf,
+        prompt,
+        extra_pnginfo,
+    })
+}
+
+fn optional_preserved_json<'a>(
+    input: Option<&'a NativeValue>,
+    type_name: &str,
+    name: &str,
+) -> Result<Option<&'a Value>, NativeNodeFailure> {
+    match input {
+        None
+        | Some(NativeValue::Primitive {
+            value: NativePrimitive::Null,
+        })
+        | Some(NativeValue::PreservedUnknown {
+            value: Value::Null, ..
+        }) => Ok(None),
+        Some(NativeValue::PreservedUnknown {
+            type_name: actual,
+            value,
+        }) if actual == type_name => Ok(Some(value)),
+        _ => Err(save_webm_invalid(format!(
+            "{name} must preserve the exact {type_name} source type"
+        ))),
+    }
+}
+
+fn save_webm_metadata(
+    prompt: Option<&Value>,
+    extra_pnginfo: Option<&Value>,
+) -> Result<Vec<(String, String)>, NativeNodeFailure> {
+    let extra_entries = extra_pnginfo
+        .and_then(Value::as_object)
+        .map_or(0, serde_json::Map::len);
+    let mut metadata = Vec::new();
+    metadata
+        .try_reserve_exact(usize::from(prompt.is_some()).saturating_add(extra_entries))
+        .map_err(|error| save_webm_resource_failure(error.to_string()))?;
+    if let Some(prompt) = prompt {
+        metadata.push((
+            "prompt".to_owned(),
+            serde_json::to_string(prompt)
+                .map_err(|error| save_webm_invalid(error.to_string()))?,
+        ));
+    }
+    if let Some(extra_pnginfo) = extra_pnginfo.and_then(Value::as_object) {
+        for (name, value) in extra_pnginfo {
+            metadata.push((
+                name.clone(),
+                serde_json::to_string(value)
+                    .map_err(|error| save_webm_invalid(error.to_string()))?,
+            ));
+        }
+    }
+    Ok(metadata)
 }
 
 fn execute_frame_interpolate(
@@ -1231,15 +1608,132 @@ fn interrupted_failure() -> NativeNodeFailure {
     }
 }
 
+fn check_save_webm_cancellation(context: &NativeNodeContext) -> Result<(), NativeNodeFailure> {
+    context
+        .cancellation
+        .check()
+        .map_err(|_| save_webm_interrupted())
+}
+
+fn save_webm_handle_failure(error: NativeHandleStoreError) -> NativeNodeFailure {
+    if matches!(error, NativeHandleStoreError::Cancelled) {
+        save_webm_interrupted()
+    } else {
+        save_webm_invalid(format!("IMAGE handle is unavailable: {error}"))
+    }
+}
+
+fn save_webm_encode_failure(error: NativeWebmEncodeServiceError) -> NativeNodeFailure {
+    match error {
+        NativeWebmEncodeServiceError::Cancelled => save_webm_interrupted(),
+        NativeWebmEncodeServiceError::Busy => NativeNodeFailure {
+            code: "webm_encoder_busy".to_owned(),
+            message: "SaveWEBM encoder is busy".to_owned(),
+            kind: NativeNodeFailureKind::Failure,
+            retryable: true,
+        },
+        NativeWebmEncodeServiceError::Unavailable => {
+            save_webm_service_failure("WebM encoding service is unavailable")
+        }
+        NativeWebmEncodeServiceError::ResourceExhausted => {
+            save_webm_resource_failure("WebM encoding exhausted its reviewed resources")
+        }
+        NativeWebmEncodeServiceError::InvalidRequest
+        | NativeWebmEncodeServiceError::InvalidProjection => {
+            save_webm_invalid(error.to_string())
+        }
+        NativeWebmEncodeServiceError::Execution(message) => NativeNodeFailure {
+            code: "webm_encode_failed".to_owned(),
+            message: format!("SaveWEBM encoding failed: {message}"),
+            kind: NativeNodeFailureKind::Failure,
+            retryable: false,
+        },
+    }
+}
+
+fn save_webm_effect_failure(error: NativeEffectServiceError) -> NativeNodeFailure {
+    match error {
+        NativeEffectServiceError::Cancelled => save_webm_interrupted(),
+        NativeEffectServiceError::Unavailable => {
+            save_webm_service_failure("prepared output service is unavailable")
+        }
+        error => NativeNodeFailure {
+            code: "webm_output_prepare_failed".to_owned(),
+            message: format!("SaveWEBM could not prepare its output: {error}"),
+            kind: NativeNodeFailureKind::Failure,
+            retryable: false,
+        },
+    }
+}
+
+fn save_webm_tensor_failure(error: TensorError) -> NativeNodeFailure {
+    match error {
+        TensorError::Cancelled => save_webm_interrupted(),
+        TensorError::AllocationFailed { .. }
+        | TensorError::ResourceLimitExceeded { .. }
+        | TensorError::WorkspaceAuthorizationExceeded { .. } => {
+            save_webm_resource_failure(error.to_string())
+        }
+        error => save_webm_invalid(error.to_string()),
+    }
+}
+
+fn save_webm_service_failure(message: impl Into<String>) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "webm_service_unavailable".to_owned(),
+        message: format!("SaveWEBM: {}", message.into()),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: true,
+    }
+}
+
+fn save_webm_resource_failure(message: impl Into<String>) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "webm_resource_exhausted".to_owned(),
+        message: format!("SaveWEBM exhausted a bounded resource: {}", message.into()),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn save_webm_rollback_failure(message: impl Into<String>) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "webm_output_rollback_failed".to_owned(),
+        message: format!("SaveWEBM could not roll back prepared output: {}", message.into()),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
+fn save_webm_interrupted() -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "execution_interrupted".to_owned(),
+        message: "SaveWEBM execution was interrupted".to_owned(),
+        kind: NativeNodeFailureKind::Interrupted,
+        retryable: false,
+    }
+}
+
+fn save_webm_invalid(message: impl Into<String>) -> NativeNodeFailure {
+    NativeNodeFailure {
+        code: "invalid_save_webm".to_owned(),
+        message: format!("SaveWEBM: {}", message.into()),
+        kind: NativeNodeFailureKind::Failure,
+        retryable: false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        NativeHandleStore, NativeHandleStoreIdentity, NativeNodeComputeSession,
-        NativeNodeServiceIdentity, NativeNodeServices, NativeResolvedPayload,
-        NativeResolvedPayloadRetention, NativeStoredModelPayload,
+        NativeEncodedWebm, NativeHandleStore, NativeHandleStoreIdentity, NativeNodeComputeSession,
+        NativeNodeServiceIdentity, NativeNodeServices, NativePreparedEffectKind,
+        NativePreparedEffectRequest, NativePreparedEffectService, NativeResolvedPayload,
+        NativeResolvedPayloadRetention, NativeStoredModelPayload, NativeWebmEncodeService,
+        NativeWebmEncodeServiceIdentity,
     };
-    use comfy_media::NativeAudioPayload;
+    use comfy_media::{NativeAudioPayload, NativeVideoPixelFormat};
     use comfy_model::{NativeFrameInterpolationModel, NativeModelPayload};
     use comfy_tensor::{
         CpuWorkspaceAuthority, DType, DeviceId, ImageTensor, NativeTensorPayload, StreamId,
@@ -1247,6 +1741,7 @@ mod tests {
     };
     use comfy_types::{AttemptId, CancellationToken, NodeId, PromptId};
     use serde_json::Value;
+    use sha2::{Digest, Sha256};
     use std::{
         error::Error,
         sync::{
@@ -1268,6 +1763,170 @@ mod tests {
         env!("CARGO_MANIFEST_DIR"),
         "/../comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json"
     ));
+    const SAVE_WEBM_FIXTURE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../comfy_test_support/fixtures/nodes/video-comfy-node-0602/fixture.json"
+    ));
+
+    #[derive(Debug)]
+    struct TestWebmService {
+        identity: NativeWebmEncodeServiceIdentity,
+        backend: Arc<comfy_tensor::CpuBackend>,
+        requests: Mutex<Vec<(NativeVideoCodec, (u64, u64), u64, Vec<(String, String)>)>>,
+    }
+
+    impl NativeWebmEncodeService for TestWebmService {
+        fn identity(&self) -> &NativeWebmEncodeServiceIdentity {
+            &self.identity
+        }
+
+        fn encode_webm(
+            &self,
+            request: NativeWebmEncodeRequest,
+            context: &comfy_tensor::ExecutionContext<'_>,
+        ) -> BoxFuture<'static, Result<NativeEncodedWebm, NativeWebmEncodeServiceError>> {
+            let (images, codec, frame_rate, crf, metadata) = request.into_parts();
+            let result = (|| {
+                context
+                    .check()
+                    .map_err(|_| NativeWebmEncodeServiceError::Cancelled)?;
+                self.requests
+                    .lock()
+                    .map_err(|_| {
+                        NativeWebmEncodeServiceError::Execution(
+                            "test request lock was poisoned".to_owned(),
+                        )
+                    })?
+                    .push((codec, frame_rate, crf.bits(), metadata));
+                let (frame_count, height, width, channels) = images
+                    .dimensions()
+                    .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                let encoded = match codec {
+                    NativeVideoCodec::Vp9 => b"HPPPT".as_slice(),
+                    NativeVideoCodec::Av1 => b"HA1T".as_slice(),
+                    NativeVideoCodec::H264 => {
+                        return Err(NativeWebmEncodeServiceError::InvalidRequest);
+                    }
+                };
+                let descriptor = TensorDescriptor::contiguous(
+                    vec![u64::try_from(encoded.len()).map_err(|_| {
+                        NativeWebmEncodeServiceError::ResourceExhausted
+                    })?],
+                    DType::U8,
+                    DeviceId::CPU,
+                    context.stream,
+                )
+                .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                let (bytes, _) = self
+                    .backend
+                    .upload_bytes(descriptor, encoded, context)
+                    .map_err(|error| NativeWebmEncodeServiceError::Execution(error.to_string()))?;
+                NativeEncodedWebm::checked(
+                    bytes,
+                    Sha256::digest(encoded).into(),
+                    codec,
+                    (width, height),
+                    frame_rate,
+                    frame_count,
+                    match (codec, channels) {
+                        (NativeVideoCodec::Vp9, 4) => NativeVideoPixelFormat::Yuva420p,
+                        (NativeVideoCodec::Vp9, _) => NativeVideoPixelFormat::Yuv420p,
+                        (NativeVideoCodec::Av1, _) => NativeVideoPixelFormat::Yuv420p10le,
+                        (NativeVideoCodec::H264, _) => {
+                            return Err(NativeWebmEncodeServiceError::InvalidRequest);
+                        }
+                    },
+                    if codec == NativeVideoCodec::Av1 {
+                        NativeVideoBitDepth::Ten
+                    } else {
+                        NativeVideoBitDepth::Eight
+                    },
+                    codec == NativeVideoCodec::Vp9 && channels == 4,
+                )
+            })();
+            Box::pin(async move { result })
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestSaveWebmEffects {
+        identity: NativeNodeServiceIdentity,
+        requests: Mutex<Vec<NativeOutputEffectRequest>>,
+        prepared: Mutex<Vec<NativePreparedEffectRequest>>,
+        cancel_after_prepare: Mutex<Option<CancellationToken>>,
+    }
+
+    impl NativePreparedEffectService for TestSaveWebmEffects {
+        fn identity(&self) -> &NativeNodeServiceIdentity {
+            &self.identity
+        }
+
+        fn maximum_output_bytes(&self) -> u64 {
+            1024 * 1024
+        }
+
+        fn prepare_output(
+            &self,
+            request: NativeOutputEffectRequest,
+            cancellation: &CancellationToken,
+        ) -> Result<NativePreparedEffectRequest, NativeEffectServiceError> {
+            cancellation
+                .check()
+                .map_err(|_| NativeEffectServiceError::Cancelled)?;
+            let mut requests = self
+                .requests
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            requests.push(request.clone());
+            let ordinal = u128::try_from(requests.len())
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            drop(requests);
+            let prepared = NativePreparedEffectRequest::checked(
+                self.identity.service_id(),
+                Uuid::from_u128(0x60200 + ordinal),
+                NativePreparedEffectKind::Output,
+                request.request_digest_sha256(),
+            )
+            .map_err(|_| NativeEffectServiceError::Rejected)?;
+            self.prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?
+                .push(prepared.clone());
+            if let Some(cancellation) = self
+                .cancel_after_prepare
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?
+                .take()
+            {
+                cancellation.cancel();
+            }
+            Ok(prepared)
+        }
+
+        fn rollback_prepared(
+            &self,
+            request: &NativePreparedEffectRequest,
+        ) -> Result<(), NativeEffectServiceError> {
+            let mut prepared = self
+                .prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?;
+            let index = prepared
+                .iter()
+                .position(|candidate| candidate == request)
+                .ok_or(NativeEffectServiceError::InvalidTicket)?;
+            prepared.remove(index);
+            Ok(())
+        }
+
+        fn rollback_all_prepared(&self) -> Result<(), NativeEffectServiceError> {
+            self.prepared
+                .lock()
+                .map_err(|_| NativeEffectServiceError::Rejected)?
+                .clear();
+            Ok(())
+        }
+    }
 
     #[derive(Debug)]
     struct TestRetention;
@@ -1610,6 +2269,60 @@ mod tests {
             )?)
         }
 
+        fn save_webm_context(
+            &self,
+            cancellation: CancellationToken,
+            cancel_after_prepare: bool,
+        ) -> Result<
+            (
+                NativeNodeContext,
+                Arc<TestWebmService>,
+                Arc<TestSaveWebmEffects>,
+            ),
+            Box<dyn Error>,
+        > {
+            let scratch = self.workspace.authorize_workspace(self.scratch_bytes)?;
+            let compute = NativeNodeComputeSession::checked(
+                NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x60205),
+                    self.attempt_id,
+                    self.node_id.clone(),
+                )?,
+                self.backend.clone(),
+                StreamId::DEFAULT,
+                &scratch,
+            )?;
+            let webm = Arc::new(TestWebmService {
+                identity: NativeWebmEncodeServiceIdentity::checked("6".repeat(64))?,
+                backend: self.backend.clone(),
+                requests: Mutex::new(Vec::new()),
+            });
+            let effects = Arc::new(TestSaveWebmEffects {
+                identity: NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x60206),
+                    self.attempt_id,
+                    self.node_id.clone(),
+                )?,
+                requests: Mutex::new(Vec::new()),
+                prepared: Mutex::new(Vec::new()),
+                cancel_after_prepare: Mutex::new(
+                    cancel_after_prepare.then_some(cancellation.clone()),
+                ),
+            });
+            let services = NativeNodeServices::checked(None, Some(effects.clone()), Some(compute))?
+                .with_webm_encode(webm.clone())?;
+            let context = NativeNodeContext::new_with_services(
+                PromptId(Uuid::from_u128(0x60204)),
+                self.attempt_id,
+                self.node_id.clone(),
+                cancellation,
+                scratch,
+                self.store.clone(),
+                services,
+            )?;
+            Ok((context, webm, effects))
+        }
+
         fn inputs(
             &self,
             image: NativeOpaqueHandle,
@@ -1696,6 +2409,74 @@ mod tests {
                 _ => None,
             })
             .ok_or_else(|| "FrameInterpolate executable binding is absent".into())
+    }
+
+    fn save_webm_executable() -> Result<Arc<dyn NativeNode>, Box<dyn Error>> {
+        native_node_bindings()?
+            .into_iter()
+            .find_map(|binding| match binding {
+                NativeNodeBinding::Executable {
+                    descriptor, node, ..
+                } if descriptor.class_type == SAVE_WEBM_CLASS_TYPE => Some(node),
+                _ => None,
+            })
+            .ok_or_else(|| "SaveWEBM executable binding is absent".into())
+    }
+
+    fn save_webm_test_inputs(
+        images: NativeOpaqueHandle,
+        codec: &str,
+        fps: f64,
+        crf: f64,
+        prompt: Option<Value>,
+        extra_pnginfo: Option<Value>,
+    ) -> BTreeMap<String, NativeValue> {
+        let mut inputs = BTreeMap::from([
+            ("images".to_owned(), NativeValue::Handle { value: images }),
+            (
+                "filename_prefix".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::String("video/ComfyUI".to_owned()),
+                },
+            ),
+            (
+                "codec".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::String(codec.to_owned()),
+                },
+            ),
+            (
+                "fps".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::Number(fps),
+                },
+            ),
+            (
+                "crf".to_owned(),
+                NativeValue::Primitive {
+                    value: NativePrimitive::Number(crf),
+                },
+            ),
+        ]);
+        if let Some(prompt) = prompt {
+            inputs.insert(
+                "prompt".to_owned(),
+                NativeValue::PreservedUnknown {
+                    type_name: "PROMPT".to_owned(),
+                    value: prompt,
+                },
+            );
+        }
+        if let Some(extra_pnginfo) = extra_pnginfo {
+            inputs.insert(
+                "extra_pnginfo".to_owned(),
+                NativeValue::PreservedUnknown {
+                    type_name: "EXTRA_PNGINFO".to_owned(),
+                    value: extra_pnginfo,
+                },
+            );
+        }
+        inputs
     }
 
     fn interpolation_inputs_for_test(
@@ -2295,6 +3076,166 @@ mod tests {
         assert!(matches!(outcome, NativeNodeOutcome::Values { .. }));
         assert_eq!(harness.store.count()?, baseline_handles + 1);
         assert!(harness.workspace.memory_snapshot().current_bytes > baseline_memory);
+        Ok(())
+    }
+
+    #[test]
+    fn save_webm_descriptor_and_fixture_match_source() -> Result<(), Box<dyn Error>> {
+        let fixture: Value = serde_json::from_str(SAVE_WEBM_FIXTURE)?;
+        assert_eq!(fixture["feature_id"], SAVE_WEBM_FEATURE_ID);
+        assert_eq!(fixture["source"]["definition_sha256"], "55496b10af66a908ef035d236f8fab8193c1ae44408dab9d202deadff3be2715");
+        let binding = save_webm_node_binding()?;
+        binding.validate()?;
+        let descriptor = binding.descriptor();
+        assert_eq!(descriptor.class_type, SAVE_WEBM_CLASS_TYPE);
+        assert!(descriptor.output_node);
+        assert_eq!(descriptor.effect, NativeEffectClass::WritesArtifact);
+        assert_eq!(descriptor.cache, NativeCachePolicy::Never);
+        assert_eq!(descriptor.outputs[0].name, "images");
+        assert_eq!(
+            descriptor
+                .inputs
+                .iter()
+                .map(|input| (input.name.as_str(), input.hidden))
+                .collect::<Vec<_>>(),
+            [
+                ("images", false),
+                ("filename_prefix", false),
+                ("codec", false),
+                ("fps", false),
+                ("crf", false),
+                ("prompt", true),
+                ("extra_pnginfo", true),
+            ]
+        );
+        let schema = descriptor
+            .source_schema
+            .as_ref()
+            .ok_or("SaveWEBM source schema is absent")?;
+        assert_eq!(schema.inputs[2].choices.len(), 2);
+        assert_eq!(schema.inputs[3].minimum, Some(crate::NativeSchemaValue::FiniteDecimal { value: "0.01".to_owned() }));
+        let NativeNodeBinding::Executable { presentation, .. } = binding else {
+            return Err("SaveWEBM binding is not executable".into());
+        };
+        assert_eq!(presentation.display_name, "Save WEBM");
+        assert_eq!(presentation.search_aliases, ["export webm"]);
+        assert!(presentation.is_experimental);
+        Ok(())
+    }
+
+    #[test]
+    fn save_webm_preserves_metadata_image_identity_and_prepares_video_output()
+    -> Result<(), Box<dyn Error>> {
+        let harness = Harness::new()?;
+        let (images, storage_id) = harness.image_handle_with_shape(2, 2, 2, 4, &[0.5; 32])?;
+        let baseline_handles = harness.store.count()?;
+        let (context, webm, effects) =
+            harness.save_webm_context(CancellationToken::default(), false)?;
+        let inputs = save_webm_test_inputs(
+            images.clone(),
+            "vp9",
+            29.97,
+            31.5,
+            Some(json!({"1": {"class_type": "SaveWEBM"}})),
+            Some(json!({"workflow": {"version": 1}, "prompt": "replacement"})),
+        );
+        let outcome = futures::executor::block_on(save_webm_executable()?.execute(context, inputs))?;
+        let NativeNodeOutcome::Values {
+            outputs,
+            ui: Some(ui),
+            effects: prepared,
+        } = outcome
+        else {
+            return Err("SaveWEBM did not return values, UI, and a prepared effect".into());
+        };
+        assert_eq!(outputs, [NativeValue::Handle { value: images.clone() }]);
+        assert_eq!(prepared.len(), 1);
+        assert_eq!(ui["animated"], json!([true]));
+        assert_eq!(ui["images"][0]["batch_index"], 0);
+        assert_eq!(ui["images"][0]["type"], "output");
+        assert_eq!(ui["images"][0]["transaction_id"], prepared[0].transaction_id().to_string());
+        assert_eq!(harness.store.count()?, baseline_handles);
+        let payload = harness.store.payload(&images)?;
+        let NativeStoredPayload::Tensor(payload) = payload.as_ref() else {
+            return Err("SaveWEBM input payload changed type".into());
+        };
+        assert_eq!(payload.tensor().storage_id(), storage_id);
+
+        let requests = webm
+            .requests
+            .lock()
+            .map_err(|_| "WebM request lock was poisoned")?;
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].0, NativeVideoCodec::Vp9);
+        assert_eq!(requests[0].1, (2_997, 100));
+        assert_eq!(requests[0].2, 31.5_f64.to_bits());
+        assert_eq!(
+            requests[0].3,
+            [
+                ("prompt".to_owned(), "{\"1\":{\"class_type\":\"SaveWEBM\"}}".to_owned()),
+                ("workflow".to_owned(), "{\"version\":1}".to_owned()),
+                ("prompt".to_owned(), "\"replacement\"".to_owned()),
+            ]
+        );
+        drop(requests);
+        let output_requests = effects
+            .requests
+            .lock()
+            .map_err(|_| "effect request lock was poisoned")?;
+        assert_eq!(output_requests.len(), 1);
+        assert_eq!(output_requests[0].namespace(), NativeOutputNamespace::Output);
+        assert_eq!(output_requests[0].filename_prefix(), "video/ComfyUI");
+        assert_eq!(output_requests[0].extension(), "webm");
+        assert_eq!(output_requests[0].media_type(), "video/webm");
+        assert_eq!(output_requests[0].media_kind(), NativeOutputMediaKind::Video);
+        assert_eq!(output_requests[0].shape(), NativeOutputShape::File);
+        assert_eq!(output_requests[0].content().as_ref(), b"HPPPT");
+        Ok(())
+    }
+
+    #[test]
+    fn save_webm_rejects_invalid_inputs_rolls_back_late_cancellation_and_retries()
+    -> Result<(), Box<dyn Error>> {
+        let harness = Harness::new()?;
+        let (images, _) = harness.image_handle()?;
+        let invalid = save_webm_test_inputs(
+            images.clone(),
+            "h264",
+            24.0,
+            32.0,
+            None,
+            None,
+        );
+        let (context, _, _) =
+            harness.save_webm_context(CancellationToken::default(), false)?;
+        let error = futures::executor::block_on(save_webm_executable()?.execute(context, invalid))
+            .expect_err("invalid SaveWEBM codec must fail");
+        assert_eq!(error.code, "invalid_save_webm");
+
+        let cancellation = CancellationToken::default();
+        let (context, _, effects) = harness.save_webm_context(cancellation, true)?;
+        let inputs = save_webm_test_inputs(
+            images.clone(),
+            "av1",
+            24.0,
+            32.0,
+            None,
+            Some(json!({"workflow": {}})),
+        );
+        let error = futures::executor::block_on(save_webm_executable()?.execute(context, inputs))
+            .expect_err("late-cancelled SaveWEBM must fail");
+        assert_eq!(error.kind, NativeNodeFailureKind::Interrupted);
+        assert!(effects
+            .prepared
+            .lock()
+            .map_err(|_| "prepared effect lock was poisoned")?
+            .is_empty());
+
+        let (context, _, _) =
+            harness.save_webm_context(CancellationToken::default(), false)?;
+        let retry = save_webm_test_inputs(images, "av1", 24.0, 32.0, None, None);
+        let outcome = futures::executor::block_on(save_webm_executable()?.execute(context, retry))?;
+        assert!(matches!(outcome, NativeNodeOutcome::Values { .. }));
         Ok(())
     }
 }

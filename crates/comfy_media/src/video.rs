@@ -420,6 +420,21 @@ fn rounded_millisecond_frame_rate(
     Ok((rounded / divisor, SOURCE_RATE_DENOMINATOR / divisor))
 }
 
+pub fn source_rounded_millisecond_frame_rate(
+    source_frame_rate: f64,
+) -> Result<(u64, u64), NativeVideoCodecPlanError> {
+    if !source_frame_rate.is_finite() || !(0.01..=1_000.0).contains(&source_frame_rate) {
+        return Err(NativeVideoCodecPlanError::InvalidOptions);
+    }
+    let rounded = (source_frame_rate * SOURCE_RATE_DENOMINATOR as f64).round_ties_even();
+    if rounded < 1.0 || rounded > u64::MAX as f64 {
+        return Err(NativeVideoCodecPlanError::Overflow);
+    }
+    let rounded = rounded as u64;
+    let divisor = greatest_common_divisor(rounded, SOURCE_RATE_DENOMINATOR);
+    Ok((rounded / divisor, SOURCE_RATE_DENOMINATOR / divisor))
+}
+
 fn round_ratio_ties_even(
     numerator: u128,
     denominator: u128,
@@ -676,6 +691,19 @@ mod tests {
             ),
             Err(NativeVideoCodecPlanError::Cancelled)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn source_webm_frame_rate_uses_python_ties_even_millisecond_rounding()
+    -> Result<(), Box<dyn Error>> {
+        assert_eq!(source_rounded_millisecond_frame_rate(24.0)?, (24, 1));
+        assert_eq!(source_rounded_millisecond_frame_rate(29.97)?, (2_997, 100));
+        assert_eq!(source_rounded_millisecond_frame_rate(0.0105)?, (1, 100));
+        assert_eq!(source_rounded_millisecond_frame_rate(0.0115)?, (3, 250));
+        assert_eq!(source_rounded_millisecond_frame_rate(1_000.0)?, (1_000, 1));
+        assert!(source_rounded_millisecond_frame_rate(0.009).is_err());
+        assert!(source_rounded_millisecond_frame_rate(f64::NAN).is_err());
         Ok(())
     }
 }
