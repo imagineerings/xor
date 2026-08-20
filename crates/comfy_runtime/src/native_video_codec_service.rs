@@ -44,7 +44,7 @@ const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1
     reason = "constructed by the following encoded VIDEO backing adapter"
 )]
 const COMPONENT_H264_MP4_BACKING_SERVICE_IDENTITY_VERSION: &str =
-    "sim.comfy.component-h264-mp4-backing-service.v1";
+    "sim.comfy.component-h264-mp4-backing-service.v2";
 
 #[allow(
     dead_code,
@@ -970,11 +970,25 @@ impl NativeComponentH264Mp4BackingService for NativeComponentH264Mp4CodecRequest
                 return async move { Err(map_h264_mp4_backing_plan_error(error)) }.boxed();
             }
         };
+        let supported_depth = matches!(
+            (
+                plan.source_bit_depth(),
+                plan.output_bit_depth(),
+                plan.pixel_format(),
+            ),
+            (
+                NativeVideoBitDepth::Eight,
+                NativeVideoBitDepth::Eight,
+                NativeVideoPixelFormat::Yuv420p,
+            ) | (
+                NativeVideoBitDepth::Ten,
+                NativeVideoBitDepth::Ten,
+                NativeVideoPixelFormat::Yuv420p10le,
+            )
+        );
         let supported_plan = plan.container() == NativeVideoContainer::Mp4
             && plan.codec() == NativeVideoCodec::H264
-            && plan.pixel_format() == NativeVideoPixelFormat::Yuv420p
-            && plan.source_bit_depth() == NativeVideoBitDepth::Eight
-            && plan.output_bit_depth() == NativeVideoBitDepth::Eight
+            && supported_depth
             && plan.alpha() == NativeVideoAlphaPolicy::Discard
             && plan.audio().is_none()
             && plan.metadata() == NativeVideoMetadataPolicy::Exclude
@@ -994,15 +1008,24 @@ impl NativeComponentH264Mp4BackingService for NativeComponentH264Mp4CodecRequest
         let expected_dimensions = plan.dimensions();
         let expected_frame_rate = plan.encode_frame_rate();
         let expected_frame_count = plan.frame_count();
+        let expected_bit_depth = plan.output_bit_depth();
         let source_video = video;
         let stream = context.stream;
         let cancellation = context.cancellation.clone();
-        let result = self.proxy.encode_h264_mp4_batch(
-            &images,
-            expected_frame_rate,
-            self.sequence_limits,
-            context,
-        );
+        let result = match expected_bit_depth {
+            NativeVideoBitDepth::Eight => self.proxy.encode_h264_mp4_batch(
+                &images,
+                expected_frame_rate,
+                self.sequence_limits,
+                context,
+            ),
+            NativeVideoBitDepth::Ten => self.proxy.encode_h264_mp4_10bit_batch(
+                &images,
+                expected_frame_rate,
+                self.sequence_limits,
+                context,
+            ),
+        };
         async move {
             let output = result.await.map_err(map_h264_mp4_backing_service_error)?;
             cancellation
@@ -1014,6 +1037,7 @@ impl NativeComponentH264Mp4BackingService for NativeComponentH264Mp4CodecRequest
                 expected_dimensions,
                 expected_frame_rate,
                 expected_frame_count,
+                expected_bit_depth,
                 stream,
             )?;
             cancellation
@@ -1031,11 +1055,14 @@ fn checked_component_h264_mp4_backing_result(
     expected_dimensions: (u64, u64),
     expected_frame_rate: (u64, u64),
     expected_frame_count: u64,
+    expected_bit_depth: NativeVideoBitDepth,
     expected_stream: StreamId,
 ) -> Result<NativeVideoPayload, NativeComponentH264Mp4BackingServiceError> {
-    if output.bit_depth() != NativeVideoBitDepth::Eight
-        || output.pixel_format() != NativeVideoPixelFormat::Yuv420p
-    {
+    let expected_pixel_format = match expected_bit_depth {
+        NativeVideoBitDepth::Eight => NativeVideoPixelFormat::Yuv420p,
+        NativeVideoBitDepth::Ten => NativeVideoPixelFormat::Yuv420p10le,
+    };
+    if output.bit_depth() != expected_bit_depth || output.pixel_format() != expected_pixel_format {
         return Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection);
     }
     let (bytes, content_sha256, width, height, frame_rate, frame_count) = output.into_parts();
@@ -2511,6 +2538,48 @@ mod tests {
         drop(output_storage_ids);
         assert_eq!(scratch.in_use_bytes(), 0);
         drop(backing);
+
+        let ten_bit_source_video = Arc::new(NativeVideoPayload::checked(
+            image.tensor().clone(),
+            2_997,
+            100,
+            NativeVideoBitDepth::Ten,
+            None,
+            None,
+            BTreeMap::from([("prompt".to_owned(), "ten-bit".to_owned())]),
+        )?);
+        let ten_bit_source_digest = *ten_bit_source_video.semantic_digest_sha256();
+        let ten_bit_request =
+            NativeComponentH264Mp4BackingRequest::checked(ten_bit_source_video.clone())?;
+        let ten_bit_backing = block_on(backing_service.encode_backing(ten_bit_request, &context))?;
+        let ten_bit_encoded = ten_bit_backing
+            .encoded()
+            .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidProjection)?;
+        assert_eq!(ten_bit_encoded.bytes().contiguous_bytes()?, b"H10P4");
+        assert_eq!(
+            ten_bit_encoded.content_sha256(),
+            &<[u8; 32]>::from(Sha256::digest(b"H10P4"))
+        );
+        assert_eq!(
+            ten_bit_encoded.source_video_sha256(),
+            &ten_bit_source_digest
+        );
+        assert_eq!(ten_bit_encoded.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            ten_bit_encoded.pixel_format(),
+            NativeVideoPixelFormat::Yuv420p10le
+        );
+        let output_storage_ids = h264_output_storage_ids
+            .lock()
+            .map_err(|_| "H.264 output storage mutex was poisoned")?;
+        assert_eq!(
+            output_storage_ids.last().copied(),
+            Some(ten_bit_encoded.bytes().storage_id())
+        );
+        drop(output_storage_ids);
+        assert_eq!(scratch.in_use_bytes(), 0);
+        drop(ten_bit_backing);
+
         assert!(matches!(
             NativeComponentH264Mp4CodecRequestService::checked(
                 proxy.clone(),
@@ -2598,7 +2667,7 @@ mod tests {
         assert_ne!(actor_thread, thread::current().id());
         assert_eq!(
             events.iter().filter(|event| event.0 == "request").count(),
-            8
+            9
         );
         assert!(events.iter().all(|event| event.1 == actor_thread));
         Ok(())
@@ -2646,6 +2715,15 @@ mod tests {
         drop(h264);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline);
 
+        let ten_bit_source_video = NativeVideoPayload::checked(
+            source_image.tensor().clone(),
+            125,
+            2_997,
+            NativeVideoBitDepth::Ten,
+            None,
+            None,
+            BTreeMap::new(),
+        )?;
         let ten_bit = materialize_owned_h264_mp4(
             &backend,
             &context,
@@ -2658,13 +2736,45 @@ mod tests {
         )?;
         assert_eq!(ten_bit.bit_depth(), NativeVideoBitDepth::Ten);
         assert_eq!(ten_bit.pixel_format(), NativeVideoPixelFormat::Yuv420p10le);
+        let ten_bit_backing = checked_component_h264_mp4_backing_result(
+            ten_bit,
+            &ten_bit_source_video,
+            (2, 2),
+            (125, 2997),
+            3,
+            NativeVideoBitDepth::Ten,
+            StreamId::DEFAULT,
+        )?;
+        let ten_bit_encoded = ten_bit_backing
+            .encoded()
+            .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidProjection)?;
+        assert_eq!(ten_bit_encoded.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            ten_bit_encoded.pixel_format(),
+            NativeVideoPixelFormat::Yuv420p10le
+        );
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
+        drop(ten_bit_backing);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+
+        let mismatched_depth = materialize_owned_h264_mp4(
+            &backend,
+            &context,
+            b"H10P4",
+            2,
+            2,
+            (125, 2997),
+            3,
+            NativeVideoBitDepth::Ten,
+        )?;
         assert!(matches!(
             checked_component_h264_mp4_backing_result(
-                ten_bit,
+                mismatched_depth,
                 &source_video,
                 (2, 2),
                 (125, 2997),
                 3,
+                NativeVideoBitDepth::Eight,
                 StreamId::DEFAULT,
             ),
             Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection)
@@ -2688,6 +2798,7 @@ mod tests {
                 (2, 2),
                 (125, 2997),
                 3,
+                NativeVideoBitDepth::Eight,
                 StreamId::DEFAULT,
             ),
             Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection)

@@ -14098,18 +14098,24 @@
         {
           "name": "video-payload-owns-distinct-component-and-encoded-representations",
           "path": "crates/comfy_media/src/native_node_payload.rs",
-          "pattern": "pub enum NativeVideoPayload[\\s\\S]*Components\\(NativeVideoComponentsPayload\\)[\\s\\S]*Encoded\\(NativeEncodedVideoPayload\\)[\\s\\S]*checked_h264_mp4_from_component[\\s\\S]*sim\\.comfy\\.media\\.video\\.encoded-h264-mp4\\.v1"
+          "pattern": "pub enum NativeVideoPayload[\\s\\S]*Components\\(NativeVideoComponentsPayload\\)[\\s\\S]*Encoded\\(NativeEncodedVideoPayload\\)[\\s\\S]*checked_h264_mp4_from_component[\\s\\S]*bit_depth = components\\.bit_depth[\\s\\S]*Yuv420p10le[\\s\\S]*sim\\.comfy\\.media\\.video\\.encoded-h264-mp4\\.v1"
         },
         {
           "name": "video-encoded-backing-fixture-bounds-representation-claims",
           "path": "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
           "pattern": "synthetic-encoded-video-backing-payload[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*component_consumers_reject_encoded_without_decode[\\s\\S]*trim_window_or_video_slice_reachable"
+        },
+        {
+          "name": "video-encoded-ten-bit-backing-fixture-preserves-one-closed-owner",
+          "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
+        "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*source_depth_is_authoritative[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*eight_bit_semantic_identity_byte_stable"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-native-video-component-foundation",
-        "comfy-parity-native-video-backing-representation-foundation"
+        "comfy-parity-native-video-backing-representation-foundation",
+        "comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation"
       ],
       "production_consumers": [
         "native VIDEO handles",
@@ -14137,7 +14143,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "NativeVideoPayload is the sole closed in-memory VIDEO representation. Its component variant owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, and byte-stable component identity. Its narrow encoded variant owns path-free checked H.264 MP4 bytes, fixed codec identity, source/content binding, and alias-aware residency. Stored payloads only seal the sum; component-only provider, node, planner, and plugin adapters reject encoded backing until reviewed decode owners exist."
+      "decision_reason": "NativeVideoPayload is the sole closed in-memory VIDEO representation. Its component variant owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, and byte-stable component identity. Its narrow encoded variant derives the matching YUV420P or YUV420P10LE profile from the checked source depth and owns path-free H.264 MP4 bytes, source/content binding, and alias-aware residency. Stored payloads only seal the sum; component-only provider, node, planner, and plugin adapters reject encoded backing until reviewed decode owners exist."
     },
     {
       "concern": "native_video_component_h264_mp4_backing_service",
@@ -14186,6 +14192,7 @@
       "call_symbols": [
         "plan_native_video_encode",
         "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_10bit_batch",
         "NativeNodeServices::with_component_h264_mp4_backing",
         "ExecutionEngine::with_component_h264_mp4_backing_service",
         "NativeImageExecutor::with_component_h264_mp4_backing_service"
@@ -14199,12 +14206,12 @@
         {
           "name": "component-h264-mp4-backing-service-derives-plan-and-moves-retained-output",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeComponentH264Mp4CodecRequestService[\\s\\S]*plan_native_video_encode[\\s\\S]*ComponentMp4[\\s\\S]*NativeVideoMetadataPolicy::Exclude[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*into_parts[\\s\\S]*NativeVideoPayload::checked_h264_mp4_from_component"
+          "pattern": "NativeComponentH264Mp4CodecRequestService[\\s\\S]*plan_native_video_encode[\\s\\S]*ComponentMp4[\\s\\S]*NativeVideoMetadataPolicy::Exclude[\\s\\S]*NativeVideoBitDepth::Eight[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*NativeVideoBitDepth::Ten[\\s\\S]*encode_h264_mp4_10bit_batch[\\s\\S]*into_parts[\\s\\S]*NativeVideoPayload::checked_h264_mp4_from_component"
         },
         {
           "name": "component-h264-mp4-backing-service-identity-binds-actor-and-all-limit-values",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.component-h264-mp4-backing-service.v1[\\s\\S]*max_audio_samples[\\s\\S]*h264_mp4_sequence_limits_configuration_u64[\\s\\S]*configuration_sha256"
+          "pattern": "sim.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*max_audio_samples[\\s\\S]*h264_mp4_sequence_limits_configuration_u64[\\s\\S]*configuration_sha256"
         },
         {
           "name": "component-h264-mp4-backing-service-propagates-through-engine-and-cache-identity",
@@ -14215,13 +14222,19 @@
           "name": "component-h264-mp4-backing-service-fixture-bounds-evidence-claims",
           "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
           "pattern": "synthetic-component-h264-mp4-backing-service[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*source_video_semantic_digest_bound[\\s\\S]*encoded_video_handle_slice_effect_or_output_committer_reachable"
+        },
+        {
+          "name": "component-h264-mp4-10bit-backing-fixture-bounds-depth-and-evidence",
+          "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
+          "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*sim.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*Ten/Yuv420p10le[\\s\\S]*aac_audio_or_container_metadata[\\s\\S]*trim_window_video_slice_or_save_video_effect"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-component-h264-mp4-backing-service-foundation",
-        "comfy-parity-native-video-backing-representation-foundation"
+        "comfy-parity-native-video-backing-representation-foundation",
+        "comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation"
       ],
       "production_consumers": [
         "canonical NativeVideoPayload encoded representation",

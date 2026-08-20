@@ -11689,6 +11689,79 @@ def native_video_codec_h264_mp4_10bit_thread_bridge_foundation_task(
     )
 
 
+def native_video_component_h264_mp4_10bit_backing_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation",
+        "Materialize ten-bit H.264 MP4 backing for component VIDEO",
+        [28, 29, 31, 32, 34, 35, 37, 41, 42, 44],
+        [17, 18, 19, 25, 27, 28, 31, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The existing checked component H.264 MP4 backing service admits the closed eight- and ten-bit component VIDEO profiles without a second service, actor, or payload owner. It derives depth from the canonical source, selects the matching retained actor operation, validates the actual YUV420P or YUV420P10LE projection, and moves the actor-owned CPU U8 Tensor into the canonical encoded VIDEO representation without another encoded-byte copy. Existing eight-bit semantic identity remains byte-stable; AAC/audio, metadata, trim windows, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
+            "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused media, node-service, runtime-adapter, and ownership tests prove exact Eight and Ten admission; frozen eight-bit semantic identity and distinct ten-bit YUV420P10LE identity; source/content/dimensions/rate/count binding; one matching actor call and zero second encoded-byte copies; v2 service identity; cancellation, resource-exhaustion, projection-failure, accounting, and retry atomicity; and unchanged component-only consumer rejection. The fixture explicitly excludes installed codecs, playable or decoded numeric H.264 evidence, PyAV encoder or byte identity, AAC/audio, container metadata, trim windows, VideoSlice, SaveVideo, effects, paths, handles, cache, persistence, recovery, publication, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.2",
+            "28.5",
+            "28.6",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "37.5",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+            "44.3",
+        ],
+        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -15249,8 +15322,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_h264_mp4_10bit_sequence_encode_foundation["id"])
         )
     )
+    video_component_h264_mp4_10bit_backing_foundation = (
+        native_video_component_h264_mp4_10bit_backing_foundation_task(
+            str(video_codec_h264_mp4_10bit_thread_bridge_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_h264_mp4_10bit_thread_bridge_foundation["id"])
+        str(video_component_h264_mp4_10bit_backing_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -15410,6 +15488,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_backing_representation_foundation,
         video_codec_h264_mp4_10bit_sequence_encode_foundation,
         video_codec_h264_mp4_10bit_thread_bridge_foundation,
+        video_component_h264_mp4_10bit_backing_foundation,
         video_foundation,
         detection_foundation,
         ]

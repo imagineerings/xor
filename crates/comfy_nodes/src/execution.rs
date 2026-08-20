@@ -2021,7 +2021,6 @@ impl NativeComponentH264Mp4BackingRequest {
             && descriptor
                 .is_contiguous()
                 .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?
-            && video.bit_depth() == NativeVideoBitDepth::Eight
             && components.audio().is_none();
         if !valid {
             return Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest);
@@ -3377,7 +3376,10 @@ mod tests {
                 context
                     .check()
                     .map_err(|_| NativeComponentH264Mp4BackingServiceError::Cancelled)?;
-                let encoded = b"HMP4";
+                let encoded = match video.bit_depth() {
+                    NativeVideoBitDepth::Eight => b"HMP4".as_slice(),
+                    NativeVideoBitDepth::Ten => b"H10P4".as_slice(),
+                };
                 let descriptor = comfy_tensor::TensorDescriptor::contiguous(
                     vec![encoded.len() as u64],
                     DType::U8,
@@ -4540,10 +4542,25 @@ mod tests {
             None,
             BTreeMap::new(),
         )?);
-        assert!(matches!(
-            NativeComponentH264Mp4BackingRequest::checked(ten_bit),
-            Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest)
-        ));
+        let ten_bit_request = NativeComponentH264Mp4BackingRequest::checked(ten_bit.clone())?;
+        let ten_bit_result = futures::executor::block_on(
+            context
+                .component_h264_mp4_backing_service()?
+                .encode_backing(ten_bit_request, &execution),
+        )?;
+        let ten_bit_encoded = ten_bit_result
+            .encoded()
+            .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidProjection)?;
+        assert_eq!(ten_bit_encoded.bytes().contiguous_bytes()?, b"H10P4");
+        assert_eq!(ten_bit_encoded.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            ten_bit_encoded.pixel_format(),
+            NativeVideoPixelFormat::Yuv420p10le
+        );
+        assert_eq!(
+            ten_bit_encoded.source_video_sha256(),
+            ten_bit.semantic_digest_sha256()
+        );
         let unavailable = NativeNodeContext::new(
             prompt_id,
             attempt_id,

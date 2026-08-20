@@ -15525,13 +15525,14 @@ fn val_ownership_native_video_component_h264_mp4_backing_service_001()
     let runtime =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.component-h264-mp4-backing-service.v1",
+        "sim.comfy.component-h264-mp4-backing-service.v2",
         "pub(crate) struct NativeComponentH264Mp4CodecRequestService",
         "plan_native_video_encode",
         "NativeVideoEncodeOptions::ComponentMp4",
         "NativeVideoMetadataPolicy::Exclude",
         "h264_mp4_sequence_limits_configuration_u64",
         "encode_h264_mp4_batch",
+        "encode_h264_mp4_10bit_batch",
         "NativeVideoPayload::checked_h264_mp4_from_component",
         "into_parts",
         "map_h264_mp4_backing_service_error",
@@ -16488,6 +16489,97 @@ fn val_ownership_native_video_codec_h264_mp4_10bit_thread_bridge_001()
 }
 
 #[test]
+fn val_ownership_native_video_component_h264_mp4_10bit_backing_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+    for required in [
+        "pub struct NativeEncodedVideoPayload",
+        "bit_depth: NativeVideoBitDepth",
+        "let bit_depth = components.bit_depth()",
+        "NativeVideoBitDepth::Ten => crate::NativeVideoPixelFormat::Yuv420p10le",
+        "sim.comfy.media.video.encoded-h264-mp4.v1",
+        "184, 236, 128, 232",
+    ] {
+        assert!(
+            media.contains(required),
+            "ten-bit encoded VIDEO lacks {required}"
+        );
+    }
+    let nodes = fs::read_to_string(root.join("crates/comfy_nodes/src/execution.rs"))?;
+    for required in [
+        "NativeComponentH264Mp4BackingRequest::checked",
+        "component_h264_mp4_backing_service_requires_checked_video_and_portable_contract",
+        "NativeVideoBitDepth::Ten",
+        "NativeVideoPixelFormat::Yuv420p10le",
+    ] {
+        assert!(
+            nodes.contains(required),
+            "ten-bit backing request lacks {required}"
+        );
+    }
+    let runtime =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "sim.comfy.component-h264-mp4-backing-service.v2",
+        "let supported_depth = matches!",
+        "NativeVideoBitDepth::Ten",
+        "NativeVideoPixelFormat::Yuv420p10le",
+        "self.proxy.encode_h264_mp4_10bit_batch",
+        "expected_bit_depth",
+        "checked_component_h264_mp4_backing_result",
+    ] {
+        assert!(
+            runtime.contains(required),
+            "ten-bit backing adapter lacks {required}"
+        );
+    }
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-component-h264-mp4-eight-and-ten-bit-backing",
+        "source_depth_is_authoritative",
+        "actor_owned_tensor_moved_without_second_copy",
+        "eight_bit_semantic_identity_byte_stable",
+        "sim.comfy.component-h264-mp4-backing-service.v2",
+        "trim_window_video_slice_or_save_video_effect",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "ten-bit backing fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(mapped_concerns.len(), 2);
+    for expected in [
+        "native_video_component_domain",
+        "native_video_component_h264_mp4_backing_service",
+    ] {
+        assert!(mapped_concerns.iter().any(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str) == Some(expected)
+        }));
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
@@ -17093,6 +17185,14 @@ fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn 
         node.matches("impl NativeNode for CreateVideoNode").count(),
         1
     );
+    let create_video_start = node
+        .find("impl NativeNode for CreateVideoNode")
+        .ok_or("missing CreateVideo implementation")?;
+    let create_video_end = node[create_video_start..]
+        .find("struct GetVideoComponentsNode")
+        .map(|offset| create_video_start + offset)
+        .ok_or("missing GetVideoComponents boundary")?;
+    let create_video = &node[create_video_start..create_video_end];
     for forbidden in [
         "load_certified_video_codec_closure",
         "bind_certified_video_codec_abi",
@@ -17103,7 +17203,7 @@ fn val_ownership_native_video_component_create_node_001() -> Result<(), Box<dyn 
         "File::",
     ] {
         assert!(
-            !node.contains(forbidden),
+            !create_video.contains(forbidden),
             "CreateVideo node owns forbidden authority {forbidden}"
         );
     }
@@ -17153,7 +17253,7 @@ fn val_ownership_native_video_component_extract_node_001() -> Result<(), Box<dyn
     for required in [
         "const COMPONENTS_FEATURE_ID: &str = \"COMFY-NODE-0207\"",
         "impl NativeNode for GetVideoComponentsNode",
-        "project_video_frames(&context, video.frames())",
+        "project_video_frames(&context, components.frames())",
         "NativePrimitive::Null",
         "rollback_components(&context, &published)",
         "get_video_components_preserves_aliases_and_nullable_audio",

@@ -1099,6 +1099,7 @@ pub struct NativeEncodedVideoPayload {
     dimensions: (u64, u64),
     frame_rate: (u64, u64),
     frame_count: u64,
+    bit_depth: NativeVideoBitDepth,
     semantic_digest_sha256: [u8; 32],
     resident_bytes: u64,
 }
@@ -1200,11 +1201,11 @@ impl NativeVideoPayload {
         else {
             return Err(NativeMediaPayloadError::InvalidVideo);
         };
+        let bit_depth = components.bit_depth();
         if components.frames().descriptor().dtype() != DType::F32
             || components.frames().descriptor().device() != DeviceId::CPU
             || !components.frames().descriptor().is_contiguous()?
             || !matches!(*source_channels, 3 | 4)
-            || components.bit_depth() != NativeVideoBitDepth::Eight
             || components.audio().is_some()
             || (*source_width, *source_height) != dimensions
             || *source_frame_count != frame_count
@@ -1220,6 +1221,7 @@ impl NativeVideoPayload {
             dimensions,
             frame_rate,
             frame_count,
+            bit_depth,
         )?;
         Ok(Self::Encoded(NativeEncodedVideoPayload {
             bytes,
@@ -1228,6 +1230,7 @@ impl NativeVideoPayload {
             dimensions,
             frame_rate,
             frame_count,
+            bit_depth,
             semantic_digest_sha256,
             resident_bytes,
         }))
@@ -1456,11 +1459,14 @@ impl NativeEncodedVideoPayload {
     }
 
     pub const fn pixel_format(&self) -> crate::NativeVideoPixelFormat {
-        crate::NativeVideoPixelFormat::Yuv420p
+        match self.bit_depth {
+            NativeVideoBitDepth::Eight => crate::NativeVideoPixelFormat::Yuv420p,
+            NativeVideoBitDepth::Ten => crate::NativeVideoPixelFormat::Yuv420p10le,
+        }
     }
 
     pub const fn bit_depth(&self) -> NativeVideoBitDepth {
-        NativeVideoBitDepth::Eight
+        self.bit_depth
     }
 
     pub const fn has_audio(&self) -> bool {
@@ -1502,6 +1508,7 @@ impl NativeEncodedVideoPayload {
             self.dimensions,
             self.frame_rate,
             self.frame_count,
+            self.bit_depth,
         )?;
         require_projection(
             self.semantic_digest_sha256,
@@ -2896,13 +2903,16 @@ fn project_encoded_h264_mp4(
     dimensions: (u64, u64),
     frame_rate: (u64, u64),
     frame_count: u64,
+    bit_depth: NativeVideoBitDepth,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     let mut projection =
         Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.encoded-h264-mp4.v1")?;
-    projection.hasher.update(b"mp4\0h264\0yuv420p\0");
-    projection
-        .hasher
-        .update([NativeVideoBitDepth::Eight.bits(), 0, 0]);
+    projection.hasher.update(b"mp4\0h264\0");
+    match bit_depth {
+        NativeVideoBitDepth::Eight => projection.hasher.update(b"yuv420p\0"),
+        NativeVideoBitDepth::Ten => projection.hasher.update(b"yuv420p10le\0"),
+    }
+    projection.hasher.update([bit_depth.bits(), 0, 0]);
     projection.hasher.update(dimensions.0.to_le_bytes());
     projection.hasher.update(dimensions.1.to_le_bytes());
     projection.hasher.update(frame_rate.0.to_le_bytes());
@@ -4328,6 +4338,62 @@ mod tests {
             encoded.semantic_digest_sha256(),
             source.semantic_digest_sha256()
         );
+        assert_eq!(
+            encoded.semantic_digest_sha256(),
+            &[
+                184, 236, 128, 232, 228, 117, 131, 71, 110, 235, 62, 109, 159, 29, 112, 128, 6,
+                195, 25, 246, 138, 137, 27, 144, 118, 242, 190, 204, 1, 51, 12, 130,
+            ]
+        );
+
+        let ten_bit_source = NativeVideoPayload::checked(
+            source
+                .components()
+                .ok_or(NativeMediaPayloadError::InvalidVideo)?
+                .frames()
+                .clone(),
+            30,
+            1,
+            NativeVideoBitDepth::Ten,
+            None,
+            None,
+            BTreeMap::from([("prompt".to_owned(), "source-only".to_owned())]),
+        )?;
+        let ten_bit_content = b"H10P4";
+        let ten_bit_bytes = tensor(
+            vec![ten_bit_content.len() as u64],
+            DType::U8,
+            ten_bit_content.to_vec(),
+        )?;
+        let ten_bit_storage_id = ten_bit_bytes.storage_id();
+        let ten_bit_content_sha256 = Sha256::digest(ten_bit_content).into();
+        let ten_bit = NativeVideoPayload::checked_h264_mp4_from_component(
+            &ten_bit_source,
+            ten_bit_bytes,
+            ten_bit_content_sha256,
+            (2, 2),
+            (30, 1),
+            1,
+        )?;
+        ten_bit.validate()?;
+        let ten_bit_backing = ten_bit
+            .encoded()
+            .ok_or(NativeMediaPayloadError::InvalidVideo)?;
+        assert_eq!(ten_bit_backing.bytes().storage_id(), ten_bit_storage_id);
+        assert_eq!(ten_bit_backing.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            ten_bit_backing.pixel_format(),
+            crate::NativeVideoPixelFormat::Yuv420p10le
+        );
+        assert_eq!(
+            ten_bit_backing.source_video_sha256(),
+            ten_bit_source.semantic_digest_sha256()
+        );
+        assert_ne!(
+            ten_bit.semantic_digest_sha256(),
+            encoded.semantic_digest_sha256()
+        );
+        assert_eq!(ten_bit.resident_parts()?.tensor_allocations().len(), 1);
 
         let forged = tensor(vec![content.len() as u64], DType::U8, content.to_vec())?;
         assert!(
