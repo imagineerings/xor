@@ -16260,8 +16260,8 @@ fn val_ownership_native_video_codec_h264_mp4_sequence_encode_001()
         "pub(crate) enum NativeVideoCodecH264EncodeError",
         "pub(crate) fn encode_h264_mp4_batch",
         "self.ltxv_h264.encoder",
-        "NativeRgb8EncodeProfile::component_h264",
-        "source_compatible_h264_rgb8_frame",
+        "NativePackedEncodeProfile::component_h264",
+        "source_compatible_h264_packed_frame",
         "retained_h264_mp4_sequence_uses_exact_rate_order_and_single_session",
         "retained_h264_mp4_sequence_later_failure_cancellation_and_retry_are_atomic",
     ] {
@@ -16326,6 +16326,79 @@ fn val_ownership_native_video_codec_h264_mp4_sequence_encode_001()
                     == Some("comfy-parity-native-video-codec-h264-mp4-sequence-encode-foundation")
             }))
     );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_codec_h264_mp4_10bit_sequence_encode_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let abi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_abi.rs"))?;
+    let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
+    for required in [
+        "AV_PIXEL_FORMAT_RGB48LE: c_int = 35",
+        "ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json",
+        "h264_mp4_10bit_manifest_matches_compiled_pixel_formats",
+    ] {
+        assert!(abi.contains(required), "ten-bit H.264 ABI lacks {required}");
+    }
+    for required in [
+        "pub(crate) fn encode_h264_mp4_10bit_batch",
+        "NativeH264Mp4PixelMode::TenBit",
+        "source_compatible_h264_packed_frame",
+        "(*value * 65_535.0).clamp(0.0, 65_535.0) as u16",
+        "value.to_le_bytes()",
+        "AV_PIXEL_FORMAT_RGB48LE",
+        "AV_PIXEL_FORMAT_YUV420P10LE",
+        "retained_h264_mp4_10bit_sequence_uses_rgb48le_staging_and_yuv420p10le",
+    ] {
+        assert!(ffi.contains(required), "ten-bit H.264 FFI lacks {required}");
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeH264Mp4",
+        "unsafe impl Sync for NativeH264Mp4",
+        "NativeStoredPayload::Video",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !ffi.contains(forbidden),
+            "ten-bit H.264 owner exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-sequence-encode/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-source-compatible-component-h264-mp4-10bit-sequence-execution",
+        "compiler_rust_and_json_pixel_format_constants_agree",
+        "source_rgb48le_quantization_alpha_discard_and_yuv420p10le_profile_are_exact_signature_tested",
+        "playable_mp4_or_decoded_numeric_ten_bit_color_oracle",
+        "actor_node_service_encoded_backing_trim_video_slice_save_effect_or_publication_reachable",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "ten-bit H.264 fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let task_id = "comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation";
+    let mapped_concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .count();
+    assert_eq!(mapped_concerns, 1);
     Ok(())
 }
 

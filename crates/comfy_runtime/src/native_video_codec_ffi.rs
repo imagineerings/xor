@@ -2,7 +2,7 @@ use crate::{
     CertifiedVideoCodecDependencyClosure, VIDEO_CODEC_FFI_UNSAFE_OWNER,
     native_video_codec_abi as abi,
 };
-use comfy_media::NativeVideoCrf;
+use comfy_media::{NativeVideoBitDepth, NativeVideoCrf};
 use comfy_tensor::{
     CpuBackend, CpuWorkspaceLease, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, ImageTensor,
     Layout, Rgb8ImageTensor, TensorDescriptor, TensorError, ViewAccess,
@@ -138,6 +138,28 @@ pub(crate) struct NativeH264Mp4SequenceLimits {
     maximum_pixels_per_frame: u64,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeH264Mp4PixelMode {
+    EightBit,
+    TenBit,
+}
+
+impl NativeH264Mp4PixelMode {
+    const fn bit_depth(self) -> NativeVideoBitDepth {
+        match self {
+            Self::EightBit => NativeVideoBitDepth::Eight,
+            Self::TenBit => NativeVideoBitDepth::Ten,
+        }
+    }
+
+    const fn source_bytes_per_pixel(self) -> i32 {
+        match self {
+            Self::EightBit => 3,
+            Self::TenBit => 6,
+        }
+    }
+}
+
 #[allow(
     dead_code,
     reason = "consumed by the retained H.264 codec-thread bridge and backing service"
@@ -193,6 +215,7 @@ pub(crate) struct NativeH264Mp4<'suite> {
     height: i32,
     frame_rate: abi::AvRational,
     frame_count: usize,
+    bit_depth: NativeVideoBitDepth,
 }
 
 #[allow(
@@ -218,6 +241,10 @@ impl NativeH264Mp4<'_> {
 
     pub(crate) const fn frame_count(&self) -> usize {
         self.frame_count
+    }
+
+    pub(crate) const fn bit_depth(&self) -> NativeVideoBitDepth {
+        self.bit_depth
     }
 }
 
@@ -1171,6 +1198,47 @@ impl NativeVideoCodecSuite {
         backend: &CpuBackend,
         context: &ExecutionContext<'_>,
     ) -> Result<NativeH264Mp4<'suite>, NativeVideoCodecH264EncodeError> {
+        self.encode_h264_mp4_batch_with_pixel_mode(
+            images,
+            frame_rate,
+            NativeH264Mp4PixelMode::EightBit,
+            limits,
+            backend,
+            context,
+        )
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following retained ten-bit H.264 codec-thread bridge"
+    )]
+    pub(crate) fn encode_h264_mp4_10bit_batch<'suite>(
+        &'suite self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        limits: NativeH264Mp4SequenceLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeH264Mp4<'suite>, NativeVideoCodecH264EncodeError> {
+        self.encode_h264_mp4_batch_with_pixel_mode(
+            images,
+            frame_rate,
+            NativeH264Mp4PixelMode::TenBit,
+            limits,
+            backend,
+            context,
+        )
+    }
+
+    fn encode_h264_mp4_batch_with_pixel_mode<'suite>(
+        &'suite self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        pixel_mode: NativeH264Mp4PixelMode,
+        limits: NativeH264Mp4SequenceLimits,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeH264Mp4<'suite>, NativeVideoCodecH264EncodeError> {
         let (frame_count, width, height) = validate_h264_image_batch(images, limits, context)?;
         let frame_rate = checked_h264_frame_rate(frame_rate)?;
         context.check().map_err(map_h264_tensor_error)?;
@@ -1191,11 +1259,17 @@ impl NativeVideoCodecSuite {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| {
-            let frame = source_compatible_h264_rgb8_frame(images, frame_index, backend, context)?;
+            let frame = source_compatible_h264_packed_frame(
+                images,
+                frame_index,
+                pixel_mode,
+                backend,
+                context,
+            )?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_check(
-            NativeRgb8EncodeProfile::component_h264(frame_rate),
+        encode_packed_frames_with_check(
+            NativePackedEncodeProfile::component_h264(frame_rate, pixel_mode),
             self.ltxv_h264.encoder,
             frame_count,
             width,
@@ -1218,6 +1292,7 @@ impl NativeVideoCodecSuite {
             height,
             frame_rate,
             frame_count,
+            bit_depth: pixel_mode.bit_depth(),
         })
     }
 
@@ -1247,8 +1322,8 @@ impl NativeVideoCodecSuite {
             context,
         )?;
         let functions = NativeLtxvH264EncodeFunctions::from_codec(&self.ltxv_h264);
-        encode_rgb8_frame_with_check(
-            NativeRgb8EncodeProfile::vp9_webm(frame_rate, crf),
+        encode_packed_frame_with_check(
+            NativePackedEncodeProfile::vp9_webm(frame_rate, crf),
             self.vpx_vp9_encoder,
             input,
             width,
@@ -1344,11 +1419,11 @@ impl NativeVideoCodecSuite {
             }
         };
         let profile = if channels == 4 {
-            NativeRgb8EncodeProfile::vp9_webm_alpha(frame_rate, crf)
+            NativePackedEncodeProfile::vp9_webm_alpha(frame_rate, crf)
         } else {
-            NativeRgb8EncodeProfile::vp9_webm(frame_rate, crf)
+            NativePackedEncodeProfile::vp9_webm(frame_rate, crf)
         };
-        encode_rgb8_frames_with_metadata_check(
+        encode_packed_frames_with_metadata_check(
             profile,
             self.vpx_vp9_encoder,
             frame_count,
@@ -1415,8 +1490,8 @@ impl NativeVideoCodecSuite {
             let frame = source_compatible_av1_rgb8_frame(images, frame_index, backend, context)?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_metadata_check(
-            NativeRgb8EncodeProfile::av1_webm(frame_rate, crf),
+        encode_packed_frames_with_metadata_check(
+            NativePackedEncodeProfile::av1_webm(frame_rate, crf),
             self.svt_av1_encoder,
             frame_count,
             width,
@@ -1881,9 +1956,10 @@ fn validate_h264_image_batch(
     dead_code,
     reason = "consumed by the following retained H.264 codec-thread bridge"
 )]
-fn source_compatible_h264_rgb8_frame(
+fn source_compatible_h264_packed_frame(
     images: &ImageTensor,
     frame_index: usize,
+    pixel_mode: NativeH264Mp4PixelMode,
     backend: &CpuBackend,
     context: &ExecutionContext<'_>,
 ) -> Result<CpuWorkspaceVec<u8>, NativeVideoCodecLtxvEncodeError> {
@@ -1908,8 +1984,11 @@ fn source_compatible_h264_rgb8_frame(
     let source_frame_elements = pixels
         .checked_mul(source_channels)
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
-    let output_frame_elements = pixels
-        .checked_mul(3)
+    let output_frame_bytes = pixels
+        .checked_mul(
+            usize::try_from(pixel_mode.source_bytes_per_pixel())
+                .map_err(|_| NativeVideoCodecLtxvEncodeError::InvalidInput)?,
+        )
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
     let start = frame_index
         .checked_mul(source_frame_elements)
@@ -1923,7 +2002,7 @@ fn source_compatible_h264_rgb8_frame(
         .get(start..end)
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
     let mut bytes = backend
-        .workspace_vec(context, output_frame_elements)
+        .workspace_vec(context, output_frame_bytes)
         .map_err(map_h264_staging_tensor_error)?;
     for (pixel_index, pixel) in input.chunks_exact(source_channels).enumerate() {
         if pixel_index & 0x3fff == 0 {
@@ -1933,13 +2012,23 @@ fn source_compatible_h264_rgb8_frame(
             .get(..3)
             .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?
         {
-            bytes
-                .try_push((*value * 255.0).clamp(0.0, 255.0) as u8)
-                .map_err(map_h264_staging_tensor_error)?;
+            match pixel_mode {
+                NativeH264Mp4PixelMode::EightBit => bytes
+                    .try_push((*value * 255.0).clamp(0.0, 255.0) as u8)
+                    .map_err(map_h264_staging_tensor_error)?,
+                NativeH264Mp4PixelMode::TenBit => {
+                    let value = (*value * 65_535.0).clamp(0.0, 65_535.0) as u16;
+                    for byte in value.to_le_bytes() {
+                        bytes
+                            .try_push(byte)
+                            .map_err(map_h264_staging_tensor_error)?;
+                    }
+                }
+            }
         }
     }
     if !input.chunks_exact(source_channels).remainder().is_empty()
-        || bytes.len() != output_frame_elements
+        || bytes.len() != output_frame_bytes
     {
         return Err(NativeVideoCodecLtxvEncodeError::InvalidInput);
     }
@@ -3993,7 +4082,7 @@ fn check_ltxv_decode_status(
     reason = "consumed by the following codec-thread batch bridge"
 )]
 #[derive(Clone, Copy)]
-enum NativeRgb8CodecKind {
+enum NativePackedCodecKind {
     LtxvH264,
     ComponentH264,
     Vp9,
@@ -4001,7 +4090,7 @@ enum NativeRgb8CodecKind {
 }
 
 #[derive(Clone, Copy)]
-enum NativeRgb8Crf {
+enum NativePackedCrf {
     None,
     Integer(u8),
     SourceFloat(NativeVideoCrf),
@@ -4012,125 +4101,138 @@ enum NativeRgb8Crf {
     reason = "consumed by the following codec-thread batch bridge"
 )]
 #[derive(Clone, Copy)]
-struct NativeRgb8EncodeProfile {
-    kind: NativeRgb8CodecKind,
+struct NativePackedEncodeProfile {
+    kind: NativePackedCodecKind,
     container: &'static std::ffi::CStr,
     frame_time_base: abi::AvRational,
     frame_rate: Option<abi::AvRational>,
-    crf: NativeRgb8Crf,
+    crf: NativePackedCrf,
     source_pixel_format: i32,
     destination_pixel_format: i32,
     destination_pixel_format_name: &'static std::ffi::CStr,
-    source_channels: i32,
+    source_bytes_per_pixel: i32,
 }
 
 #[allow(
     dead_code,
     reason = "consumed by the following codec-thread batch bridge"
 )]
-impl NativeRgb8EncodeProfile {
+impl NativePackedEncodeProfile {
     fn ltxv_h264(crf: u8) -> Self {
         Self {
-            kind: NativeRgb8CodecKind::LtxvH264,
+            kind: NativePackedCodecKind::LtxvH264,
             container: c"mp4",
             frame_time_base: ltxv_frame_time_base(),
             frame_rate: None,
-            crf: NativeRgb8Crf::Integer(crf),
+            crf: NativePackedCrf::Integer(crf),
             source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
             destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P,
             destination_pixel_format_name: c"yuv420p",
-            source_channels: 3,
+            source_bytes_per_pixel: 3,
         }
     }
 
-    fn component_h264(frame_rate: abi::AvRational) -> Self {
+    fn component_h264(frame_rate: abi::AvRational, pixel_mode: NativeH264Mp4PixelMode) -> Self {
+        let (source_pixel_format, destination_pixel_format, destination_pixel_format_name) =
+            match pixel_mode {
+                NativeH264Mp4PixelMode::EightBit => (
+                    abi::AV_PIXEL_FORMAT_RGB24,
+                    abi::AV_PIXEL_FORMAT_YUV420P,
+                    c"yuv420p",
+                ),
+                NativeH264Mp4PixelMode::TenBit => (
+                    abi::AV_PIXEL_FORMAT_RGB48LE,
+                    abi::AV_PIXEL_FORMAT_YUV420P10LE,
+                    c"yuv420p10le",
+                ),
+            };
         Self {
-            kind: NativeRgb8CodecKind::ComponentH264,
+            kind: NativePackedCodecKind::ComponentH264,
             container: c"mp4",
             frame_time_base: abi::AvRational {
                 numerator: frame_rate.denominator,
                 denominator: frame_rate.numerator,
             },
             frame_rate: Some(frame_rate),
-            crf: NativeRgb8Crf::None,
-            source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
-            destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P,
-            destination_pixel_format_name: c"yuv420p",
-            source_channels: 3,
+            crf: NativePackedCrf::None,
+            source_pixel_format,
+            destination_pixel_format,
+            destination_pixel_format_name,
+            source_bytes_per_pixel: pixel_mode.source_bytes_per_pixel(),
         }
     }
 
     fn vp9_webm(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
         Self {
-            kind: NativeRgb8CodecKind::Vp9,
+            kind: NativePackedCodecKind::Vp9,
             container: c"webm",
             frame_time_base: abi::AvRational {
                 numerator: frame_rate.denominator,
                 denominator: frame_rate.numerator,
             },
             frame_rate: Some(frame_rate),
-            crf: NativeRgb8Crf::SourceFloat(crf),
+            crf: NativePackedCrf::SourceFloat(crf),
             source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
             destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P,
             destination_pixel_format_name: c"yuv420p",
-            source_channels: 3,
+            source_bytes_per_pixel: 3,
         }
     }
 
     fn vp9_webm_alpha(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
         Self {
-            kind: NativeRgb8CodecKind::Vp9,
+            kind: NativePackedCodecKind::Vp9,
             container: c"webm",
             frame_time_base: abi::AvRational {
                 numerator: frame_rate.denominator,
                 denominator: frame_rate.numerator,
             },
             frame_rate: Some(frame_rate),
-            crf: NativeRgb8Crf::SourceFloat(crf),
+            crf: NativePackedCrf::SourceFloat(crf),
             source_pixel_format: abi::AV_PIXEL_FORMAT_RGBA,
             destination_pixel_format: abi::AV_PIXEL_FORMAT_YUVA420P,
             destination_pixel_format_name: c"yuva420p",
-            source_channels: 4,
+            source_bytes_per_pixel: 4,
         }
     }
 
     fn av1_webm(frame_rate: abi::AvRational, crf: NativeVideoCrf) -> Self {
         Self {
-            kind: NativeRgb8CodecKind::Av1,
+            kind: NativePackedCodecKind::Av1,
             container: c"webm",
             frame_time_base: abi::AvRational {
                 numerator: frame_rate.denominator,
                 denominator: frame_rate.numerator,
             },
             frame_rate: Some(frame_rate),
-            crf: NativeRgb8Crf::SourceFloat(crf),
+            crf: NativePackedCrf::SourceFloat(crf),
             source_pixel_format: abi::AV_PIXEL_FORMAT_RGB24,
             destination_pixel_format: abi::AV_PIXEL_FORMAT_YUV420P10LE,
             destination_pixel_format_name: c"yuv420p10le",
-            source_channels: 3,
+            source_bytes_per_pixel: 3,
         }
     }
 
     fn is_vp9(self) -> bool {
-        matches!(self.kind, NativeRgb8CodecKind::Vp9)
+        matches!(self.kind, NativePackedCodecKind::Vp9)
     }
 
     fn is_av1(self) -> bool {
-        matches!(self.kind, NativeRgb8CodecKind::Av1)
+        matches!(self.kind, NativePackedCodecKind::Av1)
     }
 
     fn is_webm(self) -> bool {
         matches!(
             self.kind,
-            NativeRgb8CodecKind::Vp9 | NativeRgb8CodecKind::Av1
+            NativePackedCodecKind::Vp9 | NativePackedCodecKind::Av1
         )
     }
 
     fn phase(self, h264: &'static str, vp9: &'static str, av1: &'static str) -> &'static str {
         match self.kind {
-            NativeRgb8CodecKind::LtxvH264 | NativeRgb8CodecKind::ComponentH264 => h264,
-            NativeRgb8CodecKind::Vp9 => vp9,
-            NativeRgb8CodecKind::Av1 => av1,
+            NativePackedCodecKind::LtxvH264 | NativePackedCodecKind::ComponentH264 => h264,
+            NativePackedCodecKind::Vp9 => vp9,
+            NativePackedCodecKind::Av1 => av1,
         }
     }
 }
@@ -4147,8 +4249,8 @@ fn encode_ltxv_h264_rgb8_with_check(
     output: &mut NativeVideoCodecMemoryOutput<'_>,
     check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
-    encode_rgb8_frame_with_check(
-        NativeRgb8EncodeProfile::ltxv_h264(crf),
+    encode_packed_frame_with_check(
+        NativePackedEncodeProfile::ltxv_h264(crf),
         encoder,
         input,
         width,
@@ -4161,8 +4263,8 @@ fn encode_ltxv_h264_rgb8_with_check(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn encode_rgb8_frame_with_check(
-    profile: NativeRgb8EncodeProfile,
+fn encode_packed_frame_with_check(
+    profile: NativePackedEncodeProfile,
     encoder: NonNull<abi::AvCodec>,
     input: &[u8],
     width: i32,
@@ -4177,7 +4279,7 @@ fn encode_rgb8_frame_with_check(
          consume: &mut dyn FnMut(&[u8]) -> Result<(), NativeVideoCodecLtxvEncodeError>| {
             consume(input)
         };
-    encode_rgb8_frames_with_check(
+    encode_packed_frames_with_check(
         profile,
         encoder,
         1,
@@ -4192,8 +4294,8 @@ fn encode_rgb8_frame_with_check(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn encode_rgb8_frames_with_check(
-    profile: NativeRgb8EncodeProfile,
+fn encode_packed_frames_with_check(
+    profile: NativePackedEncodeProfile,
     encoder: NonNull<abi::AvCodec>,
     frame_count: usize,
     width: i32,
@@ -4207,7 +4309,7 @@ fn encode_rgb8_frames_with_check(
     ) -> Result<(), NativeVideoCodecLtxvEncodeError>,
     check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
-    encode_rgb8_frames_with_metadata_check(
+    encode_packed_frames_with_metadata_check(
         profile,
         encoder,
         frame_count,
@@ -4223,8 +4325,8 @@ fn encode_rgb8_frames_with_check(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn encode_rgb8_frames_with_metadata_check(
-    profile: NativeRgb8EncodeProfile,
+fn encode_packed_frames_with_metadata_check(
+    profile: NativePackedEncodeProfile,
     encoder: NonNull<abi::AvCodec>,
     frame_count: usize,
     width: i32,
@@ -4414,15 +4516,15 @@ fn encode_rgb8_frames_with_metadata_check(
         pointer: std::ptr::null_mut(),
         free: functions.av_dict_free,
     };
-    if !matches!(profile.crf, NativeRgb8Crf::None) {
+    if !matches!(profile.crf, NativePackedCrf::None) {
         let mut crf_bytes = [0_u8; 32];
         match profile.crf {
-            NativeRgb8Crf::None => {}
-            NativeRgb8Crf::Integer(value) => {
+            NativePackedCrf::None => {}
+            NativePackedCrf::Integer(value) => {
                 let mut cursor = 0;
                 write_decimal(u32::from(value), &mut crf_bytes, &mut cursor)?;
             }
-            NativeRgb8Crf::SourceFloat(value) => {
+            NativePackedCrf::SourceFloat(value) => {
                 write_python_float(value.value(), &mut crf_bytes)?;
             }
         }
@@ -4436,7 +4538,7 @@ fn encode_rgb8_frames_with_metadata_check(
             )),
         )?;
     }
-    if matches!(profile.kind, NativeRgb8CodecKind::LtxvH264) {
+    if matches!(profile.kind, NativePackedCodecKind::LtxvH264) {
         check_ltxv_native_status(
             "set preset option",
             checked_native_call!((functions.av_dict_set)(
@@ -4546,7 +4648,7 @@ fn encode_rgb8_frames_with_metadata_check(
         free: functions.sws_free_context,
     };
     let source_stride = width
-        .checked_mul(profile.source_channels)
+        .checked_mul(profile.source_bytes_per_pixel)
         .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
     let mut source_line_size = [0_i32; abi::AV_NUM_DATA_POINTERS];
     source_line_size[0] = source_stride;
@@ -4565,7 +4667,7 @@ fn encode_rgb8_frames_with_metadata_check(
                 .ok()
                 .and_then(|width| width.checked_mul(usize::try_from(height).ok()?))
                 .and_then(|pixels| {
-                    pixels.checked_mul(usize::try_from(profile.source_channels).ok()?)
+                    pixels.checked_mul(usize::try_from(profile.source_bytes_per_pixel).ok()?)
                 })
                 .ok_or(NativeVideoCodecLtxvEncodeError::InvalidInput)?;
             if input.len() != expected_bytes {
@@ -4600,7 +4702,7 @@ fn encode_rgb8_frames_with_metadata_check(
                     frame.pointer.as_ptr(),
                 )),
             )?;
-            drain_rgb8_encode_packets(
+            drain_packed_encode_packets(
                 false,
                 profile,
                 codec.pointer,
@@ -4629,7 +4731,7 @@ fn encode_rgb8_frames_with_metadata_check(
             std::ptr::null(),
         )),
     )?;
-    drain_rgb8_encode_packets(
+    drain_packed_encode_packets(
         true,
         profile,
         codec.pointer,
@@ -4661,9 +4763,9 @@ fn encode_rgb8_frames_with_metadata_check(
     dead_code,
     reason = "consumed by the following retained H.264 decode leaf"
 )]
-fn drain_rgb8_encode_packets(
+fn drain_packed_encode_packets(
     flushing: bool,
-    profile: NativeRgb8EncodeProfile,
+    profile: NativePackedEncodeProfile,
     codec: NonNull<abi::AvCodecContext>,
     packet: NonNull<abi::AvPacket>,
     stream: NonNull<abi::AvStream>,
@@ -4673,7 +4775,7 @@ fn drain_rgb8_encode_packets(
     remaining_iterations: &mut usize,
     check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
-    if matches!(profile.kind, NativeRgb8CodecKind::LtxvH264) {
+    if matches!(profile.kind, NativePackedCodecKind::LtxvH264) {
         return drain_ltxv_h264_packets(
             flushing,
             codec,
@@ -4686,7 +4788,7 @@ fn drain_rgb8_encode_packets(
             check_cancellation,
         );
     }
-    drain_rgb8_encode_packets_inner(
+    drain_packed_encode_packets_inner(
         flushing,
         profile,
         codec,
@@ -4712,9 +4814,9 @@ fn drain_ltxv_h264_packets(
     remaining_iterations: &mut usize,
     check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
-    drain_rgb8_encode_packets_inner(
+    drain_packed_encode_packets_inner(
         flushing,
-        NativeRgb8EncodeProfile::ltxv_h264(0),
+        NativePackedEncodeProfile::ltxv_h264(0),
         codec,
         packet,
         stream,
@@ -4727,9 +4829,9 @@ fn drain_ltxv_h264_packets(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn drain_rgb8_encode_packets_inner(
+fn drain_packed_encode_packets_inner(
     flushing: bool,
-    profile: NativeRgb8EncodeProfile,
+    profile: NativePackedEncodeProfile,
     codec: NonNull<abi::AvCodecContext>,
     packet: NonNull<abi::AvPacket>,
     stream: NonNull<abi::AvStream>,
@@ -8752,8 +8854,8 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| { consume(&[1_u8; 12]) };
-        encode_rgb8_frames_with_metadata_check(
-            NativeRgb8EncodeProfile::vp9_webm(
+        encode_packed_frames_with_metadata_check(
+            NativePackedEncodeProfile::vp9_webm(
                 checked_vp9_frame_rate((2_997, 125))?,
                 NativeVideoCrf::checked(31.5)?,
             ),
@@ -8821,7 +8923,7 @@ mod tests {
         let (backend, context) = avio_context(&cancellation, 64 * 1024)?;
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
-        let profile = NativeRgb8EncodeProfile::vp9_webm(
+        let profile = NativePackedEncodeProfile::vp9_webm(
             checked_vp9_frame_rate((2_997, 125))?,
             NativeVideoCrf::checked(31.5)?,
         );
@@ -8843,7 +8945,7 @@ mod tests {
                 (),
                 NativeVideoCodecLtxvEncodeError,
             >| { consume(&[1_u8; 12]) };
-            let result = encode_rgb8_frames_with_metadata_check(
+            let result = encode_packed_frames_with_metadata_check(
                 profile,
                 encoder,
                 1,
@@ -8899,7 +9001,7 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| { consume(&[1_u8; 12]) };
-        encode_rgb8_frames_with_metadata_check(
+        encode_packed_frames_with_metadata_check(
             profile,
             encoder,
             1,
@@ -8929,7 +9031,7 @@ mod tests {
                 NativeVideoCodecLtxvEncodeError,
             >| { consume(&[1_u8; 12]) };
             assert!(matches!(
-                encode_rgb8_frames_with_metadata_check(
+                encode_packed_frames_with_metadata_check(
                     profile,
                     encoder,
                     1,
@@ -8964,7 +9066,7 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| { consume(&[1_u8; 12]) };
-        encode_rgb8_frames_with_metadata_check(
+        encode_packed_frames_with_metadata_check(
             profile,
             encoder,
             1,
@@ -9020,8 +9122,8 @@ mod tests {
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
         let frame_rate = checked_vp9_frame_rate((2_997, 125))?;
-        encode_rgb8_frame_with_check(
-            NativeRgb8EncodeProfile::vp9_webm(frame_rate, NativeVideoCrf::checked(31.5)?),
+        encode_packed_frame_with_check(
+            NativePackedEncodeProfile::vp9_webm(frame_rate, NativeVideoCrf::checked(31.5)?),
             encoder,
             &[1_u8; 12],
             2,
@@ -9128,7 +9230,7 @@ mod tests {
         assert_eq!((bytes.len(), width, height), (45, 5, 3));
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
-        let profile = NativeRgb8EncodeProfile::vp9_webm(
+        let profile = NativePackedEncodeProfile::vp9_webm(
             checked_vp9_frame_rate((2_997, 125))?,
             NativeVideoCrf::checked(63.0)?,
         );
@@ -9138,7 +9240,7 @@ mod tests {
             .map_err(|_| "encode failure mutex was poisoned")? = Some("codec_open");
         let mut failed_output = mock_encode_output(&backend, &context, 64)?;
         assert!(matches!(
-            encode_rgb8_frame_with_check(
+            encode_packed_frame_with_check(
                 profile,
                 encoder,
                 bytes,
@@ -9159,7 +9261,7 @@ mod tests {
         reset_encode_fixture()?;
         let mut limited_output = mock_encode_output(&backend, &context, 2)?;
         assert!(matches!(
-            encode_rgb8_frame_with_check(
+            encode_packed_frame_with_check(
                 profile,
                 encoder,
                 bytes,
@@ -9180,7 +9282,7 @@ mod tests {
         reset_encode_fixture()?;
         let mut iteration_limited_output = mock_encode_output(&backend, &context, 64)?;
         assert!(matches!(
-            encode_rgb8_frame_with_check(
+            encode_packed_frame_with_check(
                 profile,
                 encoder,
                 bytes,
@@ -9199,7 +9301,7 @@ mod tests {
         reset_encode_fixture()?;
         let mut successful_output = mock_encode_output(&backend, &context, 64)?;
         let mut successful_checks = 0;
-        encode_rgb8_frame_with_check(
+        encode_packed_frame_with_check(
             profile,
             encoder,
             bytes,
@@ -9219,7 +9321,7 @@ mod tests {
             let mut output = mock_encode_output(&backend, &context, 64)?;
             let mut checks = 0;
             assert!(matches!(
-                encode_rgb8_frame_with_check(
+                encode_packed_frame_with_check(
                     profile,
                     encoder,
                     bytes,
@@ -9244,7 +9346,7 @@ mod tests {
         }
         reset_encode_fixture()?;
         let mut retry_output = mock_encode_output(&backend, &context, 64)?;
-        encode_rgb8_frame_with_check(
+        encode_packed_frame_with_check(
             profile,
             encoder,
             bytes,
@@ -9282,7 +9384,13 @@ mod tests {
         let limits = NativeH264Mp4SequenceLimits::checked(64, 64, 1, 16, 3, 4)?;
         let (frame_count, width, height) = validate_h264_image_batch(&images, limits, &context)?;
         assert_eq!((frame_count, width, height), (3, 2, 2));
-        let staged = source_compatible_h264_rgb8_frame(&images, 0, &backend, &context)?;
+        let staged = source_compatible_h264_packed_frame(
+            &images,
+            0,
+            NativeH264Mp4PixelMode::EightBit,
+            &backend,
+            &context,
+        )?;
         assert_eq!(
             &*staged,
             &[0, 127, 255, 0, 127, 255, 0, 127, 255, 0, 127, 255]
@@ -9299,12 +9407,20 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| {
-            let frame =
-                source_compatible_h264_rgb8_frame(&images, frame_index, &backend, &context)?;
+            let frame = source_compatible_h264_packed_frame(
+                &images,
+                frame_index,
+                NativeH264Mp4PixelMode::EightBit,
+                &backend,
+                &context,
+            )?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_check(
-            NativeRgb8EncodeProfile::component_h264(checked_h264_frame_rate((2_997, 100))?),
+        encode_packed_frames_with_check(
+            NativePackedEncodeProfile::component_h264(
+                checked_h264_frame_rate((2_997, 100))?,
+                NativeH264Mp4PixelMode::EightBit,
+            ),
             encoder,
             frame_count,
             width,
@@ -9365,6 +9481,78 @@ mod tests {
     }
 
     #[test]
+    fn retained_h264_mp4_10bit_sequence_uses_rgb48le_staging_and_yuv420p10le()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let _test_serial_guard = TEST_SERIAL
+            .lock()
+            .map_err(|_| "video codec test mutex was poisoned")?;
+        reset_encode_fixture()?;
+        take_avio_events()?;
+        let cancellation = CancellationToken::default();
+        let (backend, context) = avio_context(&cancellation, 256 * 1024)?;
+        let mut values = Vec::new();
+        for _pixel in 0..4 {
+            values.extend_from_slice(&[-1.0, 0.5, 2.0, 0.25]);
+        }
+        let images = ImageTensor::from_f32(&backend, &context, 1, 2, 2, 4, &values)?;
+        let staged = source_compatible_h264_packed_frame(
+            &images,
+            0,
+            NativeH264Mp4PixelMode::TenBit,
+            &backend,
+            &context,
+        )?;
+        assert_eq!(
+            &*staged,
+            &[
+                0, 0, 255, 127, 255, 255, 0, 0, 255, 127, 255, 255, 0, 0, 255, 127, 255, 255, 0, 0,
+                255, 127, 255, 255,
+            ]
+        );
+
+        let mut output = mock_encode_output(&backend, &context, 64)?;
+        let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
+            .ok_or("mock encoder allocation failed")?;
+        let mut provide_frame = |_frame_index: usize,
+                                 consume: &mut dyn FnMut(
+            &[u8],
+        ) -> Result<
+            (),
+            NativeVideoCodecLtxvEncodeError,
+        >| consume(&staged);
+        encode_packed_frames_with_check(
+            NativePackedEncodeProfile::component_h264(
+                checked_h264_frame_rate((24, 1))?,
+                NativeH264Mp4PixelMode::TenBit,
+            ),
+            encoder,
+            1,
+            2,
+            2,
+            8,
+            &mock_encode_functions(),
+            &mut output,
+            &mut provide_frame,
+            &mut || cancellation.check(),
+        )?;
+        assert_eq!(output.staged_bytes()?, b"HPT");
+        drop(output);
+        drop(staged);
+        drop(unsafe { Box::from_raw(encoder.as_ptr().cast::<u8>()) });
+        assert_eq!(context.scratch.in_use_bytes(), 0);
+        let events = take_encode_events()?;
+        assert!(
+            events
+                .iter()
+                .any(|event| event == "option:pixel_format=yuv420p10le")
+        );
+        assert!(events.iter().any(|event| event == "sws_alloc:35->62"));
+        assert!(!events.iter().any(|event| event.starts_with("dict:crf=")));
+        assert!(!events.iter().any(|event| event.starts_with("dict:preset=")));
+        Ok(())
+    }
+
+    #[test]
     fn retained_h264_mp4_sequence_later_failure_cancellation_and_retry_are_atomic()
     -> Result<(), Box<dyn std::error::Error>> {
         let _test_serial_guard = TEST_SERIAL
@@ -9383,7 +9571,10 @@ mod tests {
             ),
             Err(NativeVideoCodecH264EncodeError::InvalidBatch)
         ));
-        let profile = NativeRgb8EncodeProfile::component_h264(checked_h264_frame_rate((24, 1))?);
+        let profile = NativePackedEncodeProfile::component_h264(
+            checked_h264_frame_rate((24, 1))?,
+            NativeH264Mp4PixelMode::EightBit,
+        );
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
 
@@ -9399,12 +9590,17 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| {
-            let frame =
-                source_compatible_h264_rgb8_frame(&images, frame_index, &backend, &context)?;
+            let frame = source_compatible_h264_packed_frame(
+                &images,
+                frame_index,
+                NativeH264Mp4PixelMode::EightBit,
+                &backend,
+                &context,
+            )?;
             consume(&frame)
         };
         assert!(matches!(
-            encode_rgb8_frames_with_check(
+            encode_packed_frames_with_check(
                 profile,
                 encoder,
                 3,
@@ -9435,12 +9631,17 @@ mod tests {
             if frame_index == 1 {
                 return Err(NativeVideoCodecLtxvEncodeError::Cancelled);
             }
-            let frame =
-                source_compatible_h264_rgb8_frame(&images, frame_index, &backend, &context)?;
+            let frame = source_compatible_h264_packed_frame(
+                &images,
+                frame_index,
+                NativeH264Mp4PixelMode::EightBit,
+                &backend,
+                &context,
+            )?;
             consume(&frame)
         };
         assert!(matches!(
-            encode_rgb8_frames_with_check(
+            encode_packed_frames_with_check(
                 profile,
                 encoder,
                 3,
@@ -9466,11 +9667,16 @@ mod tests {
             (),
             NativeVideoCodecLtxvEncodeError,
         >| {
-            let frame =
-                source_compatible_h264_rgb8_frame(&images, frame_index, &backend, &context)?;
+            let frame = source_compatible_h264_packed_frame(
+                &images,
+                frame_index,
+                NativeH264Mp4PixelMode::EightBit,
+                &backend,
+                &context,
+            )?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_check(
+        encode_packed_frames_with_check(
             profile,
             encoder,
             3,
@@ -9528,8 +9734,8 @@ mod tests {
             let frame = source_compatible_vp9_rgb8_frame(&images, frame_index, &backend, &context)?;
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
-        encode_rgb8_frames_with_check(
-            NativeRgb8EncodeProfile::vp9_webm(
+        encode_packed_frames_with_check(
+            NativePackedEncodeProfile::vp9_webm(
                 checked_vp9_frame_rate((2_997, 125))?,
                 NativeVideoCrf::checked(32.0)?,
             ),
@@ -9634,8 +9840,8 @@ mod tests {
                 source_compatible_vp9_rgba8_frame(&images, frame_index, &backend, &context)?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_metadata_check(
-            NativeRgb8EncodeProfile::vp9_webm_alpha(
+        encode_packed_frames_with_metadata_check(
+            NativePackedEncodeProfile::vp9_webm_alpha(
                 checked_vp9_frame_rate((2_997, 125))?,
                 NativeVideoCrf::checked(31.5)?,
             ),
@@ -9796,8 +10002,8 @@ mod tests {
             let frame = source_compatible_av1_rgb8_frame(&images, frame_index, &backend, &context)?;
             consume(&frame)
         };
-        encode_rgb8_frames_with_metadata_check(
-            NativeRgb8EncodeProfile::av1_webm(
+        encode_packed_frames_with_metadata_check(
+            NativePackedEncodeProfile::av1_webm(
                 checked_vp9_frame_rate((2_997, 125))?,
                 NativeVideoCrf::checked(31.5)?,
             ),
@@ -9958,8 +10164,8 @@ mod tests {
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
         assert!(matches!(
-            encode_rgb8_frames_with_check(
-                NativeRgb8EncodeProfile::vp9_webm(
+            encode_packed_frames_with_check(
+                NativePackedEncodeProfile::vp9_webm(
                     checked_vp9_frame_rate((2_997, 125))?,
                     NativeVideoCrf::checked(32.0)?,
                 ),
@@ -9992,7 +10198,7 @@ mod tests {
         let images = ImageTensor::from_f32(&backend, &context, 3, 2, 2, 3, &[0.5; 36])?;
         let encoder = NonNull::new(Box::into_raw(Box::new(0_u8)).cast::<abi::AvCodec>())
             .ok_or("mock encoder allocation failed")?;
-        let profile = NativeRgb8EncodeProfile::vp9_webm(
+        let profile = NativePackedEncodeProfile::vp9_webm(
             checked_vp9_frame_rate((2_997, 125))?,
             NativeVideoCrf::checked(32.0)?,
         );
@@ -10013,7 +10219,7 @@ mod tests {
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
         assert!(matches!(
-            encode_rgb8_frames_with_check(
+            encode_packed_frames_with_check(
                 profile,
                 encoder,
                 3,
@@ -10048,7 +10254,7 @@ mod tests {
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
         assert!(matches!(
-            encode_rgb8_frames_with_check(
+            encode_packed_frames_with_check(
                 profile,
                 encoder,
                 3,
@@ -10077,7 +10283,7 @@ mod tests {
             let frame = source_compatible_vp9_rgb8_frame(&images, frame_index, &backend, &context)?;
             consume(frame.as_u8_slice().map_err(map_vp9_staging_tensor_error)?)
         };
-        encode_rgb8_frames_with_check(
+        encode_packed_frames_with_check(
             profile,
             encoder,
             3,

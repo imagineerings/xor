@@ -84,6 +84,7 @@ pub(crate) const AV_PIXEL_FORMAT_YUV420P: c_int = 0;
 pub(crate) const AV_PIXEL_FORMAT_RGB24: c_int = 2;
 pub(crate) const AV_PIXEL_FORMAT_RGBA: c_int = 26;
 pub(crate) const AV_PIXEL_FORMAT_YUVA420P: c_int = 33;
+pub(crate) const AV_PIXEL_FORMAT_RGB48LE: c_int = 35;
 pub(crate) const AV_PIXEL_FORMAT_YUV420P10LE: c_int = 62;
 pub(crate) const AV_NO_PRESENTATION_TIMESTAMP: i64 = i64::MIN;
 pub(crate) const AV_SEEK_SIZE: c_int = 0x1_0000;
@@ -546,6 +547,7 @@ mod tests {
         assert_eq!(AV_PIXEL_FORMAT_RGB24, 2);
         assert_eq!(AV_PIXEL_FORMAT_RGBA, 26);
         assert_eq!(AV_PIXEL_FORMAT_YUVA420P, 33);
+        assert_eq!(AV_PIXEL_FORMAT_RGB48LE, 35);
         assert_eq!(AV_PIXEL_FORMAT_YUV420P10LE, 62);
         assert_eq!(AV_NO_PRESENTATION_TIMESTAMP, i64::MIN);
         assert_eq!(AV_SEEK_SIZE, 0x1_0000);
@@ -750,6 +752,28 @@ mod tests {
             manifest["pixel_formats"],
             serde_json::json!({
                 "AV_PIX_FMT_RGB24": AV_PIXEL_FORMAT_RGB24,
+                "AV_PIX_FMT_YUV420P10LE": AV_PIXEL_FORMAT_YUV420P10LE
+            })
+        );
+    }
+
+    #[test]
+    fn h264_mp4_10bit_manifest_matches_compiled_pixel_formats() {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../abi/video-codec/ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json"
+        ))
+        .expect("reviewed ten-bit H.264 MP4 ABI manifest must be valid JSON");
+        assert_eq!(
+            manifest["source"]["archive_sha256"],
+            FFMPEG_7_1_SOURCE_ARCHIVE_SHA256
+        );
+        assert_eq!(manifest["target"], "x86_64-unknown-linux-gnu");
+        assert_eq!(manifest["contract"]["symbol_count"], 54);
+        assert_eq!(manifest["contract"]["new_symbols"], 0);
+        assert_eq!(
+            manifest["pixel_formats"],
+            serde_json::json!({
+                "AV_PIX_FMT_RGB48LE": AV_PIXEL_FORMAT_RGB48LE,
                 "AV_PIX_FMT_YUV420P10LE": AV_PIXEL_FORMAT_YUV420P10LE
             })
         );

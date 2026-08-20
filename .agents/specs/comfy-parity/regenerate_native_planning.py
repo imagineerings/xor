@@ -11548,6 +11548,79 @@ def native_video_backing_representation_foundation_task(dependency: str) -> dict
     )
 
 
+def native_video_codec_h264_mp4_10bit_sequence_encode_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-h264-mp4-10bit-sequence-encode-foundation",
+        "Encode bounded ten-bit component IMAGE sequences to H.264 MP4",
+        [28, 29, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The retained provider-proved libx264 suite encodes bounded CPU F32 BHWC three- or four-channel component IMAGE sequences through the existing one-session H.264 MP4 state machine at ten-bit depth. It stages only the first three channels as source-compatible clamped and truncated little-endian RGB48LE, converts to compiler-reviewed YUV420P10LE, preserves exact reduced rate, frame order, packet bounds, flush, trailer, cancellation, reverse cleanup, and retry semantics, and leaves the reviewed 54-symbol table unchanged. Actor transport, canonical encoded backing, AAC/audio, metadata, trim windows, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and installed/playable/numeric codec evidence remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-av1-pixel-format-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-av1-pixel-format-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-h264-mp4-10bit-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-h264-mp4-10bit-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-sequence-encode/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused compiler/Rust/JSON ABI tests prove RGB48LE=35 and YUV420P10LE=62 with zero new symbols. Exact-signature retained-session tests prove source multiply/clamp/truncate U16 little-endian RGB staging with alpha discard, RGB48LE-to-YUV420P10LE profile selection, exact reduced rate and no ordinary CRF/preset, bounded output and packet ownership, one flush and trailer, cancellation and later-frame failure cleanup, zero scratch after drop, and clean retry while the eight-bit H.264, VP9, AV1, and LTXV paths remain unchanged. The fixture explicitly excludes actor/node/backing/slice/effect reachability, AAC/audio, metadata, paths, handles, cache, persistence, recovery, publication, installed/playable/numeric codec proof, PyAV byte identity, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "28.6",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -15098,8 +15171,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_component_h264_mp4_backing_service_foundation["id"])
         )
     )
+    video_codec_h264_mp4_10bit_sequence_encode_foundation = (
+        native_video_codec_h264_mp4_10bit_sequence_encode_foundation_task(
+            str(video_backing_representation_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_backing_representation_foundation["id"])
+        str(video_codec_h264_mp4_10bit_sequence_encode_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -15257,6 +15335,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_h264_mp4_thread_bridge_foundation,
         video_component_h264_mp4_backing_service_foundation,
         video_backing_representation_foundation,
+        video_codec_h264_mp4_10bit_sequence_encode_foundation,
         video_foundation,
         detection_foundation,
         ]
