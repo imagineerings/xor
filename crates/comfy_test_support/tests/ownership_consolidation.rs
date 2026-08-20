@@ -14906,7 +14906,7 @@ fn val_ownership_native_video_codec_suite_admission_001() -> Result<(), Box<dyn 
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
         ".admit_ltxv_h264(&startup_cancellation)",
         ".admit_video_suite(&startup_cancellation)",
         "codec: &NativeVideoCodecSuite",
@@ -14969,12 +14969,12 @@ fn val_ownership_native_video_codec_vp9_webm_encode_001() -> Result<(), Box<dyn 
         "pub(crate) fn encode_vp9_rgb8_frame",
         "self.vpx_vp9_encoder",
         "open_bounded_avio_output",
-        "NativeRgb8EncodeProfile::vp9_webm",
+        "NativePackedEncodeProfile::vp9_webm",
         "c\"webm\"",
         "c\"yuv420p\"",
         "c\"framerate\"",
         "c\"b\"",
-        "drain_rgb8_encode_packets",
+        "drain_packed_encode_packets",
         "retained_vp9_webm_encode_uses_exact_profile_rate_packets_and_cleanup",
         "retained_vp9_webm_encode_validates_bounds_cancellation_and_retry",
     ] {
@@ -15044,7 +15044,7 @@ fn val_ownership_native_video_codec_vp9_webm_batch_encode_001()
         "pub(crate) fn encode_vp9_webm_batch",
         "validate_vp9_image_batch",
         "source_compatible_vp9_rgb8_frame",
-        "encode_rgb8_frames_with_check",
+        "encode_packed_frames_with_check",
         "av_frame_make_writable",
         "presentation_timestamp = frame_timestamp",
         "retained_vp9_webm_batch_encode_reuses_one_session_and_preserves_order",
@@ -15211,7 +15211,7 @@ fn val_ownership_native_video_codec_av1_webm_thread_bridge_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
         "pub(crate) struct NativeOwnedAv1Webm",
         "EncodeAv1Webm",
         "Av1Webm(NativeOwnedAv1Webm)",
@@ -15306,7 +15306,7 @@ fn val_ownership_native_video_codec_h264_mp4_thread_bridge_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
         "pub(crate) struct NativeOwnedH264Mp4",
         "EncodeH264Mp4",
         "H264Mp4(NativeOwnedH264Mp4)",
@@ -15831,8 +15831,8 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
 
     let ffi = fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_ffi.rs"))?;
     for required in [
-        "enum NativeRgb8Crf",
-        "NativeRgb8Crf::SourceFloat",
+        "enum NativePackedCrf",
+        "NativePackedCrf::SourceFloat",
         "write_python_float",
         "retained_vp9_webm_crf_formats_source_float_without_integer_narrowing",
         "dict:crf=31.5",
@@ -15856,7 +15856,7 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
         "NativeVideoCrf",
         "crf.bits() != 31.5_f64.to_bits()",
         "NativeVideoCrf::checked(31.5)",
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
     ] {
         assert!(service.contains(required), "VP9 CRF actor lacks {required}");
     }
@@ -15933,7 +15933,7 @@ fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
         "struct NativeVideoContainerMetadataLimits",
         "struct NativeVideoContainerMetadata",
         "encode_vp9_webm_batch_with_metadata",
-        "encode_rgb8_frames_with_metadata_check",
+        "encode_packed_frames_with_metadata_check",
         "set WebM container metadata",
         "retained_vp9_webm_container_metadata_is_bounded_ordered_and_preheader",
         "retained_vp9_webm_container_metadata_failure_cancellation_and_retry_are_atomic",
@@ -15957,7 +15957,7 @@ fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
         "metadata: NativeVideoContainerMetadata",
         "encode_vp9_webm_batch_with_metadata",
         "metadata.entries()",
@@ -16069,7 +16069,7 @@ fn val_ownership_native_video_codec_vp9_webm_alpha_001() -> Result<(), Box<dyn s
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v8",
+        "sim.comfy.video-codec-thread.v9",
         "has_alpha: bool",
         "pub(crate) fn has_alpha",
         "encoded.has_alpha()",
@@ -16403,6 +16403,91 @@ fn val_ownership_native_video_codec_h264_mp4_10bit_sequence_encode_001()
 }
 
 #[test]
+fn val_ownership_native_video_codec_h264_mp4_10bit_thread_bridge_001()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = repository_root()?;
+    let service =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    for required in [
+        "sim.comfy.video-codec-thread.v9",
+        "bit_depth: NativeVideoBitDepth",
+        "pub(crate) fn encode_h264_mp4_10bit_batch",
+        "encode_h264_mp4_batch_with_bit_depth",
+        "NativeVideoBitDepth::Ten =>",
+        ".encode_h264_mp4_10bit_batch(",
+        "let bit_depth = encoded.bit_depth()",
+        "NativeVideoPixelFormat::Yuv420p10le",
+        "materialize_h264_mp4_result",
+        "materialize_owned_encoded_bytes",
+        "drop(encoded)",
+        "retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv",
+        "owned_encoded_output_materialization_is_accounted_atomic_and_retryable",
+    ] {
+        assert!(
+            service.contains(required),
+            "ten-bit H.264 actor bridge lacks {required}"
+        );
+    }
+    for forbidden in [
+        "unsafe impl Send for NativeH264Mp4",
+        "unsafe impl Sync for NativeH264Mp4",
+        "unsafe impl Send for NativeOwnedH264Mp4",
+        "unsafe impl Sync for NativeOwnedH264Mp4",
+        "OutputCommitter",
+    ] {
+        assert!(
+            !service.contains(forbidden),
+            "ten-bit H.264 actor bridge exposes forbidden {forbidden}"
+        );
+    }
+
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-retained-h264-mp4-10bit-owned-tensor-thread-bridge",
+        "sim.comfy.video-codec-thread.v9",
+        "one_deliberate_post_encode_copy_observed",
+        "native_or_workspace_owner_crosses_thread_response",
+        "public_node_backing_video_slice_save_effect_path_or_output_committer_reachable",
+        "media_payload_or_handle_published",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "ten-bit H.264 actor fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    let task_id = "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation";
+    let mapped_concerns = concerns
+        .iter()
+        .filter(|concern| {
+            concern
+                .get("consolidation_tasks")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(mapped_concerns.len(), 2);
+    for expected in [
+        "native_video_reviewed_codec_registry_h264_mp4_thread_bridge",
+        "native_video_reviewed_codec_registry_ltxv_thread_service",
+    ] {
+        assert!(mapped_concerns.iter().any(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str) == Some(expected)
+        }));
+    }
+    Ok(())
+}
+
+#[test]
 fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
@@ -16416,7 +16501,7 @@ fn val_ownership_native_video_codec_ltxv_h264_mp4_encode_001()
         "c\"mp4\"",
         "c\"yuv420p\"",
         "c\"veryfast\"",
-        "drain_rgb8_encode_packets",
+        "drain_packed_encode_packets",
         "retained_ltxv_h264_mp4_encode_uses_exact_options_packets_and_cleanup",
         "retained_ltxv_h264_mp4_encode_failure_and_cancellation_are_atomic",
     ] {
@@ -16848,7 +16933,8 @@ fn val_ownership_native_video_codec_ltxv_node_service_001() -> Result<(), Box<dy
     for required in [
         "ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>",
         "service.identity().configuration_sha256()",
-        ":ltxv={ltxv_identity}",
+        "configuration_token.push_str(\":ltxv=\")",
+        "configuration_token.push_str(ltxv_identity)",
         "engine = engine.with_ltxv_preprocess_service(ltxv_preprocess_service.clone())",
         "IdentityLtxvPreprocessService",
     ] {

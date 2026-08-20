@@ -123,12 +123,12 @@
         {
           "name": "vp9-webm-batch-encode-stages-source-image-frames-in-order",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "encode_vp9_webm_batch[\\s\\S]*validate_vp9_image_batch[\\s\\S]*source_compatible_vp9_rgb8_frame[\\s\\S]*encode_rgb8_frames_with_check"
+          "pattern": "encode_vp9_webm_batch[\\s\\S]*validate_vp9_image_batch[\\s\\S]*source_compatible_vp9_rgb8_frame[\\s\\S]*encode_packed_frames_with_check"
         },
         {
           "name": "vp9-webm-batch-encode-reuses-one-session-with-pts-and-final-flush",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "for frame_index in 0..frame_count[\\s\\S]*av_frame_make_writable[\\s\\S]*presentation_timestamp = frame_timestamp[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*send_frame[\\s\\S]*null"
+          "pattern": "for frame_index in 0..frame_count[\\s\\S]*av_frame_make_writable[\\s\\S]*presentation_timestamp = frame_timestamp[\\s\\S]*drain_packed_encode_packets[\\s\\S]*send_frame[\\s\\S]*null"
         },
         {
           "name": "vp9-webm-batch-encode-tests-order-bounds-failure-and-retry",
@@ -14832,7 +14832,7 @@
         "NativeAv1Webm",
         "NativeVideoCodecAv1EncodeError",
         "NativeVideoCodecSuite::encode_av1_webm_batch_with_metadata",
-        "NativeRgb8EncodeProfile::av1_webm",
+        "NativePackedEncodeProfile::av1_webm",
         "source_compatible_av1_rgb8_frame"
       ],
       "allowed_adapters": [
@@ -14873,7 +14873,7 @@
         {
           "name": "av1-webm-encode-preserves-crf-preset-global-header-and-metadata",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativeRgb8CodecKind::Av1[\\s\\S]*write_python_float[\\s\\S]*c\"preset\"[\\s\\S]*c\"6\"[\\s\\S]*AV_CODEC_FLAG_GLOBAL_HEADER[\\s\\S]*set WebM container metadata"
+          "pattern": "NativePackedCodecKind::Av1[\\s\\S]*write_python_float[\\s\\S]*c\"preset\"[\\s\\S]*c\"6\"[\\s\\S]*AV_CODEC_FLAG_GLOBAL_HEADER[\\s\\S]*set WebM container metadata"
         },
         {
           "name": "av1-webm-encode-discards-source-alpha-with-bounded-staging",
@@ -14996,7 +14996,7 @@
         {
           "name": "av1-webm-thread-bridge-reuses-current-mixed-actor-and-accounting-tests",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "av1-webm-thread-bridge-fixture-bounds-evidence-claims",
@@ -15170,7 +15170,10 @@
         "NativeVideoCodecThreadOperation::EncodeH264Mp4",
         "NativeVideoCodecThreadOutput::H264Mp4",
         "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_10bit_batch",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch_with_bit_depth",
         "process_h264_mp4_request",
+        "materialize_h264_mp4_result",
         "materialize_owned_h264_mp4",
         "materialize_owned_encoded_bytes"
       ],
@@ -15198,19 +15201,21 @@
       ],
       "call_symbols": [
         "NativeVideoCodecSuite::encode_h264_mp4_batch",
+        "NativeVideoCodecSuite::encode_h264_mp4_10bit_batch",
         "CpuBackend::upload_bytes",
-        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch"
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_10bit_batch"
       ],
       "required_mappings": [
         {
           "name": "h264-mp4-thread-bridge-shares-one-bounded-actor-and-caller-authority",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeLtxvCodecThreadInvocation[\\s\\S]*scratch: ScratchReservation[\\s\\S]*cancellation: CancellationToken[\\s\\S]*NativeVideoCodecThreadOperation[\\s\\S]*EncodeH264Mp4[\\s\\S]*try_send[\\s\\S]*sync_channel\\(1\\)"
+          "pattern": "NativeLtxvCodecThreadInvocation[\\s\\S]*scratch: ScratchReservation[\\s\\S]*cancellation: CancellationToken[\\s\\S]*NativeVideoCodecThreadOperation[\\s\\S]*EncodeH264Mp4[\\s\\S]*bit_depth: NativeVideoBitDepth[\\s\\S]*try_send[\\s\\S]*sync_channel\\(1\\)"
         },
         {
           "name": "h264-mp4-thread-bridge-drops-native-session-before-portable-response",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "process_h264_mp4_request[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*encoded_bytes[\\s\\S]*materialize_owned_h264_mp4[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
+          "pattern": "process_h264_mp4_request[\\s\\S]*NativeVideoBitDepth::Eight[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*NativeVideoBitDepth::Ten[\\s\\S]*encode_h264_mp4_10bit_batch[\\s\\S]*materialize_h264_mp4_result[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
         },
         {
           "name": "h264-mp4-thread-bridge-shares-exact-accounted-u8-materializer",
@@ -15218,25 +15223,31 @@
           "pattern": "materialize_owned_h264_mp4[\\s\\S]*materialize_owned_encoded_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
         },
         {
-          "name": "h264-mp4-thread-bridge-projects-eight-bit-non-alpha-portable-output",
+          "name": "h264-mp4-thread-bridge-projects-closed-depth-non-alpha-portable-output",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeOwnedH264Mp4[\\s\\S]*NativeVideoBitDepth::Eight[\\s\\S]*NativeVideoPixelFormat::Yuv420p[\\s\\S]*has_alpha[\\s\\S]*false[\\s\\S]*NativeVideoCodec::H264[\\s\\S]*NativeVideoContainer::Mp4"
+          "pattern": "NativeOwnedH264Mp4[\\s\\S]*bit_depth: NativeVideoBitDepth[\\s\\S]*NativeVideoBitDepth::Eight[\\s\\S]*NativeVideoPixelFormat::Yuv420p[\\s\\S]*NativeVideoBitDepth::Ten[\\s\\S]*NativeVideoPixelFormat::Yuv420p10le[\\s\\S]*has_alpha[\\s\\S]*false[\\s\\S]*NativeVideoCodec::H264[\\s\\S]*NativeVideoContainer::Mp4"
         },
         {
-          "name": "h264-mp4-thread-bridge-reuses-v8-mixed-actor-and-accounting-tests",
+          "name": "h264-mp4-thread-bridge-reuses-v9-mixed-actor-and-accounting-tests",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "h264-mp4-thread-bridge-fixture-bounds-evidence-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json",
           "pattern": "synthetic-retained-h264-mp4-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*public_node_service_backing_slice_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
+        },
+        {
+          "name": "h264-mp4-10bit-thread-bridge-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json",
+          "pattern": "synthetic-retained-h264-mp4-10bit-owned-tensor-thread-bridge[\\s\\S]*sim.comfy.video-codec-thread.v9[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*public_node_backing_video_slice_save_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
-        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation"
       ],
       "production_consumers": [
         "the following encoded-backing video service and VideoSlice or SaveVideo adapters"
@@ -15270,7 +15281,7 @@
         "VAL-MEMORY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "One capacity-one retained codec actor carries H.264 requests to the sole native owner thread, drops every borrowed H.264 MP4 owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable eight-bit non-alpha bytes with scratch converged."
+      "decision_reason": "One capacity-one retained codec actor carries closed eight- and ten-bit H.264 requests to the sole native owner thread, drops every borrowed H.264 MP4 owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable depth-exact non-alpha bytes with scratch converged."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_admission",
@@ -15374,7 +15385,7 @@
         "NativeLtxvH264Mp4",
         "NativeLtxvH264Codec::encode_rgb8_frame",
         "encode_ltxv_h264_rgb8_with_check",
-        "drain_rgb8_encode_packets"
+        "drain_packed_encode_packets"
       ],
       "allowed_adapters": [
         "the admitted retained LTXV pair supplies the exact private libx264 encoder descriptor and typed FFmpeg function table",
@@ -15416,7 +15427,7 @@
         {
           "name": "ltxv-h264-encode-bounds-drain-cancellation-and-raii",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_packed_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
         },
         {
           "name": "ltxv-h264-encode-tests-call-order-failure-cancellation-and-cleanup",
@@ -15813,7 +15824,8 @@
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-ltxv-thread-service-foundation",
         "comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation",
-        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation"
       ],
       "production_consumers": [
         "the following worker-owned service provisioning and LTXVPreprocess node adapter"
@@ -15948,21 +15960,21 @@
         "crates/comfy_runtime/src/native_video_codec_ffi.rs"
       ],
       "owner_symbols": [
-        "NativeRgb8Crf",
+        "NativePackedCrf",
         "NativeVp9WebmEncodeLimits",
         "NativeVp9WebmBatchLimits",
         "NativeVideoContainerMetadataLimits",
         "NativeVideoContainerMetadata",
-        "NativeRgb8EncodeProfile",
+        "NativePackedEncodeProfile",
         "NativeVp9Webm",
         "NativeVideoCodecSuite::encode_vp9_rgb8_frame",
         "NativeVideoCodecSuite::encode_vp9_webm_batch",
         "NativeVideoCodecSuite::encode_vp9_webm_batch_with_metadata",
         "encode_rgb8_frame_with_check",
-        "encode_rgb8_frames_with_check",
-        "encode_rgb8_frames_with_metadata_check",
+        "encode_packed_frames_with_check",
+        "encode_packed_frames_with_metadata_check",
         "source_compatible_vp9_rgba8_frame",
-        "drain_rgb8_encode_packets"
+        "drain_packed_encode_packets"
       ],
       "allowed_adapters": [
         "the retained video codec suite supplies the exact private provider-proved libvpx-vp9 descriptor and typed FFmpeg function table",
@@ -15997,7 +16009,7 @@
         {
           "name": "vp9-webm-encode-preserves-source-float-crf",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativeRgb8Crf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
+          "pattern": "NativePackedCrf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
         },
         {
           "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
@@ -16012,7 +16024,7 @@
         {
           "name": "vp9-webm-encode-bounds-drain-cancellation-and-raii",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "maximum_packet_iterations[\\s\\S]*drain_rgb8_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
+          "pattern": "maximum_packet_iterations[\\s\\S]*drain_packed_encode_packets[\\s\\S]*check_cancellation[\\s\\S]*av_packet_unref[\\s\\S]*av_write_trailer"
         },
         {
           "name": "vp9-webm-encode-tests-profile-bounds-cancellation-and-retry",
@@ -16178,7 +16190,7 @@
         {
           "name": "vp9-webm-thread-bridge-carries-source-alpha-projection-without-a-second-actor",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
+          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
         }
       ],
       "known_open_reasons": [],

@@ -36,7 +36,7 @@ use std::{
 use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
-const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v8";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v9";
 #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
 const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1";
 #[allow(
@@ -157,6 +157,7 @@ enum NativeVideoCodecThreadOperation {
         images: ImageTensor,
         frame_rate: (u64, u64),
         limits: NativeH264Mp4SequenceLimits,
+        bit_depth: NativeVideoBitDepth,
     },
 }
 
@@ -179,6 +180,7 @@ pub(crate) struct NativeOwnedH264Mp4 {
     height: i32,
     frame_rate: (i32, i32),
     frame_count: usize,
+    bit_depth: NativeVideoBitDepth,
 }
 
 #[allow(
@@ -207,11 +209,14 @@ impl NativeOwnedH264Mp4 {
     }
 
     pub(crate) const fn bit_depth(&self) -> NativeVideoBitDepth {
-        NativeVideoBitDepth::Eight
+        self.bit_depth
     }
 
     pub(crate) const fn pixel_format(&self) -> NativeVideoPixelFormat {
-        NativeVideoPixelFormat::Yuv420p
+        match self.bit_depth {
+            NativeVideoBitDepth::Eight => NativeVideoPixelFormat::Yuv420p,
+            NativeVideoBitDepth::Ten => NativeVideoPixelFormat::Yuv420p10le,
+        }
     }
 
     pub(crate) const fn has_alpha(&self) -> bool {
@@ -690,11 +695,49 @@ impl NativeLtxvCodecRequestProxy {
         limits: NativeH264Mp4SequenceLimits,
         context: &ExecutionContext<'_>,
     ) -> BoxFuture<'static, Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError>> {
+        self.encode_h264_mp4_batch_with_bit_depth(
+            images,
+            frame_rate,
+            limits,
+            NativeVideoBitDepth::Eight,
+            context,
+        )
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following ten-bit encoded-backing video service"
+    )]
+    pub(crate) fn encode_h264_mp4_10bit_batch(
+        &self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        limits: NativeH264Mp4SequenceLimits,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError>> {
+        self.encode_h264_mp4_batch_with_bit_depth(
+            images,
+            frame_rate,
+            limits,
+            NativeVideoBitDepth::Ten,
+            context,
+        )
+    }
+
+    fn encode_h264_mp4_batch_with_bit_depth(
+        &self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        limits: NativeH264Mp4SequenceLimits,
+        bit_depth: NativeVideoBitDepth,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError>> {
         let result = self.submit(
             NativeVideoCodecThreadOperation::EncodeH264Mp4 {
                 images: images.clone(),
                 frame_rate,
                 limits,
+                bit_depth,
             },
             context,
         );
@@ -990,6 +1033,11 @@ fn checked_component_h264_mp4_backing_result(
     expected_frame_count: u64,
     expected_stream: StreamId,
 ) -> Result<NativeVideoPayload, NativeComponentH264Mp4BackingServiceError> {
+    if output.bit_depth() != NativeVideoBitDepth::Eight
+        || output.pixel_format() != NativeVideoPixelFormat::Yuv420p
+    {
+        return Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection);
+    }
     let (bytes, content_sha256, width, height, frame_rate, frame_count) = output.into_parts();
     let dimensions = (
         u64::try_from(width)
@@ -1410,8 +1458,9 @@ fn process_video_codec_request(
             images,
             frame_rate,
             limits,
+            bit_depth,
         } => NativeVideoCodecThreadOutput::H264Mp4(process_h264_mp4_request(
-            codec, backend, &context, &images, frame_rate, limits,
+            codec, backend, &context, &images, frame_rate, limits, bit_depth,
         )?),
     };
     context
@@ -1517,19 +1566,35 @@ fn process_h264_mp4_request(
     images: &ImageTensor,
     frame_rate: (u64, u64),
     limits: NativeH264Mp4SequenceLimits,
+    bit_depth: NativeVideoBitDepth,
 ) -> Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError> {
     context
         .check()
         .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
-    let encoded = codec
-        .encode_h264_mp4_batch(images, frame_rate, limits, backend, context)
-        .map_err(map_h264_thread_encode_error)?;
+    let encoded = match bit_depth {
+        NativeVideoBitDepth::Eight => {
+            codec.encode_h264_mp4_batch(images, frame_rate, limits, backend, context)
+        }
+        NativeVideoBitDepth::Ten => {
+            codec.encode_h264_mp4_10bit_batch(images, frame_rate, limits, backend, context)
+        }
+    }
+    .map_err(map_h264_thread_encode_error)?;
+    materialize_h264_mp4_result(backend, context, encoded)
+}
+
+fn materialize_h264_mp4_result(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    encoded: crate::NativeH264Mp4<'_>,
+) -> Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError> {
     context
         .check()
         .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
     let (width, height) = encoded.dimensions();
     let frame_rate = encoded.frame_rate();
     let frame_count = encoded.frame_count();
+    let bit_depth = encoded.bit_depth();
     let encoded_bytes = encoded
         .encoded_bytes()
         .map_err(map_h264_thread_encode_error)?;
@@ -1541,6 +1606,7 @@ fn process_h264_mp4_request(
         height,
         frame_rate,
         frame_count,
+        bit_depth,
     )?;
     drop(encoded);
     context
@@ -1602,6 +1668,7 @@ fn materialize_owned_h264_mp4(
     height: i32,
     frame_rate: (i32, i32),
     frame_count: usize,
+    bit_depth: NativeVideoBitDepth,
 ) -> Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError> {
     let (bytes, content_sha256) = materialize_owned_encoded_bytes(backend, context, encoded_bytes)?;
     Ok(NativeOwnedH264Mp4 {
@@ -1611,6 +1678,7 @@ fn materialize_owned_h264_mp4(
         height,
         frame_rate,
         frame_count,
+        bit_depth,
     })
 }
 
@@ -2181,6 +2249,7 @@ mod tests {
                                 images,
                                 frame_rate,
                                 limits,
+                                bit_depth,
                             } => {
                                 if !matches!(images.dimensions(), Ok((3, 2, 2, 4)))
                                     || frame_rate != (2997, 100)
@@ -2189,14 +2258,19 @@ mod tests {
                                 {
                                     return Err(NativeLtxvCodecThreadError::StatePoisoned);
                                 }
+                                let encoded_bytes = match bit_depth {
+                                    NativeVideoBitDepth::Eight => b"HMP4".as_slice(),
+                                    NativeVideoBitDepth::Ten => b"H10P4".as_slice(),
+                                };
                                 let encoded = materialize_owned_h264_mp4(
                                     &actor_backend,
                                     &context,
-                                    b"HMP4",
+                                    encoded_bytes,
                                     2,
                                     2,
                                     (2997, 100),
                                     3,
+                                    bit_depth,
                                 )?;
                                 h264_output_storage_ids
                                     .lock()
@@ -2293,6 +2367,31 @@ mod tests {
         );
         assert_eq!(scratch.in_use_bytes(), 0);
         drop(h264);
+
+        let h264_10bit = block_on(proxy.encode_h264_mp4_10bit_batch(
+            &image,
+            (2997, 100),
+            h264_limits,
+            &context,
+        ))?;
+        assert_eq!(h264_10bit.encoded_bytes()?, b"H10P4");
+        assert_eq!(h264_10bit.dimensions(), (2, 2));
+        assert_eq!(h264_10bit.frame_rate(), (2997, 100));
+        assert_eq!(h264_10bit.frame_count(), 3);
+        assert_eq!(h264_10bit.codec(), NativeVideoCodec::H264);
+        assert_eq!(h264_10bit.container(), NativeVideoContainer::Mp4);
+        assert_eq!(h264_10bit.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(
+            h264_10bit.pixel_format(),
+            NativeVideoPixelFormat::Yuv420p10le
+        );
+        assert!(!h264_10bit.has_alpha());
+        assert_eq!(
+            h264_10bit.content_sha256(),
+            <[u8; 32]>::from(Sha256::digest(b"H10P4"))
+        );
+        assert_eq!(scratch.in_use_bytes(), 0);
+        drop(h264_10bit);
 
         let planning_limits = NativeVideoCodecLimits::checked(4, 1024, 1, 1024)?;
         let backing_service = NativeComponentH264Mp4CodecRequestService::checked(
@@ -2499,7 +2598,7 @@ mod tests {
         assert_ne!(actor_thread, thread::current().id());
         assert_eq!(
             events.iter().filter(|event| event.0 == "request").count(),
-            7
+            8
         );
         assert!(events.iter().all(|event| event.1 == actor_thread));
         Ok(())
@@ -2531,15 +2630,57 @@ mod tests {
         drop(encoded);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline);
 
-        let h264 = materialize_owned_h264_mp4(&backend, &context, b"HMP4", 2, 2, (125, 2997), 3)?;
+        let h264 = materialize_owned_h264_mp4(
+            &backend,
+            &context,
+            b"HMP4",
+            2,
+            2,
+            (125, 2997),
+            3,
+            NativeVideoBitDepth::Eight,
+        )?;
         assert_eq!(h264.encoded_bytes()?, b"HMP4");
         assert_eq!(scratch.in_use_bytes(), 0);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
         drop(h264);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline);
 
-        let mismatched =
-            materialize_owned_h264_mp4(&backend, &context, b"HMP4", 3, 2, (125, 2997), 3)?;
+        let ten_bit = materialize_owned_h264_mp4(
+            &backend,
+            &context,
+            b"H10P4",
+            2,
+            2,
+            (125, 2997),
+            3,
+            NativeVideoBitDepth::Ten,
+        )?;
+        assert_eq!(ten_bit.bit_depth(), NativeVideoBitDepth::Ten);
+        assert_eq!(ten_bit.pixel_format(), NativeVideoPixelFormat::Yuv420p10le);
+        assert!(matches!(
+            checked_component_h264_mp4_backing_result(
+                ten_bit,
+                &source_video,
+                (2, 2),
+                (125, 2997),
+                3,
+                StreamId::DEFAULT,
+            ),
+            Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection)
+        ));
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+
+        let mismatched = materialize_owned_h264_mp4(
+            &backend,
+            &context,
+            b"HMP4",
+            3,
+            2,
+            (125, 2997),
+            3,
+            NativeVideoBitDepth::Eight,
+        )?;
         assert!(matches!(
             checked_component_h264_mp4_backing_result(
                 mismatched,

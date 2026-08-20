@@ -11621,6 +11621,74 @@ def native_video_codec_h264_mp4_10bit_sequence_encode_foundation_task(
     )
 
 
+def native_video_codec_h264_mp4_10bit_thread_bridge_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-codec-h264-mp4-10bit-thread-bridge-foundation",
+        "Carry owned ten-bit H.264 MP4 bytes through the retained codec actor",
+        [28, 29, 31, 32, 34, 35, 41, 42],
+        [17, 18, 19, 25, 27, 28, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The sole capacity-one retained codec actor carries checked ten-bit H.264 IMAGE batches, exact reduced rates, bounded sequence limits, caller scratch, stream, and cancellation to the native owner thread. One closed bit-depth request selects the completed ten-bit retained session, drops every borrowed native and AVIO owner on that thread, reuses the shared exact-length CPU U8 Tensor copy, and returns portable bytes with digest, dimensions, rate, frame count, ten-bit YUV420P10LE identity, and no alpha. Eight-bit H.264, LTXV, VP9, AV1, and component-backing behavior remain unchanged; ten-bit encoded VIDEO backing, AAC/audio, metadata, slicing, effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-sequence-encode/manifest.json",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused actor and ownership tests prove closed ten-bit request carriage through the existing bounded queue and native thread; exact selection of the retained ten-bit H.264 session; one shared checked CPU U8 Tensor materialization; exact bytes, digest, dimensions, reduced rate, frame count, ten-bit YUV420P10LE and no-alpha projections; native-owner drop before response; cancellation and resource-exhaustion atomicity; scratch convergence, persistent output accounting, clean retry, and v9 identity; and unchanged eight-bit H.264, LTXV, VP9, AV1, and component-backing behavior. The fixture explicitly excludes installed or playable codec evidence, PyAV byte identity, AAC/audio, metadata, public node or backing reachability, VideoSlice, SaveVideo effects, paths, handles, cache, persistence, recovery, publication, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "28.6",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "41.3",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -15176,8 +15244,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_backing_representation_foundation["id"])
         )
     )
+    video_codec_h264_mp4_10bit_thread_bridge_foundation = (
+        native_video_codec_h264_mp4_10bit_thread_bridge_foundation_task(
+            str(video_codec_h264_mp4_10bit_sequence_encode_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_h264_mp4_10bit_sequence_encode_foundation["id"])
+        str(video_codec_h264_mp4_10bit_thread_bridge_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -15336,6 +15409,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_component_h264_mp4_backing_service_foundation,
         video_backing_representation_foundation,
         video_codec_h264_mp4_10bit_sequence_encode_foundation,
+        video_codec_h264_mp4_10bit_thread_bridge_foundation,
         video_foundation,
         detection_foundation,
         ]
