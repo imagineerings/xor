@@ -125,8 +125,8 @@ jobs:
       run: ./script/linux
     - name: steps::download_wasi_sdk
       run: ./script/download-wasi-sdk
-    - name: ./script/bundle-linux
-      run: ./script/bundle-linux
+    - name: ./script/bundle-linux --rust-tools
+      run: ./script/bundle-linux --rust-tools
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
@@ -174,8 +174,8 @@ jobs:
       run: ./script/linux
     - name: steps::download_wasi_sdk
       run: ./script/download-wasi-sdk
-    - name: ./script/bundle-linux
-      run: ./script/bundle-linux
+    - name: ./script/bundle-linux --rust-tools
+      run: ./script/bundle-linux --rust-tools
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
@@ -296,7 +296,7 @@ jobs:
     - name: steps::clear_target_dir_if_large
       run: ./script/clear-target-dir-if-larger-than 350 200
     - name: run_bundling::bundle_mac::bundle_mac
-      run: ./script/bundle-mac aarch64-apple-darwin
+      run: ./script/bundle-mac --rust-tools aarch64-apple-darwin
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
@@ -351,7 +351,7 @@ jobs:
     - name: steps::clear_target_dir_if_large
       run: ./script/clear-target-dir-if-larger-than 350 200
     - name: run_bundling::bundle_mac::bundle_mac
-      run: ./script/bundle-mac x86_64-apple-darwin
+      run: ./script/bundle-mac --rust-tools x86_64-apple-darwin
     - name: run_bundling::upload_artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
@@ -403,7 +403,7 @@ jobs:
       run: ./script/clear-target-dir-if-larger-than.ps1 350 200
       shell: pwsh
     - name: run_bundling::bundle_windows::bundle_windows
-      run: script/bundle-windows.ps1 -Architecture aarch64
+      run: script/bundle-windows.ps1 -RustTools -Architecture aarch64
       shell: pwsh
       working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact
@@ -457,7 +457,7 @@ jobs:
       run: ./script/clear-target-dir-if-larger-than.ps1 350 200
       shell: pwsh
     - name: run_bundling::bundle_windows::bundle_windows
-      run: script/bundle-windows.ps1 -Architecture x86_64
+      run: script/bundle-windows.ps1 -RustTools -Architecture x86_64
       shell: pwsh
       working-directory: ${{ env.SIM_WORKSPACE }}
     - name: run_bundling::upload_artifact

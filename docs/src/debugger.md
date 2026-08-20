@@ -147,6 +147,8 @@ Build tasks can also refer to the existing tasks by unsubstituted label:
 Given a Sim task, Sim can automatically create a scenario for you. Automatic scenario creation also powers our scenario creation from gutter.
 Automatic scenario creation is currently supported for Rust, Go, Python, JavaScript, and TypeScript.
 
+Rust workspace builds with `rust-tools` also create DAP scenarios from eligible Cargo targets and Rust test cases. The Cargo panel's Debug action and the Tests panel's Debug action use the existing Cargo build locator and debug-adapter flow; they do not start Cargo directly from either panel. Unsupported harnesses, including doctests, show a disabled reason. User-authored `.sim/debug.json` and global debug scenarios remain available and are not replaced by Cargo presets.
+
 ## Breakpoints
 
 To set a breakpoint, simply click next to the line number in the editor gutter.

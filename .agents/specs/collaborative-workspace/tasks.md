@@ -11,22 +11,31 @@ Milestone 1 remains an end-to-end GPUI slice over existing Sim state before serv
 | Milestone | Leaf tasks | Estimated agent-days | Principal outcome |
 | --- | ---: | ---: | --- |
 | 0 — evidence and decisions | 23 | 35 | Reproducible inventory, ADRs, baselines and threat model |
-| 1 — native vertical slice | 34 | 51 | Reversible Collaborative Workspace over existing project/ACP/Git state |
+| 1 — native vertical slice | 41 | 63 | Reversible Collaborative Workspace over existing project/ACP/Git state |
 | 2 — protocol and service foundations | 53 | 95 | Canonical domain, identity, tenant, protocol, persistence and import foundations |
 | 3 — communication parity | 47 | 82 | Channels, messages, DMs, awareness, search, notifications and social surfaces |
 | 4 — project and Git collaboration | 27 | 49 | NIP-MP/NIP-34, branch channels, review and CI linkage |
 | 5 — agent convergence | 37 | 69 | ACP/MCP, personas, memory, jobs, activity and remote execution |
 | 6 — platform parity | 57 | 106 | Workflows, audit, administration, deletion, media, huddles, pairing and mesh |
 | 7 — clients, operations and retirement | 52 | 95 | Client compatibility, release readiness, cutover, retirement and parity proof |
-| **Total** | **330** | **582** | Complete approved migration scope |
+| **Total** | **337** | **594** | Complete approved migration scope |
 
-The dependency graph has an estimated **310 agent-day critical path** from inventory and ADR approval through domain/auth/storage, messaging, agent/workflow convergence, compatibility gates, cutover and retirement. With four stable workstreams and prompt reviews, implementation work is approximately 10–16 elapsed months; required observation windows, external client certification and production approvals can extend calendar delivery. A single sequential agent is approximately 582 working days before review/rework allowance.
+The approved compile-time isolation change adds Epic 49 with 15 leaves and 24 estimated agent-days before further unrelated Collaborative Workspace work. It does not alter milestone scope or canonical ownership; it makes Standard Sim and Multiplayer Sim explicit supported build profiles. The resulting plan contains 352 leaves and 618 estimated agent-days.
+
+The dependency graph has an estimated **316 agent-day critical path** from inventory and ADR approval through domain/auth/storage, messaging, agent/workflow convergence, compatibility gates, cutover and retirement. With four stable workstreams and prompt reviews, implementation work is approximately 10–16 elapsed months; required observation windows, external client certification and production approvals can extend calendar delivery. A single sequential agent is approximately 594 working days before review/rework allowance.
+
+The dependency-safe decomposition of Tasks 7.5, 9.1 and 10.2 adds seven explicit leaves and recalibrates Milestone 1 by 12 agent-days. This is not added product scope: it exposes previously hidden workspace contracts, downstream adapters, workspace mounting and upper-layer registration work that cannot share one review or one crate owner without dependency cycles.
 
 No leaf is intentionally larger than three agent-days. Cross-system scenarios are split into fixture construction, implementation, and execution/reporting leaves. If a leaf exceeds that bound during implementation, it must be split before code review without changing its epic scope.
+
+### Implementation-discovered validation bootstrap
+
+Tasks 1.1 through 1.4 name `check-inventory.py` in their validation metadata, but Task 1.5 creates that checker and depends on all four catalogs. During this bootstrap cycle, each catalog is validated by an equivalent source-to-catalog comparison and the specification validator; Task 1.5 must rerun the named canonical validations before the inventory epic closes. This records the dependency contradiction without changing approved scope, ownership, or task ordering.
 
 ## Dependency waves and parallel-safe workstreams
 
 - **Wave 0 / Milestone 0:** inventory generation, independent fixtures and ADR evidence may proceed in parallel; the security review follows the ownership decisions and baselines.
+- **Feature-isolation gate:** 49.1 → 49.2 → 49.3 → parallel 49.4/49.5/49.6 → parallel 49.7/49.8/49.9 → 49.10 → parallel 49.11/49.12 → 49.13 → 49.14 → 49.15. No unrelated Collaborative Workspace leaf may begin until 49.14 proves both build configurations in CI.
 - **Wave 1 / Milestone 1:** onboarding/settings, shell composition and activity fixtures converge into one vertical slice. Shared workspace files are serialized in numeric dependency order.
 - **Wave 2 / Milestone 2:** protocol codecs, identity, tenant admission, service adapters, persistence and importers. ADR-001 gates 14.1 and 15.1; ADR-002 gates 12.1.
 - **Wave 3 / Milestone 3:** channel/message foundations precede DMs and awareness. Search, desktop notifications and push are separate workstreams after projections exist.
@@ -43,9 +52,11 @@ Parallel-safe workstreams after their stated prerequisites are:
 - **Companion clients:** CLI, web, mobile and admin migrations proceed independently after the compatibility endpoint and their capability-specific server owners exist.
 - **Operations and evidence:** fixtures, threat models, deployment packaging, conformance, load/fault gates and cutover rehearsals remain independent of production reducers and production mutation.
 
-## Approval-gated leaves
+## ADR-dependent leaves
 
-| Decision | Leaves blocked pending approval |
+ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dependency-gated by their normative decision records, not blocked on an open product choice.
+
+| Decision | Leaves governed by the accepted decision |
 | --- | --- |
 | ADR-001 service/database topology | 2.1, 14.1, 15.1, 44.1 |
 | ADR-002 account/Nostr binding | 2.2, 12.1, 12.2, 12.3 |
@@ -56,11 +67,12 @@ Parallel-safe workstreams after their stated prerequisites are:
 
 ## Shared-write sequencing
 
-- Workspace presentation files serialize through 5.1 → 5.2 → 5.3 → 6.1 → 6.2 → 7.1 → 9.1 → 10.1.
+- Workspace presentation files serialize through 5.1 → 5.2 → 5.3 → 6.1 → 6.2 → 7.1 → 7.5 → 9.1 → 9.5 → 10.1 → 10.2 → 10.9 → 10.3 → 10.4 → 10.5. Sidebar activation follows 7.2, 7.3 and 7.4 → 7.6 without reversing the `sidebar` → `workspace` dependency.
 - Activity projection files serialize through 8.1 → 8.2 → 8.3 → 8.4 → 32.1 → 32.2 → 32.3 → 32.4.
 - Collaboration schemas serialize through 15.1 → 15.2 → 15.3 → 18.1 → 19.1 and then aggregate-specific migrations.
 - Channel store integration serializes through 18.4 → 21.1 → 26.1.
-- Git review integration serializes through 9.1 → 9.2 → 27.1 → 27.2 → 27.3.
+- Git review integration serializes through workspace host 9.1 → parallel `agent_ui`/`git_ui` adapters 9.6 and 9.7 → upper mount 9.8 → 9.2 → 27.1 → 27.2 → 27.3.
+- Participant/status integration serializes through workspace view data 10.2 → parallel `agent_ui` adapter 10.8 and workspace top/status mount 10.9 → upper registration 10.10. Shared `agent_ui` and `sim` crate-root writes are serialized after 9.6/9.2 and 9.8 respectively.
 - Agent stores serialize through 29.1 → 29.2 → 30.1 → 31.1; remote execution follows 33.1 → 33.2.
 - Administrative schema and APIs serialize through 35.1 → 36.1 → 36.2 → 37.1.
 - Client compatibility documents serialize through 43.1 → 43.2 → 43.3 → 43.4 → 43.5; final architecture evidence follows 48.1 → 48.4.
@@ -71,7 +83,7 @@ Parallel-safe workstreams after their stated prerequisites are:
 
 - [ ] 1. Generate and enforce the Buzz coverage ledger
 
-  - [ ] 1.1. Generate the Buzz Rust-package catalog
+  - [x] 1.1. Generate the Buzz Rust-package catalog
     - Enumerate workspace members, manifests, binaries and feature flags with stable CAP mappings.
     - _Requirements: 1.1, 1.2_
     - _Capability IDs: CAP-001, CAP-043, CAP-044_
@@ -79,46 +91,51 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/Cargo.toml, projects/buzz/crates/*/Cargo.toml_
     - _Writes: .agents/specs/collaborative-workspace/catalogs/buzz-packages.csv_
     - _Validation: `python3 .agents/specs/collaborative-workspace/scripts/check-inventory.py --catalog packages` reports every workspace member_
+    - _Evidence: 2026-08-13 — an independent Python `tomllib`/CSV comparison verified all 31 workspace members, manifest paths, package names, library/binary targets, declared or implicit features, unique stable package IDs, and CAP mappings; `validate_spec.py` passed with 84 acceptance criteria and 378 task records. Task 1.5 reran the canonical check and corrected explicit-versus-workspace version provenance plus the omitted `mention` and `wamp_bench` binaries. Commit: `005a5a680205df31ab53721485e7ee21beaf45b5`._
 
-  - [ ] 1.2. Generate the event-kind and NIP catalog
+  - [x] 1.2. Generate the event-kind and NIP catalog
     - Extract registered kinds and standard/custom protocol documents into stable protocol rows.
     - _Requirements: 1.1, 1.2, 5.1_
     - _Capability IDs: CAP-001, CAP-002, CAP-044_
     - _Depends on: none_
     - _Reads: projects/buzz/crates/buzz-core/src/kind.rs, projects/buzz/docs/nips/*, projects/buzz/NOSTR.md_
-    - _Writes: .agents/specs/collaborative-workspace/catalogs/protocol.csv_
+    - _Writes: .agents/specs/collaborative-workspace/catalogs/protocol.csv, .agents/specs/collaborative-workspace/source-inventory.md_
     - _Validation: inventory checker reports all registered constants and NIP files exactly once_
+    - _Evidence: 2026-08-13 — an independent Python source-to-CSV comparison verified unique rows for all 137 scalar `u32` constants (133 event kinds plus four range boundaries), 28 referenced standard NIPs, all 16 custom NIP documents, both checked-in NIP-MP fixture files, and `NOSTR.md`; every source path exists and every row has valid CAP coverage. The source inventory and Task 11.5 were corrected from the stale 116-constant planning snapshot. `validate_spec.py` passed with 84 acceptance criteria and 378 task records. Task 1.5 reran the canonical protocol check. Commit: `25febd0ca7a2d5bbf6a33a0a723d3e15cc0e4ab4`._
 
-  - [ ] 1.3. Generate the data and migration catalog
+  - [x] 1.3. Generate the data and migration catalog
     - Enumerate SQL migrations, schemas, object stores, Redis state and desktop persistence sources.
     - _Requirements: 1.1, 17.1_
     - _Capability IDs: CAP-005, CAP-030, CAP-045_
     - _Depends on: none_
-    - _Reads: projects/buzz/migrations/*, projects/buzz/schema/**, projects/buzz/desktop/src-tauri/src/{migration,archive,event?sync}/**_
+    - _Reads: projects/buzz/migrations/*, projects/buzz/schema/**, projects/buzz/crates/buzz-db/src/lib.rs, projects/buzz/crates/buzz-media/src/{storage,upload,upload_record}.rs, projects/buzz/crates/buzz-pubsub/src/**, projects/buzz/crates/buzz-relay/src/api/git/{store,pack_cache}.rs, projects/buzz/desktop/src-tauri/src/{migration,event_sync,app_state,app_state_keyring,secret_store,key_backup}.rs, projects/buzz/desktop/src-tauri/src/{archive,managed_agents}/**, projects/buzz/desktop/src-tauri/src/commands/legacy_storage.rs, projects/buzz/desktop/src-tauri/src/mesh_llm/identity.rs, projects/buzz/desktop/src/{app,features,shared}/**_
     - _Writes: .agents/specs/collaborative-workspace/catalogs/data-sources.csv_
     - _Validation: catalog check accounts for all 30 SQL migrations and every discovered durable store_
+    - _Evidence: 2026-08-13 — an independent Python CSV/source comparison verified 62 unique catalog rows, exact one-to-one coverage of all 30 SQL migrations, the current schema snapshot, and 31 server, Redis, desktop, secret, cache, operational, and migration-bridge boundaries; every listed source path exists and every CAP reference is valid. The audit explicitly records the documented-but-absent Redis typing implementation as `REDIS-TYPING-GAP-001`. `validate_spec.py` passed with 84 acceptance criteria and 378 task records. Task 1.5 reran the canonical data check. Commit: `ff954e6fc7397de843ce54e588779c8d1ab8419a`._
 
-  - [ ] 1.4. Generate client, desktop and deployment catalogs
+  - [x] 1.4. Generate client, desktop and deployment catalogs
     - Enumerate Tauri modules, desktop features, client routes, charts, workflows, scripts, examples and benchmarks.
     - _Requirements: 1.1, 1.2_
     - _Capability IDs: CAP-036, CAP-038, CAP-039, CAP-040, CAP-041, CAP-043, CAP-044_
-    - _Depends on: none_
-    - _Reads: projects/buzz/desktop/src/**, projects/buzz/mobile/lib/**, projects/buzz/web/src/**, projects/buzz/admin-web/**, projects/buzz/deploy/**, projects/buzz/.github/workflows/**_
-    - _Writes: .agents/specs/collaborative-workspace/catalogs/surfaces.csv_
+    - _Depends on: 1.2_
+    - _Reads: projects/buzz/desktop/src/**, projects/buzz/desktop/src-tauri/src/**, projects/buzz/desktop/tests/**, projects/buzz/mobile/{lib,test}/**, projects/buzz/web/{src,tests}/**, projects/buzz/admin-web/**, projects/buzz/deploy/**, projects/buzz/.github/workflows/**, projects/buzz/scripts/**, projects/buzz/examples/**, projects/buzz/benchmarks/**, projects/buzz/perf/**_
+    - _Writes: .agents/specs/collaborative-workspace/catalogs/surfaces.csv, .agents/specs/collaborative-workspace/source-inventory.md_
     - _Validation: inventory checker reports no unmapped feature, route, deployment component or test surface_
+    - _Evidence: 2026-08-13 — an independent Python source-to-CSV audit verified 193 unique rows with exact coverage of all 39 declared Tauri modules, 29 desktop feature directories, 13 desktop routes, six web routes, ten mobile feature directories plus app/deep-link surfaces, four admin routes, four deployment components, all 18 GitHub workflows, all 61 script files, both examples, both benchmark suites, and five client test surfaces. Every source path exists and every CAP reference is valid. The source inventory was corrected from 17 to 18 workflows and from the stale Task 1.3 Tauri-catalog reference to Task 1.4. `validate_spec.py` passed with 84 acceptance criteria and 378 task records. Task 1.5 reran the canonical surfaces check. Commit: `93818e4091469e9e2f617779884861b884769ec7`._
 
-  - [ ] 1.5. Enforce inventory drift in repository checks
+  - [x] 1.5. Enforce inventory drift in repository checks
     - Add one checker that joins all catalogs to CAP, requirement, owner and leaf-task references and fails on omissions.
     - _Requirements: 1.2, 1.3, 1.4_
     - _Capability IDs: CAP-001, CAP-045_
     - _Depends on: 1.1, 1.2, 1.3, 1.4_
     - _Reads: .agents/specs/collaborative-workspace/catalogs/**, .agents/specs/collaborative-workspace/{source-inventory,reuse-audit,requirements,tasks}.md_
-    - _Writes: .agents/specs/collaborative-workspace/scripts/check-inventory.py, script/check-collaborative-workspace-inventory_
+    - _Writes: .agents/specs/collaborative-workspace/scripts/check-inventory.py, script/check-collaborative-workspace-inventory, .agents/specs/collaborative-workspace/catalogs/buzz-packages.csv_
     - _Validation: a temporary unmapped fixture makes the checker fail with its exact source path and missing references_
+    - _Evidence: 2026-08-13 — added `.agents/specs/collaborative-workspace/scripts/check-inventory.py` and `script/check-collaborative-workspace-inventory` to validate exact catalog schemas and stable IDs; join every row through CAP-001–CAP-045 to canonical owner/disposition, acceptance criteria, and decimal leaves; verify every catalog source path; and detect package, protocol, migration, Tauri, client, deployment, workflow, script, example, benchmark, and test-surface drift. `python3 .agents/specs/collaborative-workspace/scripts/check-inventory.py --catalog all`, each focused `--catalog` mode, and the repository wrapper passed with 31 package, 184 protocol, 62 data, 193 surface, 45 capability, 84 criterion, and 330 leaf records. `cargo metadata --manifest-path projects/buzz/Cargo.toml --no-deps --format-version 1` independently matched all 31 package versions and library/binary targets. A temporary `unmapped-surface.rs` fixture failed with exit 1 while naming its exact absolute path and all four missing reference classes. The checker exposed and corrected four stale package-version provenance values plus the omitted `mention` and `wamp_bench` binaries in `catalogs/buzz-packages.csv`. `sh -n` and `git diff --check` passed; ShellCheck was unavailable. `validate_spec.py` passed with 84 acceptance criteria and 378 task records. Commit: `3ee584249e15ef48e9647fbec2308b95b6f2c53f`._
 
 - [ ] 2. Record canonical ownership and architecture decisions
 
-  - [ ] 2.1. Decide ADR-001 service and database topology
+  - [x] 2.1. Decide ADR-001 service and database topology
     - Record final process, schema and dependency-version ownership plus the bounded sidecar exit conditions.
     - _Requirements: 2.1, 2.2, 2.3_
     - _Capability IDs: CAP-003, CAP-005, CAP-043_
@@ -126,8 +143,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/reuse-audit.md, crates/collab/**, projects/buzz/ARCHITECTURE.md_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-001-service-topology.md_
     - _Validation: architecture review records one migration authority and explicit sidecar removal gates_
+    - _Evidence: 2026-08-14 — accepted ADR-001 records `collab` as the final collaboration service and operational owner, one Sim-owned Postgres migration authority, aggregate-specific canonical data owners, a transactional command/outbox projection path, and Redis as derived expiring state. It bounds the Buzz-derived Nostr ingress sidecar to migration Phases 2–7, denies it migration and projection-write authority, and defines measurable entry, observation, rollback and removal gates including dependency alignment, in-process route parity, supported-client compatibility and deployment-artifact cleanup. Architecture structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 2.2. Decide ADR-002 account and Nostr identity binding
+  - [x] 2.2. Decide ADR-002 account and Nostr identity binding
     - Record binding cardinality, verification, recovery, rotation and organization policy.
     - _Requirements: 2.1, 7.1, 7.4_
     - _Capability IDs: CAP-007, CAP-008, CAP-009_
@@ -135,8 +153,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/reuse-audit.md, crates/client/src/user.rs, projects/buzz/docs/nips/NIP-OA.md_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-002-identity-binding.md_
     - _Validation: identity review covers create, link, rotate, revoke, archive and recovery without ambiguous authority_
+    - _Evidence: 2026-08-14 — accepted ADR-002 separates Sim service accounts, Nostr signing identities, community profiles and independently authored agent identities. It permits multiple community-local npubs while enforcing one active signer per community/account/profile tuple, possession-proof linking, atomic rotation, terminal revocation, history-preserving archive, bounded verified recovery, canonical protected-key custody and organization policies that may narrow but cannot forge or replace authorship. A lifecycle table and identity-review gate cover create, link, activate, rotate, revoke, archive, restore and recover success/failure paths, cross-community isolation, replay, storage failure and NIP-OA provenance. Identity structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 2.3. Decide ADR-003 hosted Git authority
+  - [x] 2.3. Decide ADR-003 hosted Git authority
     - Choose authority boundaries between NIP-34 hosting, external providers and local Sim Git.
     - _Requirements: 2.1, 10.1, 10.2_
     - _Capability IDs: CAP-018, CAP-019, CAP-020_
@@ -144,8 +163,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/reuse-audit.md, crates/git_hosting_providers/**, projects/buzz/docs/git-on-object-storage.md_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-003-git-authority.md_
     - _Validation: decision table assigns one authority for working state, hosted refs, patches and review records_
+    - _Evidence: 2026-08-14 — accepted ADR-003 preserves native Sim project/worktree/Git authority locally and assigns each repository exactly one versioned hosted authority: Sim NIP-34 hosting, one external provider, or none. Its decision table covers working state, hosted refs, object durability, patches, pull requests, issues, reviews, approvals, CI/status and merges; it makes Sim-hosted manifest CAS the ref commit point, treats provider responses as externally authoritative, prohibits project grouping from granting repository access, and defines write-freeze/reconciliation/rollback for authority transfers. Git-authority structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 2.4. Decide ADR-004 huddle transport
+  - [x] 2.4. Decide ADR-004 huddle transport
     - Select native transport and define the Buzz audio compatibility support window.
     - _Requirements: 2.1, 14.3, 14.4_
     - _Capability IDs: CAP-032_
@@ -153,8 +173,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/livekit_api/**, crates/livekit_client/**, projects/buzz/crates/buzz-relay/src/audio/**_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-004-huddle-transport.md_
     - _Validation: review records lifecycle parity, platform support and adapter retirement criteria_
+    - _Evidence: 2026-08-14 — accepted ADR-004 makes LiveKit the sole native realtime media/room authority beneath a transport-neutral huddle lifecycle and retains Buzz protocol v1/v2 as a bounded Opus/WebSocket gateway into the same room. It maps lifecycle and participant semantics, preserves legacy admission/frame/backpressure behavior, defines mixed-client media bridging, tenant/generation isolation, platform/device/permission gates, TTS/transcript ownership, visible failure and cleanup, and explicit Phase 8 support-floor/removal criteria with no legacy-room fallback. Huddle-decision structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 2.5. Decide ADR-005 push platform scope
+  - [x] 2.5. Decide ADR-005 push platform scope
     - Record required push platforms, attestation requirements and the first mobile-cutover support floor.
     - _Requirements: 2.1, 9.5, 19.2_
     - _Capability IDs: CAP-016_
@@ -162,8 +183,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-push-gateway/**, .agents/specs/collaborative-workspace/reuse-audit.md_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-005-push-scope.md_
     - _Validation: approval records supported targets, attestations, fallback and compatibility floor_
+    - _Evidence: 2026-08-14 — accepted ADR-005 makes APNs production plus sandbox validation and Apple App Attest the first mobile-cutover floor, preserves NIP-PL wake-only payload noninterference and encrypted endpoint custody, and defines visible foreground/manual-sync fallback with no attestation bypass. FCM and UnifiedPush are excluded from the first floor because Buzz has no conforming profiles; a payload-free common provider contract and eight-part approval gate make later providers explicit work rather than a silent downgrade. Push-scope structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 2.6. Decide ADR-006 shared-compute policy
+  - [x] 2.6. Decide ADR-006 shared-compute policy
     - Record mesh trust, eligibility, resources, fairness, fallback and deployment policy.
     - _Requirements: 2.1, 16.3, 19.2_
     - _Capability IDs: CAP-035_
@@ -171,10 +193,11 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-relay-mesh/**, .agents/specs/collaborative-workspace/reuse-audit.md_
     - _Writes: .agents/specs/collaborative-workspace/decisions/adr-006-shared-compute.md_
     - _Validation: approval records fail-closed eligibility, resource limits, fairness and no-silent-fallback rules_
+    - _Evidence: 2026-08-14 — accepted ADR-006 makes shared compute deployment/community/user/device opt-in and initially restricts providers to same-deployment or explicitly sharing active community members. It defines nine fail-closed eligibility gates, signed/fenced mesh and executor leases, locally enforced resource/sandbox bounds, community-isolated weighted fairness, prompt/privacy consent, disabled-by-default deployment and rollback policy, and a strict no-silent-fallback rule including unknown-outcome and cross-owner retry handling. Third-party compute remains ineligible behind an explicit eight-part approval gate. Shared-compute structure checks, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 3. Capture independent compatibility and behavior baselines
 
-  - [ ] 3.1. Freeze signed-event and relay protocol fixtures
+  - [x] 3.1. Freeze signed-event and relay protocol fixtures
     - Capture valid, malformed, replaceable, privacy-gated and mixed-version event traces without production reducers.
     - _Requirements: 5.1, 5.2, 5.3, 20.2_
     - _Capability IDs: CAP-001, CAP-002, CAP-004, CAP-044_
@@ -182,8 +205,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-test-client/**, projects/buzz/crates/buzz-conformance/**_
     - _Writes: .agents/specs/collaborative-workspace/fixtures/protocol/*_
     - _Validation: independent trace checker accepts valid fixtures and rejects each malformed fixture_
+    - _Evidence: 2026-08-13 — froze deterministic NIP-01 event vectors, NIP-01 WebSocket request/response traces, byte-exact copies of the four Buzz conformance traces, replaceable-head orderings, author-only/`#p`/shared privacy decisions, and simultaneous kind 9/kind 40002 compatibility in `.agents/specs/collaborative-workspace/fixtures/protocol/`. The standard-library-only `check_fixtures.py` independently reimplements canonical event hashing, BIP-340 verification, lowest-ID timestamp ties, privacy projection, wire-frame sequencing and the tenant-transition checks without importing a Buzz reducer. Its full run passed 7 event, 2 replaceable, 7 privacy, 1 mixed-version, 4 wire and 4 relay cases; focused runs accepted every valid case and classified all five malformed event vectors and all three malformed relay traces with their expected failure. A direct in-memory mutation of a valid event was rejected as `invalid_id`, and a flipped positive wire verdict was rejected as `wrong_ok_verdict`. SHA-256 comparison proved the four relay traces are byte-identical to `buzz-conformance/tests/fixtures`. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-conformance --test replay_fixtures` passed all 6 tests. A temporary standalone verifier using `nostr 0.44.7` parsed and cryptographically verified all 10 valid frozen events. Python AST parsing, `git diff --check`, and `validate_spec.py` passed. Commit: `49189489f09cab63bc75c292be2a3027ba76b72d`._
 
-  - [ ] 3.2. Freeze CLI and companion-client contract fixtures
+  - [x] 3.2. Freeze CLI and companion-client contract fixtures
     - Capture command output, exit codes, routes, deep links, negotiation and background lifecycle contracts.
     - _Requirements: 16.4, 18.1, 20.1_
     - _Capability IDs: CAP-038, CAP-039, CAP-040, CAP-041, CAP-042_
@@ -191,8 +215,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-cli/**, projects/buzz/mobile/test/**, projects/buzz/web/**, projects/buzz/admin-web/**_
     - _Writes: .agents/specs/collaborative-workspace/fixtures/clients/*_
     - _Validation: fixture manifest identifies client version, input, expected output and authority for every captured contract_
+    - _Evidence: 2026-08-13 — added a versioned 28-row contract manifest and independent source-drift checker under `.agents/specs/collaborative-workspace/fixtures/clients/`. Every row records a stable ID, category, client/version, concrete input, observable expected output, and exact source/test authority. Coverage freezes the 22-group CLI inventory, help secrecy, local-pack boundary, JSON error envelope, exit taxonomy and entity links; all five web routes plus invite consent, app handoff and NIP-07/NIP-98 browser claim; all four admin routes plus forbidden, unavailable-content and local-status behavior; and mobile message/invite parsing, hostile-link rejection, cold-start dispatch, background grace/reconnect, pairing negotiation, CLOSED classification and retry hints. It also records the current absence of a common startup feature-negotiation endpoint as an explicit compatibility gap owned by Task 43.2. `check_contracts.py` matched all four client versions and all frozen source tokens/routes; an in-memory contract missing `expected_output` failed with its stable ID and missing field. The actual `buzz --help` exited 0 without secret values and the actual no-key `buzz channels list` exited 3 with the exact frozen JSON error, correcting an initially omitted `auth error:` prefix. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-cli command_` passed all 3 command inventory/name/count tests, and the focused help-secret test passed. Python AST parsing, inventory validation, `git diff --check`, and `validate_spec.py` passed. Flutter and companion-client node dependencies were unavailable locally, so their behavior is validated by exact source/test authority rather than rerunning those suites in this checkpoint. Commit: `d61a718f139f5da1bc6489cb2fc4bbf288f5fe93`._
 
-  - [ ] 3.3. Freeze migration and archive fixtures
+  - [x] 3.3. Freeze migration and archive fixtures
     - Build sanitized fixtures for every SQL and desktop stored-data version with counts and integrity hashes.
     - _Requirements: 17.1, 17.2, 20.1_
     - _Capability IDs: CAP-005, CAP-024, CAP-030, CAP-045_
@@ -200,8 +225,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/migrations/**, projects/buzz/desktop/src-tauri/src/{migration,archive,managed?agents}/**_
     - _Writes: .agents/specs/collaborative-workspace/fixtures/migrations/*_
     - _Validation: fixture index covers every stored version and verifies hashes without private key material_
+    - _Evidence: 2026-08-14 — added a catalog-driven migration fixture corpus under `.agents/specs/collaborative-workspace/fixtures/migrations/`. `manifest.json` freezes SHA-256, byte count, line count, stable sequence, catalog name, and exact source path for all 30 ordered PostgreSQL migrations. `desktop-stores.json` provides 32 sanitized semantic versions across all 20 inventoried desktop persistence boundaries, including Sprout/release/dev app trees, inline-fallback/key-reference managed agents, persona/team folds, global/scoped retention, archive schema v0 plus all three one-shot migrations, keyring/file/backup states, WebKit stores, agent nest/receipts/logs, event sync, and mesh identity. Secret-bearing stores contain identifiers and expected migration behavior only; all key material and encrypted payload bytes are omitted. The independent standard-library `check_fixtures.py` joined the corpus to `catalogs/data-sources.csv`, verified every catalog source path, exact SQL sequence and hashes/counts, exact per-store version sets, per-fixture record counts and canonical hashes, the desktop-document hash, and explicit `contains_private_key_material: false` declarations. Its built-in negative checks rejected both a mutated fixture hash and an injected nsec-like value. The checker passed with `sql_migrations=30 desktop_stores=20 desktop_versions=32 secret_material=absent`; inventory validation and `validate_spec.py` passed. Commit: `4dbf73b1d36cb2e328a9a1a02aaa47b8dd59b19f`._
 
-  - [ ] 3.4. Freeze performance and known-gap baselines
+  - [x] 3.4. Freeze performance and known-gap baselines
     - Record relay, fan-out, search, push, workflow, mesh and orchestration measurements plus documented incomplete behavior.
     - _Requirements: 1.3, 20.1, 20.3_
     - _Capability IDs: CAP-006, CAP-015, CAP-016, CAP-027, CAP-035, CAP-044_
@@ -209,10 +235,11 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/benchmarks/**, projects/buzz/perf/**, projects/buzz/TESTING.md, projects/buzz/VISION*.md_
     - _Writes: .agents/specs/collaborative-workspace/fixtures/baselines.md_
     - _Validation: baseline document records command, environment, result budget and known defect for each subsystem_
+    - _Evidence: 2026-08-14 — froze seven evidence records in `.agents/specs/collaborative-workspace/fixtures/baselines.md`, each with exact source authority, reproduction command, capture environment, observed result, explicit preservation/readiness budget, known defect and downstream owner. The deterministic Redis fan-out model produced the pinned 64.0x reduction and 0.00% scoped irrelevant delivery for 1/2/4 pods, and its three unit tests passed. A focused Rust run passed 3 search unit tests with 19 PostgreSQL tests explicitly ignored, 15 push tests with 6 PostgreSQL tests ignored, 154 workflow tests with 2 PostgreSQL tests ignored, and all 32 mesh tests; none was a measured test. A standard-library Harbor audit parsed 22 Python files, discovered 53 test functions and verified all four pinned prompt hashes. The document treats absent live relay, Redis, PostgreSQL, provider, physical mesh and Harbor measurements as failed readiness conditions owned by Tasks 22.12, 41.5, 45.4 and 45.5, rather than inventing latency or throughput targets. It also freezes the explicit relay-shutdown test gap, workflow placeholder/approval gaps and adjacent media quota, Git-store wiring and moderation gaps. Docker services, `uv` and `pytest` were unavailable, so no live-service or leaderboard result is claimed. Markdown structure checks, inventory validation, `git diff --check`, and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 4. Complete the cross-boundary threat and operations review
 
-  - [ ] 4.1. Threat-model tenant, identity and protocol boundaries
+  - [x] 4.1. Threat-model tenant, identity and protocol boundaries
     - Enumerate host confusion, replay, signing-key, authorization-before-limit and metadata leak threats with owners.
     - _Requirements: 6.3, 19.1, 19.2_
     - _Capability IDs: CAP-001, CAP-003, CAP-007, CAP-008, CAP-009_
@@ -220,8 +247,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/SECURITY.md, projects/buzz/docs/multi-tenant-relay.md, .agents/specs/collaborative-workspace/decisions/**_
     - _Writes: .agents/specs/collaborative-workspace/security/tenant-identity.md_
     - _Validation: review maps each threat to a fail-closed control and negative test leaf_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/tenant-identity.md` with 12 mandatory invariants, 36 stable threats and ten complete boundaries spanning trusted listener/proxy provenance, row-zero tenant binding, NIP-42, NIP-98 and shared replay, signed-event/filter compatibility, common principal/identity authorization, credential lifecycle, RLS/transaction constraints, count/search/projection privacy, Redis/realtime isolation and per-community system signing/audit. Every threat maps a user-observable failure to a canonical Sim owner, fail-closed control and focused implementation/recovery leaves; every boundary records hostile input, decision order, bounds, authorization, public error, secret/cleanup behavior and tests. The review preserves Buzz's host-derived tenant, host/channel agreement, composite-key, label-flow and per-community authority semantics while recording that public trusted constructors, RLS/crypto axioms, HA replay capacity, dev `X-Pubkey`, external TLS, environment/plaintext key fallbacks, keyless audit and physical timing are gaps or deployment obligations rather than proven target guarantees. It fixes the mandatory order as transport bound → trusted tenant → crypto/replay → principal/binding → current authorization → tenant transaction → redacted result/cleanup, including authorization before existence/ranking/limit/count. A structural audit verified 36 sequential threat IDs, ten boundary records, all three requirement traces and valid task references. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-core tenant -- --nocapture` passed 10/10 and `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-auth nip98 -- --nocapture` passed 18/18. Inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.2. Threat-model agents, providers and MCP
+  - [x] 4.2. Threat-model agents, providers and MCP
     - Cover hostile provider output, subprocess cleanup, tool permissions and secret separation.
     - _Requirements: 11.1, 11.5, 19.1, 19.2_
     - _Capability IDs: CAP-021, CAP-022, CAP-034_
@@ -229,8 +257,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/docs/remote-agents.md, .agents/specs/goose-migration/security-permissions/**_
     - _Writes: .agents/specs/collaborative-workspace/security/agent-workflow.md_
     - _Validation: security checklist assigns bounded input/output, cancellation and permission tests to every executor boundary_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/agent-workflow.md` with 25 stable threats, eight cross-cutting invariants and 14 enumerated executor boundaries spanning collaboration ingress, ACP, model providers, MCP, compatibility mapping, filesystem/Git tools, terminal, network, local pools, jobs/delegation, provider binaries, remote substrates, mesh and observer publication. Every executor boundary names its canonical owner, hostile input, input/output bound, permission authority, cancellation/resource-cleanup contract, secret rule and focused downstream test leaves. The review preserves Sim's existing agent/ACP/tool-permission/sandbox/credentials owners, treats content scanners as non-authoritative defense in depth, freezes Buzz's provider limits and all eight documented provider defects, and records the Buzz v1 `info`/`deploy` versus canonical inspect/terminate compatibility tension without inventing a legacy wire operation. A cross-cutting checklist assigns hostile output, permission races, process trees, pre-secret negotiation, secret echo, exactly-one execution, remote shutdown and mesh failure evidence through Tasks 28.2–45.5 and the binding Goose security-permission plan. It also documents, without silently changing the plan, the extraneous direct ADR-005 dependency on Tasks 41.2 and 41.3; their required ADR-006/Task 4.8 gates remain safe through Task 41.1's transitive dependency. A structural checker verified 14 complete boundary records, 25 sequential threat IDs and all four requirement traces; inventory validation, `git diff --check`, and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.3. Threat-model media storage and rendering
+  - [x] 4.3. Threat-model media storage and rendering
     - Cover object paths, MIME confusion, decompression, previews, credentials and orphan cleanup.
     - _Requirements: 14.1, 14.2, 19.1, 19.2_
     - _Capability IDs: CAP-031_
@@ -238,8 +267,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-media/**, crates/media/**_
     - _Writes: .agents/specs/collaborative-workspace/security/media.md_
     - _Validation: review maps media abuse cases and resource bounds to upload, storage and rendering tests_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/media.md` with nine security invariants, 28 stable threats and ten complete boundaries covering pre-body admission, streaming/temp files, byte/type/codec/privacy validation, derived variants, canonical metadata/object commit, authorized ranges, Blossom, native GPUI decoding, link previews and checkpointed cleanup. Each boundary names its authority, abuse cases, resource limits, secret/privacy rule, failure/cancellation behavior and focused Tasks 17.9–45.3. The review preserves shared content-addressed bytes only behind server-derived tenant bindings, freezes Buzz's safe structural floors, requires durable quota reservations and immutable/verified objects, treats active content as inert downloads, and prevents adapters/caches from turning a hash hit into cross-community visibility. It records the missing Buzz durable per-principal quota, deferred orphan GC, string-shaped body-limit fallback and the assertion-shaped low-level `crates/media` FFI surface as gaps rather than preserved behavior. A structural audit verified all ten boundary records, 28 sequential threat IDs, 20 valid task references and all four requirement traces. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-media` passed 117 unit tests with the one live-MinIO integration test explicitly ignored; `cargo test -p media` built the native bindings and reported zero tests, confirming Task 38.5 must add fallible renderer coverage. Inventory validation, `git diff --check`, and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.4. Define operational limits and telemetry constraints
+  - [x] 4.4. Define operational limits and telemetry constraints
     - Set measurable connection, frame, queue, retry, freshness, migration, logging and telemetry-disabled expectations.
     - _Requirements: 8.4, 19.3, 19.5_
     - _Capability IDs: CAP-004, CAP-006, CAP-028, CAP-043_
@@ -247,17 +277,19 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/security/**, .agents/specs/telemetry-disabled-default/**, projects/buzz/deploy/**_
     - _Writes: .agents/specs/collaborative-workspace/security/operational-limits.md_
     - _Validation: every limit has an owner, metric, alert threshold and focused verification task_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/operational-limits.md` as the normative registry for 55 limits across connections/protocol, durable queues/projections/search/read state, workflows/agents/remote execution, push, media/huddles, relay mesh/shared compute and migration/compatibility/health/logging/telemetry. Every stable OL-* row defines enforcement and fail-closed behavior, one canonical owner, a bounded-cardinality metric or deterministic client signal, numeric warn/page or release-stop threshold and focused downstream verification leaves. The registry preserves Buzz's established security/compatibility ceilings while supplying previously missing readiness budgets for projection/replica freshness, queues, search, cancellation, fairness, migration checkpoints, shadow lag, rollback, logging cardinality and recovery drills; it explicitly treats unmeasured values as gates for Tasks 22.12 and 45.4–45.5 rather than achieved performance. Four private dashboard groupings and seven automatic stop/rollback classes cover every limit family. Client metrics/diagnostics remain default-off under the existing `TelemetrySettings` owner with exactly zero telemetry HTTP, while local logs and required server operational metrics remain available. A structural audit verified 55 unique limit IDs, complete owner/metric-alert/verification cells, all required limit families and task references. Inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.5. Threat-model workflow and webhook execution
+  - [x] 4.5. Threat-model workflow and webhook execution
     - Cover webhook authentication, SSRF/redirects, conditions, retries, actions, secrets and approval bypass.
     - _Requirements: 13.2, 13.3, 19.1, 19.2_
     - _Capability IDs: CAP-027_
     - _Depends on: 3.4_
-    - _Reads: projects/buzz/crates/buzz-workflow/**, projects/buzz/crates/buzz-relay/src/workflow-sink.rs_
+    - _Reads: projects/buzz/crates/buzz-workflow/**, projects/buzz/crates/buzz-relay/src/{workflow_sink,webhook_secret,router}.rs, projects/buzz/crates/buzz-relay/src/api/bridge.rs, projects/buzz/crates/buzz-relay/src/handlers/command_executor.rs, projects/buzz/crates/buzz-db/src/workflow.rs_
     - _Writes: .agents/specs/collaborative-workspace/security/workflow.md_
     - _Validation: review maps each trigger/action/approval threat to a bounded negative or recovery test_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/workflow.md` with ten invariants, 36 stable threats and 11 complete boundaries spanning definition activation, event/manual triggers, schedules, inbound webhooks, condition/template evaluation, durable run leases, canonical action dispatch, outbound webhooks, approvals, retry/recovery and compatibility migration. Every threat maps to focused negative or recovery leaves and every boundary records authority, abuse cases, resource limits, secret handling, failure/recovery and test ownership. The review preserves Buzz's useful tenant/owner rechecks, scheduled-fire claim, condition bounds and DNS-pinning/no-proxy/no-redirect controls while freezing the missing definition/retry/idempotency limits, query-secret risk, loopback action path, feature-disabled false-success results and incomplete actions as gaps. It identifies a concrete approval contradiction: the executor can suspend and the database/relay contain grant/deny machinery, but the common finalizer never creates the approval record and instead fails the run; the apparent event/update transaction and detached resume path are also not atomic recovery. Task 34.6 therefore owns one canonical waiting/decision/outbox transaction rather than treating either Buzz path as parity. The factual read path was corrected from nonexistent `workflow-sink.rs` to `workflow_sink.rs` and expanded to the actual webhook/approval route, secret and database owners. A structural audit verified 36 sequential threat rows, 11 boundary records and all four requirement traces. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-workflow` passed 154 tests with two Postgres tests explicitly ignored; inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.6. Threat-model push delivery
+  - [x] 4.6. Threat-model push delivery
     - Cover lease capability, wake privacy, endpoint authority, amplification, provider errors and queue bounds.
     - _Requirements: 9.5, 19.1, 19.2_
     - _Capability IDs: CAP-016_
@@ -265,225 +297,261 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-push-gateway/**, projects/buzz/docs/nips/NIP-PL.md_
     - _Writes: .agents/specs/collaborative-workspace/security/push.md_
     - _Validation: review proves payload minimization and assigns lease, amplification, retry and redaction tests_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/push.md` with 12 mandatory invariants, 36 stable threats and ten executor boundaries spanning notification eligibility, lease wire/effective state, accepted-event matching, durable wake claims, App Attest installation authority, encrypted endpoint custody, NIP-98 gateway admission, APNs delivery, queue recovery and deployment/platform negotiation. Every threat maps an observable failure to a canonical Sim owner, fail-closed control and focused downstream negative/recovery leaves. The review proves payload minimization by fixing a payload-less executor contract and the provider-owned byte constant, while separately constraining timing/frequency leakage; it preserves Buzz's trusted-origin agreement, narrow filters, current read authorization, transactional match responsibility, community-scoped dedup, generation/endpoint revalidation, atomic replay/quota admission and sanitized provider outcomes. It records the full relay/database/gateway ownership path, discarded disposition-error strengthening, post-send-begin crash window, App Attest token-provenance assumption, static numeric bounds, unsupported FCM/UnifiedPush profiles and encrypted migration state as obligations rather than hidden parity. A structural audit verified all 12 invariant, 36 threat and ten boundary IDs plus requirement/task references. `cargo test --manifest-path projects/buzz/Cargo.toml -p buzz-push-gateway --lib -- --nocapture` passed 15 tests with six live-PostgreSQL tests explicitly ignored; inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.7. Threat-model voice and huddles
+  - [x] 4.7. Threat-model voice and huddles
     - Cover audio authorization, devices, transcript privacy, model files, transport failure and resource cleanup.
     - _Requirements: 14.3, 14.4, 19.1, 19.2_
     - _Capability IDs: CAP-032_
     - _Depends on: 2.4, 3.4_
-    - _Reads: projects/buzz/crates/buzz-voice/**, projects/buzz/crates/buzz-relay/src/audio/**_
+    - _Reads: .agents/specs/collaborative-workspace/decisions/adr-004-huddle-transport.md, projects/buzz/crates/buzz-voice/**, projects/buzz/crates/buzz-relay/src/audio/**, projects/buzz/desktop/src-tauri/src/huddle/**_
     - _Writes: .agents/specs/collaborative-workspace/security/huddle.md_
     - _Validation: review maps audio/transcript/model threats to authorization, failure and cleanup tests_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/huddle.md` with 12 mandatory invariants, 36 stable threats and ten complete boundaries spanning canonical lifecycle/policy, native LiveKit token/room authority, Buzz v1/v2 gateway admission, media/codec backpressure, devices, model acquisition, imported voices/TTS, STT consent, transcript projection and terminal cleanup/retirement. Every threat maps an observable failure to a canonical Sim owner, fail-closed control and focused downstream negative/recovery leaf. The review preserves Buzz's host/NIP-42/membership admission, frame/version/peer/heartbeat bounds, lossy media versus state-control distinction, stale-generation fencing, STT queue/speech bounds, model hash/size/safe-install checks and content-addressed voice files while applying ADR-004's one-LiveKit-room/no-legacy-fallback ownership. It records community-free legacy media datagrams, droppable state-bearing control, room version pinning, silent dead-STT handles, best-effort media cleanup, model behavior trust and imported-voice privacy as strengthening or product boundaries rather than hidden parity. A structural audit verified all 12 invariant, 36 threat and ten boundary IDs plus requirement/task references. Direct `rustc --test` runs passed all four isolated Buzz v2 audio-wire tests and the pinned April INT8 model-metadata test. A broader `buzz-relay` package build exhausted the available disk before tests, so no package-wide result is claimed; its 10 GiB regenerable `projects/buzz/target` cache was removed afterward. Inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 4.8. Threat-model relay mesh and shared compute
+  - [x] 4.8. Threat-model relay mesh and shared compute
     - Cover peer authentication, replay, stale membership, resource claims, scheduling and unapproved fallback.
     - _Requirements: 16.3, 19.1, 19.2_
     - _Capability IDs: CAP-035_
     - _Depends on: 2.6, 3.4_
-    - _Reads: projects/buzz/crates/buzz-relay-mesh/**, projects/buzz/VISION_MESH.md_
+    - _Reads: .agents/specs/collaborative-workspace/decisions/adr-006-shared-compute.md, projects/buzz/crates/buzz-relay-mesh/**, projects/buzz/VISION_MESH.md, projects/buzz/desktop/src-tauri/src/mesh_llm/**_
     - _Writes: .agents/specs/collaborative-workspace/security/mesh.md_
     - _Validation: review assigns replay, revocation, resource, fairness and no-fallback tests_
+    - _Evidence: 2026-08-14 — added `.agents/specs/collaborative-workspace/security/mesh.md` with 12 mandatory invariants, 36 stable threats and ten complete boundaries spanning deployment/tenant peer admission, relay membership and session fences, bounded transport, signed compute discovery and consent, eligibility/fair scheduling, canonical executor/resource leases, inference sandbox/context release, hostile output/no-silent-fallback, revocation/partition cleanup and deployment visibility. Every threat maps an observable failure to a canonical Sim owner and focused downstream negative/recovery leaves. The review preserves Buzz's frozen ALPN/version/frame bounds, boot-scoped endpoint identity, relay attestation, monotonic ready/gossip hints, deterministic connection handling, signed member/owner/endpoint discovery, transport allowlists and stale/revoked-member behavior while applying ADR-006's stronger bilateral opt-in, local resource authority, one canonical job lease, community-local fairness and no-silent-fallback rules. It records the missing community field in the relay frame, non-atomic desktop capacity/status state, membership-only vision language, non-deployable Kubernetes mesh provider, long runtime-management waits and unimplemented distributed-model authority as strengthening or unavailable boundaries rather than hidden parity. A structural audit verified all 12 invariant, 36 threat and ten boundary IDs plus requirement/task references. Inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 ## Milestone 1 — ship the native collaborative vertical slice
 
 - [ ] 5. Add reversible workspace presentation selection
 
-  - [ ] 5.1. Define the workspace-presentation setting
+  - [x] 5.1. Define the workspace-presentation setting
     - Add the Editor and Collaborative enum, default and settings schema without changing current startup behavior.
     - _Requirements: 3.1, 3.4_
     - _Capability IDs: CAP-037_
     - _Depends on: 1.5_
-    - _Reads: crates/workspace/src/workspace_settings.rs, crates/settings/**_
-    - _Writes: crates/workspace/src/workspace_presentation.rs_
+    - _Reads: crates/workspace/src/{workspace,workspace_settings}.rs, crates/settings/**, crates/settings_content/src/workspace.rs, assets/settings/default.json_
+    - _Writes: crates/workspace/src/{workspace,workspace_settings,workspace_presentation}.rs, crates/settings_content/src/workspace.rs, crates/settings/src/vscode_import.rs, assets/settings/default.json_
     - _Validation: `cargo test -p workspace workspace_presentation_setting` covers default and deserialization_
+    - _Evidence: 2026-08-14 — added the canonical serialized `WorkspacePresentation::{Editor, Collaborative}` enum to the existing workspace settings schema with snake-case values and `Editor` as the default, exposed it through `crates/workspace/src/workspace_presentation.rs`, and projected it into `WorkspaceSettings` without adding any startup or composition branch. `assets/settings/default.json` explicitly selects `editor`, so existing installations retain the current presentation; VS Code import leaves the Sim-only value unset so the normal default/merge path remains authoritative. Focused tests prove the Rust default, shipped default-settings value, supported/invalid deserialization and the containing `WorkspaceSettingsContent` JSON schema field/enum. Task metadata was expanded to the discovered schema/default/import integration points. `cargo test -p workspace workspace_presentation_setting` passed all three tests (220 unrelated tests filtered out). Explicit Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 5.2. Persist workspace presentation across restart
+  - [x] 5.2. Persist workspace presentation across restart
     - Store and restore the selected presentation in existing workspace persistence without copying project state.
     - _Requirements: 3.2, 3.3_
     - _Capability IDs: CAP-036, CAP-037_
     - _Depends on: 5.1_
-    - _Reads: crates/workspace/src/{persistence,workspace-presentation}.rs_
-    - _Writes: crates/workspace/src/persistence.rs_
+    - _Reads: crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation.rs, crates/workspace/src/workspace_settings.rs, crates/workspace/src/persistence.rs, crates/workspace/src/persistence/model.rs_
+    - _Writes: crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation.rs, crates/workspace/src/persistence.rs, crates/workspace/src/persistence/model.rs_
     - _Validation: `cargo test -p workspace workspace_presentation_restart` verifies both modes and unchanged project identity_
+    - _Evidence: 2026-08-14 — extended the existing `WorkspaceDb` row and `SerializedWorkspace` state with a checked `workspace_presentation` discriminator whose migration defaults existing rows to `editor`; the canonical settings value initializes new workspaces, while every local, empty/session-restored and remote workspace opening path restores the row-specific value before composition. The save path updates the discriminator in the same workspace upsert/savepoint as existing layout state and does not create or mutate project, worktree, Git, identity, credential, collaboration or agent-session records. Stable string codecs reject unknown values at the schema boundary and log/fall back to Editor if a corrupted database value is encountered. `workspace_presentation_restart_preserves_project_identity` round-tripped Editor and Collaborative through both database-ID and canonical-root restoration while retaining the same workspace ID, local location, reopen paths and identity paths. `cargo test -p workspace workspace_presentation_restart` passed (1/1), `cargo test -p workspace workspace_presentation` passed (4/4), `cargo test -p workspace persistence::tests` passed (44/44), `./script/clippy -p workspace` passed with release/all-target/all-feature warnings denied, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 5.3. Add presentation switching actions
+  - [x] 5.3. Add presentation switching actions
     - Register reversible actions that recompose the active workspace while retaining canonical entities.
     - _Requirements: 3.3_
     - _Capability IDs: CAP-036, CAP-037_
     - _Depends on: 5.2_
-    - _Reads: crates/workspace/src/{workspace,workspace-presentation}.rs, crates/workspace/src/actions.rs_
-    - _Writes: crates/workspace/src/workspace_presentation_actions.rs, crates/workspace/src/actions.rs_
+    - _Reads: crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation.rs, crates/workspace/src/workspace_settings.rs, crates/workspace/src/persistence.rs, crates/settings/src/settings_file.rs_
+    - _Writes: crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation_actions.rs_
     - _Validation: `cargo test -p workspace switch_workspace_presentation` checks entity IDs and navigation survive both transitions_
+    - _Evidence: 2026-08-14 — added public `SwitchToEditorWorkspace` and `SwitchToCollaborativeWorkspace` GPUI actions in the dedicated presentation-action module and registered them on the existing `Workspace::actions` chain (the planned `crates/workspace/src/actions.rs` integration point does not exist). Each action changes only the presentation discriminator on the live `Workspace`, updates the canonical user preference through the existing settings writer, schedules the existing workspace serializer and notifies GPUI to recompose; it does not replace or copy the workspace, project, panes, items, navigation or persistence aggregates, and same-presentation dispatch remains entity-idempotent. The rendered `MultiWorkspace` action test performs Editor → Collaborative → Editor transitions and proves the workspace/project/active-pane/active-item entity IDs, backward/forward navigation state and recent-navigation history remain identical, while both the settings preference and existing `WorkspaceDb` row track each target. `cargo test -p workspace switch_workspace_presentation` passed (1/1), `cargo test -p workspace workspace_presentation` passed (5/5), `cargo test -p workspace test_pane_navigation` passed (1/1), `./script/clippy -p workspace` passed with release/all-target/all-feature warnings denied, and Rust 2024 formatting plus `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 5.4. Add onboarding workspace-choice controls
+  - [x] 5.4. Add onboarding workspace-choice controls
     - Render two accessible choices with concise shared-data explanation and save the chosen setting.
     - _Requirements: 3.1, 3.2_
     - _Capability IDs: CAP-037_
     - _Depends on: 5.1_
-    - _Reads: crates/onboarding/src/{onboarding,basics-page}.rs, crates/ui/src/**_
-    - _Writes: crates/onboarding/src/workspace_choice.rs_
+    - _Reads: crates/onboarding/src/onboarding.rs, crates/onboarding/src/basics_page.rs, crates/ui/src/components/button/**, crates/settings/src/settings_file.rs, crates/settings/src/settings_store.rs, crates/workspace/src/workspace_presentation.rs, crates/workspace/src/workspace_settings.rs_
+    - _Writes: crates/onboarding/Cargo.toml, crates/onboarding/src/onboarding.rs, crates/onboarding/src/basics_page.rs, crates/onboarding/src/workspace_choice.rs_
     - _Validation: `cargo test -p onboarding workspace_choice` verifies labels, selection, keyboard activation and persisted value_
+    - _Evidence: 2026-08-14 — added a native GPUI Workspace section at the start of the existing onboarding basics page with exactly “Editor Workspace” and “Collaborative Workspace,” visible descriptions, a concise same-projects-and-data explanation, stable tab order, native focus treatment, assistive labels and toggle-state semantics. Selection derives directly from canonical `WorkspaceSettings`; Enter/Space activation writes `settings.workspace.workspace_presentation` through the existing settings-file owner, and no onboarding-specific presentation store or project copy was introduced. The test-only `settings/test-support` feature enables deterministic GPUI/FakeFs coverage without changing production dependencies. `cargo test -p onboarding workspace_choice -- --nocapture` passed 1/1 and proves initial Editor selection, Space activation of Collaborative, Enter activation of Editor and both persisted JSON values; `cargo test -p onboarding` passed the crate test and doc-test targets; `cargo fmt --all -- --check`, `./script/clippy -p onboarding`, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 5.5. Cover existing-user and initialization failure behavior
+  - [x] 5.5. Cover existing-user and initialization failure behavior
     - Prove existing users remain in Editor and a failed Collaborative initialization offers a recoverable Editor fallback.
     - _Requirements: 3.3, 3.4_
     - _Capability IDs: CAP-036, CAP-037_
     - _Depends on: 5.3, 5.4_
-    - _Reads: crates/onboarding/src/workspace_choice.rs, crates/workspace/src/workspace_presentation.rs_
-    - _Writes: crates/workspace/tests/workspace_presentation.rs_
+    - _Reads: crates/onboarding/src/workspace_choice.rs, crates/workspace/src/{collaborative_shell_state,collaborative_workspace,workspace_presentation,workspace_presentation_actions,workspace}.rs, crates/workspace/src/persistence/model.rs_
+    - _Writes: crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace workspace_presentation` covers upgrade, failure, retry and explicit later switch_
+    - _Evidence: 2026-08-14 — after Task 6.6 supplied the canonical shell-failure boundary, added a rendered GPUI regression that starts from the shipped/default Editor presentation, explicitly enters Collaborative, projects initialization failure, retries once without switching presentation, projects the repeated failure, and activates the visible Editor fallback. The fallback and a later explicit return to Collaborative both persist through the existing workspace/settings owners while preserving the exact Workspace, Project, active Pane and active Item entities; the recovered Collaborative shell no longer shows stale failure state. This extends, rather than duplicates, Task 5.1's default/schema upgrade checks, Task 5.2's missing-row/default migration and restart coverage, and Task 5.3's navigation-preservation coverage. The planned integration-test path does not exist because `workspace` keeps these GPUI fixtures in its library test module, so the discovered write path is `crates/workspace/src/workspace.rs`. `cargo test -p workspace workspace_presentation -- --nocapture` passed all six matching default, schema, upgrade/restart, reversible-switch and failure/retry/fallback tests; the full workspace suite passed 231/231. `./script/clippy -p workspace`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 6. Compose the collaborative GPUI shell
 
-  - [ ] 6.1. Add the CollaborativeWorkspace composition root
+  - [x] 6.1. Add the CollaborativeWorkspace composition root
     - Create the native GPUI view and select it from the approved presentation setting.
     - _Requirements: 4.1_
     - _Capability IDs: CAP-036_
-    - _Depends on: 5.3_
-    - _Reads: crates/workspace/src/{workspace,pane,dock,status-bar}.rs, crates/ui/src/**_
-    - _Writes: crates/workspace/src/collaborative_workspace.rs_
+    - _Depends on: 5.3, 5.5_
+    - _Reads: crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation_actions.rs, crates/workspace/src/pane.rs, crates/workspace/src/dock.rs, crates/workspace/src/status_bar.rs, crates/ui/src/**_
+    - _Writes: crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation_actions.rs_
     - _Validation: `cargo test -p workspace collaborative_workspace_mounts` proves no React or Tauri process is launched_
+    - _Evidence: 2026-08-14 — added a native `CollaborativeWorkspace` GPUI entity owned by the existing `Workspace`, holding the same canonical `Entity<Project>` rather than a copied project model. `Workspace::render` now selects the existing editor composition or this native root from the persisted `WorkspacePresentation` discriminator; the new module depends only on native Rust/GPUI/project/UI crates and has no React, Tauri or child-process integration. Presentation transitions move focus to the active presentation so the reverse switch remains reachable after the Collaborative root has painted. `cargo test -p workspace collaborative_workspace_mounts -- --nocapture` passed and proves Editor is the initial rendered composition, switching mounts the native Collaborative root with the identical project entity, and the action path switches back to Editor; `cargo test -p workspace workspace_presentation`, `cargo test -p workspace switch_workspace_presentation`, the full 226-test workspace suite, `cargo fmt --all -- --check`, `./script/clippy -p workspace` and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 6.2. Implement the collaborative top-bar layout
+  - [x] 6.2. Implement the collaborative top-bar layout
     - Compose title, participant region, share/invite actions and connection/layout affordances with native components.
     - _Requirements: 4.1, 4.4_
     - _Capability IDs: CAP-036_
     - _Depends on: 6.1_
-    - _Reads: crates/workspace/src/collaborative_workspace.rs, crates/title_bar/**, crates/ui/src/**_
-    - _Writes: crates/workspace/src/collaborative_top_bar.rs_
+    - _Reads: crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/workspace.rs, crates/title_bar/src/title_bar.rs, crates/title_bar/src/collab.rs, crates/ui/src/components/button/**_
+    - _Writes: crates/workspace/src/collaborative_top_bar.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_top_bar` checks hierarchy, labels and unavailable-action states_
+    - _Evidence: 2026-08-14 — added a native theme-token-driven top bar to the Collaborative composition with canonical first-visible-worktree title projection, an explicit no-active-task state, participant region, share/invite controls, connection state and review/editor layout affordances. Share, invite, connection details and review layout fail visibly unavailable until their later canonical owners are bound; each icon action has an assistive label and reason tooltip. The Editor Workspace control dispatches the existing presentation action, and the top bar introduces no participant, connection, task or project store. `cargo test -p workspace collaborative_top_bar -- --nocapture` passed and verifies all eight ordered regions render, the projected labels and action-availability model are truthful, and the enabled Editor control performs the reverse presentation transition; `cargo test -p workspace collaborative_workspace_mounts`, the full 227-test workspace suite, `cargo fmt --all -- --check`, `./script/clippy -p workspace` and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 6.3. Implement the left-rail layout container
+  - [x] 6.3. Implement the left-rail layout container
     - Add pinned, community/project and task/thread sections with independent scrolling and native density tokens.
     - _Requirements: 4.1, 4.2_
     - _Capability IDs: CAP-036_
     - _Depends on: 6.1_
-    - _Reads: crates/sidebar/src/sidebar.rs, crates/workspace/src/collaborative_workspace.rs, crates/ui/src/**_
-    - _Writes: crates/sidebar/src/collaborative_rail.rs_
+    - _Reads: crates/sidebar/src/sidebar.rs, crates/workspace/src/{collaborative_workspace,multi_workspace}.rs, crates/ui/src/{components,divider,scroll}.rs_
+    - _Writes: crates/sidebar/src/collaborative_rail.rs, crates/sidebar/src/sidebar.rs, crates/sidebar/src/sidebar_tests.rs, crates/workspace/src/multi_workspace.rs_
     - _Validation: `cargo test -p sidebar collaborative_rail_layout` checks section order and bounded scrolling_
+    - _Evidence: 2026-08-14 — added a native `CollaborativeRail` entity under the existing `Sidebar` owner with ordered Pinned, Communities and Projects, and Tasks and Threads regions, theme-token density, explicit empty states and three independent retained `ScrollHandle`s. `MultiWorkspace` now presents the registered sidebar on the left whenever the active workspace uses the Collaborative presentation, including when the Editor sidebar preference is closed, without changing that preference, its configured side or its persisted width; the rail receives the correct left-side divider and does not expose the Editor-only resize, close, history or recent-project controls. Resize interaction remains disabled until Task 6.5 introduces independently owned Collaborative layout state. No project, community, task, thread or navigation store was added. `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed and verifies section geometry, bounded nonzero regions, labels, independent scroll offsets and unchanged Editor sidebar state; the full 141-test sidebar suite and full 227-test workspace suite passed. `cargo fmt --all -- --check`, `./script/clippy -p sidebar`, `./script/clippy -p workspace`, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 6.4. Implement timeline and review split geometry
+  - [x] 6.4. Implement timeline and review split geometry
     - Add resizable central/review regions with minimum sizes and a full-width collapsed timeline state.
     - _Requirements: 4.1, 4.2_
     - _Capability IDs: CAP-036_
-    - _Depends on: 6.1_
-    - _Reads: crates/workspace/src/{collaborative_workspace,pane}.rs, crates/ui/src/resizable.rs_
-    - _Writes: crates/workspace/src/collaborative_layout.rs_
+    - _Depends on: 6.1, 6.2_
+    - _Reads: crates/workspace/src/{collaborative_workspace,collaborative_top_bar,dock,workspace}.rs, crates/gpui/src/elements/div.rs_
+    - _Writes: crates/workspace/src/collaborative_layout.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/collaborative_top_bar.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_layout_bounds` checks expanded, collapsed and narrow constraints_
+    - _Evidence: 2026-08-14 — added one native `CollaborativeLayout` entity to the existing Collaborative workspace composition, with a central timeline region, optional Review Changes region, a draggable native GPUI divider and pure geometry constraints that preserve a 480px timeline and 320px review minimum. The top-bar review affordance now toggles the same layout owner; explicit collapse produces a full-width timeline, reopening restores the retained width, and viewports below the 806px combined minimum hide the review surface without mutating requested visibility or width. The layout holds presentation geometry only and introduces no transcript, diff, project or Git state; persistence remains owned by Task 6.5. The planned `crates/ui/src/resizable.rs` integration point does not exist, so the implementation reuses the existing workspace dock/div drag idiom and records the discovered GPUI source boundary. `cargo test -p workspace collaborative_layout_bounds -- --nocapture`, `cargo test -p workspace collaborative_top_bar -- --nocapture`, `cargo test -p workspace collaborative_workspace_mounts -- --nocapture` and the full 228-test workspace suite passed. `cargo fmt --all -- --check`, `./script/clippy -p workspace` and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 6.5. Persist collaborative layout state
+  - [x] 6.5. Persist collaborative layout state
     - Persist review visibility, width and collaborative rail width independently of Editor layout state.
     - _Requirements: 4.2, 4.3_
     - _Capability IDs: CAP-036_
-    - _Depends on: 6.4_
-    - _Reads: crates/workspace/src/{collaborative_layout,persistence}.rs_
-    - _Writes: crates/workspace/src/collaborative_layout_persistence.rs_
+    - _Depends on: 6.3, 6.4_
+    - _Reads: crates/workspace/src/{collaborative_layout,collaborative_workspace,multi_workspace,persistence,workspace}.rs, crates/sidebar/src/{sidebar,sidebar_tests}.rs, crates/db/src/kvp.rs_
+    - _Writes: crates/workspace/src/collaborative_layout_persistence.rs, crates/workspace/src/collaborative_layout.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/multi_workspace.rs, crates/workspace/src/workspace.rs, crates/sidebar/src/sidebar.rs, crates/sidebar/src/sidebar_tests.rs_
     - _Validation: `cargo test -p workspace collaborative_layout_restart` verifies round trip, bounds clamping and Editor isolation_
+    - _Evidence: 2026-08-14 — added one versioned Collaborative-layout record in Sim's existing scoped key-value persistence, keyed by the canonical `WorkspaceId` and synchronously restored before the Collaborative composition is created. The record owns only requested review visibility, retained review width and Collaborative rail width; writes ride the existing throttled/flushable workspace serialization lifecycle for local, remote, empty and detached workspaces. Review widths clamp to 320–1600px and rail widths to 200–800px, missing records use native defaults, and malformed or unsupported-version records log and fail safely to defaults. `MultiWorkspace` and `Sidebar` now project and resize the retained Collaborative rail width only while that presentation is active, including double-click reset, without changing the Sidebar entity's separately serialized Editor width or its `multi_workspace_state` namespace. No schema, project record, pane model or duplicate persistence service was introduced. `cargo test -p workspace collaborative_layout_restart -- --nocapture` passed its round-trip, clamp, per-workspace, corrupt/future-version and exact Editor-state-isolation checks; `cargo test -p workspace collaborative_layout -- --nocapture` passed both persistence and rendered review geometry tests; `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed native drag-resize and Editor-width-isolation coverage; the full 229-test workspace suite and full 141-test sidebar suite passed. `cargo fmt --all -- --check`, `./script/clippy -p workspace -p sidebar` and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 6.6. Add shell loading and initialization-error states
+  - [x] 6.6. Add shell loading and initialization-error states
     - Render bounded loading, unavailable-service and retry states without discarding presentation or project context.
     - _Requirements: 4.1, 8.3_
     - _Capability IDs: CAP-036_
-    - _Depends on: 6.1, 6.2, 6.3, 6.4_
-    - _Reads: crates/workspace/src/collaborative_workspace.rs, crates/ui/src/**_
-    - _Writes: crates/workspace/src/collaborative_shell_state.rs_
+    - _Depends on: 6.1, 6.2, 6.3, 6.4, 6.5_
+    - _Reads: crates/workspace/src/{collaborative_workspace,workspace_presentation_actions,workspace}.rs, crates/ui/src/components/{banner,button,label}.rs_
+    - _Writes: crates/workspace/src/collaborative_shell_state.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_shell_state` covers loading, retry, partial failure and recovery_
+    - _Evidence: 2026-08-14 — added one transient `CollaborativeShellState` entity to the native Collaborative composition with scoped Ready, Loading, PartialFailure, InitializationFailed and Retrying phases; it owns no transcript, service, project or persistence state. Theme-native banners expose the affected scope and last trustworthy state, keep the existing project and Collaborative layout mounted, and offer a retry control that emits exactly one scoped request while remaining visibly Retrying until a later canonical service binding reports recovery. Initialization failure additionally exposes an explicit “Open Editor Workspace” action through the existing presentation switch owner rather than silently changing modes. The future service-construction boundary carries a narrow release-build dead-code expectation until its planned bindings land. `cargo test -p workspace collaborative_shell_state -- --nocapture` passed 1/1, the full workspace suite passed 230/230, `./script/clippy -p workspace`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 7. Bind collaborative navigation to existing stores
 
-  - [ ] 7.1. Define collaborative navigation row projection
+  - [x] 7.1. Define collaborative navigation row projection
     - Project existing entities into stable row IDs, groups and state badges without creating another store.
     - _Requirements: 4.3_
     - _Capability IDs: CAP-036, CAP-042_
-    - _Depends on: 6.3_
-    - _Reads: crates/sidebar/src/collaborative_rail.rs, crates/project/src/**, crates/channel/src/channel_store.rs, crates/agent_ui/src/thread_metadata_store.rs_
-    - _Writes: crates/sidebar/src/collaborative_navigation.rs_
+    - _Depends on: 6.3, 6.6_
+    - _Reads: crates/sidebar/src/collaborative_rail.rs, crates/project/src/{project,worktree_store}.rs, crates/channel/src/channel_store.rs, crates/agent_ui/src/thread_metadata_store.rs_
+    - _Writes: Cargo.lock, crates/sidebar/Cargo.toml, crates/sidebar/src/sidebar.rs, crates/sidebar/src/collaborative_navigation.rs_
     - _Validation: `cargo test -p sidebar collaborative_navigation_projection` verifies stable IDs and one row per source entity_
+    - _Evidence: 2026-08-14 — added a UI-independent, non-persisted navigation projection contract under the existing Sidebar owner. Typed canonical source identities use `ProjectGroupKey`, project-scoped `WorktreeId`, channel ID and `ThreadId`; row identity additionally includes the presentation group so one source may legitimately appear once in Pinned and once in its canonical group, while duplicate rows for the same source/group fail explicitly instead of being silently overwritten. Constructors derive directly from `Project`, `Channel` and `ThreadMetadata`, retain input ordering, and carry labels plus Unread, Running, WaitingForUser, Failed, Archived and Completed badges without observing or copying any store. The module has a narrow release dead-code expectation until Tasks 7.2–7.4 bind its consumers. Four focused tests prove stable identity across channel/thread renames, exact project-entity projection, canonical grouping, badge retention, valid pinned references and duplicate rejection; `cargo test -p sidebar collaborative_navigation_projection -- --nocapture` passed 4/4 and the full sidebar suite passed 145/145. `./script/clippy -p sidebar`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 7.2. Populate pinned and recent work groups
+  - [x] 7.2. Populate pinned and recent work groups
     - Bind existing pinned/recent project and task records with empty and unavailable states.
     - _Requirements: 4.1, 4.3_
     - _Capability IDs: CAP-036_
     - _Depends on: 7.1_
-    - _Reads: crates/recent_projects/src/**, crates/sidebar/src/collaborative_navigation.rs_
-    - _Writes: crates/sidebar/src/collaborative_pinned.rs_
+    - _Reads: crates/recent_projects/src/sidebar_recent_projects.rs, crates/workspace/src/persistence.rs, crates/agent_ui/src/thread_metadata_store.rs, crates/sidebar/src/{collaborative_navigation,collaborative_rail,sidebar}.rs_
+    - _Writes: crates/sidebar/src/collaborative_pinned.rs, crates/sidebar/src/collaborative_rail.rs, crates/sidebar/src/sidebar.rs, crates/sidebar/src/sidebar_tests.rs_
     - _Validation: `cargo test -p sidebar collaborative_pinned` covers order, removal and missing targets_
+    - _Evidence: 2026-08-14 — added a native `CollaborativePinned` projection under the existing rail. It loads canonical recent projects from `WorkspaceDb`, observes canonical `ThreadMetadataStore` updates, excludes archived threads, merges candidates by descending source timestamp, preserves explicit pin order ahead of up to eight recent rows and never persists a second list. Missing pinned targets remain observable, duplicate pin or recent records fail explicitly, and loading, empty and unavailable states use native theme components. Source audit found no existing Sim or Buzz project/task pin-record owner to bind; the runtime therefore supplies no synthetic pin records and truthfully renders canonical recent work or its empty/unavailable state, while the projection accepts ordered references from a future approved canonical owner without claiming one exists. Four focused tests cover ordering, removal, archived filtering, missing targets, malformed duplicates and rendered empty/unavailable states; `cargo test -p sidebar collaborative_pinned -- --nocapture` passed 4/4, `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed 1/1, and the full sidebar suite passed 149/149. `./script/clippy -p sidebar`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 7.3. Populate project, repository and worktree groups
+  - [x] 7.3. Populate project, repository and worktree groups
     - Render canonical Sim project hierarchy and selection without deriving duplicate project records.
     - _Requirements: 3.3, 4.3_
     - _Capability IDs: CAP-018, CAP-036_
-    - _Depends on: 7.1_
-    - _Reads: crates/project/src/**, crates/worktree/src/**, crates/sidebar/src/collaborative_navigation.rs_
-    - _Writes: crates/sidebar/src/collaborative_projects.rs_
+    - _Depends on: 7.1, 7.2_
+    - _Reads: crates/workspace/src/multi_workspace.rs, crates/project/src/{project,git_store}.rs, crates/worktree/src/worktree.rs, crates/sidebar/src/{collaborative_navigation,collaborative_rail}.rs_
+    - _Writes: crates/sidebar/src/collaborative_navigation.rs, crates/sidebar/src/collaborative_projects.rs, crates/sidebar/src/collaborative_rail.rs, crates/sidebar/src/sidebar.rs_
     - _Validation: `cargo test -p sidebar collaborative_projects` checks multiple repositories/worktrees and deleted worktrees_
+    - _Evidence: 2026-08-14 — added a native `CollaborativeProjects` projection that reads ordered `MultiWorkspace::project_groups` and the live canonical Project repository and visible-Worktree entities on every render. Project rows retain `ProjectGroupKey`; repository identities add the canonical work-directory path; worktree identities now add their canonical absolute path to the project-scoped `WorktreeId`, preventing collisions when multiple Project entities in one linked-worktree group reuse numeric IDs. Repository and worktree rows are deterministically path-sorted, exact canonical duplicates reached through multiple workspaces collapse to one presentation row, removed worktrees disappear on the next source projection, and missing `MultiWorkspace`, empty and malformed duplicate-group states remain visible. The rail now mounts this entity in the existing independently scrolling Communities and Projects section and introduces no project/repository/worktree persistence. Three focused tests cover multiple repositories, colliding numeric worktree IDs at distinct paths, stable order, deleted-worktree removal and duplicate-group failure; `cargo test -p sidebar collaborative_projects -- --nocapture` passed 3/3, `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed 1/1, and the full sidebar suite passed 152/152. `./script/clippy -p sidebar`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 7.4. Populate task and thread history groups
+  - [x] 7.4. Populate task and thread history groups
     - Bind active, historical and archived ACP/thread metadata with running, waiting, failed and completed indicators.
     - _Requirements: 4.1, 4.3_
     - _Capability IDs: CAP-021, CAP-025, CAP-036_
-    - _Depends on: 7.1_
-    - _Reads: crates/agent_ui/src/thread_metadata_store.rs, crates/task/**, crates/sidebar/src/collaborative_navigation.rs_
-    - _Writes: crates/sidebar/src/collaborative_tasks.rs_
+    - _Depends on: 7.1, 7.3_
+    - _Reads: crates/agent_ui/src/{thread_metadata_store,agent_panel,conversation_view}.rs, crates/acp_thread/src/acp_thread.rs, crates/sidebar/src/{collaborative_navigation,collaborative_rail,sidebar}.rs_
+    - _Writes: crates/sidebar/src/collaborative_tasks.rs, crates/sidebar/src/collaborative_rail.rs, crates/sidebar/src/sidebar.rs_
     - _Validation: `cargo test -p sidebar collaborative_tasks` checks state transitions, archive and history ordering_
+    - _Evidence: 2026-08-14 — added a native `CollaborativeTasks` projection that observes canonical `ThreadMetadataStore` records and derives live status through the existing AgentPanel/ACP conversation projection rather than introducing another task/session store. Archived metadata always projects Archived; live ACP Running, WaitingForConfirmation, Error and Completed map to Running, Waiting for user, Failed and Completed; drafts remain explicitly Draft without a false terminal badge; unloaded non-archived history projects Completed because Sim's canonical metadata does not persist a separate terminal outcome. Rows sort active Running/Waiting/Failed first, then drafts, completed history newest-first and archived history last. The existing rail mounts the entity in its independent Tasks and Threads scroller with native empty/unavailable states. Three focused tests exhaust live transitions and badges, active/history/archive ordering, and draft treatment; `cargo test -p sidebar collaborative_tasks -- --nocapture` passed 3/3, `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed 1/1, and the full sidebar suite passed 155/155. The lack of a persisted historical failure outcome is recorded rather than filled with duplicate state; Tasks 8.1–8.4 own the canonical lifecycle/outcome projection. `./script/clippy -p sidebar`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 7.5. Add selection, history and deep-link navigation
-    - Route row activation and supported entity links through existing workspace navigation and persist selected context.
+  - [x] 7.5. Define workspace navigation targets, history and persistence
+    - Own typed collaborative navigation targets, safe entity-link resolution, back/forward history and selected-context persistence without importing sidebar row types.
     - _Requirements: 4.3, 16.4_
     - _Capability IDs: CAP-036, CAP-042_
     - _Depends on: 7.2, 7.3, 7.4_
-    - _Reads: crates/workspace/src/path_link.rs, crates/sidebar/src/collaborative_{pinned,projects,tasks}.rs_
-    - _Writes: crates/workspace/src/collaborative_navigation.rs_
+    - _Reads: crates/workspace/src/{path_link,persistence,workspace}.rs, crates/project/src/project.rs_
+    - _Writes: crates/workspace/src/collaborative_navigation.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_navigation` covers back/forward, restart, missing entity and unsafe link rejection_
+    - _Decomposition resolution (2026-08-14): approved split keeps the reusable target/history/persistence owner in `workspace`; Task 7.6 performs sidebar-specific activation and deep-link dispatch through that lower-level contract._
+    - _Evidence: 2026-08-14 — added the UI-free `workspace::collaborative_navigation` owner with typed community, canonical project-group, repository, worktree, channel, thread, Buzz message, hosted repository/project, pull-request and issue targets. Project targets preserve Sim's path-list and non-secret remote-identity semantics; an explicit regression proves runtime SSH passwords are never serialized. The workspace owns a bounded versioned current/back/forward state under the existing `WorkspaceId` and schedules it through the existing serialization lifecycle rather than adding a project, thread or selection store. Navigation rejects invalid or unavailable targets without mutation, preserves forward history until a successful new selection, and exposes persistence-aware workspace methods for the sidebar adapter in Task 7.6. The compatibility parser accepts the documented `buzz://message|repo|project|pr|issue` forms, lowercase-normalizes cryptographic IDs, enforces exact required/single query parameters and rejects oversized URLs, credentials, ports, paths, fragments, unknown parameters, invalid hex and unsafe d-tags. Malformed or future persisted state fails closed to an empty navigation state. `cargo test -p workspace collaborative_navigation --no-fail-fast` passed 6/6, the full `cargo test -p workspace --no-fail-fast` suite passed 237/237, `./script/clippy -p workspace`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 7.6. Bind sidebar rows to workspace navigation
+    - Convert pinned, project/worktree and task/thread row activation plus supported entity links into the workspace-owned targets without persisting a second selection.
+    - _Requirements: 4.3, 16.4_
+    - _Capability IDs: CAP-036, CAP-042_
+    - _Depends on: 7.5_
+    - _Reads: crates/workspace/src/collaborative_navigation.rs, crates/sidebar/src/collaborative_{navigation,pinned,projects,tasks}.rs_
+    - _Writes: crates/sidebar/src/collaborative_pinned.rs, crates/sidebar/src/collaborative_projects.rs, crates/sidebar/src/collaborative_tasks.rs_
+    - _Validation: `cargo test -p sidebar collaborative_navigation_activation` covers every row type, back/forward dispatch, missing targets and unsafe entity links_
+    - _Implementation contradiction (2026-08-14): the approved write set contains the pinned/project/task row surfaces but no entity-link consumer or back/forward control surface. Those two behaviors are already canonically implemented below the sidebar by Task 7.5; adding an unused sidebar parser/history wrapper would duplicate ownership and violate the architecture. Task 7.6 therefore binds every currently rendered row type and validates the existing Task 7.5 entity-link/history contract as a combined checkpoint. The first actual entity-link consumer must call `workspace::collaborative_navigation::target_from_entity_link` directly rather than introduce a sidebar copy._
+    - _Evidence: 2026-08-14 — made pinned project/thread, project-group, repository, worktree and task/thread rows native clickable GPUI targets without adding selection persistence. Project-family activation re-resolves the live `MultiWorkspace` project hierarchy, activates the owning workspace and records the workspace-owned typed target only after the repository/worktree still exists. Task activation re-resolves canonical `ThreadMetadata`, selects the matching project-group workspace, loads and focuses the existing `AgentPanel` thread, then records the same canonical target. Pinned rows delegate to those same project/thread activation functions so they cannot report a false selection or drift from primary-row behavior. Missing workspaces, projects, repositories, worktrees, threads and agent surfaces produce visible themed errors and do not mutate navigation. Three focused mapping fixtures cover every rendered row family; `cargo test -p sidebar collaborative_navigation_activation --no-fail-fast` passed 3/3 and the full sidebar suite passed 158/158 in an isolated target. The combined `cargo test -p workspace collaborative_navigation --no-fail-fast` contract passed 6/6 for back/forward dispatch, missing targets, restart persistence, supported Buzz entity links, unsafe-link rejection and credential-free project identity. All-target/all-feature clippy with `--deny warnings`, Rust 2024 formatting and `git diff --check` passed. The repository release-profile clippy wrapper was also attempted, but a concurrent external workspace rebuild exhausted the shared disk; its equivalent warning policy passed against the isolated dev graph after the release-only partial artifacts were cleaned. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 8. Project existing ACP activity into the central timeline
 
-  - [ ] 8.1. Define the ActivityItem projection contract
+  - [x] 8.1. Define the ActivityItem projection contract
     - Add stable source identity, semantic class, actor/verb/object/outcome, lifecycle and detail-link fields without GPUI dependencies.
     - _Requirements: 12.1, 12.2_
     - _Capability IDs: CAP-025, CAP-036_
     - _Depends on: 3.1, 6.1_
     - _Reads: crates/acp_thread/src/acp_thread.rs, crates/action_log/src/**, projects/buzz/VISION_ACTIVITY.md_
-    - _Writes: crates/agent_ui/src/activity_projection.rs_
+    - _Writes: crates/agent_ui/src/activity_projection.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui activity_projection_contract` covers stable identity and serializable detail handles_
+    - _Evidence: 2026-08-14 — added a GPUI-free, serde-compatible `ActivityItem` contract with non-empty stable `(source_kind, source_id)` identity, independent monotonic `source_version`, all twelve semantic render classes from Buzz's activity vision, actor/verb/object/outcome, terminal-aware lifecycle, canonical context and visibility, occurrence/projection timestamps, and typed ACP/action/protocol/Git/workflow/raw detail handles plus stable action/Git/entity links. Identity remains unchanged as a source advances from running to terminal state, allowing Task 8.4 to replace rows in place; unknown semantics retain explicit Generic/Raw classes for truthful fallback. Four focused tests cover stable versioned identity, empty-ID rejection, every detail-handle JSON round trip and complete-item JSON round trip; `cargo test -p agent_ui activity_projection_contract -- --nocapture` passed 4/4 and the full agent_ui suite passed 398/398. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. The crate-root module declaration was added to the discovered write set so downstream mapping leaves can consume the public contract. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 8.2. Map ACP messages and lifecycle events
+  - [x] 8.2. Map ACP messages and lifecycle events
     - Project human/agent messages, session start/stop, idle, disconnect and cancellation into one item each.
     - _Requirements: 12.1, 12.4_
     - _Capability IDs: CAP-021, CAP-025_
     - _Depends on: 8.1_
     - _Reads: crates/acp_thread/src/**, crates/agent_ui/src/activity_projection.rs_
-    - _Writes: crates/agent_ui/src/activity_acp.rs_
+    - _Writes: crates/agent_ui/src/activity_acp.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui activity_acp_mapping` exhausts ACP message and lifecycle fixtures_
+    - _Evidence: 2026-08-14 — added an ACP adapter over canonical `UserMessage`, `AssistantMessage`, `AssistantMessageChunk`, `AcpThreadEvent`, `ThreadStatus`, `SessionId` and `StopReason` types. Human messages prefer the stable Sim client message ID so optimistic acknowledgement does not replace the row, then fall back to protocol ID or deterministic entry identity; agent message and thought chunks use protocol IDs or deterministic entry/chunk identities and each project exactly once. Canonical thread status, stopped, error and load-error events normalize directly into lifecycle inputs, while connection owners can supply the explicit disconnected state. Every lifecycle input requires a non-empty caller-owned event ID and truthfully maps started, idle, disconnected, failed, successful end-turn, token/request limits, refusal and explicit user cancellation to semantic verb/object/outcome and lifecycle values; repeated lifecycle versions retain one item ID for Task 8.4 in-place reduction. Canonical session, project, thread, actor and visibility context is preserved, and details point back to typed ACP entry handles. Four focused fixtures cover optimistic acknowledgement, message/thought cardinality, every current ACP stop reason plus connection/failure states, direct thread-event normalization, invalid lifecycle identity and stable lifecycle updates; `cargo test -p agent_ui activity_acp_mapping -- --nocapture` passed 4/4. The full agent_ui suite passed 402/402 after one unrelated remote-connection migration test transiently failed in the first full run, passed immediately in isolation, and passed in the clean rerun. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed; clippy initially exhausted disk while writing recoverable build metadata, and `cargo clean -p agent_ui` removed only 3.8 GiB of that package's rebuildable artifacts before the successful rerun. The crate-root export was added to the discovered write set. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 8.3. Map native tool and permission activity
+  - [x] 8.3. Map native tool and permission activity
     - Project reads, searches, edits, shell commands, tests and permission requests with truthful outcomes.
     - _Requirements: 12.1, 12.2_
     - _Capability IDs: CAP-022, CAP-025_
-    - _Depends on: 8.1_
+    - _Depends on: 8.1, 8.2_
     - _Reads: crates/action_log/src/**, crates/agent_ui/src/activity_projection.rs_
-    - _Writes: crates/agent_ui/src/activity_actions.rs_
+    - _Writes: crates/agent_ui/src/activity_actions.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui activity_action_mapping` maps every registered action kind or generic fallback_
+    - _Evidence: 2026-08-14 — added a native action adapter over canonical ACP `ToolCallId`, `ToolKind`, `ToolCallStatus` and authorization state. Every current tool kind maps to a truthful semantic verb/object/class: reads, edits, deletes, moves, searches, shell commands, recognized test commands, thoughts, fetches, mode switches and Other; future non-exhaustive kinds use the same Generic fallback instead of fabricated semantics. Pending, running, completed, failed, rejected and cancelled states map to explicit lifecycle/outcome values, while permission grants and action choices produce distinct waiting-for-user Permission items without executing or persisting a second permission decision. Stable tool-call identity survives lifecycle versions, typed ACP details remain available, and the item links the existing canonical action ID for later diff resolution. The `ActionLog` audit confirmed that it owns aggregate buffer/diff/review state but no per-operation event registry, so the adapter does not invent duplicate ActionLog events or attach aggregate diff totals to individual calls. Four focused tests cover all ten current kinds, Generic fallback, six ordinary statuses, both permission modes, stable action links and bounded test-command recognition; `cargo test -p agent_ui activity_action_mapping -- --nocapture` passed 4/4 and the full agent_ui suite passed 406/406. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. The first full-suite attempt could not link because the shared target filled; removing only the recoverable 24 GiB `target/debug/incremental` compiler cache restored 26 GiB free, after which the suite passed. The crate-root export was added to the discovered write set, and the dependency now serializes that shared write after Task 8.2. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 8.4. Coalesce streaming and state updates in place
+  - [x] 8.4. Coalesce streaming and state updates in place
     - Reduce fragments and lifecycle transitions by source ID without duplicate terminal rows.
     - _Requirements: 12.3, 12.4_
     - _Capability IDs: CAP-025_
     - _Depends on: 8.2, 8.3_
     - _Reads: crates/agent_ui/src/activity_{projection,acp,actions}.rs_
-    - _Writes: crates/agent_ui/src/activity_reducer.rs_
+    - _Writes: crates/agent_ui/src/activity_reducer.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui activity_reducer` covers duplicate, reordered, cancelled and timed-out updates_
+    - _Evidence: 2026-08-14 — added an ordered `ActivityReducer` keyed exclusively by canonical `ActivityItemId`. First observations append once; higher source versions replace the same slot; identical same-version payloads deduplicate; lower reordered versions are ignored; and different payloads at one version fail explicitly without mutating accepted state. Nonterminal lifecycle snapshots may advance or resume in place, while terminal items cannot return to nonterminal state, change terminal lifecycle, or change terminal outcome status; later versions may enrich detail for the same terminal result. Six focused tests cover duplicate delivery, reordered stale updates, streaming content replacement, cancelled-item resurrection rejection, timed-out terminal enrichment/conflict and divergent same-version payloads; `cargo test -p agent_ui activity_reducer -- --nocapture` passed 6/6 and the full agent_ui suite passed 412/412. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. The crate-root export was added to the discovered write set, already serialized after both mapping prerequisites. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 8.5. Render the virtualized collaborative timeline
+  - [x] 8.5. Render the virtualized collaborative timeline
     - Render projected items with semantic summaries, progressive details and a truthful unknown-event row.
     - _Requirements: 4.1, 12.1, 12.2_
     - _Capability IDs: CAP-025, CAP-036_
     - _Depends on: 8.4_
     - _Reads: crates/agent_ui/src/activity_{projection,reducer}.rs, crates/agent_ui/src/conversation_view/**_
-    - _Writes: crates/agent_ui/src/collaborative_timeline.rs_
+    - _Writes: crates/agent_ui/src/collaborative_timeline.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui collaborative_timeline_render` checks ordering, virtualization and detail disclosure_
+    - _Evidence: 2026-08-14 — added a native GPUI `CollaborativeTimeline` over the canonical `ActivityReducer`, using GPUI's variable-height `ListState` with tail-following rather than materializing every feed row or persisting a second transcript. Inserts splice one row, streaming and lifecycle replacements remeasure only their stable row, and duplicate or stale updates do not disturb the list. Rows render semantic actor/verb/object summaries, lifecycle and outcome state, and typed ACP/action/protocol/Git/workflow detail handles behind an in-place disclosure control; Generic and Raw classes visibly identify unsupported activity and preserve source identity instead of inventing semantics. Empty state, separators, surfaces and text all use native Sim/GPUI components and theme tokens. Four focused tests cover reducer order, a 1,000-item virtual-list count, disclosure-state transitions with typed detail text, and truthful unknown-event fallback; `cargo test -p agent_ui collaborative_timeline_render -- --nocapture` passed 4/4 and the full agent_ui suite passed 416/416. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. The crate-root export was added to the discovered write set, serialized after Task 8.4. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 8.6. Add ACP activity projection regression fixtures
+  - [x] 8.6. Add ACP activity projection regression fixtures
     - Lock exactly-once mappings and empty/waiting/error behavior for the Milestone 1 source catalog.
     - _Requirements: 12.1, 12.3, 12.4, 20.1_
     - _Capability IDs: CAP-021, CAP-022, CAP-025, CAP-044_
@@ -491,232 +559,346 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/fixtures/protocol/**, crates/agent_ui/src/activity_*.rs_
     - _Writes: crates/agent_ui/tests/collaborative_activity.rs_
     - _Validation: `cargo test -p agent_ui collaborative_activity` passes with no unmapped source kind_
+    - _Evidence: 2026-08-14 — added a public-surface integration suite that enumerates the complete current Milestone 1 projection catalog: human messages, assistant messages, assistant thought summaries, all ten registered ACP tool kinds, and started/idle/completed lifecycle events. The catalog asserts every named source maps to a distinct canonical activity ID, every first delivery inserts one row, every repeat delivery deduplicates, and no expected fixture name is absent. Separate recovery fixtures verify an empty thread emits no rows and that permission waiting, explicit disconnection reasons and agent failures retain their semantic class, lifecycle and user-visible outcome. A compatibility check parses the checked-in protocol manifest, pins schema version 1, preserves mixed legacy/v2 coverage and records Buzz verification as the fixture authority. `cargo test -p agent_ui collaborative_activity -- --nocapture` passed 3/3; the full crate run passed 416 unit plus 3 integration tests. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 9. Integrate native diff review into the collaborative shell
 
-  - [ ] 9.1. Mount the existing native review pane
-    - Compose AgentDiffPane and ProjectDiff in the shell without cloning Git or diff state.
+  - [x] 9.1. Define the dependency-safe collaborative review host
+    - Add a workspace-owned host and registration contract for canonical project-bound review surfaces without naming concrete `agent_ui` or `git_ui` types.
     - _Requirements: 4.1, 10.4_
     - _Capability IDs: CAP-020, CAP-036_
-    - _Depends on: 6.4, 8.5_
-    - _Reads: crates/agent_ui/src/agent_diff.rs, crates/git_ui/src/project_diff.rs, crates/workspace/src/collaborative_layout.rs_
-    - _Writes: crates/workspace/src/collaborative_review.rs_
-    - _Validation: `cargo test -p workspace collaborative_review_mount` verifies shared GitStore and pane collapse_
+    - _Depends on: 6.4, 7.5, 8.5_
+    - _Reads: crates/workspace/src/{collaborative_layout,workspace}.rs, crates/project/src/{project,git_store}.rs_
+    - _Writes: crates/workspace/src/collaborative_review.rs, crates/workspace/src/workspace.rs_
+    - _Validation: `cargo test -p workspace collaborative_review_host` verifies one project-bound provider per slot, canonical project identity, registration failure and pane collapse_
+    - _Decomposition resolution (2026-08-14): approved split keeps the host contract below `agent_ui` and `git_ui`; Tasks 9.6 and 9.7 adapt concrete panes independently and Task 9.8 performs the upper registration/mount._
+    - _Evidence: 2026-08-14 — added a workspace-owned `CollaborativeReviewHost` with dependency-safe agent-change and project-change slots, exact canonical `Project` entity checks, typed mismatch/occupied/unavailable failures, deterministic selection, registration-token-safe removal and collapse-aware view exposure that retains provider state. `Workspace` now constructs the host from its existing project and exposes notifying registration, selection, unregistration and visibility boundaries without naming `agent_ui` or `git_ui` types. The focused `cargo test -p workspace collaborative_review_host -- --nocapture` passed 1/1 and the full workspace suite passed 238/238; `./script/clippy -p workspace` passed with all targets, all features and denied warnings. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 9.2. Add stable timeline-to-change links
+  - [x] 9.6. Adapt AgentDiffPane to the collaborative review host
+    - Expose the existing agent diff surface through the workspace contract while retaining its canonical ACP thread, ActionLog and project state.
+    - _Requirements: 4.1, 10.4_
+    - _Capability IDs: CAP-020, CAP-021, CAP-036_
+    - _Depends on: 9.1_
+    - _Reads: crates/agent_ui/src/{agent_diff,agent_ui}.rs, crates/workspace/src/collaborative_review.rs_
+    - _Writes: crates/agent_ui/src/collaborative_review.rs, crates/agent_ui/src/agent_ui.rs_
+    - _Validation: `cargo test -p agent_ui collaborative_agent_review_adapter` proves the host uses the existing thread/ActionLog diff and reports unavailable or stale state_
+    - _Evidence: 2026-08-14 — added `CollaborativeAgentReviewAdapter`, which accepts only an active canonical `AcpThread`, verifies the workspace's exact `Project` entity, retains the thread's existing `ActionLog` identity, constructs the existing native `AgentDiffPane`, and registers that pane in the workspace-owned agent-change slot without a second diff or transcript model. Missing-thread, canonical registration, selected-view identity and cross-project stale-state scenarios are covered. `cargo test -p agent_ui collaborative_agent_review_adapter -- --nocapture` passed 1/1 unit tests with the unrelated integration target correctly filtering all three tests; `./script/clippy -p agent_ui` passed in release mode with all targets, all features and denied warnings after obtaining the pinned WebRTC artifact. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 9.7. Adapt ProjectDiff to the collaborative review host
+    - Expose the existing project diff surface through the workspace contract while retaining its canonical Project and GitStore state.
+    - _Requirements: 4.1, 10.4_
+    - _Capability IDs: CAP-020, CAP-036_
+    - _Depends on: 9.1_
+    - _Reads: crates/git_ui/src/{git_ui,project_diff}.rs, crates/workspace/src/collaborative_review.rs_
+    - _Writes: crates/git_ui/src/collaborative_review.rs, crates/git_ui/src/git_ui.rs_
+    - _Validation: `cargo test -p git_ui collaborative_project_review_adapter` proves file/diff state comes from the existing Project/GitStore and reports unavailable or stale state_
+    - _Evidence: 2026-08-14 — added `CollaborativeProjectReviewAdapter`, which discovers the workspace's already-open native `ProjectDiff`, retains the exact canonical `Project` and current `GitStore` identities, and registers that same view in the workspace-owned project-change slot without creating fallback project, repository or diff state. The focused test covers explicit unavailable state before `ProjectDiff` is opened, selected-view identity after registration and fail-closed cross-project reuse; current Git-store identity is revalidated at registration. `cargo test -p git_ui collaborative_project_review_adapter -- --nocapture` passed 1/1 and the complete `git_ui` suite passed 132/132 plus doc tests. `./script/clippy -p git_ui` passed in release mode with all targets, all features and denied warnings after obtaining the pinned WebRTC artifact. Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 9.8. Register and mount native review adapters
+    - Register the agent and project review adapters from the upper Sim composition and mount the selected native surface in the collaborative shell without a fallback copy.
+    - _Requirements: 4.1, 4.2, 10.4_
+    - _Capability IDs: CAP-020, CAP-036_
+    - _Depends on: 9.6, 9.7_
+    - _Reads: crates/agent_ui/src/collaborative_review.rs, crates/git_ui/src/collaborative_review.rs, crates/workspace/src/{collaborative_layout,collaborative_review,collaborative_workspace,workspace}.rs, crates/sim/src/{main,sim}.rs_
+    - _Writes: crates/sim/src/sim.rs, crates/workspace/src/{collaborative_layout,collaborative_workspace,workspace}.rs_
+    - _Validation: `cargo test -p sim collaborative_review_registration` verifies AgentDiffPane/ProjectDiff selection, shared project identity, resizable mount and collapsed full-width timeline_
+    - _Discovered contradiction (2026-08-14): the approved design assigns shell composition to `workspace`, but the original Sim-only write set could register providers without replacing `CollaborativeLayout`'s placeholder review region. The dependency-safe resolution retains upper adapter registration in `sim` while expanding the leaf to the three existing workspace-owned presentation files needed to mount the host's selected `AnyView`; it adds no dependency from `workspace` to `agent_ui` or `git_ui` and does not change canonical ownership._
+    - _Evidence: 2026-08-14 — upper Sim composition now observes the existing native `ProjectDiff` and active `AgentPanel` ACP thread, constructs their approved adapters outside the originating `Workspace` update lease, and replaces registrations through scoped host tokens. The workspace shell mounts the host-selected native `AnyView` without introducing `agent_ui`/`git_ui` dependencies or fallback diff state; selection preserves exact view identity, while collapse retains the provider and gives the timeline the full layout width. `cargo test -p sim collaborative_review_registration -- --nocapture`, `cargo test -p workspace collaborative_review_host -- --nocapture`, and `cargo test -p workspace collaborative_layout_bounds -- --nocapture` each passed 1/1. `./script/clippy -p workspace` and `./script/clippy -p sim` passed in release mode with all targets, all features and denied warnings; Sim lint required network access only to retrieve the pinned WebRTC archive. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 9.2. Add stable timeline-to-change links
     - Resolve activity action/change IDs to repository, file and hunk targets and surface stale targets.
     - _Requirements: 10.3, 10.4_
     - _Capability IDs: CAP-020, CAP-025_
-    - _Depends on: 9.1_
+    - _Depends on: 9.8_
     - _Reads: crates/action_log/src/**, crates/workspace/src/collaborative_review.rs, crates/git_ui/src/project_diff.rs_
-    - _Writes: crates/agent_ui/src/activity_diff_link.rs_
+    - _Writes: crates/agent_ui/src/activity_diff_link.rs, crates/agent_ui/src/agent_ui.rs_
     - _Validation: `cargo test -p agent_ui activity_diff_link` covers valid, moved, stale and missing hunks_
+    - _Discovered contradiction (2026-08-14): the planned write set named the new module but omitted the crate-root declaration required to compile it. The dependency-safe correction adds only the one-line `agent_ui.rs` module export and does not expand behavior, ownership or milestone scope._
+    - _Evidence: 2026-08-14 — added an ephemeral `ActivityDiffLinkResolver` and current-target index keyed by exact `ActionLog`/`ProjectDiff` entity identities. Stable action and Git-change links bind to opaque repository/change/file/hunk IDs, while current native `ProjectPath` and hunk ranges remain projections from the canonical review state. Resolution follows a moved path only when stable file/hunk identity survives and fails closed for unsupported or empty links, duplicate/mismatched bindings, replaced sources, stale changes/files and missing hunks. `cargo test -p agent_ui activity_diff_link -- --nocapture` passed 1/1 with the unrelated integration target filtering its three tests; the complete `cargo test -p agent_ui` suite then passed 418/418 unit tests and 3/3 collaborative-activity integration tests. `./script/clippy -p agent_ui` passed in release mode with all targets, all features and denied warnings. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 9.3. Expose review file navigation and aggregate statistics
+  - [x] 9.3. Expose review file navigation and aggregate statistics
     - Reuse native file selection and addition/deletion totals in top and status surfaces.
     - _Requirements: 10.4_
     - _Capability IDs: CAP-020, CAP-036_
-    - _Depends on: 9.1_
+    - _Depends on: 9.8_
     - _Reads: crates/git_ui/src/project_diff.rs, crates/workspace/src/collaborative_review.rs_
-    - _Writes: crates/workspace/src/collaborative_review_summary.rs_
+    - _Writes: crates/workspace/src/collaborative_review_summary.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_review_summary` checks file changes and zero/stale states_
+    - _Discovered contradiction (2026-08-14): the original write set omitted the workspace crate-root declaration required to compile the new summary module. The correction adds only that module export; later exact `workspace.rs` writers are serialized through Task 10.2's dependency on 9.3._
+    - _Evidence: 2026-08-14 — added a workspace-owned `CollaborativeReviewSummary` projection keyed by the selected native review slot, exact provider entity and monotonic revision. It exposes opaque file identities, current canonical `ProjectPath` navigation targets, selected file and aggregate additions/deletions without owning Git or diff mutation. Construction rejects empty/duplicate/missing selections; navigation and selection fail closed for replaced providers, stale revisions or removed files; replacement accepts only a strictly newer projection from the same provider, including an explicit zero-change state. `cargo test -p workspace collaborative_review_summary -- --nocapture` passed 1/1, and the complete `cargo test -p workspace` suite passed 239/239. `./script/clippy -p workspace` passed in release mode with all targets, all features and denied warnings. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 9.4. Route valid keep, reject, stage and review actions
+  - [x] 9.4. Route valid keep, reject, stage and review actions
     - Invoke existing native actions only when their source and Git state permit them and surface failures.
     - _Requirements: 10.4_
     - _Capability IDs: CAP-020_
-    - _Depends on: 9.1, 9.2_
+    - _Depends on: 9.2, 9.3, 9.8_
     - _Reads: crates/agent_ui/src/agent_diff.rs, crates/git_ui/src/project_diff.rs_
-    - _Writes: crates/workspace/src/collaborative_review_actions.rs_
+    - _Writes: crates/workspace/src/collaborative_review_actions.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_review_actions` covers valid, conflict, rejected and stale transitions_
+    - _Discovered contradiction (2026-08-14): the original write set omitted the workspace crate-root declaration required to compile the new action-routing module. The correction adds only that module export; Task 9.3 is an explicit predecessor for its earlier crate-root write, and later exact `workspace.rs` work is serialized through Task 10.2's dependency on 9.4._
+    - _Evidence: 2026-08-14 — added a workspace-owned authorization router for keep/reject on native agent changes and stage/review on native project changes. It requires the exact provider entity and revision, checks current conflict/rejected/stale state and provider-advertised capabilities, and invokes a caller-supplied native action only after every check succeeds; invalid slot, unavailable action and native failure remain explicit without duplicating `AgentDiffPane` or `ProjectDiff` mutations. Rejected requests are verified not to invoke their native closure. `cargo test -p workspace collaborative_review_actions -- --nocapture` passed 1/1 after the final stale-revision and unavailable-action cases, the complete workspace suite passed 240/240, and `./script/clippy -p workspace` passed in release mode with all targets, all features and denied warnings. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 9.5. Add review-pane regression scenarios
+  - [x] 9.5. Add review-pane regression scenarios
     - Exercise pane collapse/restore, file navigation, action links and canonical Git updates together.
     - _Requirements: 4.2, 10.3, 10.4, 20.1_
     - _Capability IDs: CAP-020, CAP-036, CAP-044_
     - _Depends on: 9.2, 9.3, 9.4_
-    - _Reads: crates/workspace/src/collaborative_review*.rs_
-    - _Writes: crates/workspace/tests/collaborative_review.rs_
+    - _Reads: crates/workspace/src/collaborative_review*.rs, crates/{fs,git,project}/src/**_
+    - _Writes: crates/workspace/Cargo.toml, crates/workspace/src/workspace.rs, crates/workspace/tests/collaborative_review.rs_
     - _Validation: `cargo test -p workspace collaborative_review` passes against a temporary repository fixture_
+    - _Discovered contradiction (2026-08-14): adding the first auto-discovered workspace integration test compiled the normal workspace library while dev-dependency feature unification exposed test-only remote identity variants, so the original single-file write set could not pass its default validation command. The narrow correction registers the external target behind `workspace/test-support` for all-feature validation and includes the same source in the default library test build through a test-only crate alias/module. This adds only `Cargo.toml` test metadata and `workspace.rs` test registration; production behavior and milestone scope are unchanged, and Task 10.2 is sequenced after 9.5 for the repeated crate-root write._
+    - _Evidence: 2026-08-14 — added a deterministic fake Git repository regression that binds the exact canonical `Project` and native review-provider entity, verifies collapse/restore preserves that provider, resolves and selects stable file targets, and routes stage through the guarded native callback. The callback updates the canonical repository index; the observed `Project` repository status transitions from unstaged to staged, a newer zero-change summary replaces the projection, and the pre-refresh action token fails stale without invocation. `cargo test -p workspace collaborative_review -- --nocapture` passed all 4 matching host/summary/action/regression tests, and the complete workspace suite passed 241/241. `./script/clippy -p workspace` passed in release mode with all targets, all features and denied warnings. Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 10. Finish native composer, status, accessibility and visual coverage
 
-  - [ ] 10.1. Mount the native collaborative composer
+  - [x] 10.1. Mount the native collaborative composer
     - Reuse the existing message/prompt editor and bind submit/cancel to the active ACP thread.
     - _Requirements: 4.1, 11.1_
     - _Capability IDs: CAP-021, CAP-036_
     - _Depends on: 8.5, 9.5_
-    - _Reads: crates/agent_ui/src/message_editor.rs, crates/workspace/src/collaborative_workspace.rs_
-    - _Writes: crates/workspace/src/collaborative_composer.rs_
+    - _Reads: crates/agent_ui/src/{agent_panel,conversation_view,message_editor}.rs, crates/workspace/src/{collaborative_workspace,workspace}.rs, crates/sim/src/sim.rs_
+    - _Writes: crates/workspace/src/{collaborative_composer,collaborative_workspace,workspace}.rs, crates/agent_ui/src/{collaborative_composer,agent_ui}.rs, crates/sim/src/sim.rs_
     - _Validation: `cargo test -p workspace collaborative_composer` covers send, empty input, cancellation and unavailable thread_
+    - _Discovered contradiction (2026-08-14): the original workspace-only write boundary could mount a surface but could not bind the existing `agent_ui::MessageEditor` without reversing the established `workspace` → `agent_ui` dependency prohibition. The narrow correction keeps the project-bound host and unavailable surface in `workspace`, adds a concrete adapter beside the canonical editor in `agent_ui`, and reconciles the active provider from the existing upper `sim` composition. This is one coherent native mount: it reuses the same editor entity and send/cancel events and creates no prompt, transcript or session authority. Task 10.2 now follows 10.1 to serialize their repeated `workspace.rs` write; its later adapter and upper-registration leaves already depend transitively on 10.2, so the `agent_ui.rs` and `sim.rs` writes remain ordered._
+    - _Evidence: 2026-08-14 — added a generation-safe, exact-project composer host and native bottom surface; adapted the active ACP thread's existing `MessageEditor`; routed submit/cancel through its existing events; and reconciled registration on active-thread changes without copying prompt or session state. The focused workspace test passed all unavailable, project-mismatch, occupied-provider, empty-input, submit, cancel and stale-unregistration scenarios. `cargo check -p agent_ui -p sim --tests`, `./script/clippy -p workspace`, `./script/clippy -p agent_ui` and `./script/clippy -p sim` passed. Final regression-suite and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 10.2. Add participant and execution status projection
-    - Project current human, agent, model, runtime and execution location into top/status surfaces.
+  - [x] 10.2. Define participant and execution status view data
+    - Define workspace-owned human/agent participant and execution-status values plus a provider contract without importing ACP UI metadata.
     - _Requirements: 4.1, 4.3_
     - _Capability IDs: CAP-007, CAP-021, CAP-036_
-    - _Depends on: 6.2, 7.4_
-    - _Reads: crates/client/src/user.rs, crates/agent_ui/src/thread_metadata_store.rs, crates/workspace/src/status_bar.rs_
-    - _Writes: crates/workspace/src/collaborative_participants.rs_
-    - _Validation: `cargo test -p workspace collaborative_participants` checks stable avatars, unknown identity and local/remote runtime labels_
+    - _Depends on: 6.2, 7.4, 9.1, 9.5, 10.1_
+    - _Reads: crates/client/src/user.rs, crates/workspace/src/{collaborative_top_bar,status_bar,workspace}.rs_
+    - _Writes: crates/workspace/src/collaborative_participants.rs, crates/workspace/src/workspace.rs_
+    - _Validation: `cargo test -p workspace collaborative_participant_view_data` checks stable human/agent identity, unknown values, model/runtime/location labels and provider absence_
+    - _Decomposition resolution (2026-08-14): approved split keeps dependency-safe view data in `workspace`; Task 10.8 adapts canonical `agent_ui` metadata and Task 10.9 mounts the provider into the top/status surfaces from the upper composition._
+    - _Discovered sequencing resolution (2026-08-14): Tasks 9.3 through 10.1 required successive workspace crate-root writes. Depending on 10.1, which transitively follows 9.3 through 9.5, serializes all registrations without changing Task 10.2 behavior or milestone scope._
+    - _Evidence: 2026-08-14 — added workspace-owned stable human/agent identities, bounded presence, execution phase, safe model/runtime/location labels and explicit ready/failed/unavailable provider states. The exact-project single-provider host uses generation-bearing tokens so stale updates or removals cannot replace current display data, while the projection owns no ACP metadata, presence or session persistence. `cargo test -p workspace collaborative_participant_view_data -- --nocapture` passed stable identity, unknown/known labels, provider absence, project mismatch, occupied provider, failure normalization, replacement and stale-token scenarios. `./script/clippy -p workspace`, Rust 2024 formatting, `git diff --check`, inventory and specification validation passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 10.3. Add project, branch, diff and task status projection
+  - [x] 10.8. Adapt ACP metadata to participant and execution status
+    - Project the active canonical thread's agent, model, runtime and execution location into workspace view data without storing a second session record.
+    - _Requirements: 4.1, 4.3_
+    - _Capability IDs: CAP-007, CAP-021, CAP-036_
+    - _Depends on: 8.5, 9.2, 9.6, 10.2_
+    - _Reads: crates/agent_ui/src/{agent_panel,agent_ui,thread_metadata_store}.rs, crates/agent_ui/src/conversation_view/thread_view.rs, crates/workspace/src/collaborative_participants.rs_
+    - _Writes: crates/agent_ui/src/collaborative_participants.rs, crates/agent_ui/src/agent_ui.rs_
+    - _Validation: `cargo test -p agent_ui collaborative_participant_adapter` covers active/changed/missing threads, stable avatars, unknown model and local/remote runtime labels_
+    - _Discovered contradiction (2026-08-14): Task 9.2's required crate-root export introduced a repeated `agent_ui.rs` write not present in the original decomposition. Adding 9.2 as an explicit predecessor serializes that one-line module registration without changing Task 10.8 behavior or milestone scope._
+    - _Evidence: 2026-08-14 — added an exact-project `agent_ui` adapter that retains the active `ThreadView` entity ID and projects its canonical agent ID/display/HTTP avatar, current model, native-Sim-versus-ACP runtime, execution phase and existing metadata's local/named-remote/unknown location into Task 10.2 view data. Missing threads and projects or cross-project reuse fail explicitly; missing model and location remain safe unknown values; the adapter owns no session or metadata persistence. `cargo test -p agent_ui collaborative_participant_adapter -- --nocapture` passed missing, active and changed thread snapshots, stable identity/avatar, unknown and selected models, and local/remote labels. `./script/clippy -p agent_ui`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 10.9. Mount participant and execution status surfaces
+    - Render workspace participant/execution providers in the existing collaborative top bar and status bar with unavailable/failure states.
+    - _Requirements: 4.1, 4.3_
+    - _Capability IDs: CAP-007, CAP-021, CAP-036_
+    - _Depends on: 10.2_
+    - _Reads: crates/workspace/src/collaborative_participants.rs, crates/workspace/src/collaborative_top_bar.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/status_bar.rs_
+    - _Writes: crates/workspace/src/collaborative_top_bar.rs, crates/workspace/src/collaborative_workspace.rs, crates/workspace/src/status_bar.rs, crates/workspace/src/workspace.rs, crates/workspace/src/workspace_presentation_actions.rs_
+    - _Validation: `cargo test -p workspace collaborative_participant_status_mount` uses a fake provider to verify top/status updates, replacement and unavailable/failure states_
+    - _Discovered contradiction (2026-08-14): the original three presentation-only writes could render an initial participant snapshot but could not propagate provider register/update/unregister transitions or remove the status projection when returning to the unchanged Editor presentation. The narrow correction adds workspace-owned synchronization beside the canonical provider host and invokes it after presentation transitions. This creates no participant/session authority and leaves Task 10.10 as the sole upper `agent_ui` provider-registration leaf._
+    - _Evidence: 2026-08-14 — mounted the workspace-owned projection into native top/status surfaces with bounded participant avatars, execution phase/model/runtime/location labels and explicit ready, failed and unavailable states. Provider registration, updates, replacement, removal and presentation changes synchronize cloned display data from the canonical host; Editor mode receives no participant status chrome. `cargo test -p workspace collaborative_participant_status_mount -- --nocapture` and `cargo test -p workspace collaborative_top_bar -- --nocapture` passed; `./script/clippy -p workspace`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 10.10. Register the ACP participant provider in Sim
+    - Register the dependency-safe `agent_ui` adapter from the upper Sim composition and prove it supplies the workspace surfaces without duplicate participant/session persistence.
+    - _Requirements: 4.1, 4.3_
+    - _Capability IDs: CAP-007, CAP-021, CAP-036_
+    - _Depends on: 9.8, 10.8, 10.9_
+    - _Reads: crates/agent_ui/src/collaborative_participants.rs, crates/workspace/src/collaborative_participants.rs, crates/sim/src/main.rs, crates/sim/src/sim.rs_
+    - _Writes: crates/sim/src/sim.rs_
+    - _Validation: `cargo test -p sim collaborative_participant_provider_registration` verifies canonical active-thread updates, unknown/unavailable state and one registered provider_
+    - _Implementation finding (2026-08-14): Sim's existing `cx.observe_new` workspace-composition hook and AgentPanel subscription are both defined in `sim.rs`; `main.rs` requires no initialization change. Narrowing the write set avoids a second registration path and does not change architecture, ownership or scope._
+    - _Evidence: 2026-08-14 — registered Task 10.8's exact-project adapter from the existing upper workspace composition and observed the canonical active `ThreadView`. Same-thread model/runtime/phase/location changes update the sole registration in place, active-thread replacement unregisters the prior generation first, and missing or invalid threads fail closed to unavailable without participant/session persistence. `cargo test -p sim collaborative_participant_provider_registration -- --nocapture` passed unavailable, unknown metadata, occupied-provider rejection, in-place update, replacement, stale-token and cleanup scenarios. `./script/clippy -p sim` passed in release mode with all targets, all features and denied warnings; Rust 2024 formatting passed. Commit: enclosing checkpoint commit, reported after creation._
+
+  - [x] 10.3. Add project, branch, diff and task status projection
     - Compose canonical project/worktree/branch/diff and task state without new persisted authorities.
     - _Requirements: 4.1, 4.3_
     - _Capability IDs: CAP-018, CAP-020, CAP-036_
-    - _Depends on: 7.3, 9.3_
-    - _Reads: crates/project/src/**, crates/workspace/src/status_bar.rs, crates/workspace/src/collaborative_review_summary.rs_
-    - _Writes: crates/workspace/src/collaborative_status.rs_
+    - _Depends on: 7.3, 9.3, 10.9_
+    - _Reads: crates/project/src/**, crates/workspace/src/collaborative_participants.rs, crates/workspace/src/status_bar.rs, crates/workspace/src/collaborative_review_summary.rs_
+    - _Writes: crates/workspace/src/collaborative_status.rs, crates/workspace/src/status_bar.rs, crates/workspace/src/workspace.rs_
     - _Validation: `cargo test -p workspace collaborative_status` covers missing repo, dirty branch and running/waiting task_
+    - _Discovered contradiction (2026-08-14): the original isolated-module write could define the projection but could not deliver the required bottom/status surface or compile without a crate-root declaration. The narrow correction mounts the projection through the existing StatusBar, observes the canonical Project/GitStore and serializes the repeated `workspace.rs` write after Task 10.9. It adds no project, Git, diff or task persistence and does not change approved ownership or milestone scope._
+    - _Evidence: 2026-08-14 — added a native status projection over the canonical visible worktree and active repository, including truthful missing-repository and detached-head states, dirty state, branch label and saturating file/addition/deletion totals. A current native review summary overrides repository-derived diff totals when supplied. The active ACP execution phase maps only to a typed task presentation value; idle/unknown remains absent and no task record is stored. The existing StatusBar mounts the component only in Collaborative mode and observes canonical Project/GitStore changes. `cargo test -p workspace collaborative_status -- --nocapture` passed missing-repository, dirty named branch, native review totals and running/waiting scenarios; `cargo test -p workspace collaborative_participant_status_mount -- --nocapture` passed Collaborative mount and Editor isolation. `./script/clippy -p workspace`, Rust 2024 formatting and `git diff --check` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 10.4. Implement keyboard focus order and workspace actions
+  - [x] 10.4. Implement keyboard focus order and workspace actions
     - Define focus traversal and shortcuts across rail, timeline, composer, review and status controls.
     - _Requirements: 4.4_
     - _Capability IDs: CAP-036_
-    - _Depends on: 7.5, 9.5, 10.1_
-    - _Reads: crates/workspace/src/collaborative_*.rs, crates/gpui/**_
-    - _Writes: crates/workspace/src/collaborative_focus.rs_
+    - _Depends on: 7.6, 9.5, 10.1, 10.3_
+    - _Reads: crates/workspace/src/{collaborative_composer,collaborative_layout,collaborative_workspace,status_bar,workspace}.rs, crates/gpui/**_
+    - _Writes: crates/workspace/src/{collaborative_focus,collaborative_composer,collaborative_layout,collaborative_workspace,status_bar,workspace}.rs_
     - _Validation: `cargo test -p workspace collaborative_focus` verifies logical order, restoration and no focus trap_
+    - _Discovered contradiction (2026-08-14): the original isolated focus-model write could define ordering but could not supply actual GPUI targets or route actions across the sidebar, central surface and existing status bar. The narrow correction gives the existing timeline, composer, review and status containers focus handles and coordinates them from `Workspace`, which already receives the canonical sidebar handle. Task 10.4 follows 10.3 to serialize the repeated `workspace.rs` and `status_bar.rs` writes. This adds no presentation persistence or alternate UI authority._
+    - _Evidence: 2026-08-14 — added a typed navigation → timeline → composer → conditionally visible review → status order; native forward, reverse and restore actions; presentation-scoped Tab/Shift-Tab routing; last-landmark restoration; and terminal fallback to the window focus chain. Review focus follows actual layout geometry, so narrow-window and user-collapsed review state cannot trap focus. `cargo test -p workspace collaborative_focus -- --nocapture` passed the logical-order and mounted GPUI traversal/restoration scenarios; `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed the Collaborative navigation regression. Final clippy, formatting, inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 10.5. Add accessibility names and state announcements
+  - [x] 10.5. Add accessibility names and state announcements
     - Label navigation, participant, activity, composer, review and failure states and announce meaningful transitions.
     - _Requirements: 4.4_
     - _Capability IDs: CAP-036_
-    - _Depends on: 10.4_
-    - _Reads: crates/workspace/src/collaborative_*.rs, crates/agent_ui/src/collaborative_timeline.rs_
-    - _Writes: crates/workspace/src/collaborative_accessibility.rs_
+    - _Depends on: 10.4, 10.10_
+    - _Reads: crates/workspace/src/{collaborative_*,status_bar,workspace}.rs, crates/agent_ui/src/collaborative_timeline.rs, crates/sidebar/src/collaborative_rail.rs_
+    - _Writes: crates/workspace/src/{collaborative_accessibility,collaborative_composer,collaborative_layout,collaborative_shell_state,collaborative_status,collaborative_top_bar,collaborative_workspace,status_bar,workspace}.rs, crates/agent_ui/src/collaborative_timeline.rs, crates/sidebar/src/collaborative_rail.rs_
     - _Validation: GPUI accessibility snapshot contains named landmarks, controls and running/error announcements_
+    - _Discovered contradiction (2026-08-14): the original isolated contract-module write could describe labels but could not expose them through the existing GPUI elements or label semantic activity rows owned by `agent_ui`. The narrow correction keeps label/announcement projection in dependency-safe `workspace::collaborative_accessibility`, applies it to the already canonical workspace/sidebar/status surfaces, and adds row semantics beside the existing `agent_ui` activity renderer. This is one cross-surface accessibility behavior, creates no parallel UI or execution state, and follows 10.4 to serialize repeated focus-surface writes._
+    - _Evidence: 2026-08-14 — added stable names and AccessKit roles for workspace, top controls, navigation, timeline, composer, review and status landmarks; bounded participant/presence labels; semantic activity row labels and expansion state; task and retry status announcements; and alert semantics for activity, provider and shell failures. The contract snapshot covers all seven required landmarks plus running and failure transitions, while focused timeline coverage proves running/error row output. `cargo test -p workspace collaborative_accessibility -- --nocapture`, `cargo test -p agent_ui collaborative_timeline_accessibility -- --nocapture` and `cargo test -p sidebar collaborative_rail_layout -- --nocapture` passed. `./script/clippy -p workspace`, `./script/clippy -p agent_ui` and `./script/clippy -p sidebar` passed with all targets/features and denied warnings. Final formatting, inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 10.6. Add native viewport visual fixtures
+  - [x] 10.6. Add native viewport visual fixtures
     - Capture expanded and collapsed compositions at the checked-in reference dimensions using theme tokens.
     - _Requirements: 4.2, 4.5_
     - _Capability IDs: CAP-036_
-    - _Depends on: 6.6, 7.5, 8.5, 9.5, 10.3_
-    - _Reads: .agents/specs/collaborative-workspace/screenshots/*.png, crates/workspace/src/collaborative_*.rs_
-    - _Writes: crates/workspace/tests/visual/collaborative_workspace.rs, crates/workspace/tests/fixtures/collaborative_workspace/*_
-    - _Validation: visual comparison passes at 1930×1262 expanded and 1928×1298 collapsed with explicit baseline approval_
+    - _Depends on: 6.6, 7.6, 8.5, 9.5, 10.3, 10.5, 10.10_
+    - _Reads: .agents/specs/collaborative-workspace/screenshots/*.png, crates/sidebar/src/{sidebar,sidebar_tests}.rs, crates/workspace/src/collaborative_*.rs_
+    - _Writes: Cargo.lock, crates/workspace/tests/visual/collaborative_workspace.rs, crates/workspace/tests/fixtures/collaborative_workspace/visual-contract.json, crates/sidebar/src/sidebar_tests.rs, crates/sidebar/Cargo.toml_
+    - _Validation: `cargo test -p sidebar collaborative_workspace_visual_fixtures -- --nocapture` renders the native expanded composition at 1930×1262 and collapsed composition at 1928×1298 against the explicitly approved reference contract_
+    - _Discovered contradiction (2026-08-14): a standalone `workspace` integration target cannot compose the canonical rail because production dependency direction is `sidebar -> workspace`; a reverse dev dependency or copied rail would violate the approved architecture. Sim's existing raster runner also has no checked-in approved baseline for this surface. The narrow correction keeps the fixture and approval contract at the requested workspace paths but includes it in the existing sidebar GPUI test module, where the real Sidebar, MultiWorkspace and CollaborativeWorkspace render together. The two user-provided PNGs remain the approved reference artifacts; their exact dimensions, hashes, required regions and expanded/collapsed state are pinned while theme colors remain native Sim tokens._
+    - _Evidence: 2026-08-14 — added a versioned visual contract for both approved screenshot artifacts and an exact-viewport GPUI fixture over the real native composition. The expanded case requires rail, top bar, timeline, review, composer and status regions with a bounded native review pane; the collapsed case requires the review region to be absent and the timeline to fill the layout. The fixture validates PNG identity metadata, viewport geometry, major pane adjacency, vertical hierarchy and native layout toggling without hardcoding light-theme pixels or introducing another UI owner. `cargo test -p sidebar collaborative_workspace_visual_fixtures -- --nocapture` passed 1/1. Final clippy, regression, formatting, inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 10.7. Add theme, zoom, narrow-window and restart regressions
+  - [x] 10.7. Add theme, zoom, narrow-window and restart regressions
     - Verify dark/high-contrast themes, reduced motion, zoom, narrow layout and full presentation-state restoration.
     - _Requirements: 3.2, 4.3, 4.4, 4.5, 20.1_
     - _Capability IDs: CAP-036, CAP-037, CAP-044_
     - _Depends on: 5.5, 6.5, 10.5, 10.6_
-    - _Reads: crates/workspace/tests/visual/collaborative_workspace.rs, crates/workspace/src/collaborative_*.rs_
-    - _Writes: crates/workspace/tests/collaborative_workspace.rs_
-    - _Validation: `cargo test -p workspace collaborative_workspace` passes all accessibility, visual, persistence and failure fixtures_
+    - _Reads: crates/workspace/tests/visual/collaborative_workspace.rs, crates/workspace/src/collaborative_*.rs, crates/sidebar/src/collaborative_*.rs, crates/agent_ui/src/collaborative_*.rs, crates/theme/src/{theme,styles/colors}.rs, crates/theme_settings/src/settings.rs_
+    - _Writes: crates/workspace/tests/collaborative_workspace.rs, crates/workspace/Cargo.toml_
+    - _Validation: `cargo test -p workspace --features test-support --test collaborative_workspace -- --nocapture --test-threads=1` passes theme/zoom, narrow-window, restart, reduced-motion and theme-token regressions_
+    - _Discovered validation correction (2026-08-14): the original command omitted the package's `test-support` feature even though the dedicated GPUI integration target consumes `AppState::test` and other existing test-support APIs. The default all-target Cargo graph also unifies `remote/test-support` without `workspace/test-support`, exposing an unrelated pre-existing `Mock` exhaustiveness mismatch. The explicit target is therefore declared with the same required feature as `collaborative_review` and validated with that feature; production identity, persistence and feature behavior are unchanged._
+    - _Evidence: 2026-08-14 — added a three-scenario integration target. The display scenario installs a sentinel high-contrast `GlobalTheme`, increases native UI rem size, verifies all collaborative landmarks, collapses review automatically at 760×640 and restores it at 1400×900. The restart scenario uses one `WorkspaceId`, resizes and collapses review, selects two thread targets and navigates backward, flushes canonical settings/KVP state, replaces the root workspace and verifies presentation, Project identity, exact review width, active target and forward history. The static reduced-motion/theme contract rejects animation/timer APIs and literal color constructors across native collaborative workspace, sidebar and agent UI sources. `cargo test -p workspace --features test-support --test collaborative_workspace -- --nocapture --test-threads=1` passed 3/3; `./script/clippy -p workspace` passed all targets/features with denied warnings. Final formatting, inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
 ## Milestone 2 — establish canonical protocol, identity and service foundations
 
-- [ ] 11. Implement the UI-free collaboration domain and Nostr codecs
+- [x] 11. Implement the UI-free collaboration domain and Nostr codecs
 
-  - [ ] 11.1. Define collaboration aggregate identifiers and provenance
+  - [x] 11.1. Define collaboration aggregate identifiers and provenance
     - Add tenant-scoped stable IDs, versions and provenance fields without I/O or GPUI dependencies.
     - _Requirements: 2.1, 2.2, 5.1_
     - _Capability IDs: CAP-001, CAP-003, CAP-005_
     - _Depends on: 2.1, 3.1_
     - _Reads: projects/buzz/crates/buzz-core/src/{event,tenant}.rs, crates/proto/**_
-    - _Writes: crates/collaboration_domain/src/identity_types.rs, crates/collaboration_domain/src/provenance.rs_
+    - _Writes: Cargo.toml, Cargo.lock, crates/collaboration_domain/Cargo.toml, crates/collaboration_domain/src/{collaboration_domain,identity_types,provenance}.rs_
     - _Validation: `cargo test -p collaboration_domain provenance` verifies stable tenant-scoped identity and version ordering_
+    - _Implementation finding (2026-08-14): the planned source modules require a crate manifest, descriptive library root and root-workspace membership before the focused package validation can compile. These are the minimal build integration paths for the approved UI/I/O-free `collaboration_domain` owner; no existing crate provides that dependency direction, and no service, protocol, persistence or GPUI dependency was introduced._
+    - _Evidence: 2026-08-14 — added the UI/I/O-free `collaboration_domain` crate with opaque community, aggregate, operation and principal UUID identifiers; an explicit nine-class aggregate type; and a `ScopedAggregateId` whose equality/order always includes community, type and raw aggregate UUID. Deterministic UUIDv5 import construction preserves a stable source mapping without treating it as tenant authority. Provenance adds strictly positive overflow-safe ordered versions, a bounded source-record ID whose deserializer enforces the same 1–1024-byte invariant, closed source/integrity kinds, observation time and optional source-version/integrity fields. Five focused tests prove cross-community identity separation, deterministic source mapping, strict successor ordering/overflow, bounded construction/deserialization and lossless provenance serialization. `cargo test -p collaboration_domain provenance -- --nocapture` passed 5/5; `./script/clippy -p collaboration_domain`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.2. Port canonical event serialization and identifiers
+  - [x] 11.2. Port canonical event serialization and identifiers
     - Implement exact canonical JSON, event-ID and signature-input encoding behind the compatibility boundary.
     - _Requirements: 5.1, 5.4_
     - _Capability IDs: CAP-001_
     - _Depends on: 11.1_
     - _Reads: projects/buzz/crates/buzz-core/src/event.rs, .agents/specs/collaborative-workspace/fixtures/protocol/**_
-    - _Writes: crates/nostr_compat/src/event.rs_
+    - _Writes: Cargo.toml, Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/{nostr_compat,event}.rs_
     - _Validation: `cargo test -p nostr_compat event_vectors` matches frozen byte and ID fixtures_
+    - _Implementation finding (2026-08-14): the first compatibility module requires a crate manifest, descriptive library root and workspace registration before its exact fixture test can compile. These are the minimal integration paths for the approved protocol-adapter boundary; the crate has no dependency on key custody, authorization, persistence, services or GPUI._
+    - _Evidence: 2026-08-14 — added the UI/service-free `nostr_compat` crate and an exact NIP-01 signature-input encoder for `[0,pubkey,created_at,kind,tags,content]` using compact UTF-8 JSON plus SHA-256 event identifiers. Public key and event-ID types accept only exact-length lowercase hexadecimal text on constructors and deserialization; timestamps and kinds are bounded by `u64`/`u16`, while tags preserve ordered string arrays and content preserves Unicode and JSON escaping. Four focused tests match all 12 structurally hashable frozen event IDs, pin the legacy event's exact preimage bytes, reproduce the frozen tampered-content ID mismatch, prove Unicode/escape behavior and reject uppercase, invalid and wrong-length identifier encodings. Signature and curve validity remain intentionally owned by Task 11.3. `cargo test -p nostr_compat event_vectors -- --nocapture` passed 4/4; `./script/clippy -p nostr_compat`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.3. Port signing and verification rules
+  - [x] 11.3. Port signing and verification rules
     - Verify Schnorr signatures, event IDs, timestamps and malformed inputs without accessing key storage.
     - _Requirements: 5.1, 5.4, 19.2_
     - _Capability IDs: CAP-001, CAP-009_
     - _Depends on: 11.2_
-    - _Reads: projects/buzz/crates/buzz-core/src/verification.rs, crates/nostr_compat/src/event.rs_
-    - _Writes: crates/nostr_compat/src/verification.rs_
+    - _Reads: projects/buzz/crates/buzz-core/src/verification.rs, crates/nostr_compat/src/event.rs, .agents/specs/collaborative-workspace/fixtures/protocol/events.json_
+    - _Writes: Cargo.toml, Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/{nostr_compat,verification}.rs_
     - _Validation: `cargo test -p nostr_compat verification` covers valid, altered, oversized and invalid-key fixtures_
+    - _Implementation finding (2026-08-14): exact Buzz-compatible BIP-340 verification requires the same audited `secp256k1` 0.29 line used by Buzz's Nostr dependency, registered once in root workspace dependencies and consumed only by `nostr_compat`. The public module/root and crate manifest must expose that boundary. This does not add signing, key custody, authorization, persistence, async runtime or I/O to the adapter._
+    - _Evidence: 2026-08-14 — added strict 128-character lowercase signature encoding, a pure `SignedEvent` verification boundary and explicit `TimestampPolicy::{Historical, Bounded}` so frozen/imported history is not rejected by a live freshness rule. Verification enforces the 256 KiB content and 512 KiB canonical-preimage ceilings before cryptography, applies saturating timestamp windows, compares the recomputed SHA-256 event ID, parses the x-only public key and verifies the BIP-340 Schnorr signature over the exact 32-byte ID. Five focused tests accept all ten frozen valid signatures and reject the frozen tampered ID, zero signature and invalid curve key; they also cover the 900-second bounded timestamp edge, oversized content before crypto and malformed signature constructor/deserialization. The complete nine-test `nostr_compat` suite preserves Task 11.2 vectors. `cargo test -p nostr_compat verification -- --nocapture` passed 5/5, `cargo test -p nostr_compat -- --nocapture` passed 9/9 plus doc tests, and `./script/clippy -p nostr_compat`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.4. Port filter and replaceable-head semantics
+  - [x] 11.4. Port filter and replaceable-head semantics
     - Implement bounded filters and exact replaceable/addressable selection rules as pure functions.
     - _Requirements: 5.1, 5.4, 8.4_
     - _Capability IDs: CAP-001, CAP-002_
     - _Depends on: 11.2_
     - _Reads: projects/buzz/crates/buzz-core/src/filter.rs, projects/buzz/crates/buzz-core/src/kind.rs_
-    - _Writes: crates/nostr_compat/src/filter.rs, crates/nostr_compat/src/head.rs_
+    - _Writes: Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/{nostr_compat,filter,head}.rs_
     - _Validation: property tests match Buzz selection for permutations, ties, deletes and invalid limits_
+    - _Implementation finding (2026-08-15): permutation coverage requires the existing workspace-pinned `proptest` package as a test-only dependency, which updates the crate manifest and lockfile; the library root must expose both pure modules. Task 11.4 is directly sequenced after Task 11.2's event types and Task 11.3's lockfile write, so no overlapping source or dependency mutation is concurrent._
+    - _Evidence: 2026-08-15 — added bounded NIP-01 filter types and pure matching with at most ten OR-ed filters; exact author/kind, inclusive time, canonical lowercase ID-prefix and AND-ed generic-tag behavior; 1,024-value/64-tag/1,024-byte tag-value ceilings; and Buzz's `#h` stored-channel fallback only when no explicit signed `h` tag exists. Added regular, NIP-16 replaceable, ephemeral and NIP-33 parameterized persistence classification; exact replacement coordinates with one required `d` tag for NIP-33; mixed-coordinate rejection; greatest-timestamp/lowest-ID head selection; and an owned deletion/tombstone order floor that blocks stale resurrection while accepting a truly newer value. Three filter tests cover AND/OR/prefix/time/tag semantics, strict `#h` precedence and invalid/excessive limits. Four head tests match both frozen timestamp/tie vectors, reject missing/duplicate discriminators, prove delete-floor behavior and run 256 property cases showing selection is input-order invariant across arbitrary timestamps and IDs. `cargo test -p nostr_compat filter -- --nocapture` passed 3/3, `cargo test -p nostr_compat head -- --nocapture` passed 4/4, and `./script/clippy -p nostr_compat`, Rust 2024 formatting, inventory validation, `git diff --check` and `validate_spec.py` passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.5. Generate the standard and Buzz kind registry
+  - [x] 11.5. Generate the standard and Buzz kind registry
     - Generate typed kind metadata, persistence class, privacy gate and replacement behavior from the frozen catalog.
     - _Requirements: 1.2, 5.1, 5.3_
     - _Capability IDs: CAP-001, CAP-044_
     - _Depends on: 1.2, 11.4_
     - _Reads: .agents/specs/collaborative-workspace/catalogs/protocol.csv, projects/buzz/crates/buzz-core/src/kind.rs_
-    - _Writes: crates/nostr_compat/src/generated_kinds.rs_
-    - _Validation: generator check fails on an unclassified kind and matches all 116 frozen constants_
+    - _Writes: crates/nostr_compat/src/{nostr_compat,generated_kinds}.rs, .agents/specs/collaborative-workspace/scripts/generate-kind-registry.py_
+    - _Validation: `python3 .agents/specs/collaborative-workspace/scripts/generate-kind-registry.py --check --verify-unclassified-guard` fails on an unclassified kind and matches all 133 frozen event-kind constants; the four range-boundary constants remain accounted for by the protocol catalog_
+    - _Implementation finding (2026-08-15): deterministic drift enforcement requires a checked generator beside the generated module, and the crate root must expose that module. Buzz's `KIND_MEDIA_UPLOAD` catalog row is intentionally typed as `InternalNotRelayEvent`; flattening it into `Registered` would erase the audited distinction. Privacy is a composable bit set because result-level and recipient gates overlap for agent turn metrics._
+    - _Evidence: 2026-08-15 — generated a numeric-sorted registry for all 133 frozen event kinds plus named constants for all four range boundaries, with typed NIP-16/NIP-33/ephemeral persistence, replacement behavior, protocol references, catalog status and the four Buzz privacy-gate families. The generator joins the authoritative protocol CSV to every scalar `u32` constant and privacy array in Buzz, rejects missing/extra/divergent constants, duplicate values, unknown privacy members and unsupported statuses, exercises an injected uncataloged-kind failure, and emits rustfmt-stable source. Three Rust tests prove sorted unique lookup, all range-boundary storage rules and overlapping privacy semantics. Generator drift/guard validation, focused Rust tests, clippy, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.6. Implement membership and identity NIP codecs
+  - [x] 11.6. Implement membership and identity NIP codecs
     - Add exact parsing and encoding for NIP-AA, NIP-IA and NIP-OA.
     - _Requirements: 5.3, 5.4, 7.1_
     - _Capability IDs: CAP-001, CAP-007, CAP-008_
     - _Depends on: 11.3, 11.5_
     - _Reads: projects/buzz/docs/nips/NIP-{AA,IA,OA}.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/identity.rs_
-    - _Validation: identity NIP vectors round-trip and reject malformed membership/attestation/archive tags_
+    - _Writes: crates/nostr_compat/src/nostr_compat.rs, crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/identity.rs_
+    - _Validation: `cargo test -p nostr_compat buzz_nips::identity -- --nocapture` round-trips identity NIP vectors and rejects malformed membership/attestation/archive tags_
+    - _Implementation finding (2026-08-15): native module exposure requires the crate root and a non-`mod.rs` `buzz_nips.rs` namespace in addition to the planned codec file. NIP-OA conditions cannot have one generic evaluator: event provenance evaluates every clause, NIP-AA ignores `kind=` during connection admission, request-borne NIP-IA proof evaluates only time clauses against the request, and published-profile NIP-IA proof evaluates no clauses. The codec exposes these contexts separately and performs no membership or archive-state mutation._
+    - _Evidence: 2026-08-15 — added strict canonical parsing and encoding for NIP-OA owner attestations, NIP-AA agent authentication presentations, and all five NIP-IA request/delta/snapshot wire shapes. Lowercase fixed-width keys/signatures, canonical decimal clauses, exact attestation preimages, self-attestation rejection, context-specific condition evaluation, one protected marker/target, 64-byte reason and 64-KiB content bounds, archive-only replacement pointers, consent actors, unmarked request references and marked profile-proof references are enforced. Five focused tests cryptographically verify and round-trip the published OA vector; round-trip AA and reject duplicate credentials; reproduce the published IA 9035, 8002 and 13535 event IDs; and reject missing/duplicate/malformed and action-incompatible tags. `cargo test -p nostr_compat buzz_nips::identity -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.7. Implement persona and managed-agent NIP codecs
+  - [x] 11.7. Implement persona and managed-agent NIP codecs
     - Add exact parsing and encoding for NIP-AP and NIP-PMA.
     - _Requirements: 5.3, 5.4, 11.2_
     - _Capability IDs: CAP-001, CAP-023_
-    - _Depends on: 11.3, 11.5_
+    - _Depends on: 11.3, 11.5, 11.6_
     - _Reads: projects/buzz/docs/nips/NIP-{AP,PMA}.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/agent_config.rs_
-    - _Validation: agent-config vectors cover versions, CAS predecessors, privacy gates and malformed projections_
+    - _Writes: Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/agent_config.rs_
+    - _Validation: `cargo test -p nostr_compat buzz_nips::agent_config -- --nocapture` covers versions, CAS predecessors, privacy gates and malformed projections_
+    - _Implementation finding (2026-08-15): strict PMA RFC3339 validation requires the existing workspace `chrono` dependency, which updates the crate manifest and its lockfile dependency edge; the non-`mod.rs` NIP namespace must expose the codec. The dependency list now includes Task 11.6 because this leaf reuses its OA verifier and serializes the shared namespace file. Task 11.7 owns exact AP/PMA wire and decrypted-payload validation only: it leaves NIP-44 encryption/decryption, key custody, persistence and transactional aggregate submission outside this compatibility crate, and keeps `PRIVATE_MANAGED_AGENT_INGEST_ENABLED` false until the ordered PMA deployment gates are implemented._
+    - _Evidence: 2026-08-15 — added NIP-AP codecs for bounded persona definitions, exact persona/team coordinates, absent-or-exact shared tags, recursive team secret-field rejection and both slim and legacy-fat kind-30177 projections. Added an inert NIP-PMA signed-envelope codec with owner verification, ciphertext bounds, exact permitted tags, canonical positive safe generations, mandatory generation-two predecessor and lifecycle state; strict duplicate/unknown-field JSON decoding for decrypted v1 active/tombstone payloads; namespaced extension and portable configuration bounds; checksum-validated nsec-to-agent derivation; unconditional OA owner proof; and complete signed 30175/30177 recovery binding verification by ID, signature, author, kind, coordinate and content hash. Five focused tests cover AP/team privacy failure, slim/fat compatibility, signed CAS envelopes with ingest disabled, supported/unsupported payload versions plus duplicate keys and tombstones, and malformed projection coordinates/content bindings. `cargo test -p nostr_compat buzz_nips::agent_config -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.8. Implement agent activity and memory NIP codecs
+  - [x] 11.8. Implement agent activity and memory NIP codecs
     - Add exact parsing and encoding for NIP-AE, NIP-AM and NIP-AO.
     - _Requirements: 5.3, 5.4, 11.3, 12.1_
     - _Capability IDs: CAP-001, CAP-024, CAP-025_
-    - _Depends on: 11.3, 11.5_
+    - _Depends on: 11.3, 11.5, 11.7_
     - _Reads: projects/buzz/docs/nips/NIP-{AE,AM,AO}.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/agent_activity.rs_
-    - _Validation: encrypted agent vectors cover coordinates, versions, observer frames and privacy failures_
+    - _Writes: crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/agent_activity.rs_
+    - _Validation: `cargo test -p nostr_compat buzz_nips::agent_activity -- --nocapture` covers encrypted agent coordinates, versions, observer frames and privacy failures_
+    - _Implementation finding (2026-08-15): the codec namespace write is serialized after Task 11.7 and its existing `chrono` dependency is reused for RFC3339 payload validation. This leaf derives the exact NIP-44 v2 conversation key and validates already-decrypted payload bytes but deliberately does not implement NIP-44 content encryption/decryption; Task 30.1 remains the approved encryption/key/zeroization boundary. Unknown NIP-AO frames remain structurally valid but are typed as ignored, matching the forward-compatible relay/client contract._
+    - _Evidence: 2026-08-15 — added NIP-AE core/memory slug grammar, strict duplicate-key body parsing, tombstones, raw-x ECDH plus `nip44-v2` HKDF-extract conversation keys, versioned HMAC-blinded coordinates and signed agent/owner encrypted-envelope validation before body-coordinate matching. Added owner-only NIP-AM envelopes with no channel leakage and decrypted turn-metric parsing that preserves null/zero semantics, rejects explicit-null cache/pricing fields, requires cumulative session/sequence, bounds costs, restricts billing authorities and tolerates future stop reasons. Added ephemeral NIP-AO telemetry/control envelopes with exact direction tags, optional channel scope, recipient-only visibility, forward-compatible ignored types, bounded strict payloads and redacted debug output. Five focused tests reproduce the published symmetric conversation key, blinded `mem/example` coordinate and signed encrypted event; reject duplicate body keys and mismatched coordinates; exercise metric privacy/null rules; exercise telemetry/control direction and debug redaction; and ignore unknown observer frames while rejecting malformed control routing. `cargo test -p nostr_compat buzz_nips::agent_activity -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.9. Implement communication-state NIP codecs
+  - [x] 11.9. Implement communication-state NIP codecs
     - Add exact parsing and encoding for NIP-CW, NIP-DV, NIP-ER and NIP-RS.
     - _Requirements: 5.3, 5.4, 9.1, 9.2, 9.3_
     - _Capability IDs: CAP-001, CAP-011, CAP-012, CAP-013_
-    - _Depends on: 11.3, 11.5_
+    - _Depends on: 11.3, 11.5, 11.8_
     - _Reads: projects/buzz/docs/nips/NIP-{CW,DV,ER,RS}.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/communication.rs_
+    - _Writes: crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/communication.rs_
     - _Validation: communication vectors cover cursors, wraps, reminders, read frontiers and malformed tags_
+    - _Implementation finding (2026-08-15): the shared codec namespace is serialized after Task 11.8. This leaf owns only wire/filter parsing, deterministic encoding and pure read-state register operations. Relay-side channel-window queries and overlays, reminder scheduling, NIP-RS full-state enumeration/barriers, persistence, delivery policy and NIP-44 encryption/decryption remain with their approved later owners; accepting ciphertext here never grants authority or makes decrypted state durable._
+    - _Evidence: 2026-08-15 — added exact NIP-CW opt-in filter parsing, composite cursors, row-budget clamping, deterministic request bindings and signature/relay-identity/tag/content validation for thread-summary and window-bounds overlays. Added relay-signed, owner-result-gated NIP-DV snapshots whose hidden channels remain set-valued presentation state. Added signed author-only NIP-ER envelopes with canonical safe-integer schedules, expiration ordering, opaque NIP-44 bounds and strict decrypted target/status/note validation. Added NIP-RS stable-coordinate envelopes, forward-compatible version handling, last-value duplicate contexts, namespace escaping, complete live/tombstone override groups, primary-coordinate confinement, max-register merging, hierarchical frontier evaluation, clear-wins canonical encoding and checked non-wrapping mark-read/mark-unread counters. Five focused tests cover cursor/request binding and malformed half cursors; DM privacy/set behavior and malformed tags; reminder schedule/privacy/duplicate JSON failures; read-frontier duplicate/escape/partial-group behavior; monotone merges, tombstones, future versions and counter exhaustion. `cargo test -p nostr_compat buzz_nips::communication -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.10. Implement project and workflow NIP codecs
+  - [x] 11.10. Implement project and workflow NIP codecs
     - Add exact parsing and encoding for NIP-GS, NIP-MP and NIP-WP.
     - _Requirements: 5.3, 5.4, 10.1, 10.2, 13.1_
     - _Capability IDs: CAP-001, CAP-018, CAP-019, CAP-027_
-    - _Depends on: 11.3, 11.5_
+    - _Depends on: 11.3, 11.5, 11.9_
     - _Reads: projects/buzz/docs/nips/NIP-{GS,MP,WP}.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/project_workflow.rs_
+    - _Writes: Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/project_workflow.rs_
     - _Validation: project/workflow vectors cover signed coordinates, versions and malformed cross-references_
+    - _Implementation finding (2026-08-15): the shared codec namespace is serialized after Task 11.9, and the existing workspace `base64` dependency is added directly to `nostr_compat` for exact NIP-GS armor handling. This leaf owns signed/canonical representation and verification only. Git CLI/key custody, project collection folding and pagination, workspace-profile role admission/persistence/NIP-11 serving, Git authorization and workflow execution remain with their approved owners; a project membership reference is never an authorization input._
+    - _Evidence: 2026-08-15 — added byte-exact NIP-GS three-line LF armor, strict duplicate/unknown-field JSON parsing, canonical field-order reconstruction, standard padded base64, size ceilings, domain-separated timestamp/OA-bound hashes and BIP-340 commit verification with a separately reported NIP-OA result. Added signed NIP-MP project parsing/encoding with exact project identity and metadata cardinality/length bounds, 64-member raw-tag cap, kind-30617 split-on-two-colons coordinates, opaque relay hints, duplicate rejection and listed-by-default visibility. Added signed NIP-WP image-sink validation and explicit/absent clear handling without assuming role authority. Five focused tests reproduce the published NIP-GS hash, armor, commit signature and owner-attestation vectors; reject noncanonical order and duplicate JSON; run all 31 authoritative NIP-MP ingest fixtures; preserve colon-bearing cross-owner coordinates without granting authority; and reject unsafe workspace icon schemes. `cargo test -p nostr_compat buzz_nips::project_workflow -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.11. Implement push-lease NIP codec
+  - [x] 11.11. Implement push-lease NIP codec
     - Add exact parsing and encoding for NIP-PL without notification policy or provider behavior.
     - _Requirements: 5.3, 5.4, 9.5_
     - _Capability IDs: CAP-001, CAP-016_
-    - _Depends on: 11.3, 11.5_
+    - _Depends on: 11.3, 11.5, 11.10_
     - _Reads: projects/buzz/docs/nips/NIP-PL.md, projects/buzz/crates/buzz-sdk/**_
-    - _Writes: crates/nostr_compat/src/buzz_nips/push_lease.rs_
+    - _Writes: Cargo.lock, crates/nostr_compat/Cargo.toml, crates/nostr_compat/src/buzz_nips.rs, crates/nostr_compat/src/buzz_nips/push_lease.rs_
     - _Validation: push-lease vectors cover generation, capabilities, expiry and malformed encrypted values_
+    - _Implementation finding (2026-08-15): the shared codec namespace is serialized after Task 11.10, and the existing workspace `uuid` dependency is added directly to `nostr_compat` for the descriptor-registered lowercase UUID-v4 channel grammar. This leaf owns signed-envelope, decrypted-schema and bounded filter grammar only. NIP-44 decryption/key custody, dual-order replacement watermarks, persistence, match-time authorization, notification policy, fixed wake payloads, gateways, provider behavior and delivery remain with their approved later owners._
+    - _Evidence: 2026-08-15 — added a signed author-bound NIP-PL kind-30350 envelope with closed exact public tags, canonical expiration, descriptor size/TTL/skew limits and deterministic encoding. Added strict duplicate/unknown-field v1 parsing; byte-exact canonical-origin confirmation; positive safe generations; complete active and minimal inactive/tombstone schemas; app-profile/transport/endpoint bounds; registered priority classes; bounded positive and subtractive filters; exact authors/self-`#p`/event IDs; descriptor-selected lowercase UUID-v4 channels; eligible/urgent kind checks; and suppression bounds. Five focused tests cover authentication, TTL and public-tag privacy failures; active round trips with ignore/suppression; minimal revocation and generation failure; duplicate/unknown/cross-user rejection; and time-travel, malformed-channel and ineligible-urgency rejection. `cargo test -p nostr_compat buzz_nips::push_lease -- --nocapture`, `./script/clippy -p nostr_compat`, Rust formatting, inventory validation, spec validation and diff hygiene passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.12. Add custom NIP catalog conformance
+  - [x] 11.12. Add custom NIP catalog conformance
     - Run every custom NIP golden/malformed fixture independently of production reducers.
     - _Requirements: 5.3, 5.4, 20.2_
     - _Capability IDs: CAP-001, CAP-044_
     - _Depends on: 11.6, 11.7, 11.8, 11.9, 11.10, 11.11_
-    - _Reads: crates/nostr_compat/src/buzz_nips/**, .agents/specs/collaborative-workspace/fixtures/protocol/**_
+    - _Reads: crates/nostr_compat/src/buzz_nips/**, projects/buzz/docs/nips/NIP-*.md, .agents/specs/collaborative-workspace/fixtures/protocol/**_
     - _Writes: crates/nostr_compat/tests/buzz_nips.rs_
     - _Validation: `cargo test -p nostr_compat buzz_nips` passes every registered custom NIP fixture_
+    - _Implementation finding (2026-08-15): the authoritative custom-NIP set consists of 16 named Markdown documents, while their executable golden and malformed vectors are intentionally colocated with the six dependency-safe codec modules from Tasks 11.6 through 11.11. The integration catalog therefore registers the exact document/module/vector relationship and runs under the same `buzz_nips` test filter; it does not reproduce protocol parsing or import any relay/product reducer. The frozen cross-protocol corpus is additionally exercised only through public `nostr_compat` verification, replacement-head and generated privacy-registry APIs._
+    - _Evidence: 2026-08-15 — added a closed 16-entry NIP-AA/AE/AM/AO/AP/CW/DV/ER/GS/IA/MP/OA/PL/PMA/RS/WP catalog that requires every source document plus a registered golden and malformed codec vector. Added independent frozen-manifest execution for accepted and malformed signed events, deterministic replacement winners, privacy visibility, simultaneous legacy/v2 kinds, wire references and all four relay artifacts; content hashes fail on fixture drift. `cargo test -p nostr_compat buzz_nips -- --nocapture` passed 30 codec vectors and 4 catalog/corpus tests. The independent Python protocol checker passed 7 event, 2 replacement, 7 privacy, 1 mixed-version, 4 wire and 4 relay cases. `./script/clippy -p nostr_compat`, Rust formatting, inventory validation and specification validation passed. Commit: enclosing checkpoint commit, reported after creation._
 
-  - [ ] 11.13. Enforce the domain dependency boundary
+  - [x] 11.13. Enforce the domain dependency boundary
     - Wire manifests and a dependency check so collaboration-domain cannot depend on GPUI, storage or transports.
     - _Requirements: 2.1, 2.4_
     - _Capability IDs: CAP-001, CAP-036_
@@ -724,214 +906,260 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: Cargo.toml, crates/collaboration_domain/**, crates/nostr_compat/**_
     - _Writes: crates/collaboration_domain/Cargo.toml, crates/nostr_compat/Cargo.toml, script/check-collaboration-dependencies_
     - _Validation: dependency checker and `cargo check -p collaboration_domain -p nostr_compat` pass_
+    - _Implementation finding (2026-08-15): both lower-level crates require an explicit manifest contract rather than only a package-name denylist. Each manifest now declares its architectural layer, exact allowed non-dev direct dependencies and all three forbidden capability classes. The checker treats normal and build edges as production, excludes dev-only fixtures, compares the direct allowlist exactly and then walks Cargo's locked resolved graph for known GPUI, persistence and transport packages. This keeps future dependency additions approval-visible while still detecting a forbidden capability hidden behind an allowed crate feature._
+    - _Evidence: 2026-08-15 — added domain/protocol-compatibility boundary metadata to `collaboration_domain` and `nostr_compat` and an executable repository-root-independent checker. It rejects missing/duplicate boundary packages, absent or incomplete metadata, stale or unexpected direct dependencies, and forbidden GPUI/storage/transport packages anywhere in the non-dev closure. `./script/check-collaboration-dependencies` passed against locked Cargo metadata; `cargo check -p collaboration_domain -p nostr_compat`, `./script/clippy -p collaboration_domain`, `./script/clippy -p nostr_compat`, `bash -n script/check-collaboration-dependencies` and Rust formatting passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-- [ ] 12. Consolidate identity binding and signing-key custody
+- [x] 12. Consolidate identity binding and signing-key custody
 
-  - [ ] 12.1. Implement approved account-to-Nostr binding records
+  - [x] 12.1. Implement approved account-to-Nostr binding records
     - Add binding creation, verification method, community scope and version state from ADR-002.
     - _Requirements: 7.1, 7.4_
     - _Capability IDs: CAP-007, CAP-008_
     - _Depends on: 2.2, 11.1, 11.3_
     - _Reads: .agents/specs/collaborative-workspace/decisions/adr-002-identity-binding.md, crates/client/src/user.rs_
-    - _Writes: crates/collaboration_domain/src/account_binding.rs_
+    - _Writes: crates/collaboration_domain/src/{account_binding,collaboration_domain}.rs_
     - _Validation: `cargo test -p collaboration_domain account_binding` covers verified, conflicting, revoked and historical bindings_
+    - _Discovered contradiction (2026-08-15): the original single-file write set could define the record but Rust cannot compile or test an unregistered module. The narrow correction adds only the crate-root module declaration and public domain exports beside the new file. It introduces no client, protocol, storage, credential or GPUI dependency and preserves the approved lower-layer ownership._
+    - _Evidence: 2026-08-15 — added validated, serde-safe ADR-002 records with distinct community, service-account, profile, Nostr-author and binding identifiers; optimistic record and policy versions; bounded verification-evidence references and method; predecessor/successor version links; lifecycle timestamps; actor and audit references; and pending/verified/active/rotated/revoked/archived states. Only active state can sign. Migrated evidence can preserve historical records but cannot authorize a live signer. Record hydration rejects invalid timestamp/state/link combinations, and active-set validation enforces one signer per community/account/profile plus one human account owner per community key while permitting the same key in another community. `cargo test -p collaboration_domain account_binding -- --nocapture` passed verified-evidence, profile/owner conflict, community-fence and revoked/historical scenarios; the full 9-test crate suite, `./script/clippy -p collaboration_domain`, the collaboration dependency checker and Rust formatting passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 12.2. Add human and agent profile domain records
+  - [x] 12.2. Add human and agent profile domain records
     - Model profiles, status, owner attestations, social lists and archival without conflating account and signing identity.
     - _Requirements: 7.1, 7.4_
     - _Capability IDs: CAP-007, CAP-023_
     - _Depends on: 11.6, 12.1_
-    - _Reads: projects/buzz/docs/nips/NIP-{OA,IA}.md, projects/buzz/crates/buzz-core/src/identity.rs_
-    - _Writes: crates/collaboration_domain/src/profile.rs_
+    - _Reads: projects/buzz/docs/nips/NIP-{OA,IA}.md, projects/buzz/crates/buzz-db/src/user.rs, projects/buzz/desktop/src-tauri/src/models.rs, projects/buzz/crates/buzz-core/src/{kind,presence}.rs_
+    - _Writes: crates/collaboration_domain/src/{profile,collaboration_domain}.rs_
     - _Validation: domain tests preserve historical authorship and reject unattested agent-owner changes_
+    - _Discovered contradiction (2026-08-15): the planned `projects/buzz/crates/buzz-core/src/identity.rs` source does not exist, and a standalone Rust module cannot run its tests without crate-root registration. Discovery found the actual legacy profile projection in `buzz-db/src/user.rs`, client surface fields in desktop `models.rs`, and status/social kind semantics in `buzz-core/{presence,kind}.rs`; NIP-OA and NIP-IA remain normative for provenance and archival. The narrow write correction adds only the dependency-free module/export. No approved identity ownership, protocol, persistence or milestone scope changes._
+    - _Evidence: 2026-08-15 — added validated human and agent profile records whose mandatory community/profile scope and immutable Nostr author are independent from service accounts and optional owner provenance. Agent owner claims require a bounded matching owner-to-agent attestation; unattested, self or mismatched claims fail. Metadata, NIP-38-style status and typed contact/mute/pin/bookmark/emoji/named-follow lists retain their signed source author and apply bounded, list-specific entry grammar. Relay archive state is separately keyed and relay-authored, validates target/consent/replacement shape, affects only active visibility on that relay and never rewrites the profile author. Profile updates require the same profile, community, author and human/agent kind plus the next optimistic version. `cargo test -p collaboration_domain profile -- --nocapture` passed human/agent authorship, unattested owner, relay-local archive and authored social/status scenarios; the full 13-test crate suite, `./script/clippy -p collaboration_domain`, the collaboration dependency checker, Rust formatting and diff hygiene passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 12.3. Add the identity-binding persistence migration
+  - [x] 12.3. Add the identity-binding persistence migration
     - Create versioned tenant-fenced bindings and revocations with no private key columns.
     - _Requirements: 6.1, 7.1, 7.4_
     - _Capability IDs: CAP-005, CAP-007_
     - _Depends on: 12.1_
     - _Reads: crates/collab/src/db/**, crates/collaboration_domain/src/account_binding.rs_
-    - _Writes: crates/collab/migrations/collaboration_identity_bindings.sql_
+    - _Writes: crates/collab/migrations/20260815000100_collaboration_identity_bindings.{up,down}.sql, crates/collab/tests/identity_binding_migration.rs, crates/collab/tests/integration/db_tests/migrations.rs_
     - _Validation: migration tests cover forward/down paths, tenant fences and absence of secret columns_
+    - _Discovered contradiction (2026-08-15): the planned unversioned migration filename is not a SQLx migration and therefore would never be resolved or applied. A reversible timestamped up/down pair is required by the existing migration authority. Resolving that pair also exposed that the integration-test helper attempted to execute reversible down files as forward migrations; it now skips down migrations, matching `sqlx::migrate::Migrator::run`. The repository's baseline migration states that production schema rollout is coordinated through the Cloud repository, so this task creates and validates the migration artifacts but does not apply them to a production deployment. That approval boundary remains unchanged._
+    - _Evidence: 2026-08-15 — added a reversible SQLx migration for append-only, version-addressable identity bindings with a unique current record, tenant-composite primary/foreign/index keys, lifecycle and timestamp checks, optimistic policy version, actor/audit references, and restrictive forced row-level security keyed only by trusted `app.community_id`. The schema stores a 32-byte public key and bounded evidence reference but contains no private key, raw challenge, seed or recovery secret. The focused migration test resolves both reversible files through SQLx, verifies forward/down DDL, tenant fences and the forbidden-secret vocabulary; the shared database migration helper now ignores reversible down entries during normal forward setup. No database or deployment was mutated._
 
-  - [ ] 12.4. Implement protected signing-key import
+  - [x] 12.4. Implement protected signing-key import
     - Import Buzz key identifiers into Sim credentials, verify a signing challenge and retain the source until confirmation.
     - _Requirements: 7.2, 7.3, 17.2_
     - _Capability IDs: CAP-009, CAP-045_
     - _Depends on: 11.3, 12.1_
-    - _Reads: crates/credentials_provider/**, crates/sim_credentials_provider/**, projects/buzz/desktop/src-tauri/src/{secret-store,identity-storage}.rs_
-    - _Writes: crates/sim_credentials_provider/src/nostr_import.rs_
+    - _Reads: crates/credentials_provider/**, crates/sim_credentials_provider/**, projects/buzz/desktop/src-tauri/src/{secret_store,identity_storage}.rs_
+    - _Writes: Cargo.{toml,lock}, crates/sim_credentials_provider/Cargo.toml, crates/sim_credentials_provider/src/{sim_credentials_provider,nostr_import}.rs_
     - _Validation: credential tests cover success, corrupt source, unavailable keyring, challenge mismatch and source preservation_
+    - _Discovered contradiction (2026-08-15): the planned Buzz source filenames used hyphens, but the actual Rust modules are `secret_store.rs` and `identity_storage.rs`. A standalone importer also cannot compile or be exercised without crate-root registration and its cryptographic/encoding dependencies; the narrow write correction registers the module, adds the already-canonical secp256k1/SHA-256/UUID/zeroization dependencies, and adds `bech32` for NIP-19 `nsec` compatibility. The importer deliberately does not link the Buzz desktop crate or embed its keyring implementation: later migration adapters implement the read-only source trait while Sim's existing `CredentialsProvider` remains the only production destination._
+    - _Evidence: 2026-08-15 — added a provider-only production import entry point with a bounded read-only Buzz source adapter, deterministic community/account/profile/public-key credential identifier, five-minute domain-separated challenge, trusted system clock, expected x-only public-key binding, and NSEC/hex/raw compatibility parsing. Source material and decoded buffers are zeroized where owned. Existing matching destinations are idempotent; conflicts are never overwritten. New values are stored as canonical 32-byte secrets, read back through the protected provider, challenged again, and removed if verification fails; source deletion is not exposed. Sanitized errors distinguish corrupt/missing/unavailable source, invalid/expired challenge, protected-store failure, conflict, read-back mismatch and cleanup failure without carrying secret material. `cargo test -p sim_credentials_provider nostr_import --release -- --nocapture` passed all five success, corrupt-source, unavailable-store, mismatch, idempotency and source-preservation scenarios; `./script/clippy -p sim_credentials_provider` and Rust formatting passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 12.5. Implement key generation, rotation and archive transitions
+  - [x] 12.5. Implement key generation, rotation and archive transitions
     - Route generation, rotation, revocation and archive through canonical credentials and identity records.
     - _Requirements: 7.2, 7.3, 7.4_
     - _Capability IDs: CAP-007, CAP-009_
     - _Depends on: 12.2, 12.4_
     - _Reads: crates/sim_credentials_provider/src/nostr_import.rs, crates/collaboration_domain/src/profile.rs_
-    - _Writes: crates/sim_credentials_provider/src/nostr_lifecycle.rs_
+    - _Writes: Cargo.{toml,lock}, crates/sim_credentials_provider/Cargo.toml, crates/sim_credentials_provider/src/{sim_credentials_provider,nostr_import,nostr_lifecycle}.rs_
     - _Validation: lifecycle tests prove old authorship remains, active signing changes and failures never synthesize a key_
+    - _Discovered contradiction (2026-08-15): rotating a key by changing the author on the existing `IdentityProfile` would violate Task 12.2's approved immutable-authorship invariant. Rotation therefore preserves the old profile and every signed projection unchanged, creates a distinct successor profile for the new author, and atomically commits the old binding's rotated version with the successor active binding/profile. Agent successors begin without inherited owner provenance because an attestation for the old key cannot authorize the new author. Implementing this safely also requires the existing import storage kernel, canonical domain dependency, OS entropy dependency, crate-root registration and lockfile to join the planned write set. These are narrow dependency/registration changes; canonical identity, credential and repository ownership is unchanged._
+    - _Evidence: 2026-08-15 — added generation, rotation, revocation, archive and active-credential resolution through Sim's credentials provider and an optimistic identity-lifecycle repository contract. Generation/rotation probes protected storage before requesting entropy, uses fallible OS randomness, challenge-verifies provider read-back and emits validated domain records only after storage succeeds. Definite repository rejection/unavailability removes the uncommitted new key; an unknown commit outcome retains the key and returns its secret-free credential identifier for reconciliation. Rotation versions and links the predecessor/successor together, preserves the historical profile author and creates an empty same-kind successor profile; old, revoked and archived bindings cannot resolve a signer. Signer resolution re-reads the canonical current binding by community/binding ID, preventing a stale pre-rotation `Active` object from signing. Terminal transitions retain protected material for historical Nostr decryption while canonical binding state forbids new signatures. The import storage kernel now also cleans a potentially partial write before returning failure. `cargo test -p sim_credentials_provider nostr_ --release -- --nocapture` passed all 11 import/lifecycle scenarios, including storage-before-entropy failure, repository rollback, unknown-outcome retention, historical authorship and active-signer movement; `./script/clippy -p sim_credentials_provider` and Rust formatting passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 12.6. Add backup and restore compatibility
+  - [x] 12.6. Add backup and restore compatibility
     - Preserve approved Buzz backup formats with redacted diagnostics and verified restore into canonical storage.
     - _Requirements: 7.2, 16.1_
     - _Capability IDs: CAP-009, CAP-033_
     - _Depends on: 12.4, 12.5_
-    - _Reads: projects/buzz/desktop/src-tauri/src/key-backup.rs, crates/sim_credentials_provider/src/nostr_lifecycle.rs_
-    - _Writes: crates/sim_credentials_provider/src/nostr_backup.rs_
+    - _Reads: projects/buzz/desktop/src-tauri/src/{key_backup,key_backup_tests}.rs, projects/buzz/desktop/src-tauri/src/commands/{identity,identity_key_backup_tests}.rs, crates/sim_credentials_provider/src/{nostr_import,nostr_lifecycle}.rs_
+    - _Writes: Cargo.{toml,lock}, crates/sim_credentials_provider/Cargo.toml, crates/sim_credentials_provider/src/{sim_credentials_provider,nostr_import,nostr_backup}.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: round-trip, wrong-password, truncated-backup and log-redaction tests pass_
+    - _Discovered contradiction (2026-08-20): the planned Buzz read path used the nonexistent hyphenated `key-backup.rs`; the actual Rust module is `key_backup.rs`, with command-level behavior and concurrency gates in `commands/identity.rs`. A new Rust module also requires crate-root registration, and exact NIP-49 compatibility requires the same bounded `nostr` 0.44.7 codec used by Buzz. The narrow correction registers the module, adds only that workspace dependency, and exposes read-only accessors on the existing internal protected-record wrapper so backup reuses the canonical credential kernel. It does not port Buzz file writing, Tauri commands or a second secret store, and it does not change approved identity ownership or pairing scope._
+    - _Evidence: 2026-08-20 — added canonical NIP-49 export and restore around the existing lifecycle repository and Sim credentials provider. Export re-resolves the active binding, verifies protected key identity and runs the production-cost KDF off the GPUI foreground executor. Restore bounds the backup/password and advertised scrypt cost before work, decrypts on the background executor, verifies the expected public key, refuses conflicting destinations and verifies protected-store read-back with cleanup on failure. Seven focused tests pass for the frozen Buzz vector, encrypted round trip through canonical storage, wrong password, truncated backup, excessive KDF cost, idempotent restore, conflicting destination preservation and diagnostic redaction. `cargo check -p sim_credentials_provider`, `cargo test -p sim_credentials_provider nostr_backup --release -- --nocapture`, `./script/clippy -p sim_credentials_provider`, `./script/check-collaboration-dependencies` and Rust formatting passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 12.7. Implement the identity-binding repository
+  - [x] 12.7. Implement the identity-binding repository
     - Read and write binding versions/revocations through typed tenant inputs and optimistic concurrency.
     - _Requirements: 6.1, 7.1, 7.4_
     - _Capability IDs: CAP-005, CAP-007_
     - _Depends on: 12.3_
-    - _Reads: crates/collab/migrations/collaboration_identity_bindings.sql, crates/collaboration_domain/src/account_binding.rs_
-    - _Writes: crates/collab/src/identity/binding_repository.rs_
+    - _Reads: crates/collab/migrations/20260815000100_collaboration_identity_bindings.{up,down}.sql, crates/collaboration_domain/src/account_binding.rs, crates/collab/src/{lib,db}.rs_
+    - _Writes: Cargo.lock, crates/collab/Cargo.toml, crates/collab/src/{lib,identity}.rs, crates/collab/src/identity/binding_repository.rs, crates/collab/tests/identity_binding_repository.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: `cargo test -p collab identity_binding_repository` covers tenant isolation, revoke and version conflict_
+    - _Discovered contradiction (2026-08-20): the planned unversioned migration read path does not exist because Task 12.3 correctly created a reversible timestamped SQLx pair. The single planned source-file write also could not register the repository or exercise PostgreSQL transaction/RLS SQL through the existing `collab` test setup. The narrow correction registers one identity module, adds the already-canonical domain/error dependencies, enables SeaORM's mock test feature and adds one focused integration test. It does not add a store, schema, protocol, credential owner or service, and no database or deployment is mutated._
+    - _Evidence: 2026-08-20 — added a PostgreSQL-only SeaORM repository over the canonical append-only identity-binding table. Every operation begins a transaction, installs the typed community as transaction-local RLS state and retains explicit community predicates. Reads hydrate and revalidate the complete domain aggregate. Appends lock the current head, enforce caller-supplied optimistic version and exact successor ordering, clear only the selected head, map uniqueness races to a closed version conflict and roll back all failures. The repository stores no credential material and exposes closed tenant, conflict, invalid-record and unavailable errors. `cargo test -p collab identity_binding_repository --test identity_binding_repository --no-default-features -- --nocapture` passed all three tenant-isolation, revocation and rollback scenarios; `cargo check -p collab`, `cargo clippy -p collab --lib --no-default-features -- --deny warnings`, Rust formatting and diff hygiene passed. The mandated release/all-target `./script/clippy -p collab` reached the repository cleanly but could not complete because this host lacks Xcode's optional Metal Toolchain; an equivalent debug all-target run hit the same external build prerequisite. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
 - [ ] 13. Add typed tenant admission and common authorization
 
-  - [ ] 13.1. Define trusted TenantContext construction
+  - [x] 13.1. Define trusted TenantContext construction
     - Construct tenant context only from approved host, listener or deployment routing and reject payload-derived values.
     - _Requirements: 6.1, 6.3_
     - _Capability IDs: CAP-003, CAP-008_
     - _Depends on: 4.1, 11.1_
     - _Reads: projects/buzz/crates/buzz-core/src/tenant.rs, projects/buzz/crates/buzz-relay/src/tenant.rs_
-    - _Writes: crates/collaboration_domain/src/tenant.rs_
+    - _Writes: crates/collaboration_domain/src/{collaboration_domain,tenant}.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: `cargo test -p collaboration_domain tenant_context` rejects absent, conflicting and event-tag tenants_
+    - _Discovered contradiction (2026-08-20): a new Rust domain module cannot compile, expose its opaque types or run the planned focused test without crate-root registration. The narrow correction adds only the module declaration/public type exports and living-spec trace beside `tenant.rs`. It adds no transport, persistence, codec, GPUI or authorization dependency and leaves trusted route resolution with the later admission adapter._
+    - _Evidence: 2026-08-20 — added an immutable tenant context with private fields and no `Default`, serde or raw-community constructor. Context establishment requires one explicit bounded trusted route branded as direct host, trusted forwarded host, listener or deployment provenance. Channel mappings, token stamps, signed URLs, event tags and body fields are separate untrusted claims: matching claims can only corroborate, while an absent route, an event-tag-only attempt or any conflicting claim fails without a context and with the same outward error text. Route references reject empty, surrounding-whitespace, control-character and over-limit values. `cargo test -p collaboration_domain tenant_context -- --nocapture` passed all six route-class, absent, event-tag-only, agreement, conflict/privacy and route-bound scenarios; the full 19-test crate suite, `./script/clippy -p collaboration_domain`, `./script/check-collaboration-dependencies`, Rust formatting and diff hygiene passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 13.2. Define common authenticated principals
+  - [x] 13.2. Define common authenticated principals
     - Normalize Sim accounts, Nostr keys, owner-attested agents, scoped tokens and services into typed principals.
     - _Requirements: 6.2, 7.1_
     - _Capability IDs: CAP-007, CAP-008, CAP-023_
     - _Depends on: 12.1, 13.1_
     - _Reads: crates/collab/src/auth.rs, projects/buzz/crates/buzz-auth/**_
-    - _Writes: crates/collaboration_domain/src/principal.rs_
+    - _Writes: crates/collaboration_domain/src/{collaboration_domain,principal}.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: principal tests reject unverified bindings and preserve service/token scopes_
+    - _Discovered contradiction (2026-08-20): the planned isolated Rust file cannot compile, expose the common principal types or execute unit tests without crate-root registration. The narrow correction adds only the domain module declaration/public exports and living-spec trace. It introduces no authentication transport, database, token issuer, policy evaluator or GPUI dependency; later tasks still own verification adapters and authorization decisions._
+    - _Evidence: 2026-08-20 — added a tenant-bound, non-deserializable authenticated-principal envelope with distinct Sim account, direct/account-bound Nostr identity, owner-attested agent, scoped-token and service kinds. Direct Nostr authentication retains NIP-42/NIP-98 provenance without implying a Sim account. Binding metadata can be attached only from a same-community active binding; verified-but-inactive and cross-community records fail. Agent construction requires a validated agent profile with matching owner proof and retains the agent as author. Explicit scope sets preserve known and bounded extension scopes for tokens/services, deterministically deduplicate them, reject invalid values and bound presented entries before collection. `cargo test -p collaboration_domain authenticated_principal -- --nocapture` passed all six identity-separation, inactive/cross-tenant binding, active binding, owner-attestation, scope-preservation and bounded-input scenarios; the full 25-test crate suite, `./script/clippy -p collaboration_domain`, `./script/check-collaboration-dependencies`, Rust formatting and diff hygiene passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 13.3. Implement membership, role and resource authorization policy
+  - [x] 13.3. Implement membership, role and resource authorization policy
     - Evaluate membership versions, roles, channel access, ownership, scopes and delegation from typed inputs.
     - _Requirements: 6.2, 6.4_
     - _Capability IDs: CAP-003, CAP-008, CAP-010, CAP-023_
     - _Depends on: 13.2_
     - _Reads: projects/buzz/crates/buzz-auth/**, crates/collaboration_domain/src/{tenant,principal}.rs_
-    - _Writes: crates/collaboration_domain/src/authorization.rs_
+    - _Writes: crates/collaboration_domain/src/{authorization,collaboration_domain}.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: authorization table tests cover every principal/resource/role decision and stale membership_
+    - _Discovered contradiction (2026-08-20): the planned standalone domain file cannot compile, expose the policy types or run its table tests without crate-root registration. The narrow correction adds only the authorization module declaration/public exports and living-spec trace. It does not add repositories, membership persistence, transport admission, invitation/delegation verification or UI behavior; those remain with their planned leaves._
+    - _Evidence: 2026-08-20 — added a pure tenant-first authorization decision over explicit scopes, community/channel membership state and versions, role, resource ownership and exact delegation. The policy distinguishes every principal kind, treats scoped tokens as their recorded subject, applies owner/admin/member/guest/bot role semantics, requires active current community membership, requires separate active current channel membership for channel-bound resources and rejects a malformed channel without a coordinate. Ownership cannot bypass membership/scope or community/administration gates. Delegation is exact to tenant, delegate, resource, action, unexpired state and current membership version; revoked or mismatched grants confer nothing. `cargo test -p collaboration_domain authorization_policy -- --nocapture` passed all six principal, role, resource/ownership, channel, stale/scope and delegation tables; the full 31-test crate suite, `./script/clippy -p collaboration_domain`, `./script/check-collaboration-dependencies`, Rust formatting and diff hygiene passed. Inventory and specification-validator evidence is recorded in the enclosing checkpoint commit._
 
-  - [ ] 13.4. Enforce tenant and policy at Sim RPC admission
+  - [x] 13.4. Enforce tenant and policy at Sim RPC admission
     - Bind existing RPC requests to TenantContext and common authorization before handler or database access.
     - _Requirements: 6.1, 6.2, 6.3_
     - _Capability IDs: CAP-003, CAP-008_
     - _Depends on: 13.1, 13.3_
     - _Reads: crates/collab/src/{auth,rpc}.rs, crates/collaboration_domain/src/authorization.rs_
-    - _Writes: crates/collab/src/tenant_admission.rs_
+    - _Writes: crates/collab/src/{lib,tenant_admission}.rs, crates/collab/tests/tenant_admission_rpc.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: `cargo test -p collab tenant_admission_rpc` proves authorization precedes database queries_
+    - _Discovered contradiction (2026-08-20): current legacy editor RPC sessions contain only `rpc::Principal::User`; they have no trusted community route, membership snapshot or collaboration resource coordinate. Applying tenant policy globally would either invent a forbidden default tenant or break unchanged Editor Workspace behavior. The narrow correction registers a mandatory admission/token boundary for every new tenant-scoped collaborative RPC and leaves editor-only handlers unchanged until their planned explicit mappings exist. A standalone module also requires crate-root registration and a focused integration test. This does not weaken the final requirement: no Collaborative Workspace RPC may use the legacy path._
+    - _Evidence: 2026-08-20 — added a fail-closed Sim RPC admission boundary that binds only trusted tenant routes, collapses missing/payload-selected/conflicting tenant failures to one denial, invokes the common policy before issuing an owned authorization token and permits handler/database work only through that token's once-owned operation closure. Denied requests execute zero query closures; an allowed request carries the exact tenant/principal and executes once. `cargo test -p collab tenant_admission_rpc --test tenant_admission_rpc --no-default-features -- --nocapture` passed authorization-order and tenant-conflict scenarios. Focused compile/clippy, Rust formatting, dependency, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 13.5. Add scoped tokens, invites and virtual-agent membership
+  - [x] 13.5. Add scoped tokens, invites and virtual-agent membership
     - Implement API scopes, replay controls, invite evidence and NIP-AA virtual membership through the common policy.
     - _Requirements: 6.2, 6.4_
     - _Capability IDs: CAP-008, CAP-010, CAP-023_
     - _Depends on: 13.3_
-    - _Reads: projects/buzz/crates/buzz-auth/**, projects/buzz/docs/nips/NIP-AA.md_
-    - _Writes: crates/collaboration_domain/src/admission_evidence.rs_
+    - _Reads: projects/buzz/crates/buzz-auth/**, projects/buzz/crates/buzz-db/src/{api_token,relay_invite}.rs, projects/buzz/crates/buzz-relay/src/invite_token.rs, projects/buzz/docs/nips/NIP-AA.md, crates/collaboration_domain/src/{authorization,principal}.rs_
+    - _Writes: crates/collaboration_domain/src/{admission_evidence,collaboration_domain}.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: tests cover scope narrowing, invite exhaustion/revocation, replay and unattested virtual agents_
+    - _Discovered contradiction (2026-08-20): the planned domain-only file cannot verify bearer hashes/signatures or durably serialize concurrent invite/replay consumption without reversing the approved separation between canonical domain state, protocol adapters and persistence. It also requires crate-root registration to compile and expose its policy inputs. The narrow correction models only already-verified evidence and explicit next-version results; transport adapters remain responsible for cryptographic verification and repositories must atomically commit consumption before admitting work. NIP-AA produces a request/connection-lifetime policy snapshot and explicitly never a persistent agent-membership row._
+    - _Evidence: 2026-08-20 — added typed scoped-token, replay-challenge, bounded-invite and NIP-AA virtual-membership evidence. Token admission preserves explicit requested scopes only when they are a subset of the grant and consumes a tenant/token-bound, current, unexpired one-time challenge. Invite redemption rejects stale, revoked, expired or exhausted evidence, advances count/version only for a new member and preserves existing-member idempotency. Virtual membership requires an owner-attested agent plus a current active owner membership, retains owner identity for connection controls and projects only transient member access for the agent without owner role inheritance. Six focused tests cover narrowing/escalation, replay/cross-tenant denial, bounded use/idempotency, exhaustion/revocation, restricted virtual access and unattested/revoked-owner denial. Focused and full crate tests, clippy, dependency, formatting, diff, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 13.6. Add independent cross-tenant negative traces
+  - [x] 13.6. Add independent cross-tenant negative traces
     - Exercise RPC, Nostr, database, cache, search, object, Git and count paths across two communities.
     - _Requirements: 6.1, 6.2, 6.3, 20.2_
     - _Capability IDs: CAP-003, CAP-008, CAP-044_
     - _Depends on: 13.4, 13.5_
     - _Reads: projects/buzz/crates/buzz-conformance/**, crates/collab/src/tenant_admission.rs_
-    - _Writes: crates/collab/tests/multitenant_conformance.rs_
+    - _Writes: crates/collab/tests/multitenant_conformance.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: `cargo test -p collab multitenant_conformance` reports no content, ID, count or timing-class leaks_
+    - _Discovered contradiction (2026-08-20): the approved dependency order places this conformance leaf before the Nostr, cache, search, object and tenant-scoped Git adapters it names. Live end-to-end traces for absent production seams would require implementing later leaves early or adding forbidden placeholder services. The narrow correction establishes an adapter-neutral independent trace contract now, drives the real tenant/RPC policy gate for all probes and requires each later adapter leaf to emit the same closed observations when its live seam lands. The test harness shares no production reducer, key helper or storage implementation._
+    - _Evidence: 2026-08-20 — added an independent two-community trace audit over RPC, Nostr, database, cache, search, object, Git and count seam labels. Every record path exercises own, foreign-ID, missing-ID and foreign-tenant probes through the real common policy/RPC authorization token; denied foreign tenants execute zero operation closures, while allowed lookups are keyed by the admitted tenant. The checker independently rejects content/community/opaque-ID crossover, foreign-inclusive counts, coverage omissions, distinct outward absence errors and distinct timing classes. The fixture proves symmetric isolation for both communities and records different tenant-local counts so a combined count cannot pass accidentally. The focused integration test passed. Release and focused clippy both reached the `collab` crate but were blocked while compiling the unrelated GPUI dev-dependency because the host lacks Xcode's Metal Toolchain; formatting, diff, dependency, inventory and specification validations passed. Later live adapter leaves retain their required E2E negative tests._
 
 - [ ] 14. Add Nostr WebSocket and HTTP adapters
 
-  - [ ] 14.1. Establish the versioned Nostr ingress boundary
+  - [x] 14.1. Establish the versioned Nostr ingress boundary
     - Add the ADR-001-approved listener/sidecar boundary and route accepted operations to domain commands.
     - _Requirements: 2.3, 5.2, 18.2_
     - _Capability IDs: CAP-002, CAP-004, CAP-043_
     - _Depends on: 2.1, 11.13, 13.4_
-    - _Reads: .agents/specs/collaborative-workspace/decisions/adr-001-service-topology.md, crates/collab/src/main.rs_
-    - _Writes: crates/collab/src/nostr/ingress.rs_
+    - _Reads: .agents/specs/collaborative-workspace/decisions/adr-001-service-topology.md, crates/collab/src/{main,tenant_admission}.rs_
+    - _Writes: crates/collab/src/{collaboration_command,lib,nostr}.rs, crates/collab/src/nostr/ingress.rs, crates/collab/tests/nostr_ingress_version.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: `cargo test -p collab nostr_ingress_version` rejects unsupported versions before a write_
+    - _Discovered contradiction (2026-08-20): the approved topology requires this ingress to target a shared versioned domain-command contract, while transactional command/outbox persistence is not implemented until Task 15.4 and the planned single-file write cannot register a Rust module or run an integration target. Implementing a listener-specific store now would create the forbidden second authority. The narrow correction defines only the Sim-owned in-memory command/sink interface, registers the Nostr module and adds a focused integration test. Task 15.4 must implement the same sink transactionally; no route, database, projection writer, sidecar process or framework-version merge lands here._
+    - _Evidence: 2026-08-20 — added a versioned Nostr ingress that accepts an already-authorized tenant request, validates its adapter and peer-minimum versions before any sink invocation and translates current requests into one shared command envelope carrying stable operation ID, exact tenant/principal, optimistic versions, typed payload and explicit in-process/temporary-sidecar origin. A narrow async sink returns authoritative operation/version receipts and has no migration or storage implementation. The focused test proves a future version produces zero writes and a current temporary-sidecar request submits exactly one correctly bound command. Focused test, formatting and diff checks passed. Full release clippy remains blocked by the host's missing Xcode Metal Toolchain while compiling the unrelated GPUI dependency; dependency, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 14.2. Implement NIP-42 WebSocket authentication
+  - [x] 14.2. Implement NIP-42 WebSocket authentication
     - Preserve challenge, response, timeout, replay and reauthentication behavior under common principals.
     - _Requirements: 5.2, 6.2, 8.1_
     - _Capability IDs: CAP-002, CAP-004, CAP-008_
     - _Depends on: 11.3, 13.2, 14.1_
-    - _Reads: projects/buzz/crates/buzz-relay/src/connection.rs, projects/buzz/crates/buzz-auth/**_
-    - _Writes: crates/collab/src/nostr/auth.rs_
+    - _Reads: projects/buzz/crates/buzz-relay/src/{connection,handlers/auth}.rs, projects/buzz/crates/buzz-auth/**, crates/nostr_compat/src/{event,verification}.rs, crates/nostr_compat/src/buzz_nips/identity.rs, crates/collaboration_domain/src/principal.rs_
+    - _Writes: Cargo.toml, Cargo.lock, crates/collab/Cargo.toml, crates/collab/src/nostr.rs, crates/collab/src/nostr/auth.rs, crates/collab/tests/nostr_auth_vectors.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
     - _Validation: old test-client auth vectors cover success, timeout, replay, wrong tenant and revoked key_
+    - _Discovered contradiction (2026-08-20): the planned single auth file cannot compile against the approved pure event verifier, register the module or run old-client-shaped integration vectors without manifest, crate-root and test writes. Shared Redis replay and authoritative membership/revocation repositories are scheduled after this leaf, so a permissive or process-local production default here would weaken the approved multi-replica security boundary. The narrow correction defines mandatory injected replay/resolver traits with no default; Task 16.1 and the canonical membership repositories must implement them before a live route is enabled. This leaf adds no AUTH persistence, listener route, Redis implementation or duplicate identity store._
+    - _Evidence: 2026-08-20 — added a NIP-42 terminal connection state machine with redacted CSPRNG challenge generation, exact AUTH challenge frame, five-second timeout, kind/signature/event-ID and ±60-second freshness verification, unique challenge/relay tags with Buzz-compatible localhost/trailing-slash normalization, optional verified NIP-AA proof, tenant/event replay claiming and a mandatory current-principal resolver. Resolver output must remain in the trusted tenant, match the signed author/owner proof and retain NIP-42 provenance; revoked or cross-tenant results fail closed. AUTH events never enter the command sink or persistence. Safe protocol dispositions preserve accepted, timeout-close, verification-failed, restricted, internal, already-authenticated and already-failed behavior. Six signed old-client-shaped vectors pass for success plus reauthentication, timeout before crypto/replay, tenant-scoped replay, wrong tenant, revoked key, wrong challenge and wrong relay. Formatting and diff checks passed. Full release clippy remains blocked by the host's missing Xcode Metal Toolchain while compiling the unrelated GPUI dependency; dependency, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 14.3. Implement bounded REQ, COUNT and subscription frames
+  - [x] 14.3. Implement bounded REQ, COUNT and subscription frames
     - Parse filters, enforce limits and emit EOSE/CLOSED/COUNT frames with cancellation cleanup.
     - _Requirements: 5.2, 8.1, 8.4_
     - _Capability IDs: CAP-002, CAP-004_
     - _Depends on: 11.4, 14.2_
     - _Reads: projects/buzz/crates/buzz-relay/src/{protocol,subscription}.rs, crates/nostr_compat/src/filter.rs_
-    - _Writes: crates/collab/src/nostr/subscriptions.rs_
-    - _Validation: conformance covers limits, EOSE, close, count privacy, cancellation and resource release_
+    - _Writes: crates/collab/src/nostr.rs, crates/collab/src/nostr/subscriptions.rs, crates/collab/tests/nostr_subscriptions.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test nostr_subscriptions --no-default-features -- --nocapture` covers limits, EOSE, close, count privacy, cancellation and resource release_
+    - _Discovered contradiction (2026-08-20): the planned single implementation file cannot register the Rust module or supply the required conformance target. The approved dependency order also places this leaf before the canonical event repository and shared pub/sub resource implementation. Adding a process-local store or fanout default would create temporary authority without the required migration controls. The narrow correction registers the module, adds a focused integration target and exposes mandatory tenant-bound query and resource interfaces with no default; Tasks 15.3 and 16.1 must implement those interfaces at their canonical boundaries before the listener is enabled._
+    - _Evidence: 2026-08-20 — added bounded REQ, COUNT and CLOSE parsing with 512 KiB frame, 256-byte identifier, ten-filter, per-filter field/value, 1,000-result and 1,024-active-subscription limits. An authenticated session fixes the admitted tenant, principal and connection ID; mandatory injected query/resource interfaces receive that scope. REQ generation-replaces resources, emits historical EVENT frames followed by EOSE and cleans up before CLOSED on query failure. COUNT remains tenant-private and allocates no subscription. CLOSE, replacement and connection cancellation release exact resource tokens, with cleanup failure retained as an observable failure. Six focused conformance scenarios pass for bounds, EVENT/EOSE/replacement/CLOSED, two-tenant COUNT isolation, cancellation, query-failure cleanup and the active ceiling. Formatting and diff checks passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain; dependency, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 14.4. Implement signed EVENT ingest and OK responses
+  - [x] 14.4. Implement signed EVENT ingest and OK responses
     - Validate, authorize and idempotently submit events while preserving exact success and rejection frames.
     - _Requirements: 5.1, 5.2, 5.4, 8.1_
     - _Capability IDs: CAP-001, CAP-002, CAP-004_
     - _Depends on: 11.3, 13.3, 14.2_
-    - _Reads: projects/buzz/crates/buzz-relay/src/handlers.rs, crates/nostr_compat/src/**_
-    - _Writes: crates/collab/src/nostr/event_ingest.rs_
-    - _Validation: differential EVENT/OK suite matches accepted, duplicate, malformed and unauthorized Buzz behavior_
+    - _Reads: projects/buzz/crates/buzz-relay/src/handlers/{event,ingest}.rs, projects/buzz/crates/buzz-relay/src/protocol.rs, .agents/specs/collaborative-workspace/fixtures/protocol/{events,wire-traces}.json, crates/nostr_compat/src/**_
+    - _Writes: crates/collab/src/collaboration_command.rs, crates/collab/src/nostr.rs, crates/collab/src/nostr/{event_ingest,subscriptions}.rs, crates/collab/tests/nostr_event_ingest.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test nostr_event_ingest --no-default-features -- --nocapture` differentially matches accepted, duplicate, malformed and unauthorized Buzz behavior; `cargo test -p collab --test nostr_ingress_version --no-default-features -- --nocapture` preserves the shared ingress contract_
+    - _Discovered contradiction (2026-08-20): the planned single adapter file cannot register its module, add the differential test target or express duplicate success through the existing domain-command receipt. Authoritative operation deduplication and event persistence are not implemented until Tasks 15.3–15.4, so an adapter-local replay cache would become forbidden duplicate authority. The narrow correction adds an applied-or-duplicate disposition to the existing generic receipt, derives a stable community-plus-event operation ID and leaves the mandatory command sink responsible for atomic deduplication. This leaf adds no event table, cache, route or fanout implementation._
+    - _Evidence: 2026-08-20 — added bounded signed EVENT parsing, normalized signed-field wire payloads and pure `nostr_compat` verification on Tokio's blocking executor with Buzz's ±15-minute freshness and content limits. Structurally malformed and cryptographically invalid events fail before submission; the frozen tampered-content vector emits the byte-exact Buzz negative OK response. AUTH replay through EVENT is rejected, normal events require the authenticated direct/bound Nostr or agent author, and NIP-59 gift wraps retain Buzz's distinct envelope-author behavior. Accepted commands traverse the existing versioned ingress with one deterministic community-and-event operation ID. Applied and duplicate receipts emit exact positive empty/`duplicate:` OK frames; rejected and unavailable sinks emit bounded restricted/error frames without leaking internals. Four focused tests pass accepted, duplicate, frozen malformed, wrong-author, malformed-envelope, domain rejection and unavailable-service scenarios, while the pre-existing ingress-version regression also passes. Formatting and diff checks passed. Full release clippy, dependency, inventory and specification validation are recorded in the enclosing checkpoint commit._
 
-  - [ ] 14.5. Implement NIP-11, NIP-05 and NIP-98 HTTP routes
+  - [x] 14.5. Implement NIP-11, NIP-05 and NIP-98 HTTP routes
     - Expose relay metadata, identity resolution and authenticated HTTP with tenant-bound policy.
     - _Requirements: 5.2, 6.1, 6.2_
     - _Capability IDs: CAP-002, CAP-008_
     - _Depends on: 13.2, 14.1_
-    - _Reads: projects/buzz/crates/buzz-relay/src/{nip11,router}.rs, projects/buzz/crates/buzz-auth/**_
-    - _Writes: crates/collab/src/nostr/http.rs_
-    - _Validation: HTTP integration tests cover host binding, signatures, expiry, replay and metadata redaction_
+    - _Reads: projects/buzz/crates/buzz-relay/src/{nip11,router}.rs, projects/buzz/crates/buzz-relay/src/api/{bridge,nip05}.rs, projects/buzz/crates/buzz-auth/**, crates/collab/src/nostr/{auth,event_ingest,subscriptions}.rs_
+    - _Writes: Cargo.lock, crates/collab/Cargo.toml, crates/collab/src/nostr.rs, crates/collab/src/nostr/{event_ingest,http}.rs, crates/collab/tests/nostr_http.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test nostr_http --no-default-features -- --nocapture` covers host binding, signatures, expiry, replay and metadata redaction; `cargo test -p collab --test nostr_event_ingest --no-default-features -- --nocapture` preserves shared signed-event parsing_
+    - _Discovered contradiction (2026-08-20): the planned single HTTP file cannot register an Axum module, decode the standard base64 authorization scheme, add integration coverage or share Task 14.4's signed-event parser without manifest, module-root, parser and test writes. Production host, profile, replay and current-principal repositories land in later service/storage leaves, so mounting these routes now would require a default tenant or process-local replay/directory state and violate the approved fail-closed topology. The narrow correction supplies a real but unmounted public router and mandatory-injection NIP-98 boundary; the canonical service composition must provide those traits before mounting it._
+    - _Evidence: 2026-08-20 — added content-negotiated `/` and `/info` NIP-11 routes, a tenant-scoped `/.well-known/nostr.json` NIP-05 route and a reusable NIP-98 authenticator. Public routes derive tenancy only from a canonical direct/trusted-forwarded Host, ignore untrusted forwarded headers, expose the same generic NIP-11 document for unmapped hosts and redact optional tenant metadata on lookup failure. Advertised frame/subscription/filter/result/identifier limits use the same adapter constants. NIP-05 bounds/canonicalizes names, performs one admitted tenant lookup, returns empty maps for malformed/missing/foreign records and advertises the bound host. NIP-98 bounds and decodes the standard authorization header, shares normalized signed-event parsing, verifies kind/signature on the blocking executor, enforces ±60-second expiry, exact tenant URL/method, optional-or-required body hash, tenant-scoped atomic replay and current same-tenant NIP-98 principal provenance. Replay/backend outages, revoked identities and mismatched tenants fail closed. Four HTTP integration tests pass NIP-11 negotiation/redaction, two-tenant NIP-05 resolution/empty behavior, valid signature/payload plus replay, and wrong-host, invalid-signature, wrong-method/body, expiry, wrong-tenant, revoked and unavailable scenarios. The Task 14.4 parser regression and focused library check also pass. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain; formatting, diff, dependency, inventory and specification validations passed._
 
-  - [ ] 14.6. Add reconnect and local-echo compatibility tests
+  - [x] 14.6. Add reconnect and local-echo compatibility tests
     - Verify reauthentication, head/window refetch, subscription rearm and optimistic event reconciliation.
     - _Requirements: 8.2, 8.3, 20.2_
     - _Capability IDs: CAP-004, CAP-006, CAP-044_
     - _Depends on: 14.3, 14.4, 14.5_
     - _Reads: projects/buzz/crates/buzz-ws-client/**, crates/collab/src/nostr/**_
-    - _Writes: crates/collab/tests/nostr_reconnect.rs_
-    - _Validation: `cargo test -p collab nostr_reconnect` proves no duplicate echo and exposes partial freshness_
+    - _Writes: crates/collab/tests/nostr_reconnect.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test nostr_reconnect --no-default-features -- --nocapture` proves no duplicate echo and exposes partial freshness_
+    - _Discovered contradiction (2026-08-20): this test leaf precedes the authoritative transactional event sink in Task 15.4 and shared cross-replica subscription resources in Task 16.1, so it cannot truthfully prove the complete production no-local-echo guarantee or add a process-local substitute without violating canonical ownership. The dependency-safe correction freezes the adapter compatibility contract over the existing mandatory query/resource and command-sink interfaces; Tasks 15.4 and 16.1 remain responsible for satisfying it with canonical persistence and fan-out._
+    - _Evidence: 2026-08-20 — added three adapter-level reconnect scenarios. A replacement connection signs a fresh NIP-42 challenge, cancels the prior connection's resource, refetches separate authoritative head and older-window filters and rearms the same live subscription under the new connection ID. A partial-freshness scenario keeps the successful head live through EOSE while an unavailable older window emits CLOSED and releases only its own resource. An uncertain optimistic publish reuses the same signed event and deterministic operation ID; applied then duplicate positive acknowledgements plus event-ID replacement of the historical echo leave one authoritative local item through both the in-process consolidated path and temporary-sidecar compatibility path. The focused test target passes all three scenarios. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
 - [ ] 15. Establish authoritative event storage and projections
 
-  - [ ] 15.1. Add the authoritative signed-event schema
+  - [x] 15.1. Add the authoritative signed-event schema
     - Create tenant-fenced event partitions, immutable bytes, signature state and addressable-head indexes under ADR-001.
     - _Requirements: 2.1, 5.1, 17.1_
     - _Capability IDs: CAP-001, CAP-005_
     - _Depends on: 2.1, 11.3, 13.6_
     - _Reads: projects/buzz/crates/buzz-db/**, projects/buzz/migrations/**, crates/collab/src/db/**_
-    - _Writes: crates/collab/migrations/collaboration_events.sql_
-    - _Validation: migration tests verify checksums, partitions, tenant fences, immutability and rollback_
+    - _Writes: crates/collab/migrations/20260820000100_collaboration_events.{up,down}.sql, crates/collab/tests/collaboration_event_migration.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test collaboration_event_migration --no-default-features -- --nocapture` verifies checksums, partitions, tenant fences, immutability and rollback_
+    - _Discovered contradiction (2026-08-20): the planned unversioned `collaboration_events.sql` path is not a runnable migration under the existing SQLx reversible migration convention and cannot represent or test rollback. A schema-only file also cannot satisfy the named migration-test validation. The dependency-safe correction adds one versioned up/down pair and one static migration-contract test; it does not run the migration, implement the Task 15.2 repository or introduce an event authority outside `collab`._
+    - _Evidence: 2026-08-20 — added the sole Sim-owned signed-event table with a community-leading primary key and sixteen community-hash partitions. Forced restrictive row-level policies cover the parent and direct partition access. Exact 32-byte IDs/authors, full unsigned 64-bit timestamps, 16-bit kinds, array tags, 256-KiB content, 512-KiB canonical signature-input bytes, 64-byte signatures and live/historical verification state are bounded in PostgreSQL. Ephemeral events have no valid persistence class. A trigger rejects all row updates while leaving later authorized retention deletion possible. Community-leading chronological, kind, author-kind and addressable indexes preserve greatest timestamp then lowest event-ID head order. The reversible down migration names only the owned table/function. Three focused tests pass SQLx SHA-384 checksum reproduction, reversible discovery, 16-partition and tenant-policy shape, field bounds, immutable trigger, exact index order, ephemeral exclusion and rollback ownership. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No production database was mutated._
 
-  - [ ] 15.2. Implement the event repository
+  - [x] 15.2. Implement the event repository
     - Store verified events once, deduplicate by ID and query exact heads and bounded filters.
     - _Requirements: 2.1, 5.1, 8.1_
     - _Capability IDs: CAP-001, CAP-005_
     - _Depends on: 15.1_
-    - _Reads: crates/collab/migrations/collaboration_events.sql, crates/nostr_compat/src/{filter,head}.rs_
-    - _Writes: crates/collab/src/db/collaboration/event_repository.rs_
-    - _Validation: `cargo test -p collab event_repository` covers duplicate, head, delete, ephemeral and tenant cases_
+    - _Reads: crates/collab/migrations/20260820000100_collaboration_events.up.sql, crates/nostr_compat/src/{filter,head}.rs_
+    - _Writes: crates/collab/src/db.rs, crates/collab/src/db/collaboration.rs, crates/collab/src/db/collaboration/event_repository.rs, crates/collab/migrations/20260820000200_collaboration_event_heads.{up,down}.sql, crates/collab/tests/event_repository.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test event_repository --no-default-features -- --nocapture` covers duplicate, head, delete, ephemeral and tenant cases_
+    - _Discovered contradiction (2026-08-20): the planned single repository file cannot register its dependency-safe module or supply the named integration target. More importantly, immutable event bytes plus an addressable lookup index cannot by themselves preserve the approved deletion watermark: physically deleting the current head would expose an older row, while updating it would violate Task 15.1 immutability. The narrow correction adds a separate tenant-fenced head-watermark migration and reversible rollback. It remains part of the one `collab` event authority and introduces neither a projection store nor adapter-local state._
+    - _Evidence: 2026-08-20 — added a Postgres-only event repository over the Task 15.1 table and an additive coordinate-watermark table. Typed input construction verifies event ID, signature and size through `nostr_compat` before storage and requires historical/live provenance to match a historical/bounded timestamp policy. Every database transaction sets the admitted row-zero community; cross-tenant inputs fail before I/O and foreign result rows roll back. Regular events insert once under `(community_id,event_id)`. Ephemeral events return `EphemeralNotPersisted` without opening a transaction. Replaceable and parameterized events atomically advance greatest-time/lowest-ID watermarks, treat exact live replays as duplicates and reject older or tombstoned heads before insertion. Deletion clears only a matching live pointer before removing immutable bytes, retaining the order floor. Bounded queries accept at most ten validated OR filters and 1,000 rows, push ID-prefix, author, kind, inclusive time and generic-tag predicates into SQL, treat empty generic-tag value sets as match-none, expose only regular rows or current live heads and order by timestamp descending/event ID ascending. Exact and coordinate-head reads reconstruct and revalidate community, canonical bytes and event ID. Five focused tests cover inserted/duplicate, invalid and valid ephemeral behavior, verification-policy mismatch, all filter classes and bounds, exact head reconstruction, rollback-owned head schema, delete-before-payload ordering, stale resurrection, and cross-tenant rollback. The Task 15.1 migration regression, focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No database was mutated._
 
-  - [ ] 15.3. Define projection provenance and rebuild checkpoints
+  - [x] 15.3. Define projection provenance and rebuild checkpoints
     - Persist source kind/ID/version, projection version, cursor and drift state for derived tables.
     - _Requirements: 2.2, 17.2_
     - _Capability IDs: CAP-005, CAP-045_
     - _Depends on: 15.1_
     - _Reads: crates/collaboration_domain/src/provenance.rs, .agents/specs/collaborative-workspace/migration-plan.md_
-    - _Writes: crates/collab/migrations/collaboration_projections.sql_
-    - _Validation: migration tests cover checkpoint resume, version conflict and per-tenant reset_
+    - _Writes: crates/collab/migrations/20260820000300_collaboration_projections.{up,down}.sql, crates/collab/tests/projection_migration.rs, .agents/specs/collaborative-workspace/{design,tasks}.md_
+    - _Validation: `cargo test -p collab --test projection_migration --no-default-features -- --nocapture` covers checkpoint resume, version conflict and per-tenant reset_
+    - _Discovered contradiction (2026-08-20): the planned unversioned single SQL file cannot be discovered by Sim's reversible SQLx migration loader, prove rollback or provide the named migration test. Columns and positive checks alone also do not make version conflicts observable under concurrent updates. The narrow correction adds a versioned up/down pair, one update-guard trigger and one static migration-contract target. It creates no projection writer or rebuild implementation before Tasks 15.4–15.5._
+    - _Evidence: 2026-08-20 — added a tenant-scoped checkpoint keyed by community, projection, source system and bounded source record ID. It preserves optional source version, observation time and paired SHA-256/Nostr/Git integrity provenance; full unsigned projection version and reset generation; a 64-KiB resume cursor; projected/reset timestamps; and clean, suspect, diverged, rebuilding or reset-pending drift state with bounded hashes/errors. Diverged rows require distinct 32-byte authoritative/projection hashes, clean rows cannot retain errors and reset-pending rows cannot retain cursors. A database trigger makes source identity immutable, requires every update to advance the projection version exactly once with serialization-failure conflicts and permits reset generation to hold or advance once; an advancing reset must atomically clear the cursor, enter reset-pending and stamp reset time. Both indexes and forced restrictive RLS lead with community. Three focused tests pass SQLx SHA-384 discovery/checksums, exact rollback ownership, provenance bounds, resume fields, optimistic conflict fencing, reset fencing, drift invariants and tenant-leading indexes/policy. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No rebuild ran and no database was mutated._
 
-  - [ ] 15.4. Implement transactional command and outbox persistence
+  - [x] 15.4. Implement transactional command and outbox persistence
     - Persist accepted commands, authoritative records and one ordered outbox operation under a stable idempotency key.
     - _Requirements: 2.2, 2.3, 8.1_
     - _Capability IDs: CAP-005, CAP-006_
@@ -939,8 +1167,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/src/db/**, crates/collaboration_domain/src/provenance.rs_
     - _Writes: crates/collab/src/db/collaboration/outbox.rs_
     - _Validation: `cargo test -p collab collaboration_outbox` covers retry, crash boundary, duplicate and ordering_
+    - _Discovered contradiction (2026-08-20): the planned single Rust write path cannot create the durable command receipt and ordered outbox tables required by the approved atomicity, migration and rollback requirements. The narrow correction adds one reversible SQLx migration pair and one focused integration target beside the named repository module. Both tables remain inside the canonical `collab` Postgres authority, and no adapter-local replay or second aggregate store is introduced._
+    - _Evidence: 2026-08-20 — added a Postgres-only `DomainCommandSink` implementation whose owned transaction installs the admitted community, reserves the stable operation ID with contract/principal/adapter/kind/fingerprint metadata, invokes one injected canonical mutation on that same transaction, inserts exactly one bounded provenance-bearing outbox operation and completes the authoritative receipt before commit. A committed duplicate returns its stored authoritative version only when all command identity fields and the SHA-256 payload fingerprint match and its outbox row exists; operation-ID content collisions reject, cross-tenant principals fail before I/O and every mutation/enqueue/completion error explicitly rolls back. The reversible schema gives receipts and globally monotonic outbox identities community-leading keys, one outbox row per operation, a receipt foreign key, bounded payload/provenance/delivery fields, delivery indexes and forced restrictive community RLS. Six focused tests cover first-apply/retry without reexecution, mutation-before-outbox ordering, interrupted enqueue rollback, collision rejection, pre-I/O tenant rejection and SQLx migration checksums/rollback. Focused library check and formatting passed; dependency, inventory and specification gates are recorded in the checkpoint validation. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No production migration ran and no database was mutated._
 
-  - [ ] 15.5. Implement projection rebuild and drift comparison
+  - [x] 15.5. Implement projection rebuild and drift comparison
     - Rebuild one tenant/aggregate from authority and compare source/version/count hashes without mutating authority.
     - _Requirements: 2.2, 8.3, 17.2_
     - _Capability IDs: CAP-005, CAP-045_
@@ -948,8 +1178,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/src/db/collaboration/{event_repository,outbox}.rs_
     - _Writes: crates/collab/src/db/collaboration/rebuild.rs_
     - _Validation: rebuild twice yields identical projections and a seeded drift produces a scoped diagnostic_
+    - _Discovered contradiction (2026-08-20): the planned production module alone cannot provide the named executable two-pass/drift scenario or prove that an adapter failure rolls back a partial projection replacement. The narrow correction adds one focused integration target beside the named module. It introduces no projection table or second authority; aggregate adapters remain responsible for their existing derived tables._
+    - _Evidence: 2026-08-20 — added a Postgres-only projection rebuild orchestrator over the Task 15.3 checkpoint schema. A bounded source identifies one projection and canonical provenance; bounded projection rows are sorted by stable key and reject duplicates, oversized rows, excessive counts and excessive aggregate payload. Under one tenant-fenced transaction the injected aggregate adapter reads authority, replaces only the selected derived aggregate and reads it back. SHA-256 comparisons length-prefix source system/record, source version, row count, keys and payloads, yielding a scoped clean/diverged diagnostic with both counts, versions and hashes. The same transaction upserts source provenance, equal or unequal hashes, a monotonically advanced checkpoint version and a bounded content-free drift summary; adapter/storage failure explicitly rolls back projection and checkpoint, and no authority mutation API exists. Three focused tests prove two rebuilds produce identical sorted materialization/hashes without authoritative writes, seeded version/count/row drift yields the exact community/projection/source diagnostic and partial replacement failure rolls back before checkpointing. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No production projection or checkpoint was mutated._
 
-  - [ ] 15.6. Enforce ephemeral non-persistence and privacy exclusions
+  - [x] 15.6. Enforce ephemeral non-persistence and privacy exclusions
     - Reject durable storage/indexing for ephemeral or privacy-disallowed kinds at the repository boundary.
     - _Requirements: 5.1, 5.3, 6.3_
     - _Capability IDs: CAP-001, CAP-005, CAP-014, CAP-025_
@@ -957,8 +1189,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/nostr_compat/src/generated_kinds.rs, crates/collab/src/db/collaboration/event_repository.rs_
     - _Writes: crates/collab/src/db/collaboration/persistence_policy.rs_
     - _Validation: privacy tests prove prohibited kinds never reach SQL, search or logs_
+    - _Discovered contradiction (2026-08-20): a standalone policy module cannot enforce a repository boundary or prove the named SQL/search/log exclusion unless the existing event writer consumes its opaque decision and a focused integration target observes the pre-I/O path. The narrow correction updates that existing `EventRepository::store` seam and its tests; it introduces no search index, event store or privacy authority._
+    - _Evidence: 2026-08-20 — added a catalog-driven event persistence policy with kind-bound opaque decisions and no permissive default. Cataloged registered and deliberately defined-unused relay kinds retain their declared persistence class; unclassified kinds and the internal non-relay media kind reject. Every ephemeral kind resolves to transient-only/search-excluded before privacy or database work. Durable private kinds require each declared author-only, recipient, result-reader and author-or-explicit-share gate independently; accepted private material is eligible only for an authorization-scoped index, while community-visible kinds alone may enter community search. The existing repository now requires and revalidates the exact decision kind before opening a transaction, preventing public-decision substitution. Four focused privacy tests prove ephemeral and mismatched-private records produce no transaction log or content marker, overlapping gates cannot be weakened, community search excludes private decisions, and unknown/internal kinds fail with content- and kind-neutral errors. All five prior event-repository tests pass with explicit decisions. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No production event, index or log was written._
 
-  - [ ] 15.7. Add Postgres failure and rollback integration tests
+  - [x] 15.7. Add Postgres failure and rollback integration tests
     - Exercise transaction abort, outbox interruption, replica lag and schema rollback with authoritative data intact.
     - _Requirements: 8.3, 17.3, 20.1_
     - _Capability IDs: CAP-005, CAP-043, CAP-044_
@@ -966,10 +1200,12 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/src/db/collaboration/**, crates/collab/migrations/collaboration_*.sql_
     - _Writes: crates/collab/tests/collaboration_storage_recovery.rs_
     - _Validation: `cargo test -p collab collaboration_storage_recovery` passes against isolated Postgres_
+    - _Discovered contradiction (2026-08-20): the planned migration glob `crates/collab/migrations/collaboration_*.sql` matches none of Sim's approved timestamp-prefixed reversible SQLx artifacts, and mock-database tests cannot validate PostgreSQL function parameter types, MVCC lag or transactional trigger failures. The narrow correction includes the exact Task 15.1–15.4 migration files in the named live test and fixes the two transaction-local tenant setters whose UUID bind was rejected by PostgreSQL `set_config(text,text,bool)`. No schema, ownership or migration strategy changes._
+    - _Evidence: 2026-08-20 — added one self-cleaning live recovery drill that creates a UUID-named database from `COLLAB_TEST_DATABASE_URL`, applies the exact event/head/checkpoint/outbox migrations and always terminates sessions and drops the database before reporting its result. A PostgreSQL trigger interrupts outbox insertion after the canonical mutation; real counts prove mutation, receipt and outbox all remain zero, then trigger removal permits one apply and one duplicate retry with exactly one row in each table. A repeatable-read read-only transaction remains on projection version 1 while primary authority and the production rebuilder reach version 2 cleanly, proving lag is observable without overwriting authority. Rolling the derived checkpoint schema down/up preserves one signed event, command authority and outbox operation; a subsequent authoritative rebuild recreates one clean checkpoint. The first live run exposed and corrected `set_config` UUID binding in both command/outbox and projection transactions; canonical UUID text now passes real PostgreSQL while existing mock suites remain green. The final target passed on disposable PostgreSQL 14 in 0.45s, and its container/database were removed. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No persistent external database or container remains._
 
 - [ ] 16. Consolidate realtime, presence infrastructure and search foundations
 
-  - [ ] 16.1. Implement tenant-scoped Redis fan-out envelopes
+  - [x] 16.1. Implement tenant-scoped Redis fan-out envelopes
     - Publish source ID/version and tenant-bound payload references without making Redis authoritative.
     - _Requirements: 8.1, 8.4_
     - _Capability IDs: CAP-006_
@@ -977,8 +1213,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-pubsub/**, crates/collab/src/**_
     - _Writes: crates/collab/src/pubsub/envelope.rs_
     - _Validation: pub/sub tests reject wrong-tenant envelopes and deduplicate local source IDs_
+    - _Discovered contradiction (2026-08-20): the planned nested envelope file cannot be registered without Sim's required non-`mod.rs` module roots, and a production module alone cannot provide the named hostile-wire and deduplication scenarios. The narrow correction adds `crates/collab/src/pubsub.rs`, exports it from the existing library root and adds one focused integration target. Redis transport remains unimplemented until Task 16.2._
+    - _Evidence: 2026-08-20 — added a strict 16-KiB v1 fan-out envelope that carries only community, positive Postgres-compatible outbox sequence, canonical lowercase topic, bounded source system/record/version/observation provenance and a lowercase SHA-256 payload reference. Encoding contains no authoritative payload or content; decoding rejects unknown fields, future versions, missing source versions, malformed hashes, invalid topics and oversized frames. A tenant-fixed local deduplicator rejects either caller/envelope tenant mismatch before state mutation, keys local and Redis echoes by canonical source system/ID/version rather than delivery sequence, admits later source versions and evicts oldest keys at a caller-selected capacity bounded to 65,536. Redis remains a lossy notification hint; ordered replay and payload authority stay in Postgres. Four focused tests cover reference-only round trip, pre-mutation cross-tenant rejection, local/Redis duplicate suppression plus bounded eviction and malformed/version/size failures. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No Redis connection or publish occurred._
 
-  - [ ] 16.2. Implement cross-replica subscription fan-out
+  - [x] 16.2. Implement cross-replica subscription fan-out
     - Connect outbox delivery to bounded local/Redis subscriptions with cancellation and replay cursors.
     - _Requirements: 8.1, 8.2, 8.4_
     - _Capability IDs: CAP-004, CAP-006_
@@ -986,8 +1224,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/src/{nostr/subscriptions,pubsub/envelope}.rs_
     - _Writes: crates/collab/src/pubsub/subscription_bus.rs_
     - _Validation: two-replica test covers ordering, reconnect replay, duplicate suppression and shutdown cleanup_
+    - _Discovered contradiction (2026-08-20): the named bus file cannot prove a two-replica/reconnect/cancellation contract without an executable integration target, while adding a Buzz Redis client directly would violate the approved adapter boundary and introduce an unplanned dependency owner. The narrow correction adds one focused test and injects bounded authoritative replay and transport interfaces; deployment-specific Redis/Postgres implementations can bind them without changing the bus or making Redis authoritative._
+    - _Evidence: 2026-08-20 — added a tenant-fixed subscription bus with injected authoritative cursor replay and encoded transport publication. Subscribe registers an initializing receiver before awaiting replay, buffers concurrent live work, validates tenant/topic/cursor, merges replay and buffer by strictly increasing outbox sequence and suppresses duplicate source system/ID/version pairs. Limits cap 4,096 subscriptions, 1,024 queued deliveries, 1,000 replay rows and the initialization buffer. Active local delivery is nonblocking; full or closed consumers are removed. Authoritative publication delivers locally and always attempts transport, so a Redis failure can be retried even after local dedup; strict remote decode plus the Task 16.1 deduplicator suppresses the publishing replica's echo. Drop/cancel removes registrations synchronously and shutdown drains all registrations, emits a marker when capacity permits and closes every receiver. Two focused async tests cover ordered two-replica replay/live delivery, local echo suppression, cursor-2 reconnect replay of 3–4, cancellation, terminal shutdown, foreign-tenant pre-registration rejection, slow-subscriber removal and transport-failure retry. Focused library check, formatting, diff, dependency, inventory and specification validation passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain. No Redis or production outbox was contacted._
 
-  - [ ] 16.3. Add replica freshness and partial-service state
+  - [x] 16.3. Add replica freshness and partial-service state
     - Track heartbeat, projection lag, pub/sub availability and last trustworthy cursors for clients/operators.
     - _Requirements: 8.3, 19.3_
     - _Capability IDs: CAP-004, CAP-006, CAP-043_
@@ -995,8 +1235,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/migrations/0026-*.sql, crates/collab/src/pubsub/subscription_bus.rs_
     - _Writes: crates/collab/src/freshness.rs_
     - _Validation: integration test distinguishes healthy, lagging, disconnected and recovering replicas_
+    - _Discovered contradiction (2026-08-20): the planned library file can define the freshness projection but cannot satisfy the named executable integration scenario by itself. The narrow correction adds one focused integration target; it does not add persistence, transport or a second health service._
+    - _Evidence: 2026-08-20 — added a tenant-fixed replica freshness tracker that combines epoch-scoped monotonic heartbeat tokens, heartbeat age, authoritative/projection cursor lag and pub/sub availability into healthy, lagging, disconnected and recovering states. Missing/stale heartbeats, unavailable pub/sub, same-epoch token regression, epoch replacement, foreign tenants and invalid cursor/future-time observations fail closed. Repeated tokens cannot renew heartbeat age. Disconnects retain the last trustworthy cursor and require two consecutive fully healthy samples before returning from recovering to healthy; lagging/disconnected observations cannot advance that cursor. Two focused integration tests exercise all four states, cursor retention/recovery, stale repeated tokens, regression, epoch replacement and tenant rejection. Focused formatting, clippy, test, library-check, dependency, inventory and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 16.4. Add privacy-aware collaboration search schema
+  - [x] 16.4. Add privacy-aware collaboration search schema
     - Create tenant-scoped searchable projections and database-level exclusions for private kinds.
     - _Requirements: 6.3, 9.4_
     - _Capability IDs: CAP-015_
@@ -1004,8 +1246,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-search/**, projects/buzz/migrations/0008-*.sql_
     - _Writes: crates/collab/migrations/collaboration_search.sql_
     - _Validation: migration test proves excluded content produces no searchable vector or index entry_
+    - _Discovered contradiction (2026-08-20): a single irreversible `collaboration_search.sql` would violate Sim's reversible migration convention, and copying signed-event bodies into the named search projection would create prohibited duplicate transcript state. The narrow correction adds one reversible migration pair plus one focused migration target. Signed-event vectors are generated on immutable event authority; only non-event canonical resources occupy the rebuildable projection table._
+    - _Evidence: 2026-08-20 — added a tenant-fenced search migration that stores Buzz's positive event-kind allowlist `(0, 9, 40002, 45001, 45003)` as a generated vector directly on `collaboration_events`, with a partial GIN index restricted to non-null vectors. All other event kinds therefore have neither copied search text nor an index-eligible vector. Added a provenance/version-bearing projection for non-event profiles, communities, projects, repositories, tasks, agents, workflows and media; only community-visible rows generate vectors, while authorized-restricted and excluded rows remain null under forced restrictive RLS. Rollback removes the derived table, index and event vector without cascade. Static tests pin privacy, tenant, rollback and checksum invariants. A live PostgreSQL 14 test proves a public kind-9 event and community project receive vectors, a kind-1059 ciphertext event and restricted project receive null vectors, only the public event matches FTS, and the event GIN index predicate is exactly `search_tsv IS NOT NULL`; the disposable container was stopped and removed after the 0.21-second run. Focused formatting, test, library-check, dependency, inventory, diff and specification gates passed. Full clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 16.5. Implement authorized search repository primitives
+  - [x] 16.5. Implement authorized search repository primitives
     - Apply tenant/visibility policy before ranking and limit and expose projection freshness.
     - _Requirements: 9.4, 8.3_
     - _Capability IDs: CAP-015_
@@ -1013,10 +1257,12 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/migrations/collaboration_search.sql, projects/buzz/crates/buzz-search/**_
     - _Writes: crates/collab/src/search/repository.rs_
     - _Validation: search tests cover authorization-before-limit, ranking, excluded kinds and lag markers_
+    - _Discovered contradiction (2026-08-20): the nested repository file requires Sim's non-`mod.rs` `crates/collab/src/search.rs` module root, and the planned production file cannot alone prove pre-I/O authorization or live Postgres ranking/privacy/freshness behavior. The narrow correction adds that module root, the existing crate export and one focused test target; Task 22.2 retains higher-level filter/query orchestration._
+    - _Evidence: 2026-08-20 — added a PostgreSQL-only collaboration search repository that requires the canonical `collaboration:search` scope plus active community-read authorization before beginning a transaction. Authorized work binds the typed tenant through RLS, normalizes and caps input at 4,096 characters, bounds pages/results, supports Buzz-compatible full-text and trailing-token prefix modes, and unions only non-null signed-event vectors with community-visible canonical vectors before rank, stable ordering, limit and offset. Hits contain only canonical event IDs/kinds or bounded provenance/document references, never copied content. An aggregate checkpoint read exposes current, lagging with affected count, or unavailable projection freshness. Mock tests prove missing scope performs zero database work, visibility predicates precede rank/limit, ordered references decode, lag is surfaced and hostile/oversized input is bounded. A live PostgreSQL 14 test proves full-text and prefix queries, nonincreasing rank order, exclusion of higher-frequency kind-1059 ciphertext and restricted task candidates, inclusion of the public kind-9 event/project, and a diverged checkpoint lag marker; the final run passed in 0.36 seconds and its disposable container was stopped and removed. Focused formatting, warning-denied library clippy, tests, library check, dependency, inventory, diff and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
 - [ ] 17. Build resumable Buzz data importers
 
-  - [ ] 17.1. Define migration checkpoint and integrity records
+  - [x] 17.1. Define migration checkpoint and integrity records
     - Persist tenant/shard, source/target cursors, counts, hashes, status and rollback boundary.
     - _Requirements: 17.1, 17.2, 17.3_
     - _Capability IDs: CAP-005, CAP-045_
@@ -1024,8 +1270,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: .agents/specs/collaborative-workspace/migration-plan.md, crates/collab/src/db/**_
     - _Writes: crates/collab/src/migration/buzz/checkpoint.rs_
     - _Validation: checkpoint tests cover interruption, monotonic resume and rejected cross-tenant reuse_
+    - _Discovered contradiction (2026-08-20): the listed Rust file cannot persist or database-fence migration progress, and its nested path requires non-`mod.rs` module roots. The narrow correction adds one reversible run/checkpoint migration pair, the two required module roots and one focused test target. This implements the approved checkpoint strategy without starting an importer or crossing any production rollback boundary._
+    - _Evidence: 2026-08-20 — added globally unique migration-run assignments bound to one community/source revision and forced-RLS checkpoints keyed by tenant, run, stream and shard. Checkpoints persist optimistic version, lifecycle, independent monotonic source/target cursor sequence plus bounded opaque token, four monotonic counts, 32-byte source/target hashes, bounded errors and a named reversible or timestamped irreversible boundary. Rust and PostgreSQL both reject identity/version/status regression, same-sequence token substitution, same-progress hash substitution, count/cursor rollback, mutable irreversible evidence and rolled-back state after the point of no return. The repository creates, loads and atomically saves typed tenant-bound checkpoints; cross-tenant reuse rejects before transaction creation. Pure tests cover pending→running→interrupted→exact resume, cursor/token regression and irreversible rollback denial; schema/checksum tests pin RLS, integrity and reversible removal. A live PostgreSQL 14 test creates and reloads the initial record, persists running/interrupted state, reconnects a repository, resumes at the exact cursor/count/hash and rejects a stale-version writer; the final run passed in 0.16 seconds and the disposable container was stopped and removed. Focused formatting, warning-denied library clippy, tests, library check, dependency, inventory, diff and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 17.2. Import signed events and addressable heads
+  - [x] 17.2. Import signed events and addressable heads
     - Preserve original bytes, IDs and signatures while attaching verified tenant/provenance metadata.
     - _Requirements: 17.1, 17.2_
     - _Capability IDs: CAP-001, CAP-005, CAP-045_
@@ -1033,17 +1281,22 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-db/**, .agents/specs/collaborative-workspace/fixtures/migrations/**_
     - _Writes: crates/collab/src/migration/buzz/events.rs_
     - _Validation: fixture import preserves byte/hash/signature/head counts and is idempotent after interruption_
+    - _Implementation finding (2026-08-20): the live event repository correctly rejects stale addressable writes, while Buzz's migration source retains superseded and deleted signed rows. The dependency-safe boundary is therefore a migration-only writer into the same immutable canonical tables. It verifies historical signatures, inserts retained rows regardless of current-head visibility and rebuilds the existing head watermark without exposing a second runtime write authority. Buzz stores signed fields rather than a raw wire document, so “original bytes” means the exact reproducible NIP-01 signature-input bytes whose SHA-256 is the preserved event ID; the preserved signature is compared independently._
+    - _Evidence: 2026-08-20 — added a PostgreSQL-only, tenant-fixed importer for batches of at most 1,000 strictly ordered Buzz rows. Source construction verifies canonical bytes, event ID, Schnorr signature, timestamp representation, replacement coordinate and Buzz's no-ephemeral-storage invariant before mutation. Each transaction installs row-zero RLS, inserts immutable historical rows idempotently, reads every row back and rejects an ID collision if canonical bytes or signature differ. Addressable rows rebuild the canonical greatest-time/lowest-ID watermark; a deleted winner retains a null-live tombstone floor. Ordered source/read-back SHA-256 values cover source sequence, ID, canonical bytes and signature, and the result exposes inserted/duplicate/coordinate counts plus the exact final source sequence for checkpoint updates. Frozen signed-event fixtures prove a partial batch, exact replay after simulated interruption, an overlapping completion window, five preserved rows, byte/signature equality, one addressable coordinate and the deleted lower-ID same-second winner. A cross-tenant batch rejects before database I/O. The live PostgreSQL 14 run passed in 0.26 seconds and its disposable container was stopped and removed. Focused formatting, warning-denied library clippy, tests, library check, dependency, inventory, diff and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 17.3. Import community, membership and channel state
+  - [x] 17.3. Import community, membership and channel state
     - Import service-issued community, membership, invite and channel records with explicit provenance.
     - _Requirements: 17.1, 17.2_
     - _Capability IDs: CAP-003, CAP-005, CAP-010, CAP-045_
-    - _Depends on: 17.1, 17.2_
+    - _Depends on: 17.1, 17.2, 18.1_
     - _Reads: projects/buzz/migrations/**, projects/buzz/crates/buzz-db/src/channel.rs_
     - _Writes: crates/collab/src/migration/buzz/community_state.rs_
     - _Validation: importer rejects unknown versions, preserves membership versions and is idempotent after interruption_
+    - _Discovered contradiction (2026-08-20): this importer was ordered before Task 18.1 even though Sim's existing integer channel tables are semantically incompatible and the canonical community/member/channel/invite targets did not yet exist. Task 18.1 is therefore an explicit prerequisite and is executed first. This avoids a temporary staging store and preserves the approved one-owner architecture._
+    - _Implementation finding (2026-08-20): Buzz's current community tables have no shared aggregate-version column, and older database shapes are already represented by the 30 checksummed source migrations. The importer therefore accepts only a frozen, normalized schema-v30 snapshot and requires the source reader to supply stable positive community/channel/membership/invite versions plus resolved canonical principal IDs. Original Buzz public keys, row keys and the complete normalized row remain covered by source provenance and integrity; an older deployment is upgraded on a copy while its original stays untouched until verification._
+    - _Evidence: 2026-08-20 — added a PostgreSQL-only community-state importer over the canonical Task 18.1 tables. Batches accept at most 1,000 strictly increasing rows for one tenant and reject unknown schema versions, invalid roles/statuses/types/visibility, nil IDs, malformed lowercase public keys/policy hashes, inconsistent timestamps/TTL pairs, invalid invite use limits and cross-tenant input before I/O. Community, relay membership, join-policy acceptance, channel, relay invite and channel-membership records retain exact Buzz table/key identity, schema version, observation time and a SHA-256 over the full normalized source record; target conflicts succeed only when that stored integrity matches. Source/read-back batch hashes bind row sequence and integrity, so overlap after interruption is observable and idempotent without updates or a staging authority. A live PostgreSQL 14 run imported five dependency-ordered rows, replayed all five as duplicates, completed two remaining rows, preserved community membership versions 7/12 and channel membership version 15, and rejected a changed-host retry as divergence; the final run passed in 0.15 seconds and the disposable container was stopped and removed. Pure tests reject schema v31 and a foreign tenant before database I/O. Focused formatting, warning-denied library clippy, tests, library check, dependency, inventory, diff and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 17.4. Import object and Git metadata by content identity
+  - [x] 17.4. Import object and Git metadata by content identity
     - Inventory object keys, hashes, repository coordinates and refs without copying bytes prematurely.
     - _Requirements: 17.1, 17.2_
     - _Capability IDs: CAP-019, CAP-031, CAP-045_
@@ -1051,17 +1304,22 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-media/**, projects/buzz/crates/buzz-relay/src/git/**_
     - _Writes: crates/collab/src/migration/buzz/object_git_metadata.rs_
     - _Validation: fixture import matches object/ref hashes and reports missing objects without advancing checkpoint_
+    - _Implementation finding (2026-08-20): Buzz's bucket deliberately mixes three identity classes: media blobs, Git packs and manifests whose keys are their byte SHA-256; derived thumbnails and Git indexes whose keys name source content; and tenant bindings/metadata (sidecars, upload records and repository pointers) whose own bytes are identified by an observed SHA-256 and, for mutable pointers, an ETag. The importer preserves those distinctions instead of treating an S3 ETag as a content digest or copying large object bodies. Tenant-reachable inventory begins at media bindings and repository pointers, then follows blob/thumbnail, current and ancestor manifest, pack and optional index references; fleet probes and unreachable immutable CAS objects are not attributed to a tenant._
+    - _Evidence: 2026-08-20 — added a bounded, strictly ordered, tenant-fixed metadata importer that accepts streamed object hashes plus only bounded sidecar/upload/manifest/pointer bodies. It validates exact Buzz key taxonomies, metadata body length and digest, content-addressed key digests, canonical manifest v1 bytes, ref names/OIDs, repository coordinates, pointer ETags, media size/type agreement and manifest ancestry without writing or copying object bodies. Its successful result contains sorted reachable object identities, media bindings, repository coordinates, refs, packs, deterministic source/target/ref-state hashes and the sole checkpoint-progress token. Missing blobs, thumbnails, manifests, ancestors or packs instead produce a sorted diagnostic report whose API cannot expose checkpoint progress; unknown keys, digest divergence, duplicate listings, ancestry cycles and foreign-tenant bindings fail closed. The focused fixture preserved five exact object identities and the Git branch/ref hash, a missing pack withheld progress at source sequence five, and a foreign-community pointer was rejected. Focused formatting, warning-denied library clippy and the dedicated test target passed._
 
-  - [ ] 17.5. Import desktop settings, drafts, read state and archive
+  - [x] 17.5. Import desktop settings, drafts, read state and archive
     - Version and import general configuration, drafts, read state and transcript archive while preserving source files.
     - _Requirements: 9.3, 17.1, 17.2_
     - _Capability IDs: CAP-013, CAP-045_
     - _Depends on: 12.4, 17.1_
-    - _Reads: projects/buzz/desktop/src-tauri/src/{migration,archive,event?sync}/**_
+    - _Reads: projects/buzz/desktop/src-tauri/src/{migration,archive,event?sync}/**, projects/buzz/desktop/src/features/{messages,channels,local-archive,notifications,presence}/**_
     - _Writes: crates/sim/src/migration/buzz/desktop_state.rs_
     - _Validation: every desktop fixture version imports twice identically and source files remain unchanged_
+    - _Discovered contradiction (2026-08-20): the original read set named only Tauri modules, but Buzz drafts, NIP-RS local read caches, manual-unread state and most device preferences are actually versioned WebKit `localStorage` records implemented in TypeScript. The read set is widened to those authoritative sources without changing the approved Sim settings/session/collaboration ownership. The nested Rust write path also requires `migration.rs` and `migration/buzz.rs` module roots, plus `sha2`/`thiserror` dependencies already present in the workspace lock graph._
+    - _Implementation finding (2026-08-20): direct mutation of a live WebKit database or Buzz archive would violate the rollback requirement and couple Sim to browser/SQLite implementation details. The importer therefore consumes a bounded, versioned read-only snapshot produced from those sources and emits a deterministic owner-neutral write batch. Sim settings, native draft/read-state caches and collaboration archive stores remain the only final owners; this module neither creates a second runtime store nor deletes source state. Credential-shaped general configuration is rejected for Task 12.4's verified credential path, pure timeline caches are intentionally skipped, and the full raw signed archive event remains available to the canonical event verifier._
+    - _Evidence: 2026-08-20 — added v1/v2 desktop snapshot and v1-v4 archive-schema validation; deterministic imports for general configuration and device settings, legacy and relay-scoped drafts, mention/attachment metadata, NIP-RS contexts, publishable/source-time metadata, legacy/current manual-unread entries, raw archived events, scope membership and save subscriptions. Import validates resource bounds, public keys, relay URLs, event/raw-JSON agreement, archive foreign keys and unique keys, exact migration-marker sets, timestamps, context bounds and secret exclusion. Source and normalized target SHA-256 values support repeat verification; settings, drafts, read state and archive rows are sorted so a second import is byte-equivalent. Both frozen desktop fixture versions imported twice identically, legacy missing draft fields upgraded without loss, current archive rows retained, cache-only state was counted but excluded, a file-backed fixture remained byte-identical and nested secret material failed closed. A lightweight harness compiled the actual module and passed all three tests plus warning-denied Clippy. The native Sim test build passed the WebRTC dependency after disk recovery but remains blocked in the unrelated `gpui_macos` build because the host lacks Xcode's Metal Toolchain._
 
-  - [ ] 17.6. Add migration rollback and verification harness
+  - [x] 17.6. Add migration rollback and verification harness
     - Compare counts/hashes, halt on divergence and restore pre-boundary binary/config/data fixtures.
     - _Requirements: 17.2, 17.3, 17.4, 20.1_
     - _Capability IDs: CAP-005, CAP-043, CAP-044, CAP-045_
@@ -1069,8 +1327,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/collab/src/migration/buzz/**, crates/sim/src/migration/buzz/**_
     - _Writes: crates/collab/tests/buzz_import_recovery.rs_
     - _Validation: isolated harness demonstrates resume, idempotency, divergence halt and pre-boundary rollback_
+    - _Evidence: 2026-08-20 — added an isolated recovery harness over the canonical migration checkpoint state machine and the real desktop-state and agent-state staging importers. The harness advances count/hash checkpoints only after cross-stream agreement, preserves counts on interruption/resume and replay of the same source window, fails and permanently halts on a target-hash divergence, and restores the exact pre-boundary binary, configuration and data fixture before transitioning to `RolledBack`. The focused integration target passed all eight recovery/importer tests; warning-denied Clippy and the collab library check passed with GPUI's existing runtime-shader feature because this host lacks the offline Metal compiler. Formatting, collaboration dependency boundaries, the exhaustive inventory gate and the feature-spec validator passed._
 
-  - [ ] 17.7. Import workflow, moderation and lifecycle state
+  - [x] 17.7. Import workflow, moderation and lifecycle state
     - Stage workflow/run/approval, moderation, retention and deletion checkpoints with workers disabled.
     - _Requirements: 15.1, 15.2, 15.3, 17.1, 17.2_
     - _Capability IDs: CAP-027, CAP-029, CAP-030, CAP-045_
@@ -1078,8 +1337,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/migrations/**, projects/buzz/crates/buzz-db/src/{moderation,workflow}.rs_
     - _Writes: crates/collab/src/migration/buzz/lifecycle_state.rs_
     - _Validation: importer preserves legal state/checkpoints and leaves workflow/deletion/retention workers disabled_
+    - _Evidence: 2026-08-20 — added a schema-versioned, tenant-fenced Buzz lifecycle staging importer for workflow definitions/runs/approval gates, moderation reports/restrictions/actions, NIP-RS replay-retention watermarks, and whole-community deletion state/requests/approvals/checkpoints. The importer preserves deterministic source/staged hashes, rejects duplicate identities, broken parent links, definition-hash drift, cross-tenant records, impossible workflow/moderation states, mismatched frozen-inventory approvals, forward deletion checkpoints and stale lease generations. Workflow scheduler/executor, retention and deletion worker activation is represented by an immutable all-disabled policy; active source workflows and terminal abort evidence cannot start work. Buzz deletion runtime inspection was additionally required to preserve its approved/fenced abort recovery semantics; this narrows validation but does not change the approved architecture or scope. Four focused lifecycle tests, warning-denied collab library clippy, collab library check, collaboration dependency validation and collaborative-workspace inventory validation passed. Commit: enclosing leaf commit, reported after creation._
 
-  - [ ] 17.8. Import push leases and wake outbox state
+  - [x] 17.8. Import push leases and wake outbox state
     - Stage encrypted leases, generations and pending wake records without contacting providers.
     - _Requirements: 9.5, 17.1, 17.2_
     - _Capability IDs: CAP-016, CAP-045_
@@ -1087,8 +1347,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/migrations/0022-*.sql, projects/buzz/migrations/0023-*.sql_
     - _Writes: crates/collab/src/migration/buzz/push_state.rs_
     - _Validation: importer preserves encrypted values/generations, rejects unknown version and sends no wake_
+    - _Evidence: 2026-08-20 — added a versioned, tenant-fenced push-state staging importer for effective NIP-PL leases, durable wake-outbox rows and event-match jobs. It preserves source event references, monotonic generations, endpoint enablement, opaque endpoint grants, bounded subscription JSON, endpoint/event dedup identities and queue attempts; rejects unknown format versions, cross-tenant rows, incomplete active/tombstone tuples, duplicate addresses/events, future-generation wakes, current-generation endpoint drift and invalid claim state. Nonportable `sending`/`matching` claims are deterministically reconciled to `pending` with attempts retained and claim fences cleared, producing separate source/staged hashes and a recovery count. Matcher, wake dispatcher and provider contact remain immutable-disabled, so staging sends no wake. The task's listed 0022 migration is unrelated TTL refresh and 0023 contains only the push gate; implementing the approved leaf required the actual 0012/0013 lease/outbox and 0018 match-queue migrations plus `buzz-db/src/push.rs`. Encrypted signed lease events remain canonically owned by Task 17.3 and are referenced by event ID here instead of duplicated. Four focused push-state tests and warning-denied collab library clippy passed. Commit: enclosing leaf commit, reported after creation._
 
-  - [ ] 17.9. Import managed-agent, team and snapshot staging records
+  - [x] 17.9. Import managed-agent, team and snapshot staging records
     - Stage versioned private agent/team/persona/snapshot records for later canonical agent import.
     - _Requirements: 11.2, 11.3, 17.1, 17.2_
     - _Capability IDs: CAP-023, CAP-024, CAP-045_
@@ -1096,12 +1357,13 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/desktop/src-tauri/src/managed-agents/**, projects/buzz/desktop/src-tauri/src/archive/**_
     - _Writes: crates/sim/src/migration/buzz/agent_staging.rs_
     - _Validation: every agent fixture stages idempotently with version/privacy hashes and source preservation_
+    - _Evidence: 2026-08-20 — added a local, owner-profile-scoped staging format for managed-agent instances, personas, teams, plain agent snapshots, NIP-44 v2 encrypted snapshots, team snapshots and hash-only references to archived observer/turn-metric evidence. Source JSON is bounded and hashed before transformation, exact format/version discriminators and nested team members are validated, memory-bearing artifacts receive a private-memory classification, encrypted artifacts remain opaque, and archive payloads stay owned by the Task 17.5 desktop archive import instead of being duplicated. Inline nsecs and provider/environment secrets must resolve through explicit protected-credential bindings; staged JSON contains only typed credential references and value hashes, while the borrowed source bytes remain unchanged. Stable source, staged, privacy and idempotency hashes make replay deterministic. Agent execution, automatic start and credential use are immutable-disabled. The task's `managed-agents/**` read path does not exist; Buzz uses `managed_agents/**`, which was inspected together with the listed archive source. A minimal harness compiled the actual Sim module and passed all four source-preservation, idempotency, privacy, owner-scope and version-failure tests plus warning-denied all-target clippy; the full native Sim target remains unavailable on this host because the unrelated Xcode Metal Toolchain is not installed. Commit: enclosing leaf commit, reported after creation._
 
 ## Milestone 3 — communication and awareness parity
 
 - [ ] 18. Extend canonical channels, communities and membership
 
-  - [ ] 18.1. Add community and channel projection schema
+  - [x] 18.1. Add community and channel projection schema
     - Create tenant-fenced community, membership and channel projection tables with source provenance.
     - _Requirements: 2.2, 6.1, 9.1_
     - _Capability IDs: CAP-003, CAP-005, CAP-010_
@@ -1109,8 +1371,11 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-db/src/channel.rs, crates/collab/src/db/queries/channels.rs_
     - _Writes: crates/collab/migrations/collaboration_channels.sql_
     - _Validation: migration tests cover tenant fences, provenance indexes and down migration_
+    - _Discovered contradiction (2026-08-20): one non-reversible SQL file cannot satisfy the required down-migration gate, and Task 17.3 cannot preserve Buzz relay invites or join-policy acceptance evidence unless their canonical persistence exists before import. The narrow dependency-safe correction uses the repository's reversible timestamped migration pair, includes invite and policy-evidence tables in the same community/channel ownership boundary, and adds one focused schema test. It does not implement lifecycle commands or redemption behavior reserved for Tasks 18.2 through 18.5._
+    - _Evidence: 2026-08-20 — added canonical community, community-membership, join-policy-acceptance, channel, invite and channel-membership tables. Tenant-data primary, foreign and query-index paths are community-leading while the trusted routing host remains globally unique; principal-bound composite foreign keys reject cross-tenant creators, memberships and invite issuers. Bounded roles, statuses, channel types, visibility, TTL/expiry pairs, invite use counts, aggregate versions and full source provenance are database-enforced. All six tables enable and force RLS with an explicit permissive candidate policy plus a restrictive transaction-local community policy, avoiding PostgreSQL's deny-all behavior for a restrictive-only policy set while retaining the tenant fence. The down migration drops six tables in dependency order without cascade, and SQLx checksums pin both directions. A live PostgreSQL 14 NOBYPASSRLS request role inserted tenant A, observed zero tenant-A rows as tenant B, failed a foreign-tenant insert and rolled the schema down to no remaining community table; the final run passed in 0.11 seconds and the disposable container was stopped and removed. Focused formatting, warning-denied library clippy, migration tests, library check, dependency, inventory, diff and specification gates passed. Full release clippy reached `collab` but remains blocked while compiling the unrelated GPUI dependency because the host lacks Xcode's Metal Toolchain._
+    - _Follow-up correction (2026-08-20): the least-privilege Task 18.1 test exposed that the earlier identity, event/head, projection, receipt/outbox, search and migration-checkpoint schemas also had restrictive-only policy sets. Each now has an explicit permissive candidate paired with its unchanged forced restrictive tenant predicate, including every event partition. A catalog test requires a pair for every restrictive policy. A live PostgreSQL 14 NOBYPASSRLS role applied all seven repaired migrations, wrote within tenant A, observed zero rows from tenant B and failed a foreign write in 0.44 seconds; the disposable container was removed. This changes admission from accidental deny-all to the designed tenant predicate and does not weaken SQL privileges or cross-tenant isolation._
 
-  - [ ] 18.2. Implement community lifecycle commands
+  - [x] 18.2. Implement community lifecycle commands
     - Add create, update, archive and join-policy transitions with version and authorization checks.
     - _Requirements: 6.2, 6.4, 9.1_
     - _Capability IDs: CAP-003, CAP-010_
@@ -1118,8 +1383,10 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-core/src/community.rs, crates/collaboration_domain/src/authorization.rs_
     - _Writes: crates/collaboration_domain/src/community.rs_
     - _Validation: domain tests cover legal transitions, stale versions and unauthorized archive_
+    - _Discovered contradiction (2026-08-20): `projects/buzz/crates/buzz-core/src/community.rs` does not exist. Buzz's authoritative community lifecycle behavior is split across `buzz-db/src/lib.rs` create/archive/unarchive transactions, `buzz-relay/src/api/operator.rs`, `buzz-relay/src/handlers/community_provisioning.rs`, and the join-policy configuration and invite APIs. Those sources were used without changing the approved canonical Sim domain owner or this leaf's scope._
+    - _Evidence: 2026-08-20 — added bounded canonical community host/icon/join-policy values, a hydratable versioned community aggregate, and pure create, metadata-update, join-policy, archive and restore commands. Every command enters the common tenant/principal/scope/membership/delegation authorization policy before checking version or mutating state; create/archive/restore require delete authority while metadata and policy changes require manage authority. Successful changes increment exactly one aggregate version, no-op retries preserve the version, stale versions preserve the complete prior aggregate, and quiescing/fenced/tombstone states reject ordinary lifecycle changes. Tests cover owner creation, metadata and versioned policy changes, stale rollback-free rejection, admin archive denial, active/archive restoration and protected-state failure. All 41 collaboration-domain tests, warning-denied all-target Clippy, formatting and diff checks passed._
 
-  - [ ] 18.3. Implement membership, roles and revocation
+  - [x] 18.3. Implement membership, roles and revocation
     - Project NIP-29 membership, role changes, virtual membership and revocation into common policy inputs.
     - _Requirements: 6.2, 6.4, 9.1_
     - _Capability IDs: CAP-008, CAP-010_
@@ -1127,8 +1394,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-db/src/channel.rs, crates/collaboration_domain/src/admission_evidence.rs_
     - _Writes: crates/collaboration_domain/src/membership.rs_
     - _Validation: membership tests cover invite, role, removal, archive and stale authorization cache_
+    - _Evidence: 2026-08-20 — added one versioned membership aggregate for community and NIP-29 channel scopes, projecting persistent community/channel records and owner-attested virtual-agent evidence into the existing common authorization inputs without a second policy model. Verified invite redemptions retain joined-versus-idempotent-retry disposition; virtual inputs remain explicitly distinguishable and cannot become persistence records through this API. Add, role-change, revoke, archive and restore commands validate the exact authorization resource shape, run the shared tenant/scope/current-membership policy first, derive actor attribution rather than trusting it, reject self-mutation, protect community ownership, restrict admins to lower-role membership changes and increment exactly one version per mutation. Revocation is terminal, archive is reversible, and stale cached membership snapshots fail against the new current version. All 46 collaboration-domain tests, warning-denied all-target Clippy, formatting and diff checks passed._
 
-  - [ ] 18.4. Implement channel types and lifecycle
+  - [x] 18.4. Implement channel types and lifecycle
     - Add open, private, DM, ephemeral, forum and huddle channel types with archive and expiry semantics.
     - _Requirements: 9.1, 15.2_
     - _Capability IDs: CAP-010, CAP-030, CAP-032_
@@ -1136,8 +1404,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-db/src/channel.rs, crates/channel/src/channel_store.rs_
     - _Writes: crates/collaboration_domain/src/channel.rs_
     - _Validation: state-transition tests cover each channel type, visibility, archive and ephemeral expiry_
+    - _Evidence: 2026-08-20 — added bounded canonical channel names/descriptions, stream/forum/direct-message/workflow/ephemeral/huddle types, open/private visibility, active/archived/expired/deleted lifecycle state and paired nonzero TTL/deadline values. Creation uses community-manage authorization and derives scoped-token attribution from its subject; existing-channel archive/restore/delete commands require the exact common channel authorization resource and current community/channel memberships. Direct messages, workflows and huddles fail closed unless private; explicit ephemeral channels require TTL while Buzz-compatible TTL remains valid on other types. Activity renews TTL with checked time arithmetic, due expiry is deterministic and versioned, restore renews an expired/archived deadline, deletion is terminal, no-op transitions do not advance versions and stale commands cannot mutate. Tests cover every type's legal visibility, invalid DM/ephemeral shapes, archive/restore for all six types, early/due expiry, activity renewal and expired recovery. Warning-denied all-target Clippy, focused tests, formatting and diff checks passed. Sim's legacy integer-ID `ChannelStore` remains unchanged and will consume this domain only through Task 18.6's adapter._
 
-  - [ ] 18.5. Implement channel invite lifecycle
+  - [x] 18.5. Implement channel invite lifecycle
     - Add use-limited invites, redemption evidence, expiry and revocation under membership policy.
     - _Requirements: 6.4, 9.1_
     - _Capability IDs: CAP-008, CAP-010_
@@ -1145,8 +1414,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/migrations/0025-*.sql, crates/collaboration_domain/src/membership.rs_
     - _Writes: crates/collaboration_domain/src/channel_invite.rs_
     - _Validation: tests cover invite exhaustion, expiry, revocation, replay and unauthorized redemption_
+    - _Evidence: 2026-08-20 — added a canonical hash-only invite aggregate supporting Buzz-compatible community invites and optional native channel targets without storing reusable bearer codes. Mint validates the exact community/channel manage-policy resource, derives scoped-token attribution from its subject, restricts grants to member/guest, enforces 60-second through 30-day lifetimes and the 10,000-use ceiling, and carries explicit active/revoked/exhausted/expired state. Redemption binds tenant plus token hash, checks expiry before existing membership or capacity, rejects foreign/inactive policy inputs, emits canonical community/channel membership records, increments only a genuinely new member, marks the final slot exhausted and preserves use count/version for an existing-member replay. Revocation and expiry are versioned; stale or mismatched bearers fail closed. Focused tests cover final-slot exhaustion, replay without double consumption, expiry ordering, revocation, wrong bearer and foreign-channel membership. All focused tests, warning-denied all-target Clippy, formatting and diff checks passed. Plaintext token generation and serialized `FOR UPDATE` persistence remain adapter/repository responsibilities rather than a second domain authority._
 
-  - [ ] 18.6. Integrate canonical channels with native stores
+  - [x] 18.6. Integrate canonical channels with native stores
     - Project community/channel/member records into existing ChannelStore and collab UI without a second authority.
     - _Requirements: 2.1, 9.1_
     - _Capability IDs: CAP-010, CAP-036_
@@ -1154,8 +1424,9 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: crates/channel/src/channel_store.rs, crates/collab_ui/src/**, crates/collaboration_domain/src/{community,membership,channel}.rs_
     - _Writes: crates/channel/src/collaboration_store.rs_
     - _Validation: `cargo test -p channel collaboration_store` proves one canonical ID and correct type/role projections_
+    - _Evidence: 2026-08-20 — extended the existing native `ChannelStore` with one version-fenced, rebuildable collaboration projection rather than another authority or legacy channel table. Each projected channel is keyed only by its exact `(community UUID, channel UUID)` canonical identity; all six channel types, visibility, lifecycle, topic/canvas metadata, community memberships and channel memberships remain typed domain records. Snapshot replacement is atomic, idempotent at equal version and rejects stale, conflicting, duplicate, unknown-channel and cross-community input without changing the last trustworthy view. Open/private visibility maps to the existing native public/member presentation, owner/admin/member/guest roles map only where Sim's legacy role is semantically safe, and Buzz's separate bot designation deliberately returns an unsupported compatibility result instead of acquiring legacy authority. The focused tests passed 3/3 and the complete channel suite passed 6/6; warning-denied all-target Clippy, all-target check, formatting, collaboration dependency and inventory gates passed. Integration required the narrow `channel` crate dependency/export and `ChannelStore` field/accessor plus corresponding lockfile edges in addition to the planned new adapter file._
 
-  - [ ] 18.7. Implement channel templates, topics and canvas metadata
+  - [x] 18.7. Implement channel templates, topics and canvas metadata
     - Add validated templates plus versioned topic/canvas records under channel write policy.
     - _Requirements: 9.1_
     - _Capability IDs: CAP-010_
@@ -1163,10 +1434,11 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/desktop/src/features/channel-templates/**, crates/collaboration_domain/src/channel.rs_
     - _Writes: crates/collaboration_domain/src/channel_metadata.rs_
     - _Validation: tests cover template validation, version conflict and unauthorized topic/canvas writes_
+    - _Evidence: 2026-08-20 — added bounded canonical channel metadata and validated Buzz-compatible stream/forum templates with open/private visibility, canvas placeholders and deduplicated persona/team references retaining runtime, model, role and local/provider backend selection. Unknown or unmatched placeholders, unsupported channel types, empty/control/oversized reference fields and excess references fail before construction. Versioned topic and canvas writes require the exact channel-shaped common authorization policy; stale versions, insufficient channel roles, timestamp regression and version exhaustion fail without partial mutation, while no-op retries preserve the version. Focused metadata tests passed 2/2 and all collaboration-domain tests passed 54/54; warning-denied all-target Clippy, all-target check, formatting, collaboration dependency, inventory, diff and specification gates passed. The existing Sim `ChannelStore` remains untouched until Task 18.6 projects these values without becoming a second authority._
 
 - [ ] 19. Port messages, threads, reactions and stable channel windows
 
-  - [ ] 19.1. Add message and auxiliary-event projection schema
+  - [x] 19.1. Add message and auxiliary-event projection schema
     - Persist messages, edits, deletes, reactions, pins, bookmarks and schedules with provenance and stable sort keys.
     - _Requirements: 9.1, 9.2_
     - _Capability IDs: CAP-005, CAP-011_
@@ -1174,24 +1446,27 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Reads: projects/buzz/crates/buzz-db/src/{event,thread,reaction}.rs, projects/buzz/migrations/**_
     - _Writes: crates/collab/migrations/collaboration_messages.sql_
     - _Validation: migration test covers same-second keys, uniqueness, tombstones and tenant fences_
+    - _Evidence: 2026-08-20 — added a reversible PostgreSQL message projection and one immutable auxiliary-event projection for edits, deletes, reaction add/remove, pin/unpin, bookmark/unbookmark and schedule/create/cancel/publish records. Both tables reference the canonical signed-event log and deliberately store no message content; community-leading channel/principal/event foreign keys, forced RLS with paired permissive/restrictive policies and bounded provenance preserve tenant and source ownership. Message windows use `(message_created_at DESC, source_event_id ASC)` and auxiliary histories use `(event_created_at, auxiliary_event_id)` so tied seconds remain lossless. Lifecycle shape checks retain deletion and removal tombstones, accept delete-before-target projection, bound custom emoji to 4 KiB and require exact schedule and related-event fields. Static/checksum tests passed 3/3. A disposable PostgreSQL 14 test passed in 0.35 seconds, proving tied-second order, source uniqueness, out-of-order tombstone retention, false-tombstone rejection, tenant invisibility/denial and clean rollback; the container was stopped and removed. Focused warning-denied Clippy and check passed with GPUI's existing runtime-shader feature because this host lacks the Xcode Metal Toolchain; formatting, dependency and inventory gates passed. The planned generic write path resolved to timestamped reversible up/down migrations plus the focused migration test._
 
-  - [ ] 19.2. Implement message command and edit/delete rules
+  - [x] 19.2. Implement message command and edit/delete rules
     - Add authorized create, edit and delete transitions with immutable source history.
     - _Requirements: 9.1_
     - _Capability IDs: CAP-011_
     - _Depends on: 18.4, 19.1_
     - _Reads: projects/buzz/desktop/src/features/messages/**, crates/collaboration_domain/src/channel.rs_
-    - _Writes: crates/collaboration_domain/src/message.rs_
+    - _Writes: crates/collaboration_domain/src/{collaboration_domain,message}.rs_
     - _Validation: domain tests cover author/moderator rights, stale edits, delete visibility and retries_
+    - _Evidence: 2026-08-20 — added the canonical message aggregate with bounded content and moderation metadata, signed-event source provenance, versioned immutable mutation history, and fail-closed hydration validation. Create, edit and delete commands require exact conversation/channel authorization shapes; owner-attested agent authors require matching proof provenance; only authors or their attested owners can edit; self-deletes require write access while moderation deletes require manage access. Duplicate delivery is idempotent only after authentication, stale or rejected commands remain atomic, deleted content is hidden through the projection API, and moderation reasons remain available for audit. Focused message tests passed 3/3, the complete collaboration-domain suite passed 57/57, warning-denied all-target Clippy passed, and repository formatting passed._
 
-  - [ ] 19.3. Implement message reactions
+  - [x] 19.3. Implement message reactions
     - Add authorized reaction add/remove and target-deletion behavior, including long custom emoji values.
     - _Requirements: 9.1_
     - _Capability IDs: CAP-011, CAP-017_
     - _Depends on: 19.2_
     - _Reads: projects/buzz/crates/buzz-db/src/reaction.rs, crates/collaboration_domain/src/message.rs_
-    - _Writes: crates/collaboration_domain/src/reaction.rs_
+    - _Writes: .agents/specs/collaborative-workspace/design.md, crates/collaboration_domain/src/{collaboration_domain,message,reaction}.rs_
     - _Validation: tests cover add/remove, long custom emoji, duplicate delivery and target deletion_
+    - _Evidence: 2026-08-20 — added a canonical reaction set that reuses message authorization and identity resolution rather than introducing a parallel policy path. Per-actor/per-value add, remove and reactivation transitions retain immutable signed-event sources, contiguous aggregate versions and exact removal references; authenticated duplicate deliveries and already-active adds are no-ops, while stale, malformed, cross-target and unauthorized commands cannot mutate state. Reaction values preserve Buzz's 64-character standard payload limit and canonical wrapped 64-byte shortcode compatibility (66 characters total). Deleted messages hide all active groups and reject new adds without deleting audit history; removals remain representable for reconciliation. Focused reaction tests passed 4/4, the complete collaboration-domain suite passed 61/61, warning-denied all-target Clippy passed, and repository formatting passed._
 
   - [ ] 19.4. Implement NIP-CW thread graph and summaries
     - Build reply ancestry, auxiliary closure, summary and bounded continuation rules from stable IDs.
@@ -1229,23 +1504,25 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Writes: crates/collab_ui/src/message_timeline.rs_
     - _Validation: GPUI tests cover pages, live insert, replies, edits, deletion and failed optimistic items_
 
-  - [ ] 19.8. Implement message pins and private bookmarks
+  - [x] 19.8. Implement message pins and private bookmarks
     - Add role-gated pins and viewer-private bookmarks with independent removal behavior.
     - _Requirements: 9.1, 9.3_
     - _Capability IDs: CAP-011, CAP-013_
     - _Depends on: 19.2_
     - _Reads: projects/buzz/desktop/src/features/messages/**, crates/collaboration_domain/src/message.rs_
-    - _Writes: crates/collaboration_domain/src/message_marker.rs_
+    - _Writes: .agents/specs/collaborative-workspace/design.md, crates/collaboration_domain/src/{collaboration_domain,message_marker}.rs_
     - _Validation: tests cover pin permissions, bookmark privacy, removal, target deletion and retries_
+    - _Evidence: 2026-08-20 — added a canonical per-message marker aggregate with immutable pin, unpin, bookmark and unbookmark source history, exact removal references, contiguous versions and fail-closed hydration. Pins and unpins reuse the common message boundary with manage authority; bookmarks reuse write authority and remain keyed to the authenticated actor. The authorized read projection exposes shared pin state but computes bookmark state only for its authenticated viewer, so another member's private bookmark cannot appear. Pin and bookmark removal remain independent, authenticated duplicate deliveries are idempotent, stale or denied commands are atomic, and deleted targets hide marker state and reject new markers without erasing reconciliation history. Focused marker tests passed 3/3, including role denial, independent viewers/removals, retry and target-deletion cases; the complete collaboration-domain suite passed 64/64, warning-denied all-target Clippy and repository formatting passed, and the feature-spec validator retained 84 acceptance criteria and 385 tasks._
 
-  - [ ] 19.9. Implement scheduled-message lifecycle
+  - [x] 19.9. Implement scheduled-message lifecycle
     - Add create, update, cancel and one-shot due execution under author permissions and bounded recovery.
     - _Requirements: 9.1, 9.3_
     - _Capability IDs: CAP-011, CAP-013_
     - _Depends on: 19.2_
     - _Reads: projects/buzz/desktop/src/features/messages/**, crates/collaboration_domain/src/message.rs_
-    - _Writes: crates/collaboration_domain/src/scheduled_message.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/{collaboration_domain,message,scheduled_message}.rs_
     - _Validation: timer tests cover edit/cancel, duplicate due, clock skew, restart and denied actor_
+    - _Evidence: 2026-08-20 — added the canonical scheduled-message aggregate with author-controlled create, edit and cancellation, bounded clock skew and scheduling horizon, durable one-shot execution claims, finite lease recovery and exact claim/result idempotency. Record hydration validates signed source uniqueness, author/owner mutation authority, contiguous author versions and the exact version implied by claim attempts, so a restarted executor can reclaim only an expired lease and a superseded worker cannot complete it. Message creation authentication is shared with immediate messages, including exact owner-attested-agent proof matching. Focused scheduled-message tests passed 4/4; message-related regressions passed 10/10; the complete collaboration-domain suite passed 68/68; warning-denied all-target Clippy, repository formatting and diff checks passed; the feature-spec validator retained 84 acceptance criteria and 385 tasks with advisory warnings only._
 
 - [ ] 20. Port encrypted DMs and visibility projections
 
@@ -3149,15 +3426,170 @@ Parallel-safe workstreams after their stated prerequisites are:
     - _Writes: .agents/specs/collaborative-workspace/final-signoff.md_
     - _Validation: sign-off checklist has named approvals, dates and no open stop-ship, ADR, deferred or duplicate-owner item_
 
+## Milestone prerequisite — isolate Standard and Multiplayer Sim builds
+
+- [x] 49. Establish the canonical `multiplayer-tools` compile-time boundary
+
+  - [x] 49.1. Inventory and classify the feature boundary
+    - Record current and planned shared, multiplayer-only, compatibility-shim and deployment-only surfaces without changing canonical ownership.
+    - _Requirements: 21.1, 21.2, 21.7, 21.8_
+    - _Capability IDs: CAP-001, CAP-002, CAP-005, CAP-009, CAP-021, CAP-036, CAP-037, CAP-043, CAP-045_
+    - _Depends on: none_
+    - _Reads: .agents/specs/collaborative-workspace/{source-inventory,reuse-audit,design,migration-plan,tasks}.md, Cargo.toml, crates/*/Cargo.toml_
+    - _Writes: .agents/specs/collaborative-workspace/{requirements,design,migration-plan,reuse-audit,tasks}.md_
+    - _Validation: feature-spec validator reports all Requirement 21 criteria traced and manual audit finds no shared canonical owner reclassified_
+    - _Evidence: 2026-08-20 — classified persisted presentation as the dependency-light disabled-build shim; Editor/project/worktree/Git/ACP/base credentials/settings/collaboration as always-shared owners; native collaborative GPUI and Buzz domain/protocol extensions as multiplayer-only; and exclusive relay/migration/assets as deployment-only. Added nine stable Requirement 21 criteria, D13 dependency/state boundaries, binary rollback rules and fifteen dependency-ordered leaves. Manual ownership review retained every CAP-001 through CAP-045 disposition, and the feature-spec validator passed with 93 acceptance criteria and 401 parsed tasks; remaining warnings are advisory legacy granularity/overlap findings documented by the decomposition audit._
+
+  - [x] 49.2. Define the public application feature
+    - Add non-default `sim/multiplayer-tools` as the only release-facing Cargo feature; Task 49.3 fills its forwarding list after the target features exist.
+    - _Requirements: 21.1, 21.3, 21.7_
+    - _Capability IDs: CAP-036, CAP-037_
+    - _Depends on: 49.1_
+    - _Reads: Cargo.toml, crates/sim/Cargo.toml_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/sim/Cargo.toml_
+    - _Validation: Cargo metadata shows `sim/multiplayer-tools` exists outside `default` and enables no dependency before Task 49.3_
+    - _Evidence: 2026-08-20 — added the canonical `sim/multiplayer-tools` public feature outside the empty default feature set. The dependency-safe shell initially enables no crate or dependency until Task 49.3 declares its forwarding targets. Cargo metadata asserted both feature arrays exactly, diff checks passed and the feature-spec validator retained 93 acceptance criteria and 401 parsed tasks._
+
+  - [x] 49.3. Declare internal composition features
+    - Add non-default internal features to the existing UI and shared consumer crates without enabling dependencies yet.
+    - _Requirements: 21.1, 21.7_
+    - _Capability IDs: CAP-009, CAP-021, CAP-036, CAP-037_
+    - _Depends on: 49.2_
+    - _Reads: crates/{workspace,onboarding,sidebar,agent_ui,git_ui,channel,sim_credentials_provider}/Cargo.toml_
+    - _Writes: crates/sim/Cargo.toml, crates/{workspace,onboarding,sidebar,agent_ui,git_ui,channel,sim_credentials_provider}/Cargo.toml_
+    - _Validation: Cargo metadata shows every internal `multiplayer-tools` feature is non-default and reachable only from the explicit application feature_
+    - _Evidence: 2026-08-20 — declared non-default internal `multiplayer-tools` features on the seven existing UI/shared consumer crates and forwarded the public Sim feature to that exact list. Cargo metadata assertions passed for the ordered forwarding set and for exclusion from every internal default set. An additional application check reached platform compilation but could not execute the macOS Metal compiler because the local Xcode Metal Toolchain is absent; no Rust or feature-graph error was reported before that environment boundary._
+
+  - [x] 49.4. Isolate the canonical channel projection dependency
+    - Make `collaboration_domain` optional in `channel` and compile its projection store only for multiplayer builds.
+    - _Requirements: 21.2, 21.3, 21.7_
+    - _Capability IDs: CAP-001, CAP-010, CAP-011, CAP-013_
+    - _Depends on: 49.3_
+    - _Reads: crates/channel/src/{channel,channel_store,collaboration_store}.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/channel/{Cargo.toml,src/{channel,channel_store}.rs}_
+    - _Validation: channel tests pass in default mode without `collaboration_domain` and multiplayer projection tests pass with the feature_
+    - _Evidence: 2026-08-20 — made `collaboration_domain` optional at the shared `channel` consumer and gated the canonical projection module, store field and APIs as one crate boundary. Default channel tests passed 3/3, flagged tests passed 6/6 including all projection cases, and exact `cargo tree --prefix none` assertions proved `collaboration_domain` absent unflagged and present flagged._
+
+  - [x] 49.5. Isolate Nostr credential extensions
+    - Make `collaboration_domain` optional in `sim_credentials_provider` and compile Nostr lifecycle/backup modules only for multiplayer builds.
+    - _Requirements: 21.2, 21.3, 21.7_
+    - _Capability IDs: CAP-001, CAP-007, CAP-009_
+    - _Depends on: 49.3_
+    - _Reads: crates/sim_credentials_provider/src/{sim_credentials_provider,nostr_import,nostr_lifecycle,nostr_backup}.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/sim_credentials_provider/{Cargo.toml,src/sim_credentials_provider.rs}_
+    - _Validation: base credential-provider tests pass unflagged and Nostr import/lifecycle/backup tests pass flagged_
+    - _Evidence: 2026-08-20 — gated Nostr import, lifecycle and backup modules at the credentials-provider crate root and made all eleven extension-only dependencies optional under its internal feature. The unflagged provider suite built and passed with zero extension tests; the flagged suite passed 18/18. Exact dependency-tree assertions proved `collaboration_domain` absent unflagged and present flagged._
+
+  - [x] 49.6. Gate native workspace composition and preserve effective-mode fallback
+    - Compile Collaborative GPUI modules only for Multiplayer Sim while retaining the lightweight presentation value and non-destructive effective Editor fallback.
+    - _Requirements: 21.2, 21.3, 21.4, 21.7_
+    - _Capability IDs: CAP-020, CAP-025, CAP-036, CAP-037_
+    - _Depends on: 49.3_
+    - _Reads: crates/workspace/src/{workspace,workspace_presentation,workspace_presentation_actions,multi_workspace,persistence,status_bar}.rs, crates/workspace/src/collaborative_*.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/workspace/Cargo.toml, crates/workspace/src/{workspace,workspace_presentation,workspace_presentation_actions,multi_workspace,status_bar}.rs_
+    - _Validation: workspace tests prove unflagged effective Editor without preference mutation and flagged mount/switch/restart restoration_
+    - _Evidence: 2026-08-20 — gated the native collaborative shell, rail/layout persistence, navigation, composer, participant, review, focus, status and top-bar modules at the workspace crate boundary. Standard Workspace now retains the dependency-light serialized presentation value but resolves Collaborative to an effective Editor presentation without rewriting the preference; Multiplayer Workspace mounts and persists the existing surfaces unchanged. Both no-default-feature crate checks passed; presentation-focused tests passed 5/5 unflagged and 7/7 flagged; and the flagged collaborative restart/theme/narrow-window integration suite passed 3/3._
+
+  - [x] 49.7. Gate the onboarding choice
+    - Render only Editor Workspace in Standard Sim and both approved choices in Multiplayer Sim without rewriting the saved preference.
+    - _Requirements: 21.2, 21.3, 21.5, 21.7_
+    - _Capability IDs: CAP-037_
+    - _Depends on: 49.6_
+    - _Reads: crates/onboarding/src/{onboarding,workspace_choice}.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/onboarding/src/workspace_choice.rs, crates/workspace/src/workspace.rs_
+    - _Validation: onboarding tests show one accessible Editor choice unflagged and both persisted choices flagged_
+    - _Evidence: 2026-08-20 — compiled the onboarding catalog as one Editor-only choice in Standard Sim and both Editor and Collaborative choices in Multiplayer Sim. The selector consumes Workspace's dependency-light effective-presentation shim, so a disabled build renders Editor selected while retaining a stored Collaborative preference for later restoration. Focused GPUI tests passed in both configurations, proving the collaborative selector absent unflagged, present flagged, keyboard accessible, and persisted only after an explicit selection._
+
+  - [x] 49.8. Gate agent and Git collaboration adapters
+    - Compile adapter modules only for multiplayer while leaving canonical ACP and Git owners unchanged.
+    - _Requirements: 21.2, 21.3, 21.7_
+    - _Capability IDs: CAP-020, CAP-021, CAP-025_
+    - _Depends on: 49.6_
+    - _Reads: crates/{agent_ui,git_ui}/src/{agent_ui,git_ui}.rs, crates/{agent_ui,git_ui}/src/collaborative_*.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/agent_ui/src/agent_ui.rs, crates/git_ui/src/git_ui.rs_
+    - _Validation: crate builds prove adapters absent unflagged and their focused tests pass flagged_
+    - _Evidence: 2026-08-20 — gated the composer, participant, agent-review, semantic-timeline and project-review adapter modules at the `agent_ui` and `git_ui` crate roots while leaving ACP, AgentPanel, project diff and Git owners shared. Both crates passed unflagged and flagged no-default-feature checks. With GPUI's supported runtime-shader test feature compensating for the locally absent Xcode Metal Toolchain, seven agent adapter/timeline unit tests, three collaborative activity compatibility tests and the focused Git review adapter test passed._
+
+  - [x] 49.9. Gate the collaborative sidebar rail
+    - Compile and mount collaborative rail/navigation modules only for multiplayer while retaining the normal Sidebar unchanged.
+    - _Requirements: 21.2, 21.3, 21.5, 21.7_
+    - _Capability IDs: CAP-036_
+    - _Depends on: 49.6_
+    - _Reads: crates/sidebar/src/sidebar.rs, crates/sidebar/src/collaborative_*.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/sidebar/src/{sidebar,sidebar_tests}.rs_
+    - _Validation: sidebar tests prove standard rendering has no collaborative rail and flagged rendering preserves navigation badges_
+    - _Evidence: 2026-08-20 — gated all five collaborative navigation/rail modules, the rail entity, width projection and live-status adapter at the Sidebar crate boundary while leaving the existing thread Sidebar compiled unchanged. Both no-default-feature crate checks passed after fetching the pre-existing audio/WebRTC artifact. Runtime-shader GPUI tests proved Standard Sidebar mounts at its canonical width with no collaborative rail, Multiplayer Sidebar preserves the rail geometry/section contract, and seven navigation projection, identity, duplicate-rejection and activation tests pass._
+
+  - [x] 49.10. Gate application reconciliation registration
+    - Register collaborative composer, participant and review reconciliation only in Multiplayer Sim.
+    - _Requirements: 21.2, 21.3, 21.5, 21.7_
+    - _Capability IDs: CAP-020, CAP-021, CAP-025, CAP-036_
+    - _Depends on: 49.4, 49.5, 49.7, 49.8, 49.9_
+    - _Reads: crates/sim/src/{sim,migration}.rs, crates/sim/src/migration/buzz.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/sim/src/{sim,migration}.rs, crates/sim/src/migration/buzz.rs_
+    - _Validation: Sim tests show no multiplayer registrations unflagged and composer/participant/review registration flagged_
+    - _Evidence: 2026-08-20 — gated the application-level composer, participant and project/agent review reconciliation state, observers, subscriptions and workspace event handlers so Standard Sim has no registration path while Multiplayer Sim retains automatic reconciliation. The same semantic ownership boundary gates the otherwise exclusive Buzz migration module; explicit module paths preserve its staged importer layout without exposing it to Standard Sim. Both application configurations passed no-default-feature checks with runtime shaders, and the flagged focused reconciliation tests passed for composer, participant and review registration._
+
+  - [x] 49.11. Add closed capability negotiation and unsupported-operation behavior
+    - Expose build capability without tenant/resource data and reject retained multiplayer entry points before lookup when unavailable.
+    - _Requirements: 21.5, 21.6_
+    - _Capability IDs: CAP-002, CAP-038, CAP-039, CAP-040, CAP-041, CAP-042_
+    - _Depends on: 49.10_
+    - _Reads: crates/workspace/src/workspace_presentation.rs, crates/sim/src/sim.rs, crates/proto/src/**_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, crates/workspace/src/{multiplayer_capability,workspace_presentation,workspace}.rs_
+    - _Validation: unit tests prove explicit advertised availability and identical closed rejection for missing, foreign and denied multiplayer targets in Standard Sim_
+    - _Evidence: 2026-08-20 — added an always-compiled, dependency-light capability advertisement whose serialized `multiplayer_tools` value explicitly reflects the build profile, plus one closed `NotIncludedInBuild` admission error. Standard-profile tests prove missing, foreign and denied target classes receive the identical error and never invoke resource lookup; Multiplayer-profile tests prove resolution begins only after successful capability admission. Workspace presentation now consumes the same canonical build-capability owner._
+
+  - [x] 49.12. Define feature-aware packaging and deployment profiles
+    - Add reproducible Standard/Multiplayer build profiles and artifact-content checks; keep base collab deployment shared and exclusive Buzz components explicit.
+    - _Requirements: 21.2, 21.3, 21.6, 21.8_
+    - _Capability IDs: CAP-002, CAP-005, CAP-016, CAP-035, CAP-043, CAP-045_
+    - _Depends on: 49.10_
+    - _Reads: script/bundle-{mac,linux,freebsd}, script/bundle-windows.ps1, .github/workflows/{release,deploy_collab}.yml_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, script/multiplayer-build-profile, docs/src/{SUMMARY,development/multiplayer-tools}.md_
+    - _Validation: profile dry runs emit explicit feature/artifact metadata and reject multiplayer payloads in Standard mode_
+    - _Evidence: 2026-08-20 — added deterministic `standard` and `multiplayer` release profiles that emit the exact Sim feature arguments, explicit artifact capability, migration policy and shared-collab disposition. Artifact inspection rejects known Buzz-owned service, protocol, migration and deployment payload names only in Standard mode while Multiplayer mode reports them. Development documentation defines build/run commands, packaging metadata, inspection, rollback and the semantic-ownership exception for shared Sim collaboration infrastructure._
+
+  - [x] 49.13. Add a local dual-configuration verification harness
+    - Check, test, warning-denied lint and smoke both application configurations and inspect the unflagged dependency tree.
+    - _Requirements: 21.2, 21.3, 21.4, 21.5, 21.8, 21.9_
+    - _Capability IDs: CAP-036, CAP-037, CAP-043, CAP-044_
+    - _Depends on: 49.11, 49.12_
+    - _Reads: script/clippy, crates/sim/Cargo.toml, crates/workspace/tests/collaborative_workspace.rs_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, script/{check-multiplayer-tools,clippy}_
+    - _Validation: script/check-multiplayer-tools runs the default and enabled quick matrices and fails a seeded dependency-leak fixture_
+    - _Evidence: 2026-08-20 — added a dual-profile harness whose quick matrix checks the Sim application, tests the always-compiled capability admission boundary, validates the package profile and denies all audited Buzz/Collaborative-exclusive packages in Standard Sim's locked normal dependency tree. Full mode additionally runs application tests and warning-denied release Clippy for each profile. The shared Clippy wrapper now accepts the internal `--no-all-features` control needed to prevent profile lint from unifying unrelated features. Both quick profiles passed and a seeded `collaboration_domain` dependency-tree fixture failed closed._
+
+  - [x] 49.14. Add the required CI feature matrix
+    - Run the local harness in CI with separate Standard and Multiplayer jobs so neither profile can regress through feature unification.
+    - _Requirements: 21.2, 21.3, 21.8, 21.9_
+    - _Capability IDs: CAP-043, CAP-044_
+    - _Depends on: 49.13_
+    - _Reads: tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml, script/check-multiplayer-tools_
+    - _Writes: .agents/specs/collaborative-workspace/tasks.md, tooling/xtask/src/tasks/workflows/run_tests.rs, .github/workflows/run_tests.yml_
+    - _Validation: workflow YAML parses and matrix/job command assertions cover feature-off, feature-on and dependency denial_
+    - _Evidence: 2026-08-20 — added separate generated `multiplayer_tools_standard` and `multiplayer_tools_multiplayer` Linux jobs at the canonical xtask workflow source. Each job runs the full local harness for exactly one profile, including isolated build, tests, warning-denied Clippy, package smoke and the shared Standard dependency denial; both are required by the aggregate `tests_pass` job. Workflow regeneration, YAML parsing and command/profile assertions passed._
+
+  - [x] 49.15. Verify documentation, cleanup and future-leaf enforcement
+    - Publish exact commands and audit every completed/planned collaborative leaf for a shared/gated/compatibility/deployment classification.
+    - _Requirements: 21.1, 21.2, 21.3, 21.7, 21.8, 21.9_
+    - _Capability IDs: CAP-001, CAP-036, CAP-037, CAP-043, CAP-044, CAP-045_
+    - _Depends on: 49.14_
+    - _Reads: .agents/specs/collaborative-workspace/**, docs/src/development/multiplayer-tools.md, script/check-multiplayer-tools_
+    - _Writes: .agents/specs/collaborative-workspace/{design,reuse-audit,tasks}.md, crates/sim/src/sim.rs, docs/src/development/multiplayer-tools.md_
+    - _Validation: feature-spec validator passes, dual-configuration harness passes, task audit has no unclassified Buzz-derived write path or perpetual deferred bucket_
+    - _Evidence: 2026-08-20 — added a semantic-ownership ledger covering every descendant leaf of all 49 epics with explicit shared, gated, disabled-build compatibility and deployment classifications. Mixed epics preserve canonical Sim owners while gating only Collaborative Workspace-exclusive adapters, registrations and service artifacts; future leaves must split independently reviewable owners and update dependency/payload denial in the introducing change. The developer guide now publishes exact quick, full, profile-specific and captured-tree commands plus the same classification rule. Standard warning-denied Clippy identified three multiplayer-test imports left unconditional; the cleanup now admits those imports only with their owning tests. Specification validation, the task-ledger coverage audit and both supported build-profile verification gates passed._
+
 ## Decomposition audit notes
 
 - No approved requirement, architecture decision, capability ownership, migration phase or milestone scope was changed.
 - Milestones are headings, the 48 approved capability epics are parent checkboxes, and all executable work is represented by nested `epic.leaf` implementation units with metadata only on leaves.
-- All 84 acceptance criteria appear in the approved design traceability table and in at least one leaf task. All CAP-001 through CAP-045 identifiers appear in at least one implementation, compatibility, validation or verified-reuse leaf.
-- The final plan contains 48 populated epic parents and 330 implementation leaves. Every leaf includes requirement, capability, dependency, read, write and validation metadata.
+- All 93 acceptance criteria appear in the approved design traceability table and in at least one leaf task. All CAP-001 through CAP-045 identifiers appear in at least one implementation, compatibility, validation or verified-reuse leaf.
+- The final plan contains 49 populated epic parents and 352 implementation leaves. Every leaf includes requirement, capability, dependency, read, write and validation metadata.
 - The decomposition audit reviewed compound titles, multi-path writes and cross-boundary outcomes. Each leaf retains one primary implementation or evidence boundary, concrete scope, and focused validation; independently reviewable domain, persistence, transport, UI, client, migration, deployment and test outcomes remain separate leaves.
-- The validator reports only four cross-root write warnings: the inventory checker and repository entry point, the shared domain-boundary enforcement check, the release workflow and its local runner, and the preservation manifest with its license notice. Each pair is one coherent enforcement or preservation artifact; splitting it would leave an independently unusable wrapper or manifest. No exact `_Writes:` path is repeated.
+- The validator's remaining granularity warnings belong to completed Milestone 1 integration checkpoints or one mechanical internal-feature declaration: Task 5.1 owns one presentation-setting schema/default/consumer contract; Tasks 6.3 and 6.5 own one cross-crate rail-layout and persistence composition each; Task 7.1 includes its manifest/lock exports for one sidebar projection; and Task 49.3 declares the same empty non-default feature across existing consumer manifests without changing code owners. Reopening landed checkpoints would change reviewed implementation history rather than resolve the approved contradictions. Every behavioral Epic 49 leaf has one primary crate or operational boundary.
+- Repeated writes are explicitly sequenced by dependencies. The approved Milestone 1 splits add upper composition leaves that intentionally mount lower-owner registrations; their narrow cross-crate writes are listed rather than hidden inside the workspace contract leaves.
 - All leaf dependencies were recomputed after renumbering. Validator checks confirm that every dependency names an existing implementation leaf and the explicit shared-write chains sequence intentional overlap.
-- No perpetual deferred bucket exists. Approval-gated work names its ADR and remains assigned to a concrete leaf after approval.
+- No perpetual deferred bucket exists. ADR-001 through ADR-006 are accepted; their implementation leaves remain concrete and dependency-gated. The three implementation-discovered dependency contradictions are resolved by Tasks 7.5–7.6, 9.1/9.6–9.8 and 10.2/10.8–10.10 without changing product scope or dependency direction.
 - No leaf is estimated above three agent-days. The compatibility/load/cutover gates are execution-and-evidence leaves over fixtures built earlier, not requests to construct those systems inside the gate task.
 - Production cutover, source deletion and irreversible operations are represented as tooling, rehearsal, evidence and separately authorized handoff work; this plan does not authorize those mutations.

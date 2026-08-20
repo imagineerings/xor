@@ -13,6 +13,7 @@ name = "git_ui"
 path = "src/git_ui.rs"
 
 [features]
+multiplayer-tools = ["workspace/multiplayer-tools"]
 test-support = ["multi_buffer/test-support", "remote_connection/test-support"]
 call = ["dep:call"]
 

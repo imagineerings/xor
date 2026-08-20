@@ -45,6 +45,7 @@ messages!(
     (Call, Foreground),
     (CallCanceled, Foreground),
     (CancelCall, Foreground),
+    (CancelCargoWorkspace, Foreground),
     (CancelLanguageServerWork, Foreground),
     (ChannelMessageSent, Foreground),
     (ChannelMessageUpdate, Foreground),
@@ -86,6 +87,18 @@ messages!(
     (GetChannelMessages, Background),
     (GetChannelMessagesById, Background),
     (GetChannelMessagesResponse, Background),
+    (GetCargoWorkspace, Background),
+    (CargoWorkspaceResponse, Background),
+    (GetRustTestDiscovery, Background),
+    (CancelRustTestDiscovery, Foreground),
+    (RustTestDiscoveryResponse, Background),
+    (ResolveRustTestAction, Foreground),
+    (RustTestActionPlanResponse, Foreground),
+    (UpdateRustTestRun, Foreground),
+    (GetStructuredExecutionSnapshot, Background),
+    (StructuredExecutionSnapshotPage, Background),
+    (GetStructuredExecutionEvents, Background),
+    (StructuredExecutionEventChunk, Background),
     (GetCodeActions, Background),
     (GetCodeActionsResponse, Background),
     (GetCompletions, Background),
@@ -392,6 +405,7 @@ request_messages!(
         ApplyCompletionAdditionalEditsResponse
     ),
     (Call, Ack),
+    (CancelCargoWorkspace, Ack),
     (CancelCall, Ack),
     (Commit, Ack),
     (RunGitHook, Ack),
@@ -413,6 +427,16 @@ request_messages!(
     (GetChannelMessages, GetChannelMessagesResponse),
     (GetChannelMessagesById, GetChannelMessagesResponse),
     (GetCodeActions, GetCodeActionsResponse),
+    (GetCargoWorkspace, CargoWorkspaceResponse),
+    (GetRustTestDiscovery, RustTestDiscoveryResponse),
+    (CancelRustTestDiscovery, Ack),
+    (ResolveRustTestAction, RustTestActionPlanResponse),
+    (UpdateRustTestRun, Ack),
+    (
+        GetStructuredExecutionSnapshot,
+        StructuredExecutionSnapshotPage
+    ),
+    (GetStructuredExecutionEvents, StructuredExecutionEventChunk),
     (GetCompletions, GetCompletionsResponse),
     (GetDefinition, GetDefinitionResponse),
     (GetDeclaration, GetDeclarationResponse),
@@ -627,6 +651,7 @@ entity_messages!(
     BlameBuffer,
     BufferReloaded,
     BufferSaved,
+    CancelCargoWorkspace,
     CloseBuffer,
     Commit,
     RunGitHook,
@@ -647,6 +672,13 @@ entity_messages!(
     ApplyCodeActionKind,
     FormatBuffers,
     GetCodeActions,
+    GetCargoWorkspace,
+    GetRustTestDiscovery,
+    CancelRustTestDiscovery,
+    ResolveRustTestAction,
+    UpdateRustTestRun,
+    GetStructuredExecutionSnapshot,
+    GetStructuredExecutionEvents,
     GetCodeLens,
     GetCompletions,
     GetDefinition,
@@ -1062,5 +1094,98 @@ mod tests {
         assert!(!chunks[0].is_last_update);
         assert!(!chunks[1].is_last_update);
         assert!(chunks[2].is_last_update);
+    }
+
+    #[test]
+    fn cargo_workspace_response_round_trips_project_paths_only() {
+        let response = CargoWorkspaceResponse {
+            request_id: 41,
+            revision: 7,
+            input_fingerprint: 11,
+            workspaces: vec![CargoWorkspace {
+                root: Some(ProjectPath {
+                    worktree_id: 3,
+                    path: "crates/example".to_string(),
+                }),
+                root_manifest: Some(ProjectPath {
+                    worktree_id: 3,
+                    path: "crates/example/Cargo.toml".to_string(),
+                }),
+                display_name: "example".to_string(),
+                is_virtual: false,
+                members: Vec::new(),
+                configuration: Some(CargoWorkspaceConfiguration {
+                    profiles: vec![CargoProfile {
+                        name: "dev".to_string(),
+                        origin: CargoProfileOrigin::Implicit as i32,
+                    }],
+                    declared_toolchain: None,
+                    host_compiler: Some(CargoHostCompiler {
+                        status: CargoHostCompilerStatus::Available as i32,
+                        release: Some("1.90.0".to_string()),
+                        host_target: Some("aarch64-apple-darwin".to_string()),
+                        stale: false,
+                    }),
+                    cargo_target: CargoTargetConfiguration::UnresolvedCargoDefault as i32,
+                    diagnostics: Vec::new(),
+                    partial: false,
+                }),
+            }],
+            failures: Vec::new(),
+            partial: false,
+        };
+        let encoded = response.encode_to_vec();
+        let decoded = CargoWorkspaceResponse::decode(encoded.as_slice())
+            .expect("Cargo workspace response should decode");
+        assert_eq!(decoded.request_id, 41);
+        let root = decoded
+            .workspaces
+            .first()
+            .and_then(|workspace| workspace.root.as_ref())
+            .expect("fixture should contain a workspace root");
+        assert_eq!(root.path, "crates/example");
+        assert!(!String::from_utf8_lossy(&encoded).contains("/Users/"));
+        assert!(!String::from_utf8_lossy(&encoded).contains("project_env"));
+    }
+
+    #[test]
+    fn structured_execution_protocol_is_bounded_and_path_safe() {
+        let page = StructuredExecutionSnapshotPage {
+            protocol_version: 1,
+            project_generation: 7,
+            provider_id: "web-tests".to_string(),
+            discovery_generation: 3,
+            status: StructuredProviderStatus::Current as i32,
+            nodes: vec![StructuredExecutionNode {
+                node_id: "case-a".to_string(),
+                parent_id: Some("suite".to_string()),
+                label: "renders a page".to_string(),
+                kind: StructuredExecutionNodeKind::Case as i32,
+                path: Some(ProjectPath {
+                    worktree_id: 2,
+                    path: "web/tests.js".to_string(),
+                }),
+            }],
+            next_page_start: 0,
+            partial: false,
+            diagnostic: None,
+            current_run: None,
+            last_complete_run: None,
+        };
+        let encoded = page.encode_to_vec();
+        let decoded = StructuredExecutionSnapshotPage::decode(encoded.as_slice())
+            .expect("structured execution page should decode");
+        assert_eq!(decoded.nodes.len(), 1);
+        assert_eq!(
+            decoded.nodes[0]
+                .path
+                .as_ref()
+                .map(|path| path.path.as_str()),
+            Some("web/tests.js")
+        );
+        let wire = String::from_utf8_lossy(&encoded);
+        assert!(!wire.contains("/Users/"));
+        assert!(!wire.contains("project_env"));
+        assert!(!wire.contains("terminal_bytes"));
     }
 }

@@ -3,6 +3,7 @@
 set -euxo pipefail
 source script/lib/blob-store.sh
 comfy=false
+rust_tools=false
 dry_run=false
 
 # Function for displaying help info
@@ -15,6 +16,7 @@ Options:
   -h, --help     Display this help and exit.
   --flatpak      Set SIM_BUNDLE_TYPE=flatpak so that this can be included in system info
   --comfy        Include the Comfy integration, accelerator backends, worker, and assets.
+  --rust-tools   Include the Cargo tool window and matching remote-server support.
   --dry-run      Print the selected package plan without building it.
   "
 }
@@ -32,6 +34,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --comfy)
             comfy=true
+            shift
+            ;;
+        --rust-tools)
+            rust_tools=true
             shift
             ;;
         --dry-run)
@@ -56,10 +62,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$dry_run" = true ]]; then
+    sim_features="none"
+    remote_features="none"
+    if [[ "$rust_tools" = true ]]; then
+        sim_features="rust-tools"
+        remote_features="rust-tools"
+    fi
     if [[ "$comfy" = true ]]; then
-        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=comfy,cuda,rocm,mlu,npu,xpu worker_features=cuda,rocm,mlu,npu,xpu include_comfy_worker=true"
+        if [[ "$rust_tools" = true ]]; then
+            sim_features="comfy,cuda,rocm,mlu,npu,xpu,rust-tools"
+        else
+            sim_features="comfy,cuda,rocm,mlu,npu,xpu"
+        fi
+        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=${sim_features} remote_features=${remote_features} worker_features=cuda,rocm,mlu,npu,xpu include_comfy_worker=true rust_tools=${rust_tools}"
     else
-        echo "mode=default packages=sim,cli sim_features=none include_comfy_worker=false"
+        echo "mode=default packages=sim,cli sim_features=${sim_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
     fi
     exit 0
 fi
@@ -105,7 +122,13 @@ else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
 if [[ "$comfy" = true ]]; then
-    cargo build --release --target "${target_triple}" --package sim --package cli --package comfy_worker --features sim/comfy,sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu
+    sim_build_features="sim/comfy,sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
+    if [[ "$rust_tools" = true ]]; then
+        sim_build_features="${sim_build_features},sim/rust-tools"
+    fi
+    cargo build --release --target "${target_triple}" --package sim --package cli --package comfy_worker --features "${sim_build_features}"
+elif [[ "$rust_tools" = true ]]; then
+    cargo build --release --target "${target_triple}" --package sim --package cli --features sim/rust-tools
 else
     cargo build --release --target "${target_triple}" --package sim --package cli
 fi
@@ -114,7 +137,11 @@ fi
 if [[ "$remote_server_triple" == "$musl_triple" ]]; then
     export RUSTFLAGS="${RUSTFLAGS:-} -C target-feature=+crt-static"
 fi
-cargo build --release --target "${remote_server_triple}" --package remote_server
+if [[ "$rust_tools" = true ]]; then
+    cargo build --release --target "${remote_server_triple}" --package remote_server --features rust-tools
+else
+    cargo build --release --target "${remote_server_triple}" --package remote_server
+fi
 
 # Upload debug info to sentry.io
 if ! command -v sentry-cli >/dev/null 2>&1; then

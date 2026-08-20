@@ -5,15 +5,18 @@ Param(
     [Parameter()][Alias('a')][string]$Architecture,
     [Parameter()][string]$Name,
     [Parameter()][switch]$Comfy,
+    [Parameter()][switch]$RustTools,
     [Parameter()][switch]$DryRun
 )
 
 if ($DryRun) {
+    $rustToolFeatures = if ($RustTools) { "rust-tools" } else { "none" }
     if ($Comfy) {
-        Write-Output "mode=comfy packages=sim,cli,comfy_worker,auto_update_helper sim_features=comfy,rocm,directml worker_features=rocm,directml include_comfy_worker=true"
+        $simFeatures = if ($RustTools) { "comfy,rocm,directml,rust-tools" } else { "comfy,rocm,directml" }
+        Write-Output "mode=comfy packages=sim,cli,comfy_worker,auto_update_helper sim_features=$simFeatures remote_features=$rustToolFeatures worker_features=rocm,directml include_comfy_worker=true rust_tools=$($RustTools.ToString().ToLower())"
     }
     else {
-        Write-Output "mode=default packages=sim,cli,auto_update_helper sim_features=none include_comfy_worker=false"
+        Write-Output "mode=default packages=sim,cli,auto_update_helper sim_features=$rustToolFeatures remote_features=$rustToolFeatures include_comfy_worker=false rust_tools=$($RustTools.ToString().ToLower())"
     }
     exit 0
 }
@@ -64,6 +67,7 @@ if ($Help) {
     Write-Output "  -Architecture, -a Which architecture to build (x86_64 or aarch64)"
     Write-Output "  -Install, -i      Run the installer after building."
     Write-Output "  -Comfy             Include Comfy, accelerator backends, worker, and assets."
+    Write-Output "  -RustTools         Include the Cargo tool window and matching remote-server support."
     Write-Output "  -DryRun            Print the selected package plan without building it."
     Write-Output "  -Help, -h         Show this help message."
     exit 0
@@ -116,7 +120,14 @@ function GenerateLicenses {
 function BuildSimAndItsFriends {
     Write-Output "Building Sim and its friends, for channel: $channel"
     if ($Comfy) {
-        cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml --target $target
+        $features = "sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml"
+        if ($RustTools) {
+            $features = "$features,sim/rust-tools"
+        }
+        cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features $features --target $target
+    }
+    elseif ($RustTools) {
+        cargo build --release --package sim --package cli --package auto_update_helper --features sim/rust-tools --target $target
     }
     else {
         cargo build --release --package sim --package cli --package auto_update_helper --target $target
@@ -144,7 +155,12 @@ function BuildSimAndItsFriends {
 
 function BuildRemoteServer {
     Write-Output "Building remote_server for $target"
-    cargo build --release --package remote_server --target $target
+    if ($RustTools) {
+        cargo build --release --package remote_server --features rust-tools --target $target
+    }
+    else {
+        cargo build --release --package remote_server --target $target
+    }
 
     # Create zipped remote server binary
     $remoteServerSrc = (Resolve-Path ".\$CargoOutDir\remote_server.exe").Path

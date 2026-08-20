@@ -1,3 +1,4 @@
+pub mod collaboration;
 mod ids;
 pub mod queries;
 mod tables;

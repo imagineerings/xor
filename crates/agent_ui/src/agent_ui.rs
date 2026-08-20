@@ -1,3 +1,8 @@
+pub mod activity_acp;
+pub mod activity_actions;
+pub mod activity_diff_link;
+pub mod activity_projection;
+pub mod activity_reducer;
 mod agent_configuration;
 pub mod agent_connection_store;
 mod agent_diff;
@@ -5,6 +10,14 @@ mod agent_model_selector;
 mod agent_panel;
 mod agent_registry_ui;
 mod buffer_codegen;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_composer;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_participants;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_timeline;
 mod completion_provider;
 mod config_options;
 mod context;

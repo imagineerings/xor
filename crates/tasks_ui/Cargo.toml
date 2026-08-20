@@ -11,12 +11,31 @@ workspace = true
 [lib]
 path = "src/tasks_ui.rs"
 
+[features]
+default = []
+test-explorer = [
+    "dep:db",
+    "dep:fs",
+    "dep:futures",
+    "dep:language_tools",
+    "dep:log",
+    "dep:serde_json",
+    "dep:settings",
+    "dep:ui_input",
+    "project/structured-execution",
+    "settings/test-explorer",
+]
+rust-test-actions = ["test-explorer", "project/rust-tests"]
+
 [dependencies]
 anyhow.workspace = true
 collections.workspace = true
+db = { workspace = true, optional = true }
 editor.workspace = true
 file_icons.workspace = true
+fs = { workspace = true, optional = true }
 fuzzy.workspace = true
+futures = { workspace = true, optional = true }
 itertools.workspace = true
 gpui.workspace = true
 menu.workspace = true
@@ -24,18 +43,22 @@ picker.workspace = true
 project.workspace = true
 task.workspace = true
 serde.workspace = true
+settings = { workspace = true, optional = true }
 ui.workspace = true
 util.workspace = true
 workspace.workspace = true
 language.workspace = true
+language_tools = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
 sim_actions.workspace = true
+serde_json = { workspace = true, optional = true }
+ui_input = { workspace = true, optional = true }
 
 [dev-dependencies]
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 language = { workspace = true, features = ["test-support"] }
 project = { workspace = true, features = ["test-support"] }
-serde_json.workspace = true
 tree-sitter-rust.workspace = true
 tree-sitter-typescript.workspace = true
 workspace = { workspace = true, features = ["test-support"] }

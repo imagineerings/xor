@@ -2,6 +2,10 @@ pub mod agent_registry_store;
 pub mod agent_server_store;
 pub mod bookmark_store;
 pub mod buffer_store;
+#[cfg(feature = "cargo-workspace")]
+pub mod cargo_workspace;
+#[cfg(feature = "cargo-workspace")]
+pub mod cargo_workspace_store;
 pub mod color_extractor;
 pub mod connection_manager;
 pub mod context_server_store;
@@ -15,7 +19,11 @@ pub mod manifest_tree;
 pub mod prettier_store;
 pub mod project_search;
 pub mod project_settings;
+#[cfg(feature = "rust-tests")]
+pub mod rust_test_provider;
 pub mod search;
+#[cfg(feature = "structured-execution")]
+pub mod structured_execution;
 pub mod task_inventory;
 pub mod task_store;
 pub mod telemetry_snapshot;
@@ -222,6 +230,12 @@ pub struct Project {
     collab_client: Arc<client::Client>,
     join_project_response_message_id: u32,
     task_store: Entity<TaskStore>,
+    #[cfg(feature = "cargo-workspace")]
+    cargo_workspace_store: Entity<cargo_workspace_store::CargoWorkspaceStore>,
+    #[cfg(feature = "structured-execution")]
+    structured_execution_store: Entity<structured_execution::StructuredExecutionStore>,
+    #[cfg(feature = "rust-tests")]
+    rust_test_provider_store: Entity<rust_test_provider::RustTestProviderStore>,
     user_store: Entity<UserStore>,
     fs: Arc<dyn Fs>,
     remote_client: Option<Entity<RemoteClient>>,
@@ -1166,6 +1180,12 @@ impl Project {
         SettingsObserver::init(&client);
         TaskStore::init(Some(&client));
         ToolchainStore::init(&client);
+        #[cfg(feature = "cargo-workspace")]
+        cargo_workspace_store::CargoWorkspaceStore::init(&client);
+        #[cfg(feature = "structured-execution")]
+        structured_execution::StructuredExecutionStore::init(&client);
+        #[cfg(feature = "rust-tests")]
+        rust_test_provider::RustTestProviderStore::init(&client);
         DapStore::init(&client, cx);
         BreakpointStore::init(&client);
         context_server_store::init(cx);
@@ -1212,6 +1232,28 @@ impl Project {
 
             let environment = cx.new(|cx| {
                 ProjectEnvironment::new(env, worktree_store.downgrade(), None, false, cx)
+            });
+            #[cfg(feature = "cargo-workspace")]
+            let cargo_workspace_store = cx.new(|cx| {
+                cargo_workspace_store::CargoWorkspaceStore::local(
+                    worktree_store.clone(),
+                    environment.clone(),
+                    cx,
+                )
+            });
+            #[cfg(feature = "structured-execution")]
+            let structured_execution_store = cx.new(|_| {
+                structured_execution::StructuredExecutionStore::local(worktree_store.clone(), 1)
+            });
+            #[cfg(feature = "rust-tests")]
+            let rust_test_provider_store = cx.new(|cx| {
+                rust_test_provider::RustTestProviderStore::local(
+                    worktree_store.clone(),
+                    environment.clone(),
+                    cargo_workspace_store.clone(),
+                    structured_execution_store.clone(),
+                    cx,
+                )
             });
             let manifest_tree = ManifestTree::new(worktree_store.clone(), cx);
             let toolchain_store = cx.new(|cx| {
@@ -1345,6 +1387,12 @@ impl Project {
                 languages,
                 collab_client: client,
                 task_store,
+                #[cfg(feature = "cargo-workspace")]
+                cargo_workspace_store,
+                #[cfg(feature = "structured-execution")]
+                structured_execution_store,
+                #[cfg(feature = "rust-tests")]
+                rust_test_provider_store,
                 user_store,
                 settings_observer,
                 fs,
@@ -1467,6 +1515,33 @@ impl Project {
                     worktree_store.downgrade(),
                     Some(remote.downgrade()),
                     false,
+                    cx,
+                )
+            });
+            #[cfg(feature = "cargo-workspace")]
+            let cargo_workspace_store = cx.new(|cx| {
+                cargo_workspace_store::CargoWorkspaceStore::remote(
+                    REMOTE_SERVER_PROJECT_ID,
+                    worktree_store.clone(),
+                    remote_proto.clone(),
+                    cx,
+                )
+            });
+            #[cfg(feature = "structured-execution")]
+            let structured_execution_store = cx.new(|_| {
+                structured_execution::StructuredExecutionStore::remote(
+                    REMOTE_SERVER_PROJECT_ID,
+                    remote_proto.clone(),
+                    worktree_store.clone(),
+                )
+            });
+            #[cfg(feature = "rust-tests")]
+            let rust_test_provider_store = cx.new(|cx| {
+                rust_test_provider::RustTestProviderStore::remote(
+                    REMOTE_SERVER_PROJECT_ID,
+                    remote_proto.clone(),
+                    worktree_store.clone(),
+                    structured_execution_store.clone(),
                     cx,
                 )
             });
@@ -1593,6 +1668,12 @@ impl Project {
                 languages,
                 collab_client: client,
                 task_store,
+                #[cfg(feature = "cargo-workspace")]
+                cargo_workspace_store,
+                #[cfg(feature = "structured-execution")]
+                structured_execution_store,
+                #[cfg(feature = "rust-tests")]
+                rust_test_provider_store,
                 user_store,
                 settings_observer,
                 fs,
@@ -1648,6 +1729,10 @@ impl Project {
             SettingsObserver::init(&remote_proto);
             TaskStore::init(Some(&remote_proto));
             ToolchainStore::init(&remote_proto);
+            #[cfg(feature = "cargo-workspace")]
+            cargo_workspace_store::CargoWorkspaceStore::init(&remote_proto);
+            #[cfg(feature = "structured-execution")]
+            structured_execution::StructuredExecutionStore::init(&remote_proto);
             DapStore::init(&remote_proto, cx);
             BreakpointStore::init(&remote_proto);
             GitStore::init(&remote_proto);
@@ -1745,6 +1830,33 @@ impl Project {
 
         let environment =
             cx.new(|cx| ProjectEnvironment::new(None, worktree_store.downgrade(), None, true, cx));
+        #[cfg(feature = "cargo-workspace")]
+        let cargo_workspace_store = cx.new(|cx| {
+            cargo_workspace_store::CargoWorkspaceStore::remote(
+                remote_id,
+                worktree_store.clone(),
+                client.clone().into(),
+                cx,
+            )
+        });
+        #[cfg(feature = "structured-execution")]
+        let structured_execution_store = cx.new(|_| {
+            structured_execution::StructuredExecutionStore::remote(
+                remote_id,
+                client.clone().into(),
+                worktree_store.clone(),
+            )
+        });
+        #[cfg(feature = "rust-tests")]
+        let rust_test_provider_store = cx.new(|cx| {
+            rust_test_provider::RustTestProviderStore::remote(
+                remote_id,
+                client.clone().into(),
+                worktree_store.clone(),
+                structured_execution_store.clone(),
+                cx,
+            )
+        });
 
         let bookmark_store =
             cx.new(|_| BookmarkStore::new(worktree_store.clone(), buffer_store.clone()));
@@ -1869,6 +1981,12 @@ impl Project {
                 languages,
                 user_store: user_store.clone(),
                 task_store,
+                #[cfg(feature = "cargo-workspace")]
+                cargo_workspace_store,
+                #[cfg(feature = "structured-execution")]
+                structured_execution_store,
+                #[cfg(feature = "rust-tests")]
+                rust_test_provider_store,
                 snippets,
                 fs,
                 remote_client: None,
@@ -2343,6 +2461,23 @@ impl Project {
         &self.task_store
     }
 
+    #[cfg(feature = "cargo-workspace")]
+    pub fn cargo_workspace_store(&self) -> &Entity<cargo_workspace_store::CargoWorkspaceStore> {
+        &self.cargo_workspace_store
+    }
+
+    #[cfg(feature = "structured-execution")]
+    pub fn structured_execution_store(
+        &self,
+    ) -> &Entity<structured_execution::StructuredExecutionStore> {
+        &self.structured_execution_store
+    }
+
+    #[cfg(feature = "rust-tests")]
+    pub fn rust_test_provider_store(&self) -> &Entity<rust_test_provider::RustTestProviderStore> {
+        &self.rust_test_provider_store
+    }
+
     #[inline]
     pub fn snippets(&self) -> &Entity<SnippetProvider> {
         &self.snippets
@@ -2787,6 +2922,34 @@ impl Project {
         self.task_store.update(cx, |task_store, cx| {
             task_store.shared(project_id, self.collab_client.clone().into(), cx);
         });
+        #[cfg(feature = "cargo-workspace")]
+        {
+            self.client_subscriptions.push(
+                self.collab_client
+                    .subscribe_to_entity(project_id)?
+                    .set_entity(&self.cargo_workspace_store, &cx.to_async()),
+            );
+            self.cargo_workspace_store.update(cx, |store, cx| {
+                store.shared(project_id, self.collab_client.clone().into(), cx)
+            });
+        }
+        #[cfg(feature = "structured-execution")]
+        {
+            self.client_subscriptions.push(
+                self.collab_client
+                    .subscribe_to_entity(project_id)?
+                    .set_entity(&self.structured_execution_store, &cx.to_async()),
+            );
+            self.structured_execution_store.update(cx, |store, _| {
+                store.shared(project_id, self.collab_client.clone().into())
+            });
+        }
+        #[cfg(feature = "rust-tests")]
+        self.client_subscriptions.push(
+            self.collab_client
+                .subscribe_to_entity(project_id)?
+                .set_entity(&self.rust_test_provider_store, &cx.to_async()),
+        );
         self.settings_observer.update(cx, |settings_observer, cx| {
             settings_observer.shared(project_id, self.collab_client.clone().into(), cx)
         });
@@ -2883,6 +3046,9 @@ impl Project {
             self.task_store.update(cx, |task_store, cx| {
                 task_store.unshared(cx);
             });
+            #[cfg(feature = "structured-execution")]
+            self.structured_execution_store
+                .update(cx, |store, _| store.unshared());
             self.breakpoint_store.update(cx, |breakpoint_store, cx| {
                 breakpoint_store.unshared(cx);
             });

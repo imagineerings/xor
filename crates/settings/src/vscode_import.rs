@@ -178,6 +178,12 @@ impl VsCodeSettings {
             auto_update: None,
             base_keymap: Some(BaseKeymapContent::VSCode),
             calls: None,
+            #[cfg(feature = "rust-tools")]
+            cargo_panel: None,
+            #[cfg(feature = "rust-tools")]
+            cargo: None,
+            #[cfg(feature = "test-explorer")]
+            tests_panel: None,
             collaboration_panel: None,
             comfy_runtime: None,
             credentials_url: None,
@@ -997,6 +1003,7 @@ impl VsCodeSettings {
     fn workspace_settings_content(&self) -> WorkspaceSettingsContent {
         WorkspaceSettingsContent {
             active_pane_modifiers: self.active_pane_modifiers(),
+            workspace_presentation: None,
             text_rendering_mode: None,
             autosave: self.read_enum("files.autoSave", |s| match s {
                 "off" => Some(AutosaveSetting::Off),

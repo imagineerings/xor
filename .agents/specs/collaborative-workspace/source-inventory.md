@@ -130,7 +130,7 @@ Every Buzz workspace package is assigned below. A package may serve several capa
 | NIP-RS | Encrypted cross-device read state | CAP-013 | Preserve manual-unread durability and mixed-version guards |
 | NIP-WP | Workspace/community icon through NIP-11 | CAP-003, CAP-036 | Preserve standard read path and role-gated write |
 
-The authoritative registry currently includes 116 constants spanning standard profile/social/list kinds; authentication; agent profiles/engrams/personas/teams/metrics/observer frames; NIP-29/43 membership; moderation and identity archive; channel windows; messages/edits/pins/bookmarks/reminders/diffs/canvas/system summaries; DMs; jobs; forum; workflows/approvals/audit; huddles/media; NIP-34 Git; and projects. Task 2.2 must generate a checked kind catalog directly from `buzz-core/src/kind.rs` so future additions cannot escape this ledger.
+The authoritative registry currently includes 137 scalar `u32` constants: 133 registered event kinds and four range-boundary constants. They span standard profile/social/list kinds; authentication; agent profiles/engrams/personas/teams/metrics/observer frames; NIP-29/43 membership; moderation and identity archive; channel windows; messages/edits/pins/bookmarks/reminders/diffs/canvas/system summaries; DMs; jobs; forum; workflows/approvals/audit; huddles/media; NIP-34 Git; and projects. Task 1.2 records every constant and protocol document in the checked catalog so future additions cannot escape this ledger.
 
 ## Database migrations
 
@@ -171,7 +171,7 @@ The authoritative registry currently includes 116 constants spanning standard pr
 
 The React desktop feature areas are: `agent-memory`, `agents`, `channel-templates`, `channels`, `chat`, `communities`, `community-members`, `custom-emoji`, `forum`, `home`, `huddle`, `identity-archive`, `local-archive`, `mesh-compute`, `messages`, `moderation`, `notifications`, `onboarding`, `presence`, `profile`, `projects`, `pulse`, `reminders`, `search`, `settings`, `sidebar`, `terminal`, `user-status`, and `workflows`. Each maps to CAP-007 and CAP-010 through CAP-040 as applicable; none is a GPUI component boundary.
 
-The Tauri host owns app/keyring state, native WebSocket, relay admission, event conversion/sync, managed-agent lifecycle/config/snapshots/personas/teams, local archive and migrations, media proxy, egress guard, huddle/TTS, mesh LLM, terminal runtime/transport, deep links, notifications, tray/menu/shortcuts, sleep inhibition, rendering workarounds and platform assets. The separate `buzz-terminal` crate is covered by CAP-022, CAP-025, CAP-034, CAP-036 and CAP-045. Task 1.3 must maintain a file-to-capability generated inventory for this surface until Tauri retirement.
+The Tauri host owns app/keyring state, native WebSocket, relay admission, event conversion/sync, managed-agent lifecycle/config/snapshots/personas/teams, local archive and migrations, media proxy, egress guard, huddle/TTS, mesh LLM, terminal runtime/transport, deep links, notifications, tray/menu/shortcuts, sleep inhibition, rendering workarounds and platform assets. The separate `buzz-terminal` crate is covered by CAP-022, CAP-025, CAP-034, CAP-036 and CAP-045. Task 1.4 must maintain a file-to-capability generated inventory for this surface until Tauri retirement.
 
 Routes cover home, channels and forum posts, new messages, agents, projects, pulse, reminders, settings and workflows. Visual behavior from `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png` is governed by CAP-036 and CAP-037.
 
@@ -189,7 +189,7 @@ Routes cover home, channels and forum posts, new messages, agents, projects, pul
 - `deploy/charts/buzz` covers relay, pairing relay, Postgres/object storage integration, ingress/HTTPRoute, autoscaling, disruption budgets, persistence, service accounts, monitors and Git storage.
 - `deploy/charts/buzz-push-gateway` covers gateway deployment, migrations, network policy, PDB, monitoring and production alerts.
 - `deploy/compose` and `deploy/local` cover self-hosted and local/HA startup.
-- Seventeen GitHub workflows cover CI, Docker/Helm, desktop/mobile candidates, signed canaries, Sprig/provider images, push gateway, mesh lifecycle, promotion and release tagging.
+- Eighteen GitHub workflows cover CI, Docker/Helm, desktop/mobile candidates, signed canaries, Sprig/provider images, push gateway, mesh lifecycle, promotion and release tagging.
 - Scripts cover schema cutover/backfill, release contracts, build bundling, isolated relay/test setup, Git permissions, screenshots, seed/reset, maintenance, mobile/desktop promotion and live smoke tests.
 - `docs/spec` contains Git-on-object-storage and multitenant TLA+/Spthy models; `buzz-conformance` is deliberately independent of production code.
 - `benchmarks/harbor-buzz-orchestra` exercises multi-agent orchestration and container substrates; `perf/RELAY_BUS_SCALING.*` models fan-out scaling.

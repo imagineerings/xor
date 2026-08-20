@@ -6,6 +6,10 @@ pub mod edit_prediction_registry;
 #[cfg(target_os = "macos")]
 pub(crate) mod mac_only_instance;
 mod migrate;
+#[cfg(feature = "multiplayer-tools")]
+#[path = "migration.rs"]
+#[allow(dead_code)]
+pub mod migration;
 #[cfg(target_os = "macos")]
 pub(crate) mod move_to_applications;
 mod open_listener;
@@ -20,11 +24,17 @@ pub(crate) mod windows_only_instance;
 
 use agent_settings::{UserAgentsMdState, init_user_agents_md};
 use agent_ui::AgentDiffToolbar;
+#[cfg(feature = "multiplayer-tools")]
+use agent_ui::AgentPanel;
+#[cfg(feature = "multiplayer-tools")]
+use agent_ui::AgentPanelEvent;
 use anyhow::Context as _;
 pub use app_menus::*;
 use assets::Assets;
 
 use breadcrumbs::Breadcrumbs;
+#[cfg(feature = "rust-tools")]
+use cargo_ui::CargoPanel;
 use client::sim_urls;
 use collections::VecDeque;
 use debugger_ui::debugger_panel::DebugPanel;
@@ -37,6 +47,8 @@ use futures::{StreamExt, channel::mpsc, select_biased};
 use git_ui::branch_diff::BranchDiffToolbar;
 use git_ui::commit_view::CommitViewToolbar;
 use git_ui::git_panel::GitPanel;
+#[cfg(feature = "multiplayer-tools")]
+use git_ui::project_diff::ProjectDiff;
 use git_ui::project_diff::ProjectDiffToolbar;
 use git_ui::solo_diff_view::{SoloDiffGitToolbar, SoloDiffStyleToolbar};
 use git_ui::staged_diff::StagedDiffToolbar;
@@ -48,6 +60,8 @@ use gpui::{
     UpdateGlobal, WeakEntity, Window, WindowBounds, WindowHandle, WindowKind, WindowOptions,
     actions, image_cache, img, point, px, retain_all,
 };
+#[cfg(feature = "multiplayer-tools")]
+use gpui::{EntityId, Subscription};
 use image_viewer::ImageInfo;
 use language::Capability;
 use language_onboarding::BasedPyrightBanner;
@@ -86,6 +100,8 @@ use std::{
     sync::Arc,
     sync::atomic::{self, AtomicBool},
 };
+#[cfg(feature = "multiplayer-tools")]
+use std::{cell::RefCell, rc::Rc};
 use terminal_view::terminal_panel::{self, TerminalPanel};
 use theme::{ActiveTheme, SystemAppearance, ThemeRegistry, deserialize_icon_theme};
 use theme_settings::{ThemeSettings, load_user_theme};
@@ -101,6 +117,15 @@ use sim_actions::{
     About, OpenAccountSettings, OpenBrowser, OpenDocs, OpenServerSettings, OpenSettingsFile,
     OpenSimUrl, OpenStatusPage, Quit,
 };
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_composer::CollaborativeComposerRegistration;
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_participants::{
+    CollaborativeParticipantProvider, CollaborativeParticipantProviderState,
+    CollaborativeParticipantRegistration, CollaborativeParticipantViewData,
+};
+#[cfg(feature = "multiplayer-tools")]
+use workspace::collaborative_review::CollaborativeReviewRegistration;
 use workspace::{
     AppState, MultiWorkspace, NewFile, NewWindow, OpenLog, Panel, Toast, Workspace,
     WorkspaceSettings, create_and_open_local_file,
@@ -118,6 +143,462 @@ pub struct CrashHandler(pub Arc<crashes::Client>);
 
 impl gpui::Global for CrashHandler {}
 
+#[cfg(feature = "multiplayer-tools")]
+#[derive(Default)]
+struct CollaborativeReviewCompositionState {
+    agent_panel_id: Option<EntityId>,
+    agent_thread_id: Option<EntityId>,
+    agent_registration: Option<CollaborativeReviewRegistration>,
+    composer_thread_view_id: Option<EntityId>,
+    composer_registration: Option<CollaborativeComposerRegistration>,
+    participant_thread_view_id: Option<EntityId>,
+    participant_view_data: Option<CollaborativeParticipantViewData>,
+    participant_registration: Option<CollaborativeParticipantRegistration>,
+    participant_observed_thread_view_id: Option<EntityId>,
+    participant_thread_observation: Option<Subscription>,
+    project_diff_id: Option<EntityId>,
+    project_registration: Option<CollaborativeReviewRegistration>,
+}
+
+#[cfg(feature = "multiplayer-tools")]
+struct CollaborativeParticipantProjection {
+    thread_view_id: EntityId,
+    view_data: CollaborativeParticipantViewData,
+    provider: CollaborativeParticipantProvider,
+}
+
+#[cfg(feature = "multiplayer-tools")]
+impl CollaborativeParticipantProjection {
+    fn from_adapter(
+        adapter: agent_ui::collaborative_participants::CollaborativeParticipantAdapter,
+    ) -> Self {
+        let thread_view_id = adapter.thread_view_id();
+        let view_data = adapter.view_data().clone();
+        let provider = adapter.into_provider();
+        Self {
+            thread_view_id,
+            view_data,
+            provider,
+        }
+    }
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_composer(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let thread_view_id = agent_panel
+        .read(cx)
+        .active_thread_view(cx)
+        .map(|thread_view| thread_view.entity_id());
+    if state.borrow().composer_thread_view_id == thread_view_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_composer::CollaborativeComposerAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().composer_registration.take() {
+            workspace.unregister_collaborative_composer_provider(registration, cx);
+        }
+        state.borrow_mut().composer_thread_view_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_composer::CollaborativeComposerAdapterError::ThreadUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative composer: {error}");
+                return;
+            }
+        };
+        let thread_view_id = adapter.thread_view_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.composer_thread_view_id = Some(thread_view_id);
+                state.composer_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative composer: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn apply_collaborative_participant_projection(
+    workspace_handle: &Entity<Workspace>,
+    projection: Option<CollaborativeParticipantProjection>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let projection_is_current = projection.as_ref().is_some_and(|projection| {
+        let state = state.borrow();
+        state.participant_thread_view_id == Some(projection.thread_view_id)
+            && state.participant_view_data.as_ref() == Some(&projection.view_data)
+            && state.participant_registration.is_some()
+    });
+    if projection_is_current
+        || (projection.is_none() && state.borrow().participant_registration.is_none())
+    {
+        return;
+    }
+
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(projection) = projection {
+            let current_registration = {
+                let state = state.borrow();
+                (state.participant_thread_view_id == Some(projection.thread_view_id))
+                    .then_some(state.participant_registration)
+                    .flatten()
+            };
+            if let Some(registration) = current_registration {
+                match workspace.update_collaborative_participant_provider(
+                    registration,
+                    CollaborativeParticipantProviderState::Ready(projection.view_data.clone()),
+                    cx,
+                ) {
+                    Ok(()) => {
+                        state.borrow_mut().participant_view_data = Some(projection.view_data);
+                        return;
+                    }
+                    Err(error) => {
+                        log::warn!(
+                            "failed to update collaborative participant provider; replacing it: {error}"
+                        );
+                    }
+                }
+            }
+
+            if let Some(registration) = state.borrow_mut().participant_registration.take() {
+                workspace.unregister_collaborative_participant_provider(registration, cx);
+            }
+            {
+                let mut state = state.borrow_mut();
+                state.participant_thread_view_id = None;
+                state.participant_view_data = None;
+            }
+            match workspace.register_collaborative_participant_provider(projection.provider, cx) {
+                Ok(registration) => {
+                    let mut state = state.borrow_mut();
+                    state.participant_thread_view_id = Some(projection.thread_view_id);
+                    state.participant_view_data = Some(projection.view_data);
+                    state.participant_registration = Some(registration);
+                }
+                Err(error) => {
+                    log::warn!("failed to register collaborative participant provider: {error}");
+                }
+            }
+        } else {
+            if let Some(registration) = state.borrow_mut().participant_registration.take() {
+                workspace.unregister_collaborative_participant_provider(registration, cx);
+            }
+            let mut state = state.borrow_mut();
+            state.participant_thread_view_id = None;
+            state.participant_view_data = None;
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_participants(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let projection = match agent_ui::collaborative_participants::CollaborativeParticipantAdapter::from_agent_panel(
+        agent_panel,
+        workspace_handle,
+        cx,
+    ) {
+        Ok(adapter) => Some(CollaborativeParticipantProjection::from_adapter(adapter)),
+        Err(
+            agent_ui::collaborative_participants::CollaborativeParticipantAdapterError::ThreadUnavailable,
+        ) => None,
+        Err(error) => {
+            log::warn!("failed to adapt collaborative participants: {error}");
+            None
+        }
+    };
+    apply_collaborative_participant_projection(workspace_handle, projection, state, cx);
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_project_review(
+    workspace_handle: &Entity<Workspace>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut App,
+) {
+    let project_diff_id = workspace_handle
+        .read(cx)
+        .item_of_type::<ProjectDiff>(cx)
+        .map(|project_diff| project_diff.entity_id());
+    if state.borrow().project_diff_id == project_diff_id {
+        return;
+    }
+
+    let adapter = git_ui::collaborative_review::CollaborativeProjectReviewAdapter::from_workspace(
+        workspace_handle,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().project_registration.take() {
+            workspace.unregister_collaborative_review_provider(registration, cx);
+        }
+        state.borrow_mut().project_diff_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                git_ui::collaborative_review::CollaborativeProjectReviewError::ProjectDiffUnavailable,
+            ) => return,
+            Err(error) => {
+                log::warn!("failed to adapt collaborative project review: {error}");
+                return;
+            }
+        };
+        let project_diff_id = adapter.project_diff().entity_id();
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.project_diff_id = Some(project_diff_id);
+                state.project_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative project review: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn reconcile_collaborative_agent_review(
+    workspace_handle: &Entity<Workspace>,
+    thread: Option<Entity<acp_thread::AcpThread>>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let thread_id = thread.as_ref().map(Entity::entity_id);
+    if state.borrow().agent_thread_id == thread_id {
+        return;
+    }
+
+    let adapter = agent_ui::collaborative_review::CollaborativeAgentReviewAdapter::new(
+        thread,
+        workspace_handle,
+        window,
+        cx,
+    );
+    let state = state.clone();
+    workspace_handle.update(cx, |workspace, cx| {
+        if let Some(registration) = state.borrow_mut().agent_registration.take() {
+            workspace.unregister_collaborative_review_provider(registration, cx);
+        }
+        state.borrow_mut().agent_thread_id = None;
+
+        let adapter = match adapter {
+            Ok(adapter) => adapter,
+            Err(
+                agent_ui::collaborative_review::CollaborativeAgentReviewError::ThreadUnavailable,
+            ) => {
+                return;
+            }
+            Err(error) => {
+                log::warn!("failed to adapt collaborative agent review: {error}");
+                return;
+            }
+        };
+        match adapter.register_in_workspace(workspace, cx) {
+            Ok(registration) => {
+                let mut state = state.borrow_mut();
+                state.agent_thread_id = thread_id;
+                state.agent_registration = Some(registration);
+            }
+            Err(error) => {
+                log::warn!("failed to register collaborative agent review: {error}");
+            }
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_project_review_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_project_review(&workspace_handle, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_agent_review_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    thread: Option<Entity<acp_thread::AcpThread>>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &Window,
+    cx: &mut Context<Workspace>,
+) {
+    let window_handle = window.window_handle();
+    cx.defer(move |cx| {
+        if let Err(error) = window_handle.update(cx, |_, window, cx| {
+            reconcile_collaborative_agent_review(&workspace_handle, thread, &state, window, cx);
+        }) {
+            log::warn!("failed to reconcile collaborative agent review: {error}");
+        }
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_composer_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_composer(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn schedule_collaborative_participant_reconciliation(
+    workspace_handle: Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    cx.defer(move |cx| {
+        reconcile_collaborative_participants(&workspace_handle, &agent_panel, &state, cx);
+    });
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn observe_collaborative_participant_thread(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: &Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    cx: &mut Context<Workspace>,
+) {
+    let thread_view = agent_panel.read(cx).active_thread_view(cx);
+    let thread_view_id = thread_view.as_ref().map(Entity::entity_id);
+    if state.borrow().participant_observed_thread_view_id == thread_view_id {
+        return;
+    }
+
+    {
+        let mut state = state.borrow_mut();
+        state.participant_observed_thread_view_id = thread_view_id;
+        state.participant_thread_observation = None;
+    }
+    let Some(thread_view) = thread_view else {
+        return;
+    };
+
+    let workspace_handle = workspace_handle.clone();
+    let agent_panel = agent_panel.clone();
+    let weak_state = Rc::downgrade(state);
+    let observation = cx.observe(&thread_view, move |_, _, cx| {
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        schedule_collaborative_participant_reconciliation(
+            workspace_handle.clone(),
+            agent_panel.clone(),
+            state,
+            cx,
+        );
+    });
+    state.borrow_mut().participant_thread_observation = Some(observation);
+}
+
+#[cfg(feature = "multiplayer-tools")]
+fn subscribe_to_collaborative_review_agent_panel(
+    workspace_handle: &Entity<Workspace>,
+    agent_panel: Entity<AgentPanel>,
+    state: &Rc<RefCell<CollaborativeReviewCompositionState>>,
+    window: &mut Window,
+    cx: &mut Context<Workspace>,
+) {
+    let agent_panel_id = agent_panel.entity_id();
+    if state.borrow().agent_panel_id == Some(agent_panel_id) {
+        return;
+    }
+    state.borrow_mut().agent_panel_id = Some(agent_panel_id);
+
+    schedule_collaborative_agent_review_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.read(cx).active_agent_thread(cx),
+        state.clone(),
+        window,
+        cx,
+    );
+    schedule_collaborative_composer_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
+    observe_collaborative_participant_thread(workspace_handle, &agent_panel, state, cx);
+    schedule_collaborative_participant_reconciliation(
+        workspace_handle.clone(),
+        agent_panel.clone(),
+        state.clone(),
+        cx,
+    );
+
+    let workspace_handle = workspace_handle.clone();
+    let state = state.clone();
+    cx.subscribe_in(
+        &agent_panel,
+        window,
+        move |_, agent_panel, event: &AgentPanelEvent, window, cx| {
+            if matches!(event, AgentPanelEvent::ActiveViewChanged) {
+                schedule_collaborative_agent_review_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.read(cx).active_agent_thread(cx),
+                    state.clone(),
+                    window,
+                    cx,
+                );
+                schedule_collaborative_composer_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+                observe_collaborative_participant_thread(
+                    &workspace_handle,
+                    agent_panel,
+                    &state,
+                    cx,
+                );
+                schedule_collaborative_participant_reconciliation(
+                    workspace_handle.clone(),
+                    agent_panel.clone(),
+                    state.clone(),
+                    cx,
+                );
+            }
+        },
+    )
+    .detach();
+}
+
 #[cfg(feature = "comfy")]
 struct ComfyComponentHostGlobal {
     profile_id: String,
@@ -129,6 +610,60 @@ struct ComfyComponentHostGlobal {
         Option<Arc<dyn comfy_runtime::NativeProviderInvocationAuthority>>,
     #[cfg(not(test))]
     provider_cost_authority: Arc<comfy_runtime::ProviderCostApprovalAuthority>,
+}
+
+#[cfg(all(test, feature = "rust-tools"))]
+mod cargo_panel_feature_tests {
+    use super::*;
+
+    #[test]
+    fn cargo_panel_is_registered_in_rust_tools_builds() {
+        assert_eq!(<CargoPanel as workspace::Panel>::persistent_name(), "Cargo");
+        assert_eq!(<CargoPanel as workspace::Panel>::panel_key(), "CargoPanel");
+    }
+
+    #[test]
+    fn cargo_actions_are_registered_only_with_rust_tools() {
+        let actions = cargo_ui::CargoAction::ALL.map(cargo_ui::CargoAction::label);
+        assert_eq!(actions, ["Build", "Check", "Run", "Test", "Bench", "Debug"]);
+        let _ = cargo_ui::BuildSelected;
+        let _ = cargo_ui::CheckSelected;
+        let _ = cargo_ui::RunSelected;
+        let _ = cargo_ui::TestSelected;
+        let _ = cargo_ui::BenchSelected;
+        let _ = cargo_ui::DebugSelected;
+    }
+
+    #[test]
+    fn rust_test_explorer_actions_are_registered_only_with_rust_tools() {
+        let _ = tasks_ui::ToggleTestsPanel;
+        let _ = tasks_ui::RunSelectedTests;
+        let _ = tasks_ui::DebugSelectedTests;
+        let _ = tasks_ui::CancelTestRun;
+        let _ = tasks_ui::RerunFailedTests;
+        let _ = tasks_ui::RevealTestTerminal;
+    }
+
+    #[test]
+    fn rust_workspace_enabled_desktop_registers_cargo_and_tests_panels() {
+        assert!(cfg!(feature = "rust-tools"));
+        assert_eq!(<CargoPanel as workspace::Panel>::persistent_name(), "Cargo");
+        let _ = tasks_ui::ToggleTestsPanel;
+        let _ = cargo_ui::BuildSelected;
+    }
+}
+
+#[cfg(all(test, not(feature = "rust-tools")))]
+mod cargo_panel_disabled_feature_tests {
+    #[test]
+    fn cargo_panel_disabled_build_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
+
+    #[test]
+    fn rust_workspace_disabled_desktop_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
 }
 
 #[cfg(feature = "comfy")]
@@ -1040,13 +1575,56 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         };
 
         let workspace_handle = cx.entity();
+        #[cfg(feature = "multiplayer-tools")]
+        let collaborative_review_state =
+            Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+        #[cfg(feature = "multiplayer-tools")]
+        schedule_collaborative_project_review_reconciliation(
+            workspace_handle.clone(),
+            collaborative_review_state.clone(),
+            cx,
+        );
+        #[cfg(feature = "multiplayer-tools")]
+        if let Some(agent_panel) = workspace.panel::<AgentPanel>(cx) {
+            subscribe_to_collaborative_review_agent_panel(
+                &workspace_handle,
+                agent_panel,
+                &collaborative_review_state,
+                window,
+                cx,
+            );
+        }
         let center_pane = workspace.active_pane().clone();
         initialize_pane(workspace, &center_pane, window, cx);
 
         cx.subscribe_in(&workspace_handle, window, {
+            #[cfg(feature = "multiplayer-tools")]
+            let workspace_handle = workspace_handle.clone();
+            #[cfg(feature = "multiplayer-tools")]
+            let collaborative_review_state = collaborative_review_state.clone();
             move |workspace, _, event, window, cx| match event {
                 workspace::Event::PaneAdded(pane) => {
                     initialize_pane(workspace, pane, window, cx);
+                }
+                #[cfg(feature = "multiplayer-tools")]
+                workspace::Event::ItemAdded { .. } | workspace::Event::ItemRemoved { .. } => {
+                    schedule_collaborative_project_review_reconciliation(
+                        workspace_handle.clone(),
+                        collaborative_review_state.clone(),
+                        cx,
+                    );
+                }
+                #[cfg(feature = "multiplayer-tools")]
+                workspace::Event::PanelAdded(panel) => {
+                    if let Ok(agent_panel) = panel.clone().downcast::<AgentPanel>() {
+                        subscribe_to_collaborative_review_agent_panel(
+                            &workspace_handle,
+                            agent_panel,
+                            &collaborative_review_state,
+                            window,
+                            cx,
+                        );
+                    }
                 }
                 workspace::Event::OpenBundledFile {
                     text,
@@ -1265,6 +1843,8 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
     cx.spawn_in(window, async move |workspace_handle, cx| {
         let project_panel = ProjectPanel::load(workspace_handle.clone(), cx.clone());
         let outline_panel = OutlinePanel::load(workspace_handle.clone(), cx.clone());
+        #[cfg(feature = "rust-tools")]
+        let cargo_panel = CargoPanel::load(workspace_handle.clone(), cx.clone());
         let terminal_panel = TerminalPanel::load(workspace_handle.clone(), cx.clone());
         let git_panel = GitPanel::load(workspace_handle.clone(), cx.clone());
         let channels_panel =
@@ -1285,6 +1865,12 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
                     .log_err();
             }
         }
+
+        #[cfg(feature = "rust-tools")]
+        let cargo_panel_task =
+            add_panel_when_ready(cargo_panel, workspace_handle.clone(), cx.clone());
+        #[cfg(not(feature = "rust-tools"))]
+        let cargo_panel_task = std::future::ready(());
 
         #[cfg(feature = "comfy")]
         let comfy_workspace_handle = workspace_handle.clone();
@@ -1319,6 +1905,7 @@ fn initialize_panels(window: &mut Window, cx: &mut Context<Workspace>) -> Task<a
         futures::join!(
             add_panel_when_ready(project_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(outline_panel, workspace_handle.clone(), cx.clone()),
+            cargo_panel_task,
             add_panel_when_ready(terminal_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(git_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
@@ -3220,11 +3807,15 @@ pub(crate) fn eager_load_active_theme_and_icon_theme(fs: Arc<dyn Fs>, cx: &mut A
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "multiplayer-tools")]
+    use acp_thread::AgentConnection as _;
     use assets::Assets;
     use collections::HashSet;
     use editor::{
         DisplayPoint, Editor, MultiBufferOffset, SelectionEffects, display_map::DisplayRow,
     };
+    #[cfg(feature = "multiplayer-tools")]
+    use gpui::Empty;
     use gpui::{
         Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
         UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
@@ -3250,6 +3841,8 @@ mod tests {
         rel_path::{RelPath, rel_path},
     };
     use workspace::MultiWorkspace;
+    #[cfg(feature = "multiplayer-tools")]
+    use workspace::PathList;
     use workspace::{
         NewFile, OpenOptions, OpenVisible, SERIALIZATION_THROTTLE_TIME, SaveIntent, SplitDirection,
         WorkspaceHandle,
@@ -3257,6 +3850,284 @@ mod tests {
         item::{Item, ItemHandle},
         open_new, open_paths, pane,
     };
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_review_registration(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = fs::FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let connection = Rc::new(acp_thread::StubAgentConnection::new());
+        let thread = cx
+            .update(|cx| {
+                connection
+                    .clone()
+                    .new_session(project.clone(), PathList::new::<&Path>(&[]), cx)
+            })
+            .await
+            .expect("stub agent thread should start");
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+
+        workspace.update_in(cx, |workspace, window, cx| {
+            ProjectDiff::deploy_at(workspace, None, window, cx);
+        });
+        cx.run_until_parked();
+
+        let project_diff_id = workspace.read_with(cx, |workspace, cx| {
+            workspace
+                .item_of_type::<ProjectDiff>(cx)
+                .expect("native project diff should be open")
+                .entity_id()
+        });
+        let state = Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+        let workspace_handle = workspace.clone();
+        cx.update(|window, cx| {
+            reconcile_collaborative_agent_review(
+                &workspace_handle,
+                Some(thread.clone()),
+                &state,
+                window,
+                cx,
+            );
+        });
+
+        workspace.read_with(cx, |workspace, _| {
+            assert_eq!(
+                workspace.collaborative_review().project().entity_id(),
+                project.entity_id()
+            );
+            assert_eq!(
+                workspace.collaborative_review().selected_slot(),
+                Some(workspace::collaborative_review::CollaborativeReviewSlot::AgentChanges)
+            );
+            workspace
+                .collaborative_review()
+                .selected_view()
+                .expect("agent review should be selected")
+                .downcast::<agent_ui::AgentDiffPane>()
+                .expect("selected agent review should remain the native pane");
+        });
+
+        cx.dispatch_action(workspace::SwitchToCollaborativeWorkspace);
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_some());
+        assert!(cx.debug_bounds("COLLABORATIVE-COMPOSER").is_some());
+        assert!(cx.debug_bounds("COLLABORATIVE-COMPOSER-EDITOR").is_none());
+
+        workspace
+            .update(cx, |workspace, cx| {
+                workspace.select_collaborative_review_provider(
+                    workspace::collaborative_review::CollaborativeReviewSlot::ProjectChanges,
+                    cx,
+                )
+            })
+            .expect("project review should be available");
+        cx.run_until_parked();
+        workspace.read_with(cx, |workspace, _| {
+            let project_diff = workspace
+                .collaborative_review()
+                .selected_view()
+                .expect("project review should be selected")
+                .downcast::<ProjectDiff>()
+                .expect("selected project review should remain the native diff");
+            assert_eq!(project_diff.entity_id(), project_diff_id);
+        });
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_some());
+
+        let layout_bounds = cx
+            .debug_bounds("COLLABORATIVE-LAYOUT")
+            .expect("collaborative layout should render");
+        let review_toggle = cx
+            .debug_bounds("COLLABORATIVE-TOP-BAR-REVIEW-LAYOUT")
+            .expect("review toggle should render");
+        cx.simulate_click(review_toggle.center(), gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("COLLABORATIVE-REVIEW-CONTENT").is_none());
+        assert_eq!(
+            cx.debug_bounds("COLLABORATIVE-TIMELINE-REGION")
+                .expect("collapsed timeline should render"),
+            layout_bounds
+        );
+    }
+
+    #[cfg(feature = "multiplayer-tools")]
+    #[gpui::test]
+    async fn collaborative_participant_provider_registration(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = fs::FakeFs::new(cx.executor());
+        let project = Project::test(fs, [], cx).await;
+        let (multi_workspace, cx) =
+            cx.add_window_view(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace =
+            multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.workspace().clone());
+        let first_thread_view = cx.new(|_| Empty);
+        let replacement_thread_view = cx.new(|_| Empty);
+        let state = Rc::new(RefCell::new(CollaborativeReviewCompositionState::default()));
+
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(&workspace, None, &state, cx);
+        });
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace
+                .collaborative_participants()
+                .state()),
+            CollaborativeParticipantProviderState::Unavailable
+        );
+
+        let unknown_view_data = CollaborativeParticipantViewData {
+            participants: vec![
+                workspace::collaborative_participants::CollaborativeParticipant::agent(
+                    "agent:primary",
+                    "Primary Agent",
+                    None,
+                    workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                ),
+            ],
+            execution: Some(
+                workspace::collaborative_participants::CollaborativeExecutionStatus {
+                    phase: workspace::collaborative_participants::CollaborativeExecutionPhase::Idle,
+                    model: None,
+                    runtime: Some("ACP".into()),
+                    location:
+                        workspace::collaborative_participants::CollaborativeExecutionLocation::Unknown,
+                },
+            ),
+        };
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: first_thread_view.entity_id(),
+                    view_data: unknown_view_data.clone(),
+                    provider: CollaborativeParticipantProvider::new(
+                        project.clone(),
+                        first_thread_view.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(unknown_view_data.clone()),
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        let first_registration = state
+            .borrow()
+            .participant_registration
+            .expect("active thread should register one participant provider");
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace
+                .collaborative_participants()
+                .state()),
+            CollaborativeParticipantProviderState::Ready(unknown_view_data.clone())
+        );
+        let occupied = workspace.update(cx, |workspace, cx| {
+            workspace.register_collaborative_participant_provider(
+                CollaborativeParticipantProvider::new(
+                    project.clone(),
+                    replacement_thread_view.entity_id(),
+                    CollaborativeParticipantProviderState::Unavailable,
+                ),
+                cx,
+            )
+        });
+        assert_eq!(
+            occupied,
+            Err(
+                workspace::collaborative_participants::CollaborativeParticipantProviderError::ProviderOccupied
+            )
+        );
+
+        let updated_view_data = CollaborativeParticipantViewData {
+            execution: Some(
+                workspace::collaborative_participants::CollaborativeExecutionStatus {
+                    phase: workspace::collaborative_participants::CollaborativeExecutionPhase::WaitingForUser,
+                    model: Some("model-current".into()),
+                    runtime: Some("ACP".into()),
+                    location:
+                        workspace::collaborative_participants::CollaborativeExecutionLocation::Local,
+                },
+            ),
+            ..unknown_view_data.clone()
+        };
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: first_thread_view.entity_id(),
+                    view_data: updated_view_data.clone(),
+                    provider: CollaborativeParticipantProvider::new(
+                        project.clone(),
+                        first_thread_view.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(updated_view_data.clone()),
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        assert_eq!(
+            state.borrow().participant_registration,
+            Some(first_registration),
+            "same-thread metadata updates should retain the sole registration"
+        );
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace
+                .collaborative_participants()
+                .state()),
+            CollaborativeParticipantProviderState::Ready(updated_view_data)
+        );
+
+        let replacement_view_data = CollaborativeParticipantViewData {
+            participants: vec![
+                workspace::collaborative_participants::CollaborativeParticipant::agent(
+                    "agent:replacement",
+                    "Replacement Agent",
+                    None,
+                    workspace::collaborative_participants::CollaborativeParticipantPresence::Online,
+                ),
+            ],
+            execution: None,
+        };
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(
+                &workspace,
+                Some(CollaborativeParticipantProjection {
+                    thread_view_id: replacement_thread_view.entity_id(),
+                    view_data: replacement_view_data.clone(),
+                    provider: CollaborativeParticipantProvider::new(
+                        project,
+                        replacement_thread_view.entity_id(),
+                        CollaborativeParticipantProviderState::Ready(replacement_view_data.clone()),
+                    ),
+                }),
+                &state,
+                cx,
+            );
+        });
+        let replacement_registration = state
+            .borrow()
+            .participant_registration
+            .expect("replacement thread should register a participant provider");
+        assert_ne!(replacement_registration, first_registration);
+        assert!(!workspace.update(cx, |workspace, cx| {
+            workspace.unregister_collaborative_participant_provider(first_registration, cx)
+        }));
+
+        cx.update(|_, cx| {
+            apply_collaborative_participant_projection(&workspace, None, &state, cx);
+        });
+        assert!(state.borrow().participant_registration.is_none());
+        assert_eq!(
+            workspace.read_with(cx, |workspace, _| workspace
+                .collaborative_participants()
+                .state()),
+            CollaborativeParticipantProviderState::Unavailable
+        );
+    }
 
     #[cfg(feature = "comfy")]
     #[test]
@@ -6864,6 +7735,8 @@ mod tests {
             git_ui::init(cx);
             project_panel::init(cx);
             outline_panel::init(cx);
+            #[cfg(feature = "rust-tools")]
+            cargo_ui::init(cx);
             terminal_view::init(cx);
             copilot_chat::init(
                 app_state.fs.clone(),

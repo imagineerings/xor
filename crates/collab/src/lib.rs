@@ -1,11 +1,19 @@
 pub mod api;
 pub mod auth;
+pub mod collaboration_command;
 pub mod db;
 pub mod entities;
 pub mod env;
 pub mod executor;
+pub mod freshness;
+pub mod identity;
+pub mod migration;
+pub mod nostr;
+pub mod pubsub;
 pub mod rpc;
+pub mod search;
 pub mod services;
+pub mod tenant_admission;
 
 use anyhow::Context as _;
 use aws_config::{BehaviorVersion, Region};

@@ -92,6 +92,10 @@
   // Layout mode of the bottom dock. Defaults to "contained"
   //   choices: contained, full, left_aligned, right_aligned
   "bottom_dock_layout": "contained",
+  // The primary workspace presentation. Collaborative uses the same projects,
+  // worktrees, Git state, credentials, and agent sessions as Editor.
+  //   choices: editor, collaborative
+  "workspace_presentation": "editor",
   // The direction that you want to split panes horizontally. Defaults to "down"
   "pane_split_direction_horizontal": "down",
   // The direction that you want to split panes vertically. Defaults to "right"

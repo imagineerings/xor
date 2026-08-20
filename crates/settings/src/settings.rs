@@ -64,6 +64,58 @@ pub trait UserSettingsContentExt {
     fn for_os(&self) -> Option<&SettingsContent>;
 }
 
+#[cfg(test)]
+mod cargo_settings_tests {
+    #[cfg(feature = "rust-tools")]
+    use collections::HashMap;
+    #[cfg(feature = "rust-tools")]
+    use settings_content::{
+        CargoPresetSettingsContent, CargoSettingsContent, MergeFromTrait as _, SettingsContent,
+    };
+
+    #[cfg(not(feature = "rust-tools"))]
+    #[test]
+    fn cargo_settings_are_excluded_without_rust_tools() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
+
+    #[cfg(feature = "rust-tools")]
+    #[test]
+    fn cargo_settings_merge_presets_by_stable_identifier() {
+        let mut user = SettingsContent::default();
+        user.cargo = Some(CargoSettingsContent {
+            schema_version: Some(1),
+            presets: HashMap::from_iter([(
+                "shared".to_string(),
+                CargoPresetSettingsContent {
+                    subcommand: Some("build".to_string()),
+                    profile: Some("dev".to_string()),
+                    ..CargoPresetSettingsContent::default()
+                },
+            )]),
+        });
+        let mut project = SettingsContent::default();
+        project.cargo = Some(CargoSettingsContent {
+            schema_version: Some(1),
+            presets: HashMap::from_iter([(
+                "shared".to_string(),
+                CargoPresetSettingsContent {
+                    subcommand: Some("test".to_string()),
+                    ..CargoPresetSettingsContent::default()
+                },
+            )]),
+        });
+        user.merge_from(&project);
+        let preset = &user
+            .cargo
+            .as_ref()
+            .expect("Cargo settings should remain present")
+            .presets["shared"];
+        assert_eq!(preset.subcommand.as_deref(), Some("test"));
+        assert_eq!(preset.profile.as_deref(), Some("dev"));
+    }
+}
+
 impl UserSettingsContentExt for UserSettingsContent {
     fn for_profile(&self, cx: &App) -> Option<&SettingsProfile> {
         let Some(active_profile) = cx.try_global::<ActiveSettingsProfileName>() else {

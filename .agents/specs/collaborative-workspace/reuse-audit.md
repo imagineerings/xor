@@ -6,6 +6,77 @@
 
 No row is “not applicable.” The complete Buzz product is in scope. Unsupported or unfinished Buzz behavior is represented as a completion task rather than silently removed.
 
+## Compile-time feature classification
+
+| Surface | Classification | Evidence and boundary |
+| --- | --- | --- |
+| `settings::WorkspacePresentation` serialization | Compatibility shim required when disabled | Always compiled so prior `collaborative` values can be preserved without loading multiplayer crates |
+| Editor workspace, `project`, `worktree`, `git`, ACP/thread/session, base credentials and existing collaboration | Shared and always compiled | Canonical owners are reused by both presentations; gating them would violate CAP-020/021/036/037 ownership decisions |
+| `workspace/src/collaborative_*`, sidebar collaborative rail, onboarding choice, `agent_ui` and `git_ui` collaborative adapters, `sim` registration | Multiplayer-only and feature-gated | Native GPUI composition; absent from Standard Sim registration and compile graph |
+| `collaboration_domain`, `nostr_compat`, Nostr signing/import extensions and future Buzz adapters | Multiplayer-only and feature-gated | Optional at first shared consumers; shared crates expose no default feature that can unify them into Standard Sim |
+| `collab` Buzz-derived relay routes, migrations, jobs, compatibility assets and deployment profiles | Deployment-only capability controlled by the same release capability | Built/deployed only by explicit multiplayer release profiles; base collab behavior is not reclassified or duplicated |
+| Capability/version identifiers and closed unsupported-operation error | Compatibility shim required when disabled | No tenant/resource IDs or multiplayer dependencies; rejection happens before lookup |
+
+This classification does not alter any CAP-001 through CAP-045 canonical owner or disposition. Every future leaf that introduces a Buzz-derived dependency, module, migration, asset, action or service registration must attach it to D13 and validate both feature configurations.
+
+### Planned-leaf feature classification ledger
+
+The classification is semantic and applies to each artifact written by a leaf, not to the leaf's directory or the name of its containing crate. The abbreviations below mean **S**: shared and always compiled, **M**: Multiplayer-only and feature-gated, **C**: compatibility shim required when disabled, and **D**: deployment or operational capability controlled by the same release capability. In a mixed row, the boundary text is normative: shared owners remain **S**, while only the Collaborative Workspace extension, adapter, registration, migration, asset or service is **M** or **D**. Every existing and planned leaf under the named epic inherits this rule.
+
+| Epic | Class | Semantic boundary for every descendant leaf |
+| --- | --- | --- |
+| 1 | D | Inventory, coverage ledgers and source fixtures are release evidence; they do not enter either application binary. |
+| 2 | D | ADR and ownership artifacts govern the multiplayer release capability without changing shared runtime owners. |
+| 3 | D | Compatibility baselines and independent oracles are operational verification artifacts. |
+| 4 | D | Threat, abuse and operations reviews gate multiplayer deployment readiness. |
+| 5 | S/C/M | The serialized presentation value and Editor resolution are **C/S**; Collaborative actions, selectors and registrations are **M**. |
+| 6 | S/M | GPUI primitives and workspace framework remain **S**; the Collaborative shell, panes and composition registrations are **M**. |
+| 7 | S/M | Project, worktree and navigation stores remain **S**; Collaborative projections, rail models and bindings are **M**. |
+| 8 | S/M | ACP thread/session/event owners remain **S**; Collaborative timeline projections and render adapters are **M**. |
+| 9 | S/M | Git state, diff models and existing review surfaces remain **S**; Collaborative review adapters, links and pane composition are **M**. |
+| 10 | S/M | Existing composer/status/accessibility infrastructure remains **S**; Collaborative composer, status bindings, fixtures and UI registration are **M**. |
+| 11 | M | Buzz-derived collaboration domain and Nostr codecs are exclusive protocol/domain components. |
+| 12 | S/M | Base credential custody remains **S**; Nostr identity binding, signing, import and backup extensions are **M**. |
+| 13 | M/D | Tenant admission types used by multiplayer adapters are **M**; server authorization enforcement and stores are **D**. |
+| 14 | M/D | Desktop/client Nostr adapters are **M**; relay WebSocket/HTTP endpoints and service registration are **D**. |
+| 15 | D | Signed-event persistence, projections, migrations and rebuild tooling are multiplayer service capabilities. |
+| 16 | S/M/D | Existing collab connection primitives remain **S**; multiplayer client projections are **M**; relay, presence and search services are **D**. |
+| 17 | C/D | Dependency-light format/version recognition is **C**; Buzz importers, dual-state tooling and migration jobs are **D**. |
+| 18 | S/M/D | Canonical channel/collab owners remain **S**; Buzz semantics in native adapters are **M**; server projections and admission are **D**. |
+| 19 | M/D | Native message/thread/reaction projections are **M**; authoritative event persistence and realtime delivery are **D**. |
+| 20 | M/D | DM presentation and wire adapters are **M**; encrypted storage, visibility enforcement and delivery are **D**. |
+| 21 | S/M/D | Existing local channel state remains **S**; multiplayer read/draft/presence projections are **M**; cross-device state services are **D**. |
+| 22 | S/M/D | Existing search and notification UI remains **S**; Collaborative result/policy adapters are **M**; indexing, outbox and push gateway are **D**. |
+| 23 | M/D | Inbox, pulse, forum, emoji and feedback native views are **M**; their projections and service APIs are **D**. |
+| 24 | S/M/D | Project/repository/worktree state remains **S**; NIP-MP metadata adapters are **M**; shared project records and authorization are **D**. |
+| 25 | S/M/D | Canonical Git, index, diff and hosting owners remain **S**; Nostr Git adapters are **M**; forge, patch and signing services are **D**. |
+| 26 | M/D | Branch/channel native linkage is **M**; authoritative branch-channel projection and event handling are **D**. |
+| 27 | S/M/D | Existing Git review and CI owners remain **S**; timeline/review composition is **M**; collaborative review and approval records are **D**. |
+| 28 | S/M/D | ACP/MCP runtimes remain **S**; channel/observer ingress adapters are **M**; remote ingress service registration is **D**. |
+| 29 | S/M/D | Existing agent settings/runtime remain **S**; persona/team native adapters are **M**; shared catalogs and managed-agent service state are **D**. |
+| 30 | S/M/D | Canonical native thread/session history remains **S**; interoperable memory/snapshot adapters are **M**; shared records and archive jobs are **D**. |
+| 31 | M/D | Signed job/delegation client models are **M**; durable job state, scheduling and recovery are **D**. |
+| 32 | S/M | ACP/action-log events remain **S**; semantic activity projection, cards and progressive disclosure are **M**. |
+| 33 | S/M/D | Existing remote development/execution remains **S**; Collaborative provider adapters are **M**; remote-agent deployment and scheduling are **D**. |
+| 34 | M/D | Native workflow/approval composition is **M**; durable triggers, execution and approval services are **D**. |
+| 35 | D | Tenant audit chains, exports and usage accounting are multiplayer service/operations capabilities. |
+| 36 | M/D | Moderation/admin native adapters are **M**; policy enforcement, queues and operator APIs are **D**. |
+| 37 | D | Retention, deletion, recovery and operator state machines are multiplayer service capabilities. |
+| 38 | S/M/D | Existing media renderers/types remain **S**; Collaborative attachment adapters are **M**; media storage and Blossom services are **D**. |
+| 39 | S/M/D | Existing audio/LiveKit/device owners remain **S**; huddle/transcript composition is **M**; compatibility relay, TTS and transcription services are **D**. |
+| 40 | S/M/D | Canonical credential storage remains **S**; pairing UI/protocol adapters are **M**; ephemeral pairing relay is **D**. |
+| 41 | M/D | Shared-compute client/scheduler adapters are **M**; relay mesh, compute admission and deployment are **D**. |
+| 42 | S/C/M | Existing Sim CLI remains **S**; command/version recognition needed for deterministic rejection is **C**; collaboration commands and aliases are **M**. |
+| 43 | C/M/D | Minimal link/version recognition is **C**; multiplayer client surfaces are **M**; web/mobile/admin delivery infrastructure is **D**. |
+| 44 | S/D | Canonical Sim/collab release infrastructure remains **S**; multiplayer charts, services, assets, migrations and release profiles are **D**. |
+| 45 | D | Compatibility, security, scale and conformance gates are release evidence and deployment qualification. |
+| 46 | C/D | Version/read compatibility retained through rollback is **C**; shadow reads, reconciliation and cutover tooling are **D**. |
+| 47 | S/C/D | Shared canonical owners remain **S**, required legacy recognition remains **C**, and retirement/removal operations are **D**. |
+| 48 | D | Parity, ownership and source-retirement evidence is a release artifact. |
+| 49 | S/C/M/D | The public flag and verification machinery are **S**; persisted-mode/capability recognition is **C**; desktop composition is **M**; packaging/CI controls are **D**. |
+
+A future leaf fails this audit if any write cannot be assigned by the row boundary, if one write changes both a shared owner and an independently reviewable multiplayer adapter without an explicit dependency split, or if a shared feature is gated solely because Collaborative Workspace consumes it. New exclusive dependencies and packaged payload names must also be added to `script/check-multiplayer-tools` or `script/multiplayer-build-profile` in the same leaf that introduces them.
+
 ## Capability ownership matrix
 
 | ID | Buzz behavior and sources | Protocol / persistence / deployment dependencies | Existing Sim owner and semantic gap | Disposition and proposed canonical owner | Migration / validation | Requirements / tasks |
@@ -71,13 +142,15 @@ No row is “not applicable.” The complete Buzz product is in scope. Unsupport
 | Media and huddles | Sim media/call owners plus collaboration metadata | Blossom and Buzz huddle compatibility adapters |
 | Remote agents/shared compute | Sim remote-agent scheduling and provider owner | Buzz provider ABI, Sprig and mesh wire during compatibility |
 
-## Approval gates
+## Accepted architecture decisions
 
-1. **ADR-001 — service/database consolidation:** approve embedding Nostr routes and Buzz-derived service modules into the existing `collab` deployment as the final topology. The safe transition uses a temporary sidecar and shared typed tenant boundary; a permanently separate Buzz control plane is prohibited.
-2. **ADR-002 — identity binding:** approve Sim account ↔ Nostr pubkey binding cardinality, recovery and organization policy. The proposed model allows multiple community-local npubs but one active signing identity per community/profile.
-3. **ADR-003 — Git hosting authority:** approve whether Sim-hosted NIP-34 Git is authoritative for hosted repositories or an additional hosting provider beside GitHub/others. Local working-copy authority is not in question.
-4. **ADR-004 — huddle transport:** approve LiveKit as the native transport with a Buzz Opus compatibility adapter, or retain the Buzz audio relay as a supported transport. The huddle domain/events remain transport-neutral.
-5. **ADR-005 — push platforms:** approve APNs-only parity versus adding FCM/UnifiedPush before the first mobile cutover. NIP-PL remains unchanged.
-6. **ADR-006 — shared compute policy:** approve default-off resource limits, trust prompts, scheduling fairness and whether third-party community compute is allowed outside self-hosted deployments.
+The product owner accepted the recommended ADR-001 through ADR-006 outcomes on 2026-08-14:
 
-No irreversible migration, dual write, or source retirement may pass its corresponding gate without recorded approval.
+1. **ADR-001 — service/database consolidation:** the existing Sim `collab` deployment is the final service and migration owner. A Buzz-derived Nostr sidecar is temporary, non-authoritative and removal-gated. See `decisions/adr-001-service-topology.md`.
+2. **ADR-002 — identity binding:** a Sim account may use multiple community-local npubs, with one active signer per community/account/profile tuple, verified possession and history-preserving lifecycle rules. See `decisions/adr-002-identity-binding.md`.
+3. **ADR-003 — Git hosting authority:** local working state remains native Sim state; each repository selects Sim NIP-34 hosting, one external provider or no hosted authority. See `decisions/adr-003-git-authority.md`.
+4. **ADR-004 — huddle transport:** LiveKit is the sole native media transport, and Buzz Opus v1/v2 remains a bounded compatibility gateway into canonical rooms. See `decisions/adr-004-huddle-transport.md`.
+5. **ADR-005 — push platforms:** APNs production plus sandbox validation and Apple App Attest form the first mobile-cutover floor. FCM and UnifiedPush require future approved profiles. See `decisions/adr-005-push-scope.md`.
+6. **ADR-006 — shared compute policy:** shared compute is default-off, initially self-hosted, explicitly consented, resource/fairness bounded and prohibited from silent provider fallback. See `decisions/adr-006-shared-compute.md`.
+
+These approvals unblock their dependency leaves but do not authorize production activation, irreversible migration, dual-write cutover or source retirement. Those actions retain the separate gates in `migration-plan.md` and `tasks.md`.

@@ -2,6 +2,12 @@
 
 set -euxo pipefail
 
+rust_tools=false
+if [[ "${1:-}" == "--rust-tools" ]]; then
+  rust_tools=true
+  shift
+fi
+
 if [[ $# -gt 0 ]]; then
   echo "
   Usage: ${0##*/}
@@ -13,7 +19,11 @@ if [[ $# -gt 0 ]]; then
 fi
 export SIM_CHANNEL=$(<crates/sim/RELEASE_CHANNEL)
 export SIM_UPDATE_EXPLANATION="You need to fetch and rebuild sim in $(pwd)"
-script/bundle-linux
+if [[ "$rust_tools" = true ]]; then
+  script/bundle-linux --rust-tools
+else
+  script/bundle-linux
+fi
 
 arch="$(uname -m)"
 commit=$(git rev-parse HEAD | cut -c 1-7)

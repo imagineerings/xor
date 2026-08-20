@@ -256,6 +256,22 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 3. **20.3** WHEN behavior is reused unchanged from Sim, THEN parity SHALL require semantic evidence covering security, persistence, failure and user-visible behavior, not a matching component name.
 4. **20.4** THE migration SHALL NOT declare complete until every CAP ID and acceptance criterion has passing evidence, all approved migration/removal gates are satisfied, documented known Buzz gaps are completed or explicitly accepted, and no prohibited duplicate owner remains.
 
+### Requirement 21: Compile-time multiplayer feature isolation
+
+**User story:** As a release owner, I want one compile-time capability switch for multiplayer functionality, so that Standard Sim remains unchanged while Multiplayer Sim includes the complete Collaborative Workspace and Buzz compatibility platform.
+
+#### Acceptance criteria
+
+1. **21.1** THE canonical `sim` application package SHALL define one public Cargo feature named `multiplayer-tools`, SHALL keep it outside the default feature set, and SHALL forward it only to narrowly scoped internal crate features and optional dependencies.
+2. **21.2** WHILE `multiplayer-tools` is disabled, THE Sim application SHALL build, test, package and start without multiplayer-only crates, dependencies, services, transports, migrations, assets, actions, settings surfaces or background jobs, and Editor Workspace behavior SHALL remain unchanged.
+3. **21.3** WHILE `multiplayer-tools` is enabled, THE Sim application SHALL offer the approved Collaborative Workspace, adapters and services without forking canonical Editor, project, worktree, Git, identity, credential, transcript or agent-session state.
+4. **21.4** IF an unflagged build reads a persisted Collaborative Workspace preference, THEN it SHALL use Editor Workspace for that run without deleting collaborative data, overwriting the saved preference or requiring a multiplayer-only crate; WHEN a compatible flagged build returns, THEN it SHALL restore that preference.
+5. **21.5** WHILE `multiplayer-tools` is disabled, THE application SHALL omit multiplayer onboarding choices, workspace-switch actions, menus, settings pages and service registrations; IF a retained compatibility entry point recognizes a multiplayer-only operation, THEN it SHALL return a deterministic “not included in this build” result without disclosing tenant or resource existence.
+6. **21.6** WHEN a desktop, service or companion client negotiates capabilities, THEN it SHALL advertise multiplayer availability explicitly and SHALL reject unsupported multiplayer-only writes before tenant or resource lookup.
+7. **21.7** THE feature boundary SHALL leave shared Editor, project, worktree, Git, ACP, credentials, settings and existing collaboration functionality always compiled, and SHALL preserve one canonical domain/state representation across both configurations.
+8. **21.8** WHEN Standard Sim is packaged or deployed, THEN exclusive Buzz services, migrations and assets SHALL be absent; WHEN Multiplayer Sim is packaged or deployed, THEN its release command SHALL enable `multiplayer-tools` explicitly and record that capability in artifact metadata.
+9. **21.9** CI SHALL build, test, warning-denied lint and smoke both configurations, inspect the default dependency tree for forbidden multiplayer-only packages, and fail when feature unification or packaging causes an unflagged artifact to include multiplayer code or dependencies.
+
 ## Constraints
 
 - The primary desktop implementation is native Rust/GPUI.
@@ -264,12 +280,8 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 - Preserve Apache-2.0 notices and attribution for imported Buzz code within the GPL-3.0-or-later Sim repository.
 - Security and tenant boundaries fail closed; compatibility never weakens authorization.
 - Production mutations and source retirement require separate authorization.
+- `multiplayer-tools` is the only public Cargo feature for this product boundary and is non-default; internal forwarding features must not be selected independently by release users.
 
-## Open questions requiring approval
+## Resolved architecture decisions
 
-- ADR-001: final service/database consolidation topology.
-- ADR-002: Sim-account to Nostr-identity binding, recovery and organization policy.
-- ADR-003: hosted NIP-34 Git authority relative to external hosting providers.
-- ADR-004: native huddle transport and duration of Buzz audio compatibility.
-- ADR-005: required push platform set at first mobile cutover.
-- ADR-006: shared-compute trust, eligibility, resource and deployment policy.
+ADR-001 through ADR-006 were accepted on 2026-08-14 without changing the acceptance criteria above. Their normative records are `decisions/adr-001-service-topology.md` through `decisions/adr-006-shared-compute.md`. Production activation, irreversible migration, compatibility breaks and source retirement remain separately approval-gated.

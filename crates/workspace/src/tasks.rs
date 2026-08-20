@@ -7,8 +7,8 @@ use language::Buffer;
 use project::{TaskSourceKind, WorktreeId};
 use remote::ConnectionState;
 use task::{
-    DebugScenario, ResolvedTask, SaveStrategy, SharedTaskContext, SpawnInTerminal, TaskContext,
-    TaskHook, TaskTemplate, TaskVariables, VariableName,
+    DebugScenario, ResolvedTask, SaveStrategy, SharedTaskContext, SpawnInTerminal,
+    StructuredTaskHandle, TaskContext, TaskHook, TaskTemplate, TaskVariables, VariableName,
 };
 use ui::Window;
 use util::TryFutureExt;
@@ -59,6 +59,51 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) {
+        self.schedule_resolved_task_internal(
+            task_source_kind,
+            resolved_task,
+            omit_history,
+            None,
+            window,
+            cx,
+        );
+    }
+
+    pub fn schedule_resolved_task_with_structured_handle(
+        &mut self,
+        task_source_kind: TaskSourceKind,
+        resolved_task: ResolvedTask,
+        omit_history: bool,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) -> StructuredTaskHandle {
+        let handle = StructuredTaskHandle::new(resolved_task.resolved.id.clone());
+        if let Some(message) =
+            structured_task_connection_error(self.project.read(cx).remote_connection_state(cx))
+        {
+            handle.mark_spawn_error(message, cx);
+            return handle;
+        }
+        self.schedule_resolved_task_internal(
+            task_source_kind,
+            resolved_task,
+            omit_history,
+            Some(handle.clone()),
+            window,
+            cx,
+        );
+        handle
+    }
+
+    fn schedule_resolved_task_internal(
+        &mut self,
+        task_source_kind: TaskSourceKind,
+        resolved_task: ResolvedTask,
+        omit_history: bool,
+        structured_handle: Option<StructuredTaskHandle>,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) {
         let spawn_in_terminal = resolved_task.resolved.clone();
         if !omit_history {
             if let Some(debugger_provider) = self.debugger_provider.as_ref() {
@@ -80,18 +125,41 @@ impl Workspace {
             let task = cx.spawn_in(window, async move |workspace, cx| {
                 Self::save_for_task(&workspace, spawn_in_terminal.save, cx).await;
 
+                if structured_handle
+                    .as_ref()
+                    .is_some_and(|handle| handle.state().is_terminal())
+                {
+                    return;
+                }
+
                 let spawn_task = workspace.update_in(cx, |workspace, window, cx| {
                     workspace
                         .terminal_provider
                         .as_ref()
                         .map(|terminal_provider| {
-                            terminal_provider.spawn(spawn_in_terminal, window, cx)
+                            if let Some(handle) = structured_handle.clone() {
+                                terminal_provider.spawn_structured(
+                                    spawn_in_terminal,
+                                    handle,
+                                    window,
+                                    cx,
+                                )
+                            } else {
+                                terminal_provider.spawn(spawn_in_terminal, window, cx)
+                            }
                         })
                 });
                 if let Some(spawn_task) = spawn_task.ok().flatten() {
                     let res = cx.background_spawn(spawn_task).await;
                     match res {
                         Some(Ok(status)) => {
+                            if let Some(handle) = structured_handle.as_ref() {
+                                if let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_completed(status, cx);
+                                }) {
+                                    log::debug!("Structured task window closed: {error:#}");
+                                }
+                            }
                             if status.success() {
                                 log::debug!("Task spawn succeeded");
                             } else {
@@ -99,17 +167,37 @@ impl Workspace {
                             }
                         }
                         Some(Err(e)) => {
+                            if let Some(handle) = structured_handle.as_ref() {
+                                if let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_spawn_error(e.to_string(), cx);
+                                }) {
+                                    log::debug!("Structured task window closed: {error:#}");
+                                }
+                            }
                             log::error!("Task spawn failed: {e:#}");
-                            _ = workspace.update(cx, |w, cx| {
+                            if let Err(error) = workspace.update(cx, |w, cx| {
                                 let id = NotificationId::unique::<ResolvedTask>();
                                 w.show_toast(Toast::new(id, format!("Task spawn failed: {e}")), cx);
-                            })
+                            }) {
+                                log::debug!("Task error toast could not be shown: {error:#}");
+                            }
                         }
-                        None => log::debug!("Task spawn got cancelled"),
+                        None => {
+                            if let Some(handle) = structured_handle.as_ref() {
+                                if let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_cancelled(handle.state().terminal_id(), false, cx);
+                                }) {
+                                    log::debug!("Structured task window closed: {error:#}");
+                                }
+                            }
+                            log::debug!("Task spawn got cancelled")
+                        }
                     };
                 }
             });
             self.scheduled_tasks.push(task);
+        } else if let Some(handle) = structured_handle {
+            handle.mark_spawn_error("No terminal provider is available", cx);
         }
     }
 
@@ -279,6 +367,18 @@ impl Workspace {
     }
 }
 
+fn structured_task_connection_error(state: Option<ConnectionState>) -> Option<&'static str> {
+    match state {
+        None | Some(ConnectionState::Connected) => None,
+        Some(ConnectionState::Connecting) => Some("The project host is still connecting"),
+        Some(
+            ConnectionState::Disconnected
+            | ConnectionState::HeartbeatMissed
+            | ConnectionState::Reconnecting,
+        ) => Some("The project host is disconnected"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,7 +392,7 @@ mod tests {
     use project::{FakeFs, Project, TaskSourceKind};
     use serde_json::json;
     use std::sync::Arc;
-    use task::TaskTemplate;
+    use task::{StructuredTaskState, StructuredTerminalId, TaskTemplate};
 
     struct Fixture {
         workspace: Entity<Workspace>,
@@ -358,6 +458,128 @@ mod tests {
 
         assert_eq!(*fixture.dirty_before_spawn.lock(), Some(true));
         assert!(cx.read(|cx| fixture.item.read(cx).is_dirty));
+    }
+
+    #[gpui::test]
+    async fn structured_task_completion_is_retained_for_late_subscribers(cx: &mut TestAppContext) {
+        let (fixture, cx) = create_fixture(cx, SaveStrategy::None).await;
+        let handle = fixture.workspace.update_in(cx, |workspace, window, cx| {
+            workspace.schedule_resolved_task_with_structured_handle(
+                TaskSourceKind::UserInput,
+                fixture.task,
+                false,
+                window,
+                cx,
+            )
+        });
+        cx.run_until_parked();
+
+        assert!(matches!(
+            handle.state(),
+            StructuredTaskState::Completed { success: true, .. }
+        ));
+        let observed = Arc::new(Mutex::new(Vec::new()));
+        fixture.workspace.update(cx, |_, cx| {
+            let observed = observed.clone();
+            handle.subscribe(cx, move |event, _| {
+                observed.lock().push(event.state.clone());
+            });
+        });
+        assert_eq!(observed.lock().as_slice(), &[handle.state()]);
+    }
+
+    #[gpui::test]
+    async fn structured_task_cancellation_delegates_and_rejects_late_completion(
+        cx: &mut TestAppContext,
+    ) {
+        let (fixture, cx) = create_fixture(cx, SaveStrategy::None).await;
+        let handle = StructuredTaskHandle::new(task::TaskId("structured-race".to_string()));
+        let cancel_called = Arc::new(Mutex::new(false));
+        fixture.workspace.update(cx, |_, cx| {
+            let cancel_called = cancel_called.clone();
+            handle.bind_terminal(
+                StructuredTerminalId(42),
+                move |_| {
+                    *cancel_called.lock() = true;
+                    true
+                },
+                cx,
+            );
+            assert!(handle.cancel(cx));
+            assert_eq!(
+                handle.state(),
+                StructuredTaskState::Cancelled {
+                    terminal_id: Some(StructuredTerminalId(42)),
+                    termination_confirmed: false,
+                }
+            );
+            assert!(handle.mark_cancelled(Some(StructuredTerminalId(42)), true, cx));
+            assert!(!handle.mark_completed(ExitStatus::default(), cx));
+        });
+
+        assert!(*cancel_called.lock());
+        assert_eq!(
+            handle.state(),
+            StructuredTaskState::Cancelled {
+                terminal_id: Some(StructuredTerminalId(42)),
+                termination_confirmed: true,
+            }
+        );
+    }
+
+    #[gpui::test]
+    async fn structured_task_dropped_caller_handle_does_not_cancel_scheduling(
+        cx: &mut TestAppContext,
+    ) {
+        let (fixture, cx) = create_fixture(cx, SaveStrategy::None).await;
+        fixture.workspace.update_in(cx, |workspace, window, cx| {
+            drop(workspace.schedule_resolved_task_with_structured_handle(
+                TaskSourceKind::UserInput,
+                fixture.task,
+                false,
+                window,
+                cx,
+            ));
+        });
+        cx.run_until_parked();
+
+        assert_eq!(*fixture.dirty_before_spawn.lock(), Some(true));
+    }
+
+    #[gpui::test]
+    async fn structured_task_reports_spawn_error_without_terminal_provider(
+        cx: &mut TestAppContext,
+    ) {
+        let (fixture, cx) = create_fixture(cx, SaveStrategy::None).await;
+        fixture.workspace.update(cx, |workspace, _| {
+            workspace.terminal_provider = None;
+        });
+        let handle = fixture.workspace.update_in(cx, |workspace, window, cx| {
+            workspace.schedule_resolved_task_with_structured_handle(
+                TaskSourceKind::UserInput,
+                fixture.task,
+                false,
+                window,
+                cx,
+            )
+        });
+        assert!(matches!(
+            handle.state(),
+            StructuredTaskState::SpawnError { .. }
+        ));
+    }
+
+    #[test]
+    fn structured_task_connection_policy_never_falls_back_to_local_execution() {
+        assert_eq!(structured_task_connection_error(None), None);
+        assert_eq!(
+            structured_task_connection_error(Some(ConnectionState::Connected)),
+            None
+        );
+        assert!(structured_task_connection_error(Some(ConnectionState::Connecting)).is_some());
+        assert!(structured_task_connection_error(Some(ConnectionState::HeartbeatMissed)).is_some());
+        assert!(structured_task_connection_error(Some(ConnectionState::Reconnecting)).is_some());
+        assert!(structured_task_connection_error(Some(ConnectionState::Disconnected)).is_some());
     }
 
     async fn create_fixture(

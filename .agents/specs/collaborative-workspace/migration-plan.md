@@ -9,6 +9,16 @@
 5. Rollback is a tested operation with an explicit last reversible checkpoint.
 6. `projects/buzz` remains buildable and security-fixable until all retirement gates pass.
 
+## Compile-time enable, disable and rollback
+
+`multiplayer-tools` is a compile-time release capability, not an authority-cutover switch. Standard Sim is built without it; Multiplayer Sim enables it explicitly on the `sim` package and multiplayer service/package profiles. The feature is established before further unrelated Collaborative Workspace leaves and does not change any canonical owner, migration phase or accepted ADR.
+
+Disabling the feature is a binary rollback only. The unflagged application reads the stable workspace-presentation representation, resolves a saved Collaborative selection to Editor in memory and leaves the saved preference, collaborative records, credentials and signing material untouched. No down migration runs and no multiplayer asset or service starts. Re-enabling a schema-compatible flagged build restores the saved presentation and reconnects through normal compatibility/version checks.
+
+Services and companion clients advertise a `multiplayer-tools` capability plus supported protocol/schema revisions. An unflagged endpoint rejects multiplayer-only commands before tenant/resource lookup. Mixed-version rollout may retain the bounded wire capability representation, but it may not dual-author domain state. Packaging manifests identify whether the capability is included; Standard artifacts reject unexpected multiplayer crates, migrations, assets or service binaries, and Multiplayer artifacts require the explicit feature in their reproducible build command.
+
+Rollback gates are: both configuration matrices green; default dependency denial green; persisted-mode fallback/re-enable green; no destructive data action on disable; and compatibility rejection proven non-enumerating. Any feature-unification leak, default behavior regression or artifact-content drift stops release and rolls back the binary/configuration only.
+
 ## Phases and gates
 
 ### Phase 0: Baseline and approval records

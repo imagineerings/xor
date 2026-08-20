@@ -2,6 +2,8 @@
 
 mod agent_registry_store;
 mod bookmark_store;
+#[cfg(feature = "cargo-workspace")]
+mod cargo_workspace;
 mod color_extractor;
 mod context_server_store;
 mod debugger;

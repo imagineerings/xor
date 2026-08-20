@@ -215,6 +215,15 @@ pub struct SettingsContent {
 
     pub outline_panel: Option<OutlinePanelSettingsContent>,
 
+    #[cfg(feature = "rust-tools")]
+    pub cargo_panel: Option<CargoPanelSettingsContent>,
+
+    #[cfg(feature = "rust-tools")]
+    pub cargo: Option<CargoSettingsContent>,
+
+    #[cfg(feature = "test-explorer")]
+    pub tests_panel: Option<TestsPanelSettingsContent>,
+
     pub project_panel: Option<ProjectPanelSettingsContent>,
 
     /// Configuration for Node-related features

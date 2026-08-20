@@ -24,6 +24,7 @@ members = [
     "crates/breadcrumbs",
     "crates/buffer_diff",
     "crates/call",
+    "crates/cargo_ui",
     "crates/channel",
     "crates/cli",
     "crates/client",
@@ -55,6 +56,7 @@ members = [
     "crates/codestral",
     "crates/collab",
     "crates/collab_ui",
+    "crates/collaboration_domain",
     "crates/collections",
     "crates/command_palette",
     "crates/command_palette_hooks",
@@ -161,6 +163,7 @@ members = [
     "crates/multi_buffer",
     "crates/net",
     "crates/node_runtime",
+    "crates/nostr_compat",
     "crates/notifications",
     "crates/oauth_callback_server",
     "crates/ollama",
@@ -310,6 +313,7 @@ bedrock = { path = "crates/bedrock" }
 breadcrumbs = { path = "crates/breadcrumbs" }
 buffer_diff = { path = "crates/buffer_diff" }
 call = { path = "crates/call" }
+cargo_ui = { path = "crates/cargo_ui" }
 channel = { path = "crates/channel" }
 cli = { path = "crates/cli" }
 client = { path = "crates/client" }
@@ -318,6 +322,8 @@ cloud_api_client = { path = "crates/cloud_api_client" }
 cloud_api_types = { path = "crates/cloud_api_types" }
 cloud_llm_client = { path = "crates/cloud_llm_client" }
 collab = { path = "crates/collab" }
+collaboration_domain = { path = "crates/collaboration_domain" }
+nostr_compat = { path = "crates/nostr_compat" }
 collab_ui = { path = "crates/collab_ui" }
 collections = { path = "crates/collections", version = "0.1.0" }
 command_palette = { path = "crates/command_palette" }
@@ -591,6 +597,7 @@ aws-smithy-runtime-api = { version = "1.9.2", features = ["http-1x", "client"] }
 aws-smithy-types = { version = "1.3.4", features = ["http-body-1-x"] }
 backtrace = "0.3"
 base64 = "0.22"
+bech32 = "0.11"
 bitflags = "2.6.0"
 brotli = "8.0.2"
 bytes = "1.0"
@@ -646,6 +653,7 @@ futures = "0.3.32"
 futures-concurrency = "7.7.1"
 futures-lite = "1.13"
 futures-util = "0.3.32"
+getrandom = "0.3.4"
 gh-workflow = { git = "https://github.com/simtropolis/gh-workflow", rev = "37f3c0575d379c218a9c455ee67585184e40d43f" }
 
 globset = "0.4"
@@ -693,6 +701,7 @@ nix = "0.29"
 nucleo = "0.5"
 num-format = "0.4.4"
 objc = "0.2"
+nostr = { version = "=0.44.7", default-features = false, features = ["std", "nip49"] }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "NSButton",
@@ -794,6 +803,7 @@ rustls-platform-verifier = "0.5.0"
 # WARNING: If you change this, you must also publish a new version of sim-scap to crates.io
 scap = { git = "https://github.com/simtropolis/scap", rev = "3d5bdb02b2fbc166b7754642db9063748b9082da", default-features = false, package = "sim-scap", version = "0.0.8-sim" }
 schemars = { version = "1.0", features = ["indexmap2"] }
+secp256k1 = { version = "0.29.1", default-features = false, features = ["std"] }
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0.221", features = ["derive", "rc"] }
 serde_json = { version = "1.0.144", features = ["preserve_order", "raw_value"] }

@@ -9,12 +9,14 @@ open_result=false
 local_install=false
 can_code_sign=false
 comfy=false
+rust_tools=false
 dry_run=false
 
 filtered_arguments=()
 for argument in "$@"; do
     case "$argument" in
         --comfy) comfy=true ;;
+        --rust-tools) rust_tools=true ;;
         --dry-run) dry_run=true ;;
         *) filtered_arguments+=("$argument") ;;
     esac
@@ -37,6 +39,7 @@ Build the application bundle for macOS.
 
 Options:
   --comfy  Include the Comfy integration, Metal backend, worker, and assets.
+  --rust-tools  Include the Cargo tool window and matching remote-server support.
   --dry-run  Print the selected package plan without building it.
   -d    Compile in debug mode
   -o    Open dir with the resulting DMG or launch the app itself in local mode.
@@ -66,10 +69,21 @@ done
 shift $((OPTIND-1))
 
 if [[ "$dry_run" = true ]]; then
+    sim_features="none"
+    remote_features="none"
+    if [[ "$rust_tools" = true ]]; then
+        sim_features="rust-tools"
+        remote_features="rust-tools"
+    fi
     if [[ "$comfy" = true ]]; then
-        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=comfy,metal worker_features=metal include_comfy_worker=true"
+        if [[ "$rust_tools" = true ]]; then
+            sim_features="comfy,metal,rust-tools"
+        else
+            sim_features="comfy,metal"
+        fi
+        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=${sim_features} remote_features=${remote_features} worker_features=metal include_comfy_worker=true rust_tools=${rust_tools}"
     else
-        echo "mode=default packages=sim,cli sim_features=none include_comfy_worker=false"
+        echo "mode=default packages=sim,cli sim_features=${sim_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
     fi
     exit 0
 fi
@@ -115,13 +129,23 @@ rustup target add $target_triple
 
 echo "Compiling sim binaries"
 if [[ "$comfy" = true ]]; then
-    cargo build ${build_flag} --package sim --package cli --package comfy_worker --features sim/comfy,sim/metal,comfy_worker/metal --target $target_triple
+    sim_build_features="sim/comfy,sim/metal,comfy_worker/metal"
+    if [[ "$rust_tools" = true ]]; then
+        sim_build_features="${sim_build_features},sim/rust-tools"
+    fi
+    cargo build ${build_flag} --package sim --package cli --package comfy_worker --features "${sim_build_features}" --target $target_triple
+elif [[ "$rust_tools" = true ]]; then
+    cargo build ${build_flag} --package sim --package cli --features sim/rust-tools --target $target_triple
 else
     cargo build ${build_flag} --package sim --package cli --target $target_triple
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-cargo build ${build_flag} --package remote_server --target $target_triple
+if [[ "$rust_tools" = true ]]; then
+    cargo build ${build_flag} --package remote_server --features rust-tools --target $target_triple
+else
+    cargo build ${build_flag} --package remote_server --target $target_triple
+fi
 
 echo "Creating application bundle"
 pushd crates/sim
@@ -131,7 +155,11 @@ sed \
     "s/package.metadata.bundle-${channel}/package.metadata.bundle/" \
     Cargo.toml
 
-app_path=$(cargo bundle ${build_flag} --target $target_triple --select-workspace-root | xargs)
+if [[ "$rust_tools" = true ]]; then
+    app_path=$(cargo bundle ${build_flag} --features rust-tools --target $target_triple --select-workspace-root | xargs)
+else
+    app_path=$(cargo bundle ${build_flag} --target $target_triple --select-workspace-root | xargs)
+fi
 
 mv Cargo.toml.backup Cargo.toml
 popd

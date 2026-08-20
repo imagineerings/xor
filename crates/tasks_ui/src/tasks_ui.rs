@@ -8,10 +8,17 @@ use task::{RevealTarget, TaskContext, TaskId, TaskTemplate, TaskVariables, Varia
 use workspace::Workspace;
 
 mod modal;
+#[cfg(feature = "test-explorer")]
+mod test_explorer;
 
 pub use modal::{Rerun, ShowAttachModal, Spawn, TaskOverrides, TasksModal};
+#[cfg(feature = "test-explorer")]
+pub use test_explorer::*;
 
 pub fn init(cx: &mut App) {
+    #[cfg(feature = "test-explorer")]
+    test_explorer::init(cx);
+
     cx.observe_new(
         |workspace: &mut Workspace, _: Option<&mut Window>, _: &mut Context<Workspace>| {
             workspace

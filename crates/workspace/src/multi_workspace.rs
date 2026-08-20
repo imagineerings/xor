@@ -29,7 +29,7 @@ const SIDEBAR_RESIZE_HANDLE_SIZE: Pixels = px(6.0);
 use crate::open_remote_project_with_existing_connection;
 use crate::{
     CloseIntent, CloseWindow, DockPosition, Event as WorkspaceEvent, Item, ModalView, OpenMode,
-    Panel, Workspace, WorkspaceId, client_side_decorations,
+    Panel, Workspace, WorkspaceId, WorkspacePresentation, client_side_decorations,
     persistence::model::MultiWorkspaceState,
 };
 
@@ -315,6 +315,14 @@ impl MultiWorkspace {
     }
 
     pub fn sidebar_render_state(&self, cx: &App) -> SidebarRenderState {
+        if self.active_workspace.read(cx).workspace_presentation()
+            == WorkspacePresentation::Collaborative
+        {
+            return SidebarRenderState {
+                open: true,
+                side: SidebarSide::Left,
+            };
+        }
         SidebarRenderState {
             open: self.sidebar_open() && self.multi_workspace_enabled(cx),
             side: self.sidebar_side(cx),
@@ -2102,20 +2110,112 @@ impl MultiWorkspace {
     }
 }
 
+impl MultiWorkspace {
+    fn rendered_sidebar_width(
+        &self,
+        sidebar: &dyn SidebarHandle,
+        _collaborative_workspace: bool,
+        cx: &App,
+    ) -> Pixels {
+        #[cfg(feature = "multiplayer-tools")]
+        if _collaborative_workspace {
+            return self.workspace().read(cx).collaborative_rail_width(cx);
+        }
+
+        sidebar.width(cx)
+    }
+
+    fn reset_rendered_sidebar_width(
+        &mut self,
+        _collaborative_workspace: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        #[cfg(feature = "multiplayer-tools")]
+        if _collaborative_workspace {
+            let workspace = self.workspace().clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.reset_collaborative_rail_width(_window, cx);
+            });
+            return;
+        }
+
+        if let Some(sidebar) = self.sidebar.as_mut() {
+            sidebar.set_width(None, cx);
+            self.serialize(cx);
+        }
+    }
+
+    fn serialize_rendered_sidebar_width(
+        &mut self,
+        _collaborative_workspace: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        #[cfg(feature = "multiplayer-tools")]
+        if _collaborative_workspace {
+            let workspace = self.workspace().clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.serialize_workspace(_window, cx);
+            });
+            return;
+        }
+
+        self.serialize(cx);
+    }
+
+    fn resize_rendered_sidebar(
+        &mut self,
+        width: Pixels,
+        _collaborative_workspace: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        #[cfg(feature = "multiplayer-tools")]
+        if _collaborative_workspace {
+            let workspace = self.workspace().clone();
+            workspace.update(cx, |workspace, cx| {
+                workspace.set_collaborative_rail_width(width, _window, cx);
+            });
+            cx.notify();
+            return;
+        }
+
+        if let Some(sidebar) = &self.sidebar {
+            sidebar.set_width(Some(width), cx);
+        }
+    }
+}
+
 impl Render for MultiWorkspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let multi_workspace_enabled = self.multi_workspace_enabled(cx);
         let sidebar_side = self.sidebar_side(cx);
-        let sidebar_on_right = sidebar_side == SidebarSide::Right;
+        let collaborative_workspace = self.workspace().read(cx).workspace_presentation()
+            == WorkspacePresentation::Collaborative;
+        let editor_sidebar_open = multi_workspace_enabled && self.sidebar_open();
+        let show_sidebar = collaborative_workspace || editor_sidebar_open;
+        let sidebar_on_right = !collaborative_workspace && sidebar_side == SidebarSide::Right;
 
-        let sidebar: Option<AnyElement> = if multi_workspace_enabled && self.sidebar_open() {
+        let sidebar: Option<AnyElement> = if show_sidebar {
             self.sidebar.as_ref().map(|sidebar_handle| {
                 let weak = cx.weak_entity();
 
-                let sidebar_width = sidebar_handle.width(cx);
+                let sidebar_width = self.rendered_sidebar_width(
+                    sidebar_handle.as_ref(),
+                    collaborative_workspace,
+                    cx,
+                );
                 let resize_handle = deferred(
                     div()
                         .id("sidebar-resize-handle")
+                        .debug_selector(move || {
+                            if collaborative_workspace {
+                                "COLLABORATIVE-RAIL-RESIZE-HANDLE".to_owned()
+                            } else {
+                                "EDITOR-SIDEBAR-RESIZE-HANDLE".to_owned()
+                            }
+                        })
                         .absolute()
                         .when(!sidebar_on_right, |el| {
                             el.right(-SIDEBAR_RESIZE_HANDLE_SIZE / 2.)
@@ -2134,19 +2234,24 @@ impl Render for MultiWorkspace {
                         .on_mouse_down(MouseButton::Left, |_, _, cx| {
                             cx.stop_propagation();
                         })
-                        .on_mouse_up(MouseButton::Left, move |event, _, cx| {
+                        .on_mouse_up(MouseButton::Left, move |event, window, cx| {
                             if event.click_count == 2 {
                                 weak.update(cx, |this, cx| {
-                                    if let Some(sidebar) = this.sidebar.as_mut() {
-                                        sidebar.set_width(None, cx);
-                                    }
-                                    this.serialize(cx);
+                                    this.reset_rendered_sidebar_width(
+                                        collaborative_workspace,
+                                        window,
+                                        cx,
+                                    );
                                 })
                                 .ok();
                                 cx.stop_propagation();
                             } else {
                                 weak.update(cx, |this, cx| {
-                                    this.serialize(cx);
+                                    this.serialize_rendered_sidebar_width(
+                                        collaborative_workspace,
+                                        window,
+                                        cx,
+                                    );
                                 })
                                 .ok();
                             }
@@ -2246,26 +2351,23 @@ impl Render for MultiWorkspace {
                         ))
                     })
                 })
-                .when(
-                    self.sidebar_open() && self.multi_workspace_enabled(cx),
-                    |this| {
-                        this.on_drag_move(cx.listener(
-                            move |this: &mut Self,
-                                  e: &DragMoveEvent<DraggedSidebar>,
-                                  window,
-                                  cx| {
-                                if let Some(sidebar) = &this.sidebar {
-                                    let new_width = if sidebar_on_right {
-                                        window.bounds().size.width - e.event.position.x
-                                    } else {
-                                        e.event.position.x
-                                    };
-                                    sidebar.set_width(Some(new_width), cx);
-                                }
-                            },
-                        ))
-                    },
-                )
+                .when(show_sidebar, |this| {
+                    this.on_drag_move(cx.listener(
+                        move |this: &mut Self, e: &DragMoveEvent<DraggedSidebar>, window, cx| {
+                            let new_width = if sidebar_on_right {
+                                window.bounds().size.width - e.event.position.x
+                            } else {
+                                e.event.position.x
+                            };
+                            this.resize_rendered_sidebar(
+                                new_width,
+                                collaborative_workspace,
+                                window,
+                                cx,
+                            );
+                        },
+                    ))
+                })
                 .children(left_sidebar)
                 .child(
                     div()
@@ -2293,8 +2395,8 @@ impl Render for MultiWorkspace {
             window,
             cx,
             Tiling {
-                left: !sidebar_on_right && multi_workspace_enabled && self.sidebar_open(),
-                right: sidebar_on_right && multi_workspace_enabled && self.sidebar_open(),
+                left: !sidebar_on_right && show_sidebar,
+                right: sidebar_on_right && show_sidebar,
                 ..Tiling::default()
             },
         )

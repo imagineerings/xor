@@ -5,6 +5,7 @@ import "ai.proto";
 import "app.proto";
 import "buffer.proto";
 import "call.proto";
+import "cargo.proto";
 import "channel.proto";
 import "core.proto";
 import "debugger.proto";
@@ -13,6 +14,7 @@ import "git.proto";
 import "image.proto";
 import "lsp.proto";
 import "notification.proto";
+import "structured_execution.proto";
 import "task.proto";
 import "toolchain.proto";
 import "worktree.proto";
@@ -489,7 +491,20 @@ message Envelope {
     GitWorktreeCreatedAtResponse git_worktree_created_at_response = 458;
     TelemetryEvent telemetry_event = 459;
     ResolveCodeAction resolve_code_action = 460;
-    ResolveCodeActionResponse resolve_code_action_response = 461; // current max
+    ResolveCodeActionResponse resolve_code_action_response = 461;
+    GetCargoWorkspace get_cargo_workspace = 462;
+    CargoWorkspaceResponse cargo_workspace_response = 463;
+    CancelCargoWorkspace cancel_cargo_workspace = 464;
+    GetStructuredExecutionSnapshot get_structured_execution_snapshot = 465;
+    StructuredExecutionSnapshotPage structured_execution_snapshot_page = 466;
+    GetStructuredExecutionEvents get_structured_execution_events = 467;
+    StructuredExecutionEventChunk structured_execution_event_chunk = 468; // current max
+    GetRustTestDiscovery get_rust_test_discovery = 469;
+    CancelRustTestDiscovery cancel_rust_test_discovery = 470;
+    RustTestDiscoveryResponse rust_test_discovery_response = 471;
+    ResolveRustTestAction resolve_rust_test_action = 472;
+    RustTestActionPlanResponse rust_test_action_plan_response = 473;
+    UpdateRustTestRun update_rust_test_run = 474; // current max
   }
 
   reserved 87 to 88;

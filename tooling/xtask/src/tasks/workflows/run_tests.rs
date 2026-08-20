@@ -86,6 +86,9 @@ pub(crate) fn run_tests() -> Workflow {
         should_run_tests
             .and_not_in_merge_queue()
             .then(check_dependencies()), // could be more specific here?
+        should_run_tests
+            .and_not_in_merge_queue()
+            .then(check_rust_tools_feature_boundary()),
         should_check_docs
             .and_not_in_merge_queue()
             .then(deploy_docs::check_docs()),
@@ -485,6 +488,45 @@ fn check_dependencies() -> NamedJob {
             .add_step(run_cargo_machete())
             .add_step(check_cargo_lock())
             .add_step(check_vulnerable_dependencies()),
+    ))
+}
+
+fn check_rust_tools_feature_boundary() -> NamedJob {
+    named::job(use_clang(
+        release_job(&[])
+            .runs_on(runners::LINUX_LARGE)
+            .add_step(steps::harden_runner())
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::cache_rust_dependencies_namespace())
+            .map(steps::install_linux_dependencies)
+            .add_step(steps::setup_sccache(Platform::Linux))
+            .add_step(steps::script("./script/check-rust-tools-feature-boundary"))
+            .add_step(steps::script("cargo check -p sim --features rust-tools"))
+            .add_step(steps::script("cargo check -p sim --no-default-features"))
+            .add_step(steps::script(
+                "cargo check -p remote_server --features rust-tools",
+            ))
+            .add_step(steps::script(
+                "cargo check -p remote_server --no-default-features",
+            ))
+            .add_step(steps::script(
+                "cargo test -p sim --features test-support,rust-tools cargo_panel",
+            ))
+            .add_step(steps::script(
+                "cargo test -p sim --no-default-features cargo_panel_disabled",
+            ))
+            .add_step(steps::script(
+                "cargo test -p tasks_ui --features rust-test-actions rust_test_actions",
+            ))
+            .add_step(steps::script(
+                "cargo test -p remote_server --features test-support,rust-tools rust_test_provider",
+            ))
+            .add_step(steps::script(
+                "cargo test -p remote_server --no-default-features cargo_workspace_disabled",
+            ))
+            .add_step(steps::show_sccache_stats(Platform::Linux))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     ))
 }
 

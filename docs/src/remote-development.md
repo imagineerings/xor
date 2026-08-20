@@ -7,6 +7,8 @@ description: Use remote development in Sim to edit code over SSH with local UI p
 
 Remote Development lets you edit code on a remote server while running Sim locally. The UI stays responsive because it runs on your machine, while language servers, tasks, and terminals run on the server.
 
+For Rust workspace tooling, Cargo metadata, Rust test discovery, Cargo tasks, and DAP build commands also run on the authoritative remote project host. The local Cargo and Tests panels receive bounded project-relative models and structured lifecycle state; they do not receive environment values, raw terminal output, or absolute host paths, and they never fall back to a local Cargo installation. The remote server must be built with the same `rust-tools` capability. A disabled or older host is shown as an unsupported protocol/capability state rather than repeatedly retrying commands.
+
 For day-to-day workflows, pair remote development with [Tasks](./tasks.md),
 [Terminal](./terminal.md), and [Debugger](./debugger.md).
 

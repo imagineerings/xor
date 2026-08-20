@@ -10,6 +10,13 @@ use futures::FutureExt as _;
 use gpui::{App, AsyncApp, Global};
 use release_channel::ReleaseChannel;
 
+#[cfg(feature = "multiplayer-tools")]
+pub mod nostr_backup;
+#[cfg(feature = "multiplayer-tools")]
+pub mod nostr_import;
+#[cfg(feature = "multiplayer-tools")]
+pub mod nostr_lifecycle;
+
 /// An environment variable whose presence indicates that the system keychain
 /// should be used in development.
 ///

@@ -13,6 +13,7 @@ path = "src/onboarding.rs"
 
 [features]
 default = []
+multiplayer-tools = ["workspace/multiplayer-tools"]
 
 [dependencies]
 anyhow.workspace = true
@@ -44,3 +45,4 @@ zlog.workspace = true
 
 [dev-dependencies]
 db = {workspace = true, features = ["test-support"]}
+settings = {workspace = true, features = ["test-support"]}

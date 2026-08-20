@@ -40,6 +40,8 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
         MenuItem::separator(),
         MenuItem::action("Project Panel", project_panel::ToggleFocus),
         MenuItem::action("Outline Panel", outline_panel::ToggleFocus),
+        #[cfg(feature = "rust-tools")]
+        MenuItem::action("Cargo", cargo_ui::ToggleCargoPanel),
         MenuItem::action("Collab Panel", collab_panel::ToggleFocus),
         MenuItem::action("Terminal Panel", terminal_panel::Toggle),
         MenuItem::action("Debugger Panel", debug_panel::ToggleFocus),

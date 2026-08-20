@@ -13,6 +13,8 @@ path = "src/settings_content.rs"
 
 [features]
 default = []
+rust-tools = []
+test-explorer = []
 
 [dependencies]
 anyhow.workspace = true

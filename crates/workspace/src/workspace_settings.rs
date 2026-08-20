@@ -1,6 +1,6 @@
 use std::{num::NonZeroUsize, time::Duration};
 
-use crate::DockPosition;
+use crate::{DockPosition, WorkspacePresentation};
 use collections::HashMap;
 use serde::Deserialize;
 use settings::CommandAliasTarget;
@@ -13,6 +13,7 @@ pub use settings::{
 #[derive(RegisterSetting)]
 pub struct WorkspaceSettings {
     pub active_pane_modifiers: ActivePanelModifiers,
+    pub workspace_presentation: WorkspacePresentation,
     pub bottom_dock_layout: settings::BottomDockLayout,
     pub pane_split_direction_horizontal: settings::PaneSplitDirectionHorizontal,
     pub pane_split_direction_vertical: settings::PaneSplitDirectionVertical,
@@ -94,6 +95,7 @@ impl Settings for WorkspaceSettings {
                         .unwrap(),
                 ),
             },
+            workspace_presentation: workspace.workspace_presentation.unwrap_or_default(),
             bottom_dock_layout: workspace.bottom_dock_layout.unwrap(),
             pane_split_direction_horizontal: workspace.pane_split_direction_horizontal.unwrap(),
             pane_split_direction_vertical: workspace.pane_split_direction_vertical.unwrap(),
