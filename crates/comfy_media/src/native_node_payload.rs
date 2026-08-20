@@ -1,4 +1,4 @@
-use comfy_tensor::{DType, StorageId, Tensor, TensorError};
+use comfy_tensor::{DType, DeviceId, StorageId, Tensor, TensorError};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1073,7 +1073,13 @@ impl NativeAudioPayload {
 }
 
 #[derive(Clone, Debug)]
-pub struct NativeVideoPayload {
+pub enum NativeVideoPayload {
+    Components(NativeVideoComponentsPayload),
+    Encoded(NativeEncodedVideoPayload),
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeVideoComponentsPayload {
     frames: Tensor,
     frame_rate_numerator: u64,
     frame_rate_denominator: u64,
@@ -1083,6 +1089,24 @@ pub struct NativeVideoPayload {
     metadata: BTreeMap<String, String>,
     semantic_digest_sha256: [u8; 32],
     resident_bytes: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeEncodedVideoPayload {
+    bytes: Tensor,
+    content_sha256: [u8; 32],
+    source_video_sha256: [u8; 32],
+    dimensions: (u64, u64),
+    frame_rate: (u64, u64),
+    frame_count: u64,
+    semantic_digest_sha256: [u8; 32],
+    resident_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeVideoRepresentation {
+    Components,
+    Encoded,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1142,7 +1166,7 @@ impl NativeVideoPayload {
             alpha.as_ref(),
             &metadata,
         )?;
-        Ok(Self {
+        Ok(Self::Components(NativeVideoComponentsPayload {
             frames,
             frame_rate_numerator,
             frame_rate_denominator,
@@ -1152,9 +1176,149 @@ impl NativeVideoPayload {
             metadata,
             semantic_digest_sha256,
             resident_bytes,
-        })
+        }))
     }
 
+    pub fn checked_h264_mp4_from_component(
+        source: &NativeVideoPayload,
+        bytes: Tensor,
+        content_sha256: [u8; 32],
+        dimensions: (u64, u64),
+        frame_rate: (u64, u64),
+        frame_count: u64,
+    ) -> Result<Self, NativeMediaPayloadError> {
+        source.validate()?;
+        let components = source
+            .components()
+            .ok_or(NativeMediaPayloadError::InvalidVideo)?;
+        let [
+            source_frame_count,
+            source_height,
+            source_width,
+            source_channels,
+        ] = components.frames().descriptor().shape()
+        else {
+            return Err(NativeMediaPayloadError::InvalidVideo);
+        };
+        if components.frames().descriptor().dtype() != DType::F32
+            || components.frames().descriptor().device() != DeviceId::CPU
+            || !components.frames().descriptor().is_contiguous()?
+            || !matches!(*source_channels, 3 | 4)
+            || components.bit_depth() != NativeVideoBitDepth::Eight
+            || components.audio().is_some()
+            || (*source_width, *source_height) != dimensions
+            || *source_frame_count != frame_count
+        {
+            return Err(NativeMediaPayloadError::InvalidVideo);
+        }
+        let source_video_sha256 = *source.semantic_digest_sha256();
+        validate_encoded_h264_mp4(&bytes, content_sha256, dimensions, frame_rate, frame_count)?;
+        let (semantic_digest_sha256, resident_bytes) = project_encoded_h264_mp4(
+            &bytes,
+            content_sha256,
+            source_video_sha256,
+            dimensions,
+            frame_rate,
+            frame_count,
+        )?;
+        Ok(Self::Encoded(NativeEncodedVideoPayload {
+            bytes,
+            content_sha256,
+            source_video_sha256,
+            dimensions,
+            frame_rate,
+            frame_count,
+            semantic_digest_sha256,
+            resident_bytes,
+        }))
+    }
+
+    pub const fn representation(&self) -> NativeVideoRepresentation {
+        match self {
+            Self::Components(_) => NativeVideoRepresentation::Components,
+            Self::Encoded(_) => NativeVideoRepresentation::Encoded,
+        }
+    }
+
+    pub const fn components(&self) -> Option<&NativeVideoComponentsPayload> {
+        match self {
+            Self::Components(components) => Some(components),
+            Self::Encoded(_) => None,
+        }
+    }
+
+    pub const fn encoded(&self) -> Option<&NativeEncodedVideoPayload> {
+        match self {
+            Self::Components(_) => None,
+            Self::Encoded(encoded) => Some(encoded),
+        }
+    }
+
+    pub const fn frame_rate(&self) -> (u64, u64) {
+        match self {
+            Self::Components(components) => components.frame_rate(),
+            Self::Encoded(encoded) => encoded.frame_rate(),
+        }
+    }
+
+    pub const fn bit_depth(&self) -> NativeVideoBitDepth {
+        match self {
+            Self::Components(components) => components.bit_depth(),
+            Self::Encoded(encoded) => encoded.bit_depth(),
+        }
+    }
+
+    pub fn duration_seconds(&self) -> f64 {
+        match self {
+            Self::Components(components) => components.duration_seconds(),
+            Self::Encoded(encoded) => encoded.duration_seconds(),
+        }
+    }
+
+    pub fn dimensions(&self) -> (u64, u64) {
+        match self {
+            Self::Components(components) => components.dimensions(),
+            Self::Encoded(encoded) => encoded.dimensions(),
+        }
+    }
+
+    pub fn frame_count(&self) -> u64 {
+        match self {
+            Self::Components(components) => components.frame_count(),
+            Self::Encoded(encoded) => encoded.frame_count(),
+        }
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        match self {
+            Self::Components(components) => components.semantic_digest_sha256(),
+            Self::Encoded(encoded) => encoded.semantic_digest_sha256(),
+        }
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        match self {
+            Self::Components(components) => components.resident_bytes(),
+            Self::Encoded(encoded) => encoded.resident_bytes(),
+        }
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        match self {
+            Self::Components(components) => components.resident_parts(),
+            Self::Encoded(encoded) => encoded.resident_parts(),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        match self {
+            Self::Components(components) => components.validate(),
+            Self::Encoded(encoded) => encoded.validate(),
+        }
+    }
+}
+
+impl NativeVideoComponentsPayload {
     pub const fn frames(&self) -> &Tensor {
         &self.frames
     }
@@ -1168,13 +1332,17 @@ impl NativeVideoPayload {
     }
 
     pub fn duration_seconds(&self) -> f64 {
-        let frames = self.frames.descriptor().shape()[0] as f64;
-        frames * self.frame_rate_denominator as f64 / self.frame_rate_numerator as f64
+        self.frame_count() as f64 * self.frame_rate_denominator as f64
+            / self.frame_rate_numerator as f64
     }
 
     pub fn dimensions(&self) -> (u64, u64) {
         let shape = self.frames.descriptor().shape();
         (shape[2], shape[1])
+    }
+
+    pub fn frame_count(&self) -> u64 {
+        self.frames.descriptor().shape()[0]
     }
 
     pub const fn audio(&self) -> Option<&NativeAudioPayload> {
@@ -1207,7 +1375,7 @@ impl NativeVideoPayload {
                     .and_then(|total| total.checked_add(value.capacity()))
                     .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)
             })?;
-        let owned_bytes = mem::size_of::<Self>()
+        let owned_bytes = mem::size_of::<NativeVideoPayload>()
             .checked_add(metadata_bytes)
             .ok_or(NativeMediaPayloadError::ResidentBytesOverflow)?;
         let mut tensors = vec![&self.frames];
@@ -1238,6 +1406,102 @@ impl NativeVideoPayload {
             self.audio.as_ref(),
             self.alpha.as_ref(),
             &self.metadata,
+        )?;
+        require_projection(
+            self.semantic_digest_sha256,
+            digest,
+            self.resident_bytes,
+            resident_bytes,
+        )?;
+        self.resident_parts()?;
+        Ok(())
+    }
+}
+
+impl NativeEncodedVideoPayload {
+    pub const fn bytes(&self) -> &Tensor {
+        &self.bytes
+    }
+
+    pub const fn content_sha256(&self) -> &[u8; 32] {
+        &self.content_sha256
+    }
+
+    pub const fn source_video_sha256(&self) -> &[u8; 32] {
+        &self.source_video_sha256
+    }
+
+    pub const fn dimensions(&self) -> (u64, u64) {
+        self.dimensions
+    }
+
+    pub const fn frame_rate(&self) -> (u64, u64) {
+        self.frame_rate
+    }
+
+    pub const fn frame_count(&self) -> u64 {
+        self.frame_count
+    }
+
+    pub fn duration_seconds(&self) -> f64 {
+        self.frame_count as f64 * self.frame_rate.1 as f64 / self.frame_rate.0 as f64
+    }
+
+    pub const fn container(&self) -> crate::NativeVideoContainer {
+        crate::NativeVideoContainer::Mp4
+    }
+
+    pub const fn codec(&self) -> crate::NativeVideoCodec {
+        crate::NativeVideoCodec::H264
+    }
+
+    pub const fn pixel_format(&self) -> crate::NativeVideoPixelFormat {
+        crate::NativeVideoPixelFormat::Yuv420p
+    }
+
+    pub const fn bit_depth(&self) -> NativeVideoBitDepth {
+        NativeVideoBitDepth::Eight
+    }
+
+    pub const fn has_audio(&self) -> bool {
+        false
+    }
+
+    pub const fn has_alpha(&self) -> bool {
+        false
+    }
+
+    pub const fn semantic_digest_sha256(&self) -> &[u8; 32] {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeMediaResidentParts, NativeMediaPayloadError> {
+        exact_tensor_parts_with_owned(
+            mem::size_of::<NativeVideoPayload>(),
+            [&self.bytes],
+            self.resident_bytes,
+        )
+    }
+
+    pub fn validate(&self) -> Result<(), NativeMediaPayloadError> {
+        validate_encoded_h264_mp4(
+            &self.bytes,
+            self.content_sha256,
+            self.dimensions,
+            self.frame_rate,
+            self.frame_count,
+        )?;
+        let (digest, resident_bytes) = project_encoded_h264_mp4(
+            &self.bytes,
+            self.content_sha256,
+            self.source_video_sha256,
+            self.dimensions,
+            self.frame_rate,
+            self.frame_count,
         )?;
         require_projection(
             self.semantic_digest_sha256,
@@ -2592,6 +2856,65 @@ fn project_video(
     Ok(projection.finish())
 }
 
+fn validate_encoded_h264_mp4(
+    bytes: &Tensor,
+    content_sha256: [u8; 32],
+    dimensions: (u64, u64),
+    frame_rate: (u64, u64),
+    frame_count: u64,
+) -> Result<(), NativeMediaPayloadError> {
+    let descriptor = bytes.descriptor();
+    let [byte_count] = descriptor.shape() else {
+        return Err(NativeMediaPayloadError::InvalidVideo);
+    };
+    if descriptor.dtype() != DType::U8
+        || descriptor.device() != DeviceId::CPU
+        || *byte_count == 0
+        || !descriptor.is_contiguous()?
+        || dimensions.0 == 0
+        || dimensions.1 == 0
+        || frame_rate.0 == 0
+        || frame_rate.1 == 0
+        || frame_rate.0 > i32::MAX as u64
+        || frame_rate.1 > i32::MAX as u64
+        || greatest_common_divisor(frame_rate.0, frame_rate.1) != 1
+        || frame_count == 0
+    {
+        return Err(NativeMediaPayloadError::InvalidVideo);
+    }
+    let actual_content_sha256: [u8; 32] = Sha256::digest(bytes.contiguous_bytes()?).into();
+    if actual_content_sha256 != content_sha256 {
+        return Err(NativeMediaPayloadError::InvalidVideo);
+    }
+    Ok(())
+}
+
+fn project_encoded_h264_mp4(
+    bytes: &Tensor,
+    content_sha256: [u8; 32],
+    source_video_sha256: [u8; 32],
+    dimensions: (u64, u64),
+    frame_rate: (u64, u64),
+    frame_count: u64,
+) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
+    let mut projection =
+        Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.encoded-h264-mp4.v1")?;
+    projection.hasher.update(b"mp4\0h264\0yuv420p\0");
+    projection
+        .hasher
+        .update([NativeVideoBitDepth::Eight.bits(), 0, 0]);
+    projection.hasher.update(dimensions.0.to_le_bytes());
+    projection.hasher.update(dimensions.1.to_le_bytes());
+    projection.hasher.update(frame_rate.0.to_le_bytes());
+    projection.hasher.update(frame_rate.1.to_le_bytes());
+    projection.hasher.update(frame_count.to_le_bytes());
+    projection.hasher.update(source_video_sha256);
+    projection.hasher.update(content_sha256);
+    projection.hash_tensor(b"encoded-bytes", bytes)?;
+    projection.add_tensor_storages([bytes])?;
+    Ok(projection.finish())
+}
+
 fn validate_camera(
     position: &[f32; 3],
     target: &[f32; 3],
@@ -3861,23 +4184,29 @@ mod tests {
             video.resident_parts()?.resident_bytes()?,
             video.resident_bytes()
         );
+        let components = video
+            .components()
+            .ok_or(NativeMediaPayloadError::InvalidVideo)?;
         let alpha = tensor(
             vec![2, 2, 2, 1],
             DType::F32,
             f32_bytes(&[0.0, 0.25, 0.5, 1.0, 1.0, 0.5, 0.25, 0.0]),
         )?;
         let ten_bit = NativeVideoPayload::checked(
-            video.frames().clone(),
+            components.frames().clone(),
             1_054_475_631_502_295,
             35_184_372_088_832,
             NativeVideoBitDepth::Ten,
             Some(audio),
             Some(alpha),
-            video.metadata().clone(),
+            components.metadata().clone(),
         )?;
         assert_eq!(ten_bit.bit_depth().bits(), 10);
-        assert!(ten_bit.audio().is_some());
-        assert!(ten_bit.alpha().is_some());
+        let ten_bit_components = ten_bit
+            .components()
+            .ok_or(NativeMediaPayloadError::InvalidVideo)?;
+        assert!(ten_bit_components.audio().is_some());
+        assert!(ten_bit_components.alpha().is_some());
         assert_ne!(
             video.semantic_digest_sha256(),
             ten_bit.semantic_digest_sha256()
@@ -3885,7 +4214,7 @@ mod tests {
         assert!(NativeVideoBitDepth::try_from(9).is_err());
         assert!(
             NativeVideoPayload::checked(
-                video.frames().clone(),
+                components.frames().clone(),
                 60,
                 2,
                 NativeVideoBitDepth::Eight,
@@ -3897,7 +4226,7 @@ mod tests {
         );
         assert!(
             NativeVideoPayload::checked(
-                video.frames().clone(),
+                components.frames().clone(),
                 30_000,
                 1_001,
                 NativeVideoBitDepth::Eight,
@@ -3934,6 +4263,95 @@ mod tests {
         assert!(
             NativeFile3DPayload::checked(NativeFile3DRole::Spz, NativeFile3DFormat::Ply, vec![1],)
                 .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn encoded_h264_mp4_video_binds_component_identity_and_portable_storage()
+    -> Result<(), Box<dyn Error>> {
+        let source = NativeVideoPayload::checked(
+            tensor(
+                vec![1, 2, 2, 3],
+                DType::F32,
+                [0.0_f32; 12]
+                    .into_iter()
+                    .flat_map(f32::to_ne_bytes)
+                    .collect(),
+            )?,
+            30,
+            1,
+            NativeVideoBitDepth::Eight,
+            None,
+            None,
+            BTreeMap::from([("prompt".to_owned(), "source-only".to_owned())]),
+        )?;
+        let content = b"HMP4";
+        let bytes = tensor(vec![content.len() as u64], DType::U8, content.to_vec())?;
+        let storage_id = bytes.storage_id();
+        let content_sha256 = Sha256::digest(content).into();
+        let encoded = NativeVideoPayload::checked_h264_mp4_from_component(
+            &source,
+            bytes,
+            content_sha256,
+            (2, 2),
+            (30, 1),
+            1,
+        )?;
+        encoded.validate()?;
+        assert_eq!(encoded.representation(), NativeVideoRepresentation::Encoded);
+        assert!(encoded.components().is_none());
+        let backing = encoded
+            .encoded()
+            .ok_or(NativeMediaPayloadError::InvalidVideo)?;
+        assert_eq!(backing.bytes().storage_id(), storage_id);
+        assert_eq!(backing.content_sha256(), &content_sha256);
+        assert_eq!(
+            backing.source_video_sha256(),
+            source.semantic_digest_sha256()
+        );
+        assert_eq!(backing.container(), crate::NativeVideoContainer::Mp4);
+        assert_eq!(backing.codec(), crate::NativeVideoCodec::H264);
+        assert_eq!(
+            backing.pixel_format(),
+            crate::NativeVideoPixelFormat::Yuv420p
+        );
+        assert_eq!(backing.bit_depth(), NativeVideoBitDepth::Eight);
+        assert!(!backing.has_audio());
+        assert!(!backing.has_alpha());
+        assert_eq!(encoded.resident_parts()?.tensor_allocations().len(), 1);
+        assert_eq!(
+            encoded.resident_parts()?.resident_bytes()?,
+            encoded.resident_bytes()
+        );
+        assert_ne!(
+            encoded.semantic_digest_sha256(),
+            source.semantic_digest_sha256()
+        );
+
+        let forged = tensor(vec![content.len() as u64], DType::U8, content.to_vec())?;
+        assert!(
+            NativeVideoPayload::checked_h264_mp4_from_component(
+                &source,
+                forged,
+                [0; 32],
+                (2, 2),
+                (30, 1),
+                1,
+            )
+            .is_err()
+        );
+        let mismatched = tensor(vec![content.len() as u64], DType::U8, content.to_vec())?;
+        assert!(
+            NativeVideoPayload::checked_h264_mp4_from_component(
+                &source,
+                mismatched,
+                content_sha256,
+                (3, 2),
+                (30, 1),
+                1,
+            )
+            .is_err()
         );
         Ok(())
     }

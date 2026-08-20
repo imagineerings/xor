@@ -7637,7 +7637,7 @@ mod tests {
         ) -> futures::future::BoxFuture<
             'static,
             Result<
-                comfy_nodes::NativeEncodedH264Mp4Backing,
+                comfy_media::NativeVideoPayload,
                 comfy_nodes::NativeComponentH264Mp4BackingServiceError,
             >,
         > {

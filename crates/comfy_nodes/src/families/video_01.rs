@@ -533,10 +533,15 @@ impl NativeNode for GetVideoComponentsNode {
             video
                 .validate()
                 .map_err(|error| components_invalid(error.to_string()))?;
-            let image = project_video_frames(&context, video.frames())?;
+            let components = video.components().ok_or_else(|| {
+                components_invalid(
+                    "GetVideoComponents cannot decode an encoded VIDEO backing yet",
+                )
+            })?;
+            let image = project_video_frames(&context, components.frames())?;
             let image_payload = NativeTensorPayload::from_image(NativeTensorRole::Image, image)
                 .map_err(|error| components_invalid(error.to_string()))?;
-            let audio_payload = video
+            let audio_payload = components
                 .audio()
                 .cloned()
                 .map(|audio| NativeStoredPayload::Audio(Arc::new(audio)));
@@ -2557,22 +2562,23 @@ mod tests {
             ),
         ))?;
         let video = harness.video(outcome)?;
-        assert_eq!(video.frames().storage_id(), image_storage);
+        let components = video.components().ok_or("component VIDEO was not retained")?;
+        assert_eq!(components.frames().storage_id(), image_storage);
         assert_eq!(
             video.frame_rate(),
             (1_054_475_631_502_295, 35_184_372_088_832)
         );
         assert_eq!(video.bit_depth(), NativeVideoBitDepth::Ten);
         assert_eq!(
-            video
+            components
                 .audio()
                 .ok_or("audio was not retained")?
                 .waveform()
                 .storage_id(),
             audio_storage
         );
-        assert!(video.alpha().is_none());
-        assert!(video.metadata().is_empty());
+        assert!(components.alpha().is_none());
+        assert!(components.metadata().is_empty());
         assert_eq!(harness.store.count()?, 3);
         Ok(())
     }
@@ -2615,7 +2621,11 @@ mod tests {
         let video = harness.video(outcome)?;
         assert_eq!(video.frame_rate(), (1, 1));
         assert_eq!(video.bit_depth(), NativeVideoBitDepth::Eight);
-        assert!(video.audio().is_none());
+        assert!(video
+            .components()
+            .ok_or("component VIDEO was not retained")?
+            .audio()
+            .is_none());
         assert_eq!(harness.store.count()?, 2);
         Ok(())
     }
@@ -2759,6 +2769,69 @@ mod tests {
                 value: NativePrimitive::Integer(8)
             })
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn get_video_components_rejects_encoded_backing_without_decoding_or_publication()
+    -> Result<(), Box<dyn Error>> {
+        let harness = Harness::new()?;
+        let cancellation = CancellationToken::default();
+        let execution = harness.backend.execution_context(
+            StreamId::DEFAULT,
+            harness.workspace.authorize_workspace(1024)?,
+            &cancellation,
+        );
+        let image = ImageTensor::from_f32(
+            &harness.backend,
+            &execution,
+            1,
+            1,
+            1,
+            3,
+            &[0.0, 0.5, 1.0],
+        )?;
+        let source = NativeVideoPayload::checked(
+            image.tensor().clone(),
+            30,
+            1,
+            NativeVideoBitDepth::Eight,
+            None,
+            None,
+            BTreeMap::new(),
+        )?;
+        let encoded_content = b"HMP4";
+        let descriptor = TensorDescriptor::contiguous(
+            vec![encoded_content.len() as u64],
+            DType::U8,
+            DeviceId::CPU,
+            StreamId::DEFAULT,
+        )?;
+        let (encoded_bytes, _) =
+            harness
+                .backend
+                .upload_bytes(descriptor, encoded_content, &execution)?;
+        let encoded = NativeVideoPayload::checked_h264_mp4_from_component(
+            &source,
+            encoded_bytes,
+            Sha256::digest(encoded_content).into(),
+            (1, 1),
+            (30, 1),
+            1,
+        )?;
+        let video = harness.store.publish(
+            NativeStoredPayload::Video(Arc::new(encoded)),
+            &CancellationToken::default(),
+        )?;
+        let count_before = harness.store.count()?;
+        let failure = futures::executor::block_on(components_executable()?.execute(
+            harness.context(CancellationToken::default())?,
+            BTreeMap::from([("video".to_owned(), NativeValue::Handle { value: video })]),
+        ))
+        .expect_err("encoded VIDEO must not be projected as materialized components");
+        assert_eq!(failure.code, "invalid_video_components");
+        assert!(failure.message.contains("cannot decode an encoded VIDEO"));
+        assert_eq!(harness.store.count()?, count_before);
         Ok(())
     }
 

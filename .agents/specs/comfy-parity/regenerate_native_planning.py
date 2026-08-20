@@ -11472,6 +11472,82 @@ def native_video_component_h264_mp4_backing_service_foundation_task(
     )
 
 
+def native_video_backing_representation_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-backing-representation-foundation",
+        "Represent component and encoded VIDEO backings canonically",
+        [28, 29, 31, 34, 35, 41, 42, 44],
+        [18, 19, 25, 27, 28, 34, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "The canonical VIDEO media payload is a closed tagged representation of either materialized components or one path-free encoded backing. The completed component H.264 MP4 service moves its actor-owned CPU U8 Tensor directly into the narrow encoded variant, binding fixed MP4/H.264/YUV420P/eight-bit/no-audio/no-alpha identity, source VIDEO semantic digest, content digest, dimensions, reduced rate, and frame count without a second byte copy. The existing VIDEO handle kind remains singular, while component-only codec planning, GetVideoComponents, provider materialization, and plugin projection reject encoded backing until their later decode owners exist. Trim windows, ten-bit H.264, AAC/audio, container metadata, file/path ingest, demux/decode, VideoSlice, SaveVideo effects, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_test_support/fixtures/video/components/manifest.json",
+            "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused media, service, consumer-admission, provider, plugin, and ownership tests prove distinct checked component and encoded tags; byte-stable existing component identity; the narrow fixed H.264 MP4 encoded profile; exact source/content/projection validation; one moved encoded Tensor StorageId and alias-aware residency; stable semantic identity; one VIDEO handle kind; component-only consumer rejection; cancellation and projection-failure atomicity; and clean retry. The fixture explicitly excludes trim windows, ten-bit H.264, AAC/audio, arbitrary metadata, paths, demux/decode, VideoSlice, SaveVideo, effects, cache, persistence, recovery, publication, installed or playable codec proof, PyAV byte identity, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.2",
+            "29.3",
+            "29.4",
+            "31.5",
+            "34.4",
+            "35.3",
+            "35.5",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+            "44.3",
+        ],
+        registered_source_edits=[
+            "comfy_media",
+            "comfy_nodes",
+            "comfy_plugin_host",
+            "comfy_runtime",
+        ],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -15017,8 +15093,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_h264_mp4_thread_bridge_foundation["id"])
         )
     )
+    video_backing_representation_foundation = (
+        native_video_backing_representation_foundation_task(
+            str(video_component_h264_mp4_backing_service_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_component_h264_mp4_backing_service_foundation["id"])
+        str(video_backing_representation_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -15175,6 +15256,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_h264_mp4_sequence_encode_foundation,
         video_codec_h264_mp4_thread_bridge_foundation,
         video_component_h264_mp4_backing_service_foundation,
+        video_backing_representation_foundation,
         video_foundation,
         detection_foundation,
         ]

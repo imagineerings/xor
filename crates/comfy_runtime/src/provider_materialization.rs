@@ -270,26 +270,31 @@ impl ProviderNativePayload {
                     sample_rate: payload.sample_rate(),
                 },
             },
-            NativeStoredPayload::Video(payload) => Self::Video {
-                frames: ProviderTensorData::from_tensor(payload.frames())?,
-                frame_rate_numerator: payload.frame_rate().0,
-                frame_rate_denominator: payload.frame_rate().1,
-                bit_depth: payload.bit_depth().bits(),
-                audio: payload
-                    .audio()
-                    .map(|audio| {
-                        Ok(ProviderAudioData {
-                            waveform: ProviderTensorData::from_tensor(audio.waveform())?,
-                            sample_rate: audio.sample_rate(),
+            NativeStoredPayload::Video(payload) => {
+                let components = payload
+                    .components()
+                    .ok_or(ProviderMaterializationError::InvalidNativePayload)?;
+                Self::Video {
+                    frames: ProviderTensorData::from_tensor(components.frames())?,
+                    frame_rate_numerator: payload.frame_rate().0,
+                    frame_rate_denominator: payload.frame_rate().1,
+                    bit_depth: payload.bit_depth().bits(),
+                    audio: components
+                        .audio()
+                        .map(|audio| {
+                            Ok(ProviderAudioData {
+                                waveform: ProviderTensorData::from_tensor(audio.waveform())?,
+                                sample_rate: audio.sample_rate(),
+                            })
                         })
-                    })
-                    .transpose()?,
-                alpha: payload
-                    .alpha()
-                    .map(ProviderTensorData::from_tensor)
-                    .transpose()?,
-                metadata: payload.metadata().clone(),
-            },
+                        .transpose()?,
+                    alpha: components
+                        .alpha()
+                        .map(ProviderTensorData::from_tensor)
+                        .transpose()?,
+                    metadata: components.metadata().clone(),
+                }
+            }
             NativeStoredPayload::Artifact(payload) => Self::Artifact {
                 source_type_id: payload.source_type_id().to_owned(),
                 media_type: payload.media_type().to_owned(),
@@ -1532,6 +1537,37 @@ mod tests {
             round_trip.frame_rate(),
             (1_054_475_631_502_295, 35_184_372_088_832)
         );
+
+        let component = NativeVideoPayload::checked(
+            materialized.tensor().clone(),
+            1_054_475_631_502_295,
+            35_184_372_088_832,
+            NativeVideoBitDepth::Eight,
+            None,
+            None,
+            BTreeMap::new(),
+        )?;
+        let encoded_bytes = b"HMP4";
+        let descriptor = TensorDescriptor::contiguous(
+            vec![encoded_bytes.len() as u64],
+            DType::U8,
+            DeviceId::CPU,
+            execution_context.stream,
+        )?;
+        let (encoded_bytes, _) =
+            backend.upload_bytes(descriptor, encoded_bytes, &execution_context)?;
+        let encoded = NativeVideoPayload::checked_h264_mp4_from_component(
+            &component,
+            encoded_bytes,
+            Sha256::digest(b"HMP4").into(),
+            (2, 1),
+            (2_997, 100),
+            1,
+        )?;
+        assert!(matches!(
+            ProviderNativePayload::from_stored(&NativeStoredPayload::Video(Arc::new(encoded))),
+            Err(ProviderMaterializationError::InvalidNativePayload)
+        ));
         Ok(())
     }
 

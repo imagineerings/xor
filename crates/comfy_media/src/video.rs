@@ -1,4 +1,4 @@
-use crate::{NativeVideoBitDepth, NativeVideoPayload};
+use crate::{NativeVideoBitDepth, NativeVideoComponentsPayload, NativeVideoPayload};
 use comfy_types::CancellationToken;
 use thiserror::Error;
 
@@ -252,7 +252,10 @@ pub fn plan_native_video_encode(
 ) -> Result<NativeVideoEncodePlan, NativeVideoCodecPlanError> {
     check_cancelled(cancellation)?;
 
-    let frame_shape = video.frames().descriptor().shape();
+    let components = video
+        .components()
+        .ok_or(NativeVideoCodecPlanError::InvalidVideo)?;
+    let frame_shape = components.frames().descriptor().shape();
     let [frame_count, height, width, channels] = frame_shape else {
         return Err(NativeVideoCodecPlanError::InvalidVideo);
     };
@@ -268,7 +271,7 @@ pub fn plan_native_video_encode(
 
     let source_frame_rate = video.frame_rate();
     let encode_frame_rate = rounded_millisecond_frame_rate(source_frame_rate)?;
-    let has_alpha = *channels == 4 || video.alpha().is_some();
+    let has_alpha = *channels == 4 || components.alpha().is_some();
     let source_bit_depth = video.bit_depth();
 
     let (container, codec, pixel_format, output_bit_depth, alpha, audio, metadata, crf, preset) =
@@ -283,7 +286,7 @@ pub fn plan_native_video_encode(
                         NativeVideoBitDepth::Ten,
                     ),
                 };
-                let audio = plan_audio(video, *frame_count, source_frame_rate, limits)?;
+                let audio = plan_audio(components, *frame_count, source_frame_rate, limits)?;
                 (
                     NativeVideoContainer::Mp4,
                     NativeVideoCodec::H264,
@@ -297,7 +300,7 @@ pub fn plan_native_video_encode(
                 )
             }
             NativeVideoEncodeOptions::WebmVp9 { crf } => {
-                require_webm_options(video, crf)?;
+                require_webm_options(components, crf)?;
                 (
                     NativeVideoContainer::Webm,
                     NativeVideoCodec::Vp9,
@@ -319,7 +322,7 @@ pub fn plan_native_video_encode(
                 )
             }
             NativeVideoEncodeOptions::WebmAv1 { crf } => {
-                require_webm_options(video, crf)?;
+                require_webm_options(components, crf)?;
                 (
                     NativeVideoContainer::Webm,
                     NativeVideoCodec::Av1,
@@ -355,7 +358,7 @@ pub fn plan_native_video_encode(
 }
 
 fn plan_audio(
-    video: &NativeVideoPayload,
+    video: &NativeVideoComponentsPayload,
     frame_count: u64,
     source_frame_rate: (u64, u64),
     limits: NativeVideoCodecLimits,
@@ -396,7 +399,7 @@ fn plan_audio(
 }
 
 fn require_webm_options(
-    video: &NativeVideoPayload,
+    video: &NativeVideoComponentsPayload,
     crf: NativeVideoCrf,
 ) -> Result<(), NativeVideoCodecPlanError> {
     if !(0.0..=63.0).contains(&crf.value()) || video.audio().is_some() {

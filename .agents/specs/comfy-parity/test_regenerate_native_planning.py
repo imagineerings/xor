@@ -79,7 +79,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 623)
+        self.assertEqual(len(tasks), 624)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -461,6 +461,9 @@ class ValidationGenerationTests(unittest.TestCase):
         video_component_h264_mp4_backing_service_foundation_id = (
             "comfy-parity-native-video-component-h264-mp4-backing-service-foundation"
         )
+        video_backing_representation_foundation_id = (
+            "comfy-parity-native-video-backing-representation-foundation"
+        )
         video_codec_plan_foundation_id = (
             "comfy-parity-native-video-codec-plan-foundation"
         )
@@ -777,7 +780,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_component_h264_mp4_backing_service_foundation_id,
+            video_backing_representation_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
@@ -1444,8 +1447,33 @@ class ValidationGenerationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            tasks_by_id[video_foundation_id]["dependencies"],
+            tasks_by_id[video_backing_representation_foundation_id]["dependencies"],
             [video_component_h264_mp4_backing_service_foundation_id],
+        )
+        self.assertEqual(
+            tasks_by_id[video_backing_representation_foundation_id]["writes"],
+            [
+                "crates/comfy_media/src/native_node_payload.rs",
+                "crates/comfy_media/src/video.rs",
+                "crates/comfy_nodes/src/execution.rs",
+                "crates/comfy_nodes/src/comfy_nodes.rs",
+                "crates/comfy_nodes/src/families/video_01.rs",
+                "crates/comfy_plugin_host/src/registry_adapter.rs",
+                "crates/comfy_runtime/src/native_video_codec_service.rs",
+                "crates/comfy_runtime/src/native_execution_controller.rs",
+                "crates/comfy_runtime/src/provider_materialization.rs",
+                "crates/comfy_runtime/src/comfy_runtime.rs",
+                "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
+                "crates/comfy_test_support/tests/ownership_consolidation.rs",
+                ".agents/specs/comfy-parity/ownership-policy.json",
+                ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+                ".agents/specs/comfy-parity/regenerate_native_planning.py",
+                ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            ],
+        )
+        self.assertEqual(
+            tasks_by_id[video_foundation_id]["dependencies"],
+            [video_backing_representation_foundation_id],
         )
         self.assertNotIn("Cargo.toml", codec_callable_symbols["writes"])
         self.assertNotIn("Cargo.lock", codec_callable_symbols["writes"])
@@ -1809,7 +1837,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             tasks_by_id[video_foundation_id]["dependencies"],
-            [video_component_h264_mp4_backing_service_foundation_id],
+            [video_backing_representation_foundation_id],
         )
         self.assertIn(
             frame_interpolate_node_foundation_id,
@@ -1846,7 +1874,7 @@ class ValidationGenerationTests(unittest.TestCase):
             tasks_by_id[video_codec_data_plane_abi_foundation_id]["dependencies"],
         )
         self.assertIn(
-            video_component_h264_mp4_backing_service_foundation_id,
+            video_backing_representation_foundation_id,
             tasks_by_id[video_foundation_id]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
@@ -2563,8 +2591,12 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[video_codec_h264_mp4_thread_bridge_foundation_id] + 1,
         )
         self.assertEqual(
-            waves[video_foundation_id],
+            waves[video_backing_representation_foundation_id],
             waves[video_component_h264_mp4_backing_service_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[video_foundation_id],
+            waves[video_backing_representation_foundation_id] + 1,
         )
         self.assertEqual(
             waves[frame_interpolation_sequence_fallback_foundation_id],

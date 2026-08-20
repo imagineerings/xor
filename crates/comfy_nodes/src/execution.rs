@@ -3,9 +3,8 @@ use crate::{
     NativeStoredPayload, NativeStoredPayloadError,
 };
 use comfy_media::{
-    MetadataWritePolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoContainer,
-    NativeVideoCrf, NativeVideoPayload, NativeVideoPixelFormat, PngError, PngLimits,
-    encode_png_frame_with_policy_and_context,
+    MetadataWritePolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf, NativeVideoPayload,
+    NativeVideoPixelFormat, PngError, PngLimits, encode_png_frame_with_policy_and_context,
 };
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, MAX_SHADER_OUTPUTS,
@@ -2005,10 +2004,14 @@ impl NativeComponentH264Mp4BackingRequest {
         video
             .validate()
             .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?;
-        let [frame_count, height, width, channels] = video.frames().descriptor().shape() else {
+        let components = video
+            .components()
+            .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidRequest)?;
+        let [frame_count, height, width, channels] = components.frames().descriptor().shape()
+        else {
             return Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest);
         };
-        let descriptor = video.frames().descriptor();
+        let descriptor = components.frames().descriptor();
         let valid = *frame_count > 0
             && *height > 0
             && *width > 0
@@ -2019,7 +2022,7 @@ impl NativeComponentH264Mp4BackingRequest {
                 .is_contiguous()
                 .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?
             && video.bit_depth() == NativeVideoBitDepth::Eight
-            && video.audio().is_none();
+            && components.audio().is_none();
         if !valid {
             return Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest);
         }
@@ -2035,118 +2038,6 @@ impl NativeComponentH264Mp4BackingRequest {
     }
 }
 
-#[derive(Debug)]
-pub struct NativeEncodedH264Mp4Backing {
-    bytes: Tensor,
-    content_sha256: [u8; 32],
-    source_video_sha256: [u8; 32],
-    dimensions: (u64, u64),
-    frame_rate: (u64, u64),
-    frame_count: u64,
-}
-
-impl NativeEncodedH264Mp4Backing {
-    pub fn checked(
-        bytes: Tensor,
-        content_sha256: [u8; 32],
-        source_video_sha256: [u8; 32],
-        dimensions: (u64, u64),
-        frame_rate: (u64, u64),
-        frame_count: u64,
-    ) -> Result<Self, NativeComponentH264Mp4BackingServiceError> {
-        let descriptor = bytes.descriptor();
-        let actual_content_sha256: [u8; 32] = Sha256::digest(
-            bytes
-                .contiguous_bytes()
-                .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?,
-        )
-        .into();
-        let valid = descriptor.dtype() == DType::U8
-            && descriptor.device() == DeviceId::CPU
-            && descriptor.shape().len() == 1
-            && descriptor.shape().first().copied().unwrap_or(0) > 0
-            && descriptor
-                .is_contiguous()
-                .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?
-            && dimensions.0 > 0
-            && dimensions.1 > 0
-            && frame_rate.0 > 0
-            && frame_rate.1 > 0
-            && frame_rate.0 <= i32::MAX as u64
-            && frame_rate.1 <= i32::MAX as u64
-            && gcd_u64(frame_rate.0, frame_rate.1) == 1
-            && frame_count > 0
-            && actual_content_sha256 == content_sha256;
-        if !valid {
-            return Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection);
-        }
-        Ok(Self {
-            bytes,
-            content_sha256,
-            source_video_sha256,
-            dimensions,
-            frame_rate,
-            frame_count,
-        })
-    }
-
-    pub fn bytes(&self) -> &Tensor {
-        &self.bytes
-    }
-
-    pub const fn content_sha256(&self) -> [u8; 32] {
-        self.content_sha256
-    }
-
-    pub const fn source_video_sha256(&self) -> [u8; 32] {
-        self.source_video_sha256
-    }
-
-    pub const fn dimensions(&self) -> (u64, u64) {
-        self.dimensions
-    }
-
-    pub const fn frame_rate(&self) -> (u64, u64) {
-        self.frame_rate
-    }
-
-    pub const fn frame_count(&self) -> u64 {
-        self.frame_count
-    }
-
-    pub const fn container(&self) -> NativeVideoContainer {
-        NativeVideoContainer::Mp4
-    }
-
-    pub const fn codec(&self) -> NativeVideoCodec {
-        NativeVideoCodec::H264
-    }
-
-    pub const fn pixel_format(&self) -> NativeVideoPixelFormat {
-        NativeVideoPixelFormat::Yuv420p
-    }
-
-    pub const fn bit_depth(&self) -> NativeVideoBitDepth {
-        NativeVideoBitDepth::Eight
-    }
-
-    pub const fn has_alpha(&self) -> bool {
-        false
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn into_parts(self) -> (Tensor, [u8; 32], [u8; 32], (u64, u64), (u64, u64), u64) {
-        (
-            self.bytes,
-            self.content_sha256,
-            self.source_video_sha256,
-            self.dimensions,
-            self.frame_rate,
-            self.frame_count,
-        )
-    }
-}
-
 pub trait NativeComponentH264Mp4BackingService: Send + Sync + fmt::Debug {
     fn identity(&self) -> &NativeComponentH264Mp4BackingServiceIdentity;
 
@@ -2154,10 +2045,7 @@ pub trait NativeComponentH264Mp4BackingService: Send + Sync + fmt::Debug {
         &self,
         request: NativeComponentH264Mp4BackingRequest,
         context: &ExecutionContext<'_>,
-    ) -> BoxFuture<
-        'static,
-        Result<NativeEncodedH264Mp4Backing, NativeComponentH264Mp4BackingServiceError>,
-    >;
+    ) -> BoxFuture<'static, Result<NativeVideoPayload, NativeComponentH264Mp4BackingServiceError>>;
 }
 
 #[derive(Debug, Error)]
@@ -3482,10 +3370,8 @@ mod tests {
             &self,
             request: NativeComponentH264Mp4BackingRequest,
             context: &ExecutionContext<'_>,
-        ) -> BoxFuture<
-            'static,
-            Result<NativeEncodedH264Mp4Backing, NativeComponentH264Mp4BackingServiceError>,
-        > {
+        ) -> BoxFuture<'static, Result<NativeVideoPayload, NativeComponentH264Mp4BackingServiceError>>
+        {
             let video = request.into_video();
             let result = (|| {
                 context
@@ -3507,21 +3393,25 @@ mod tests {
                     .map_err(|error| {
                         NativeComponentH264Mp4BackingServiceError::Execution(error.to_string())
                     })?;
-                let frame_count = video
+                let components = video
+                    .components()
+                    .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidRequest)?;
+                let frame_count = components
                     .frames()
                     .descriptor()
                     .shape()
                     .first()
                     .copied()
                     .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidRequest)?;
-                NativeEncodedH264Mp4Backing::checked(
+                NativeVideoPayload::checked_h264_mp4_from_component(
+                    video.as_ref(),
                     bytes,
                     Sha256::digest(encoded).into(),
-                    *video.semantic_digest_sha256(),
                     video.dimensions(),
                     video.frame_rate(),
                     frame_count,
                 )
+                .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)
             })();
             Box::pin(async move { result })
         }
@@ -4552,7 +4442,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<NativeComponentH264Mp4BackingRequest>();
-        assert_send_sync::<NativeEncodedH264Mp4Backing>();
+        assert_send_sync::<NativeVideoPayload>();
         assert!(NativeComponentH264Mp4BackingServiceIdentity::checked("not-a-digest").is_err());
         let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
         let backend = Arc::new(backend);
@@ -4602,33 +4492,44 @@ mod tests {
             BTreeMap::from([("prompt".to_owned(), "source-only".to_owned())]),
         )?);
         let request = NativeComponentH264Mp4BackingRequest::checked(video.clone())?;
-        assert_eq!(request.video().frames().storage_id(), frame_storage);
+        assert_eq!(
+            request
+                .video()
+                .components()
+                .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidRequest)?
+                .frames()
+                .storage_id(),
+            frame_storage
+        );
         let result = futures::executor::block_on(
             context
                 .component_h264_mp4_backing_service()?
                 .encode_backing(request, &execution),
         )?;
-        assert_eq!(result.bytes().contiguous_bytes()?, b"HMP4");
+        let encoded = result
+            .encoded()
+            .ok_or(NativeComponentH264Mp4BackingServiceError::InvalidProjection)?;
+        assert_eq!(encoded.bytes().contiguous_bytes()?, b"HMP4");
         assert_eq!(
-            result.source_video_sha256(),
-            *video.semantic_digest_sha256()
+            encoded.source_video_sha256(),
+            video.semantic_digest_sha256()
         );
-        assert_eq!(result.container(), NativeVideoContainer::Mp4);
-        assert_eq!(result.codec(), NativeVideoCodec::H264);
-        assert_eq!(result.pixel_format(), NativeVideoPixelFormat::Yuv420p);
-        assert_eq!(result.bit_depth(), NativeVideoBitDepth::Eight);
-        assert!(!result.has_alpha());
-        assert!(matches!(
-            NativeEncodedH264Mp4Backing::checked(
-                result.bytes().clone(),
+        assert_eq!(encoded.container(), comfy_media::NativeVideoContainer::Mp4);
+        assert_eq!(encoded.codec(), NativeVideoCodec::H264);
+        assert_eq!(encoded.pixel_format(), NativeVideoPixelFormat::Yuv420p);
+        assert_eq!(encoded.bit_depth(), NativeVideoBitDepth::Eight);
+        assert!(!encoded.has_alpha());
+        assert!(
+            NativeVideoPayload::checked_h264_mp4_from_component(
+                video.as_ref(),
+                encoded.bytes().clone(),
                 [0; 32],
-                result.source_video_sha256(),
-                result.dimensions(),
-                result.frame_rate(),
-                result.frame_count(),
-            ),
-            Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection)
-        ));
+                encoded.dimensions(),
+                encoded.frame_rate(),
+                encoded.frame_count(),
+            )
+            .is_err()
+        );
 
         let ten_bit = Arc::new(NativeVideoPayload::checked(
             frames.tensor().clone(),

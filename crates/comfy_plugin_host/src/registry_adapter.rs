@@ -966,8 +966,9 @@ fn plugin_value_from_stored(
             if family != ValueFamily::Tensor {
                 return Err(invalid_value(&port.id));
             }
+            let components = stored.components().ok_or_else(|| invalid_value(&port.id))?;
             let value = TensorValue::new(
-                stored.frames().descriptor().clone(),
+                components.frames().descriptor().clone(),
                 stored.resident_bytes(),
                 hex_digest(stored.semantic_digest_sha256()),
             )

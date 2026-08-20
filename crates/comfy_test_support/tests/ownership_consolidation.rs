@@ -15510,10 +15510,9 @@ fn val_ownership_native_video_component_h264_mp4_backing_service_001()
     for required in [
         "pub struct NativeComponentH264Mp4BackingServiceIdentity",
         "pub struct NativeComponentH264Mp4BackingRequest",
-        "pub struct NativeEncodedH264Mp4Backing",
         "pub enum NativeComponentH264Mp4BackingServiceError",
         "pub trait NativeComponentH264Mp4BackingService",
-        "actual_content_sha256",
+        "Result<NativeVideoPayload",
         "with_component_h264_mp4_backing",
         "component_h264_mp4_backing_service",
         "component_h264_mp4_backing_service_requires_checked_video_and_portable_contract",
@@ -15533,7 +15532,7 @@ fn val_ownership_native_video_component_h264_mp4_backing_service_001()
         "NativeVideoMetadataPolicy::Exclude",
         "h264_mp4_sequence_limits_configuration_u64",
         "encode_h264_mp4_batch",
-        "NativeEncodedH264Mp4Backing::checked",
+        "NativeVideoPayload::checked_h264_mp4_from_component",
         "into_parts",
         "map_h264_mp4_backing_service_error",
     ] {
@@ -15612,6 +15611,118 @@ fn val_ownership_native_video_component_h264_mp4_backing_service_001()
             })
             .count(),
         1
+    );
+    Ok(())
+}
+
+#[test]
+fn val_ownership_native_video_backing_representation_001() -> Result<(), Box<dyn std::error::Error>>
+{
+    let root = repository_root()?;
+    let media = fs::read_to_string(root.join("crates/comfy_media/src/native_node_payload.rs"))?;
+    for required in [
+        "pub enum NativeVideoPayload",
+        "Components(NativeVideoComponentsPayload)",
+        "Encoded(NativeEncodedVideoPayload)",
+        "pub struct NativeVideoComponentsPayload",
+        "pub struct NativeEncodedVideoPayload",
+        "checked_h264_mp4_from_component",
+        "sim.comfy.media.video.encoded-h264-mp4.v1",
+        "actual_content_sha256",
+        "encoded_h264_mp4_video_binds_component_identity_and_portable_storage",
+    ] {
+        assert!(
+            media.contains(required),
+            "VIDEO backing media owner lacks {required}"
+        );
+    }
+    for forbidden in [
+        "file_path:",
+        "PathBuf",
+        "NativeVideoTrimWindow",
+        "unsafe impl Send",
+    ] {
+        assert!(
+            !media.contains(forbidden),
+            "VIDEO backing media owner exposes deferred {forbidden}"
+        );
+    }
+
+    let planner = fs::read_to_string(root.join("crates/comfy_media/src/video.rs"))?;
+    assert!(
+        planner.contains(".components()") && planner.contains("InvalidVideo"),
+        "video planner does not reject encoded backing"
+    );
+    let nodes = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    assert!(
+        nodes.contains("cannot decode an encoded VIDEO backing yet"),
+        "GetVideoComponents does not fail closed on encoded backing"
+    );
+    let provider =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/provider_materialization.rs"))?;
+    assert!(
+        provider.contains(".components()")
+            && provider.contains("ProviderMaterializationError::InvalidNativePayload"),
+        "provider materialization does not reject encoded backing"
+    );
+    let plugin = fs::read_to_string(root.join("crates/comfy_plugin_host/src/registry_adapter.rs"))?;
+    assert!(
+        plugin.contains("stored") && plugin.contains(".components()"),
+        "plugin projection does not require component backing"
+    );
+    let runtime =
+        fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
+    assert!(
+        runtime.contains("NativeVideoPayload::checked_h264_mp4_from_component"),
+        "H.264 backing service does not return canonical encoded VIDEO"
+    );
+    let fixture = fs::read_to_string(root.join(
+        "crates/comfy_test_support/fixtures/video/encoded-video-backing-payload/manifest.json",
+    ))?;
+    for required in [
+        "synthetic-encoded-video-backing-payload",
+        "actor_owned_tensor_moved_without_second_copy",
+        "component_consumers_reject_encoded_without_decode",
+        "trim_window_or_video_slice_reachable",
+    ] {
+        assert!(
+            fixture.contains(required),
+            "encoded VIDEO fixture lacks {required}"
+        );
+    }
+
+    let policy: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join(".agents/specs/comfy-parity/ownership-policy.json"),
+    )?)?;
+    let concerns = policy
+        .get("concerns")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("missing ownership concerns")?;
+    let concern = concerns
+        .iter()
+        .find(|concern| {
+            concern.get("concern").and_then(serde_json::Value::as_str)
+                == Some("native_video_component_domain")
+        })
+        .ok_or("missing canonical VIDEO ownership concern")?;
+    assert_eq!(
+        concern
+            .get("canonical_owner")
+            .and_then(serde_json::Value::as_str),
+        Some("comfy_media::NativeVideoPayload")
+    );
+    let task_id = "comfy-parity-native-video-backing-representation-foundation";
+    assert_eq!(
+        concerns
+            .iter()
+            .filter(|concern| {
+                concern
+                    .get("consolidation_tasks")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|tasks| tasks.iter().any(|task| task.as_str() == Some(task_id)))
+            })
+            .count(),
+        2
     );
     Ok(())
 }
