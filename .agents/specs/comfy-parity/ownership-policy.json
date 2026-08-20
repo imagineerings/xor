@@ -14791,7 +14791,7 @@
         "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
         "process_av1_webm_request",
         "materialize_owned_av1_webm",
-        "materialize_owned_webm_bytes"
+        "materialize_owned_encoded_bytes"
       ],
       "allowed_adapters": [
         "the existing retained codec-thread service remains the sole channel thread suite load bind admission and shutdown owner",
@@ -14811,7 +14811,8 @@
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
           "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
           "role": "canonical_service",
-          "symbol": "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata"
+          "symbol": "NativeLtxvCodecRequestProxy::encode_av1_webm_batch_with_metadata",
+          "pattern": "pub\\(crate\\) fn encode_av1_webm_batch_with_metadata\\("
         }
       ],
       "call_symbols": [
@@ -14823,7 +14824,7 @@
         {
           "name": "av1-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeAv1Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
+          "pattern": "NativeLtxvCodecThreadInvocation[\\s\\S]*scratch: ScratchReservation[\\s\\S]*cancellation: CancellationToken[\\s\\S]*NativeVideoCodecThreadOperation[\\s\\S]*EncodeAv1Webm[\\s\\S]*try_send[\\s\\S]*sync_channel\\(1\\)"
         },
         {
           "name": "av1-webm-thread-bridge-drops-native-session-before-portable-response",
@@ -14833,7 +14834,7 @@
         {
           "name": "av1-webm-thread-bridge-shares-exact-accounted-u8-materializer",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "materialize_owned_av1_webm[\\s\\S]*materialize_owned_webm_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
+          "pattern": "materialize_owned_av1_webm[\\s\\S]*materialize_owned_encoded_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
         },
         {
           "name": "av1-webm-thread-bridge-projects-ten-bit-non-alpha-portable-output",
@@ -14841,9 +14842,9 @@
           "pattern": "NativeOwnedAv1Webm[\\s\\S]*NativeVideoBitDepth::Ten[\\s\\S]*NativeVideoPixelFormat::Yuv420p10le[\\s\\S]*has_alpha[\\s\\S]*false"
         },
         {
-          "name": "av1-webm-thread-bridge-reuses-v7-mixed-actor-and-accounting-tests",
+          "name": "av1-webm-thread-bridge-reuses-current-mixed-actor-and-accounting-tests",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v7[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv[\\s\\S]*owned_vp9_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "av1-webm-thread-bridge-fixture-bounds-evidence-claims",
@@ -14940,7 +14941,7 @@
         {
           "name": "h264-mp4-sequence-discards-alpha-with-bounded-staging",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "source_compatible_h264_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel.get\\(\\.\\.3\\)[\\s\\S]*stage H\\.264 RGB frame"
+          "pattern": "source_compatible_h264_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel[\\s\\S]*?\\.get\\(\\.\\.3\\)[\\s\\S]*stage H\\.264 RGB frame"
         },
         {
           "name": "h264-mp4-sequence-tests-rate-options-order-cancellation-and-retry",
@@ -14988,6 +14989,119 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "One retained suite method executes the provider-proved ordinary 8-bit H.264 MP4 sequence profile through the existing bounded AVIO and shared packet state machine. It stages only source RGB, preserves exact rate and frame order, omits LTXV-specific options, returns attempt-local bytes, and leaves actor, encoded backing, audio, ten-bit, node, effect, cache, path, persistence, recovery, and publication ownership to later adapters."
+    },
+    {
+      "concern": "native_video_reviewed_codec_registry_h264_mp4_thread_bridge",
+      "canonical_owner": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+      "owner_files": [
+        "crates/comfy_runtime/src/native_video_codec_service.rs"
+      ],
+      "owner_symbols": [
+        "NativeOwnedH264Mp4",
+        "NativeVideoCodecThreadOperation::EncodeH264Mp4",
+        "NativeVideoCodecThreadOutput::H264Mp4",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+        "process_h264_mp4_request",
+        "materialize_owned_h264_mp4",
+        "materialize_owned_encoded_bytes"
+      ],
+      "allowed_adapters": [
+        "the existing retained codec-thread service remains the sole channel thread suite load bind admission and shutdown owner",
+        "the bounded H.264 MP4 IMAGE-sequence primitive supplies attempt-local staged bytes while every native owner remains on the actor thread",
+        "checked sequence limits and caller scratch cancellation and stream authority cross the sole actor without native authority",
+        "the canonical CPU backend uploader owns the one exact-length U8 Tensor copy and persistent backend allocation accounting shared with VP9 and AV1",
+        "following encoded-backing node and effect adapters may move the portable output but own no codec actor native pointer cache persistence recovery or publication state"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeOwnedH264Mp4",
+          "role": "sealed_lifecycle_projection",
+          "symbol": "NativeOwnedH264Mp4"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+          "role": "canonical_service",
+          "symbol": "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+          "pattern": "pub\\(crate\\) fn encode_h264_mp4_batch\\("
+        }
+      ],
+      "call_symbols": [
+        "NativeVideoCodecSuite::encode_h264_mp4_batch",
+        "CpuBackend::upload_bytes",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch"
+      ],
+      "required_mappings": [
+        {
+          "name": "h264-mp4-thread-bridge-shares-one-bounded-actor-and-caller-authority",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeLtxvCodecThreadInvocation[\\s\\S]*scratch: ScratchReservation[\\s\\S]*cancellation: CancellationToken[\\s\\S]*NativeVideoCodecThreadOperation[\\s\\S]*EncodeH264Mp4[\\s\\S]*try_send[\\s\\S]*sync_channel\\(1\\)"
+        },
+        {
+          "name": "h264-mp4-thread-bridge-drops-native-session-before-portable-response",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "process_h264_mp4_request[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*encoded_bytes[\\s\\S]*materialize_owned_h264_mp4[\\s\\S]*drop\\(encoded\\)[\\s\\S]*Ok\\(output\\)"
+        },
+        {
+          "name": "h264-mp4-thread-bridge-shares-exact-accounted-u8-materializer",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "materialize_owned_h264_mp4[\\s\\S]*materialize_owned_encoded_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
+        },
+        {
+          "name": "h264-mp4-thread-bridge-projects-eight-bit-non-alpha-portable-output",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeOwnedH264Mp4[\\s\\S]*NativeVideoBitDepth::Eight[\\s\\S]*NativeVideoPixelFormat::Yuv420p[\\s\\S]*has_alpha[\\s\\S]*false[\\s\\S]*NativeVideoCodec::H264[\\s\\S]*NativeVideoContainer::Mp4"
+        },
+        {
+          "name": "h264-mp4-thread-bridge-reuses-v8-mixed-actor-and-accounting-tests",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
+        },
+        {
+          "name": "h264-mp4-thread-bridge-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json",
+          "pattern": "synthetic-retained-h264-mp4-owned-tensor-thread-bridge[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*public_node_service_backing_slice_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation"
+      ],
+      "production_consumers": [
+        "the following encoded-backing video service and VideoSlice or SaveVideo adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One capacity-one retained codec actor carries H.264 requests to the sole native owner thread, drops every borrowed H.264 MP4 owner there, and reuses the single checked exact-length CPU U8 Tensor materializer before returning portable eight-bit non-alpha bytes with scratch converged."
     },
     {
       "concern": "native_video_reviewed_codec_registry_ltxv_h264_admission",
@@ -15529,7 +15643,8 @@
       "consolidation_tasks": [
         "comfy-parity-authoritative-ownership-gate",
         "comfy-parity-native-video-codec-ltxv-thread-service-foundation",
-        "comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation"
+        "comfy-parity-native-video-codec-av1-webm-thread-bridge-foundation",
+        "comfy-parity-native-video-codec-h264-mp4-thread-bridge-foundation"
       ],
       "production_consumers": [
         "the following worker-owned service provisioning and LTXVPreprocess node adapter"
@@ -15825,7 +15940,7 @@
         "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch_with_metadata",
         "process_vp9_webm_request",
         "materialize_owned_vp9_webm",
-        "materialize_owned_webm_bytes"
+        "materialize_owned_encoded_bytes"
       ],
       "allowed_adapters": [
         "the existing retained codec-thread service remains the sole channel, thread, suite, load, bind, admission, and shutdown owner",
@@ -15844,7 +15959,8 @@
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
           "qualified": "comfy_runtime::native_video_codec_service::NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
           "role": "canonical_service",
-          "symbol": "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch"
+          "symbol": "NativeLtxvCodecRequestProxy::encode_vp9_webm_batch",
+          "pattern": "pub\\(crate\\) fn encode_vp9_webm_batch\\("
         }
       ],
       "call_symbols": [
@@ -15863,7 +15979,7 @@
         {
           "name": "vp9-webm-thread-bridge-shares-one-bounded-actor-and-caller-authority",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*sync_channel\\(1\\)[\\s\\S]*try_send[\\s\\S]*ScratchReservation[\\s\\S]*CancellationToken"
+          "pattern": "NativeLtxvCodecThreadInvocation[\\s\\S]*scratch: ScratchReservation[\\s\\S]*cancellation: CancellationToken[\\s\\S]*NativeVideoCodecThreadOperation[\\s\\S]*EncodeVp9Webm[\\s\\S]*try_send[\\s\\S]*sync_channel\\(1\\)"
         },
         {
           "name": "vp9-webm-thread-bridge-drops-native-session-before-portable-response",
@@ -15873,12 +15989,12 @@
         {
           "name": "vp9-webm-thread-bridge-materializes-exact-accounted-u8-tensor",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "materialize_owned_vp9_webm[\\s\\S]*materialize_owned_webm_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
+          "pattern": "materialize_owned_vp9_webm[\\s\\S]*materialize_owned_encoded_bytes[\\s\\S]*TensorDescriptor::contiguous[\\s\\S]*DType::U8[\\s\\S]*DeviceId::CPU[\\s\\S]*upload_bytes[\\s\\S]*content_sha256"
         },
         {
           "name": "vp9-webm-thread-bridge-tests-affinity-accounting-failure-and-retry",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv[\\s\\S]*owned_vp9_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "vp9-webm-thread-bridge-fixture-bounds-evidence-claims",
@@ -15888,12 +16004,12 @@
         {
           "name": "vp9-webm-thread-bridge-carries-owned-ordered-container-metadata",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
+          "pattern": "EncodeVp9Webm[\\s\\S]*NativeVideoContainerMetadata[\\s\\S]*encode_vp9_webm_batch_with_metadata[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
         },
         {
           "name": "vp9-webm-thread-bridge-carries-source-alpha-projection-without-a-second-actor",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v7[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv"
+          "pattern": "sim.comfy.video-codec-thread.v8[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
         }
       ],
       "known_open_reasons": [],

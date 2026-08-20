@@ -1,12 +1,16 @@
 use crate::{
-    CertifiedVideoCodecDependencyClosure, NativeLtxvH264PreprocessLimits,
-    NativeVideoCodecAv1EncodeError, NativeVideoCodecBindingError, NativeVideoCodecLoadError,
-    NativeVideoCodecLtxvAdmissionError, NativeVideoCodecLtxvPreprocessError,
-    NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite, NativeVideoCodecSuiteAdmissionError,
-    NativeVideoCodecVp9EncodeError, NativeVideoContainerMetadata, NativeVp9WebmBatchLimits,
-    bind_certified_video_codec_abi, load_certified_video_codec_closure,
+    CertifiedVideoCodecDependencyClosure, NativeH264Mp4SequenceLimits,
+    NativeLtxvH264PreprocessLimits, NativeVideoCodecAv1EncodeError, NativeVideoCodecBindingError,
+    NativeVideoCodecH264EncodeError, NativeVideoCodecLoadError, NativeVideoCodecLtxvAdmissionError,
+    NativeVideoCodecLtxvPreprocessError, NativeVideoCodecRuntimeVersions, NativeVideoCodecSuite,
+    NativeVideoCodecSuiteAdmissionError, NativeVideoCodecVp9EncodeError,
+    NativeVideoContainerMetadata, NativeVp9WebmBatchLimits, bind_certified_video_codec_abi,
+    load_certified_video_codec_closure,
 };
-use comfy_media::{NativeVideoBitDepth, NativeVideoCodec, NativeVideoCrf, NativeVideoPixelFormat};
+use comfy_media::{
+    NativeVideoBitDepth, NativeVideoCodec, NativeVideoContainer, NativeVideoCrf,
+    NativeVideoPixelFormat,
+};
 use comfy_nodes::{
     NativeEncodedWebm, NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
     NativeLtxvPreprocessServiceIdentity, NativeWebmEncodeRequest, NativeWebmEncodeService,
@@ -28,7 +32,7 @@ use std::{
 use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
-const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v7";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v8";
 #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
 const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1";
 
@@ -102,7 +106,9 @@ pub(crate) enum NativeLtxvCodecThreadError {
     Vp9Encode(#[source] Box<NativeVideoCodecVp9EncodeError>),
     #[error("native AV1 WebM encoding failed: {0}")]
     Av1Encode(#[source] Box<NativeVideoCodecAv1EncodeError>),
-    #[error("native WebM owned-byte materialization failed: {0}")]
+    #[error("native H.264 MP4 encoding failed: {0}")]
+    H264Encode(#[source] Box<NativeVideoCodecH264EncodeError>),
+    #[error("native encoded-byte materialization failed: {0}")]
     EncodedOutput(#[source] Box<TensorError>),
 }
 
@@ -137,12 +143,90 @@ enum NativeVideoCodecThreadOperation {
         limits: NativeVp9WebmBatchLimits,
         metadata: NativeVideoContainerMetadata,
     },
+    EncodeH264Mp4 {
+        images: ImageTensor,
+        frame_rate: (u64, u64),
+        limits: NativeH264Mp4SequenceLimits,
+    },
 }
 
 enum NativeVideoCodecThreadOutput {
     Image(ImageTensor),
     Vp9Webm(NativeOwnedVp9Webm),
     Av1Webm(NativeOwnedAv1Webm),
+    H264Mp4(NativeOwnedH264Mp4),
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following encoded-backing video service"
+)]
+#[derive(Debug)]
+pub(crate) struct NativeOwnedH264Mp4 {
+    bytes: Tensor,
+    content_sha256: [u8; 32],
+    width: i32,
+    height: i32,
+    frame_rate: (i32, i32),
+    frame_count: usize,
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following encoded-backing video service"
+)]
+impl NativeOwnedH264Mp4 {
+    pub(crate) fn encoded_bytes(&self) -> Result<&[u8], TensorError> {
+        self.bytes.contiguous_bytes()
+    }
+
+    pub(crate) const fn dimensions(&self) -> (i32, i32) {
+        (self.width, self.height)
+    }
+
+    pub(crate) const fn content_sha256(&self) -> [u8; 32] {
+        self.content_sha256
+    }
+
+    pub(crate) const fn frame_rate(&self) -> (i32, i32) {
+        self.frame_rate
+    }
+
+    pub(crate) const fn frame_count(&self) -> usize {
+        self.frame_count
+    }
+
+    pub(crate) const fn bit_depth(&self) -> NativeVideoBitDepth {
+        NativeVideoBitDepth::Eight
+    }
+
+    pub(crate) const fn pixel_format(&self) -> NativeVideoPixelFormat {
+        NativeVideoPixelFormat::Yuv420p
+    }
+
+    pub(crate) const fn has_alpha(&self) -> bool {
+        false
+    }
+
+    pub(crate) const fn codec(&self) -> NativeVideoCodec {
+        NativeVideoCodec::H264
+    }
+
+    pub(crate) const fn container(&self) -> NativeVideoContainer {
+        NativeVideoContainer::Mp4
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn into_parts(self) -> (Tensor, [u8; 32], i32, i32, (i32, i32), usize) {
+        (
+            self.bytes,
+            self.content_sha256,
+            self.width,
+            self.height,
+            self.frame_rate,
+            self.frame_count,
+        )
+    }
 }
 
 #[allow(
@@ -438,7 +522,8 @@ impl NativeLtxvCodecRequestProxy {
             match result.await? {
                 NativeVideoCodecThreadOutput::Image(image) => Ok(image),
                 NativeVideoCodecThreadOutput::Vp9Webm(_)
-                | NativeVideoCodecThreadOutput::Av1Webm(_) => {
+                | NativeVideoCodecThreadOutput::Av1Webm(_)
+                | NativeVideoCodecThreadOutput::H264Mp4(_) => {
                     Err(NativeLtxvCodecThreadError::StatePoisoned)
                 }
             }
@@ -487,7 +572,8 @@ impl NativeLtxvCodecRequestProxy {
             match result.await? {
                 NativeVideoCodecThreadOutput::Vp9Webm(encoded) => Ok(encoded),
                 NativeVideoCodecThreadOutput::Image(_)
-                | NativeVideoCodecThreadOutput::Av1Webm(_) => {
+                | NativeVideoCodecThreadOutput::Av1Webm(_)
+                | NativeVideoCodecThreadOutput::H264Mp4(_) => {
                     Err(NativeLtxvCodecThreadError::StatePoisoned)
                 }
             }
@@ -518,7 +604,40 @@ impl NativeLtxvCodecRequestProxy {
             match result.await? {
                 NativeVideoCodecThreadOutput::Av1Webm(encoded) => Ok(encoded),
                 NativeVideoCodecThreadOutput::Image(_)
-                | NativeVideoCodecThreadOutput::Vp9Webm(_) => {
+                | NativeVideoCodecThreadOutput::Vp9Webm(_)
+                | NativeVideoCodecThreadOutput::H264Mp4(_) => {
+                    Err(NativeLtxvCodecThreadError::StatePoisoned)
+                }
+            }
+        }
+        .boxed()
+    }
+
+    #[allow(
+        dead_code,
+        reason = "consumed by the following encoded-backing video service"
+    )]
+    pub(crate) fn encode_h264_mp4_batch(
+        &self,
+        images: &ImageTensor,
+        frame_rate: (u64, u64),
+        limits: NativeH264Mp4SequenceLimits,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<'static, Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError>> {
+        let result = self.submit(
+            NativeVideoCodecThreadOperation::EncodeH264Mp4 {
+                images: images.clone(),
+                frame_rate,
+                limits,
+            },
+            context,
+        );
+        async move {
+            match result.await? {
+                NativeVideoCodecThreadOutput::H264Mp4(encoded) => Ok(encoded),
+                NativeVideoCodecThreadOutput::Image(_)
+                | NativeVideoCodecThreadOutput::Vp9Webm(_)
+                | NativeVideoCodecThreadOutput::Av1Webm(_) => {
                     Err(NativeLtxvCodecThreadError::StatePoisoned)
                 }
             }
@@ -906,6 +1025,7 @@ fn map_ltxv_node_service_error(
         | NativeLtxvCodecThreadError::Preprocess(_)
         | NativeLtxvCodecThreadError::Vp9Encode(_)
         | NativeLtxvCodecThreadError::Av1Encode(_)
+        | NativeLtxvCodecThreadError::H264Encode(_)
         | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
             NativeLtxvPreprocessServiceError::Execution(error.to_string())
         }
@@ -951,6 +1071,7 @@ fn map_webm_node_service_error(error: NativeLtxvCodecThreadError) -> NativeWebmE
         | NativeLtxvCodecThreadError::Preprocess(_)
         | NativeLtxvCodecThreadError::Vp9Encode(_)
         | NativeLtxvCodecThreadError::Av1Encode(_)
+        | NativeLtxvCodecThreadError::H264Encode(_)
         | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
             NativeWebmEncodeServiceError::Execution(error.to_string())
         }
@@ -1001,6 +1122,13 @@ fn process_video_codec_request(
             metadata,
         } => NativeVideoCodecThreadOutput::Av1Webm(process_av1_webm_request(
             codec, backend, &context, &images, frame_rate, crf, limits, &metadata,
+        )?),
+        NativeVideoCodecThreadOperation::EncodeH264Mp4 {
+            images,
+            frame_rate,
+            limits,
+        } => NativeVideoCodecThreadOutput::H264Mp4(process_h264_mp4_request(
+            codec, backend, &context, &images, frame_rate, limits,
         )?),
     };
     context
@@ -1099,6 +1227,45 @@ fn process_av1_webm_request(
     Ok(output)
 }
 
+fn process_h264_mp4_request(
+    codec: &NativeVideoCodecSuite,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    images: &ImageTensor,
+    frame_rate: (u64, u64),
+    limits: NativeH264Mp4SequenceLimits,
+) -> Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError> {
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    let encoded = codec
+        .encode_h264_mp4_batch(images, frame_rate, limits, backend, context)
+        .map_err(map_h264_thread_encode_error)?;
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    let (width, height) = encoded.dimensions();
+    let frame_rate = encoded.frame_rate();
+    let frame_count = encoded.frame_count();
+    let encoded_bytes = encoded
+        .encoded_bytes()
+        .map_err(map_h264_thread_encode_error)?;
+    let output = materialize_owned_h264_mp4(
+        backend,
+        context,
+        encoded_bytes,
+        width,
+        height,
+        frame_rate,
+        frame_count,
+    )?;
+    drop(encoded);
+    context
+        .check()
+        .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
+    Ok(output)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn materialize_owned_vp9_webm(
     backend: &CpuBackend,
@@ -1110,7 +1277,7 @@ fn materialize_owned_vp9_webm(
     frame_count: usize,
     has_alpha: bool,
 ) -> Result<NativeOwnedVp9Webm, NativeLtxvCodecThreadError> {
-    let (bytes, content_sha256) = materialize_owned_webm_bytes(backend, context, encoded_bytes)?;
+    let (bytes, content_sha256) = materialize_owned_encoded_bytes(backend, context, encoded_bytes)?;
     Ok(NativeOwnedVp9Webm {
         bytes,
         content_sha256,
@@ -1132,7 +1299,7 @@ fn materialize_owned_av1_webm(
     frame_rate: (i32, i32),
     frame_count: usize,
 ) -> Result<NativeOwnedAv1Webm, NativeLtxvCodecThreadError> {
-    let (bytes, content_sha256) = materialize_owned_webm_bytes(backend, context, encoded_bytes)?;
+    let (bytes, content_sha256) = materialize_owned_encoded_bytes(backend, context, encoded_bytes)?;
     Ok(NativeOwnedAv1Webm {
         bytes,
         content_sha256,
@@ -1143,7 +1310,28 @@ fn materialize_owned_av1_webm(
     })
 }
 
-fn materialize_owned_webm_bytes(
+#[allow(clippy::too_many_arguments)]
+fn materialize_owned_h264_mp4(
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+    encoded_bytes: &[u8],
+    width: i32,
+    height: i32,
+    frame_rate: (i32, i32),
+    frame_count: usize,
+) -> Result<NativeOwnedH264Mp4, NativeLtxvCodecThreadError> {
+    let (bytes, content_sha256) = materialize_owned_encoded_bytes(backend, context, encoded_bytes)?;
+    Ok(NativeOwnedH264Mp4 {
+        bytes,
+        content_sha256,
+        width,
+        height,
+        frame_rate,
+        frame_count,
+    })
+}
+
+fn materialize_owned_encoded_bytes(
     backend: &CpuBackend,
     context: &ExecutionContext<'_>,
     encoded_bytes: &[u8],
@@ -1155,10 +1343,10 @@ fn materialize_owned_webm_bytes(
         .map_err(|_| NativeLtxvCodecThreadError::ResourceExhausted)?;
     let descriptor =
         TensorDescriptor::contiguous(vec![byte_length], DType::U8, DeviceId::CPU, context.stream)
-            .map_err(map_vp9_output_tensor_error)?;
+            .map_err(map_encoded_output_tensor_error)?;
     let (bytes, _) = backend
         .upload_bytes(descriptor, encoded_bytes, context)
-        .map_err(map_vp9_output_tensor_error)?;
+        .map_err(map_encoded_output_tensor_error)?;
     context
         .check()
         .map_err(|_| NativeLtxvCodecThreadError::Cancelled)?;
@@ -1189,7 +1377,20 @@ fn map_av1_thread_encode_error(
     }
 }
 
-fn map_vp9_output_tensor_error(error: TensorError) -> NativeLtxvCodecThreadError {
+fn map_h264_thread_encode_error(
+    error: NativeVideoCodecH264EncodeError,
+) -> NativeLtxvCodecThreadError {
+    match error {
+        NativeVideoCodecH264EncodeError::Cancelled => NativeLtxvCodecThreadError::Cancelled,
+        NativeVideoCodecH264EncodeError::NativeAllocation { .. }
+        | NativeVideoCodecH264EncodeError::ResourceExhausted { .. } => {
+            NativeLtxvCodecThreadError::ResourceExhausted
+        }
+        error => NativeLtxvCodecThreadError::H264Encode(Box::new(error)),
+    }
+}
+
+fn map_encoded_output_tensor_error(error: TensorError) -> NativeLtxvCodecThreadError {
     match error {
         TensorError::Cancelled => NativeLtxvCodecThreadError::Cancelled,
         TensorError::AllocationFailed { .. }
@@ -1376,6 +1577,9 @@ mod tests {
                                 if crf.bits() != 31.5_f64.to_bits() {
                                     return Err(NativeLtxvCodecThreadError::StatePoisoned);
                                 }
+                                Err(NativeLtxvCodecThreadError::StatePoisoned)
+                            }
+                            NativeVideoCodecThreadOperation::EncodeH264Mp4 { .. } => {
                                 Err(NativeLtxvCodecThreadError::StatePoisoned)
                             }
                         }
@@ -1583,17 +1787,20 @@ mod tests {
     }
 
     #[test]
-    fn retained_video_codec_thread_returns_owned_vp9_bytes_and_preserves_ltxv()
+    fn retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv()
     -> Result<(), Box<dyn std::error::Error>> {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<NativeLtxvCodecRequestProxy>();
         assert_send_sync::<NativeOwnedVp9Webm>();
         assert_send_sync::<NativeOwnedAv1Webm>();
+        assert_send_sync::<NativeOwnedH264Mp4>();
 
         let cancellation = CancellationToken::default();
         let (backend, _image, scratch) = test_image_and_context(&cancellation)?;
         let image_context = request_context(scratch.clone(), &cancellation);
         let image = ImageTensor::from_f32(&backend, &image_context, 3, 2, 2, 4, &[0.5; 48])?;
+        let input_storage_id = image.tensor().storage_id();
+        let h264_limits = NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 32, 4, 1024)?;
         let events = Arc::new(Mutex::new(Vec::new()));
         let actor_backend = backend.clone();
         let service = start_ltxv_codec_thread({
@@ -1683,6 +1890,29 @@ mod tests {
                                 )?;
                                 Ok(NativeVideoCodecThreadOutput::Av1Webm(encoded))
                             }
+                            NativeVideoCodecThreadOperation::EncodeH264Mp4 {
+                                images,
+                                frame_rate,
+                                limits,
+                            } => {
+                                if !matches!(images.dimensions(), Ok((3, 2, 2, 4)))
+                                    || frame_rate != (2997, 100)
+                                    || limits != h264_limits
+                                    || images.tensor().storage_id() != input_storage_id
+                                {
+                                    return Err(NativeLtxvCodecThreadError::StatePoisoned);
+                                }
+                                let encoded = materialize_owned_h264_mp4(
+                                    &actor_backend,
+                                    &context,
+                                    b"HMP4",
+                                    2,
+                                    2,
+                                    (2997, 100),
+                                    3,
+                                )?;
+                                Ok(NativeVideoCodecThreadOutput::H264Mp4(encoded))
+                            }
                         }
                     },
                 ))
@@ -1755,6 +1985,24 @@ mod tests {
         assert_eq!(scratch.in_use_bytes(), 0);
         drop(av1);
 
+        let h264 =
+            block_on(proxy.encode_h264_mp4_batch(&image, (2997, 100), h264_limits, &context))?;
+        assert_eq!(h264.encoded_bytes()?, b"HMP4");
+        assert_eq!(h264.dimensions(), (2, 2));
+        assert_eq!(h264.frame_rate(), (2997, 100));
+        assert_eq!(h264.frame_count(), 3);
+        assert_eq!(h264.codec(), NativeVideoCodec::H264);
+        assert_eq!(h264.container(), NativeVideoContainer::Mp4);
+        assert_eq!(h264.bit_depth(), NativeVideoBitDepth::Eight);
+        assert_eq!(h264.pixel_format(), NativeVideoPixelFormat::Yuv420p);
+        assert!(!h264.has_alpha());
+        assert_eq!(
+            h264.content_sha256(),
+            <[u8; 32]>::from(Sha256::digest(b"HMP4"))
+        );
+        assert_eq!(scratch.in_use_bytes(), 0);
+        drop(h264);
+
         let metadata_limits = crate::NativeVideoContainerMetadataLimits::checked(3, 16, 16, 64)?;
         let webm_service =
             NativeWebmCodecRequestService::checked(proxy.clone(), batch_limits, metadata_limits)?;
@@ -1822,14 +2070,14 @@ mod tests {
         assert_ne!(actor_thread, thread::current().id());
         assert_eq!(
             events.iter().filter(|event| event.0 == "request").count(),
-            5
+            6
         );
         assert!(events.iter().all(|event| event.1 == actor_thread));
         Ok(())
     }
 
     #[test]
-    fn owned_vp9_output_materialization_is_accounted_atomic_and_retryable()
+    fn owned_encoded_output_materialization_is_accounted_atomic_and_retryable()
     -> Result<(), Box<dyn std::error::Error>> {
         let cancellation = CancellationToken::default();
         let (backend, authority) = BackendWorkspaceAuthority::create_backend(1024)?;
@@ -1842,6 +2090,13 @@ mod tests {
         assert_eq!(scratch.in_use_bytes(), 0);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
         drop(encoded);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+
+        let h264 = materialize_owned_h264_mp4(&backend, &context, b"HMP4", 2, 2, (125, 2997), 3)?;
+        assert_eq!(h264.encoded_bytes()?, b"HMP4");
+        assert_eq!(scratch.in_use_bytes(), 0);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
+        drop(h264);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline);
 
         let cancelled = CancellationToken::default();
