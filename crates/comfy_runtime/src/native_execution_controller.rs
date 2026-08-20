@@ -50,17 +50,17 @@ use comfy_model::{
 };
 use comfy_nodes::{
     CatalogNodeDescriptor, CatalogNodeStatus, NATIVE_NODE_CONTRACT_SCHEMA_VERSION,
-    NativeDynamicInputDescriptor, NativeHandleKind, NativeHandleStoreError, NativeHandleType,
-    NativeImageDescriptor, NativeImageDescriptorError, NativeImageEffect, NativeInputDescriptor,
-    NativeInputRequirement, NativeLtxvPreprocessService, NativeNodeBinding,
-    NativeNodeBindingDisposition, NativeNodeContractError, NativeNodePresentation,
-    NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputSchemaMetadata, NativePortCardinality,
-    NativePrimitive, NativePrimitiveType, NativeResolvedPayload, NativeStoredModelPayload,
-    NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType, NativeWebmEncodeService,
-    NodeDescriptor, NodeRegistry, PortDescriptor, generated_family_node_bindings,
-    native_diffusion_descriptors, native_image_descriptors, native_source_type_projection,
-    native_text_generation_transaction, native_value_type_for_output_schema,
-    native_value_types_for_input_schema,
+    NativeComponentH264Mp4BackingService, NativeDynamicInputDescriptor, NativeHandleKind,
+    NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
+    NativeImageEffect, NativeInputDescriptor, NativeInputRequirement, NativeLtxvPreprocessService,
+    NativeNodeBinding, NativeNodeBindingDisposition, NativeNodeContractError,
+    NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputSchemaMetadata,
+    NativePortCardinality, NativePrimitive, NativePrimitiveType, NativeResolvedPayload,
+    NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
+    NativeWebmEncodeService, NodeDescriptor, NodeRegistry, PortDescriptor,
+    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
+    native_source_type_projection, native_text_generation_transaction,
+    native_value_type_for_output_schema, native_value_types_for_input_schema,
 };
 use comfy_nodes::{
     NativeEffectServiceError, NativeImagePreviewError, NativeNodeServiceIdentity,
@@ -4125,6 +4125,7 @@ pub struct NativeImageExecutor {
     shader_executor: Arc<dyn NativeShaderExecutor>,
     ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
     webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
+    component_h264_mp4_backing_service: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
     metadata_enabled: bool,
     diffusion_enabled: bool,
 }
@@ -4173,6 +4174,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4205,6 +4207,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4236,6 +4239,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4272,6 +4276,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: false,
         })
@@ -4305,6 +4310,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4343,6 +4349,7 @@ impl NativeImageExecutor {
             shader_executor: default_native_shader_executor(),
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             metadata_enabled,
             diffusion_enabled: true,
         })
@@ -4391,6 +4398,14 @@ impl NativeImageExecutor {
         self
     }
 
+    pub fn with_component_h264_mp4_backing_service(
+        mut self,
+        service: Arc<dyn NativeComponentH264Mp4BackingService>,
+    ) -> Self {
+        self.component_h264_mp4_backing_service = Some(service);
+        self
+    }
+
     fn execution_configuration_token(
         &self,
         plan: &CompiledPlan,
@@ -4414,6 +4429,10 @@ impl NativeImageExecutor {
             .webm_encode_service
             .as_deref()
             .map(|service| service.identity().configuration_sha256());
+        let component_h264_mp4_identity = self
+            .component_h264_mp4_backing_service
+            .as_deref()
+            .map(|service| service.identity().configuration_sha256());
         let mut configuration_token =
             format!("{configuration_token}:provider={provider_identity}:shader={shader_identity}");
         if let Some(ltxv_identity) = ltxv_identity {
@@ -4423,6 +4442,10 @@ impl NativeImageExecutor {
         if let Some(webm_identity) = webm_identity {
             configuration_token.push_str(":webm=");
             configuration_token.push_str(webm_identity);
+        }
+        if let Some(component_h264_mp4_identity) = component_h264_mp4_identity {
+            configuration_token.push_str(":h264-mp4=");
+            configuration_token.push_str(component_h264_mp4_identity);
         }
         configuration_token
     }
@@ -4508,6 +4531,11 @@ impl NativeImageExecutor {
         }
         if let Some(webm_encode_service) = &self.webm_encode_service {
             engine = engine.with_webm_encode_service(webm_encode_service.clone());
+        }
+        if let Some(component_h264_mp4_backing_service) = &self.component_h264_mp4_backing_service {
+            engine = engine.with_component_h264_mp4_backing_service(
+                component_h264_mp4_backing_service.clone(),
+            );
         }
         if let Some(event_bus) = event_bus {
             engine = engine.with_event_bus(event_bus);
@@ -7592,6 +7620,33 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct IdentityComponentH264Mp4BackingService {
+        identity: comfy_nodes::NativeComponentH264Mp4BackingServiceIdentity,
+    }
+
+    impl NativeComponentH264Mp4BackingService for IdentityComponentH264Mp4BackingService {
+        fn identity(&self) -> &comfy_nodes::NativeComponentH264Mp4BackingServiceIdentity {
+            &self.identity
+        }
+
+        fn encode_backing(
+            &self,
+            _request: comfy_nodes::NativeComponentH264Mp4BackingRequest,
+            _context: &ExecutionContext<'_>,
+        ) -> futures::future::BoxFuture<
+            'static,
+            Result<
+                comfy_nodes::NativeEncodedH264Mp4Backing,
+                comfy_nodes::NativeComponentH264Mp4BackingServiceError,
+            >,
+        > {
+            Box::pin(async {
+                Err(comfy_nodes::NativeComponentH264Mp4BackingServiceError::Unavailable)
+            })
+        }
+    }
+
     fn native(value: Value) -> NativeValue {
         match value {
             Value::Null => NativeValue::Primitive {
@@ -7812,6 +7867,26 @@ mod tests {
         assert!(webm_identity.ends_with(&format!(":webm={}", "e".repeat(64))));
         assert_ne!(webm_identity, first_identity);
 
+        let (h264_mp4_backend, _) =
+            CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
+        let h264_mp4 = NativeImageExecutor::new_with_cpu_backend(
+            profile_id,
+            BTreeMap::new(),
+            true,
+            Arc::new(h264_mp4_backend),
+        )?
+        .with_shader_executor(Arc::new(IdentityShaderExecutor("shader-a")))
+        .with_component_h264_mp4_backing_service(Arc::new(
+            IdentityComponentH264Mp4BackingService {
+                identity: comfy_nodes::NativeComponentH264Mp4BackingServiceIdentity::checked(
+                    "f".repeat(64),
+                )?,
+            },
+        ));
+        let h264_mp4_identity = h264_mp4.execution_configuration_token(&plan, "balanced");
+        assert!(h264_mp4_identity.ends_with(&format!(":h264-mp4={}", "f".repeat(64))));
+        assert_ne!(h264_mp4_identity, first_identity);
+
         let (both_backend, _) =
             CpuWorkspaceAuthority::create_backend(DEFAULT_NATIVE_IMAGE_MEMORY_LIMIT_BYTES)?;
         let both = NativeImageExecutor::new_with_cpu_backend(
@@ -7826,10 +7901,22 @@ mod tests {
         }))
         .with_webm_encode_service(Arc::new(IdentityWebmEncodeService {
             identity: comfy_nodes::NativeWebmEncodeServiceIdentity::checked("e".repeat(64))?,
-        }));
+        }))
+        .with_component_h264_mp4_backing_service(Arc::new(
+            IdentityComponentH264Mp4BackingService {
+                identity: comfy_nodes::NativeComponentH264Mp4BackingServiceIdentity::checked(
+                    "f".repeat(64),
+                )?,
+            },
+        ));
         assert!(
             both.execution_configuration_token(&plan, "balanced")
-                .ends_with(&format!(":ltxv={}:webm={}", "d".repeat(64), "e".repeat(64)))
+                .ends_with(&format!(
+                    ":ltxv={}:webm={}:h264-mp4={}",
+                    "d".repeat(64),
+                    "e".repeat(64),
+                    "f".repeat(64)
+                ))
         );
         Ok(())
     }

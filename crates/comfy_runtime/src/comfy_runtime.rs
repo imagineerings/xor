@@ -1,8 +1,10 @@
 pub use comfy_nodes::{
     CatalogNodeDescriptor, CatalogNodeInputSchemaMetadata, CatalogNodeOutputSchemaMetadata,
     CatalogNodeSchemaMetadata, CatalogNodeSource, CatalogNodeStatus, NativeCacheDependencies,
-    NativeCachePolicy, NativeDescriptorSchemaMetadata, NativeDynamicInputDescriptor,
-    NativeDynamicSchemaMetadata, NativeEffectClass, NativeEncodedWebm, NativeHandleKind,
+    NativeCachePolicy, NativeComponentH264Mp4BackingRequest, NativeComponentH264Mp4BackingService,
+    NativeComponentH264Mp4BackingServiceError, NativeComponentH264Mp4BackingServiceIdentity,
+    NativeDescriptorSchemaMetadata, NativeDynamicInputDescriptor, NativeDynamicSchemaMetadata,
+    NativeEffectClass, NativeEncodedH264Mp4Backing, NativeEncodedWebm, NativeHandleKind,
     NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
     NativeInputDescriptor, NativeInputRequirement, NativeInputSchemaMetadata,
     NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,

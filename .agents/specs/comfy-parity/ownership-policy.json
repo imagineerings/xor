@@ -14110,6 +14110,126 @@
       "decision_reason": "NativeVideoPayload is the sole in-memory VIDEO component value. It owns checked frame tensors, exact reduced u64 rational frame rate, typed 8/10-bit identity, optional audio and separate alpha, bounded metadata, duration, dimensions, content identity, and alias-aware residency. Provider and stored-payload layers only transport or seal that value. Codec/container execution, filesystem paths, interpolation state, cache, persistence, and publication remain outside this concern."
     },
     {
+      "concern": "native_video_component_h264_mp4_backing_service",
+      "canonical_owner": "comfy_nodes::execution::NativeComponentH264Mp4BackingService",
+      "owner_files": [
+        "crates/comfy_nodes/src/execution.rs",
+        "crates/comfy_nodes/src/comfy_nodes.rs",
+        "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+        "crates/comfy_runtime/src/native_video_codec_service.rs",
+        "crates/comfy_runtime/src/executor.rs",
+        "crates/comfy_runtime/src/native_execution_controller.rs",
+        "crates/comfy_runtime/src/comfy_runtime.rs"
+      ],
+      "owner_symbols": [
+        "NativeComponentH264Mp4BackingServiceIdentity",
+        "NativeComponentH264Mp4BackingRequest",
+        "NativeEncodedH264Mp4Backing",
+        "NativeComponentH264Mp4BackingServiceError",
+        "NativeComponentH264Mp4BackingService",
+        "NativeComponentH264Mp4CodecRequestService",
+        "ExecutionEngine::with_component_h264_mp4_backing_service",
+        "NativeImageExecutor::with_component_h264_mp4_backing_service"
+      ],
+      "allowed_adapters": [
+        "the canonical component VIDEO payload and codec planner own source semantic identity bit depth audio metadata and ties-even millisecond rate projection",
+        "the existing retained H.264 actor remains the sole codec thread native lifetime and exact encoded-byte Tensor allocation owner",
+        "the H.264 sequence limits expose only deterministic configuration values for service identity",
+        "NativeNodeServices and ExecutionEngine carry the checked service Arc without owning codec state",
+        "NativeImageExecutor appends the checked component H.264 MP4 backing configuration digest to execution cache identity",
+        "later encoded VIDEO trim-window VideoSlice SaveVideo and effect adapters may consume portable backing but own no codec actor"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::execution::NativeComponentH264Mp4BackingService",
+          "role": "canonical_service",
+          "symbol": "NativeComponentH264Mp4BackingService"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "qualified": "comfy_runtime::native_video_codec_service::NativeComponentH264Mp4CodecRequestService",
+          "role": "allowed_adapter",
+          "symbol": "NativeComponentH264Mp4CodecRequestService"
+        }
+      ],
+      "call_symbols": [
+        "plan_native_video_encode",
+        "NativeLtxvCodecRequestProxy::encode_h264_mp4_batch",
+        "NativeNodeServices::with_component_h264_mp4_backing",
+        "ExecutionEngine::with_component_h264_mp4_backing_service",
+        "NativeImageExecutor::with_component_h264_mp4_backing_service"
+      ],
+      "required_mappings": [
+        {
+          "name": "component-h264-mp4-backing-service-owns-checked-video-and-portable-contract",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeComponentH264Mp4BackingServiceIdentity[\\s\\S]*NativeComponentH264Mp4BackingRequest[\\s\\S]*NativeEncodedH264Mp4Backing[\\s\\S]*NativeComponentH264Mp4BackingServiceError[\\s\\S]*trait NativeComponentH264Mp4BackingService"
+        },
+        {
+          "name": "component-h264-mp4-backing-service-derives-plan-and-moves-retained-output",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "NativeComponentH264Mp4CodecRequestService[\\s\\S]*plan_native_video_encode[\\s\\S]*ComponentMp4[\\s\\S]*NativeVideoMetadataPolicy::Exclude[\\s\\S]*encode_h264_mp4_batch[\\s\\S]*into_parts[\\s\\S]*NativeEncodedH264Mp4Backing::checked"
+        },
+        {
+          "name": "component-h264-mp4-backing-service-identity-binds-actor-and-all-limit-values",
+          "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
+          "pattern": "sim.comfy.component-h264-mp4-backing-service.v1[\\s\\S]*max_audio_samples[\\s\\S]*h264_mp4_sequence_limits_configuration_u64[\\s\\S]*configuration_sha256"
+        },
+        {
+          "name": "component-h264-mp4-backing-service-propagates-through-engine-and-cache-identity",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "component_h264_mp4_backing_service[\\s\\S]*with_component_h264_mp4_backing_service[\\s\\S]*:h264-mp4="
+        },
+        {
+          "name": "component-h264-mp4-backing-service-fixture-bounds-evidence-claims",
+          "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
+          "pattern": "synthetic-component-h264-mp4-backing-service[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*source_video_semantic_digest_bound[\\s\\S]*encoded_video_handle_slice_effect_or_output_committer_reachable"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-authoritative-ownership-gate",
+        "comfy-parity-native-video-component-h264-mp4-backing-service-foundation"
+      ],
+      "production_consumers": [
+        "later encoded VIDEO representation trim-window VideoSlice SaveVideo and prepared-effect adapters"
+      ],
+      "requirements": [
+        "Requirement 28",
+        "Requirement 29",
+        "Requirement 31",
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 35",
+        "Requirement 37",
+        "Requirement 41",
+        "Requirement 42"
+      ],
+      "design": [
+        "D17",
+        "D18",
+        "D19",
+        "D25",
+        "D27",
+        "D28",
+        "D31",
+        "D36",
+        "D41"
+      ],
+      "validation": [
+        "VAL-TENSOR-001",
+        "VAL-MEDIA-001",
+        "VAL-RUNTIME-TRUST-001",
+        "VAL-NATIVE-BOUNDARY-001",
+        "VAL-NODE-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "One checked component VIDEO service derives the canonical metadata-free 8-bit H.264 MP4 plan, dispatches it through the sole retained actor, moves its already-accounted Tensor without another encoded-byte copy, binds source and content digests, validates every projection, and partitions execution identity by actor plus all configured planning and sequence limits."
+    },
+    {
       "concern": "native_video_encoding_codec_planning",
       "canonical_owner": "comfy_media::video::plan_native_video_encode",
       "owner_files": [

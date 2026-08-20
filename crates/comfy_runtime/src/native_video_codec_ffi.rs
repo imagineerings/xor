@@ -140,7 +140,7 @@ pub(crate) struct NativeH264Mp4SequenceLimits {
 
 #[allow(
     dead_code,
-    reason = "consumed by the following retained H.264 codec-thread bridge"
+    reason = "consumed by the retained H.264 codec-thread bridge and backing service"
 )]
 impl NativeH264Mp4SequenceLimits {
     pub(crate) fn checked(
@@ -168,6 +168,17 @@ impl NativeH264Mp4SequenceLimits {
             maximum_frames,
             maximum_pixels_per_frame,
         })
+    }
+
+    pub(crate) const fn configuration_values(self) -> (usize, usize, u64, usize, usize, u64) {
+        (
+            self.maximum_output_bytes,
+            self.avio_buffer_bytes,
+            self.maximum_native_session_bytes,
+            self.maximum_packet_iterations,
+            self.maximum_frames,
+            self.maximum_pixels_per_frame,
+        )
     }
 }
 

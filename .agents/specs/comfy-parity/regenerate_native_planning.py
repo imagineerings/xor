@@ -11389,6 +11389,89 @@ def native_video_codec_h264_mp4_thread_bridge_foundation_task(
     )
 
 
+def native_video_component_h264_mp4_backing_service_foundation_task(
+    dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-video-component-h264-mp4-backing-service-foundation",
+        "Materialize bounded H.264 MP4 backing for component VIDEO",
+        [28, 29, 31, 32, 34, 35, 37, 41, 42],
+        [17, 18, 19, 25, 27, 28, 31, 36, 41],
+        [
+            "VAL-TENSOR-001",
+            "VAL-MEDIA-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-NATIVE-BOUNDARY-001",
+            "VAL-NODE-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "A checked native-node service accepts one canonical materialized component VIDEO, derives the canonical metadata-free 8-bit H.264 MP4 encode plan under fixed service limits, and carries its immutable IMAGE storage through the sole retained codec actor. It moves the actor-owned CPU U8 Tensor without another encoded-byte copy into a checked portable backing bound to the source VIDEO semantic digest, content digest, dimensions, reduced rate, frame count, MP4/H.264/YUV420P identity, and no alpha. Ten-bit video, AAC/audio, container metadata, file-backed VIDEO representation, trim windows, slicing, save effects, paths, handles, cache, persistence, recovery, and publication remain later owners.",
+        [
+            "projects/comfy/ComfyUI/requirements.txt",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_util/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_tensor/src/cpu_backend.rs",
+            "crates/comfy_tensor/src/image_ops.rs",
+            "crates/comfy_tensor/src/operation.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/components/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-plan/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-sequence-encode/manifest.json",
+            "crates/comfy_test_support/fixtures/video/codec-h264-mp4-thread-bridge/manifest.json",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/fixtures/video/component-h264-mp4-backing-service/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Focused media, service, execution-injection, and ownership tests prove checked component VIDEO admission; metadata-free canonical planning with ties-even millisecond rate projection; exact source semantic and encoded content binding; one actor call and zero second encoded-byte copies; stable service identity over actor and all planning and sequence limits; cancellation, busy, exhaustion, projection-failure, accounting, and retry atomicity; and absent-service behavior. The fixture explicitly excludes installed codecs, playable or decoded numeric H.264 evidence, PyAV encoder or byte identity, ten-bit video, AAC/audio, container metadata, encoded VIDEO representation, trim windows, VideoSlice, SaveVideo, effects, paths, handles, cache, persistence, recovery, publication, and complete native-heap interception.",
+        [dependency],
+        locked=True,
+        criterion_ids=[
+            "28.5",
+            "29.3",
+            "29.4",
+            "31.5",
+            "31.6",
+            "32.1",
+            "34.4",
+            "34.6",
+            "35.3",
+            "35.5",
+            "35.6",
+            "37.5",
+            "41.4",
+            "41.5",
+            "42.2",
+            "42.4",
+        ],
+        registered_source_edits=["comfy_nodes", "comfy_runtime"],
+    )
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -14929,8 +15012,13 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_h264_mp4_sequence_encode_foundation["id"])
         )
     )
+    video_component_h264_mp4_backing_service_foundation = (
+        native_video_component_h264_mp4_backing_service_foundation_task(
+            str(video_codec_h264_mp4_thread_bridge_foundation["id"])
+        )
+    )
     video_foundation = native_video_execution_foundation_task(
-        str(video_codec_h264_mp4_thread_bridge_foundation["id"])
+        str(video_component_h264_mp4_backing_service_foundation["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -15086,6 +15174,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_save_webm_node_foundation,
         video_codec_h264_mp4_sequence_encode_foundation,
         video_codec_h264_mp4_thread_bridge_foundation,
+        video_component_h264_mp4_backing_service_foundation,
         video_foundation,
         detection_foundation,
         ]

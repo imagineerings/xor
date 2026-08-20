@@ -8,13 +8,16 @@ use crate::{
     load_certified_video_codec_closure,
 };
 use comfy_media::{
-    NativeVideoBitDepth, NativeVideoCodec, NativeVideoContainer, NativeVideoCrf,
-    NativeVideoPixelFormat,
+    NativeVideoAlphaPolicy, NativeVideoBitDepth, NativeVideoCodec, NativeVideoCodecLimits,
+    NativeVideoCodecPlanError, NativeVideoContainer, NativeVideoCrf, NativeVideoEncodeOptions,
+    NativeVideoMetadataPolicy, NativeVideoPixelFormat, plan_native_video_encode,
 };
 use comfy_nodes::{
-    NativeEncodedWebm, NativeLtxvPreprocessService, NativeLtxvPreprocessServiceError,
-    NativeLtxvPreprocessServiceIdentity, NativeWebmEncodeRequest, NativeWebmEncodeService,
-    NativeWebmEncodeServiceError, NativeWebmEncodeServiceIdentity,
+    NativeComponentH264Mp4BackingRequest, NativeComponentH264Mp4BackingService,
+    NativeComponentH264Mp4BackingServiceError, NativeComponentH264Mp4BackingServiceIdentity,
+    NativeEncodedH264Mp4Backing, NativeEncodedWebm, NativeLtxvPreprocessService,
+    NativeLtxvPreprocessServiceError, NativeLtxvPreprocessServiceIdentity, NativeWebmEncodeRequest,
+    NativeWebmEncodeService, NativeWebmEncodeServiceError, NativeWebmEncodeServiceIdentity,
 };
 use comfy_tensor::{
     CpuBackend, DType, DeviceId, ExecutionContext, ImageTensor, ScratchReservation, StreamId,
@@ -35,6 +38,12 @@ const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
 const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v8";
 #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
 const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1";
+#[allow(
+    dead_code,
+    reason = "constructed by the following encoded VIDEO backing adapter"
+)]
+const COMPONENT_H264_MP4_BACKING_SERVICE_IDENTITY_VERSION: &str =
+    "sim.comfy.component-h264-mp4-backing-service.v1";
 
 #[allow(
     dead_code,
@@ -414,6 +423,62 @@ impl NativeWebmCodecRequestService {
             proxy,
             batch_limits,
             metadata_limits,
+            identity,
+        })
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "constructed by the following encoded VIDEO backing adapter"
+)]
+#[derive(Clone, Debug)]
+pub(crate) struct NativeComponentH264Mp4CodecRequestService {
+    proxy: NativeLtxvCodecRequestProxy,
+    planning_limits: NativeVideoCodecLimits,
+    sequence_limits: NativeH264Mp4SequenceLimits,
+    identity: NativeComponentH264Mp4BackingServiceIdentity,
+}
+
+#[allow(
+    dead_code,
+    reason = "constructed by the following encoded VIDEO backing adapter"
+)]
+impl NativeComponentH264Mp4CodecRequestService {
+    pub(crate) fn checked(
+        proxy: NativeLtxvCodecRequestProxy,
+        planning_limits: NativeVideoCodecLimits,
+        sequence_limits: NativeH264Mp4SequenceLimits,
+    ) -> Result<Self, NativeComponentH264Mp4BackingServiceError> {
+        let sequence_values = h264_mp4_sequence_limits_configuration_u64(sequence_limits)?;
+        if planning_limits.max_encoded_bytes() > sequence_values[0]
+            || planning_limits.max_frames() > sequence_values[4]
+            || planning_limits.max_pixels_per_frame() > sequence_values[5]
+        {
+            return Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest);
+        }
+        let mut digest = Sha256::new();
+        digest.update(COMPONENT_H264_MP4_BACKING_SERVICE_IDENTITY_VERSION.as_bytes());
+        digest.update([0]);
+        digest.update(proxy.identity().configuration_sha256().as_bytes());
+        for value in [
+            planning_limits.max_frames(),
+            planning_limits.max_pixels_per_frame(),
+            planning_limits.max_audio_samples(),
+            planning_limits.max_encoded_bytes(),
+        ] {
+            digest.update(value.to_be_bytes());
+        }
+        for value in sequence_values {
+            digest.update(value.to_be_bytes());
+        }
+        let configuration_sha256 = format!("{:x}", digest.finalize());
+        let identity = NativeComponentH264Mp4BackingServiceIdentity::checked(configuration_sha256)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?;
+        Ok(Self {
+            proxy,
+            planning_limits,
+            sequence_limits,
             identity,
         })
     }
@@ -822,6 +887,135 @@ impl NativeWebmEncodeService for NativeWebmCodecRequestService {
     }
 }
 
+impl NativeComponentH264Mp4BackingService for NativeComponentH264Mp4CodecRequestService {
+    fn identity(&self) -> &NativeComponentH264Mp4BackingServiceIdentity {
+        &self.identity
+    }
+
+    fn encode_backing(
+        &self,
+        request: NativeComponentH264Mp4BackingRequest,
+        context: &ExecutionContext<'_>,
+    ) -> BoxFuture<
+        'static,
+        Result<NativeEncodedH264Mp4Backing, NativeComponentH264Mp4BackingServiceError>,
+    > {
+        if context.cancellation.check().is_err() {
+            return async { Err(NativeComponentH264Mp4BackingServiceError::Cancelled) }.boxed();
+        }
+        let video = request.into_video();
+        if video.frames().descriptor().stream() != context.stream {
+            return async { Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest) }
+                .boxed();
+        }
+        let plan = match plan_native_video_encode(
+            video.as_ref(),
+            NativeVideoEncodeOptions::ComponentMp4 {
+                metadata: NativeVideoMetadataPolicy::Exclude,
+            },
+            self.planning_limits,
+            &context.cancellation,
+        ) {
+            Ok(plan) => plan,
+            Err(error) => {
+                return async move { Err(map_h264_mp4_backing_plan_error(error)) }.boxed();
+            }
+        };
+        let supported_plan = plan.container() == NativeVideoContainer::Mp4
+            && plan.codec() == NativeVideoCodec::H264
+            && plan.pixel_format() == NativeVideoPixelFormat::Yuv420p
+            && plan.source_bit_depth() == NativeVideoBitDepth::Eight
+            && plan.output_bit_depth() == NativeVideoBitDepth::Eight
+            && plan.alpha() == NativeVideoAlphaPolicy::Discard
+            && plan.audio().is_none()
+            && plan.metadata() == NativeVideoMetadataPolicy::Exclude
+            && plan.crf().is_none()
+            && plan.preset().is_none();
+        if !supported_plan {
+            return async { Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest) }
+                .boxed();
+        }
+        let images = match ImageTensor::from_tensor(video.frames().clone()) {
+            Ok(images) => images,
+            Err(_) => {
+                return async { Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest) }
+                    .boxed();
+            }
+        };
+        let expected_dimensions = plan.dimensions();
+        let expected_frame_rate = plan.encode_frame_rate();
+        let expected_frame_count = plan.frame_count();
+        let source_video_sha256 = *video.semantic_digest_sha256();
+        let stream = context.stream;
+        let cancellation = context.cancellation.clone();
+        let result = self.proxy.encode_h264_mp4_batch(
+            &images,
+            expected_frame_rate,
+            self.sequence_limits,
+            context,
+        );
+        async move {
+            let output = result.await.map_err(map_h264_mp4_backing_service_error)?;
+            cancellation
+                .check()
+                .map_err(|_| NativeComponentH264Mp4BackingServiceError::Cancelled)?;
+            let backing = checked_component_h264_mp4_backing_result(
+                output,
+                source_video_sha256,
+                expected_dimensions,
+                expected_frame_rate,
+                expected_frame_count,
+                stream,
+            )?;
+            cancellation
+                .check()
+                .map_err(|_| NativeComponentH264Mp4BackingServiceError::Cancelled)?;
+            Ok(backing)
+        }
+        .boxed()
+    }
+}
+
+fn checked_component_h264_mp4_backing_result(
+    output: NativeOwnedH264Mp4,
+    source_video_sha256: [u8; 32],
+    expected_dimensions: (u64, u64),
+    expected_frame_rate: (u64, u64),
+    expected_frame_count: u64,
+    expected_stream: StreamId,
+) -> Result<NativeEncodedH264Mp4Backing, NativeComponentH264Mp4BackingServiceError> {
+    let (bytes, content_sha256, width, height, frame_rate, frame_count) = output.into_parts();
+    let dimensions = (
+        u64::try_from(width)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?,
+        u64::try_from(height)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?,
+    );
+    let frame_rate = (
+        u64::try_from(frame_rate.0)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?,
+        u64::try_from(frame_rate.1)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?,
+    );
+    let frame_count = u64::try_from(frame_count)
+        .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidProjection)?;
+    if dimensions != expected_dimensions
+        || frame_rate != expected_frame_rate
+        || frame_count != expected_frame_count
+        || bytes.descriptor().stream() != expected_stream
+    {
+        return Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection);
+    }
+    NativeEncodedH264Mp4Backing::checked(
+        bytes,
+        content_sha256,
+        source_video_sha256,
+        dimensions,
+        frame_rate,
+        frame_count,
+    )
+}
+
 #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
 enum WebmActorOutput {
     Vp9(NativeOwnedVp9Webm),
@@ -899,6 +1093,28 @@ fn metadata_limits_configuration_u64(
         u64::try_from(values.1).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
         u64::try_from(values.2).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
         u64::try_from(values.3).map_err(|_| NativeWebmEncodeServiceError::InvalidRequest)?,
+    ])
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following encoded VIDEO backing adapter"
+)]
+fn h264_mp4_sequence_limits_configuration_u64(
+    limits: NativeH264Mp4SequenceLimits,
+) -> Result<[u64; 6], NativeComponentH264Mp4BackingServiceError> {
+    let values = limits.configuration_values();
+    Ok([
+        u64::try_from(values.0)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?,
+        u64::try_from(values.1)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?,
+        values.2,
+        u64::try_from(values.3)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?,
+        u64::try_from(values.4)
+            .map_err(|_| NativeComponentH264Mp4BackingServiceError::InvalidRequest)?,
+        values.5,
     ])
 }
 
@@ -1074,6 +1290,66 @@ fn map_webm_node_service_error(error: NativeLtxvCodecThreadError) -> NativeWebmE
         | NativeLtxvCodecThreadError::H264Encode(_)
         | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
             NativeWebmEncodeServiceError::Execution(error.to_string())
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following encoded VIDEO backing adapter"
+)]
+fn map_h264_mp4_backing_plan_error(
+    error: NativeVideoCodecPlanError,
+) -> NativeComponentH264Mp4BackingServiceError {
+    match error {
+        NativeVideoCodecPlanError::Cancelled => {
+            NativeComponentH264Mp4BackingServiceError::Cancelled
+        }
+        NativeVideoCodecPlanError::LimitExceeded | NativeVideoCodecPlanError::Overflow => {
+            NativeComponentH264Mp4BackingServiceError::ResourceExhausted
+        }
+        NativeVideoCodecPlanError::InvalidVideo
+        | NativeVideoCodecPlanError::InvalidOptions
+        | NativeVideoCodecPlanError::InvalidLimits => {
+            NativeComponentH264Mp4BackingServiceError::InvalidRequest
+        }
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "consumed by the following encoded VIDEO backing adapter"
+)]
+fn map_h264_mp4_backing_service_error(
+    error: NativeLtxvCodecThreadError,
+) -> NativeComponentH264Mp4BackingServiceError {
+    match error {
+        NativeLtxvCodecThreadError::Cancelled => {
+            NativeComponentH264Mp4BackingServiceError::Cancelled
+        }
+        NativeLtxvCodecThreadError::Busy => NativeComponentH264Mp4BackingServiceError::Busy,
+        NativeLtxvCodecThreadError::InvalidScratch(_) => {
+            NativeComponentH264Mp4BackingServiceError::InvalidRequest
+        }
+        NativeLtxvCodecThreadError::ResourceExhausted => {
+            NativeComponentH264Mp4BackingServiceError::ResourceExhausted
+        }
+        NativeLtxvCodecThreadError::ThreadStopped
+        | NativeLtxvCodecThreadError::ThreadPanicked
+        | NativeLtxvCodecThreadError::StatePoisoned => {
+            NativeComponentH264Mp4BackingServiceError::Unavailable
+        }
+        error @ (NativeLtxvCodecThreadError::ThreadSpawn(_)
+        | NativeLtxvCodecThreadError::Load(_)
+        | NativeLtxvCodecThreadError::Binding(_)
+        | NativeLtxvCodecThreadError::Admission(_)
+        | NativeLtxvCodecThreadError::SuiteAdmission(_)
+        | NativeLtxvCodecThreadError::Preprocess(_)
+        | NativeLtxvCodecThreadError::Vp9Encode(_)
+        | NativeLtxvCodecThreadError::Av1Encode(_)
+        | NativeLtxvCodecThreadError::H264Encode(_)
+        | NativeLtxvCodecThreadError::EncodedOutput(_)) => {
+            NativeComponentH264Mp4BackingServiceError::Execution(error.to_string())
         }
     }
 }
@@ -1484,9 +1760,11 @@ fn hash_identity_field(digest: &mut Sha256, value: &[u8]) {
 mod tests {
     use super::*;
     use crate::NativeVp9WebmEncodeLimits;
+    use comfy_media::NativeVideoPayload;
     use comfy_tensor::{BackendWorkspaceAuthority, DType, DeviceId, Layout, TensorDescriptor};
     use futures::executor::block_on;
     use std::{
+        collections::BTreeMap,
         rc::Rc,
         sync::{
             Condvar,
@@ -1802,9 +2080,11 @@ mod tests {
         let input_storage_id = image.tensor().storage_id();
         let h264_limits = NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 32, 4, 1024)?;
         let events = Arc::new(Mutex::new(Vec::new()));
+        let h264_output_storage_ids = Arc::new(Mutex::new(Vec::new()));
         let actor_backend = backend.clone();
         let service = start_ltxv_codec_thread({
             let events = events.clone();
+            let h264_output_storage_ids = h264_output_storage_ids.clone();
             move || {
                 events
                     .lock()
@@ -1911,6 +2191,10 @@ mod tests {
                                     (2997, 100),
                                     3,
                                 )?;
+                                h264_output_storage_ids
+                                    .lock()
+                                    .map_err(|_| NativeLtxvCodecThreadError::StatePoisoned)?
+                                    .push(encoded.bytes.storage_id());
                                 Ok(NativeVideoCodecThreadOutput::H264Mp4(encoded))
                             }
                         }
@@ -2003,6 +2287,141 @@ mod tests {
         assert_eq!(scratch.in_use_bytes(), 0);
         drop(h264);
 
+        let planning_limits = NativeVideoCodecLimits::checked(4, 1024, 1, 1024)?;
+        let backing_service = NativeComponentH264Mp4CodecRequestService::checked(
+            proxy.clone(),
+            planning_limits,
+            h264_limits,
+        )?;
+        let same_backing_service = NativeComponentH264Mp4CodecRequestService::checked(
+            proxy.clone(),
+            planning_limits,
+            h264_limits,
+        )?;
+        let changed_backing_service = NativeComponentH264Mp4CodecRequestService::checked(
+            proxy.clone(),
+            NativeVideoCodecLimits::checked(4, 1024, 2, 1024)?,
+            h264_limits,
+        )?;
+        assert_eq!(
+            NativeComponentH264Mp4BackingService::identity(&backing_service),
+            NativeComponentH264Mp4BackingService::identity(&same_backing_service)
+        );
+        assert_ne!(
+            NativeComponentH264Mp4BackingService::identity(&backing_service),
+            NativeComponentH264Mp4BackingService::identity(&changed_backing_service)
+        );
+        let base_backing_identity =
+            NativeComponentH264Mp4BackingService::identity(&backing_service).configuration_sha256();
+        for (changed_planning, changed_sequence) in [
+            (
+                NativeVideoCodecLimits::checked(3, 1024, 1, 1024)?,
+                h264_limits,
+            ),
+            (
+                NativeVideoCodecLimits::checked(4, 512, 1, 1024)?,
+                h264_limits,
+            ),
+            (
+                NativeVideoCodecLimits::checked(4, 1024, 2, 1024)?,
+                h264_limits,
+            ),
+            (
+                NativeVideoCodecLimits::checked(4, 1024, 1, 512)?,
+                h264_limits,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(2048, 256, 1024, 32, 4, 1024)?,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(1024, 512, 1024, 32, 4, 1024)?,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(1024, 256, 2048, 32, 4, 1024)?,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 64, 4, 1024)?,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 32, 5, 1024)?,
+            ),
+            (
+                planning_limits,
+                NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 32, 4, 2048)?,
+            ),
+        ] {
+            let changed_service = NativeComponentH264Mp4CodecRequestService::checked(
+                proxy.clone(),
+                changed_planning,
+                changed_sequence,
+            )?;
+            assert_ne!(
+                NativeComponentH264Mp4BackingService::identity(&changed_service)
+                    .configuration_sha256(),
+                base_backing_identity
+            );
+        }
+        let source_video = Arc::new(NativeVideoPayload::checked(
+            image.tensor().clone(),
+            2_997,
+            100,
+            NativeVideoBitDepth::Eight,
+            None,
+            None,
+            BTreeMap::from([("prompt".to_owned(), "source-only".to_owned())]),
+        )?);
+        let source_digest = *source_video.semantic_digest_sha256();
+        let backing_request = NativeComponentH264Mp4BackingRequest::checked(source_video.clone())?;
+        let backing = block_on(backing_service.encode_backing(backing_request, &context))?;
+        assert_eq!(backing.bytes().contiguous_bytes()?, b"HMP4");
+        assert_eq!(
+            backing.content_sha256(),
+            <[u8; 32]>::from(Sha256::digest(b"HMP4"))
+        );
+        assert_eq!(backing.source_video_sha256(), source_digest);
+        assert_eq!(backing.dimensions(), (2, 2));
+        assert_eq!(backing.frame_rate(), (2997, 100));
+        assert_eq!(backing.frame_count(), 3);
+        assert_eq!(backing.codec(), NativeVideoCodec::H264);
+        assert_eq!(backing.container(), NativeVideoContainer::Mp4);
+        assert_eq!(backing.bit_depth(), NativeVideoBitDepth::Eight);
+        assert_eq!(backing.pixel_format(), NativeVideoPixelFormat::Yuv420p);
+        assert!(!backing.has_alpha());
+        let output_storage_ids = h264_output_storage_ids
+            .lock()
+            .map_err(|_| "H.264 output storage mutex was poisoned")?;
+        assert_eq!(
+            output_storage_ids.last().copied(),
+            Some(backing.bytes().storage_id())
+        );
+        drop(output_storage_ids);
+        assert_eq!(scratch.in_use_bytes(), 0);
+        drop(backing);
+        assert!(matches!(
+            NativeComponentH264Mp4CodecRequestService::checked(
+                proxy.clone(),
+                NativeVideoCodecLimits::checked(4, 1024, 1, 2048)?,
+                h264_limits,
+            ),
+            Err(NativeComponentH264Mp4BackingServiceError::InvalidRequest)
+        ));
+        let pre_cancelled = CancellationToken::default();
+        assert!(pre_cancelled.cancel());
+        let pre_cancelled_context = request_context(scratch.clone(), &pre_cancelled);
+        let pre_cancelled_request = NativeComponentH264Mp4BackingRequest::checked(source_video)?;
+        assert!(matches!(
+            block_on(
+                backing_service.encode_backing(pre_cancelled_request, &pre_cancelled_context,)
+            ),
+            Err(NativeComponentH264Mp4BackingServiceError::Cancelled)
+        ));
+        assert_eq!(scratch.in_use_bytes(), 0);
+
         let metadata_limits = crate::NativeVideoContainerMetadataLimits::checked(3, 16, 16, 64)?;
         let webm_service =
             NativeWebmCodecRequestService::checked(proxy.clone(), batch_limits, metadata_limits)?;
@@ -2070,7 +2489,7 @@ mod tests {
         assert_ne!(actor_thread, thread::current().id());
         assert_eq!(
             events.iter().filter(|event| event.0 == "request").count(),
-            6
+            7
         );
         assert!(events.iter().all(|event| event.1 == actor_thread));
         Ok(())
@@ -2097,6 +2516,21 @@ mod tests {
         assert_eq!(scratch.in_use_bytes(), 0);
         assert_eq!(backend.memory_snapshot().current_bytes, baseline + 16);
         drop(h264);
+        assert_eq!(backend.memory_snapshot().current_bytes, baseline);
+
+        let mismatched =
+            materialize_owned_h264_mp4(&backend, &context, b"HMP4", 3, 2, (125, 2997), 3)?;
+        assert!(matches!(
+            checked_component_h264_mp4_backing_result(
+                mismatched,
+                [7; 32],
+                (2, 2),
+                (125, 2997),
+                3,
+                StreamId::DEFAULT,
+            ),
+            Err(NativeComponentH264Mp4BackingServiceError::InvalidProjection)
+        ));
         assert_eq!(backend.memory_snapshot().current_bytes, baseline);
 
         let cancelled = CancellationToken::default();

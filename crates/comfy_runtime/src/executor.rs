@@ -6,13 +6,14 @@ use crate::{
 };
 use chrono::Utc;
 use comfy_nodes::{
-    NativeAssetReference, NativeAssetServiceError, NativeHandleStore, NativeHandleStoreError,
-    NativeHandleStoreIdentity, NativeHandleType, NativeLtxvPreprocessService,
-    NativeNodeBindingDisposition, NativeNodeComputeSession, NativeNodeContractError,
-    NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle, NativePayloadResidency,
-    NativePreparedEffectKind, NativePreparedEffectService, NativeProviderExecutionIdentity,
-    NativeResidentAllocationId, NativeResolvedPayload, NativeResolvedPayloadRetention,
-    NativeStoredPayload, NativeStructuredValue, NativeValue, NativeWebmEncodeService, NodeRegistry,
+    NativeAssetReference, NativeAssetServiceError, NativeComponentH264Mp4BackingService,
+    NativeHandleStore, NativeHandleStoreError, NativeHandleStoreIdentity, NativeHandleType,
+    NativeLtxvPreprocessService, NativeNodeBindingDisposition, NativeNodeComputeSession,
+    NativeNodeContractError, NativeNodeServiceIdentity, NativeNodeServices, NativeOpaqueHandle,
+    NativePayloadResidency, NativePreparedEffectKind, NativePreparedEffectService,
+    NativeProviderExecutionIdentity, NativeResidentAllocationId, NativeResolvedPayload,
+    NativeResolvedPayloadRetention, NativeStoredPayload, NativeStructuredValue, NativeValue,
+    NativeWebmEncodeService, NodeRegistry,
 };
 pub use comfy_nodes::{
     NativeCacheDependencies as CacheDependencies, NativeCachePolicy as RuntimeCachePolicy,
@@ -2228,6 +2229,7 @@ pub struct ExecutionEngine {
     shader_executor: Option<Arc<dyn NativeShaderExecutor>>,
     ltxv_preprocess_service: Option<Arc<dyn NativeLtxvPreprocessService>>,
     webm_encode_service: Option<Arc<dyn NativeWebmEncodeService>>,
+    component_h264_mp4_backing_service: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
     asset_resolvers: Option<Arc<NativeAssetResolverRegistry>>,
     handle_store_generation: NativeHandleStoreGeneration,
 }
@@ -2283,6 +2285,7 @@ impl ExecutionEngine {
             shader_executor: None,
             ltxv_preprocess_service: None,
             webm_encode_service: None,
+            component_h264_mp4_backing_service: None,
             asset_resolvers: None,
             handle_store_generation,
         })
@@ -2323,6 +2326,14 @@ impl ExecutionEngine {
 
     pub fn with_webm_encode_service(mut self, service: Arc<dyn NativeWebmEncodeService>) -> Self {
         self.webm_encode_service = Some(service);
+        self
+    }
+
+    pub fn with_component_h264_mp4_backing_service(
+        mut self,
+        service: Arc<dyn NativeComponentH264Mp4BackingService>,
+    ) -> Self {
+        self.component_h264_mp4_backing_service = Some(service);
         self
     }
 
@@ -2705,6 +2716,11 @@ impl ExecutionEngine {
         if let Some(webm_encode) = &self.webm_encode_service {
             services = services
                 .with_webm_encode(webm_encode.clone())
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        }
+        if let Some(component_h264_mp4_backing) = &self.component_h264_mp4_backing_service {
+            services = services
+                .with_component_h264_mp4_backing(component_h264_mp4_backing.clone())
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
         }
         if let Some(provider_execution) = &plan.provider_execution {
