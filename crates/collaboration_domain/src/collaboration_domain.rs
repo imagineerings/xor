@@ -15,6 +15,7 @@ pub mod provenance;
 pub mod reaction;
 pub mod scheduled_message;
 pub mod tenant;
+pub mod thread;
 
 pub use account_binding::{
     AccountBinding, AccountBindingError, AccountBindingFields, BindingId, BindingStatus,
@@ -94,4 +95,9 @@ pub use scheduled_message::{
 pub use tenant::{
     TenantContext, TenantContextError, TenantRouteError, TrustedTenantRoute,
     TrustedTenantRouteSource, UntrustedTenantClaim, UntrustedTenantClaimSource,
+};
+pub use thread::{
+    AuxiliaryClosure, AuxiliaryEvent, AuxiliaryEventKind, MAX_AUXILIARY_EVENTS_PER_HOP,
+    MAX_THREAD_DEPTH, MAX_THREAD_PAGE_ROWS, MAX_THREAD_SUMMARY_PARTICIPANTS, ThreadCursor,
+    ThreadError, ThreadEvent, ThreadGraph, ThreadNode, ThreadPage, ThreadReference, ThreadSummary,
 };

@@ -1468,14 +1468,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Validation: tests cover add/remove, long custom emoji, duplicate delivery and target deletion_
     - _Evidence: 2026-08-20 — added a canonical reaction set that reuses message authorization and identity resolution rather than introducing a parallel policy path. Per-actor/per-value add, remove and reactivation transitions retain immutable signed-event sources, contiguous aggregate versions and exact removal references; authenticated duplicate deliveries and already-active adds are no-ops, while stale, malformed, cross-target and unauthorized commands cannot mutate state. Reaction values preserve Buzz's 64-character standard payload limit and canonical wrapped 64-byte shortcode compatibility (66 characters total). Deleted messages hide all active groups and reject new adds without deleting audit history; removals remain representable for reconciliation. Focused reaction tests passed 4/4, the complete collaboration-domain suite passed 61/61, warning-denied all-target Clippy passed, and repository formatting passed._
 
-  - [ ] 19.4. Implement NIP-CW thread graph and summaries
+  - [x] 19.4. Implement NIP-CW thread graph and summaries
     - Build reply ancestry, auxiliary closure, summary and bounded continuation rules from stable IDs.
     - _Requirements: 5.3, 9.1, 9.2_
     - _Capability IDs: CAP-011_
     - _Depends on: 11.9, 19.2, 19.3, 19.8, 19.9_
     - _Reads: projects/buzz/docs/nips/NIP-CW.md, projects/buzz/crates/buzz-db/src/thread.rs_
-    - _Writes: crates/collaboration_domain/src/thread.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/{collaboration_domain,thread}.rs_
     - _Validation: golden thread fixtures cover deep replies, deleted roots, aux closure and malformed references_
+    - _Discovered contradiction (2026-08-21): the planned standalone domain file cannot compile, expose its graph types or run the required golden fixtures without crate-root registration. The narrow correction adds only the module declaration/public exports and living-spec trace; it adds no transport, persistence, access-scoping, relay codec or UI owner and leaves stable channel-window querying with Task 19.5._
+    - _Evidence: 2026-08-21 — added a canonical UI-free NIP-CW graph over immutable event IDs with order-independent ancestry resolution, same-channel parent validation, optional-root agreement, cycle rejection and the Buzz depth-100 ceiling. Deleted events remain structural ancestors while active summaries count direct and nested replies, newest descendant activity and at most ten distinct recent Nostr authors. Thread reads clamp row budgets and continue strictly by `(created_at ASC, event_id ASC)` so tied seconds remain lossless. The auxiliary closure accepts only stable same-channel references, deduplicates IDs, orders deterministically and caps both the reaction/edit/delete row hop and delete-of-aux hop at 1,000 events. Four golden fixtures passed for depth-four ancestry and tied-second paging, deleted roots/replies, two-hop bounded closure, and missing/cross-channel/root/cycle/depth failures; the full collaboration-domain suite passed 72/72, warning-denied all-target/all-feature release Clippy passed, and repository formatting passed. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 19.5. Implement stable channel and thread query windows
     - Query immutable keyset pages plus live overlay with exact continuation under concurrent writes.
