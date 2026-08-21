@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Represent physics/navigation files and docs through existing Sim project, worktree, docs, task, and diagnostic owners. Runtime behavior remains excluded or decision-blocked until an approved existing or proposed Sim runtime owner executes it natively. Godot physics and navigation servers are reference concepts only and are neither embedded nor delegated to.
+Represent physics/navigation files and docs through existing Zed project, worktree, docs, task, and diagnostic owners. Runtime behavior remains excluded or decision-blocked until an approved existing or proposed Zed runtime owner executes it natively. Godot physics and navigation servers are reference concepts only and are neither embedded nor delegated to.
 
 ## Components
 
@@ -13,19 +13,19 @@ Represent physics/navigation files and docs through existing Sim project, worktr
 
 ### Property 1: Runtime Exclusion
 
-_For any_ Godot physics or navigation runtime feature, Sim SHALL not embed the runtime implementation.
+_For any_ Godot physics or navigation runtime feature, Zed SHALL not embed the runtime implementation.
 
 **Validates: Requirement 1.1, 1.2**
 
 ### Property 2: Native Metadata
 
-_For any_ indexed physics or navigation source, Sim SHALL expose docs symbols and metadata without treating a task/interface declaration as runtime execution.
+_For any_ indexed physics or navigation source, Zed SHALL expose docs symbols and metadata without treating a task/interface declaration as runtime execution.
 
 **Validates: Requirement 2.1**
 
 ### D-NATIVE: Native simulation path
 
-The compatibility boundary accepts resource/property data into Sim-owned records. Executable support requires an approved native runtime owner with deterministic lifecycle tests; otherwise the behavior remains excluded or decision-blocked. No fallback launches Godot.
+The compatibility boundary accepts resource/property data into Zed-owned records. Executable support requires an approved native runtime owner with deterministic lifecycle tests; otherwise the behavior remains excluded or decision-blocked. No fallback launches Godot.
 
 **Validates: Requirement 9.1, 9.2, 9.3, 9.4, 9.5**
 

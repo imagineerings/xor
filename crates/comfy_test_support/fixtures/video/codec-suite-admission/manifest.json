@@ -1,5 +1,5 @@
 {
-  "fixture_schema": "sim.comfy.video-codec-suite-admission.v1",
+  "fixture_schema": "zed.comfy.video-codec-suite-admission.v1",
   "truth_mode": "synthetic-retained-native-video-codec-suite-admission",
   "source": {
     "comfyui_version": "0.27.1",

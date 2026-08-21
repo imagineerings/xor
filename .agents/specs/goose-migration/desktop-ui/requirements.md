@@ -2,24 +2,24 @@
 
 ## Introduction
 
-Migrate the user-facing features of goose's Electron desktop app by building GPUI-based equivalents within sim's existing desktop application. Rather than porting React/Electron code, we map each goose UI feature to the appropriate GPUI component or build new GPUI views where gaps exist.
+Migrate the user-facing features of goose's Electron desktop app by building GPUI-based equivalents within zed's existing desktop application. Rather than porting React/Electron code, we map each goose UI feature to the appropriate GPUI component or build new GPUI views where gaps exist.
 
-Sim already provides: GPUI rendering framework, workspace/panel system, agent panel, conversation view, inline assistant, configuration UI, theme system, notifications, settings UI, and onboarding. Goose's desktop app adds: recipe execution UI, scheduling UI, startup diagnostics, shared sessions, mesh networking, dedicated session manager UI, and ACP client connection management.
+Zed already provides: GPUI rendering framework, workspace/panel system, agent panel, conversation view, inline assistant, configuration UI, theme system, notifications, settings UI, and onboarding. Goose's desktop app adds: recipe execution UI, scheduling UI, startup diagnostics, shared sessions, mesh networking, dedicated session manager UI, and ACP client connection management.
 
 ## Glossary
 
-- **GPUI**: Sim's native Rust UI framework
+- **GPUI**: Zed's native Rust UI framework
 - **Agent Panel**: Existing GPUI panel for interacting with the agent (`crates/agent_ui/src/agent_panel.rs`)
 - **Conversation View**: Existing GPUI conversation view (`crates/agent_ui/src/conversation_view.rs`)
-- **Workspace**: Sim's window/panel management system (`crates/workspace/`)
+- **Workspace**: Zed's window/panel management system (`crates/workspace/`)
 - **ACP Client**: Agent-Client Protocol connection integrated in `crates/acp_thread/`
-- **Mesh**: Peer-to-peer networking (if applicable to sim's architecture)
+- **Mesh**: Peer-to-peer networking (if applicable to zed's architecture)
 
 ## Requirements
 
 ### Requirement 1: Agent Session Management UI
 
-**User Story:** As a sim user, I want to manage agent sessions (list, create, delete, rename) through the GPUI interface, so that I can organize my agent conversations.
+**User Story:** As a zed user, I want to manage agent sessions (list, create, delete, rename) through the GPUI interface, so that I can organize my agent conversations.
 
 #### Acceptance Criteria
 
@@ -33,7 +33,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 2: Recipe Execution UI
 
-**User Story:** As a sim user, I want to discover, view, and run recipes from the GPUI interface, so that I can execute multi-step workflows without the CLI.
+**User Story:** As a zed user, I want to discover, view, and run recipes from the GPUI interface, so that I can execute multi-step workflows without the CLI.
 
 #### Acceptance Criteria
 
@@ -47,7 +47,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 3: Scheduling UI
 
-**User Story:** As a sim user, I want to schedule agent tasks from the GPUI interface, so that I can set up recurring operations.
+**User Story:** As a zed user, I want to schedule agent tasks from the GPUI interface, so that I can set up recurring operations.
 
 #### Acceptance Criteria
 
@@ -56,11 +56,11 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 3. **3.3** THE user SHALL be able to create, pause, and delete schedules
 4. **3.4** THE scheduling UI SHALL call the single scheduled-recipe service defined by recipe-system Requirement 14; `crates/scheduler/` MAY supply executor primitives but SHALL NOT become a second persistence owner
 
-**Mapping:** New GPUI settings view or panel, integrating with sim's existing `crates/scheduler/` crate.
+**Mapping:** New GPUI settings view or panel, integrating with zed's existing `crates/scheduler/` crate.
 
 ### Requirement 4: Startup Diagnostics
 
-**User Story:** As a sim user, I want the application to check for configuration and connectivity issues on startup, so that I can resolve problems early.
+**User Story:** As a zed user, I want the application to check for configuration and connectivity issues on startup, so that I can resolve problems early.
 
 #### Acceptance Criteria
 
@@ -73,7 +73,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 5: Shared Sessions
 
-**User Story:** As a sim user, I want to share agent sessions with other users via links, so that I can collaborate on agent interactions.
+**User Story:** As a zed user, I want to share agent sessions with other users via links, so that I can collaborate on agent interactions.
 
 #### Acceptance Criteria
 
@@ -81,11 +81,11 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 2. **5.2** THE user SHALL be able to import a shared session from a link
 3. **5.3** THE shared session data SHALL be serializable and deserializable
 
-**Mapping:** GPUI integration using sim's existing deeplink mechanism (`parse_sim_link`) and session serialization.
+**Mapping:** GPUI integration using zed's existing deeplink mechanism (`parse_zed_link`) and session serialization.
 
 ### Requirement 6: ACP Connection Management
 
-**User Story:** As a sim user, I want visibility into the ACP connection state, so that I know when the agent is connected, disconnected, or reconnecting.
+**User Story:** As a zed user, I want visibility into the ACP connection state, so that I know when the agent is connected, disconnected, or reconnecting.
 
 #### Acceptance Criteria
 
@@ -97,7 +97,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 7: Agent Configuration UI Enhancements
 
-**User Story:** As a sim user, I want to configure provider extensions and agent settings through the GPUI settings UI, so that I can manage all configuration visually.
+**User Story:** As a zed user, I want to configure provider extensions and agent settings through the GPUI settings UI, so that I can manage all configuration visually.
 
 #### Acceptance Criteria
 
@@ -109,23 +109,23 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 8: Notification Enhancements
 
-**User Story:** As a sim user, I want agent-related notifications (task complete, action required, errors) via the GPUI notification system, so that I stay informed.
+**User Story:** As a zed user, I want agent-related notifications (task complete, action required, errors) via the GPUI notification system, so that I stay informed.
 
 #### Acceptance Criteria
 
-1. **8.1** THE agent SHALL use sim's existing notification system (`crates/notifications/`) for agent events
+1. **8.1** THE agent SHALL use zed's existing notification system (`crates/notifications/`) for agent events
 2. **8.2** WHEN a scheduled task completes THEN the system SHALL show a notification
 3. **8.3** WHEN an action requires user input THEN the system SHALL show a notification
 
-**Mapping:** Integrate agent events with sim's `Toast` and `NotificationId` system from `crates/workspace/`.
+**Mapping:** Integrate agent events with zed's `Toast` and `NotificationId` system from `crates/workspace/`.
 
 ### Requirement 9: Internationalization (i18n)
 
-**User Story:** As a sim user, I want the UI in my language, so that I can use the application comfortably.
+**User Story:** As a zed user, I want the UI in my language, so that I can use the application comfortably.
 
 #### Acceptance Criteria
 
-1. **9.1** WHERE Goose locale parity is approved, THE GPUI application SHALL extend Sim's existing localization approach; a new i18n subsystem SHALL require separate architecture approval
+1. **9.1** WHERE Goose locale parity is approved, THE GPUI application SHALL extend Zed's existing localization approach; a new i18n subsystem SHALL require separate architecture approval
 2. **9.2** THE language SHALL be configurable in settings
 3. **9.3** THE i18n system SHALL support dynamic loading of translation files
 
@@ -133,7 +133,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 10: Auto-Update UI
 
-**User Story:** As a sim user, I want to be notified of and manage application updates from the UI, so that I stay up to date.
+**User Story:** As a zed user, I want to be notified of and manage application updates from the UI, so that I stay up to date.
 
 #### Acceptance Criteria
 
@@ -145,7 +145,7 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ### Requirement 11: Embedded MCP App Security
 
-**User Story:** As a sim user, I want embedded extension interfaces isolated from my application and machine, so that viewing an MCP App does not grant ambient privileges.
+**User Story:** As a zed user, I want embedded extension interfaces isolated from my application and machine, so that viewing an MCP App does not grant ambient privileges.
 
 #### Acceptance Criteria
 
@@ -156,10 +156,10 @@ Sim already provides: GPUI rendering framework, workspace/panel system, agent pa
 
 ## Design Approach
 
-All goose desktop UI features will be implemented as **GPUI components/views** within sim's existing architecture:
+All goose desktop UI features will be implemented as **GPUI components/views** within zed's existing architecture:
 
 ```
-goose Electron/React Feature          →  sim GPUI Equivalent
+goose Electron/React Feature          →  zed GPUI Equivalent
 ──────────────────────────────────────────────────────────────
 sessions.ts / session management      →  ThreadStore + agent_ui session list
 recipe/ UI components                 →  New agent_ui recipe panel
@@ -169,20 +169,20 @@ sharedSessions.ts / sessionLinks.ts   →  Deeplink + serialization in agent
 updates.ts                            →  auto_update_ui integration
 config.ts / goosed.ts                 →  Existing settings_ui + agent_configuration
 i18n/                                 →  New GPUI i18n crate or pattern
-mesh.ts                               →  Evaluate; may not be needed in sim
+mesh.ts                               →  Evaluate; may not be needed in zed
 ```
 
 ## References
 
 - Source (goose): `projects/goose/ui/desktop/` — Full Electron/React app
-- Existing sim: `crates/sim/` — main desktop binary
-- Existing sim: `crates/agent_ui/` — agent panel, conversation, configuration
-- Existing sim: `crates/gpui/` — GPUI framework
-- Existing sim: `crates/ui/` — UI components
-- Existing sim: `crates/settings_ui/` — settings UI
-- Existing sim: `crates/workspace/` — workspace/panel management
-- Existing sim: `crates/notifications/` — notification system
-- Existing sim: `crates/auto_update/`, `crates/auto_update_ui/` — update system
-- Existing sim: `crates/onboarding/` — onboarding views
-- Existing sim: `crates/theme/` — theming system
+- Existing zed: `crates/zed/` — main desktop binary
+- Existing zed: `crates/agent_ui/` — agent panel, conversation, configuration
+- Existing zed: `crates/gpui/` — GPUI framework
+- Existing zed: `crates/ui/` — UI components
+- Existing zed: `crates/settings_ui/` — settings UI
+- Existing zed: `crates/workspace/` — workspace/panel management
+- Existing zed: `crates/notifications/` — notification system
+- Existing zed: `crates/auto_update/`, `crates/auto_update_ui/` — update system
+- Existing zed: `crates/onboarding/` — onboarding views
+- Existing zed: `crates/theme/` — theming system
 - Source (goose): `projects/goose/ui/desktop/src/components/McpApps/`, `utils/csp.ts`, `utils/htmlSecurity.ts`, `utils/urlSecurity.ts`

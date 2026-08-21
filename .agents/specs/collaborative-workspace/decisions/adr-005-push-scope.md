@@ -10,7 +10,7 @@
 
 Buzz implements NIP-PL blind push and a stateful APNs gateway. The relay owns authorization-aware lease matching and durable wake jobs; the gateway owns installation authority, encrypted APNs-token custody, App Attest verification, relay-scoped delivery grants and the fixed APNs reconnect payload. Current NIP-PL documentation explicitly leaves FCM and UnifiedPush profiles undefined because their fixed-payload and hostile-endpoint security contracts have not been registered.
 
-Sim has native desktop notification UI but no equivalent mobile push executor. The first companion-client cutover must preserve iOS wake behavior without placing event content, relay identity, channel, sender, unread count, ciphertext or deep links in provider payloads. Extensibility must not weaken that privacy boundary or delay the first cutover on platforms Buzz does not currently support.
+Zed has native desktop notification UI but no equivalent mobile push executor. The first companion-client cutover must preserve iOS wake behavior without placing event content, relay identity, channel, sender, unread count, ciphertext or deep links in provider payloads. Extensibility must not weaken that privacy boundary or delay the first cutover on platforms Buzz does not currently support.
 
 ## Decision
 
@@ -24,7 +24,7 @@ The first mobile cutover supports these push targets:
 | iOS development/TestFlight validation | Required for release validation | APNs sandbox profile with its matching application identifier, topic, environment and App Attest configuration |
 | Android FCM | Not required for the first cutover | No conforming NIP-PL profile is approved by this ADR |
 | UnifiedPush | Not required for the first cutover | No conforming public-gateway profile is approved by this ADR |
-| Desktop | Existing native Sim notifications; not a mobile push transport | Authoritative data is already available through the connected client |
+| Desktop | Existing native Zed notifications; not a mobile push transport | Authoritative data is already available through the connected client |
 
 APNs parity includes installation enrollment, App Attest verification, assertion counters, endpoint rotation, relay delegation, encrypted endpoint custody, lease generation/expiry/revocation, durable wake delivery, permanent-endpoint invalidation, bounded transient retry, production/sandbox separation and privacy conformance.
 
@@ -92,7 +92,7 @@ Until such a profile is approved, descriptors must not advertise it and clients 
 
 The first mobile cutover can proceed when:
 
-- current supported Buzz iOS production and sandbox fixtures enroll, rotate, delegate, revoke and wake through the Sim-owned gateway;
+- current supported Buzz iOS production and sandbox fixtures enroll, rotate, delegate, revoke and wake through the Zed-owned gateway;
 - NIP-PL lease encryption, generation, origin isolation, matching and replacement fixtures pass without resigning valid existing leases;
 - every APNs attempt carries the exact constant body and no relay/event data;
 - App Attest production validation, assertion replay/counter tests and generic-error tests pass;

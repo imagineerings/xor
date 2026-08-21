@@ -3,8 +3,8 @@ wit_bindgen::generate!({
     world: "comfy-plugin",
 });
 
-use exports::sim::comfy_plugin::plugin::Guest;
-use sim::comfy_plugin::types;
+use exports::zed::comfy_plugin::plugin::Guest;
+use zed::comfy_plugin::types;
 
 struct HangComponent;
 

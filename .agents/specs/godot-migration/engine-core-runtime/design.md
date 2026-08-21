@@ -21,7 +21,7 @@ Godot-compatible files terminate at `project`, `worktree`, and `language` parsin
 
 ### Property 1: Runtime Boundary
 
-_For any_ runtime-only Godot subsystem, the boundary policy SHALL not classify it as a Sim runtime adapter.
+_For any_ runtime-only Godot subsystem, the boundary policy SHALL not classify it as a Zed runtime adapter.
 
 **Validates: Requirement 1.1**
 
@@ -33,7 +33,7 @@ _For any_ invalid project or resource file, parsing SHALL return diagnostics rat
 
 ### Property 3: Metadata Only
 
-_For any_ indexed Godot scene or resource, Sim SHALL preserve project/resource references needed for indexing, preview, and tooling without scene-tree execution.
+_For any_ indexed Godot scene or resource, Zed SHALL preserve project/resource references needed for indexing, preview, and tooling without scene-tree execution.
 
 **Validates: Requirement 1.2, 1.3, 3.1**
 

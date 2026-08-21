@@ -32,10 +32,10 @@ impl ValueRepresentation {
 
     pub const fn wire_schema(self) -> &'static str {
         match self {
-            Self::ScalarV1 => "sim:comfy-value/scalar@1",
-            Self::TensorV1 => "sim:comfy-value/tensor@1",
-            Self::ArtifactV1 => "sim:comfy-value/artifact@1",
-            Self::ModelV1 => "sim:comfy-value/model@1",
+            Self::ScalarV1 => "zed:comfy-value/scalar@1",
+            Self::TensorV1 => "zed:comfy-value/tensor@1",
+            Self::ArtifactV1 => "zed:comfy-value/artifact@1",
+            Self::ModelV1 => "zed:comfy-value/model@1",
         }
     }
 }
@@ -527,7 +527,7 @@ macro_rules! plugin_types {
             $(TypeRegistration {
                 canonical: $canonical,
                 source_socket: $source,
-                publisher: "sim",
+                publisher: "zed",
                 family: ValueFamily::$family,
                 representation: ValueFamily::$family.representation(),
                 wire_schema: ValueFamily::$family.representation().wire_schema(),
@@ -851,10 +851,10 @@ mod tests {
             registry.evolution(registry.resolve("IMAGE")?)?,
             TypeEvolutionRule::AdditiveWithinMajor
         );
-        assert_eq!(registry.publisher(registry.resolve("IMAGE")?)?, "sim");
+        assert_eq!(registry.publisher(registry.resolve("IMAGE")?)?, "zed");
         assert_eq!(
             registry.wire_schema(registry.resolve("IMAGE")?)?,
-            "sim:comfy-value/tensor@1"
+            "zed:comfy-value/tensor@1"
         );
         assert_eq!(
             registry.resolve("MODEL_TASK_ID")?.to_string(),
@@ -972,7 +972,7 @@ mod tests {
             TypeRegistration {
                 canonical: "comfy:a@1",
                 source_socket: "A",
-                publisher: "sim",
+                publisher: "zed",
                 family: ValueFamily::Scalar,
                 representation: ValueRepresentation::ScalarV1,
                 wire_schema: ValueRepresentation::ScalarV1.wire_schema(),
@@ -982,7 +982,7 @@ mod tests {
             TypeRegistration {
                 canonical: "comfy:b@1",
                 source_socket: "B",
-                publisher: "sim",
+                publisher: "zed",
                 family: ValueFamily::Tensor,
                 representation: ValueRepresentation::TensorV1,
                 wire_schema: ValueRepresentation::TensorV1.wire_schema(),
@@ -1020,7 +1020,7 @@ mod tests {
         let mismatch = [TypeRegistration {
             canonical: "comfy:mismatch@1",
             source_socket: "MISMATCH",
-            publisher: "sim",
+            publisher: "zed",
             family: ValueFamily::Scalar,
             representation: ValueRepresentation::TensorV1,
             wire_schema: ValueRepresentation::TensorV1.wire_schema(),
@@ -1065,7 +1065,7 @@ mod tests {
             publisher: "publisher",
             family: ValueFamily::Scalar,
             representation: ValueRepresentation::ScalarV1,
-            wire_schema: "sim:comfy-value/tensor@1",
+            wire_schema: "zed:comfy-value/tensor@1",
             evolution: TypeEvolutionRule::AdditiveWithinMajor,
             aliases: &[],
         }];

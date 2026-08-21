@@ -126,7 +126,7 @@ impl Render for IncomingCallNotification {
                 }),
             )
             .child(Label::new(format!(
-                "{} is sharing a project in Sim",
+                "{} is sharing a project in Zed",
                 self.state.call.calling_user.username
             ))),
         )

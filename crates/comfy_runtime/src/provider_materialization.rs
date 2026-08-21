@@ -23,12 +23,12 @@ use crate::{
     ProviderResultReceipt, ProviderResultReceiptIssuer, ProviderResultReceiptVerifier,
 };
 
-pub const NATIVE_PROVIDER_TRANSPORT_SCHEMA: &str = "sim:comfy-provider-transport@1";
-pub const NATIVE_PROVIDER_MATERIALIZER_SCHEMA: &str = "sim:comfy-provider-materializer@1";
+pub const NATIVE_PROVIDER_TRANSPORT_SCHEMA: &str = "zed:comfy-provider-transport@1";
+pub const NATIVE_PROVIDER_MATERIALIZER_SCHEMA: &str = "zed:comfy-provider-materializer@1";
 pub const MAX_PROVIDER_MATERIALIZATION_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_PROVIDER_TRANSPORT_REQUEST_BYTES: usize = 16 * 1024 * 1024;
-const PROVIDER_TRANSPORT_REQUEST_DOMAIN: &[u8] = b"sim.comfy.provider-transport-request\0";
-const PROVIDER_TRANSPORT_RESPONSE_DOMAIN: &[u8] = b"sim.comfy.provider-transport-response\0";
+const PROVIDER_TRANSPORT_REQUEST_DOMAIN: &[u8] = b"zed.comfy.provider-transport-request\0";
+const PROVIDER_TRANSPORT_RESPONSE_DOMAIN: &[u8] = b"zed.comfy.provider-transport-response\0";
 const PROVIDER_TRANSPORT_VERSION: u16 = 1;
 const MAX_PROVIDER_TRANSPORT_PORTS: usize = 1_024;
 const MAX_PROVIDER_TRANSPORT_VALUES_PER_PORT: usize = 4_096;
@@ -1578,12 +1578,12 @@ mod tests {
         let materializer: CanonicalTypeId = NATIVE_PROVIDER_MATERIALIZER_SCHEMA.parse()?;
         validate_native_provider_schemas(&transport, &materializer)?;
 
-        let wrong_transport: CanonicalTypeId = "sim:other-provider-transport@1".parse()?;
+        let wrong_transport: CanonicalTypeId = "zed:other-provider-transport@1".parse()?;
         assert_eq!(
             validate_native_provider_schemas(&wrong_transport, &materializer),
             Err(ProviderMaterializationError::UnsupportedTransportSchema)
         );
-        let wrong_materializer: CanonicalTypeId = "sim:other-provider-materializer@1".parse()?;
+        let wrong_materializer: CanonicalTypeId = "zed:other-provider-materializer@1".parse()?;
         assert_eq!(
             validate_native_provider_schemas(&transport, &wrong_materializer),
             Err(ProviderMaterializationError::UnsupportedMaterializerSchema)

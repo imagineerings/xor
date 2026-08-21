@@ -2,19 +2,19 @@
 
 ## Overview
 
-The existing Comfy specs describe how Sim recreates broad Comfy behavior. This design adds a coverage and anti-duplication layer around those specs. The layer turns the real Comfy source tree into a structured inventory, maps each inventory item to one owning Sim spec or subsystem, and fails migration gates when source functionality is unowned, multiply owned, unsupported without a reason, or implemented through hidden ComfyUI pass-through.
+The existing Comfy specs describe how Zed recreates broad Comfy behavior. This design adds a coverage and anti-duplication layer around those specs. The layer turns the real Comfy source tree into a structured inventory, maps each inventory item to one owning Zed spec or subsystem, and fails migration gates when source functionality is unowned, multiply owned, unsupported without a reason, or implemented through hidden ComfyUI pass-through.
 
-The key design decision is to make coverage data declarative and testable. The inventory and ledger live under this specification's `catalogs/` directory and are validated by specification tooling. Runtime compatibility fixtures may reference catalog IDs, but coverage governance does not create a `sim_game` product crate or runtime registry.
+The key design decision is to make coverage data declarative and testable. The inventory and ledger live under this specification's `catalogs/` directory and are validated by specification tooling. Runtime compatibility fixtures may reference catalog IDs, but coverage governance does not create a `zed_game` product crate or runtime registry.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
   A["Comfy Source Tree"] --> B["Inventory Extractor"]
-  B --> C["Sim Source Inventory Fixture"]
+  B --> C["Zed Source Inventory Fixture"]
   C --> D["Coverage Ledger"]
   E["Existing Comfy Specs"] --> D
-  F["Existing Sim Subsystems"] --> D
+  F["Existing Zed Subsystems"] --> D
   D --> G["Spec Gatekeeper"]
   D --> K["Missing Port Backlog Planner"]
   K --> E
@@ -23,7 +23,7 @@ flowchart TD
   D --> J["Parity Fixture Suite"]
 ```
 
-The inventory extractor reads source paths and static metadata from the external Comfy checkout. The coverage ledger is committed in the Sim repository and maps inventory categories to owners. Gatekeeper validation consumes the committed fixtures; it does not require the external Comfy checkout during normal CI unless an explicit inventory-refresh task runs.
+The inventory extractor reads source paths and static metadata from the external Comfy checkout. The coverage ledger is committed in the Zed repository and maps inventory categories to owners. Gatekeeper validation consumes the committed fixtures; it does not require the external Comfy checkout during normal CI unless an explicit inventory-refresh task runs.
 
 ## Components and Interfaces
 
@@ -55,7 +55,7 @@ The inventory extractor reads source paths and static metadata from the external
 
 - Store coverage records with `source_id`, `source_path`, `source_kind`, `owner`, `status`, `boundary_decision`, `fixture_refs`, and `diagnostic_code`.
 - Enforce the ten existing Comfy specs as allowed owners.
-- Support existing-Sim owners where behavior is already covered by platform, UI, media, task, secret, storage, artifact, project, or agent systems.
+- Support existing-Zed owners where behavior is already covered by platform, UI, media, task, secret, storage, artifact, project, or agent systems.
 - Represent unsupported and divergent behavior explicitly.
 
 **Interface contract:**
@@ -108,7 +108,7 @@ The inventory extractor reads source paths and static metadata from the external
 
 **Interface contract:**
 
-- `validate_sim_coverage(inventory, ledger, specs, tasks) -> GateReport`
+- `validate_zed_coverage(inventory, ledger, specs, tasks) -> GateReport`
 - `validate_task_start(task, ledger) -> GateReport`
 - `validate_task_completion(task, ledger, changed_files) -> GateReport`
 
@@ -146,7 +146,7 @@ The inventory extractor reads source paths and static metadata from the external
 **Responsibilities:**
 
 - Link coverage records to fixtures under `crates/world_model/fixtures/comfy/`.
-- Ensure fixtures derived from Comfy source mark `native_sim_records` and `comfyui_passthrough`.
+- Ensure fixtures derived from Comfy source mark `native_zed_records` and `comfyui_passthrough`.
 - Reject fixtures that imply model downloads, API calls, or unreviewed native dependencies.
 - Preserve source paths and capture metadata.
 
@@ -157,7 +157,7 @@ The inventory extractor reads source paths and static metadata from the external
 
 **Dependencies:** Existing Comfy fixtures and dependency-review records.
 
-**Rationale:** Fixtures are the bridge between broad source inventory and concrete Sim behavior.
+**Rationale:** Fixtures are the bridge between broad source inventory and concrete Zed behavior.
 
 ## Data Models
 
@@ -187,7 +187,7 @@ The inventory extractor reads source paths and static metadata from the external
 - `owner_path`: spec path or module path.
 - `status`: `Implemented`, `Planned`, `Delegated`, `Unsupported`, `Divergent`.
 - `boundary_decision`: reason for delegated, unsupported, or divergent statuses.
-- `evidence`: tests, fixtures, modules, or existing-Sim equivalence references.
+- `evidence`: tests, fixtures, modules, or existing-Zed equivalence references.
 - `dependency_gate`: optional G7/dependency-review reference.
 
 ### SimCoverageDiagnostic
@@ -203,10 +203,10 @@ The inventory extractor reads source paths and static metadata from the external
 - `owner`: coverage owner that must receive the implementation task.
 - `source_ids`: coverage records included in the group.
 - `capability_family`: runtime, graph, model, diffusion, asset, workflow, media, provider, extension, or packaging.
-- `required_foundation`: optional prerequisite task when no native Sim foundation exists yet.
-- `expected_writes`: owner-spec task files, Sim modules, tests, and fixtures expected to change.
+- `required_foundation`: optional prerequisite task when no native Zed foundation exists yet.
+- `expected_writes`: owner-spec task files, Zed modules, tests, and fixtures expected to change.
 - `validation`: command or fixture check required before the group can be marked implemented.
-- `evidence_policy`: fixture, test, or existing-Sim equivalence reference needed for ledger completion.
+- `evidence_policy`: fixture, test, or existing-Zed equivalence reference needed for ledger completion.
 
 ## Correctness Properties
 
@@ -222,15 +222,15 @@ _For any_ `SimSourceItem`, the coverage ledger SHALL resolve exactly one coverag
 
 **Validates: Requirement 2.1, 2.3, 4.1-4.10**
 
-### Property 3: Existing Sim Delegation
+### Property 3: Existing Zed Delegation
 
-_For any_ Comfy feature that overlaps an existing Sim subsystem, the coverage ledger SHALL mark that subsystem as owner and prevent a parallel Comfy-derived runtime owner unless a documented extension relationship exists.
+_For any_ Comfy feature that overlaps an existing Zed subsystem, the coverage ledger SHALL mark that subsystem as owner and prevent a parallel Comfy-derived runtime owner unless a documented extension relationship exists.
 
 **Validates: Requirement 2.2, 2.4**
 
 ### Property 4: Native Recreation
 
-_For any_ supported Comfy behavior marked implemented, the evidence SHALL reference native Sim records, services, workers, artifacts, diagnostics, or tests and SHALL NOT rely on ComfyUI pass-through.
+_For any_ supported Comfy behavior marked implemented, the evidence SHALL reference native Zed records, services, workers, artifacts, diagnostics, or tests and SHALL NOT rely on ComfyUI pass-through.
 
 **Validates: Requirement 3.1, 3.4, 6.3**
 
@@ -248,7 +248,7 @@ _For any_ inventory item added by a source refresh, the coverage gate SHALL fail
 
 ### Property 7: Evidence for Implemented Coverage
 
-_For any_ coverage item marked implemented, the coverage gate SHALL require fixture, test, code module, or existing-Sim equivalence evidence.
+_For any_ coverage item marked implemented, the coverage gate SHALL require fixture, test, code module, or existing-Zed equivalence evidence.
 
 **Validates: Requirement 5.4, 6.1**
 
@@ -293,7 +293,7 @@ _For any_ coverage record that is planned, product-approved unsupported, diverge
 - Unit-test static extraction for representative route decorators, old node mappings, V3 `ComfyExtension` schema nodes, CLI flags, OpenAPI operation IDs, and blueprint filenames.
 - Unit-test owner suggestion rules for every existing Comfy spec.
 - Gatekeeper tests for missing owner, duplicate owners, unsupported without reason, implemented without evidence, and ComfyUI pass-through fixtures.
-- Fixture tests that validate `native_sim_records`, `comfyui_passthrough`, source attribution, and dependency-review metadata.
+- Fixture tests that validate `native_zed_records`, `comfyui_passthrough`, source attribution, and dependency-review metadata.
 - Backlog planner tests that validate planned, divergent, unsupported, and evidence-missing records generate owner-specific implementation tasks.
 - Regression tests using a committed inventory snapshot so CI catches accidental coverage loss without needing the external Comfy checkout.
 

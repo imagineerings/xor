@@ -22,62 +22,62 @@ use sha2::{Digest, Sha256};
 const EXPECTED: [(&str, &str, &str); 12] = [
     (
         "COMFY-TENSOR-OP-A56F89536902",
-        "sim.native.einops.rearrange-0.8.1.v1",
+        "zed.native.einops.rearrange-0.8.1.v1",
         "9fbbde89b35613cd94421fb8a6464542d946ec40a517663e7183473ea801959d",
     ),
     (
         "COMFY-TENSOR-OP-4F9C05E204D4",
-        "sim.native.kornia.rgb-to-lab-0.8.2-f32.v1",
+        "zed.native.kornia.rgb-to-lab-0.8.2-f32.v1",
         "62601ee4f38d75c9494e10c16e32e0a666aa76a6f750ef47a6c1aa166e7a9da0",
     ),
     (
         "COMFY-TENSOR-OP-A555F803F554",
-        "sim.native.kornia.rgb-to-ycbcr-0.8.2-f32.v1",
+        "zed.native.kornia.rgb-to-ycbcr-0.8.2-f32.v1",
         "7261afd10d510b782e77235480a2e603be8b97bd72ec14f17cd705ac75f52dd7",
     ),
     (
         "COMFY-TENSOR-OP-9EF1D9EB674A",
-        "sim.native.kornia.ycbcr-to-rgb-0.8.2-f32.v1",
+        "zed.native.kornia.ycbcr-to-rgb-0.8.2-f32.v1",
         "6ff4fa8ff87c096af3bd75afd8681f8d5a3b8d51e0ed240b8b10e9ab152dbd0f",
     ),
     (
         "COMFY-TENSOR-OP-A551C36699B7",
-        "sim.native.kornia.canny-0.8.2-f32.v1",
+        "zed.native.kornia.canny-0.8.2-f32.v1",
         "e71b92be3beddf73aa314b238da7656ae1e89517a86e01a55033ed6e91b49156",
     ),
     (
         "COMFY-TENSOR-OP-AF5C2820E4C3",
-        "sim.native.kornia.morphology-dilation-0.8.2-flat-geodesic.v1",
+        "zed.native.kornia.morphology-dilation-0.8.2-flat-geodesic.v1",
         "7019329d959a699fb3dcd368d2f959bbd88b1c2d84482f0eefa045102dde6cdb",
     ),
     (
         "COMFY-TENSOR-OP-9236C1C08976",
-        "sim.native.kornia.morphology-erosion-0.8.2-flat-geodesic.v1",
+        "zed.native.kornia.morphology-erosion-0.8.2-flat-geodesic.v1",
         "3bf748576b53bfb6d5a56c225bfa7725a3049dd414c8e939f6d259ba7b2b418f",
     ),
     (
         "COMFY-TENSOR-OP-AC69F309A190",
-        "sim.native.kornia.morphology-top-hat-0.8.2-flat-geodesic.v1",
+        "zed.native.kornia.morphology-top-hat-0.8.2-flat-geodesic.v1",
         "7bde9a0bfcd6521c0788ae0d02b33bb0d1be2a3cd8b31657240cd448fbe702c9",
     ),
     (
         "COMFY-TENSOR-OP-638DE6179D46",
-        "sim.native.torchvision.efficientnet-v2-s-0.27.v1",
+        "zed.native.torchvision.efficientnet-v2-s-0.27.v1",
         "7c3ba3a770a9d1eaa4a1184eb78e955dd8117476c90830c157d73e8f2d189999",
     ),
     (
         "COMFY-TENSOR-OP-852D8E9DBC9C",
-        "sim.native.torchvision.raft-large-0.27.v1",
+        "zed.native.torchvision.raft-large-0.27.v1",
         "53147794c771878de08ab379beebeb54cc52caa7c11f9e9ea9fe2809f0563931",
     ),
     (
         "COMFY-TENSOR-OP-9E730487CA71",
-        "sim.native.torchvision.deform-conv2d-0.27-f32.v1",
+        "zed.native.torchvision.deform-conv2d-0.27-f32.v1",
         "5d099e5597608f27ce8e8e5e5f1580b1445418c3d2c71b263dfd529b1a860114",
     ),
     (
         "COMFY-TENSOR-OP-B7926028DA57",
-        "sim.native.torchvision.to-pil-image-0.27-rgb8-boundary.v1",
+        "zed.native.torchvision.to-pil-image-0.27-rgb8-boundary.v1",
         "5f287104cedb74eaacf7da30c492c2127d6a4fe56c8216bb607f2b42d0aced80",
     ),
 ];

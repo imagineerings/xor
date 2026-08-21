@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-metal-metadata";
+  pname = "zed-comfy-backend-metal-metadata";
   version = "macos13-metal3-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/metal"
+    destination="$out/lib/zed/comfy-backends/metal"
     mkdir -p "$destination/abi" "$destination/kernels"
     cp ${../../../crates/comfy_backend_metal/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_metal/abi/execution-v1.json} "$destination/abi/"
@@ -32,7 +32,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim Metal ABI and kernel-source metadata without Apple framework redistribution";
+    description = "Reviewed Zed Metal ABI and kernel-source metadata without Apple framework redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "aarch64-darwin" "x86_64-darwin" ];
   };

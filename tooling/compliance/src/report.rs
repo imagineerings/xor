@@ -13,7 +13,7 @@ use crate::{
     git::CommitDetails,
 };
 
-const PULL_REQUEST_BASE_URL: &str = "https://github.com/simtropolis/sim/pull";
+const PULL_REQUEST_BASE_URL: &str = "https://github.com/simtropolis/zed/pull";
 
 #[derive(Debug)]
 pub struct ReportEntry<R> {

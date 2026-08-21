@@ -73,12 +73,12 @@ if [[ -n "$tree_file" ]]; then
     fi
     standard_tree=$(<"$tree_file")
 else
-    standard_tree=$(cargo tree --locked -p sim --no-default-features -e normal --prefix none)
+    standard_tree=$(cargo tree --locked -p zed --no-default-features -e normal --prefix none)
 fi
 
 forbidden_dependencies=$(printf '%s\n' "$standard_tree" | grep -E "$forbidden_dependency_pattern" || true)
 if [[ -n "$forbidden_dependencies" ]]; then
-    echo "Standard Sim dependency graph contains multiplayer-only packages:" >&2
+    echo "Standard Zed dependency graph contains multiplayer-only packages:" >&2
     printf '%s\n' "$forbidden_dependencies" >&2
     exit 1
 fi
@@ -90,20 +90,20 @@ fi
 
 run_quick_profile() {
     local selected_profile=$1
-    local sim_features="gpui_platform/runtime_shaders"
+    local zed_features="gpui_platform/runtime_shaders"
     local workspace_features="gpui_platform/runtime_shaders"
 
     if [[ "$selected_profile" = "multiplayer" ]]; then
-        sim_features="sim/multiplayer-tools gpui_platform/runtime_shaders"
+        zed_features="zed/multiplayer-tools gpui_platform/runtime_shaders"
         workspace_features="workspace/multiplayer-tools gpui_platform/runtime_shaders"
     fi
 
     echo "check $selected_profile"
     CARGO_INCREMENTAL=0 cargo check \
-        -p sim \
+        -p zed \
         -p gpui_platform \
         --no-default-features \
-        --features "$sim_features"
+        --features "$zed_features"
 
     echo "test $selected_profile capability admission"
     CARGO_INCREMENTAL=0 cargo test \
@@ -119,26 +119,26 @@ run_quick_profile() {
 
 run_full_profile() {
     local selected_profile=$1
-    local sim_features="gpui_platform/runtime_shaders"
+    local zed_features="gpui_platform/runtime_shaders"
 
     if [[ "$selected_profile" = "multiplayer" ]]; then
-        sim_features="sim/multiplayer-tools gpui_platform/runtime_shaders"
+        zed_features="zed/multiplayer-tools gpui_platform/runtime_shaders"
     fi
 
     echo "test $selected_profile application"
     CARGO_INCREMENTAL=0 cargo test \
-        -p sim \
+        -p zed \
         -p gpui_platform \
         --no-default-features \
-        --features "$sim_features"
+        --features "$zed_features"
 
     echo "clippy $selected_profile"
     GITHUB_ACTIONS=1 CARGO_INCREMENTAL=0 ./script/clippy \
         --no-all-features \
-        -p sim \
+        -p zed \
         -p gpui_platform \
         --no-default-features \
-        --features "$sim_features"
+        --features "$zed_features"
 }
 
 profiles=()

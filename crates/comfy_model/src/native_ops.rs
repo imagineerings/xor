@@ -468,10 +468,10 @@ impl NativeExecutionRequirements {
         capabilities: &BackendCapabilityMatrix,
     ) -> Result<(), NativeOpsError> {
         for support in self.iter() {
-            capabilities.require("sim.comfy_model.native_module.execute", support)?;
+            capabilities.require("zed.comfy_model.native_module.execute", support)?;
             if !capabilities.is_deterministic(support) {
                 return Err(TensorError::UnsupportedCapability {
-                    operation: "sim.comfy_model.native_module.execute".to_owned(),
+                    operation: "zed.comfy_model.native_module.execute".to_owned(),
                     device: capabilities.device(),
                     reason: format!(
                         "primitive {:?}, role {:?}, dtype {:?}, layout {:?} is not certified deterministic",
@@ -537,11 +537,11 @@ impl NativeExecutionRequirements {
         }
         self.require_matrix_support(capabilities)?;
         capabilities.require(
-            "sim.comfy_model.native_module.execute.record_event",
+            "zed.comfy_model.native_module.execute.record_event",
             OperationSupport::record_event(),
         )?;
         capabilities.require(
-            "sim.comfy_model.native_module.execute.wait_event",
+            "zed.comfy_model.native_module.execute.wait_event",
             OperationSupport::wait_event(),
         )?;
         for support in [
@@ -550,7 +550,7 @@ impl NativeExecutionRequirements {
         ] {
             if !capabilities.is_deterministic(support) {
                 return Err(TensorError::UnsupportedCapability {
-                    operation: "sim.comfy_model.native_module.execute.event".to_owned(),
+                    operation: "zed.comfy_model.native_module.execute.event".to_owned(),
                     device: capabilities.device(),
                     reason: format!(
                         "event primitive {:?} is not certified deterministic",
@@ -4300,7 +4300,7 @@ impl<'a> NativeModuleStateDigest<'a> {
             hasher: Sha256::new(),
             cancellation,
         };
-        digest.bytes(b"sim.native-module.semantic-state.v1");
+        digest.bytes(b"zed.native-module.semantic-state.v1");
         digest
     }
 

@@ -122,9 +122,9 @@ INSERT INTO public.collaboration_search_documents (
     source_observed_at, projection_version, document_type, visibility_scope,
     title, body
 ) VALUES
-    ($1, 'sim', 'project:public', '1', clock_timestamp(), 1, 'project',
+    ($1, 'zed', 'project:public', '1', clock_timestamp(), 1, 'project',
      'community', 'public project', 'canonical searchable marker'),
-    ($1, 'sim', 'project:restricted', '1', clock_timestamp(), 1, 'project',
+    ($1, 'zed', 'project:restricted', '1', clock_timestamp(), 1, 'project',
      'authorized_restricted', 'restricted project', 'canonical searchable marker')
 "#,
     )

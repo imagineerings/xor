@@ -129,22 +129,22 @@ mod tests {
         "#;
         let parsed: VsCodeDebugTaskFile =
             serde_json_lenient::from_str(raw).expect("deserializing launch.json");
-        let sim = DebugTaskFile::try_from(parsed).expect("converting to Sim debug templates");
+        let zed = DebugTaskFile::try_from(parsed).expect("converting to Zed debug templates");
         pretty_assertions::assert_eq!(
-            sim,
+            zed,
             DebugTaskFile(vec![DebugScenario {
                 label: "Debug my JS app".into(),
                 adapter: "JavaScript".into(),
                 config: json!({
                     "request": "launch",
-                    "program": "${SIM_WORKTREE_ROOT}/xyz.js",
+                    "program": "${ZED_WORKTREE_ROOT}/xyz.js",
                     "showDevDebugOutput": false,
                     "stopOnEntry": true,
                     "args": [
                         "--foo",
-                        "${SIM_WORKTREE_ROOT}/thing",
+                        "${ZED_WORKTREE_ROOT}/thing",
                     ],
-                    "cwd": "${SIM_WORKTREE_ROOT}/${FOO}/sub",
+                    "cwd": "${ZED_WORKTREE_ROOT}/${FOO}/sub",
                     "env": {
                         "X": "Y",
                     },
@@ -174,11 +174,11 @@ mod tests {
         "#;
         let parsed: VsCodeDebugTaskFile =
             serde_json_lenient::from_str(raw).expect("deserializing launch.json");
-        let sim = DebugTaskFile::try_from(parsed).expect("converting to Sim debug templates");
+        let zed = DebugTaskFile::try_from(parsed).expect("converting to Zed debug templates");
 
         let expected_placeholder = format!("${{{}}}", VariableName::PickProcessId);
         pretty_assertions::assert_eq!(
-            sim,
+            zed,
             DebugTaskFile(vec![DebugScenario {
                 label: "Attach to Process".into(),
                 adapter: "CodeLLDB".into(),

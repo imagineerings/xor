@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim should provide a graph/node/flowchart interface for designing and executing advanced diffusion pipelines.
+Zed should provide a graph/node/flowchart interface for designing and executing advanced diffusion pipelines.
 
 ### Requirement 1: Typed Graph Model
 

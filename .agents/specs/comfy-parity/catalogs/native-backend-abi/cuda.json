@@ -42,7 +42,7 @@
     "approved_vendor_redistributables": [],
     "license_approval_required_for_vendor_runtime": true,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-cuda-package-v1",
+    "signature_domain": "zed-comfy-cuda-package-v1",
     "runtime_compilation_for_core_kernels": false
   },
   "provenance": {

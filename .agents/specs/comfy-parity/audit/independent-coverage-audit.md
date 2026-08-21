@@ -4,7 +4,7 @@
 
 **PASS — the frozen native Rust/GPUI specification satisfies the coverage, reconciliation, traceability, regeneration, and implementation-readiness gates audited here. No blocking defect remains.**
 
-This is a specification result, not runtime-parity evidence. Current Sim has no
+This is a specification result, not runtime-parity evidence. Current Zed has no
 cataloged equivalent or partial Comfy implementation: the ledger records 9,667
 `missing`, 835 `conflicting`, 2,123 `deferred`, and 87 `uncertain` rows. Source
 runtime observation covers 103 of 12,659 independently testable rows (0.8137%).
@@ -45,7 +45,7 @@ declared versions and deterministic fingerprints rather than invented SHAs.
 | comfy-cli 0.0.0 CI placeholder | 312 | `09d0b5f262bce3105f83777a310f1e391c4624f95142da5e3230626b68a276e6` |
 | Comfy docs, no declared project version | 5,800 | `1f4c9c460b8f5b35e30eb4d2d64bc201a958f247ab21af6c68743cce28c33931` |
 | embedded-docs 0.5.7, with ComfyUI pinning 0.5.6 | 10,298 | `5aebf925cf36fe7b8df3c89466ad96ffa42110542a392ec6156b88fc807ec956` |
-| Sim 1.10.2 fingerprint manifest | 3,310 | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
+| Zed 1.10.2 fingerprint manifest | 3,310 | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
 
 Each of the six source-file ledgers exactly matches its filesystem: 949, 4,697,
 735, 312, 5,800, and 10,298 rows respectively, with zero missing paths, extra
@@ -132,8 +132,8 @@ before claiming parity.
 
 ## Native-only architecture and first slice
 
-The architecture consistently assigns production execution to Sim-owned Rust
-crates, a private Sim-owned Rust worker, GPUI entities/services, native
+The architecture consistently assigns production execution to Zed-owned Rust
+crates, a private Zed-owned Rust worker, GPUI entities/services, native
 tensor/autograd/RNG/model/sampler/scheduler/media implementations, and an
 optional native HTTP/WebSocket compatibility host that never forwards to
 ComfyUI. Release gates prohibit Python/Comfy process paths, external Comfy
@@ -212,4 +212,4 @@ execution, but they do block any claim that native runtime parity already
 exists.
 
 The audit modified only this report. It did not change source applications,
-Sim implementation code, dependencies, Git state, or external systems.
+Zed implementation code, dependencies, Git state, or external systems.

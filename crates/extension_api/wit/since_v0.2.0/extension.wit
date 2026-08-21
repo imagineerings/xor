@@ -1,4 +1,4 @@
-package sim:extension;
+package zed:extension;
 
 world extension {
     import github;
@@ -69,7 +69,7 @@ world extension {
         env: env-vars,
     }
 
-    /// A Sim worktree.
+    /// A Zed worktree.
     resource worktree {
         /// Returns the ID of the worktree.
         id: func() -> u64;
@@ -83,7 +83,7 @@ world extension {
         shell-env: func() -> env-vars;
     }
 
-    /// A Sim project.
+    /// A Zed project.
     resource project {
         /// Returns the IDs of all of the worktrees in this project.
         worktree-ids: func() -> list<u64>;

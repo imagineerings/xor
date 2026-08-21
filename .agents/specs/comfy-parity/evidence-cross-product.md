@@ -3,7 +3,7 @@
 ## Scope and baseline
 
 This pass reconciles compatibility contracts that cross the Python engine,
-browser frontend, Desktop host, and eventual Sim boundary. It is intentionally
+browser frontend, Desktop host, and eventual Zed boundary. It is intentionally
 separate from the product inventories: a backend writer and frontend reader can
 each be correctly inventoried while still disagreeing at their shared boundary.
 
@@ -12,7 +12,7 @@ each be correctly inventoried while still disagreeing at their shared boundary.
 | ComfyUI | 0.27.1; fingerprint `21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f` | `baseline.md`; `projects/comfy/ComfyUI/pyproject.toml`; `comfyui_version.py` |
 | ComfyUI Frontend | 1.48.2; fingerprint `aeb208b759effdacf2ea3b1929f0a3e583201f0b7b3cb006f36f1007364b8ca3` | `baseline.md`; `projects/comfy/ComfyUI-Frontend/package.json` |
 | Comfy Desktop | 1.0.28; fingerprint `2442854931f3a5a80e68aa55eab21a26dcefe868b4e875251a5b4d811668e448` | `baseline.md`; `projects/comfy/Comfy-Desktop/package.json` |
-| Sim | 1.10.2; fingerprint `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` | `baseline.md`; `crates/sim/Cargo.toml` |
+| Zed | 1.10.2; fingerprint `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` | `baseline.md`; `crates/zed/Cargo.toml` |
 
 Git metadata is absent at the nested source roots, so this pass does not claim
 commit SHAs. The package versions and deterministic source-tree fingerprints
@@ -56,8 +56,8 @@ the source test was inspected, not rerun here.
 | Availability | active | 27 |
 | Availability | conditional | 6 |
 | Availability | deprecated/dead | 1 |
-| Sim status | missing | 31 |
-| Sim status | conflicting | 3 |
+| Zed status | missing | 31 |
+| Zed status | conflicting | 3 |
 
 The 34 rows comprise nine workflow/serialization/state transforms
 (`041`-`049`), nineteen carrier or explicit-boundary formats (`050`-`068`),
@@ -87,9 +87,9 @@ the frontend; 24 also have a backend producer or server-side contract.
 | --- | --- | ---: |
 | Evidence | test-backed | 33 |
 | Evidence | code-inferred | 27 |
-| Sim status | missing | 49 |
-| Sim status | conflicting | 5 |
-| Sim status | uncertain | 6 |
+| Zed status | missing | 49 |
+| Zed status | conflicting | 5 |
+| Zed status | uncertain | 6 |
 | Availability | active | 35 |
 | Availability | conditional (exact label) | 13 |
 | Availability | conditional plus cloud/paid | 2 |
@@ -102,13 +102,13 @@ the frontend; 24 also have a backend producer or server-side contract.
 
 Product inclusion is non-exclusive: 51 compatibility rows involve the
 frontend, 45 involve ComfyUI, 18 involve Desktop, and one explicitly records
-the Sim baseline.
+the Zed baseline.
 
 ### Combined cross pass
 
 - 94 stable cross-product contracts.
 - 62 test-backed and 32 code-inferred; no documented-only or unverified rows.
-- 80 missing, 8 conflicting, and 6 uncertain in current Sim evidence.
+- 80 missing, 8 conflicting, and 6 uncertain in current Zed evidence.
 - 0 equivalent, 0 partial, and 0 deferred cross rows.
 - 62/94 (66.0%) have focused source-test evidence.
 - 0/94 (0.0%) were dynamically confirmed in this environment.
@@ -136,7 +136,7 @@ are normalized to numbers. Node `widgets_values` may be an array or a record.
 The Python engine does not execute the UI workflow. The frontend separately
 generates an API prompt and places the UI workflow under
 `extra_data.extra_pnginfo.workflow`, which output nodes may embed. This is why
-Sim needs a lossless UI document and a distinct prompt transform.
+Zed needs a lossless UI document and a distinct prompt transform.
 
 ### Workflow JSON schema 1
 
@@ -156,7 +156,7 @@ compatibility fallback, not evidence that arbitrary future versions satisfy
 
 `Comfy.Validation.Workflows` defaults to false. When enabled, Zod schema
 validation and link repair run, but `loadGraphData` uses the original graph if
-validation fails. A Sim parser should preserve that recovery outcome while
+validation fails. A Zed parser should preserve that recovery outcome while
 using bounded, memory-safe parsing and retaining original bytes. A strict-only
 importer would reject source-loadable artifacts; an unbounded fail-open parser
 would create an avoidable security regression.
@@ -173,7 +173,7 @@ localized slot names, compresses widget input slots, records frontend version,
 resolves subgraphs, omits virtual/muted/bypassed nodes, and removes inputs whose
 upstream node was removed. Missing node classes make `loadApiJson` visibly
 warn, but the source importer skips them and therefore cannot losslessly
-round-trip that API prompt. Sim should retain the original prompt bytes even if
+round-trip that API prompt. Zed should retain the original prompt bytes even if
 its editable reconstruction is partial.
 
 ### Node, socket, widget, and seed compatibility
@@ -232,7 +232,7 @@ Metadata suppression is also per writer, not global in practice.
 `--disable-metadata` governs core PNG/APNG/WebP, audio, SaveVideo, GLB,
 latent/model, PNG-advanced, and EXR-advanced paths. In this snapshot SaveWEBM
 and SaveSVG do not consult it. File3D pass-through preserves existing container
-metadata rather than injecting current prompt/workflow. A single blanket Sim
+metadata rather than injecting current prompt/workflow. A single blanket Zed
 preference would not reproduce these contracts.
 
 All inspected metadata parsers accept Python's bare `NaN`, `Infinity`, and
@@ -271,7 +271,7 @@ classes are:
 
 Every `fetchApi` request adds `Comfy-User`. Cloud builds may also wait up to ten
 seconds for authentication, add provider credentials, and use a unified 401
-remint/retry flow. Sim should keep identity, retry safety, and route capability
+remint/retry flow. Zed should keep identity, retry safety, and route capability
 scoped to a profile.
 
 ## WebSocket reconciliation
@@ -318,7 +318,7 @@ Normal `executing` events include display/prompt fields, but reconnect replay
 sends only `node`. The frontend's declared Zod schema requires more fields,
 while its runtime handler intentionally falls back to `display_node || node`.
 A strict generated decoder would reject an evidence-backed source variant;
-Sim's schema must model the union.
+Zed's schema must model the union.
 
 Backend emits nine `assets.seed.*` lifecycle events with no bundled typed
 frontend consumer. Conversely, frontend declares `notification`,
@@ -373,7 +373,7 @@ context menus, graph lifecycle, authentication, and output callbacks.
 Callback exceptions are isolated, but an async hook has no timeout and can
 hold an aggregate invocation indefinitely. More importantly, source Python
 extensions run in the engine process and frontend modules run with page-origin
-DOM/network/LiteGraph authority. Native Sim should preserve that ambient power
+DOM/network/LiteGraph authority. Native Zed should preserve that ambient power
 only in an explicitly trusted compatibility mode; untrusted extensions need a
 sandbox or a lossless missing-extension placeholder.
 
@@ -416,7 +416,7 @@ Desktop source plugins define six stable modes:
 | `cloud` | cloud | authenticated/entitled URL provider |
 
 Unknown source fields remain in installation records, and an unknown source
-fails actions visibly instead of being rewritten. Sim profiles should preserve
+fails actions visibly instead of being rewritten. Zed profiles should preserve
 the same source identity and isolate workflows, cookies/auth, queue/history,
 downloads, paths, and windows per selected instance.
 
@@ -463,7 +463,7 @@ The compatibility evidence now maps to the native boundary in `design.md` D1:
 
 1. Implement prompt validation, execution, tensors, autograd, RNG, models,
    devices, memory, samplers, schedulers, nodes, media, cache, cancellation, and
-   recovery in Sim-owned Rust crates and workers.
+   recovery in Zed-owned Rust crates and workers.
 2. Keep lossless workflow, protocol, identifier, metadata, migration, and
    attempt types separate from GPUI entities and from private worker handles.
 3. Build native GPUI graph/workspace surfaces from compiled built-in descriptors
@@ -499,7 +499,7 @@ maps to an exact native implementation task and validation.
 - Format IDs are unique and contiguous from 041 through 074.
 - Compatibility IDs are unique and contiguous from 001 through 060.
 - All 94 rows cite executable source and carry evidence, availability,
-  confidence, Sim status/gap, requirement, design, task, validation, and open
+  confidence, Zed status/gap, requirement, design, task, validation, and open
   question fields.
 - Backend 141-route and 26-event totals, frontend 149-HTTP-use and 24-event
   totals, Desktop 273-channel and 299-preload-member totals, and six Desktop

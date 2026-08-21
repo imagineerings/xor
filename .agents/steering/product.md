@@ -1,6 +1,6 @@
 # Product
 
-This repository (internally "sim") is the source for **Sim**, a high-performance, GPU-accelerated, multiplayer code editor built in Rust by Sim Industries. Sim targets macOS, Linux, and Windows.
+This repository (internally "zed") is the source for **Zed**, a high-performance, GPU-accelerated, multiplayer code editor built in Rust by Zed Industries. Zed targets macOS, Linux, and Windows.
 
 Key product areas:
 - **Code editor** — fast text editing, LSP integration, syntax highlighting via Tree-sitter, vim mode
@@ -11,4 +11,4 @@ Key product areas:
 - **Debugger** — built-in DAP (Debug Adapter Protocol) support
 - **Terminal** — integrated terminal using alacritty_terminal
 
-Sim unifies the former Goose agent capabilities into Sim's native agent crates and ships native editor, CLI, and local API surfaces from the main workspace.
+Zed unifies the former Goose agent capabilities into Zed's native agent crates and ships native editor, CLI, and local API surfaces from the main workspace.

@@ -20,9 +20,9 @@ Add diagnostics and launcher models in W2, then defer real local/remote worker l
 
 - [ ] 1. Add serving diagnostics and worker launcher models
   - Validate local Python/GPU/checkpoint setup, persistent session configuration, and remote worker metadata.
-  - Keep launch readiness as native Sim diagnostics and model records only; block downloads and heavy dependencies until explicit approval/dependency review without starting worker processes.
+  - Keep launch readiness as native Zed diagnostics and model records only; block downloads and heavy dependencies until explicit approval/dependency review without starting worker processes.
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.1_
   - _Writes: crates/world_model/src/serving.rs, crates/world_model/src/worker_launcher.rs, crates/world_model/src/serving_tests.rs_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/model-serving-packaging/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/model-serving-packaging/design.md, Cargo.toml, projects/godot_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/model-serving-packaging_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/model-serving-packaging/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/model-serving-packaging/design.md, Cargo.toml, projects/godot_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/model-serving-packaging_

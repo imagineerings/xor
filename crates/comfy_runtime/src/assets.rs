@@ -39,7 +39,7 @@ pub const MAX_PAGE_SIZE: usize = 1_000;
 pub const ASSET_SERVICE_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_MAX_ASSET_INDEX_BYTES: usize = 64 * 1024 * 1024;
 pub const DEFAULT_MAX_ASSET_RECORDS: usize = 100_000;
-const ASSET_INDEX_FILENAME: &str = ".sim-asset-index.json";
+const ASSET_INDEX_FILENAME: &str = ".zed-asset-index.json";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -199,7 +199,7 @@ impl AssetIdentity {
             ));
         }
         Ok(format!(
-            "sim-asset://{}/{relative_path}",
+            "zed-asset://{}/{relative_path}",
             self.namespace.locator_type()
         ))
     }
@@ -329,9 +329,9 @@ impl AssetRoots {
                 "asset reference is malformed".to_owned(),
             ));
         }
-        let value = reference.strip_prefix("sim-asset://").ok_or_else(|| {
+        let value = reference.strip_prefix("zed-asset://").ok_or_else(|| {
             AssetError::InvalidReference(
-                "asset references must use the sim-asset scheme".to_owned(),
+                "asset references must use the zed-asset scheme".to_owned(),
             )
         })?;
         let (namespace, relative_path) = value.split_once('/').ok_or_else(|| {
@@ -734,7 +734,7 @@ impl NativeAssetResolverRegistry {
             return Err(NativeAssetServiceError::Missing);
         }
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-asset-reference.v1");
+        hasher.update(b"zed.comfy.native-asset-reference.v1");
         hasher.update(service_identity.service_id().as_bytes());
         hasher.update(identity.profile_id.as_bytes());
         hasher.update(identity.namespace.locator_type().as_bytes());
@@ -3115,7 +3115,7 @@ mod tests {
             .roots()
             .identity(AssetNamespace::Output, "task 18/native-image.png")?;
         let reference = identity.to_reference()?;
-        assert_eq!(reference, "sim-asset://output/task 18/native-image.png");
+        assert_eq!(reference, "zed-asset://output/task 18/native-image.png");
         assert_eq!(
             service.roots().identity_from_reference(&reference)?,
             identity
@@ -3124,18 +3124,18 @@ mod tests {
 
         for invalid in [
             "https://output/task18/native-image.png",
-            "sim-asset://output/../secret",
-            "sim-asset://other/task18/native-image.png",
-            "sim-asset://output/",
-            "sim-asset://output/task18/native-image.png?download=1",
-            "sim-asset://output/task18\\native-image.png",
+            "zed-asset://output/../secret",
+            "zed-asset://other/task18/native-image.png",
+            "zed-asset://output/",
+            "zed-asset://output/task18/native-image.png?download=1",
+            "zed-asset://output/task18\\native-image.png",
         ] {
             assert!(service.roots().identity_from_reference(invalid).is_err());
         }
         assert!(
             service
                 .roots()
-                .identity_from_reference("sim-asset://other-profile/output/native-image.png")
+                .identity_from_reference("zed-asset://other-profile/output/native-image.png")
                 .is_err()
         );
         Ok(())

@@ -130,7 +130,7 @@ required_manifest = {
     "redistributes_vendor_runtime": False,
     "runtime_compilation_forbidden": True,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-mlu-package-v1",
+    "signature_domain": "zed-comfy-mlu-package-v1",
     "signature_coverage": "package-coverage-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
 }
@@ -278,7 +278,7 @@ manifest = {
     "runtime_compilation_forbidden": True,
     "signer": signer,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-mlu-package-v1",
+    "signature_domain": "zed-comfy-mlu-package-v1",
     "signature_coverage": "package-coverage-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "unsafe_owner": "comfy_backend_mlu::loader",
@@ -339,7 +339,7 @@ catalog = {
 }
 output.write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
-    build_package "$temporary/package" x86_64-unknown-linux-gnu sim.test "$receipt" "$contracts"
+    build_package "$temporary/package" x86_64-unknown-linux-gnu zed.test "$receipt" "$contracts"
     cp "$temporary/package/abi/symbols-v1.json" "$temporary/original.json"
     printf '\n' >> "$temporary/package/abi/symbols-v1.json"
     if inspect "$temporary/package" >/dev/null 2>&1; then
@@ -352,11 +352,11 @@ PY
         exit 1
     fi
     printf '%s\n' '{"schema_version":1,"algorithm":"ed25519","signature":"AAAA"}' > "$temporary/bad-receipt.json"
-    if build_package "$temporary/bad-package" x86_64-unknown-linux-gnu sim.test "$temporary/bad-receipt.json" "$contracts" >/dev/null 2>&1; then
+    if build_package "$temporary/bad-package" x86_64-unknown-linux-gnu zed.test "$temporary/bad-receipt.json" "$contracts" >/dev/null 2>&1; then
         echo "malformed MLU signature receipt was accepted" >&2
         exit 1
     fi
-    if build_package "$temporary/wrong-target" x86_64-apple-darwin sim.test "$receipt" "$contracts" >/dev/null 2>&1; then
+    if build_package "$temporary/wrong-target" x86_64-apple-darwin zed.test "$receipt" "$contracts" >/dev/null 2>&1; then
         echo "unsupported MLU package target was accepted" >&2
         exit 1
     fi

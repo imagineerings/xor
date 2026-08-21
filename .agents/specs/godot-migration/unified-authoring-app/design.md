@@ -2,9 +2,9 @@
 
 ## Architecture
 
-Compose existing workspace, project, editor, inspector, media, task, agent, and graph surfaces around Godot-compatible import metadata and Sim-native runtime state. Add no parallel Godot-specific workspace or runtime.
+Compose existing workspace, project, editor, inspector, media, task, agent, and graph surfaces around Godot-compatible import metadata and Zed-native runtime state. Add no parallel Godot-specific workspace or runtime.
 
-Unified authoring is implemented as native Sim functionality. Workspace items, routes, previews, diagnostics, and generated artifact panels reuse records at their existing owners and compose Sim graph, preview, generated asset, and world-model provenance data rather than exposing compatibility labels or pass-through workflow state.
+Unified authoring is implemented as native Zed functionality. Workspace items, routes, previews, diagnostics, and generated artifact panels reuse records at their existing owners and compose Zed graph, preview, generated asset, and world-model provenance data rather than exposing compatibility labels or pass-through workflow state.
 
 ## Components
 
@@ -28,7 +28,7 @@ _For any_ world-model preview request, execution SHALL require worker diagnostic
 
 ### D-NATIVE: Native unified authoring path
 
-Godot-compatible project/file concepts terminate at import and presentation boundaries. Existing Sim owners retain UI, storage, preview/runtime execution, tasks, provenance, cancellation, recovery, persistence, and cleanup. Unsupported runtime behavior is explicit and no action delegates to Godot.
+Godot-compatible project/file concepts terminate at import and presentation boundaries. Existing Zed owners retain UI, storage, preview/runtime execution, tasks, provenance, cancellation, recovery, persistence, and cleanup. Unsupported runtime behavior is explicit and no action delegates to Godot.
 
 **Validates: Requirement 9.1, 9.2, 9.3, 9.4, 9.5**
 

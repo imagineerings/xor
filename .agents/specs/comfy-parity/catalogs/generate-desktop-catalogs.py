@@ -316,11 +316,11 @@ def build_features() -> list[dict[str, object]]:
                 "observable_behavior": behavior,
                 "failure_cancellation_recovery": "Preserve the source-defined validation, visible error, cancellation cleanup, retry, and restart behavior; unresolved edge detail remains an explicit test target.",
                 "persistence_side_effects": "See desktop-persistence.csv, desktop-settings.csv, desktop-ipc.csv, and the cited source for exact durable and external effects.",
-                "sim_status": "uncertain",
-                "sim_evidence": "Current target evidence is maintained in native-sim-evidence.csv and master-feature-catalog.json; this row's Sim status is synchronized from the master native-architecture audit.",
-                "parity_gap": "If Sim lacks the stated observable behavior and compatibility contract, implement it or record an explicit deferral decision.",
-                "acceptance": f"With deterministic fixtures and the same preconditions, Sim shall reproduce: {behavior}",
-                "validation": "Source contract/unit test plus side-by-side Sim protocol or GPUI interaction test; add failure injection when the capability performs I/O or process work.",
+                "zed_status": "uncertain",
+                "zed_evidence": "Current target evidence is maintained in native-zed-evidence.csv and master-feature-catalog.json; this row's Zed status is synchronized from the master native-architecture audit.",
+                "parity_gap": "If Zed lacks the stated observable behavior and compatibility contract, implement it or record an explicit deferral decision.",
+                "acceptance": f"With deterministic fixtures and the same preconditions, Zed shall reproduce: {behavior}",
+                "validation": "Source contract/unit test plus side-by-side Zed protocol or GPUI interaction test; add failure injection when the capability performs I/O or process work.",
                 "open_questions": "Runtime-only details are unverified unless separately marked observed by the lead audit.",
             })
     identifiers = [str(row["feature_id"]) for row in rows]

@@ -234,19 +234,19 @@ where
 ///
 /// This function checks if the current process is running with root privileges
 /// and terminates the program with an error message unless explicitly allowed via the
-/// `SIM_ALLOW_ROOT` environment variable.
+/// `ZED_ALLOW_ROOT` environment variable.
 #[cfg(unix)]
 pub fn prevent_root_execution() {
     let is_root = nix::unistd::geteuid().is_root();
-    let allow_root = std::env::var("SIM_ALLOW_ROOT").is_ok_and(|val| val == "true");
+    let allow_root = std::env::var("ZED_ALLOW_ROOT").is_ok_and(|val| val == "true");
 
     if is_root && !allow_root {
         eprintln!(
             "\
-Error: Running Sim as root or via sudo is unsupported.
-       Doing so (even once) may subtly break things for all subsequent non-root usage of Sim.
+Error: Running Zed as root or via sudo is unsupported.
+       Doing so (even once) may subtly break things for all subsequent non-root usage of Zed.
        It is untested and not recommended, don't complain when things break.
-       If you wish to proceed anyways, set `SIM_ALLOW_ROOT=true` in your environment."
+       If you wish to proceed anyways, set `ZED_ALLOW_ROOT=true` in your environment."
         );
         std::process::exit(1);
     }
@@ -307,51 +307,51 @@ fn load_shell_from_passwd() -> Result<()> {
     Ok(())
 }
 
-/// Returns a shell escaped path for the current sim executable
-pub fn get_shell_safe_sim_path(shell_kind: shell::ShellKind) -> anyhow::Result<String> {
+/// Returns a shell escaped path for the current zed executable
+pub fn get_shell_safe_zed_path(shell_kind: shell::ShellKind) -> anyhow::Result<String> {
     use anyhow::Context as _;
     use paths::PathExt;
-    let mut sim_path =
-        std::env::current_exe().context("Failed to determine current sim executable path.")?;
+    let mut zed_path =
+        std::env::current_exe().context("Failed to determine current zed executable path.")?;
     if cfg!(target_os = "linux")
-        && !sim_path.is_file()
-        && let Some(truncated) = sim_path
+        && !zed_path.is_file()
+        && let Some(truncated) = zed_path
             .clone()
             .file_name()
             .and_then(|s| s.to_str())
             .and_then(|n| n.strip_suffix(" (deleted)"))
     {
         // Might have been deleted during update; let's use the new binary if there is one.
-        sim_path.set_file_name(truncated);
+        zed_path.set_file_name(truncated);
     }
 
-    sim_path
+    zed_path
         .try_shell_safe(shell_kind)
-        .context("Failed to shell-escape Sim executable path.")
+        .context("Failed to shell-escape Zed executable path.")
 }
 
-/// Returns a path for the sim cli executable, this function
-/// should be called from the sim executable, not sim-cli.
-pub fn get_sim_cli_path() -> Result<PathBuf> {
+/// Returns a path for the zed cli executable, this function
+/// should be called from the zed executable, not zed-cli.
+pub fn get_zed_cli_path() -> Result<PathBuf> {
     use anyhow::Context as _;
-    let sim_path =
-        std::env::current_exe().context("Failed to determine current sim executable path.")?;
-    let parent = sim_path
+    let zed_path =
+        std::env::current_exe().context("Failed to determine current zed executable path.")?;
+    let parent = zed_path
         .parent()
-        .context("Failed to determine parent directory of sim executable path.")?;
+        .context("Failed to determine parent directory of zed executable path.")?;
 
     let possible_locations: &[&str] = if cfg!(target_os = "macos") {
-        // On macOS, the sim executable and sim-cli are inside the app bundle,
+        // On macOS, the zed executable and zed-cli are inside the app bundle,
         // so here ./cli is for both installed and development builds.
         &["./cli"]
     } else if cfg!(target_os = "windows") {
-        // bin/sim.exe is for installed builds, ./cli.exe is for development builds.
-        &["bin/sim.exe", "./cli.exe"]
+        // bin/zed.exe is for installed builds, ./cli.exe is for development builds.
+        &["bin/zed.exe", "./cli.exe"]
     } else if cfg!(target_os = "linux") || cfg!(target_os = "freebsd") {
         // bin is the standard, ./cli is for the target directory in development builds.
-        &["../bin/sim", "./cli"]
+        &["../bin/zed", "./cli"]
     } else {
-        anyhow::bail!("unsupported platform for determining sim-cli path");
+        anyhow::bail!("unsupported platform for determining zed-cli path");
     };
 
     possible_locations
@@ -361,11 +361,11 @@ pub fn get_sim_cli_path() -> Result<PathBuf> {
                 .join(p)
                 .canonicalize()
                 .ok()
-                .filter(|p| p != &sim_path)
+                .filter(|p| p != &zed_path)
         })
         .with_context(|| {
             format!(
-                "could not find sim-cli from any of: {}",
+                "could not find zed-cli from any of: {}",
                 possible_locations.join(", ")
             )
         })
@@ -386,9 +386,9 @@ pub async fn load_login_shell_environment() -> Result<()> {
         .await
         .with_context(|| format!("capturing environment with {:?}", get_system_shell()))?
     {
-        // Skip SHLVL to prevent it from polluting Sim's process environment.
+        // Skip SHLVL to prevent it from polluting Zed's process environment.
         // The login shell used for env capture increments SHLVL, and if we propagate it,
-        // terminals spawned by Sim will inherit it and increment again, causing SHLVL
+        // terminals spawned by Zed will inherit it and increment again, causing SHLVL
         // to start at 2 instead of 1 (and increase by 2 on each reload).
         if name == "SHLVL" {
             continue;

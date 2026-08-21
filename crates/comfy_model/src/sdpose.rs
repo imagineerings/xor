@@ -217,9 +217,9 @@ const LOTUS_CONDITIONING_F16_BITS: [u16; 2048] = [
     0x3924, 0x3793, 0x3bb7, 0x3d8c, 0xbb4f, 0x3c25, 0xb963, 0x3e01,
 ];
 
-const SDPOSE_SD2_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-sd2-capture.v1\0";
-const SDPOSE_MODEL_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-model-resource.v1\0";
-const SDPOSE_HEATMAP_HEAD_SOURCE_DOMAIN: &[u8] = b"sim.comfy.sdpose-heatmap-head.v1\0";
+const SDPOSE_SD2_SOURCE_DOMAIN: &[u8] = b"zed.comfy.sdpose-sd2-capture.v1\0";
+const SDPOSE_MODEL_SOURCE_DOMAIN: &[u8] = b"zed.comfy.sdpose-model-resource.v1\0";
+const SDPOSE_HEATMAP_HEAD_SOURCE_DOMAIN: &[u8] = b"zed.comfy.sdpose-heatmap-head.v1\0";
 pub const SDPOSE_HEAD_SOURCE_SHA256: &str =
     "19a55d1ecf16796226ed204241852b9b237a563addf636ff738167d9273cf97a";
 pub const SDPOSE_MODEL_DETECTION_SOURCE_SHA256: &str =

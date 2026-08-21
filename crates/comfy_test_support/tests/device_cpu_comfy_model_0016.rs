@@ -26,7 +26,7 @@ use smol::process::Command;
 
 const CERTIFICATION_RELATIVE_PATH: &str =
     ".agents/specs/comfy-parity/catalogs/native-device-certification/cpu-comfy-model-0016.json";
-const ATTESTATION_SIGNER: &str = "sim.hardware.lab.cpu.mt-mbp-l2kh69c7rg";
+const ATTESTATION_SIGNER: &str = "zed.hardware.lab.cpu.mt-mbp-l2kh69c7rg";
 const ATTESTATION_PUBLIC_KEY: &str =
     "627d26c97f76a810b90828422cff3e6cdaa083ed885d40169bae0e08255d07eb";
 const SIGNING_KEY_PATH_ENV: &str = "COMFY_CPU_CERTIFICATION_SIGNING_KEY_PKCS8_PATH";
@@ -303,7 +303,7 @@ fn execute_hardware_matrix(
                 &workspace.join("crates/comfy_tensor/src/backends/cpu_comfy_model_0016.rs"),
             )?,
             execution_abi_sha256,
-            abi_floor: "sim-tensor-backend-v1".to_owned(),
+            abi_floor: "zed-tensor-backend-v1".to_owned(),
             framework_count: 0,
             symbol_count: 3,
             class_count: 0,
@@ -314,7 +314,7 @@ fn execute_hardware_matrix(
                 "initialize_cpu_tensor_backend".to_owned(),
             ],
             package: CertificationPackageEvidence::NotApplicable {
-                reason: "CPU adapter is compiled into the native Rust Sim worker and has no separately signed vendor package".to_owned(),
+                reason: "CPU adapter is compiled into the native Rust Zed worker and has no separately signed vendor package".to_owned(),
             },
         },
         matrix,
@@ -446,7 +446,7 @@ fn observe_environment() -> Result<CertificationEnvironment> {
         .ok_or_else(|| anyhow!("rustc returned no host target"))?
         .to_owned();
     Ok(CertificationEnvironment {
-        lab_id: "sim-cpu-lab-mt-mbp-l2kh69c7rg".to_owned(),
+        lab_id: "zed-cpu-lab-mt-mbp-l2kh69c7rg".to_owned(),
         hostname: command_stdout("hostname", &[])?,
         os_name: observe_os_name()?,
         os_version: observe_os_version()?,

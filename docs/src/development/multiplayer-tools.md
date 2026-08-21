@@ -1,11 +1,11 @@
 # Multiplayer build profiles
 
-Sim supports two release configurations. `multiplayer-tools` is the only public Cargo feature for the Collaborative Workspace and Buzz-derived platform. It is opt-in and is not part of Sim's default feature set.
+Zed supports two release configurations. `multiplayer-tools` is the only public Cargo feature for the Collaborative Workspace and Buzz-derived platform. It is opt-in and is not part of Zed's default feature set.
 
 The profiles are:
 
-- `standard`: Editor Sim with `multiplayer-tools` disabled. Multiplayer-only application composition, Buzz services, compatibility transports, migrations, jobs and assets must not be compiled, registered or packaged.
-- `multiplayer`: Sim with `multiplayer-tools` enabled explicitly. Shared Editor, project, worktree, Git, ACP, credentials, settings and existing collaboration owners remain the same implementations used by Standard Sim.
+- `standard`: Editor Zed with `multiplayer-tools` disabled. Multiplayer-only application composition, Buzz services, compatibility transports, migrations, jobs and assets must not be compiled, registered or packaged.
+- `multiplayer`: Zed with `multiplayer-tools` enabled explicitly. Shared Editor, project, worktree, Git, ACP, credentials, settings and existing collaboration owners remain the same implementations used by Standard Zed.
 
 Use the profile helper to obtain deterministic build and artifact metadata:
 
@@ -17,11 +17,11 @@ script/multiplayer-build-profile multiplayer --dry-run
 The corresponding desktop commands are:
 
 ```sh
-cargo build -p sim --no-default-features
-cargo build -p sim --no-default-features --features multiplayer-tools
+cargo build -p zed --no-default-features
+cargo build -p zed --no-default-features --features multiplayer-tools
 
-cargo run -p sim --no-default-features
-cargo run -p sim --no-default-features --features multiplayer-tools
+cargo run -p zed --no-default-features
+cargo run -p zed --no-default-features --features multiplayer-tools
 ```
 
 Release automation must record the helper output with the artifact metadata. It must not infer the profile from a directory name, package name or runtime setting. Multiplayer packages must use the `multiplayer` profile and therefore record `artifact_capability=multiplayer-tools:true`.
@@ -37,7 +37,7 @@ script/multiplayer-build-profile multiplayer --inspect path/to/assembled-artifac
 
 The Standard profile fails when it finds known Buzz-owned service, protocol, migration or deployment payload names. The Multiplayer profile reports those entries without rejecting them. This inspection complements the Cargo dependency-tree check; hiding a UI surface is not sufficient isolation.
 
-The existing Sim collaboration server and clients are shared infrastructure. The profile helper deliberately reports `shared_collab_deployment=retained` and does not reject generic `collab` artifacts. Only functionality classified as Collaborative Workspace-exclusive by the capability audit belongs behind this release capability.
+The existing Zed collaboration server and clients are shared infrastructure. The profile helper deliberately reports `shared_collab_deployment=retained` and does not reject generic `collab` artifacts. Only functionality classified as Collaborative Workspace-exclusive by the capability audit belongs behind this release capability.
 
 Disabling the profile never deletes collaborative data, credentials, signing material or a saved Collaborative Workspace preference. Rollback publishes a Standard artifact, stops multiplayer-exclusive services and migrations according to the migration plan, and preserves those stores for a later compatible Multiplayer build.
 
@@ -69,7 +69,7 @@ Classify by semantic ownership, not by repository path:
 
 - Existing Editor, project, worktree, Git, ACP, credentials, settings, media, audio, remote-development and collaboration behavior stays shared and always compiled.
 - A Collaborative Workspace-only adapter, extension, action, view, asset, migration, job or registration is enabled only through `multiplayer-tools`, even when it lives in a shared crate.
-- Only dependency-light version, setting and deep-link representations needed to preserve state or reject an unsupported operation remain in Standard Sim. Rejection must occur before tenant or resource lookup.
-- Server and deployment artifacts exclusive to the Collaborative Workspace use the same explicit release capability. Generic Sim collaboration infrastructure remains shared.
+- Only dependency-light version, setting and deep-link representations needed to preserve state or reject an unsupported operation remain in Standard Zed. Rejection must occur before tenant or resource lookup.
+- Server and deployment artifacts exclusive to the Collaborative Workspace use the same explicit release capability. Generic Zed collaboration infrastructure remains shared.
 
 If a proposed task writes both shared behavior and an independently reviewable multiplayer-only implementation, split and sequence it before coding. Both configurations remain supported after every boundary leaf; hiding UI while still compiling or shipping exclusive dependencies is a failure.

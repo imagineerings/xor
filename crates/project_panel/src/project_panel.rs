@@ -47,7 +47,7 @@ use settings::{
     DockSide, ProjectPanelEntrySpacing, Settings, SettingsStore, ShowDiagnostics, ShowIndentGuides,
     update_settings_file,
 };
-use sim_actions::{
+use zed_actions::{
     project_panel::{Toggle, ToggleFocus},
     workspace::OpenWithSystem,
 };
@@ -1175,10 +1175,10 @@ impl ProjectPanel {
                                     .action("Download...", Box::new(DownloadFromRemote))
                             })
                             .separator()
-                            .action("Copy Path", Box::new(sim_actions::workspace::CopyPath))
+                            .action("Copy Path", Box::new(zed_actions::workspace::CopyPath))
                             .action(
                                 "Copy Relative Path",
-                                Box::new(sim_actions::workspace::CopyRelativePath),
+                                Box::new(zed_actions::workspace::CopyRelativePath),
                             )
                             .when(has_git_repo, |menu| {
                                 menu.separator()
@@ -2741,21 +2741,21 @@ impl ProjectPanel {
 
     fn find_next_selection_after_deletion(
         &self,
-        sanitisim_entries: BTreeSet<SelectedEntry>,
+        sanitized_entries: BTreeSet<SelectedEntry>,
         cx: &mut Context<Self>,
     ) -> Option<SelectedEntry> {
-        if sanitisim_entries.is_empty() {
+        if sanitized_entries.is_empty() {
             return None;
         }
         let project = self.project.read(cx);
-        let (worktree_id, worktree) = sanitisim_entries
+        let (worktree_id, worktree) = sanitized_entries
             .iter()
             .map(|entry| entry.worktree_id)
             .filter_map(|id| project.worktree_for_id(id, cx).map(|w| (id, w.read(cx))))
             .max_by(|(_, a), (_, b)| a.root_name().cmp(b.root_name()))?;
         let git_store = project.git_store().read(cx);
 
-        let marked_entries_in_worktree = sanitisim_entries
+        let marked_entries_in_worktree = sanitized_entries
             .iter()
             .filter(|e| e.worktree_id == worktree_id)
             .collect::<HashSet<_>>();
@@ -3671,7 +3671,7 @@ impl ProjectPanel {
 
     fn copy_path(
         &mut self,
-        _: &sim_actions::workspace::CopyPath,
+        _: &zed_actions::workspace::CopyPath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -3699,7 +3699,7 @@ impl ProjectPanel {
 
     fn copy_relative_path(
         &mut self,
-        _: &sim_actions::workspace::CopyRelativePath,
+        _: &zed_actions::workspace::CopyRelativePath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -3980,9 +3980,9 @@ impl ProjectPanel {
         entries: BTreeSet<SelectedEntry>,
         cx: &App,
     ) -> BTreeSet<SelectedEntry> {
-        let mut sanitisim_entries = BTreeSet::new();
+        let mut sanitized_entries = BTreeSet::new();
         if entries.is_empty() {
-            return sanitisim_entries;
+            return sanitized_entries;
         }
 
         let project = self.project.read(cx);
@@ -4010,7 +4010,7 @@ impl ProjectPanel {
                     })
                     .collect::<BTreeSet<_>>();
 
-                sanitisim_entries.extend(worktree_entries.into_iter().filter(|entry| {
+                sanitized_entries.extend(worktree_entries.into_iter().filter(|entry| {
                     let Some(entry_info) = worktree.entry_for_id(entry.entry_id) else {
                         return false;
                     };
@@ -4023,7 +4023,7 @@ impl ProjectPanel {
             }
         }
 
-        sanitisim_entries
+        sanitized_entries
     }
 
     fn effective_entries(&self) -> BTreeSet<SelectedEntry> {

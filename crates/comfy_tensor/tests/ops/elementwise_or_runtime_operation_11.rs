@@ -450,11 +450,11 @@ fn adam_and_npu_name_are_focused_adapters_with_checked_failure_paths()
     let npu = DeviceId::new(DeviceKind::Npu, 3);
     let properties = NativeDeviceProperties::new(
         npu,
-        "Sim Native NPU Fixture",
+        "Zed Native NPU Fixture",
         16 * 1024 * 1024,
         1,
         0,
-        Some("sim-npu-v1".to_owned()),
+        Some("zed-npu-v1".to_owned()),
         true,
     )?;
     let capabilities = BackendCapabilityMatrix::new_with_properties(
@@ -465,7 +465,7 @@ fn adam_and_npu_name_are_focused_adapters_with_checked_failure_paths()
     )?;
     assert_eq!(
         npu_get_device_name_exact_native(&capabilities, npu, &cancellation)?,
-        "Sim Native NPU Fixture"
+        "Zed Native NPU Fixture"
     );
     assert!(npu_get_device_name_exact_native(&capabilities, DeviceId::CPU, &cancellation).is_err());
     let cancelled = CancellationToken::default();

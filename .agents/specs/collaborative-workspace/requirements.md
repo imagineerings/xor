@@ -2,23 +2,23 @@
 
 ## Problem
 
-Sim has mature native editor, project, Git, agent, ACP, remote-development and collaboration primitives. Buzz has a broader signed-event collaboration product and operational stack, but it is nested as a separate Rust/React/Tauri/mobile/web system. Shipping both unchanged would split identity, projects, conversations, agents, diffs and operational ownership. The product needs a native GPUI collaborative presentation and complete Buzz capability parity while converging each responsibility on one canonical Sim owner.
+Zed has mature native editor, project, Git, agent, ACP, remote-development and collaboration primitives. Buzz has a broader signed-event collaboration product and operational stack, but it is nested as a separate Rust/React/Tauri/mobile/web system. Shipping both unchanged would split identity, projects, conversations, agents, diffs and operational ownership. The product needs a native GPUI collaborative presentation and complete Buzz capability parity while converging each responsibility on one canonical Zed owner.
 
 ## Scope
 
 ### In scope
 
 - Every capability identified as CAP-001 through CAP-045 in `source-inventory.md`.
-- A first-shippable native vertical slice using existing Sim projects, ACP threads and diffs, with `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png` as its canonical visual references.
+- A first-shippable native vertical slice using existing Zed projects, ACP threads and diffs, with `screenshots/screenshot-1.png` and `screenshots/screenshot-2.png` as its canonical visual references.
 - Complete protocol, service, data, client, operational and source-retirement migration.
 - Compatibility with existing signed events, identities, deployments, CLI scripts, mobile/web clients and stored data unless an approval gate explicitly authorizes a break.
 - Completing documented Buzz stubs or defects before declaring parity.
 
 ### Out of scope
 
-- Product capabilities not present in Buzz or required to consolidate it with Sim.
-- Replacing Sim's editor, language tooling, local project/worktree model or Git implementation with Buzz equivalents.
-- Embedding the Buzz React/Tauri desktop in Sim.
+- Product capabilities not present in Buzz or required to consolidate it with Zed.
+- Replacing Zed's editor, language tooling, local project/worktree model or Git implementation with Buzz equivalents.
+- Embedding the Buzz React/Tauri desktop in Zed.
 - Executing production deployment, deletion or irreversible cutover operations while creating or implementing this specification.
 
 ## Glossary
@@ -26,7 +26,7 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 - **Canonical owner**: the only component permitted to author authoritative state for an aggregate after cutover.
 - **Compatibility adapter**: a boundary that preserves an external wire, file or process contract while translating to/from canonical state.
 - **Community**: the tenant/workspace boundary selected from trusted request context before authentication or data access.
-- **Collaborative Workspace**: Sim's native GPUI collaboration-oriented workspace presentation; it does not create a second project or data model.
+- **Collaborative Workspace**: Zed's native GPUI collaboration-oriented workspace presentation; it does not create a second project or data model.
 - **Parity**: all inventoried behavior passes reuse evidence or implementation/conformance tests, including security and failure semantics.
 - **Signed event log**: the immutable interoperable record for Nostr-authored collaboration events; relational projections derived from it are not independent authorities.
 
@@ -56,13 +56,13 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 ### Requirement 3: Reversible workspace presentation
 
-**User story:** As a Sim user, I want to choose the editor or collaborative presentation without forking my data, so that I can work in the mode appropriate to my task.
+**User story:** As a Zed user, I want to choose the editor or collaborative presentation without forking my data, so that I can work in the mode appropriate to my task.
 
 #### Acceptance criteria
 
-1. **3.1** WHEN onboarding is shown, THEN Sim SHALL present “Editor Workspace” and “Collaborative Workspace” as clear choices and explain that both use the same underlying projects and data.
-2. **3.2** WHEN a choice is made, THEN Sim SHALL persist the presentation preference and open the selected presentation on subsequent launches.
-3. **3.3** WHEN the user switches presentation later, THEN Sim SHALL preserve project, worktree, Git, identity, credentials, agent session and collaboration state without copying or forking it.
+1. **3.1** WHEN onboarding is shown, THEN Zed SHALL present “Editor Workspace” and “Collaborative Workspace” as clear choices and explain that both use the same underlying projects and data.
+2. **3.2** WHEN a choice is made, THEN Zed SHALL persist the presentation preference and open the selected presentation on subsequent launches.
+3. **3.3** WHEN the user switches presentation later, THEN Zed SHALL preserve project, worktree, Git, identity, credentials, agent session and collaboration state without copying or forking it.
 4. **3.4** IF an existing user has not selected Collaborative Workspace, THEN current Editor Workspace behavior SHALL remain unchanged.
 
 ### Requirement 4: Native collaborative composition and accessibility
@@ -105,8 +105,8 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 #### Acceptance criteria
 
-1. **7.1** THE system SHALL support human and agent Nostr identities, profiles, status, owner attestations, social lists and relay-scoped archival while retaining explicit bindings to Sim service accounts where required.
-2. **7.2** WHEN a signing key is imported, generated, paired, rotated, backed up or restored, THEN Sim's canonical credentials provider SHALL use protected storage, verify round trips, redact outputs and avoid deleting the prior source before successful verification.
+1. **7.1** THE system SHALL support human and agent Nostr identities, profiles, status, owner attestations, social lists and relay-scoped archival while retaining explicit bindings to Zed service accounts where required.
+2. **7.2** WHEN a signing key is imported, generated, paired, rotated, backed up or restored, THEN Zed's canonical credentials provider SHALL use protected storage, verify round trips, redact outputs and avoid deleting the prior source before successful verification.
 3. **7.3** IF protected key storage is unavailable or corrupt, THEN the system SHALL fail safely or use an explicitly documented owner-only fallback without silently generating a replacement identity.
 4. **7.4** WHEN an identity is archived, revoked or rotated, THEN historical authorship SHALL remain intact while active access, autocomplete, agent authorization and future signatures reflect the new state.
 
@@ -130,7 +130,7 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 1. **9.1** THE system SHALL support Buzz channel types, membership/roles/invites, DMs, messages, replies, edits, deletions, reactions, pins, bookmarks, schedules, canvases, forum posts, custom emoji and entity links with equivalent visibility rules.
 2. **9.2** WHEN timelines or threads are paged, THEN rows, replies, aux events, summaries and bounds SHALL retain stable order and exact continuation under same-second events, deletions and concurrent live updates.
 3. **9.3** THE system SHALL synchronize read/unread/manual-unread state, drafts, reminders, presence and typing with documented privacy, expiry, cross-device and offline behavior.
-4. **9.4** WHEN search or discovery runs, THEN authorization and privacy exclusions SHALL be applied before limit/ranking, and results MAY compose with existing Sim file/project search without exposing private event content.
+4. **9.4** WHEN search or discovery runs, THEN authorization and privacy exclusions SHALL be applied before limit/ranking, and results MAY compose with existing Zed file/project search without exposing private event content.
 5. **9.5** WHEN a native or push notification is emitted, THEN it SHALL be deduplicated, permission-aware and privacy-preserving; push payloads SHALL be wake-only and authoritative data SHALL be fetched after reconnect.
 
 ### Requirement 10: Projects, Git forge and review parity
@@ -146,11 +146,11 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 ### Requirement 11: Agent platform parity
 
-**User story:** As a human supervising agents, I want identities, runtimes and delegated work to compose with Sim's native ACP platform, so that agents are first-class collaborators without duplicate execution engines.
+**User story:** As a human supervising agents, I want identities, runtimes and delegated work to compose with Zed's native ACP platform, so that agents are first-class collaborators without duplicate execution engines.
 
 #### Acceptance criteria
 
-1. **11.1** THE system SHALL accept supported ACP agents and MCP servers while using Sim's agent, ACP thread, tool-permission and process-lifecycle owners for native execution.
+1. **11.1** THE system SHALL accept supported ACP agents and MCP servers while using Zed's agent, ACP thread, tool-permission and process-lifecycle owners for native execution.
 2. **11.2** THE system SHALL support agent identities, owner attestations, managed agents, personas, teams, catalogs, runtime/model/provider/environment configuration and share/private projection rules.
 3. **11.3** THE system SHALL preserve encrypted engrams, private managed-agent state, snapshots, local archive and per-turn usage metrics with explicit ownership, retention, import/export and privacy semantics.
 4. **11.4** WHEN jobs or delegated tasks are requested, accepted, progressed, completed, cancelled or failed, THEN one idempotent state machine SHALL authorize the transition and expose it to humans and participating agents.
@@ -185,7 +185,7 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 #### Acceptance criteria
 
 1. **14.1** WHEN media is uploaded or downloaded, THEN the system SHALL authenticate, tenant-scope, validate type/size/content, store and render it without exposing object-store credentials or cross-community paths.
-2. **14.2** THE system SHALL preserve Blossom compatibility, attachment metadata, thumbnails, images, video and link-preview behavior through native Sim media renderers where possible.
+2. **14.2** THE system SHALL preserve Blossom compatibility, attachment metadata, thumbnails, images, video and link-preview behavior through native Zed media renderers where possible.
 3. **14.3** WHEN a huddle starts, joins, leaves or ends, THEN lifecycle, participant, reaction, audio-control and transcript events SHALL remain consistent across the native transport and supported Buzz compatibility transport.
 4. **14.4** IF microphone, speaker, network, local voice model, transcription or TTS fails, THEN the UI SHALL expose the failed function, retain the huddle/conversation state and offer a safe retry or fallback.
 
@@ -206,18 +206,18 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 #### Acceptance criteria
 
-1. **16.1** THE system SHALL preserve NIP-AB device pairing, QR/session expiry, replay protection and verified import into Sim's canonical credential store.
+1. **16.1** THE system SHALL preserve NIP-AB device pairing, QR/session expiry, replay protection and verified import into Zed's canonical credential store.
 2. **16.2** THE remote-agent provider boundary SHALL preserve discovery, hostile-output validation, secret/config separation, identity fail-closed, presence-as-status, bounded cleanup and at-most-one-instance semantics.
 3. **16.3** WHERE shared compute or relay mesh is enabled, THE system SHALL authenticate community membership, enforce approved resource/trust policy, fence stale peers and expose availability/failure without silently falling back to an unapproved provider.
 4. **16.4** THE agent-first CLI, web repository/invite client, mobile client and administration surfaces SHALL remain interoperable throughout migration and retain documented commands, URLs, deep links and exit/error contracts or an approved versioned replacement.
 
 ### Requirement 17: Data migration, import and rollback
 
-**User story:** As an existing user or operator, I want all Buzz and Sim state migrated safely, so that upgrading does not lose work or identities.
+**User story:** As an existing user or operator, I want all Buzz and Zed state migrated safely, so that upgrading does not lose work or identities.
 
 #### Acceptance criteria
 
-1. **17.1** BEFORE changing canonical ownership, THE migration SHALL inventory and version existing Buzz Postgres, Redis-derived, object-store, keyring/fallback, desktop archive/config, agent snapshot, event-sync and Sim persistence data.
+1. **17.1** BEFORE changing canonical ownership, THE migration SHALL inventory and version existing Buzz Postgres, Redis-derived, object-store, keyring/fallback, desktop archive/config, agent snapshot, event-sync and Zed persistence data.
 2. **17.2** WHEN an importer or schema migration runs, THEN it SHALL be resumable, idempotent, integrity-checked, tenant-scoped and observable, and SHALL preserve the original until verification passes.
 3. **17.3** IF migration verification or compatibility health fails before the point of no return, THEN operators SHALL be able to restore the prior binary/configuration and authoritative data without accepting divergent writes.
 4. **17.4** WHEN a temporary bridge, dual read or dual write is introduced, THEN the migration SHALL define precedence, reconciliation, divergence alerts, rollback and a dated removal gate.
@@ -228,7 +228,7 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 #### Acceptance criteria
 
-1. **18.1** THE migration SHALL publish a compatibility matrix for Sim desktop versions, Buzz desktop/mobile/web/CLI versions, relay/service versions, protocol features and stored-schema versions.
+1. **18.1** THE migration SHALL publish a compatibility matrix for Zed desktop versions, Buzz desktop/mobile/web/CLI versions, relay/service versions, protocol features and stored-schema versions.
 2. **18.2** WHEN a compatibility boundary changes, THEN clients SHALL negotiate or receive a clear minimum-version error before performing an incompatible write.
 3. **18.3** BEFORE retiring any Buzz component, THE system SHALL meet its parity, migration, traffic/usage, rollback-window, documentation and ownership exit criteria.
 4. **18.4** WHEN retirement completes, THEN `projects/buzz` SHALL be reference-only or removed according to approved licensing/history policy, and builds/releases SHALL no longer depend on its retired desktop or duplicate runtime implementations.
@@ -242,8 +242,8 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 1. **19.1** THE design SHALL threat-model signing keys, identity binding, untrusted events/content, provider binaries, MCP tools, webhooks, media, search, push, mesh, database access and cross-tenant timing/metadata leaks.
 2. **19.2** THE implementation SHALL preserve or strengthen frame/body/output limits, SSRF and redirect policy, secret redaction, sandbox/permission gates, TLS configuration, process cleanup, retention and least privilege.
 3. **19.3** THE consolidated services SHALL provide health/readiness, metrics, structured redacted logs, migration status, projection drift, queue/backpressure, replica freshness and compatibility-version observability.
-4. **19.4** WHEN deployed through local, Compose, Helm or release pipelines, THEN configuration/schema validation, signed artifacts, migration jobs, rollback inputs and platform packages SHALL follow Sim's canonical release conventions.
-5. **19.5** WHILE telemetry is disabled by Sim settings, THE collaborative workspace SHALL not re-enable client telemetry through Buzz-derived code; local operational logging and server observability SHALL remain available under their documented policies.
+4. **19.4** WHEN deployed through local, Compose, Helm or release pipelines, THEN configuration/schema validation, signed artifacts, migration jobs, rollback inputs and platform packages SHALL follow Zed's canonical release conventions.
+5. **19.5** WHILE telemetry is disabled by Zed settings, THE collaborative workspace SHALL not re-enable client telemetry through Buzz-derived code; local operational logging and server observability SHALL remain available under their documented policies.
 
 ### Requirement 20: Verification and final parity
 
@@ -253,23 +253,23 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 
 1. **20.1** THE verification program SHALL include focused unit, GPUI, integration, end-to-end, migration, compatibility, security, fault-injection, load and visual tests appropriate to each capability.
 2. **20.2** THE multitenant conformance checker and protocol fixtures SHALL remain independent of production reducers and SHALL run against both compatibility and consolidated service paths during migration.
-3. **20.3** WHEN behavior is reused unchanged from Sim, THEN parity SHALL require semantic evidence covering security, persistence, failure and user-visible behavior, not a matching component name.
+3. **20.3** WHEN behavior is reused unchanged from Zed, THEN parity SHALL require semantic evidence covering security, persistence, failure and user-visible behavior, not a matching component name.
 4. **20.4** THE migration SHALL NOT declare complete until every CAP ID and acceptance criterion has passing evidence, all approved migration/removal gates are satisfied, documented known Buzz gaps are completed or explicitly accepted, and no prohibited duplicate owner remains.
 
 ### Requirement 21: Compile-time multiplayer feature isolation
 
-**User story:** As a release owner, I want one compile-time capability switch for multiplayer functionality, so that Standard Sim remains unchanged while Multiplayer Sim includes the complete Collaborative Workspace and Buzz compatibility platform.
+**User story:** As a release owner, I want one compile-time capability switch for multiplayer functionality, so that Standard Zed remains unchanged while Multiplayer Zed includes the complete Collaborative Workspace and Buzz compatibility platform.
 
 #### Acceptance criteria
 
-1. **21.1** THE canonical `sim` application package SHALL define one public Cargo feature named `multiplayer-tools`, SHALL keep it outside the default feature set, and SHALL forward it only to narrowly scoped internal crate features and optional dependencies.
-2. **21.2** WHILE `multiplayer-tools` is disabled, THE Sim application SHALL build, test, package and start without multiplayer-only crates, dependencies, services, transports, migrations, assets, actions, settings surfaces or background jobs, and Editor Workspace behavior SHALL remain unchanged.
-3. **21.3** WHILE `multiplayer-tools` is enabled, THE Sim application SHALL offer the approved Collaborative Workspace, adapters and services without forking canonical Editor, project, worktree, Git, identity, credential, transcript or agent-session state.
+1. **21.1** THE canonical `zed` application package SHALL define one public Cargo feature named `multiplayer-tools`, SHALL keep it outside the default feature set, and SHALL forward it only to narrowly scoped internal crate features and optional dependencies.
+2. **21.2** WHILE `multiplayer-tools` is disabled, THE Zed application SHALL build, test, package and start without multiplayer-only crates, dependencies, services, transports, migrations, assets, actions, settings surfaces or background jobs, and Editor Workspace behavior SHALL remain unchanged.
+3. **21.3** WHILE `multiplayer-tools` is enabled, THE Zed application SHALL offer the approved Collaborative Workspace, adapters and services without forking canonical Editor, project, worktree, Git, identity, credential, transcript or agent-session state.
 4. **21.4** IF an unflagged build reads a persisted Collaborative Workspace preference, THEN it SHALL use Editor Workspace for that run without deleting collaborative data, overwriting the saved preference or requiring a multiplayer-only crate; WHEN a compatible flagged build returns, THEN it SHALL restore that preference.
 5. **21.5** WHILE `multiplayer-tools` is disabled, THE application SHALL omit multiplayer onboarding choices, workspace-switch actions, menus, settings pages and service registrations; IF a retained compatibility entry point recognizes a multiplayer-only operation, THEN it SHALL return a deterministic “not included in this build” result without disclosing tenant or resource existence.
 6. **21.6** WHEN a desktop, service or companion client negotiates capabilities, THEN it SHALL advertise multiplayer availability explicitly and SHALL reject unsupported multiplayer-only writes before tenant or resource lookup.
 7. **21.7** THE feature boundary SHALL leave shared Editor, project, worktree, Git, ACP, credentials, settings and existing collaboration functionality always compiled, and SHALL preserve one canonical domain/state representation across both configurations.
-8. **21.8** WHEN Standard Sim is packaged or deployed, THEN exclusive Buzz services, migrations and assets SHALL be absent; WHEN Multiplayer Sim is packaged or deployed, THEN its release command SHALL enable `multiplayer-tools` explicitly and record that capability in artifact metadata.
+8. **21.8** WHEN Standard Zed is packaged or deployed, THEN exclusive Buzz services, migrations and assets SHALL be absent; WHEN Multiplayer Zed is packaged or deployed, THEN its release command SHALL enable `multiplayer-tools` explicitly and record that capability in artifact metadata.
 9. **21.9** CI SHALL build, test, warning-denied lint and smoke both configurations, inspect the default dependency tree for forbidden multiplayer-only packages, and fail when feature unification or packaging causes an unflagged artifact to include multiplayer code or dependencies.
 
 ## Constraints
@@ -277,7 +277,7 @@ Sim has mature native editor, project, Git, agent, ACP, remote-development and c
 - The primary desktop implementation is native Rust/GPUI.
 - Lower-level domain, persistence and protocol modules must not depend on GPUI.
 - Use `./script/clippy`, repository Rust conventions and GPUI executor timers in GPUI tests.
-- Preserve Apache-2.0 notices and attribution for imported Buzz code within the GPL-3.0-or-later Sim repository.
+- Preserve Apache-2.0 notices and attribution for imported Buzz code within the GPL-3.0-or-later Zed repository.
 - Security and tenant boundaries fail closed; compatibility never weakens authorization.
 - Production mutations and source retirement require separate authorization.
 - `multiplayer-tools` is the only public Cargo feature for this product boundary and is non-default; internal forwarding features must not be selected independently by release users.

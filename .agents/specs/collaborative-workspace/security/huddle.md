@@ -117,14 +117,14 @@ Recording is not implied by joining, transcription, transport compatibility or m
 
 ### HUD-B05 — capture, playback and device control
 
-- **Owner:** existing Sim `audio` device abstractions and native huddle controls.
+- **Owner:** existing Zed `audio` device abstractions and native huddle controls.
 - **Rule:** permission before capture, explicit selected devices, mute/PTT/action generation at buffer/track boundary, and visible device loss/switch/retry.
 - **Failure:** stop the affected track and clear queued capture/playback without changing membership unless lifecycle policy says so.
 - **Tests:** Tasks 39.4, 39.7 and 39.8.
 
 ### HUD-B06 — TTS model acquisition and readiness
 
-- **Owner:** Sim model/cache conventions consumed by `audio::collaboration_tts`.
+- **Owner:** Zed model/cache conventions consumed by `audio::collaboration_tts`.
 - **Rule:** allowlisted HTTPS source and pinned revision/hash/size; streamed byte ceiling; traversal/link-safe extraction; verified temp install; attribution and manifest are readiness requirements.
 - **Failure:** keep/restore prior verified model; expose unavailable/error; never execute a partial directory.
 - **Tests:** Tasks 39.5, 44.5 and 45.3.

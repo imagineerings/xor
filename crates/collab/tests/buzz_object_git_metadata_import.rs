@@ -120,7 +120,7 @@ fn fixture(community_id: CommunityId) -> (Vec<BuzzObjectMetadataRecord>, [u8; 32
             record(
                 community_id,
                 5,
-                format!("repos/{community_id}/{owner}/sim/pointer"),
+                format!("repos/{community_id}/{owner}/zed/pointer"),
                 pointer.len() as u64,
                 Some(pointer.clone()),
                 sha256(&pointer),
@@ -154,7 +154,7 @@ fn fixture_inventory_preserves_content_and_ref_identity() {
     assert_eq!(media.sha256, blob_sha256);
     assert_eq!(media.mime_type, "image/png");
     let repository = inventory.repositories.first().expect("repository");
-    assert_eq!(repository.repository_name, "sim");
+    assert_eq!(repository.repository_name, "zed");
     assert_eq!(repository.head, "refs/heads/main");
     assert_eq!(
         repository.refs.get("refs/heads/main"),
@@ -202,7 +202,7 @@ fn foreign_tenant_pointer_fails_closed() {
     let record = record(
         community_id,
         1,
-        format!("repos/{foreign}/{owner}/sim/pointer"),
+        format!("repos/{foreign}/{owner}/zed/pointer"),
         pointer.len() as u64,
         Some(pointer.clone()),
         sha256(&pointer),

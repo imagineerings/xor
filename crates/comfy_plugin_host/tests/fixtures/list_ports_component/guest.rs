@@ -3,8 +3,8 @@ wit_bindgen::generate!({
     world: "comfy-plugin",
 });
 
-use exports::sim::comfy_plugin::plugin::Guest;
-use sim::comfy_plugin::{host, types};
+use exports::zed::comfy_plugin::plugin::Guest;
+use zed::comfy_plugin::{host, types};
 
 struct EchoComponent;
 
@@ -63,7 +63,7 @@ impl Guest for EchoComponent {
             "fixture random response changed",
         )?;
         require(
-            host::model_open("sim-asset://model/fixture.json")? != 0,
+            host::model_open("zed-asset://model/fixture.json")? != 0,
             "fixture model handle is invalid",
         )?;
 
@@ -132,7 +132,7 @@ fn require(condition: bool, message: &str) -> Result<(), types::InvocationError>
 
 fn manifest_projection() -> types::ManifestProjection {
     types::ManifestProjection {
-        component_world: "sim:comfy-plugin@1.0.0".to_owned(),
+        component_world: "zed:comfy-plugin@1.0.0".to_owned(),
         schema_version: 1,
         identifier: "test.echo-plugin".to_owned(),
         plugin_version: version(1, 2, 3),
@@ -293,7 +293,7 @@ fn capability_requests() -> Vec<types::CapabilityRequest> {
         (types::CapabilityKind::Randomness, "sampler"),
         (
             types::CapabilityKind::Model,
-            "sim-asset://model/fixture.json",
+            "zed-asset://model/fixture.json",
         ),
         (types::CapabilityKind::TransactionalOutput, "outputs"),
         (

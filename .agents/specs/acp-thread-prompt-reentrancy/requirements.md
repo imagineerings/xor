@@ -2,11 +2,11 @@
 
 ## Problem
 
-`AcpThread` starts an agent connection prompt while the thread entity is still being updated. Sim's native local slash commands synchronously append transient output to that same `AcpThread`, so submitting commands such as `/status`, `/goal`, or `/grind` through the normal conversation path attempts a second entity update and panics. The later crash-server `BrokenPipe` warning is a consequence of the process panic, not a separate failure.
+`AcpThread` starts an agent connection prompt while the thread entity is still being updated. Zed's native local slash commands synchronously append transient output to that same `AcpThread`, so submitting commands such as `/status`, `/goal`, or `/grind` through the normal conversation path attempts a second entity update and panics. The later crash-server `BrokenPipe` warning is a consequence of the process panic, not a separate failure.
 
 ## Scope
 
-- In scope: the `AcpThread` prompt-dispatch ownership boundary, Sim-native local slash commands, and regression coverage through the real native connection.
+- In scope: the `AcpThread` prompt-dispatch ownership boundary, Zed-native local slash commands, and regression coverage through the real native connection.
 - In scope: preservation of prompt completion, transient command output, queued input, cancellation, permission/elicitation, persistence, and session-close behavior.
 - Out of scope: changing slash-command syntax or behavior, external ACP command catalogs, GPUI entity-map checks, or introducing a new dispatcher or state machine.
 
@@ -19,12 +19,12 @@
 #### Acceptance criteria
 
 1. WHEN `AcpThread` starts an agent prompt THEN THE system SHALL invoke the connection prompt only after the active `AcpThread` update boundary has ended.
-2. WHEN a Sim-native local command appends transient output during prompt dispatch THEN THE system SHALL update the `AcpThread` exactly once without a re-entrant entity update panic.
+2. WHEN a Zed-native local command appends transient output during prompt dispatch THEN THE system SHALL update the `AcpThread` exactly once without a re-entrant entity update panic.
 3. THE system SHALL preserve the existing client-user-message-ID prompt path and the fallback `AgentConnection::prompt` path.
 
 ### Requirement 2: Command and lifecycle preservation
 
-**User story:** As a Sim user, I want native commands to retain their existing behavior after the crash fix, so that output, continuation, and control boundaries remain predictable.
+**User story:** As a Zed user, I want native commands to retain their existing behavior after the crash fix, so that output, continuation, and control boundaries remain predictable.
 
 #### Acceptance criteria
 

@@ -50,7 +50,7 @@ impl Gitea {
         }
 
         // TODO: detecting self hosted instances by checking whether "gitea" is in the url or not
-        // is not very reliable. See https://github.com/simtropolis/sim/issues/26393 for more
+        // is not very reliable. See https://github.com/simtropolis/zed/issues/26393 for more
         // information.
         if !host.contains("gitea") {
             bail!("not a Gitea URL");
@@ -222,14 +222,14 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_ssh_url() {
         let parsed_remote = Gitea::public_instance()
-            .parse_remote_url("git@gitea.com:simtropolis/sim.git")
+            .parse_remote_url("git@gitea.com:simtropolis/zed.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             }
         );
     }
@@ -237,21 +237,21 @@ mod tests {
     #[test]
     fn test_parse_remote_url_given_https_url() {
         let parsed_remote = Gitea::public_instance()
-            .parse_remote_url("https://gitea.com/simtropolis/sim.git")
+            .parse_remote_url("https://gitea.com/simtropolis/zed.git")
             .unwrap();
 
         assert_eq!(
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_ssh_url() {
-        let remote_url = "git@gitea.my-enterprise.com:simtropolis/sim.git";
+        let remote_url = "git@gitea.my-enterprise.com:simtropolis/zed.git";
 
         let parsed_remote = Gitea::from_remote_url(remote_url)
             .unwrap()
@@ -262,14 +262,14 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             }
         );
     }
 
     #[test]
     fn test_parse_remote_url_given_self_hosted_https_url() {
-        let remote_url = "https://gitea.my-enterprise.com/simtropolis/sim.git";
+        let remote_url = "https://gitea.my-enterprise.com/simtropolis/zed.git";
         let parsed_remote = Gitea::from_remote_url(remote_url)
             .unwrap()
             .parse_remote_url(remote_url)
@@ -279,7 +279,7 @@ mod tests {
             parsed_remote,
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             }
         );
     }
@@ -289,7 +289,7 @@ mod tests {
         let permalink = Gitea::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -298,7 +298,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitea.com/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://gitea.com/simtropolis/zed/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -307,7 +307,7 @@ mod tests {
         let permalink = Gitea::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -316,7 +316,7 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitea.com/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L7";
+        let expected_url = "https://gitea.com/simtropolis/zed/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L7";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
@@ -325,7 +325,7 @@ mod tests {
         let permalink = Gitea::public_instance().build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             },
             BuildPermalinkParams::new(
                 "faa6f979be417239b2e070dbbf6392b909224e0b",
@@ -334,18 +334,18 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitea.com/simtropolis/sim/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L24-L48";
+        let expected_url = "https://gitea.com/simtropolis/zed/src/commit/faa6f979be417239b2e070dbbf6392b909224e0b/crates/editor/src/git/permalink.rs#L24-L48";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_gitea_self_hosted_permalink_from_ssh_url() {
         let gitea =
-            Gitea::from_remote_url("git@gitea.some-enterprise.com:simtropolis/sim.git").unwrap();
+            Gitea::from_remote_url("git@gitea.some-enterprise.com:simtropolis/zed.git").unwrap();
         let permalink = gitea.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             },
             BuildPermalinkParams::new(
                 "e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7",
@@ -354,27 +354,27 @@ mod tests {
             ),
         );
 
-        let expected_url = "https://gitea.some-enterprise.com/simtropolis/sim/src/commit/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
+        let expected_url = "https://gitea.some-enterprise.com/simtropolis/zed/src/commit/e6ebe7974deb6bb6cc0e2595c8ec31f0c71084b7/crates/editor/src/git/permalink.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 
     #[test]
     fn test_build_gitea_self_hosted_permalink_from_https_url() {
-        let gitea = Gitea::from_remote_url("https://gitea-instance.big-co.com/simtropolis/sim.git")
+        let gitea = Gitea::from_remote_url("https://gitea-instance.big-co.com/simtropolis/zed.git")
             .unwrap();
         let permalink = gitea.build_permalink(
             ParsedGitRemote {
                 owner: "simtropolis".into(),
-                repo: "sim".into(),
+                repo: "zed".into(),
             },
             BuildPermalinkParams::new(
                 "b2efec9824c45fcc90c9a7eb107a50d1772a60aa",
-                &repo_path("crates/sim/src/main.rs"),
+                &repo_path("crates/zed/src/main.rs"),
                 None,
             ),
         );
 
-        let expected_url = "https://gitea-instance.big-co.com/simtropolis/sim/src/commit/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/sim/src/main.rs";
+        let expected_url = "https://gitea-instance.big-co.com/simtropolis/zed/src/commit/b2efec9824c45fcc90c9a7eb107a50d1772a60aa/crates/zed/src/main.rs";
         assert_eq!(permalink.to_string(), expected_url.to_string())
     }
 }

@@ -42,7 +42,7 @@ impl RuntimeAdapter {
             .ok_or(TensorError::ShapeOverflow)?;
         self.0
             .allocate(&[elements], element_type, cancellation)
-            .map_err(|error| map_execution_error("sim.cuda.allocate", error))
+            .map_err(|error| map_execution_error("zed.cuda.allocate", error))
     }
 
     fn create_stream(
@@ -65,7 +65,7 @@ impl RuntimeAdapter {
             usize::try_from(destination_offset).map_err(|_| TensorError::ShapeOverflow)?;
         self.0
             .copy_from_host(destination, destination_offset, bytes, cancellation)
-            .map_err(|error| map_execution_error("sim.cuda.transfer.host-to-device", error))
+            .map_err(|error| map_execution_error("zed.cuda.transfer.host-to-device", error))
     }
 
     fn copy_to_host(
@@ -80,7 +80,7 @@ impl RuntimeAdapter {
             usize::try_from(source_offset).map_err(|_| TensorError::ShapeOverflow)?;
         self.0
             .copy_to_host(source, source_offset, bytes, cancellation)
-            .map_err(|error| map_execution_error("sim.cuda.transfer.device-to-host", error))
+            .map_err(|error| map_execution_error("zed.cuda.transfer.device-to-host", error))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -97,7 +97,7 @@ impl RuntimeAdapter {
         self.0
             .add(left, right, output, cancellation)
             .map(CudaTrackedEvent::Native)
-            .map_err(|error| map_execution_error("sim.cuda.binary.add", error))
+            .map_err(|error| map_execution_error("zed.cuda.binary.add", error))
     }
 
     fn record_event(
@@ -108,7 +108,7 @@ impl RuntimeAdapter {
         self.0
             .synchronize(cancellation)
             .map(|()| CudaTrackedEvent::Synchronized)
-            .map_err(|error| map_execution_error("sim.cuda.event.record", error))
+            .map_err(|error| map_execution_error("zed.cuda.event.record", error))
     }
 
     fn wait_event(
@@ -120,7 +120,7 @@ impl RuntimeAdapter {
             CudaTrackedEvent::Native(event) => self
                 .0
                 .wait_event(event, cancellation)
-                .map_err(|error| map_execution_error("sim.cuda.event.wait", error)),
+                .map_err(|error| map_execution_error("zed.cuda.event.wait", error)),
             CudaTrackedEvent::Synchronized => {
                 cancellation.check()?;
                 Ok(())
@@ -297,7 +297,7 @@ impl CudaTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.cuda.transfer.host-to-device",
+            "zed.cuda.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -352,7 +352,7 @@ impl CudaTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.cuda.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.cuda.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -379,7 +379,7 @@ impl CudaTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.cuda.test.download-storage", tensor, context)?;
+        self.require_input("zed.cuda.test.download-storage", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = usize::try_from(storage.byte_length)
             .map_err(|_| TensorError::ShapeOverflow)?;
@@ -455,7 +455,7 @@ impl CudaTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.cuda.storage.lookup".to_owned(),
+                operation: "zed.cuda.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified CUDA backend instance"
                     .to_owned(),
@@ -532,7 +532,7 @@ impl CudaTensorBackend {
             });
         }
         if source.descriptor().device() == self.device {
-            self.require_input("sim.cuda.copy", source, context)?;
+            self.require_input("zed.cuda.copy", source, context)?;
             return Ok(PreparedCopySource::Cuda {
                 storage: self.storage(source)?,
                 byte_offset: tensor_byte_offset(source.descriptor())?,
@@ -543,7 +543,7 @@ impl CudaTensorBackend {
             return try_copy_bytes(bytes, "CUDA CPU copy staging").map(PreparedCopySource::Cpu);
         }
         Err(self.unsupported(
-            "sim.cuda.copy",
+            "zed.cuda.copy",
             "source must be host-addressable contiguous CPU storage or this CUDA backend instance",
         ))
     }
@@ -590,7 +590,7 @@ impl CachedAllocationOwner for CudaTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-cuda-v1"
+        "zed-native-cuda-v1"
     }
 
     fn release_cached_allocations(
@@ -625,7 +625,7 @@ impl TensorBackend for CudaTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.cuda.allocate",
+            "zed.cuda.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -660,7 +660,7 @@ impl TensorBackend for CudaTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.cuda.copy",
+            "zed.cuda.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -669,7 +669,7 @@ impl TensorBackend for CudaTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.cuda.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.cuda.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -749,7 +749,7 @@ impl TensorBackend for CudaTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities.require(
-            "sim.cuda.event.record",
+            "zed.cuda.event.record",
             OperationSupport::record_event(),
         )?;
         let stream = self.stream(context.stream, context.cancellation)?;
@@ -765,7 +765,7 @@ impl TensorBackend for CudaTensorBackend {
     ) -> Result<(), TensorError> {
         check_backend_context_identity(self.backend_id, context)?;
         self.capabilities
-            .require("sim.cuda.event.wait", OperationSupport::wait_event())?;
+            .require("zed.cuda.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "CUDA event belongs to a different backend instance".to_owned(),
@@ -798,7 +798,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.fill", context)
+        self.unsupported_result("zed.cuda.fill", context)
     }
 
     fn unary(
@@ -808,7 +808,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.unary", context)
+        self.unsupported_result("zed.cuda.unary", context)
     }
 
     fn binary(
@@ -820,11 +820,11 @@ impl TensorBackend for CudaTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.cuda.binary", context);
+            return self.unsupported_result("zed.cuda.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.cuda.binary.add",
+                "zed.cuda.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -833,7 +833,7 @@ impl TensorBackend for CudaTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.cuda.binary.add",
+            "zed.cuda.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -863,7 +863,7 @@ impl TensorBackend for CudaTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.cuda.binary.add",
+                "zed.cuda.binary.add",
                 "the reviewed CUDA Add binding requires zero-offset whole buffers",
             ));
         }
@@ -918,7 +918,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.binary-scalar", context)
+        self.unsupported_result("zed.cuda.binary-scalar", context)
     }
 
     fn reduction(
@@ -928,7 +928,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.reduction", context)
+        self.unsupported_result("zed.cuda.reduction", context)
     }
 
     fn indexing(
@@ -938,7 +938,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.indexing", context)
+        self.unsupported_result("zed.cuda.indexing", context)
     }
 
     fn resize(
@@ -948,7 +948,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.resize", context)
+        self.unsupported_result("zed.cuda.resize", context)
     }
 
     fn convolution(
@@ -958,7 +958,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.convolution", context)
+        self.unsupported_result("zed.cuda.convolution", context)
     }
 
     fn linear_algebra(
@@ -968,7 +968,7 @@ impl TensorBackend for CudaTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.linear-algebra", context)
+        self.unsupported_result("zed.cuda.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -978,7 +978,7 @@ impl TensorBackend for CudaTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.cuda.custom-kernel", context)
+        self.unsupported_result("zed.cuda.custom-kernel", context)
     }
 }
 
@@ -1031,7 +1031,7 @@ fn cuda_element_type(dtype: DType) -> Result<CudaElementType, TensorError> {
         DType::F16 => Ok(CudaElementType::F16),
         DType::F32 => Ok(CudaElementType::F32),
         _ => Err(TensorError::UnsupportedCapability {
-            operation: "sim.cuda.element-type".to_owned(),
+            operation: "zed.cuda.element-type".to_owned(),
             device: DeviceId::new(DeviceKind::Cuda, 0),
             reason: format!("CUDA element type for {dtype:?} is not reviewed"),
         }),

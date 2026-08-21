@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-film-feature-pyramid-v1",
+  "artifact": "zed-native-film-feature-pyramid-v1",
   "evidence_kind": "source-fingerprinted reduced exact composition oracle",
   "source": {
     "repository": "ComfyUI",

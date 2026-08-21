@@ -294,7 +294,7 @@ pub struct CatalogModelDescriptor {
     pub source_symbol: String,
     pub source_line: Option<u32>,
     pub test_evidence: String,
-    pub sim_status: ModelParityStatus,
+    pub zed_status: ModelParityStatus,
     pub parity_gap: String,
     pub feature_id: String,
 }

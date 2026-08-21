@@ -284,7 +284,7 @@ impl CpuBackend {
     ) -> Result<BackendCapabilityMatrix, TensorError> {
         let properties = NativeDeviceProperties::new(
             DeviceId::CPU,
-            "Sim native Rust CPU",
+            "Zed native Rust CPU",
             memory_limit_bytes,
             0,
             0,
@@ -476,7 +476,7 @@ impl CpuBackend {
         if actual != expected {
             return Err(TensorError::StorageLength { expected, actual });
         }
-        let mut tensor = self.allocate_tensor("sim.cpu.upload", descriptor, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.upload", descriptor, context)?;
         {
             let mut write = tensor.write()?;
             let destination = write.storage_bytes_mut()?;
@@ -514,7 +514,7 @@ impl CpuBackend {
                     .ok_or(TensorError::ShapeOverflow)?,
             });
         }
-        let mut tensor = self.allocate_tensor("sim.cpu.upload-f32", descriptor, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.upload-f32", descriptor, context)?;
         {
             let mut write = tensor.write()?;
             for (destination, value) in write
@@ -546,7 +546,7 @@ impl CpuBackend {
             )
         {
             return Err(self.unsupported(
-                "sim.cpu.resize-vjp",
+                "zed.cpu.resize-vjp",
                 "resize VJP is certified for non-antialiased nearest-exact and bilinear modes",
             ));
         }
@@ -761,7 +761,7 @@ impl TensorBackend for CpuBackend {
         descriptor: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        let tensor = self.allocate_tensor("sim.cpu.allocate", descriptor, context)?;
+        let tensor = self.allocate_tensor("zed.cpu.allocate", descriptor, context)?;
         self.finish(tensor, context)
     }
 
@@ -773,13 +773,13 @@ impl TensorBackend for CpuBackend {
     ) -> Result<(Tensor, EventFence), TensorError> {
         validate_inputs(
             self,
-            "sim.cpu.copy",
+            "zed.cpu.copy",
             PrimitiveOperation::Copy,
             std::slice::from_ref(source),
             context,
         )?;
         self.require_descriptor(
-            "sim.cpu.copy",
+            "zed.cpu.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -787,7 +787,7 @@ impl TensorBackend for CpuBackend {
         )?;
         require_same_shape(source.descriptor().shape(), destination.shape())?;
         require_dtype(source.descriptor().dtype(), destination.dtype())?;
-        let mut tensor = self.allocate_tensor("sim.cpu.copy", destination, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.copy", destination, context)?;
         copy_logical(source, &mut tensor, context.cancellation)?;
         self.finish(tensor, context)
     }
@@ -795,7 +795,7 @@ impl TensorBackend for CpuBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         context.check()?;
         self.capabilities
-            .require("sim.cpu.event.record", OperationSupport::record_event())?;
+            .require("zed.cpu.event.record", OperationSupport::record_event())?;
         let previous = self
             .event_sequence
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
@@ -820,7 +820,7 @@ impl TensorBackend for CpuBackend {
     ) -> Result<(), TensorError> {
         context.check()?;
         self.capabilities
-            .require("sim.cpu.event.wait", OperationSupport::wait_event())?;
+            .require("zed.cpu.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "CPU event belongs to a different backend instance".to_owned(),
@@ -862,7 +862,7 @@ impl TensorBackend for CpuBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.cpu.fill",
+            "zed.cpu.fill",
             PrimitiveOperation::Fill,
             TensorRole::Output,
             &output,
@@ -870,15 +870,15 @@ impl TensorBackend for CpuBackend {
         )?;
         let encoded = output
             .dtype()
-            .encode_scalar(value, "sim.cpu.fill", DeviceId::CPU)
+            .encode_scalar(value, "zed.cpu.fill", DeviceId::CPU)
             .map_err(|error| match error {
                 TensorError::UnsupportedCapability { reason, .. } => {
-                    self.unsupported("sim.cpu.fill", reason)
+                    self.unsupported("zed.cpu.fill", reason)
                 }
                 other => other,
             })?;
         let shape = output.shape().to_vec();
-        let mut tensor = self.allocate_tensor("sim.cpu.fill", output, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.fill", output, context)?;
         let mut write = tensor.write()?;
         for_each_index(&shape, context.cancellation, |indices| {
             write_element(&mut write, indices, &encoded)
@@ -1180,16 +1180,16 @@ impl TensorBackend for CpuBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.capabilities
-            .require_primitive("sim.cpu.convolution", PrimitiveOperation::Convolution)?;
+            .require_primitive("zed.cpu.convolution", PrimitiveOperation::Convolution)?;
         validate_inputs(
             self,
-            "sim.cpu.convolution",
+            "zed.cpu.convolution",
             PrimitiveOperation::Convolution,
             inputs,
             context,
         )?;
         self.require_descriptor(
-            "sim.cpu.convolution",
+            "zed.cpu.convolution",
             PrimitiveOperation::Convolution,
             TensorRole::Output,
             &output,
@@ -1291,7 +1291,7 @@ impl TensorBackend for CpuBackend {
         }
 
         let output_shape = output.shape().to_vec();
-        let mut tensor = self.allocate_tensor("sim.cpu.convolution", output, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.convolution", output, context)?;
         let mut write = tensor.write()?;
         let mut value_index = 0usize;
         for_each_index(&output_shape, context.cancellation, |indices| {
@@ -1304,7 +1304,7 @@ impl TensorBackend for CpuBackend {
                 .ok_or(TensorError::ShapeOverflow)?;
             let encoded = dtype.encode_decoded_scalar(
                 DecodedScalar::Real(f64::from(value)),
-                "sim.cpu.convolution",
+                "zed.cpu.convolution",
                 DeviceId::CPU,
             )?;
             write_element(&mut write, indices, &encoded)
@@ -1322,10 +1322,10 @@ impl TensorBackend for CpuBackend {
     ) -> Result<(Tensor, EventFence), TensorError> {
         let primitive = PrimitiveOperation::LinearAlgebra(operation);
         self.capabilities
-            .require_primitive("sim.cpu.linear-algebra", primitive)?;
+            .require_primitive("zed.cpu.linear-algebra", primitive)?;
         if operation != LinearAlgebraOperation::BatchMatrixMultiply {
             return Err(self.unsupported(
-                "sim.cpu.linear-algebra",
+                "zed.cpu.linear-algebra",
                 "this native profile currently certifies batch matrix multiplication only",
             ));
         }
@@ -1339,7 +1339,7 @@ impl TensorBackend for CpuBackend {
         };
         for input in [left, right] {
             self.require_descriptor(
-                "sim.cpu.linear-algebra.bmm",
+                "zed.cpu.linear-algebra.bmm",
                 primitive,
                 TensorRole::Input,
                 input.descriptor(),
@@ -1377,13 +1377,13 @@ impl TensorBackend for CpuBackend {
         let shape = vec![*batch, *rows, *columns];
         require_same_shape(&shape, output.shape())?;
         self.require_descriptor(
-            "sim.cpu.linear-algebra.bmm",
+            "zed.cpu.linear-algebra.bmm",
             primitive,
             TensorRole::Output,
             &output,
             context,
         )?;
-        let mut tensor = self.allocate_tensor("sim.cpu.linear-algebra.bmm", output, context)?;
+        let mut tensor = self.allocate_tensor("zed.cpu.linear-algebra.bmm", output, context)?;
         let mut write = tensor.write()?;
         for_each_index(&shape, context.cancellation, |indices| {
             let [batch, row, column] = indices else {
@@ -1399,7 +1399,7 @@ impl TensorBackend for CpuBackend {
             }
             let encoded = dtype.encode_decoded_scalar(
                 DecodedScalar::Real(f64::from(sum)),
-                "sim.cpu.linear-algebra.bmm",
+                "zed.cpu.linear-algebra.bmm",
                 DeviceId::CPU,
             )?;
             write_element(&mut write, indices, &encoded)
@@ -1514,7 +1514,7 @@ impl TensorBackend for CpuBackend {
         offsets: &[u64],
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        const OPERATION: &str = "sim.tensor.indexing.rectangular-slice-replacement.v1";
+        const OPERATION: &str = "zed.tensor.indexing.rectangular-slice-replacement.v1";
         context.check()?;
         for tensor in [input, source] {
             if tensor.descriptor().device() != DeviceId::CPU {
@@ -1675,17 +1675,17 @@ impl TensorBackend for CpuBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
         self.capabilities
-            .require_primitive("sim.cpu.custom-kernel", PrimitiveOperation::CustomKernel)?;
+            .require_primitive("zed.cpu.custom-kernel", PrimitiveOperation::CustomKernel)?;
         validate_inputs(
             self,
-            "sim.cpu.custom-kernel",
+            "zed.cpu.custom-kernel",
             PrimitiveOperation::CustomKernel,
             inputs,
             context,
         )?;
         for output in outputs {
             self.require_descriptor(
-                "sim.cpu.custom-kernel",
+                "zed.cpu.custom-kernel",
                 PrimitiveOperation::CustomKernel,
                 TensorRole::Output,
                 output,
@@ -1693,7 +1693,7 @@ impl TensorBackend for CpuBackend {
             )?;
         }
         Err(self.unsupported(
-            "sim.cpu.custom-kernel",
+            "zed.cpu.custom-kernel",
             "no custom CPU kernel is registered for this foundation backend",
         ))
     }
@@ -1876,89 +1876,89 @@ fn map_elementwise_part_four_error(error: ElementwiseRuntimePartFourError) -> Te
 
 fn unary_operation_label(operation: UnaryOperation) -> &'static str {
     match operation {
-        UnaryOperation::Absolute => "sim.cpu.unary.absolute",
-        UnaryOperation::Negate => "sim.cpu.unary.negate",
-        UnaryOperation::Exponential => "sim.cpu.unary.exponential",
-        UnaryOperation::NaturalLogarithm => "sim.cpu.unary.natural-logarithm",
-        UnaryOperation::SquareRoot => "sim.cpu.unary.square-root",
-        UnaryOperation::Reciprocal => "sim.cpu.unary.reciprocal",
-        UnaryOperation::Sine => "sim.cpu.unary.sine",
-        UnaryOperation::Cosine => "sim.cpu.unary.cosine",
-        UnaryOperation::HyperbolicTangent => "sim.cpu.unary.hyperbolic-tangent",
-        UnaryOperation::Sigmoid => "sim.cpu.unary.sigmoid",
-        UnaryOperation::Round => "sim.cpu.unary.round",
-        UnaryOperation::Sinc => "sim.cpu.unary.sinc",
-        UnaryOperation::Log1p => "sim.cpu.unary.log1p",
-        UnaryOperation::ReciprocalSquareRoot => "sim.cpu.unary.rsqrt",
-        UnaryOperation::Relu => "sim.cpu.unary.relu",
-        UnaryOperation::IsFinite => "sim.cpu.unary.is-finite",
-        UnaryOperation::InvertUnitInterval => "sim.cpu.unary.invert-unit-interval",
-        UnaryOperation::LogarithmBaseTwo => "sim.cpu.unary.log2",
-        UnaryOperation::Signum => "sim.cpu.unary.signum",
-        UnaryOperation::Tangent => "sim.cpu.unary.tangent",
-        UnaryOperation::ArcTangent => "sim.cpu.unary.arc-tangent",
-        UnaryOperation::ArcHyperbolicTangent => "sim.cpu.unary.arc-hyperbolic-tangent",
+        UnaryOperation::Absolute => "zed.cpu.unary.absolute",
+        UnaryOperation::Negate => "zed.cpu.unary.negate",
+        UnaryOperation::Exponential => "zed.cpu.unary.exponential",
+        UnaryOperation::NaturalLogarithm => "zed.cpu.unary.natural-logarithm",
+        UnaryOperation::SquareRoot => "zed.cpu.unary.square-root",
+        UnaryOperation::Reciprocal => "zed.cpu.unary.reciprocal",
+        UnaryOperation::Sine => "zed.cpu.unary.sine",
+        UnaryOperation::Cosine => "zed.cpu.unary.cosine",
+        UnaryOperation::HyperbolicTangent => "zed.cpu.unary.hyperbolic-tangent",
+        UnaryOperation::Sigmoid => "zed.cpu.unary.sigmoid",
+        UnaryOperation::Round => "zed.cpu.unary.round",
+        UnaryOperation::Sinc => "zed.cpu.unary.sinc",
+        UnaryOperation::Log1p => "zed.cpu.unary.log1p",
+        UnaryOperation::ReciprocalSquareRoot => "zed.cpu.unary.rsqrt",
+        UnaryOperation::Relu => "zed.cpu.unary.relu",
+        UnaryOperation::IsFinite => "zed.cpu.unary.is-finite",
+        UnaryOperation::InvertUnitInterval => "zed.cpu.unary.invert-unit-interval",
+        UnaryOperation::LogarithmBaseTwo => "zed.cpu.unary.log2",
+        UnaryOperation::Signum => "zed.cpu.unary.signum",
+        UnaryOperation::Tangent => "zed.cpu.unary.tangent",
+        UnaryOperation::ArcTangent => "zed.cpu.unary.arc-tangent",
+        UnaryOperation::ArcHyperbolicTangent => "zed.cpu.unary.arc-hyperbolic-tangent",
     }
 }
 
 fn binary_operation_label(operation: BinaryOperation, scalar: bool) -> &'static str {
     match (scalar, operation) {
-        (false, BinaryOperation::Add) => "sim.cpu.binary.add",
-        (false, BinaryOperation::Subtract) => "sim.cpu.binary.subtract",
-        (false, BinaryOperation::Multiply) => "sim.cpu.binary.multiply",
-        (false, BinaryOperation::Divide) => "sim.cpu.binary.divide",
-        (false, BinaryOperation::Remainder) => "sim.cpu.binary.remainder",
-        (false, BinaryOperation::Power) => "sim.cpu.binary.power",
-        (false, BinaryOperation::Minimum) => "sim.cpu.binary.minimum",
-        (false, BinaryOperation::Maximum) => "sim.cpu.binary.maximum",
-        (false, BinaryOperation::Equal) => "sim.cpu.binary.equal",
-        (false, BinaryOperation::Less) => "sim.cpu.binary.less",
-        (false, BinaryOperation::LessEqual) => "sim.cpu.binary.less-equal",
-        (false, BinaryOperation::Greater) => "sim.cpu.binary.greater",
-        (false, BinaryOperation::GreaterEqual) => "sim.cpu.binary.greater-equal",
-        (false, BinaryOperation::LogicalAnd) => "sim.cpu.binary.logical-and",
-        (false, BinaryOperation::LogicalOr) => "sim.cpu.binary.logical-or",
-        (false, BinaryOperation::FloatingRemainder) => "sim.cpu.binary.fmod",
-        (false, BinaryOperation::Atan2) => "sim.cpu.binary.atan2",
-        (false, BinaryOperation::LogAddExp) => "sim.cpu.binary.logaddexp",
-        (true, BinaryOperation::Add) => "sim.cpu.binary-scalar.add",
-        (true, BinaryOperation::Subtract) => "sim.cpu.binary-scalar.subtract",
-        (true, BinaryOperation::Multiply) => "sim.cpu.binary-scalar.multiply",
-        (true, BinaryOperation::Divide) => "sim.cpu.binary-scalar.divide",
-        (true, BinaryOperation::Remainder) => "sim.cpu.binary-scalar.remainder",
-        (true, BinaryOperation::Power) => "sim.cpu.binary-scalar.power",
-        (true, BinaryOperation::Minimum) => "sim.cpu.binary-scalar.minimum",
-        (true, BinaryOperation::Maximum) => "sim.cpu.binary-scalar.maximum",
-        (true, BinaryOperation::Equal) => "sim.cpu.binary-scalar.equal",
-        (true, BinaryOperation::Less) => "sim.cpu.binary-scalar.less",
-        (true, BinaryOperation::LessEqual) => "sim.cpu.binary-scalar.less-equal",
-        (true, BinaryOperation::Greater) => "sim.cpu.binary-scalar.greater",
-        (true, BinaryOperation::GreaterEqual) => "sim.cpu.binary-scalar.greater-equal",
-        (true, BinaryOperation::LogicalAnd) => "sim.cpu.binary-scalar.logical-and",
-        (true, BinaryOperation::LogicalOr) => "sim.cpu.binary-scalar.logical-or",
-        (true, BinaryOperation::FloatingRemainder) => "sim.cpu.binary-scalar.fmod",
-        (true, BinaryOperation::Atan2) => "sim.cpu.binary-scalar.atan2",
-        (true, BinaryOperation::LogAddExp) => "sim.cpu.binary-scalar.logaddexp",
+        (false, BinaryOperation::Add) => "zed.cpu.binary.add",
+        (false, BinaryOperation::Subtract) => "zed.cpu.binary.subtract",
+        (false, BinaryOperation::Multiply) => "zed.cpu.binary.multiply",
+        (false, BinaryOperation::Divide) => "zed.cpu.binary.divide",
+        (false, BinaryOperation::Remainder) => "zed.cpu.binary.remainder",
+        (false, BinaryOperation::Power) => "zed.cpu.binary.power",
+        (false, BinaryOperation::Minimum) => "zed.cpu.binary.minimum",
+        (false, BinaryOperation::Maximum) => "zed.cpu.binary.maximum",
+        (false, BinaryOperation::Equal) => "zed.cpu.binary.equal",
+        (false, BinaryOperation::Less) => "zed.cpu.binary.less",
+        (false, BinaryOperation::LessEqual) => "zed.cpu.binary.less-equal",
+        (false, BinaryOperation::Greater) => "zed.cpu.binary.greater",
+        (false, BinaryOperation::GreaterEqual) => "zed.cpu.binary.greater-equal",
+        (false, BinaryOperation::LogicalAnd) => "zed.cpu.binary.logical-and",
+        (false, BinaryOperation::LogicalOr) => "zed.cpu.binary.logical-or",
+        (false, BinaryOperation::FloatingRemainder) => "zed.cpu.binary.fmod",
+        (false, BinaryOperation::Atan2) => "zed.cpu.binary.atan2",
+        (false, BinaryOperation::LogAddExp) => "zed.cpu.binary.logaddexp",
+        (true, BinaryOperation::Add) => "zed.cpu.binary-scalar.add",
+        (true, BinaryOperation::Subtract) => "zed.cpu.binary-scalar.subtract",
+        (true, BinaryOperation::Multiply) => "zed.cpu.binary-scalar.multiply",
+        (true, BinaryOperation::Divide) => "zed.cpu.binary-scalar.divide",
+        (true, BinaryOperation::Remainder) => "zed.cpu.binary-scalar.remainder",
+        (true, BinaryOperation::Power) => "zed.cpu.binary-scalar.power",
+        (true, BinaryOperation::Minimum) => "zed.cpu.binary-scalar.minimum",
+        (true, BinaryOperation::Maximum) => "zed.cpu.binary-scalar.maximum",
+        (true, BinaryOperation::Equal) => "zed.cpu.binary-scalar.equal",
+        (true, BinaryOperation::Less) => "zed.cpu.binary-scalar.less",
+        (true, BinaryOperation::LessEqual) => "zed.cpu.binary-scalar.less-equal",
+        (true, BinaryOperation::Greater) => "zed.cpu.binary-scalar.greater",
+        (true, BinaryOperation::GreaterEqual) => "zed.cpu.binary-scalar.greater-equal",
+        (true, BinaryOperation::LogicalAnd) => "zed.cpu.binary-scalar.logical-and",
+        (true, BinaryOperation::LogicalOr) => "zed.cpu.binary-scalar.logical-or",
+        (true, BinaryOperation::FloatingRemainder) => "zed.cpu.binary-scalar.fmod",
+        (true, BinaryOperation::Atan2) => "zed.cpu.binary-scalar.atan2",
+        (true, BinaryOperation::LogAddExp) => "zed.cpu.binary-scalar.logaddexp",
     }
 }
 
 fn index_operation_label(operation: &IndexSpec) -> &'static str {
     match operation {
-        IndexSpec::Select { .. } => "sim.cpu.index.select",
-        IndexSpec::Narrow { .. } => "sim.cpu.index.narrow",
-        IndexSpec::Gather { .. } => "sim.cpu.index.gather",
-        IndexSpec::Scatter { .. } => "sim.cpu.index.scatter",
-        IndexSpec::MaskedSelect => "sim.cpu.index.masked-select",
+        IndexSpec::Select { .. } => "zed.cpu.index.select",
+        IndexSpec::Narrow { .. } => "zed.cpu.index.narrow",
+        IndexSpec::Gather { .. } => "zed.cpu.index.gather",
+        IndexSpec::Scatter { .. } => "zed.cpu.index.scatter",
+        IndexSpec::MaskedSelect => "zed.cpu.index.masked-select",
     }
 }
 
 fn resize_operation_label(mode: ResizeMode) -> &'static str {
     match mode {
-        ResizeMode::NearestExact => "sim.cpu.resize.nearest-exact",
-        ResizeMode::Bilinear => "sim.cpu.resize.bilinear",
-        ResizeMode::Area => "sim.cpu.resize.area",
-        ResizeMode::Bicubic => "sim.cpu.resize.bicubic",
-        ResizeMode::Lanczos => "sim.cpu.resize.lanczos",
+        ResizeMode::NearestExact => "zed.cpu.resize.nearest-exact",
+        ResizeMode::Bilinear => "zed.cpu.resize.bilinear",
+        ResizeMode::Area => "zed.cpu.resize.area",
+        ResizeMode::Bicubic => "zed.cpu.resize.bicubic",
+        ResizeMode::Lanczos => "zed.cpu.resize.lanczos",
     }
 }
 
@@ -1982,17 +1982,17 @@ fn require_dtype(expected: DType, actual: DType) -> Result<(), TensorError> {
 
 fn reduction_operation_label(operation: ReductionOperation) -> &'static str {
     match operation {
-        ReductionOperation::Sum => "sim.cpu.reduction.sum",
-        ReductionOperation::Product => "sim.cpu.reduction.product",
-        ReductionOperation::Mean => "sim.cpu.reduction.mean",
-        ReductionOperation::Minimum => "sim.cpu.reduction.minimum",
-        ReductionOperation::Maximum => "sim.cpu.reduction.maximum",
-        ReductionOperation::ArgMinimum => "sim.cpu.reduction.arg-minimum",
-        ReductionOperation::ArgMaximum => "sim.cpu.reduction.arg-maximum",
-        ReductionOperation::All => "sim.cpu.reduction.all",
-        ReductionOperation::Any => "sim.cpu.reduction.any",
-        ReductionOperation::Variance => "sim.cpu.reduction.variance",
-        ReductionOperation::StandardDeviation => "sim.cpu.reduction.standard-deviation",
+        ReductionOperation::Sum => "zed.cpu.reduction.sum",
+        ReductionOperation::Product => "zed.cpu.reduction.product",
+        ReductionOperation::Mean => "zed.cpu.reduction.mean",
+        ReductionOperation::Minimum => "zed.cpu.reduction.minimum",
+        ReductionOperation::Maximum => "zed.cpu.reduction.maximum",
+        ReductionOperation::ArgMinimum => "zed.cpu.reduction.arg-minimum",
+        ReductionOperation::ArgMaximum => "zed.cpu.reduction.arg-maximum",
+        ReductionOperation::All => "zed.cpu.reduction.all",
+        ReductionOperation::Any => "zed.cpu.reduction.any",
+        ReductionOperation::Variance => "zed.cpu.reduction.variance",
+        ReductionOperation::StandardDeviation => "zed.cpu.reduction.standard-deviation",
     }
 }
 
@@ -4239,7 +4239,7 @@ mod tests {
                     reason: "constructed CPU backend has no native properties".to_owned(),
                 })?;
         assert_eq!(properties.device(), DeviceId::CPU);
-        assert_eq!(properties.name(), "Sim native Rust CPU");
+        assert_eq!(properties.name(), "Zed native Rust CPU");
         assert_eq!(properties.total_memory_bytes(), 257);
         assert_eq!(properties.major(), 0);
         assert_eq!(properties.minor(), 0);
@@ -4747,7 +4747,7 @@ mod tests {
                 .map(|value| {
                     dtype.encode_decoded_scalar(
                         DecodedScalar::Real(f64::from(*value)),
-                        "sim.cpu.unary.hyperbolic-tangent.test",
+                        "zed.cpu.unary.hyperbolic-tangent.test",
                         DeviceId::CPU,
                     )
                 })
@@ -4778,7 +4778,7 @@ mod tests {
                 let decoded_source = read_real_f32(&input, &[index as u64])?;
                 let expected_bytes = dtype.encode_decoded_scalar(
                     DecodedScalar::Real(f64::from(decoded_source.tanh())),
-                    "sim.cpu.unary.hyperbolic-tangent.test",
+                    "zed.cpu.unary.hyperbolic-tangent.test",
                     DeviceId::CPU,
                 )?;
                 let expected = match dtype.decode_scalar(&expected_bytes)? {
@@ -4856,7 +4856,7 @@ mod tests {
                 .map(|value| {
                     dtype.encode_decoded_scalar(
                         DecodedScalar::Real(f64::from(*value)),
-                        "sim.cpu.linear-algebra.bmm.test",
+                        "zed.cpu.linear-algebra.bmm.test",
                         DeviceId::CPU,
                     )
                 })
@@ -4894,7 +4894,7 @@ mod tests {
                 * read_real_f32(&rounded_right, &[0, 0, 0])?;
             let expected_bytes = dtype.encode_decoded_scalar(
                 DecodedScalar::Real(f64::from(decoded_product)),
-                "sim.cpu.linear-algebra.bmm.test",
+                "zed.cpu.linear-algebra.bmm.test",
                 DeviceId::CPU,
             )?;
             let expected = match dtype.decode_scalar(&expected_bytes)? {
@@ -5082,7 +5082,7 @@ mod tests {
                 .map(|value| {
                     let encoded = dtype.encode_decoded_scalar(
                         DecodedScalar::Real(f64::from(*value)),
-                        "sim.cpu.convolution",
+                        "zed.cpu.convolution",
                         DeviceId::CPU,
                     )?;
                     match dtype.decode_scalar(&encoded)? {

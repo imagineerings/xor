@@ -342,7 +342,7 @@ mod tests {
         let subject = principal(2);
         let agent_profile = agent_profile(community_id);
         let principals = [
-            AuthenticatedPrincipal::sim_account(
+            AuthenticatedPrincipal::zed_account(
                 subject,
                 community_id,
                 ServiceAccountId::new(1),
@@ -393,7 +393,7 @@ mod tests {
         let community_id = community(1);
         let tenant = tenant(community_id);
         let subject = principal(2);
-        let authenticated = AuthenticatedPrincipal::sim_account(
+        let authenticated = AuthenticatedPrincipal::zed_account(
             subject,
             community_id,
             ServiceAccountId::new(1),
@@ -432,7 +432,7 @@ mod tests {
         let community_id = community(1);
         let tenant = tenant(community_id);
         let subject = principal(2);
-        let authenticated = AuthenticatedPrincipal::sim_account(
+        let authenticated = AuthenticatedPrincipal::zed_account(
             subject,
             community_id,
             ServiceAccountId::new(1),
@@ -475,7 +475,7 @@ mod tests {
         let community_id = community(1);
         let tenant = tenant(community_id);
         let subject = principal(2);
-        let authenticated = AuthenticatedPrincipal::sim_account(
+        let authenticated = AuthenticatedPrincipal::zed_account(
             subject,
             community_id,
             ServiceAccountId::new(1),
@@ -526,7 +526,7 @@ mod tests {
         let community_id = community(1);
         let tenant = tenant(community_id);
         let subject = principal(2);
-        let authenticated = AuthenticatedPrincipal::sim_account(
+        let authenticated = AuthenticatedPrincipal::zed_account(
             subject,
             community_id,
             ServiceAccountId::new(1),
@@ -546,7 +546,7 @@ mod tests {
             AuthorizationDecision::Denied(AuthorizationDenial::MissingScope)
         );
 
-        let authenticated = AuthenticatedPrincipal::sim_account(
+        let authenticated = AuthenticatedPrincipal::zed_account(
             subject,
             community_id,
             ServiceAccountId::new(1),

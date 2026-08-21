@@ -668,7 +668,7 @@ def build_tensor_rows(usages):
             "numerics_requirement": numerics,
             "vjp_jvp_requirement": vjp,
             "cancellation_requirement": cancellation,
-            "native_rust_decision": "Implement behind the Sim-owned comfy_tensor facade; third-party crate APIs and backend-specific handles must not become workflow or plugin ABI.",
+            "native_rust_decision": "Implement behind the Zed-owned comfy_tensor facade; third-party crate APIs and backend-specific handles must not become workflow or plugin ABI.",
             "limitations": "Receiver-unverified candidates require call-graph/type confirmation before implementation closure." if confidence == "low" else "Static resolution does not prove runtime branch reachability or exact overload selection.",
         })
     return rows
@@ -1071,7 +1071,7 @@ def main():
 
 ## Scope and baseline
 
-This evidence pack statically inventories the tensor/operator, autograd, and random-number surfaces that the pinned ComfyUI source uses and turns each surface into an explicit native Rust conformance obligation. Production Sim may use ComfyUI only as a development-time oracle. None of these rows authorizes a Python runtime, a PyTorch process, JavaScript execution, or an external ComfyUI dependency in production.
+This evidence pack statically inventories the tensor/operator, autograd, and random-number surfaces that the pinned ComfyUI source uses and turns each surface into an explicit native Rust conformance obligation. Production Zed may use ComfyUI only as a development-time oracle. None of these rows authorizes a Python runtime, a PyTorch process, JavaScript execution, or an external ComfyUI dependency in production.
 
 The source baseline is ComfyUI `{version}` with `{files}` regular files and all-file fingerprint `{fingerprint}`. The generator scanned `{python_files}` Python files and reconciled every one against [`catalogs/backend-source-coverage.csv`](catalogs/backend-source-coverage.csv); it does not duplicate the canonical 949-row source closure. `{native_ast}` files parsed directly with the host AST. `{normalized_ast}` file used syntax-only normalization of Python 3.10 `match`/`case` headers so Python 3.9 could preserve and inspect the original call expressions and line numbers. The canonical source catalog's `infrastructure-only` label can mean an internal implementation-support module with no independently named feature row. Calls in executable product paths are therefore counted as production execution evidence while the original source classification remains preserved on each row; only `.ci`, `.github`, and `script_examples` Python is placed in the support tier.
 
@@ -1087,7 +1087,7 @@ Existing tests are linked when they directly call the same symbol. Such a link r
 
 {tensor_groups}
 
-Every row carries native shape, dtype, layout, device, numerics, VJP/JVP, and cancellation requirements. The implementation boundary is a Sim-owned `comfy_tensor` facade. A selected compute crate may sit behind that facade, but its types, handles, serialization, and backend assumptions cannot become workflow or Rust/WASM plugin ABI.
+Every row carries native shape, dtype, layout, device, numerics, VJP/JVP, and cancellation requirements. The implementation boundary is a Zed-owned `comfy_tensor` facade. A selected compute crate may sit behind that facade, but its types, handles, serialization, and backend assumptions cannot become workflow or Rust/WASM plugin ABI.
 
 ## Autograd reconciliation
 
@@ -1103,7 +1103,7 @@ Native parity requires graph ownership, saved-tensor lifetimes, broadcasting red
 
 {rng_phases}
 
-Sim must not use a process-global RNG as an implicit compatibility mechanism. Each row requires a versioned phase identity derived from workflow seed, node identity, execution ordinal, phase, sample or batch index, and declared retry policy. Cancellation, validation failure, OOM retry, and worker recovery may not commit partial RNG advancement. CPU-seeded transfer and native-device generation remain distinct contracts because they can produce different observable sequences.
+Zed must not use a process-global RNG as an implicit compatibility mechanism. Each row requires a versioned phase identity derived from workflow seed, node identity, execution ordinal, phase, sample or batch index, and declared retry policy. Cancellation, validation failure, OOM retry, and worker recovery may not commit partial RNG advancement. CPU-seeded transfer and native-device generation remain distinct contracts because they can produce different observable sequences.
 
 ## Boundaries and limitations
 

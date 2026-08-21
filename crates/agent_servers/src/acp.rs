@@ -44,7 +44,7 @@ use terminal::terminal_settings::{AlternateScroll, CursorShape};
 use crate::{CURSOR_ID, GEMINI_ID};
 
 pub const GEMINI_TERMINAL_AUTH_METHOD_ID: &str = "spawn-gemini-cli";
-const PARAMETERISIM_MODEL_PICKER_META_KEY: &str = "parameterizedModelPicker";
+const PARAMETERIZED_MODEL_PICKER_META_KEY: &str = "parameterizedModelPicker";
 const MAX_DEBUG_BACKLOG_MESSAGES: usize = 2000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -654,7 +654,7 @@ pub async fn connect(
 
 const MINIMUM_SUPPORTED_VERSION: ProtocolVersion = ProtocolVersion::V1;
 
-/// Build a `Client` connection over `transport` with Sim's full
+/// Build a `Client` connection over `transport` with Zed's full
 /// agent→client handler set wired up.
 ///
 /// All incoming requests and notifications are forwarded to the foreground
@@ -763,7 +763,7 @@ fn client_capabilities_for_agent(
     ]);
 
     if agent_id.as_ref() == CURSOR_ID {
-        meta.insert(PARAMETERISIM_MODEL_PICKER_META_KEY.into(), true.into());
+        meta.insert(PARAMETERIZED_MODEL_PICKER_META_KEY.into(), true.into());
     }
 
     let mut capabilities = acp::ClientCapabilities::new()
@@ -930,7 +930,7 @@ impl AcpConnection {
         // `ConnectionTo<Agent>` once the transport handshake is ready.
         let (connection_tx, connection_rx) = futures::channel::oneshot::channel();
         let connection_future =
-            connect_client_future("sim", transport, dispatch_tx.clone(), connection_tx);
+            connect_client_future("zed", transport, dispatch_tx.clone(), connection_tx);
         let io_task = cx.background_spawn(async move {
             if let Err(err) = connection_future.await {
                 log::error!("ACP connection error: {err}");
@@ -985,7 +985,7 @@ impl AcpConnection {
                         cx.update(|cx| cx.has_flag::<AcpBetaFeatureFlag>()),
                     ))
                     .client_info(
-                        acp::Implementation::new("sim", version)
+                        acp::Implementation::new("zed", version)
                             .title(release_channel.map(ToOwned::to_owned)),
                     ),
             )
@@ -2540,7 +2540,7 @@ pub mod test_support {
 
         let (connection_tx, connection_rx) = futures::channel::oneshot::channel();
         let client_future = connect_client_future(
-            "sim-test",
+            "zed-test",
             client_transport,
             dispatch_tx.clone(),
             connection_tx,
@@ -2863,7 +2863,7 @@ mod tests {
                         url_elicitation_id.clone(),
                         "https://auth.example.com/device",
                     ),
-                    "Authorize Sim in your browser",
+                    "Authorize Zed in your browser",
                 ),
                 acp::CompleteElicitationNotification::new(url_elicitation_id),
                 cx,
@@ -3015,14 +3015,14 @@ mod tests {
     }
 
     #[test]
-    fn cursor_client_capabilities_include_parameterisim_model_picker_meta() {
+    fn cursor_client_capabilities_include_parameterized_model_picker_meta() {
         let capabilities = client_capabilities_for_agent(&AgentId::new(CURSOR_ID), false);
         let meta = capabilities
             .meta
             .expect("expected client capabilities meta");
 
         assert_eq!(
-            meta.get(PARAMETERISIM_MODEL_PICKER_META_KEY),
+            meta.get(PARAMETERIZED_MODEL_PICKER_META_KEY),
             Some(&serde_json::json!(true))
         );
         assert_eq!(meta.get("terminal_output"), Some(&serde_json::json!(true)));
@@ -3030,13 +3030,13 @@ mod tests {
     }
 
     #[test]
-    fn non_cursor_client_capabilities_do_not_include_parameterisim_model_picker_meta() {
+    fn non_cursor_client_capabilities_do_not_include_parameterized_model_picker_meta() {
         let capabilities = client_capabilities_for_agent(&AgentId::new("codex-acp"), false);
         let meta = capabilities
             .meta
             .expect("expected client capabilities meta");
 
-        assert!(!meta.contains_key(PARAMETERISIM_MODEL_PICKER_META_KEY));
+        assert!(!meta.contains_key(PARAMETERIZED_MODEL_PICKER_META_KEY));
     }
 
     #[test]
@@ -3890,7 +3890,7 @@ mod tests {
 
         let (connection_tx, connection_rx) = futures::channel::oneshot::channel();
         let client_future = connect_client_future(
-            "sim-test",
+            "zed-test",
             client_transport,
             dispatch_tx.clone(),
             connection_tx,

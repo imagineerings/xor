@@ -766,10 +766,10 @@ impl ArtifactRoot {
             });
         }
         let probe = if relative_directory.as_os_str().is_empty() {
-            PathBuf::from(".sim-directory-probe")
+            PathBuf::from(".zed-directory-probe")
         } else {
             normalize_relative_path_with_limits(relative_directory, &ParserLimits::default())?
-                .join(".sim-directory-probe")
+                .join(".zed-directory-probe")
         };
         let (directory, _) = match self.open_capability_parent(&probe, false) {
             Ok(value) => value,
@@ -2579,7 +2579,7 @@ fn scan_root(
             let file_name = entry.file_name();
             if file_name
                 .to_str()
-                .is_some_and(|name| name.starts_with(".sim-"))
+                .is_some_and(|name| name.starts_with(".zed-"))
             {
                 continue;
             }

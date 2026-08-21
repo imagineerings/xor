@@ -2,14 +2,14 @@
 
 ## Introduction
 
-Sim needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models. Comfy compatibility defines the expected asset semantics and fixtures, but every supported asset feature must be recreated as native Sim functionality backed by Sim storage, media, artifact, and project services rather than passed through to ComfyUI or represented by a compatibility label alone.
+Zed needs Comfy's asset library behavior for generated outputs, uploads, model references, user files, tags, metadata, previews, and filesystem scans. This asset behavior is core world-model harness functionality because generated outputs, model references, and workflow files must be discoverable and reusable across harness jobs. This spec owns asset indexing and API semantics. It delegates media preview rendering to `rendering-media/`, model folder registration to `comfy-model-memory-runtime/`, and generated artifact provenance to shared world-model artifact models. Comfy compatibility defines the expected asset semantics and fixtures, but every supported asset feature must be recreated as native Zed functionality backed by Zed storage, media, artifact, and project services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 
 - **Asset**: Content identified by a hash, size, MIME type, and creation timestamp.
 - **Asset Reference**: A user-facing or filesystem-facing record that points to asset content and carries name, tags, preview id, metadata, owner, and cache state.
 - **Asset Seed Scan**: Background synchronization of model, input, and output roots into the asset database.
-- **User Data**: Per-user settings, workflow files, and UI state stored under Sim user storage.
+- **User Data**: Per-user settings, workflow files, and UI state stored under Zed user storage.
 - **Cache State**: File path, mtime, missing status, verify flag, and enrichment level for filesystem-backed references.
 
 ## Requirements
@@ -49,7 +49,7 @@ Sim needs Comfy's asset library behavior for generated outputs, uploads, model r
 
 ### Requirement 4: Asset Seeding and Enrichment
 
-**User Story:** As a maintainer, I want Sim to synchronize filesystem roots into assets without blocking normal generation.
+**User Story:** As a maintainer, I want Zed to synchronize filesystem roots into assets without blocking normal generation.
 
 #### Acceptance Criteria
 
@@ -70,22 +70,22 @@ Sim needs Comfy's asset library behavior for generated outputs, uploads, model r
 3. **5.3** WHEN user data is created, read, moved, or deleted THEN THE system SHALL confine paths to that user's public storage root.
 4. **5.4** WHEN settings are read or written THEN THE system SHALL store them in the user's server-side settings file.
 
-### Requirement 6: Sim Integration Boundary
+### Requirement 6: Zed Integration Boundary
 
-**User Story:** As a Sim developer, I want the Comfy asset library to reuse Sim's storage and media systems.
+**User Story:** As a Zed developer, I want the Comfy asset library to reuse Zed's storage and media systems.
 
 #### Acceptance Criteria
 
-1. **6.1** IF Sim already has artifact, media preview, user storage, or secret infrastructure THEN THE asset library SHALL adapt those systems rather than adding a parallel storage stack.
+1. **6.1** IF Zed already has artifact, media preview, user storage, or secret infrastructure THEN THE asset library SHALL adapt those systems rather than adding a parallel storage stack.
 2. **6.2** WHEN asset records reference generated outputs THEN THE system SHALL include shared provenance identifiers.
 3. **6.3** IF the asset database is unavailable while assets are required THEN THE system SHALL fail startup with actionable diagnostics.
-4. **6.4** WHEN a Comfy asset feature is implemented in Sim THEN THE system SHALL expose native implementation types and modules with `SimAsset*` or `SimUserData*` naming and SHALL NOT use `Comfy*` names for Sim-owned records, services, or queues.
+4. **6.4** WHEN a Comfy asset feature is implemented in Zed THEN THE system SHALL expose native implementation types and modules with `SimAsset*` or `SimUserData*` naming and SHALL NOT use `Comfy*` names for Zed-owned records, services, or queues.
 
 ### Requirement 9: Materialized coverage backlog
 
 #### Acceptance criteria
 
-1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Sim behavior and source-backed compatibility record.
+1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Zed behavior and source-backed compatibility record.
 2. **9.2** THE system SHALL NOT count labels, placeholders, metadata-only fixtures, or hidden upstream pass-throughs as implementation evidence.
 3. **9.3** WHEN backlog behavior is materialized THEN focused validation SHALL cover success, failure, cancellation, persistence, security, and relevant platform outcomes.
 4. **9.4** WHEN coverage status changes THEN THE owner SHALL preserve stable capability identity, owner traceability, and evidence for the new classification.

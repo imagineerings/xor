@@ -6,9 +6,9 @@ Migrate goose's dictation system, providing speech-to-text via local Whisper mod
 
 ### Key Architectural Decisions
 
-- **Audio capture in `crates/audio/`**: Sim already has `crates/audio/` for audio playback/recording primitives. Extend it with microphone capture.
+- **Audio capture in `crates/audio/`**: Zed already has `crates/audio/` for audio playback/recording primitives. Extend it with microphone capture.
 - **New `crates/dictation/` crate**: STT processing (Whisper inference or cloud API calls) lives in a dedicated crate.
-- **Whisper via `candle`**: Goose uses `candle-core` and `candle-nn` for local Whisper inference. These are already workspace dependencies in sim, making this feasible.
+- **Whisper via `candle`**: Goose uses `candle-core` and `candle-nn` for local Whisper inference. These are already workspace dependencies in zed, making this feasible.
 - **Pluggable providers**: Follow the same pattern as LLM providers — a `DictationProvider` trait with built-in and cloud implementations.
 
 ## 2. Architecture
@@ -179,7 +179,7 @@ _For any_ dictation provider, [for each supported format], THE provider SHALL ac
 ## References
 
 - Source: `projects/goose/crates/goose/src/dictation/`
-- Sim: `crates/audio/`
+- Zed: `crates/audio/`
 
 ## Requirements traceability
 

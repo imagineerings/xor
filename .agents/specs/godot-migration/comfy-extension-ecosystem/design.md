@@ -2,7 +2,7 @@
 
 ## Overview
 
-The extension ecosystem is a controlled harness extension layer. Sim discovers node packs, extracts supported schemas and assets, and records diagnostics, but it does not run arbitrary extension code without policy gates. Python-backed execution and package installation are separate concerns.
+The extension ecosystem is a controlled harness extension layer. Zed discovers node packs, extracts supported schemas and assets, and records diagnostics, but it does not run arbitrary extension code without policy gates. Python-backed execution and package installation are separate concerns.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ flowchart TD
 - **Responsibilities**: V1 mapping support, modern extension entrypoint support, display names, relative module metadata, and import failure diagnostics.
 - **Native behavior**: Converts V1 `NODE_CLASS_MAPPINGS` and supported modern
   entrypoint declarations into native `SimCustomNode*` registration records and
-  Sim-owned `SimNodeDefinition` values with `SimNodeSource::Custom`, while
+  Zed-owned `SimNodeDefinition` values with `SimNodeSource::Custom`, while
   unsupported registration mechanisms produce diagnostics instead of pass-through
   ComfyUI imports.
 
@@ -64,7 +64,7 @@ flowchart TD
 - **Purpose**: Serve extension web assets and workflow templates safely.
 - **Responsibilities**: Static asset path confinement, cache policy, deprecated path warnings, and content type safety.
 - **Native behavior**: Registers extension web and template roots as native
-  `SimExtensionAsset*` records, resolves requests through Sim-owned confined
+  `SimExtensionAsset*` records, resolves requests through Zed-owned confined
   routes, emits deprecated-path diagnostics, and assigns cache/content metadata
   without proxying requests through ComfyUI.
 
@@ -80,7 +80,7 @@ flowchart TD
 
 ### ExtensionTemplateIndex
 
-- **Purpose**: Feed extension templates and subgraphs into native Sim indexes.
+- **Purpose**: Feed extension templates and subgraphs into native Zed indexes.
 - **Responsibilities**: Expose extension workflow template names/assets,
   sanitize metadata, and register reusable custom-node subgraphs in the shared
   workflow subgraph index.

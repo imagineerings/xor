@@ -10,7 +10,7 @@ use crate::tasks::workflow_checks::{self};
 mod after_release;
 mod autofix_pr;
 mod bump_patch_version;
-mod bump_sim_version;
+mod bump_zed_version;
 mod cherry_pick;
 mod compliance_check;
 mod danger;
@@ -32,11 +32,11 @@ mod runners;
 mod steps;
 mod vars;
 
-const ARCHIVED_SIM_WORKFLOWS: &[&str] = &[
+const ARCHIVED_ZED_WORKFLOWS: &[&str] = &[
     "after_release",
     "autofix_pr",
     "bump_patch_version",
-    "bump_sim_version",
+    "bump_zed_version",
     "cherry_pick",
     "compliance_check",
     "danger",
@@ -120,10 +120,10 @@ struct WorkflowFile {
 }
 
 impl WorkflowFile {
-    fn sim(f: fn() -> Workflow) -> WorkflowFile {
+    fn zed(f: fn() -> Workflow) -> WorkflowFile {
         WorkflowFile {
             source: WorkflowSource::Contextless(f),
-            r#type: WorkflowType::Sim,
+            r#type: WorkflowType::Zed,
         }
     }
 
@@ -150,7 +150,7 @@ impl WorkflowFile {
 
     fn active_output_path(&self, workflow_name: &str) -> Option<PathBuf> {
         let workflow_file_stem = workflow_name.rsplit("::").next().unwrap_or(workflow_name);
-        if self.r#type == WorkflowType::Sim && ARCHIVED_SIM_WORKFLOWS.contains(&workflow_file_stem)
+        if self.r#type == WorkflowType::Zed && ARCHIVED_ZED_WORKFLOWS.contains(&workflow_file_stem)
         {
             return None;
         }
@@ -191,26 +191,26 @@ impl WorkflowFile {
 
 fn workflow_files() -> impl IntoIterator<Item = WorkflowFile> {
     [
-        WorkflowFile::sim(after_release::after_release),
-        WorkflowFile::sim(autofix_pr::autofix_pr),
-        WorkflowFile::sim(bump_patch_version::bump_patch_version),
-        WorkflowFile::sim(bump_sim_version::bump_sim_version),
-        WorkflowFile::sim(cherry_pick::cherry_pick),
-        WorkflowFile::sim(compliance_check::compliance_check),
-        WorkflowFile::sim(danger::danger),
-        WorkflowFile::sim(deploy_collab::deploy_collab),
-        WorkflowFile::sim(deploy_docs::deploy_docs),
-        WorkflowFile::sim(deploy_docs::deploy_nightly_docs),
-        WorkflowFile::sim(extension_bump::extension_bump),
-        WorkflowFile::sim(extension_auto_bump::extension_auto_bump),
-        WorkflowFile::sim(extension_tests::extension_tests),
-        WorkflowFile::sim(extension_workflow_rollout::extension_workflow_rollout),
-        WorkflowFile::sim(nix_build::nix_build),
-        WorkflowFile::sim(publish_extension_cli::publish_extension_cli),
-        WorkflowFile::sim(release::release),
-        WorkflowFile::sim(release_nightly::release_nightly),
-        WorkflowFile::sim(run_bundling::run_bundling),
-        WorkflowFile::sim(run_tests::run_tests),
+        WorkflowFile::zed(after_release::after_release),
+        WorkflowFile::zed(autofix_pr::autofix_pr),
+        WorkflowFile::zed(bump_patch_version::bump_patch_version),
+        WorkflowFile::zed(bump_zed_version::bump_zed_version),
+        WorkflowFile::zed(cherry_pick::cherry_pick),
+        WorkflowFile::zed(compliance_check::compliance_check),
+        WorkflowFile::zed(danger::danger),
+        WorkflowFile::zed(deploy_collab::deploy_collab),
+        WorkflowFile::zed(deploy_docs::deploy_docs),
+        WorkflowFile::zed(deploy_docs::deploy_nightly_docs),
+        WorkflowFile::zed(extension_bump::extension_bump),
+        WorkflowFile::zed(extension_auto_bump::extension_auto_bump),
+        WorkflowFile::zed(extension_tests::extension_tests),
+        WorkflowFile::zed(extension_workflow_rollout::extension_workflow_rollout),
+        WorkflowFile::zed(nix_build::nix_build),
+        WorkflowFile::zed(publish_extension_cli::publish_extension_cli),
+        WorkflowFile::zed(release::release),
+        WorkflowFile::zed(release_nightly::release_nightly),
+        WorkflowFile::zed(run_bundling::run_bundling),
+        WorkflowFile::zed(run_tests::run_tests),
         WorkflowFile::extension(extensions::run_tests::run_tests),
         WorkflowFile::extension_shared(extensions::bump_version::bump_version),
     ]
@@ -218,9 +218,9 @@ fn workflow_files() -> impl IntoIterator<Item = WorkflowFile> {
 
 #[derive(PartialEq, Eq, strum::EnumIter)]
 pub enum WorkflowType {
-    /// Workflows living in the Sim repository
-    Sim,
-    /// Workflows living in the `sim-extensions/workflows` repository that are
+    /// Workflows living in the Zed repository
+    Zed,
+    /// Workflows living in the `zed-extensions/workflows` repository that are
     /// required workflows for PRs to the extension organization
     ExtensionCi,
     /// Workflows living in each of the extensions to perform checks and version
@@ -239,15 +239,15 @@ impl WorkflowType {
             ),
             preamble = Self::PREAMBLE,
             workflow_name = workflow_name,
-            external_disclaimer = (*self != WorkflowType::Sim)
-                .then_some(" within the Sim repository.")
+            external_disclaimer = (*self != WorkflowType::Zed)
+                .then_some(" within the Zed repository.")
                 .unwrap_or_default(),
         )
     }
 
     pub fn folder_path(&self) -> PathBuf {
         match self {
-            WorkflowType::Sim => PathBuf::from(".github/workflows"),
+            WorkflowType::Zed => PathBuf::from(".github/workflows"),
             WorkflowType::ExtensionCi => PathBuf::from("extensions/workflows"),
             WorkflowType::ExtensionsShared => PathBuf::from("extensions/workflows/shared"),
         }
@@ -275,7 +275,7 @@ impl WorkflowType {
 }
 
 pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
-    if !Path::new("crates/sim/").is_dir() {
+    if !Path::new("crates/zed/").is_dir() {
         anyhow::bail!("xtask workflows must be ran from the project root");
     }
 
@@ -294,13 +294,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sim_workflow_generation_matches_archive_policy() -> Result<()> {
+    fn zed_workflow_generation_matches_archive_policy() -> Result<()> {
         let workflow_args = GenerateWorkflowArgs { sha: None };
         let mut active_workflow_files = Vec::new();
         let mut archived_workflow_files = Vec::new();
 
         for workflow_file in workflow_files() {
-            if workflow_file.r#type != WorkflowType::Sim {
+            if workflow_file.r#type != WorkflowType::Zed {
                 continue;
             }
 
@@ -323,8 +323,8 @@ mod tests {
         archived_workflow_files.sort();
 
         assert_eq!(active_workflow_files, ["release.yml", "run_tests.yml"]);
-        assert_eq!(archived_workflow_files.len(), ARCHIVED_SIM_WORKFLOWS.len());
-        for workflow_name in ARCHIVED_SIM_WORKFLOWS {
+        assert_eq!(archived_workflow_files.len(), ARCHIVED_ZED_WORKFLOWS.len());
+        for workflow_name in ARCHIVED_ZED_WORKFLOWS {
             assert!(archived_workflow_files.contains(&format!("{workflow_name}.yml")));
             assert!(
                 Path::new(env!("CARGO_MANIFEST_DIR"))

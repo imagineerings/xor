@@ -271,7 +271,7 @@ impl AbiManifest {
         if self.package_policy.redistribute_vendor_runtime
             || !self.package_policy.license_approval_required
             || self.package_policy.signature_algorithm != "ed25519"
-            || self.package_policy.signature_domain != "sim-comfy-mlu-package-v1"
+            || self.package_policy.signature_domain != "zed-comfy-mlu-package-v1"
             || !self.package_policy.runtime_compilation_forbidden
         {
             return Err(contract(

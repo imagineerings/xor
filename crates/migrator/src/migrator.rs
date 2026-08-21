@@ -691,7 +691,7 @@ mod tests {
             &r#"
             {
                 "features": {
-                    "inline_completion_provider": "sim"
+                    "inline_completion_provider": "zed"
                 },
             }
             "#
@@ -700,7 +700,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "sim"
+                        "provider": "zed"
                     }
                 }
                 "#
@@ -1275,7 +1275,7 @@ mod tests {
         "default_width": 640,
         "default_height": 320,
         "default_model": {
-            "provider": "sim.dev",
+            "provider": "zed.dev",
             "model": "claude-sonnet-4"
         }
     }
@@ -1297,7 +1297,7 @@ mod tests {
         "default_width": 640,
         "default_height": 320,
         "default_model": {
-            "provider": "sim.dev",
+            "provider": "zed.dev",
             "model": "claude-sonnet-4"
         }
     }
@@ -2890,7 +2890,7 @@ mod tests {
             &r#"
             {
                 "features": {
-                    "edit_prediction_provider": "sim"
+                    "edit_prediction_provider": "zed"
                 },
                 "edit_predictions": {
                     "mode": "eager"
@@ -2902,7 +2902,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "sim",
+                        "provider": "zed",
                         "mode": "eager"
                     }
                 }
@@ -2945,7 +2945,7 @@ mod tests {
             &r#"
             {
                 "edit_predictions": {
-                    "provider": "sim"
+                    "provider": "zed"
                 }
             }
             "#
@@ -3052,7 +3052,7 @@ mod tests {
                 },
                 "macos": {
                     "features": {
-                        "edit_prediction_provider": "sim"
+                        "edit_prediction_provider": "zed"
                     }
                 },
                 "profiles": {
@@ -3073,7 +3073,7 @@ mod tests {
                     },
                     "macos": {
                         "edit_predictions": {
-                            "provider": "sim"
+                            "provider": "zed"
                         }
                     },
                     "profiles": {
@@ -3185,7 +3185,7 @@ mod tests {
             &r#"
             {
                 "edit_predictions": {
-                    "provider": "sim"
+                    "provider": "zed"
                 }
             }
             "#
@@ -3211,7 +3211,7 @@ mod tests {
                 &r#"
                 {
                     "edit_predictions": {
-                        "provider": "sim"
+                        "provider": "zed"
                     }
                 }
                 "#
@@ -3886,7 +3886,7 @@ mod tests {
             Some(&"{\n    \"agent\": {\n        \n    }\n}\n"),
         );
 
-        // Project-local settings (.sim/settings.json) with always_allow_tool_actions
+        // Project-local settings (.zed/settings.json) with always_allow_tool_actions
         // These files have no platform/channel overrides or root-level profiles.
         assert_migrate_with_migrations(
             &[MigrationType::Json(

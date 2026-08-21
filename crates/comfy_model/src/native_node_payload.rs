@@ -237,7 +237,7 @@ impl NativeModelResourceIdentity {
 
     fn canonical_digest(&self) -> Result<String, NativeModelPayloadError> {
         let mut hasher = Sha256::new();
-        hash_field(&mut hasher, b"sim.comfy.native-model-resource.v1")?;
+        hash_field(&mut hasher, b"zed.comfy.native-model-resource.v1")?;
         hash_field(&mut hasher, &[self.role.digest_tag()])?;
         hash_field(&mut hasher, self.identifier.as_bytes())?;
         hash_field(&mut hasher, self.format.as_bytes())?;
@@ -418,7 +418,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Model,
             patch_identity.base_artifact_digest.clone(),
-            "sim-native-sd15-model-v1",
+            "zed-native-sd15-model-v1",
             patch_identity.base_artifact_digest.clone(),
             model.patch_execution_digest(),
         )?;
@@ -446,7 +446,7 @@ impl NativeModelPayload {
             ));
         }
         let execution_sha256 = digest_fields(
-            b"sim.comfy.native-sd1-clip-payload.v1",
+            b"zed.comfy.native-sd1-clip-payload.v1",
             [plan.digest(), clip.architecture().digest()],
         )?;
         let backing_bytes =
@@ -460,7 +460,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Clip,
             plan.clip_model_identifier(),
-            "sim-native-sd1-clip-v1",
+            "zed-native-sd1-clip-v1",
             plan.artifact_identity().as_str(),
             execution_sha256,
         )?;
@@ -568,7 +568,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Clip,
             format!("native-decoder-{:?}", decoder.configuration().architecture),
-            "sim-native-decoder-clip-v1",
+            "zed-native-decoder-clip-v1",
             tokenizer_digest,
             decoder_digest,
         )?;
@@ -610,7 +610,7 @@ impl NativeModelPayload {
             | crate::QwenVisionFamily::Qwen35_27B => QWEN35_SOURCE_SHA256,
         };
         let artifact_sha256 = digest_fields(
-            b"sim.comfy.native-qwen-multimodal-artifacts.v1",
+            b"zed.comfy.native-qwen-multimodal-artifacts.v1",
             [
                 family_source_sha256,
                 QWEN_VL_SOURCE_SHA256,
@@ -625,7 +625,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Clip,
             format!("native-qwen-multimodal-{:?}", resource.family()),
-            "sim-native-qwen-multimodal-clip-v1",
+            "zed-native-qwen-multimodal-clip-v1",
             artifact_sha256,
             execution_sha256,
         )?;
@@ -652,7 +652,7 @@ impl NativeModelPayload {
             ));
         }
         let artifact_sha256 = digest_fields(
-            b"sim.comfy.native-gemma-multimodal-artifacts.v1",
+            b"zed.comfy.native-gemma-multimodal-artifacts.v1",
             [
                 QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256,
                 LLAMA_SOURCE_SHA256,
@@ -678,7 +678,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Clip,
             format!("native-gemma-multimodal-{:?}", resource.family()),
-            "sim-native-gemma-multimodal-clip-v1",
+            "zed-native-gemma-multimodal-clip-v1",
             artifact_sha256,
             execution_sha256,
         )?;
@@ -724,7 +724,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::Model,
             "native-sdpose-lotusd",
-            "sim-native-sdpose-model-v1",
+            "zed-native-sdpose-model-v1",
             resource.artifact_sha256(),
             resource.semantic_state_digest_sha256(),
         )?;
@@ -752,7 +752,7 @@ impl NativeModelPayload {
         let identity = NativeModelResourceIdentity::checked(
             NativeModelResourceRole::FrameInterpolation,
             identifier,
-            "sim-native-frame-interpolation-v1",
+            "zed-native-frame-interpolation-v1",
             resource.artifact_sha256(),
             resource.semantic_state_digest_sha256(),
         )?;
@@ -1532,7 +1532,7 @@ fn project_audio_encoder_output(
     resource: &AudioEncoderOutputResource,
 ) -> Result<([u8; 32], u64), NativeModelPayloadError> {
     let mut projection = NativeStructuredProjection::new::<AudioEncoderOutput>(
-        b"sim.comfy.model.audio-encoder-output.v1",
+        b"zed.comfy.model.audio-encoder-output.v1",
     )?;
     match resource {
         AudioEncoderOutputResource::Layered {
@@ -1597,7 +1597,7 @@ fn project_ic_lora_parameters(
     reference_downscale_factor: NonZeroU64,
 ) -> Result<([u8; 32], u64), NativeModelPayloadError> {
     let mut projection = NativeStructuredProjection::new::<IcLoraParameters>(
-        b"sim.comfy.model.ic-lora-parameters.v1",
+        b"zed.comfy.model.ic-lora-parameters.v1",
     )?;
     projection.hash_u64(reference_downscale_factor.get());
     Ok(projection.finish())
@@ -1610,7 +1610,7 @@ fn project_loss_map(losses: &[Tensor]) -> Result<([u8; 32], u64), NativeModelPay
         ));
     }
     let mut projection =
-        NativeStructuredProjection::new::<LossMap>(b"sim.comfy.model.loss-map.v1")?;
+        NativeStructuredProjection::new::<LossMap>(b"zed.comfy.model.loss-map.v1")?;
     projection.hash_len(losses.len())?;
     projection.add_allocation::<Tensor>(losses.len())?;
     for loss in losses {

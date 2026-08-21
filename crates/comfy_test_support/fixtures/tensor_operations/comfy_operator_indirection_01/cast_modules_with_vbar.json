@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-23DA7F686728",
   "baseline_overload_id": "COMFY-TENSOR-OP-23DA7F686728:blocked",
   "baseline_fixture_sha256": "8f78a4136dc1bf010e7b5bbd08da89e1741f1f96db752eeebe0224ea0176925e",
-  "overload_id": "sim.native.model.prefetch_modules.v1",
+  "overload_id": "zed.native.model.prefetch_modules.v1",
   "owner_task_id": "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "modules", "type": "mutable NativeModule slice"},

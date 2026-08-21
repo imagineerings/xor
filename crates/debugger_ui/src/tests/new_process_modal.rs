@@ -74,10 +74,10 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                 .to_string()
                 .leak(),
         ),
-        // Path with $SIM_WORKTREE_ROOT - should be substituted without double appending
+        // Path with $ZED_WORKTREE_ROOT - should be substituted without double appending
         (
             format!(
-                "$SIM_WORKTREE_ROOT{0}src{0}program",
+                "$ZED_WORKTREE_ROOT{0}src{0}program",
                 std::path::MAIN_SEPARATOR
             )
             .leak(),
@@ -111,8 +111,8 @@ async fn test_debug_session_substitutes_variables_and_relativizes_paths(
                             input_path
                         );
 
-                        let expected_other_field = if input_path.contains("$SIM_WORKTREE_ROOT") {
-                            input_path.replace("$SIM_WORKTREE_ROOT", path!("/test/worktree/path"))
+                        let expected_other_field = if input_path.contains("$ZED_WORKTREE_ROOT") {
+                            input_path.replace("$ZED_WORKTREE_ROOT", path!("/test/worktree/path"))
                         } else {
                             input_path.to_string()
                         };
@@ -215,7 +215,7 @@ async fn test_save_debug_scenario_to_file(executor: BackgroundExecutor, cx: &mut
         .unwrap();
 
     let debug_json_content = fs
-        .load(path!("/project/.sim/debug.json").as_ref())
+        .load(path!("/project/.zed/debug.json").as_ref())
         .await
         .expect("debug.json should exist")
         .lines()
@@ -278,7 +278,7 @@ async fn test_save_debug_scenario_to_file(executor: BackgroundExecutor, cx: &mut
         ]"#};
 
     let debug_json_content = fs
-        .load(path!("/project/.sim/debug.json").as_ref())
+        .load(path!("/project/.zed/debug.json").as_ref())
         .await
         .expect("debug.json should exist")
         .lines()
@@ -300,7 +300,7 @@ async fn test_debug_modal_subtitles_with_multiple_worktrees(
     fs.insert_tree(
         path!("/workspace1"),
         json!({
-            ".sim": {
+            ".zed": {
                 "debug.json": r#"[
                     {
                         "adapter": "fake-adapter",
@@ -353,7 +353,7 @@ async fn test_debug_modal_subtitles_with_multiple_worktrees(
 
     assert_eq!(
         subtitles.as_slice(),
-        [path!(".sim/debug.json"), path!(".sim/debug.json")]
+        [path!(".zed/debug.json"), path!(".zed/debug.json")]
     );
 }
 
@@ -375,7 +375,7 @@ async fn test_dap_adapter_config_conversion_and_validation(cx: &mut TestAppConte
         registry.enumerate_adapters::<Vec<_>>()
     });
 
-    let sim_config = SimDebugConfig {
+    let zed_config = SimDebugConfig {
         label: "test_debug_session".into(),
         adapter: "test_adapter".into(),
         request: DebugRequest::Launch(LaunchRequest {
@@ -400,15 +400,15 @@ async fn test_dap_adapter_config_conversion_and_validation(cx: &mut TestAppConte
             })
             .unwrap_or_else(|| panic!("Adapter {} should exist", adapter_name));
 
-        let mut adapter_specific_config = sim_config.clone();
+        let mut adapter_specific_config = zed_config.clone();
         adapter_specific_config.adapter = adapter_name.to_string().into();
 
         let debug_scenario = adapter
-            .config_from_sim_format(adapter_specific_config)
+            .config_from_zed_format(adapter_specific_config)
             .await
             .unwrap_or_else(|_| {
                 panic!(
-                    "Adapter {} should successfully convert from Sim format",
+                    "Adapter {} should successfully convert from Zed format",
                     adapter_name
                 )
             });

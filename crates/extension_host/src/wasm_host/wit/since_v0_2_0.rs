@@ -22,16 +22,16 @@ wasmtime::component::bindgen!({
         "worktree": ExtensionWorktree,
         "project": ExtensionProject,
         "key-value-store": ExtensionKeyValueStore,
-        "sim:extension/github": since_v0_6_0::sim::extension::github,
-        "sim:extension/http-client": latest::sim::extension::http_client,
-        "sim:extension/lsp": since_v0_6_0::sim::extension::lsp,
-        "sim:extension/nodejs": latest::sim::extension::nodejs,
-        "sim:extension/platform": since_v0_6_0::sim::extension::platform,
-        "sim:extension/slash-command": latest::sim::extension::slash_command,
+        "zed:extension/github": since_v0_6_0::zed::extension::github,
+        "zed:extension/http-client": latest::zed::extension::http_client,
+        "zed:extension/lsp": since_v0_6_0::zed::extension::lsp,
+        "zed:extension/nodejs": latest::zed::extension::nodejs,
+        "zed:extension/platform": since_v0_6_0::zed::extension::platform,
+        "zed:extension/slash-command": latest::zed::extension::slash_command,
     },
 });
 
-pub use self::sim::extension::*;
+pub use self::zed::extension::*;
 
 mod settings {
     #![allow(dead_code)]

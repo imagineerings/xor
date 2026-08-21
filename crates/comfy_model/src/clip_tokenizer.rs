@@ -1372,7 +1372,7 @@ impl Qwen2BpeTokenizer {
         })?;
         let (byte_encoder, byte_decoder) = qwen2_byte_alphabet()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.qwen2-byte-bpe.v1");
+        hasher.update(b"zed.comfy.qwen2-byte-bpe.v1");
         hasher.update(format!("{profile:?}").as_bytes());
         hasher.update(tokenizer_configuration_json.as_bytes());
         hasher.update(vocabulary_json.as_bytes());
@@ -1833,7 +1833,7 @@ impl GemmaTokenizer {
         ];
         let special_tokens = BTreeSet::from([GEMMA3_IMAGE_TOKEN, GEMMA3_END_OF_TURN_TOKEN]);
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.gemma3-sentencepiece-tokenizer.v1");
+        hasher.update(b"zed.comfy.gemma3-sentencepiece-tokenizer.v1");
         hasher.update(tokenizer.artifact_sha256.as_bytes());
         for added in &added_tokens {
             hasher.update(added.token.to_le_bytes());
@@ -2713,7 +2713,7 @@ impl NativePromptTokenizer {
     ) -> Result<String, NativeTokenizerError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-prompt-tokenizer.v1");
+        hasher.update(b"zed.comfy.native-prompt-tokenizer.v1");
         hasher.update(format!("{:?}", self.configuration).as_bytes());
         match &self.family {
             NativeTokenizerFamily::ClipBpe(tokenizer) => {

@@ -1037,7 +1037,7 @@ fn render_availability(output: &ExecutionOutput, cx: &mut App) -> AnyElement {
         } => (
             Role::Alert,
             format!(
-                "Output {} was deleted outside Sim and detected at {}",
+                "Output {} was deleted outside Zed and detected at {}",
                 output.name,
                 detected_at.to_rfc3339()
             ),

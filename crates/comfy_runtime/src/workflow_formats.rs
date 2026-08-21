@@ -3819,7 +3819,7 @@ mod tests {
                 "inputs": [],
                 "outputs": [],
                 "widgets_values": ["workflow-second", "workflow-value"],
-                "sim:native-widgets": {
+                "zed:native-widgets": {
                     "version": 1,
                     "widgets": [
                         {
@@ -3858,7 +3858,7 @@ mod tests {
         );
 
         let mut malformed = workflow.value().clone();
-        malformed["nodes"][0]["sim:native-widgets"]["widgets"][0]
+        malformed["nodes"][0]["zed:native-widgets"]["widgets"][0]
             .as_object_mut()
             .expect("native widget object")
             .remove("prompt_value");
@@ -3872,7 +3872,7 @@ mod tests {
         ));
 
         let mut duplicated = workflow.value().clone();
-        duplicated["nodes"][0]["sim:native-widgets"]["widgets"][1]["identifier"] =
+        duplicated["nodes"][0]["zed:native-widgets"]["widgets"][1]["identifier"] =
             Value::String("second".to_owned());
         let duplicated = WorkflowFormatDocument::parse(
             &serde_json::to_vec(&duplicated).expect("serialize duplicated widget workflow"),
@@ -3884,7 +3884,7 @@ mod tests {
         ));
 
         let mut unknown = workflow.value().clone();
-        unknown["nodes"][0]["sim:native-widgets"]["widgets"][0]["identifier"] =
+        unknown["nodes"][0]["zed:native-widgets"]["widgets"][0]["identifier"] =
             Value::String("socket_only".to_owned());
         let unknown = WorkflowFormatDocument::parse(
             &serde_json::to_vec(&unknown).expect("serialize unknown widget workflow"),

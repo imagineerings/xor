@@ -277,7 +277,7 @@ fn collaborative_workspace_reduced_motion_and_theme_token_contract() {
             for forbidden in ["hsla(", "rgba(", "rgb("] {
                 assert!(
                     !source.contains(forbidden),
-                    "{} hardcodes {forbidden} instead of a Sim theme token",
+                    "{} hardcodes {forbidden} instead of a Zed theme token",
                     path.display()
                 );
             }

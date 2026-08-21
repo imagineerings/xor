@@ -2,23 +2,23 @@
 
 ## Introduction
 
-Migrate goose's text-based terminal UI (TUI) features into sim's existing CLI and GPUI terminal infrastructure. Goose's `text/` is a separate React-based TUI application. In sim, equivalent functionality should be built into the existing CLI (`crates/cli/`) and, where appropriate, exposed through GPUI terminal views or a new GPUI-based TUI mode.
+Migrate goose's text-based terminal UI (TUI) features into zed's existing CLI and GPUI terminal infrastructure. Goose's `text/` is a separate React-based TUI application. In zed, equivalent functionality should be built into the existing CLI (`crates/cli/`) and, where appropriate, exposed through GPUI terminal views or a new GPUI-based TUI mode.
 
-Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal view (`crates/terminal_view/`), a terminal emulator (`crates/terminal/`), and an inline assistant. Goose's text UI adds: an interactive TUI session, markdown rendering in the terminal, configuration wizard flow, extension management, onboarding, and slash commands.
+Zed already provides: a CLI (`crates/cli/`) with various subcommands, a terminal view (`crates/terminal_view/`), a terminal emulator (`crates/terminal/`), and an inline assistant. Goose's text UI adds: an interactive TUI session, markdown rendering in the terminal, configuration wizard flow, extension management, onboarding, and slash commands.
 
 ## Glossary
 
-- **CLI**: Sim's existing command-line interface (`crates/cli/`)
+- **CLI**: Zed's existing command-line interface (`crates/cli/`)
 - **TUI**: Terminal User Interface — an interactive text-based UI distinct from batch CLI commands
-- **GPUI Terminal**: Sim's embedded terminal emulator (`crates/terminal/`, `crates/terminal_view/`)
-- **Inline Assistant**: Sim's existing inline agent within the editor/terminal (`crates/agent_ui/src/inline_assistant.rs`)
-- **Markdown Rendering**: Sim already has `crates/markdown/` for markdown parsing and rendering
+- **GPUI Terminal**: Zed's embedded terminal emulator (`crates/terminal/`, `crates/terminal_view/`)
+- **Inline Assistant**: Zed's existing inline agent within the editor/terminal (`crates/agent_ui/src/inline_assistant.rs`)
+- **Markdown Rendering**: Zed already has `crates/markdown/` for markdown parsing and rendering
 
 ## Requirements
 
 ### Requirement 1: Interactive TUI Session
 
-**User Story:** As a sim user, I want an interactive terminal UI for agent conversations, so that I can have a rich chat experience without the desktop GUI.
+**User Story:** As a zed user, I want an interactive terminal UI for agent conversations, so that I can have a rich chat experience without the desktop GUI.
 
 #### Acceptance Criteria
 
@@ -28,24 +28,24 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 4. **1.4** THE TUI mode SHALL support multiline input
 5. **1.5** THE TUI mode SHALL preserve session state across invocations
 
-**Mapping:** New interactive mode in `crates/cli/` using sim's existing `crates/terminal/` and `gpui` for rendering, or a simpler ratatui/crossterm-based approach if a full GPUI context is too heavy.
+**Mapping:** New interactive mode in `crates/cli/` using zed's existing `crates/terminal/` and `gpui` for rendering, or a simpler ratatui/crossterm-based approach if a full GPUI context is too heavy.
 
 ### Requirement 2: Configuration Wizard
 
-**User Story:** As a sim user, I want to configure the agent interactively from the terminal, so that I can set up providers and preferences without a GUI.
+**User Story:** As a zed user, I want to configure the agent interactively from the terminal, so that I can set up providers and preferences without a GUI.
 
 #### Acceptance Criteria
 
 1. **2.1** THE CLI SHALL provide an interactive configuration wizard
 2. **2.2** THE wizard SHALL guide the user through provider setup
 3. **2.3** THE wizard SHALL guide the user through extension/MCP configuration
-4. **2.4** THE wizard SHALL persist configuration changes to sim's settings system
+4. **2.4** THE wizard SHALL persist configuration changes to zed's settings system
 
-**Mapping:** New interactive subcommand in `crates/cli/`, leveraging sim's existing `crates/agent_settings/` and `crates/settings/`.
+**Mapping:** New interactive subcommand in `crates/cli/`, leveraging zed's existing `crates/agent_settings/` and `crates/settings/`.
 
 ### Requirement 3: Extensions Management in Terminal
 
-**User Story:** As a sim user, I want to list, add, and remove extensions from the terminal, so that I can manage the agent's capabilities without a GUI.
+**User Story:** As a zed user, I want to list, add, and remove extensions from the terminal, so that I can manage the agent's capabilities without a GUI.
 
 #### Acceptance Criteria
 
@@ -58,7 +58,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 
 ### Requirement 4: Markdown Rendering in Terminal
 
-**User Story:** As a sim user, I want agent responses rendered with markdown formatting in the terminal, so that code blocks, lists, and emphasis are visually clear.
+**User Story:** As a zed user, I want agent responses rendered with markdown formatting in the terminal, so that code blocks, lists, and emphasis are visually clear.
 
 #### Acceptance Criteria
 
@@ -71,7 +71,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 
 ### Requirement 5: Terminal Onboarding
 
-**User Story:** As a new sim user, I want an onboarding flow in the terminal, so that I can get started without a GUI.
+**User Story:** As a new zed user, I want an onboarding flow in the terminal, so that I can get started without a GUI.
 
 #### Acceptance Criteria
 
@@ -83,7 +83,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 
 ### Requirement 6: Slash Commands in TUI
 
-**User Story:** As a sim user, I want slash commands available in the TUI, so that I can quickly invoke recipes, skills, and actions.
+**User Story:** As a zed user, I want slash commands available in the TUI, so that I can quickly invoke recipes, skills, and actions.
 
 #### Acceptance Criteria
 
@@ -95,7 +95,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 
 ### Requirement 7: Tool Call Display
 
-**User Story:** As a sim user, I want to see tool calls and results in the TUI, so that I can monitor what the agent is doing.
+**User Story:** As a zed user, I want to see tool calls and results in the TUI, so that I can monitor what the agent is doing.
 
 #### Acceptance Criteria
 
@@ -103,7 +103,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 2. **7.2** THE TUI mode SHALL display tool results when available
 3. **7.3** THE TUI mode SHALL indicate when tools are executing (spinner/progress)
 
-**Mapping:** Extend sim's existing tool execution display patterns (already present in agent_ui conversation view) to the terminal output.
+**Mapping:** Extend zed's existing tool execution display patterns (already present in agent_ui conversation view) to the terminal output.
 
 ### Requirement 8: Machine-Readable Agent Output
 
@@ -132,7 +132,7 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 
 #### Acceptance Criteria
 
-1. **10.1** WHERE the review command is approved, IT SHALL compose Sim's existing git, project, agent, model, and permission services rather than implement a parallel review engine
+1. **10.1** WHERE the review command is approved, IT SHALL compose Zed's existing git, project, agent, model, and permission services rather than implement a parallel review engine
 2. **10.2** THE command SHALL support an explicit diff range, prompt, model, check selection, severity filter, output format, and dry-run behavior
 3. **10.3** THE command SHALL preserve repository state and return documented errors for invalid ranges, dirty-state conflicts, denied tools, failed checks, and provider failures
 
@@ -153,13 +153,13 @@ Sim already provides: a CLI (`crates/cli/`) with various subcommands, a terminal
 #### Acceptance Criteria
 
 1. **12.1** THE migration SHALL inventory Goose session, provider, extension, plugin, skill, recipe, schedule, gateway, local-model, ACP, MCP, update, and validation commands and mark each reusable, extended, excluded, or unresolved
-2. **12.2** EACH approved command SHALL call the owning Sim domain service and SHALL NOT introduce a second persistence, provider, extension, scheduler, or update implementation
+2. **12.2** EACH approved command SHALL call the owning Zed domain service and SHALL NOT introduce a second persistence, provider, extension, scheduler, or update implementation
 3. **12.3** DEPRECATED or intentionally excluded Goose commands SHALL return a documented compatibility message where command-name compatibility is required
 
 ## Design Approach
 
 ```
-goose text/ React Feature              →  sim CLI/TUI Equivalent
+goose text/ React Feature              →  zed CLI/TUI Equivalent
 ─────────────────────────────────────────────
 tui.tsx (interactive session)          →  New interactive CLI mode in crates/cli/
 configure.tsx (wizard)                  →  New CLI configure subcommand
@@ -174,10 +174,10 @@ toolcall.tsx                           →  Enhanced tool output in CLI
 
 - Source (goose): `projects/goose/ui/text/` — React TUI application
 - Source (goose): `projects/goose/crates/goose-cli/src/cli.rs`, `session/mod.rs`, `session/output.rs`, `commands/review/`, `commands/term.rs`, `bin/generate_manpages.rs`
-- Existing sim: `crates/cli/` — CLI framework
-- Existing sim: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
-- Existing sim: `crates/markdown/` — markdown parsing and rendering
-- Existing sim: `crates/agent_ui/src/inline_assistant.rs` — inline agent
-- Existing sim: `crates/agent_ui/src/terminal_inline_assistant.rs` — terminal inline agent
-- Existing sim: `crates/onboarding/` — onboarding views
-- Existing sim: `crates/settings/`, `crates/agent_settings/` — settings system
+- Existing zed: `crates/cli/` — CLI framework
+- Existing zed: `crates/terminal/`, `crates/terminal_view/` — terminal emulator
+- Existing zed: `crates/markdown/` — markdown parsing and rendering
+- Existing zed: `crates/agent_ui/src/inline_assistant.rs` — inline agent
+- Existing zed: `crates/agent_ui/src/terminal_inline_assistant.rs` — terminal inline agent
+- Existing zed: `crates/onboarding/` — onboarding views
+- Existing zed: `crates/settings/`, `crates/agent_settings/` — settings system

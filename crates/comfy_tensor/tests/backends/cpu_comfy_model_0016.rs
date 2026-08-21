@@ -43,7 +43,7 @@ fn cpu_adapter_is_a_compiled_alias_of_the_canonical_backend() -> Result<(), Tens
                 reason: "constructed CPU backend has no native properties".to_owned(),
             })?;
     assert_eq!(properties.device(), DeviceId::CPU);
-    assert_eq!(properties.name(), "Sim native Rust CPU");
+    assert_eq!(properties.name(), "Zed native Rust CPU");
     assert_eq!(properties.total_memory_bytes(), 64);
     assert_eq!(properties.architecture(), Some(std::env::consts::ARCH));
     assert!(!properties.has_fp16());

@@ -299,14 +299,14 @@ impl SerializedPaneGroup {
                     items,
                 ))
             }
-            SerializedPaneGroup::Pane(serialisim_pane) => {
+            SerializedPaneGroup::Pane(serialized_pane) => {
                 let pane = workspace
                     .update_in(cx, |workspace, window, cx| {
                         workspace.add_pane(window, cx).downgrade()
                     })
                     .log_err()?;
-                let active = serialisim_pane.active;
-                let new_items = serialisim_pane
+                let active = serialized_pane.active;
+                let new_items = serialized_pane
                     .deserialize_to(project, &pane, workspace_id, workspace.clone(), cx)
                     .await
                     .context("Could not deserialize pane)")

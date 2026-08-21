@@ -14,7 +14,7 @@ The migration retains only these active workflows:
 - `after_release.yml` — post-release docs, Discord, Winget, and Sentry automation.
 - `bump_collab_staging.yml` — collaboration staging version updates.
 - `bump_patch_version.yml` — patch release version updates.
-- `bump_sim_version.yml` — preview and stable version updates.
+- `bump_zed_version.yml` — preview and stable version updates.
 - `compliance_check.yml` — scheduled release compliance reporting.
 - `deploy_collab.yml` — collaboration server image publication and deployment.
 - `deploy_docs.yml` — reusable documentation deployment.
@@ -65,15 +65,15 @@ The migration retains only these active workflows:
 
 ## Regenerating workflows
 
-Run `cargo xtask workflows` from the repository root to regenerate active workflows. The generator excludes its archived Sim workflows, so it writes only `run_tests.yml` and `release.yml` to the active Sim workflow directory. It does not overwrite archived copies in this directory. Extension-repository workflow outputs under `extensions/workflows/` are unaffected.
+Run `cargo xtask workflows` from the repository root to regenerate active workflows. The generator excludes its archived Zed workflows, so it writes only `run_tests.yml` and `release.yml` to the active Zed workflow directory. It does not overwrite archived copies in this directory. Extension-repository workflow outputs under `extensions/workflows/` are unaffected.
 
-The exclusion list is `ARCHIVED_SIM_WORKFLOWS` in `tooling/xtask/src/tasks/workflows.rs`. When an archived generated workflow is intentionally restored, remove its name from that list in the same change. Otherwise regeneration will remove the active generated file and skip recreating it.
+The exclusion list is `ARCHIVED_ZED_WORKFLOWS` in `tooling/xtask/src/tasks/workflows.rs`. When an archived generated workflow is intentionally restored, remove its name from that list in the same change. Otherwise regeneration will remove the active generated file and skip recreating it.
 
 ## Restoring a workflow
 
 1. Identify the restoration task in `.agents/specs/ci-migration/tasks.md` and review its requirements, dependencies, required secrets, and cross-workflow references.
 2. Move the archived file into `.github/workflows/` with `git mv`.
-3. For an auto-generated workflow, also remove its name from `ARCHIVED_SIM_WORKFLOWS`, run `cargo xtask workflows`, and confirm regeneration preserves the restored active file. Do not hand-edit generated YAML.
+3. For an auto-generated workflow, also remove its name from `ARCHIVED_ZED_WORKFLOWS`, run `cargo xtask workflows`, and confirm regeneration preserves the restored active file. Do not hand-edit generated YAML.
 4. Restore dependent workflows together where required. In particular, `after_release.yml` and `deploy_nightly_docs.yml` depend on `deploy_docs.yml`, and extension automation has shared workflow dependencies.
 5. Validate permissions, triggers, references, and required repository secrets before merging. Confirm the restored workflow appears in GitHub Actions only after the intended activation change is reviewed.
 

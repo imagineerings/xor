@@ -85,11 +85,11 @@ fn publish_job() -> NamedJob {
 
 fn update_sha_in_zed(publish_job: &NamedJob, message: &WorkflowInput) -> NamedJob {
     let (generate_token, generated_token) =
-        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY).into();
+        generate_token(vars::ZED_ZIPPY_APP_ID, vars::ZED_ZIPPY_APP_PRIVATE_KEY).into();
 
     fn replace_sha() -> Step<Run> {
         named::bash(indoc! {r#"
-            sed -i "s/SIM_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/SIM_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
+            sed -i "s/ZED_EXTENSION_CLI_SHA: &str = \"[a-f0-9]*\"/ZED_EXTENSION_CLI_SHA: \&str = \"$GITHUB_SHA\"/" \
                 tooling/xtask/src/tasks/workflows/extension_tests.rs
         "#})
     }
@@ -147,7 +147,7 @@ fn create_pull_request_zed(
 fn update_sha_in_extensions(publish_job: &NamedJob, message: &WorkflowInput) -> NamedJob {
     let extensions_repo = RepositoryTarget::new("simtropolis", &["extensions"]);
     let (generate_token, generated_token) =
-        generate_token(vars::SIM_ZIPPY_APP_ID, vars::SIM_ZIPPY_APP_PRIVATE_KEY)
+        generate_token(vars::ZED_ZIPPY_APP_ID, vars::ZED_ZIPPY_APP_PRIVATE_KEY)
             .for_repository(extensions_repo)
             .into();
 
@@ -163,7 +163,7 @@ fn update_sha_in_extensions(publish_job: &NamedJob, message: &WorkflowInput) -> 
 
     fn replace_sha() -> Step<Run> {
         named::bash(indoc! {r#"
-            sed -i "s/SIM_EXTENSION_CLI_SHA: [a-f0-9]*/SIM_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
+            sed -i "s/ZED_EXTENSION_CLI_SHA: [a-f0-9]*/ZED_EXTENSION_CLI_SHA: $GITHUB_SHA/" \
                 .github/workflows/ci.yml
         "#})
     }
@@ -195,7 +195,7 @@ fn create_pull_request_extensions(
     let title = format!("Bump extension CLI version to `{}`", short_sha);
 
     let body = formatdoc! {r#"
-        This PR bumps the extension CLI version to https://github.com/simtropolis/sim/commit/${{{{ github.sha }}}}.
+        This PR bumps the extension CLI version to https://github.com/simtropolis/zed/commit/${{{{ github.sha }}}}.
 
         {message}
     "#};

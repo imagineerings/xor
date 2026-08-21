@@ -2381,7 +2381,7 @@ mod tests {
         );
         cases.insert(
             "native_primitive_dispatch_cannot_forge_catalog_ids",
-            OperationContractId::new("sim.native-internal.forged").is_err(),
+            OperationContractId::new("zed.native-internal.forged").is_err(),
         );
         cases.insert(
             "copy_on_write_preserves_logical_identity_and_mutation_lineage",

@@ -11,7 +11,7 @@ Phase 1 reduces the active GitHub Actions surface to an explicit two-file allowl
 | Top-level `.github/workflows/*.yml` files | 41 |
 | Retained core workflows | 2 |
 | Non-core workflows to archive | 39 |
-| Generated Sim workflows | 20 |
+| Generated Zed workflows | 20 |
 | Generated retained core workflows | 2 |
 | Generated non-core workflows to archive | 18 |
 | Hand-written non-core workflows to archive | 21 |
@@ -22,7 +22,7 @@ The retained core workflows are `release.yml` and `run_tests.yml`. At the start 
 
 ### Explicit active allowlist
 
-Phase 1 defines the active Sim workflow allowlist as exactly `release.yml` and `run_tests.yml`. The migration is derived from a filesystem inventory, not a historical count or a curated subset: every other top-level `.yml` file is archived.
+Phase 1 defines the active Zed workflow allowlist as exactly `release.yml` and `run_tests.yml`. The migration is derived from a filesystem inventory, not a historical count or a curated subset: every other top-level `.yml` file is archived.
 
 ### History-preserving archive
 
@@ -43,22 +43,22 @@ The README inventory is checked against the directory contents and must list eac
 
 ### Generator policy
 
-`tooling/xtask/src/tasks/workflows.rs` remains the source of truth for generated workflow definitions. `ARCHIVED_SIM_WORKFLOWS` contains all 18 generated non-core Sim workflow names. `WorkflowFile::active_output_path` returns no active path for those names, and generation therefore writes only the two core Sim workflows. The cleanup and write paths do not traverse `.github/workflows/archive/`, so archived files are not modified or removed.
+`tooling/xtask/src/tasks/workflows.rs` remains the source of truth for generated workflow definitions. `ARCHIVED_ZED_WORKFLOWS` contains all 18 generated non-core Zed workflow names. `WorkflowFile::active_output_path` returns no active path for those names, and generation therefore writes only the two core Zed workflows. The cleanup and write paths do not traverse `.github/workflows/archive/`, so archived files are not modified or removed.
 
-The focused test derives active output paths from the same workflow source inventory used by generation. It asserts that the complete generated Sim set partitions into:
+The focused test derives active output paths from the same workflow source inventory used by generation. It asserts that the complete generated Zed set partitions into:
 
 - active: `release.yml`, `run_tests.yml`;
-- archived: every name in `ARCHIVED_SIM_WORKFLOWS`.
+- archived: every name in `ARCHIVED_ZED_WORKFLOWS`.
 
-This makes a newly added generated Sim workflow fail the policy test until it is deliberately assigned to one side of the partition.
+This makes a newly added generated Zed workflow fail the policy test until it is deliberately assigned to one side of the partition.
 
-<!-- impl: tooling/xtask/src/tasks/workflows.rs#ARCHIVED_SIM_WORKFLOWS -->
+<!-- impl: tooling/xtask/src/tasks/workflows.rs#ARCHIVED_ZED_WORKFLOWS -->
 <!-- impl: tooling/xtask/src/tasks/workflows.rs#WorkflowFile::active_output_path -->
-<!-- impl: tooling/xtask/src/tasks/workflows.rs#sim_workflow_generation_matches_archive_policy -->
+<!-- impl: tooling/xtask/src/tasks/workflows.rs#zed_workflow_generation_matches_archive_policy -->
 
 ### Later restoration
 
-A later restoration moves an archived workflow back to the top level only after its task is authorized. If it is generated, the same change removes its name from `ARCHIVED_SIM_WORKFLOWS`; otherwise `cargo xtask workflows` would remove or omit it. `run_bundling.yml` remains archived after Phase 1, and Task 3 is the first unstarted restoration task.
+A later restoration moves an archived workflow back to the top level only after its task is authorized. If it is generated, the same change removes its name from `ARCHIVED_ZED_WORKFLOWS`; otherwise `cargo xtask workflows` would remove or omit it. `run_bundling.yml` remains archived after Phase 1, and Task 3 is the first unstarted restoration task.
 
 ## Archive groups and dependencies
 
@@ -70,7 +70,7 @@ A later restoration moves an archived workflow back to the top level only after 
 | Collaboration | `deploy_collab.yml` | Validate registry and Kubernetes credentials. |
 | Autofix, Nix, compliance | `autofix_pr.yml`, `nix_build.yml`, `compliance_check.yml` | Generated; validate tokens and caches. |
 | Extensions | `extension_tests.yml`, `extension_bump.yml`, `extension_auto_bump.yml`, `publish_extension_cli.yml`, `extension_workflow_rollout.yml` | Generated group with cross-workflow and core-CI integration. |
-| Review and release utilities | `danger.yml`, `pr_issue_labeler.yml`, `cherry_pick.yml`, `bump_sim_version.yml`, `bump_patch_version.yml`, `bump_collab_staging.yml` | Generated files must leave the archive policy when restored. |
+| Review and release utilities | `danger.yml`, `pr_issue_labeler.yml`, `cherry_pick.yml`, `bump_zed_version.yml`, `bump_patch_version.yml`, `bump_collab_staging.yml` | Generated files must leave the archive policy when restored. |
 | Community | all community, duplicate, ranking, triage, stale, congratulation, and notifier workflows | Restore only after event and permission review. |
 | Slack | `hotfix-review-monitor.yml`, `slack_notify_community_automation_failure.yml`, `slack_notify_first_responders.yml`, `slack_notify_label_created.yml` | Validate destinations and secrets before activation. |
 
@@ -99,7 +99,7 @@ When a later task restores a workflow, the archived content is the starting impl
 | 1.1, 1.2 | Measured inventory and explicit active allowlist | Filesystem inventory check |
 | 1.3, 1.5 | History-preserving archive and inactive archive location | Staged rename and active-set checks |
 | 1.4 | Exact README inventory | Directory-to-README comparison |
-| 2.1, 2.3, 2.4 | `ARCHIVED_SIM_WORKFLOWS`, active output path, focused partition test | Focused xtask test and active-set check |
+| 2.1, 2.3, 2.4 | `ARCHIVED_ZED_WORKFLOWS`, active output path, focused partition test | Focused xtask test and active-set check |
 | 2.2 | Generator cleanup/write scope | Archive diff before and after generation |
 | 3.1, 3.2, 3.3, 3.4 | Later Task 3 bundling restoration | Task 3 workflow inspection |
 | 4.1, 4.2, 4.3, 4.4 | Later nightly release restoration | Task 4 workflow inspection |
@@ -122,7 +122,7 @@ When a later task restores a workflow, the archived content is the starting impl
 Phase 1 validation runs in this order:
 
 1. Run the spec validator before and after edits.
-2. Run `cargo test -p xtask sim_workflow_generation_matches_archive_policy -- --nocapture`.
+2. Run `cargo test -p xtask zed_workflow_generation_matches_archive_policy -- --nocapture`.
 3. Confirm only `release.yml` and `run_tests.yml` are top-level `.yml` workflows.
 4. Confirm the archive contains 39 `.yml` files and the README inventory matches them exactly.
 5. Confirm the 39 moves preserve content and history.

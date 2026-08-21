@@ -2,13 +2,13 @@
 
 ## Problem
 
-Goose's TypeScript package is an ACP client plus generated Goose custom-method types and validators. The previous specification incorrectly treated it as a REST/OpenAPI SDK. Sim needs a source-compatible plan that follows the actual protocol boundary.
+Goose's TypeScript package is an ACP client plus generated Goose custom-method types and validators. The previous specification incorrectly treated it as a REST/OpenAPI SDK. Zed needs a source-compatible plan that follows the actual protocol boundary.
 
 ## Requirements
 
 ### Requirement 1: Standard ACP client
 
-**User story:** As a TypeScript developer, I want a typed ACP client, so that I can control an approved Sim ACP server without hand-written protocol messages.
+**User story:** As a TypeScript developer, I want a typed ACP client, so that I can control an approved Zed ACP server without hand-written protocol messages.
 
 #### Acceptance criteria
 
@@ -30,7 +30,7 @@ Goose's TypeScript package is an ACP client plus generated Goose custom-method t
 
 ### Requirement 3: Generated custom-method client
 
-**User story:** As a TypeScript developer, I want generated types and dispatch for approved Sim extensions, so that client and server stay compatible.
+**User story:** As a TypeScript developer, I want generated types and dispatch for approved Zed extensions, so that client and server stay compatible.
 
 #### Acceptance criteria
 
@@ -55,7 +55,7 @@ Goose's TypeScript package is an ACP client plus generated Goose custom-method t
 
 #### Acceptance criteria
 
-1. **5.1** THE SDK SHALL communicate supported Goose/Sim extensions through ACP initialization metadata.
+1. **5.1** THE SDK SHALL communicate supported Goose/Zed extensions through ACP initialization metadata.
 2. **5.2** THE SDK SHALL preserve unknown metadata fields and tolerate newer optional methods without crashing.
 3. **5.3** THE package SHALL document the compatible ACP, server, Node.js, browser/Electron, OS, and architecture versions.
 
@@ -71,7 +71,7 @@ Goose's TypeScript package is an ACP client plus generated Goose custom-method t
 
 ## Open questions
 
-- Will Sim publish this SDK and native binary packages, or only document the protocol?
+- Will Zed publish this SDK and native binary packages, or only document the protocol?
 - Which custom methods are stable compatibility commitments?
 - Which environments (Node, browser, Electron) must be supported?
 

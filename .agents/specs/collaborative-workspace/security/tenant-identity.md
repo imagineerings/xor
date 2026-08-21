@@ -9,18 +9,18 @@ The accepted ownership decisions remain normative:
 - `crates/collaboration_domain` owns UI-free tenant, principal, identity-binding, authorization and provenance types. A wire tag, URL parameter, database UUID or compatibility event cannot construct trusted context directly.
 - `crates/collab` owns request admission, current membership and role policy, tenant-fenced repositories, the signed-event log, command/outbox commit and per-community audit chain.
 - `crates/nostr_compat` owns byte-exact event, filter, kind, NIP-42 and NIP-98 compatibility semantics but never authorizes a request or retrieves a signing key.
-- `crates/client` and the existing Sim service authentication stack own service accounts and organization principals. Possession of a Nostr key does not imply a Sim account.
-- `crates/credentials_provider` and `crates/sim_credentials_provider` own private-key custody, protected references, import, rotation, backup and recovery. Collaboration tables contain public keys and credential references only.
+- `crates/client` and the existing Zed service authentication stack own service accounts and organization principals. Possession of a Nostr key does not imply a Zed account.
+- `crates/credentials_provider` and `crates/zed_credentials_provider` own private-key custody, protected references, import, rotation, backup and recovery. Collaboration tables contain public keys and credential references only.
 - The immutable signed event is the authorship authority. Identity bindings, profiles and NIP-OA attestations add authorization and provenance; none may rewrite the author.
 - Redis, search, presence, caches and compatibility responses are derived tenant-scoped projections. They cannot become authentication, authorization, identity or durable event authority.
-- ADR-001 fixes the final service and schema owner in Sim `collab`. ADR-002 fixes community/profile-scoped account-to-npub binding and one active signer per tuple.
+- ADR-001 fixes the final service and schema owner in Zed `collab`. ADR-002 fixes community/profile-scoped account-to-npub binding and one active signer per tuple.
 
 The review does not declare physical timing non-interference. Shared database, CPU, cache and network contention remain measurable. It does require coarse admission, bounded work, per-tenant quotas and tests showing that content, identifiers, exact counts, response classes and private metadata do not cross tenants. Task 4.4 owns measurable operational limits and timing-class alert budgets.
 
 ## Source evidence and preserved constraints
 
 - `projects/buzz/docs/multi-tenant-relay.md` defines host-derived `TenantContext`, host/channel agreement, label-flow non-interference, composite tenant keys, a finite error alphabet, tenant-scoped projections and per-community signing/audit separation. Its TLA+/Tamarin claims are relative to named RLS, cryptographic, resolution and deployment axioms; implementation tests must admit those axioms independently.
-- `projects/buzz/crates/buzz-core/src/tenant.rs` deliberately has no `Default` or `Deserialize` for tenant context, but its public `resolved`/`from_uuid` constructors are only a lint-and-review fence. Sim must replace that with constructors inaccessible outside approved admission and repository adapters.
+- `projects/buzz/crates/buzz-core/src/tenant.rs` deliberately has no `Default` or `Deserialize` for tenant context, but its public `resolved`/`from_uuid` constructors are only a lint-and-review fence. Zed must replace that with constructors inaccessible outside approved admission and repository adapters.
 - `projects/buzz/crates/buzz-relay/src/tenant.rs` normalizes host names, rejects empty/unmapped/lookup-failed hosts generically and has no default-tenant fallback. Deployment-internal calls resolve the configured relay authority through the same path.
 - Buzz NIP-42 uses a random challenge and a five-second unauthenticated deadline. Its connection path bounds slots, send queues and slow clients and stores the resolved tenant on the connection before frames are read.
 - Buzz NIP-98 validates kind, signature, timestamp, exact URL/method and optional payload hash. Its current shared replay guard is tenant-scoped and fail-closed, but dev-mode `X-Pubkey` deliberately skips replay and must never be reachable in a production profile.
@@ -71,7 +71,7 @@ The review does not declare physical timing non-interference. Shared database, C
 | T-TIP-021 | Malformed/oversized event, filter, tag or canonical JSON consumes resources or reaches policy partially parsed | Frame/body/depth/cardinality bounds before allocation; exact codecs; one typed rejection and no persistence | Tasks 11.2, 11.3, 11.4, 14.3, 14.4 |
 | T-TIP-022 | Altered event ID, signature, author, timestamp or replacement coordinate is accepted | Recompute canonical ID, verify BIP-340 and exact kind/head rules before authorization and durable write | Tasks 11.2, 11.3, 11.4, 14.4, 45.1 |
 | T-TIP-023 | A community/system signing key signs another community's membership or system event | Credential handle and signing request are tenant typed; output author/key is checked against intended community before publish | Tasks 12.4, 12.5, 13.5, 14.4, 45.2 |
-| T-TIP-024 | Nostr possession is treated as Sim account, organization or billing authentication | Common principal keeps account and key claims distinct; explicit verified binding required by policy | Tasks 12.1, 13.2, 13.3, 45.2 |
+| T-TIP-024 | Nostr possession is treated as Zed account, organization or billing authentication | Common principal keeps account and key claims distinct; explicit verified binding required by policy | Tasks 12.1, 13.2, 13.3, 45.2 |
 | T-TIP-025 | Binding challenge is replayed, retargeted to another community/profile or approved by an administrator without key possession | Single-use domain-separated challenge bound to account/community/profile/pubkey and current policy; possession proof mandatory | Tasks 12.1, 12.7, 13.2, 45.2 |
 | T-TIP-026 | Concurrent activation creates two active signers or binds one npub to conflicting owners | Tenant/account/profile uniqueness plus optimistic version transaction; conflict has no partial state | Tasks 12.1, 12.3, 12.7 |
 | T-TIP-027 | Rotation, revocation, archive or recovery failure silently replaces/resurrects a key | Verify successor storage first; atomic lifecycle transition; terminal states cannot be toggled active; old source retained until confirmation | Tasks 12.4, 12.5, 12.6, 12.7 |
@@ -136,7 +136,7 @@ Numeric limits not already frozen by Buzz are assigned by Task 4.4. Until an own
 
 ### TI-B06 — credential retrieval, signing and lifecycle
 
-- **Owner:** existing Sim credential providers and `sim_credentials_provider` Nostr adapters.
+- **Owner:** existing Zed credential providers and `zed_credentials_provider` Nostr adapters.
 - **Untrusted input:** imported nsec/hex/NIP-49 data, backup, recovery input, key reference, signing preimage and lifecycle request.
 - **Bounds/order:** bounded parsing/KDF; protected write and round-trip signature before activation; tenant/binding/key agreement before every sign; verify signed output before release.
 - **Secret rule:** collaboration state stores only public key and protected reference. Raw values never reach command args, public events, logs, telemetry or errors; old source survives until confirmed.
@@ -145,7 +145,7 @@ Numeric limits not already frozen by Buzz are assigned by Task 4.4. Until an own
 
 ### TI-B07 — tenant-fenced database transaction and constraints
 
-- **Owner:** ADR-001 Sim migration authority and `collab` repositories.
+- **Owner:** ADR-001 Zed migration authority and `collab` repositories.
 - **Required role:** non-superuser, non-owner, `NOBYPASSRLS`; transaction-local community set before statements; no pooled-connection tenant residue.
 - **Schema rule:** all tenant tables, partitions, indexes, uniqueness, foreign keys, audit heads and projection checkpoints include community. No request path uses an unscoped lookup as an authorization oracle.
 - **Error rule:** rollback the whole command/outbox transaction and translate database errors to the public taxonomy before logging/responding.

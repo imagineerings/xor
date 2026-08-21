@@ -9,7 +9,7 @@ Migrate the remaining goose components: Ask AI bot service, Nostr session sharin
 - **Ask AI remains conditional**: Do not create or deploy a service until product, chat-platform, privacy, abuse, and operational ownership are approved.
 - **Session import extends the existing thread importer**: Add Claude Code, Codex, and Pi adapters without creating a second session store.
 - **Nostr remains conditional**: If approved, make it an optional adapter over shared-session serialization; do not create a crate until the feature boundary requires one.
-- **Scripts and examples are reconciled, not copied**: Reuse Sim's `script/`, CI, examples, and test harnesses and add only confirmed workflow gaps.
+- **Scripts and examples are reconciled, not copied**: Reuse Zed's `script/`, CI, examples, and test harnesses and add only confirmed workflow gaps.
 - **Provider error proxy is developer-only and conditional**: Prefer existing HTTP diagnostics; any proxy has opt-in and redaction-safe defaults.
 
 ## 2. Architecture

@@ -1584,7 +1584,7 @@
         {
           "index": 1,
           "starred": false,
-          "syntax": "sim.to(v.dtype)",
+          "syntax": "zed.to(v.dtype)",
           "syntax_kind": "Call"
         },
         {
@@ -3459,7 +3459,7 @@
         {
           "index": 1,
           "starred": false,
-          "syntax": "sim.to(v.dtype)",
+          "syntax": "zed.to(v.dtype)",
           "syntax_kind": "Call"
         },
         {

@@ -1,16 +1,16 @@
-# ADR-002: Sim Account and Nostr Identity Binding
+# ADR-002: Zed Account and Nostr Identity Binding
 
 - **Status:** Accepted
 - **Decision date:** 2026-08-14
-- **Approval:** The product owner approved the recommended model: a Sim account may use multiple community-local Nostr identities, with exactly one active signing identity for each community/profile.
+- **Approval:** The product owner approved the recommended model: a Zed account may use multiple community-local Nostr identities, with exactly one active signing identity for each community/profile.
 - **Requirements:** 2.1, 7.1, 7.4
 - **Capabilities:** CAP-007, CAP-008, CAP-009
 
 ## Context
 
-Sim service accounts and organizations currently identify users for hosted services, while Buzz identities are Nostr keypairs whose public keys author immutable signed events. Buzz also supports independent agent keys and NIP-OA owner attestations. Conflating these concepts would either make a service-account mutation rewrite cryptographic authorship or make possession of a Nostr key sufficient to assume unrelated service-account privileges.
+Zed service accounts and organizations currently identify users for hosted services, while Buzz identities are Nostr keypairs whose public keys author immutable signed events. Buzz also supports independent agent keys and NIP-OA owner attestations. Conflating these concepts would either make a service-account mutation rewrite cryptographic authorship or make possession of a Nostr key sufficient to assume unrelated service-account privileges.
 
-The migration must preserve existing npubs, signatures, profiles, social lists, agent provenance and archive history. It must also use Sim credential providers for secret-key custody, work across multiple communities, prevent ambiguous active signers and fail closed when verification or protected storage is unavailable.
+The migration must preserve existing npubs, signatures, profiles, social lists, agent provenance and archive history. It must also use Zed credential providers for secret-key custody, work across multiple communities, prevent ambiguous active signers and fail closed when verification or protected storage is unavailable.
 
 ## Decision
 
@@ -18,7 +18,7 @@ The migration must preserve existing npubs, signatures, profiles, social lists, 
 
 The canonical model keeps four related concepts distinct:
 
-1. A **Sim service account** is the canonical human account, subscription and organization principal owned by `client::UserStore` and Sim service authentication.
+1. A **Zed service account** is the canonical human account, subscription and organization principal owned by `client::UserStore` and Zed service authentication.
 2. A **Nostr signing identity** is a public key and protected signing-key reference. Its public key is the immutable author of events it signs.
 3. A **community profile** is community-scoped display, status, social and archival state associated with a signing identity.
 4. An **agent identity** is its own Nostr signing identity and profile. A verified NIP-OA attestation records authorization provenance from an owner identity but never changes the event author.
@@ -27,7 +27,7 @@ Bindings connect these concepts explicitly; they do not merge their identifiers 
 
 ### Cardinality and active signer
 
-A Sim service account may bind zero or more Nostr identities. Bindings are community-scoped and profile-scoped so the same account may intentionally use different npubs in different communities or distinct profiles in one community.
+A Zed service account may bind zero or more Nostr identities. Bindings are community-scoped and profile-scoped so the same account may intentionally use different npubs in different communities or distinct profiles in one community.
 
 The uniqueness rules are:
 
@@ -42,7 +42,7 @@ Selecting a different presentation or switching communities changes the resolved
 
 ### Binding record and authority
 
-The Sim collaboration identity-binding repository is the canonical owner of binding state. Each version records:
+The Zed collaboration identity-binding repository is the canonical owner of binding state. Each version records:
 
 - community, service-account, profile and public-key identifiers;
 - binding status (`pending`, `verified`, `active`, `rotated`, `revoked` or `archived`);
@@ -52,13 +52,13 @@ The Sim collaboration identity-binding repository is the canonical owner of bind
 - organization-policy version and actor principal; and
 - an optimistic-concurrency version and audit reference.
 
-No binding table stores a private key, backup phrase, raw attestation secret or reusable challenge. Sim's canonical credentials provider owns protected secret references. The immutable signed event log remains the authorship authority; a binding is authorization and presentation metadata, not permission to rewrite an author.
+No binding table stores a private key, backup phrase, raw attestation secret or reusable challenge. Zed's canonical credentials provider owns protected secret references. The immutable signed event log remains the authorship authority; a binding is authorization and presentation metadata, not permission to rewrite an author.
 
 ### Create and link verification
 
 A newly generated key is created in the canonical credentials provider, round-trip tested with a challenge signature and exposed to binding activation only after protected storage confirms the exact public key. An imported, paired or restored key remains in its source until the canonical provider verifies storage and signs a fresh domain-separated challenge.
 
-Linking an existing public key requires both authenticated control of the Sim service account and proof of current key possession. The service issues a single-use, short-lived, community- and account-bound challenge. The Nostr key signs the exact challenge; replay, host/community mismatch, expired evidence, unsupported signature formats and public-key mismatch fail before a binding write. Organization administrators cannot forge possession evidence.
+Linking an existing public key requires both authenticated control of the Zed service account and proof of current key possession. The service issues a single-use, short-lived, community- and account-bound challenge. The Nostr key signs the exact challenge; replay, host/community mismatch, expired evidence, unsupported signature formats and public-key mismatch fail before a binding write. Organization administrators cannot forge possession evidence.
 
 A pending binding grants no signing, membership, role or recovery authority. Activation is an optimistic transaction that verifies policy and uniqueness, makes the selected binding active and, when rotating, transitions the predecessor in the same transaction.
 
@@ -66,9 +66,9 @@ A pending binding grants no signing, membership, role or recovery authority. Act
 
 Rotation creates and verifies a successor key before changing active state. The atomic activation transaction marks the prior binding `rotated`, links predecessor and successor versions, updates future signing resolution and invalidates cached/autocomplete active-identity projections. If successor storage, challenge verification, policy evaluation or persistence fails, the prior active identity remains unchanged and usable.
 
-Revocation is a fail-closed authorization action. It prevents future signatures through Sim, active access derived from the binding, autocomplete as an active identity and issuance of new owner attestations. It does not invalidate historical event signatures or erase public profiles required to attribute retained events. Compromise revocation also cancels outstanding pairing, recovery and delegation evidence for that key and requires reauthentication under organization policy.
+Revocation is a fail-closed authorization action. It prevents future signatures through Zed, active access derived from the binding, autocomplete as an active identity and issuance of new owner attestations. It does not invalidate historical event signatures or erase public profiles required to attribute retained events. Compromise revocation also cancels outstanding pairing, recovery and delegation evidence for that key and requires reauthentication under organization policy.
 
-NIP-OA attestations remain independently verifiable historical evidence. Revoking an owner or agent binding prevents new Sim-authorized use but cannot cryptographically retract already signed attestations; policy evaluates their bounds, event time and current authorization where required.
+NIP-OA attestations remain independently verifiable historical evidence. Revoking an owner or agent binding prevents new Zed-authorized use but cannot cryptographically retract already signed attestations; policy evaluates their bounds, event time and current authorization where required.
 
 ### Archive and relay-scoped state
 
@@ -78,7 +78,7 @@ Service-account deletion and community departure detach active service authoriza
 
 ### Recovery and backup
 
-Recovery proves control of a recoverable secret or approved organization recovery factor and then imports the key into Sim's canonical credentials provider. NIP-49 `ncryptsec`, legacy nsec/hex and approved pairing formats remain compatibility inputs. Every recovery:
+Recovery proves control of a recoverable secret or approved organization recovery factor and then imports the key into Zed's canonical credentials provider. NIP-49 `ncryptsec`, legacy nsec/hex and approved pairing formats remain compatibility inputs. Every recovery:
 
 1. applies bounded parsing and KDF/resource limits;
 2. redacts private material from logs, telemetry and errors;
@@ -125,9 +125,9 @@ Policy is evaluated from the host-derived community and authenticated organizati
 
 ## Alternatives rejected
 
-1. **One global npub per Sim account:** rejected because it prevents community-local identity and privacy policy while forcing cross-community correlation.
+1. **One global npub per Zed account:** rejected because it prevents community-local identity and privacy policy while forcing cross-community correlation.
 2. **Unlimited simultaneously active keys per profile:** rejected because signing, mentions, permissions and recovery would have ambiguous authority.
-3. **Treat any verified npub as a Sim account:** rejected because key possession does not grant unrelated hosted account, organization or billing privileges.
+3. **Treat any verified npub as a Zed account:** rejected because key possession does not grant unrelated hosted account, organization or billing privileges.
 4. **Let administrators relink keys without possession proof:** rejected because it enables authorship takeover.
 5. **Rewrite or delete historical authorship after rotation/revocation:** rejected because signed-event authorship is immutable and required for compatibility and audit.
 6. **Treat NIP-OA owner attestation as owner authorship:** rejected by the protocol and by the independent human/agent identity model.

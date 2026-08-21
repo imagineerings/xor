@@ -29,7 +29,7 @@
     "ownership_scope_prefixes": [
       "crates/comfy_",
       "crates/extension_host/",
-      "crates/sim/",
+      "crates/zed/",
       "crates/workspace/"
     ]
   },
@@ -358,7 +358,7 @@
       ],
       "call_path_prefixes": [
         "crates/comfy_api/",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [
         {
@@ -375,7 +375,7 @@
       "known_open_reasons": [],
       "production_consumers": [
         "NativeApiHost",
-        "Sim native API serve mode"
+        "Zed native API serve mode"
       ],
       "requirements": [
         "Requirement 10"
@@ -512,7 +512,7 @@
       ],
       "call_path_prefixes": [
         "crates/comfy_",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [
         {
@@ -525,7 +525,7 @@
       "production_consumers": [
         "comfy_api native HTTP host",
         "comfy_api WebSocket host",
-        "Sim headless serve mode"
+        "Zed headless serve mode"
       ],
       "requirements": [
         "Requirement 8",
@@ -764,7 +764,7 @@
       "allowed_adapters": [
         "AssetRoots maps profile namespaces and stable canonical-path configured-root identities to canonical ArtifactRoot values",
         "AssetIdentity maps to ArtifactKey before filesystem access and retains an optional stable root identifier for plural model roots",
-        "AssetIdentity::to_reference and AssetRoots::identity_from_reference are the sole bounded sim-asset wire mapping; controller and GPUI code consume that mapping without parsing or formatting the scheme",
+        "AssetIdentity::to_reference and AssetRoots::identity_from_reference are the sole bounded zed-asset wire mapping; controller and GPUI code consume that mapping without parsing or formatting the scheme",
         "API and GPUI views consume the same SharedAssetService with sealed AuthorizedCapabilities and never grant themselves capabilities",
         "AssetPluginCapabilityServices is a least-privilege broker over that shared service and delegates authorization and verified reads to AssetService",
         "NativeAssetResolverRegistry seals authorized AssetIdentity values behind attempt-scoped NativeAssetReference tokens; native nodes receive only the opaque reference and bounded NativeAssetResolver interface, never paths or grants",
@@ -858,7 +858,7 @@
           "pattern": "\\bAssetRoots::new\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -866,7 +866,7 @@
           "pattern": "\\b(?:roots|self\\.roots)\\.resolve_existing\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         }
       ],
@@ -2104,7 +2104,7 @@
         {
           "name": "task38-production-feature-forwarding-preserves-disjoint-owners",
           "path": ".agents/specs/comfy-parity/validate_backend_dependencies.py",
-          "pattern": "validate_production_feature_manifests[\\s\\S]*crates/comfy_worker/Cargo.toml[\\s\\S]*comfy_runtime/\\{adapter\\}[\\s\\S]*comfy_tensor/\\{adapter\\}[\\s\\S]*crates/comfy_test_support/Cargo.toml[\\s\\S]*crates/sim/Cargo.toml"
+          "pattern": "validate_production_feature_manifests[\\s\\S]*crates/comfy_worker/Cargo.toml[\\s\\S]*comfy_runtime/\\{adapter\\}[\\s\\S]*comfy_tensor/\\{adapter\\}[\\s\\S]*crates/comfy_test_support/Cargo.toml[\\s\\S]*crates/zed/Cargo.toml"
         },
         {
           "name": "task38-adapter-source-policy-rejects-bindgen-and-sdk-downloads",
@@ -2442,7 +2442,7 @@
         "CredentialsProvider"
       ],
       "allowed_adapters": [
-        "sim_credentials_provider::SimCredentialsProvider implements the existing storage trait",
+        "zed_credentials_provider::ZedCredentialsProvider implements the existing storage trait",
         "comfy_runtime::SecretId is a checked identifier DTO and SecretValue is a non-serializable operation-scoped wrapper",
         "Native runtime settings retain only checked SecretId and credential-scope identifiers; Task 20 binds both to the verified native component measurement before the operation-scoped credentials actuator is called"
       ],
@@ -2454,10 +2454,10 @@
           "symbol": "CredentialsProvider"
         },
         {
-          "path": "crates/sim_credentials_provider/src/sim_credentials_provider.rs",
-          "qualified": "sim_credentials_provider::SimCredentialsProvider",
+          "path": "crates/zed_credentials_provider/src/zed_credentials_provider.rs",
+          "qualified": "zed_credentials_provider::ZedCredentialsProvider",
           "role": "allowed_adapter",
-          "symbol": "SimCredentialsProvider"
+          "symbol": "ZedCredentialsProvider"
         },
         {
           "path": "crates/comfy_runtime/src/trust.rs",
@@ -2476,12 +2476,12 @@
         "CredentialsProvider",
         "SecretId",
         "SecretValue",
-        "SimCredentialsProvider"
+        "ZedCredentialsProvider"
       ],
       "required_mappings": [
         {
           "name": "provider-secret-id-to-credentials-provider",
-          "path": "crates/sim/src/comfy_plugin_services.rs",
+          "path": "crates/zed/src/comfy_plugin_services.rs",
           "pattern": "secret_id[\\s\\S]*read_credentials|read_credentials[\\s\\S]*secret_id"
         }
       ],
@@ -2494,7 +2494,7 @@
       "production_consumers": [
         "native provider adapters",
         "plugin secret capability adapter",
-        "Sim runtime profile initialization"
+        "Zed runtime profile initialization"
       ],
       "requirements": [
         "Requirement 22",
@@ -2511,7 +2511,7 @@
         "VAL-E2E-005",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "Comfy persists and requests only checked secret and credential-scope identifiers; the existing Sim credentials provider remains the sole owner of secret bytes and storage operations. Task 20 must bind those scopes to the authenticated plugin authorization and verified native component measurement before access."
+      "decision_reason": "Comfy persists and requests only checked secret and credential-scope identifiers; the existing Zed credentials provider remains the sole owner of secret bytes and storage operations. Task 20 must bind those scopes to the authenticated plugin authorization and verified native component measurement before access."
     },
     {
       "concern": "deterministic_algorithm_execution_policy",
@@ -2781,7 +2781,7 @@
         {
           "name": "device-certificate-format-is-strict-canonical-and-domain-separated",
           "path": "crates/comfy_test_support/src/device_certification.rs",
-          "pattern": "sim-comfy-device-certification-v2[\\s\\S]*DeviceCertificationTrustAnchor[\\s\\S]*CertificationImplementationManifest[\\s\\S]*to_canonical_json[\\s\\S]*parse_and_verify"
+          "pattern": "zed-comfy-device-certification-v2[\\s\\S]*DeviceCertificationTrustAnchor[\\s\\S]*CertificationImplementationManifest[\\s\\S]*to_canonical_json[\\s\\S]*parse_and_verify"
         },
         {
           "name": "cpu-certificate-binds-transitive-manifest-and-pinned-trust-anchor",
@@ -3143,7 +3143,7 @@
           "pattern": "\\bExtensionStore::(?:global|new)\\(",
           "path_prefixes": [
             "crates/extension_host/",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -3152,7 +3152,7 @@
           "path_prefixes": [
             "crates/comfy_",
             "crates/extension_host/",
-            "crates/sim/"
+            "crates/zed/"
           ]
         }
       ],
@@ -3163,8 +3163,8 @@
           "pattern": "ComponentLifecycleAdapter|InstalledComponent"
         },
         {
-          "name": "sim-bootstraps-extension-owned-comfy-host",
-          "path": "crates/sim/src/sim.rs",
+          "name": "zed-bootstraps-extension-owned-comfy-host",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "ComponentHost|register_component_lifecycle_adapter"
         },
         {
@@ -3179,7 +3179,7 @@
         "comfy-parity-pre-breadth-ownership-closure"
       ],
       "production_consumers": [
-        "Sim extension management",
+        "Zed extension management",
         "Comfy plugin enable, update, and restart lifecycle",
         "plugin manifest verification"
       ],
@@ -3209,7 +3209,7 @@
         "ExternalNavigationPolicy"
       ],
       "allowed_adapters": [
-        "Sim open-url UI executes only a sealed Comfy navigation decision",
+        "Zed open-url UI executes only a sealed Comfy navigation decision",
         "ExecutionDockPanel authorizes fixed error-help destinations with an explicit user gesture immediately before invoking GPUI open_url",
         "plugin route and declarative UI DTOs carry URLs but no authority"
       ],
@@ -3258,7 +3258,7 @@
         "VAL-OWNERSHIP-DOMAIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "ExternalNavigationPolicy alone validates Comfy-originated schemes and gesture requirements; generic Sim navigation remains the actuator and cannot infer plugin authority."
+      "decision_reason": "ExternalNavigationPolicy alone validates Comfy-originated schemes and gesture requirements; generic Zed navigation remains the actuator and cannot infer plugin authority."
     },
     {
       "concern": "final_output_commit",
@@ -3476,7 +3476,7 @@
         {
           "name": "native-output-effects-bind-checked-media-identity",
           "path": "crates/comfy_nodes/src/execution.rs",
-          "pattern": "pub enum NativeOutputMediaKind[\\s\\S]*pub fn accepts[\\s\\S]*pub fn checked_media[\\s\\S]*media_kind\\.accepts[\\s\\S]*sim\\.comfy\\.native-output-effect\\.v2"
+          "pattern": "pub enum NativeOutputMediaKind[\\s\\S]*pub fn accepts[\\s\\S]*pub fn checked_media[\\s\\S]*media_kind\\.accepts[\\s\\S]*zed\\.comfy\\.native-output-effect\\.v2"
         },
         {
           "name": "output-committer-revalidates-relative-prefix-containment",
@@ -3596,8 +3596,8 @@
           "symbol": "ComponentHostRouter"
         },
         {
-          "path": "crates/sim/src/sim.rs",
-          "qualified": "sim::SimComfyPluginContributionSource",
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::SimComfyPluginContributionSource",
           "role": "live_inventory_adapter",
           "symbol": "SimComfyPluginContributionSource"
         },
@@ -3652,8 +3652,8 @@
       ],
       "required_mappings": [
         {
-          "name": "sim-projects-live-verified-inventory-without-copying-lifecycle-state",
-          "path": "crates/sim/src/sim.rs",
+          "name": "zed-projects-live-verified-inventory-without-copying-lifecycle-state",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "self\\.router\\.current\\(\\)\\?\\.installed_plugins\\(\\)\\?[\\s\\S]*PluginContributionInput::from_verified_manifest"
         },
         {
@@ -3705,7 +3705,7 @@
         "VAL-PLUGIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The existing signed UiContribution ABI is the one authoritative frontend declaration. ExtensionStore and ComponentHost retain installation, signature, authorization, and lifecycle state; Sim projects only the current verified inventory; and comfy_ui owns only bounded typed presentation, ambiguity rejection, and exact accessible placeholders. This prevents a second extension host, manifest validator, action registry, settings store, capability model, persistence layer, or JavaScript execution path while preserving ABI and serialized-boundary separation."
+      "decision_reason": "The existing signed UiContribution ABI is the one authoritative frontend declaration. ExtensionStore and ComponentHost retain installation, signature, authorization, and lifecycle state; Zed projects only the current verified inventory; and comfy_ui owns only bounded typed presentation, ambiguity rejection, and exact accessible placeholders. This prevents a second extension host, manifest validator, action registry, settings store, capability model, persistence layer, or JavaScript execution path while preserving ABI and serialized-boundary separation."
     },
     {
       "concern": "graph_context_dispatch",
@@ -3794,7 +3794,7 @@
       ],
       "call_path_prefixes": [
         "crates/comfy_ui/",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [
         {
@@ -4170,7 +4170,7 @@
         "VAL-OWNERSHIP-001",
         "VAL-RECOVERY-009"
       ],
-      "decision_reason": "Legacy installation migration validates bounded read-only evidence and refuses source lifecycle requests only; all foundational path, asset, workflow, settings, output, process, security, persistence, and transaction behavior remains with the existing canonical Sim/comfy owners."
+      "decision_reason": "Legacy installation migration validates bounded read-only evidence and refuses source lifecycle requests only; all foundational path, asset, workflow, settings, output, process, security, persistence, and transaction behavior remains with the existing canonical Zed/comfy owners."
     },
     {
       "concern": "legacy_plugin_mapping",
@@ -4746,7 +4746,7 @@
           "pattern": "\\bModelRegistry::built_in\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         }
       ],
@@ -4832,7 +4832,7 @@
           "pattern": "\\.index_mut\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -5313,12 +5313,12 @@
       ],
       "call_path_prefixes": [
         "crates/comfy_api/",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [],
       "known_open_reasons": [],
       "production_consumers": [
-        "Sim comfy serve mode"
+        "Zed comfy serve mode"
       ],
       "requirements": [
         "Requirement 8",
@@ -5333,7 +5333,7 @@
         "VAL-WS-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "The native API listener is a distinct compatibility protocol owner; existing Sim RPC, proxy, debug, and extension transports are unrelated and cannot serve or forward this contract."
+      "decision_reason": "The native API listener is a distinct compatibility protocol owner; existing Zed RPC, proxy, debug, and extension transports are unrelated and cannot serve or forward this contract."
     },
     {
       "concern": "native_attempt_memory_policy",
@@ -5463,8 +5463,8 @@
           "pattern": "session\\.memory_snapshot\\(\\)[\\s\\S]*AttemptMemoryController::new"
         },
         {
-          "name": "sim-profile-memory-policy-enters-one-runtime-plan-adapter",
-          "path": "crates/sim/src/sim.rs",
+          "name": "zed-profile-memory-policy-enters-one-runtime-plan-adapter",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "NativeExecutionControllerConfig::new[\\s\\S]*with_memory_policy\\(profile\\.memory_policy\\)"
         },
         {
@@ -5665,7 +5665,7 @@
         "comfy-parity-wave39-vendor-execution-ownership-consolidation"
       ],
       "production_consumers": [
-        "Sim native runtime profile memory-policy adapter",
+        "Zed native runtime profile memory-policy adapter",
         "private native worker execution preflight",
         "BackendWorkspaceAuthority-issued workspace authorization consumed by each native attempt through the CPU compatibility alias or exact accelerator pairing",
         "native model and tensor placement adapters",
@@ -5692,7 +5692,7 @@
         "VAL-RECOVERY-008",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "AttemptMemoryController and MemoryPlanner alone own reservation order, policy resolution, placement metadata, pressure decisions, bounded OOM phases, the exact workspace ceiling for each retry phase, and fence-aware terminal state. NativeRuntimeProfile owns the persisted user choice; Sim and NativeExecutionControllerConfig only carry it into the path-free NativeImageWorkerPlan, and worker preflight alone resolves the effective mode and places that exact token into execution cache configuration. AttemptMemoryController issues one opaque non-cloneable PlannedWorkspaceAuthorization and freezes replanning; WorkerSession consumes it without accepting a raw byte count and delegates its private ceiling to the paired non-cloneable BackendWorkspaceAuthority, which alone checks and seals it for the exact backend. CpuWorkspaceAuthority is an alias-only compatibility name and neither CpuBackend nor an accelerator backend can mint authority. MemoryPlacementInventory alone owns worker accounting, cache and IPC-resource metadata, and atomic accounting publication and emits MemoryAccountingSnapshot, while MemoryTopology is its checked configured-device inventory. The exact-device TensorBackend owns real allocations, the shared BackendMemoryTracker, workspace leases, and cache release through CachedAllocationOwner. ModelStore owns verified mmap and model caching; no compatibility adapter creates a second authorizer, allocator, inventory, accounting service, transaction manager, or model store."
+      "decision_reason": "AttemptMemoryController and MemoryPlanner alone own reservation order, policy resolution, placement metadata, pressure decisions, bounded OOM phases, the exact workspace ceiling for each retry phase, and fence-aware terminal state. NativeRuntimeProfile owns the persisted user choice; Zed and NativeExecutionControllerConfig only carry it into the path-free NativeImageWorkerPlan, and worker preflight alone resolves the effective mode and places that exact token into execution cache configuration. AttemptMemoryController issues one opaque non-cloneable PlannedWorkspaceAuthorization and freezes replanning; WorkerSession consumes it without accepting a raw byte count and delegates its private ceiling to the paired non-cloneable BackendWorkspaceAuthority, which alone checks and seals it for the exact backend. CpuWorkspaceAuthority is an alias-only compatibility name and neither CpuBackend nor an accelerator backend can mint authority. MemoryPlacementInventory alone owns worker accounting, cache and IPC-resource metadata, and atomic accounting publication and emits MemoryAccountingSnapshot, while MemoryTopology is its checked configured-device inventory. The exact-device TensorBackend owns real allocations, the shared BackendMemoryTracker, workspace leases, and cache release through CachedAllocationOwner. ModelStore owns verified mmap and model caching; no compatibility adapter creates a second authorizer, allocator, inventory, accounting service, transaction manager, or model store."
     },
     {
       "concern": "native_audio_dsp_foundations",
@@ -6112,7 +6112,7 @@
         {
           "name": "diffusion-e2e-validates-committed-png-metadata",
           "path": "crates/comfy_test_support/tests/native_diffusion_e2e.rs",
-          "pattern": "prompt_workflow_and_frontend_metadata_match[\\s\\S]*sim-native-diffusion-v1"
+          "pattern": "prompt_workflow_and_frontend_metadata_match[\\s\\S]*zed-native-diffusion-v1"
         },
         {
           "name": "diffusion-e2e-uses-canonical-supervisor-recovery",
@@ -6242,7 +6242,7 @@
         {
           "name": "runtime-cache-binds-guidance-version",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "sha256_tagged\\(\\s*\"sim\\.comfy\\.guidance-adapter\\.identity\\.v1\",\\s*\\[GUIDANCE_ADAPTER_ID\\.as_bytes\\(\\)\\]"
+          "pattern": "sha256_tagged\\(\\s*\"zed\\.comfy\\.guidance-adapter\\.identity\\.v1\",\\s*\\[GUIDANCE_ADAPTER_ID\\.as_bytes\\(\\)\\]"
         },
         {
           "name": "fixture-generator-uses-runtime-guidance-adapter",
@@ -6456,7 +6456,7 @@
         {
           "name": "qwen2-artifacts-bind-semantic-identity-and-owned-residency",
           "path": "crates/comfy_model/src/clip_tokenizer.rs",
-          "pattern": "sim\\.comfy\\.qwen2-byte-bpe\\.v1[\\s\\S]*tokenizer_configuration_json\\.as_bytes\\(\\)[\\s\\S]*vocabulary_json\\.as_bytes\\(\\)[\\s\\S]*merges\\.as_bytes\\(\\)[\\s\\S]*fn resident_bytes\\(&self\\)"
+          "pattern": "zed\\.comfy\\.qwen2-byte-bpe\\.v1[\\s\\S]*tokenizer_configuration_json\\.as_bytes\\(\\)[\\s\\S]*vocabulary_json\\.as_bytes\\(\\)[\\s\\S]*merges\\.as_bytes\\(\\)[\\s\\S]*fn resident_bytes\\(&self\\)"
         },
         {
           "name": "qwen2-source-fingerprinted-tests-cover-specials-nfc-profiles-and-failures",
@@ -7448,7 +7448,7 @@
         "RegistryCertifiedDirectMlImage and RetainedDirectMlLibraryHandles are non-cloneable unsafe projections of NativeFfiRegistry certificates; the handle bundle owns an Arc certification-and-image retention object and exact-path RAII HMODULE values while the non-cloneable private DirectMlSymbols callable table exists only inside CertifiedDirectMlExecutionInputs beside those handles and every execution child retains that owned lifetime",
         "comfy_types::NativeBackendBindingStatus remains the only binding DTO and DirectMlBackend always returns Unbound until a dependent runtime adapter supplies the retained registry certificates",
         "the package command pins and structurally checks the licensed Microsoft redistributable and copies a separately reviewed strict FFI catalog and signature receipt without performing Authenticode or Ed25519 verification, issuing a certificate, or authorizing execution",
-        "comfy_runtime::DirectMlPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-directml-package-v1 domain; native_ffi_directml verifies the signed package before mapping strict DTOs once into NativeFfiContract rows and the sole NativeFfiRegistry",
+        "comfy_runtime::DirectMlPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct zed-comfy-directml-package-v1 domain; native_ffi_directml verifies the signed package before mapping strict DTOs once into NativeFfiContract rows and the sole NativeFfiRegistry",
         "native_ffi_directml delegates recursive path security to ArtifactRoot and exact membership, bounded two-pass capture, and canonical coverage validation to comfy_runtime::trust native package admission; it retains no duplicate package walker or coverage parser",
         "native_ffi_directml seals exact package bytes, obtains registry certificates for every reviewed D3D12, DirectML, and DXGI contract, and projects one owned Arc certification-and-image retention bundle into RetainedDirectMlLibraryHandles without a borrowed or leaked witness"
       ],
@@ -8028,7 +8028,7 @@
         {
           "name": "task111-metal-execution-abi-fixes-exact-selectors-reviewed-headers-kernels-and-digests",
           "path": "crates/comfy_backend_metal/src/execution_abi.rs",
-          "pattern": "(?=[\\s\\S]*const RESOURCE_SELECTORS:[\\s\\S]*29)(?=[\\s\\S]*const REVIEWED_HEADERS:[\\s\\S]*12)(?=[\\s\\S]*pub return_nullability: ReturnNullability)(?=[\\s\\S]*pub reviewed_headers: Vec<ReviewedHeaderContract>)(?=[\\s\\S]*resource selector names, exact encodings, or return nullability differ)(?=[\\s\\S]*reviewed SDK header identities differ)(?=[\\s\\S]*sim_comfy_metal_add_f16_v1)(?=[\\s\\S]*sim_comfy_metal_add_f32_v1)(?=[\\s\\S]*is_sha256)"
+          "pattern": "(?=[\\s\\S]*const RESOURCE_SELECTORS:[\\s\\S]*29)(?=[\\s\\S]*const REVIEWED_HEADERS:[\\s\\S]*12)(?=[\\s\\S]*pub return_nullability: ReturnNullability)(?=[\\s\\S]*pub reviewed_headers: Vec<ReviewedHeaderContract>)(?=[\\s\\S]*resource selector names, exact encodings, or return nullability differ)(?=[\\s\\S]*reviewed SDK header identities differ)(?=[\\s\\S]*zed_comfy_metal_add_f16_v1)(?=[\\s\\S]*zed_comfy_metal_add_f32_v1)(?=[\\s\\S]*is_sha256)"
         },
         {
           "name": "task111-metal-execution-sdk-verifier-resolves-every-declared-selector-encoding",
@@ -8131,7 +8131,7 @@
         "RegistryCertifiedImage, CertifiedMluImages, and the module-private MluRuntime accept only unsafe caller projections of live NativeFfiRegistry certificates and are non-cloneable; MluSymbols exists only inside the certificate-lifetime-bound MluCallSurface, and MluRuntime retains the exact native handles for that lifetime while remaining an unsafe loader boundary consumed only by MluExecutionRuntime rather than a second public execution service",
         "comfy_types::NativeBackendBindingStatus remains the only binding DTO and MluBackend always returns Unbound until a dependent runtime adapter supplies the retained registry certificate",
         "the package command copies a separately reviewed strict FFI catalog and structurally checks digest-covered metadata without verifying a signature, issuing a certificate, bundling Neuware, or authorizing execution",
-        "comfy_runtime::MluPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-mlu-package-v1 domain; native_ffi_mlu verifies the signed package before mapping strict DTOs once into NativeFfiContract rows and the sole NativeFfiRegistry",
+        "comfy_runtime::MluPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct zed-comfy-mlu-package-v1 domain; native_ffi_mlu verifies the signed package before mapping strict DTOs once into NativeFfiContract rows and the sole NativeFfiRegistry",
         "native_ffi_mlu delegates recursive path security to ArtifactRoot and exact membership, bounded two-pass capture, and canonical coverage validation to comfy_runtime::trust native package admission; it retains no duplicate package walker or coverage parser",
         "native_ffi_mlu opens discovered vendor images without following final symlinks, rechecks immutable metadata while hashing, obtains registry certificates, seals exact bytes in retained Linux memfds, and projects only RegistryCertifiedImage values into MluExecutionRuntime",
         "WorkerBackendSelection::Mlu is a checked launch DTO over NativeMluPackageSettings and a device ordinal; RuntimeSupervisor remains the sole process/restart owner, WorkerBackendSession remains the sole selected backend/authority and readiness owner, and neither adapter can issue certificates or construct a CPU fallback",
@@ -8483,7 +8483,7 @@
         "SignedPackageRoot is a discovery boundary only; RegistryCertifiedNpuImages is a non-cloneable opaque input that retains the caller's complete NativeFfiRegistry certification bundle and is the only raw-handle projection into the private unsafe owner; the private non-cloneable NativeNpuSymbols callable table exists only inside OwnedNpuCore beside those retained images",
         "comfy_types::NativeBackendBindingStatus remains the only binding DTO and NpuBackend always returns Unbound until the runtime registry maps the exact retained images",
         "the package command rejects CANN payloads and checks only canonical structure and coverage; NativeFfiRegistry remains the cryptographic verification and certificate owner",
-        "comfy_runtime::NpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-npu-package-v1 domain; native_ffi_npu verifies the signed package before mapping strict DTOs once into one callable and one explicit dependency-only NativeFfiContract row",
+        "comfy_runtime::NpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct zed-comfy-npu-package-v1 domain; native_ffi_npu verifies the signed package before mapping strict DTOs once into one callable and one explicit dependency-only NativeFfiContract row",
         "native_ffi_npu delegates recursive path security to ArtifactRoot, bounded two-pass package capture and coverage validation to comfy_runtime::trust, and exact native image capture, digesting, sealing, and retained-descriptor lifetime to the canonical Unix native-library owner",
         "libruntime.so is an exact dependency-only image required_by ascendcl; it has no reviewed callable declaration, cannot satisfy required_symbols_for or callable authorize, and is opened only before the certified libascendcl.so callable surface"
       ],
@@ -8860,7 +8860,7 @@
         "comfy_types::NativeBackendBindingStatus remains the only binding DTO and XpuBackend always returns Unbound until a dependent runtime adapter supplies retained registry certificates",
         "the package command verifies exact reviewed Level Zero and oneDNN raw header digests, normalized declarations, C verifier digest, and structural coverage without bundling vendor runtimes, issuing a certificate, or authorizing execution",
         "the separately feature-gated deterministic in-memory execution harness implements the safe session semantics only and cannot construct RegistryCertifiedXpuImages or authorize production",
-        "comfy_runtime::XpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct sim-comfy-xpu-package-v1 domain; native_ffi_xpu verifies signed exact package coverage before mapping strict DTOs once into canonical NativeFfiContract rows and the sole NativeFfiRegistry",
+        "comfy_runtime::XpuPackageVerificationKey is a focused wrapper over the canonical NativePackageVerificationAuthority with the distinct zed-comfy-xpu-package-v1 domain; native_ffi_xpu verifies signed exact package coverage before mapping strict DTOs once into canonical NativeFfiContract rows and the sole NativeFfiRegistry",
         "native_ffi_xpu delegates recursive path security, bounded stable package capture, exact coverage, native-library capture, digesting, Linux sealing, Windows retained-snapshot lifetime, and cancellation to the canonical comfy_runtime::trust owners; it retains only XPU target, ABI, contract, discovery, certificate projection, and loader-order semantics",
         "NativeXpuPackageSettings is the checked settings projection for package root, signer, and public verification key only; package tooling, discovery, installed SDKs, compiled features, and structural receipts never grant availability"
       ],
@@ -9184,7 +9184,7 @@
         {
           "name": "frame-interpolation-resource-seals-exact-role-and-identity",
           "path": "crates/comfy_model/src/native_node_payload.rs",
-          "pattern": "NativeModelResourceRole::FrameInterpolation[\\s\\S]*sim-native-frame-interpolation-v1[\\s\\S]*NativeModelResource::FrameInterpolation"
+          "pattern": "NativeModelResourceRole::FrameInterpolation[\\s\\S]*zed-native-frame-interpolation-v1[\\s\\S]*NativeModelResource::FrameInterpolation"
         },
         {
           "name": "frame-interpolation-resource-projects-owner-and-tensor-residency",
@@ -9199,7 +9199,7 @@
         {
           "name": "frame-interpolation-resource-fixture-binds-prerequisite-and-sealed-contract",
           "path": "crates/comfy_test_support/fixtures/models/frame-interpolation/resource/manifest.json",
-          "pattern": "admission_manifest_sha256[\\s\\S]*INTERP_MODEL[\\s\\S]*sim-native-frame-interpolation-v1"
+          "pattern": "admission_manifest_sha256[\\s\\S]*INTERP_MODEL[\\s\\S]*zed-native-frame-interpolation-v1"
         },
         {
           "name": "frame-interpolation-resource-handle-lifecycle-is-focused-and-concrete",
@@ -11313,7 +11313,7 @@
           "pattern": "\\bNodeRegistry::built_in\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -11321,7 +11321,7 @@
           "pattern": "\\bNativeNodeRegistry::default\\(|\\bnodes\\.register\\(|\\bregister_bound_batch(?:_with_presentations)?\\(",
           "path_prefixes": [
             "crates/comfy_runtime/",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -11329,7 +11329,7 @@
           "pattern": "\\bregister_plugin_nodes\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -13174,7 +13174,7 @@
       ],
       "call_path_prefixes": [
         "crates/comfy_",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [
         {
@@ -14083,7 +14083,7 @@
         {
           "name": "video-component-digest-binds-depth-rate-and-components",
           "path": "crates/comfy_media/src/native_node_payload.rs",
-          "pattern": "sim\\.comfy\\.media\\.video\\.v2[\\s\\S]*frame_rate_numerator\\.to_le_bytes[\\s\\S]*frame_rate_denominator\\.to_le_bytes[\\s\\S]*bit_depth\\.bits[\\s\\S]*hash_tensor\\(b\"frames\""
+          "pattern": "zed\\.comfy\\.media\\.video\\.v2[\\s\\S]*frame_rate_numerator\\.to_le_bytes[\\s\\S]*frame_rate_denominator\\.to_le_bytes[\\s\\S]*bit_depth\\.bits[\\s\\S]*hash_tensor\\(b\"frames\""
         },
         {
           "name": "provider-transport-preserves-video-component-identity",
@@ -14098,7 +14098,7 @@
         {
           "name": "video-payload-owns-distinct-component-and-encoded-representations",
           "path": "crates/comfy_media/src/native_node_payload.rs",
-          "pattern": "pub enum NativeVideoPayload[\\s\\S]*Components\\(NativeVideoComponentsPayload\\)[\\s\\S]*Encoded\\(NativeEncodedVideoPayload\\)[\\s\\S]*checked_h264_mp4_from_component[\\s\\S]*bit_depth = components\\.bit_depth[\\s\\S]*Yuv420p10le[\\s\\S]*sim\\.comfy\\.media\\.video\\.encoded-h264-mp4\\.v1"
+          "pattern": "pub enum NativeVideoPayload[\\s\\S]*Components\\(NativeVideoComponentsPayload\\)[\\s\\S]*Encoded\\(NativeEncodedVideoPayload\\)[\\s\\S]*checked_h264_mp4_from_component[\\s\\S]*bit_depth = components\\.bit_depth[\\s\\S]*Yuv420p10le[\\s\\S]*zed\\.comfy\\.media\\.video\\.encoded-h264-mp4\\.v1"
         },
         {
           "name": "video-encoded-backing-fixture-bounds-representation-claims",
@@ -14211,7 +14211,7 @@
         {
           "name": "component-h264-mp4-backing-service-identity-binds-actor-and-all-limit-values",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*max_audio_samples[\\s\\S]*h264_mp4_sequence_limits_configuration_u64[\\s\\S]*configuration_sha256"
+          "pattern": "zed.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*max_audio_samples[\\s\\S]*h264_mp4_sequence_limits_configuration_u64[\\s\\S]*configuration_sha256"
         },
         {
           "name": "component-h264-mp4-backing-service-propagates-through-engine-and-cache-identity",
@@ -14226,7 +14226,7 @@
         {
           "name": "component-h264-mp4-10bit-backing-fixture-bounds-depth-and-evidence",
           "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
-          "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*sim.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*Ten/Yuv420p10le[\\s\\S]*aac_audio_or_container_metadata[\\s\\S]*trim_window_video_slice_or_save_video_effect"
+          "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*zed.comfy.component-h264-mp4-backing-service.v2[\\s\\S]*Ten/Yuv420p10le[\\s\\S]*aac_audio_or_container_metadata[\\s\\S]*trim_window_video_slice_or_save_video_effect"
         }
       ],
       "known_open_reasons": [],
@@ -14425,7 +14425,7 @@
         {
           "name": "video-codec-loader-fixture-records-relocation-and-forbids-callable-codec-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-retained-loader/manifest.json",
-          "pattern": "(?=[\\s\\S]*synthetic-glibc-isolated-loader)(?=[\\s\\S]*loader_relocation_binding)(?=[\\s\\S]*library_constructors_or_destructors_may_run)(?=[\\s\\S]*explicit_dlsym_or_callable_address_projection)(?=[\\s\\S]*encoder_availability_probed)(?=[\\s\\S]*sim_invoked_codec_api)"
+          "pattern": "(?=[\\s\\S]*synthetic-glibc-isolated-loader)(?=[\\s\\S]*loader_relocation_binding)(?=[\\s\\S]*library_constructors_or_destructors_may_run)(?=[\\s\\S]*explicit_dlsym_or_callable_address_projection)(?=[\\s\\S]*encoder_availability_probed)(?=[\\s\\S]*zed_invoked_codec_api)"
         }
       ],
       "known_open_reasons": [],
@@ -15009,7 +15009,7 @@
         {
           "name": "av1-webm-thread-bridge-reuses-current-mixed-actor-and-accounting-tests",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "zed.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "av1-webm-thread-bridge-fixture-bounds-evidence-claims",
@@ -15243,7 +15243,7 @@
         {
           "name": "h264-mp4-thread-bridge-reuses-v9-mixed-actor-and-accounting-tests",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
+          "pattern": "zed.comfy.video-codec-thread.v9[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv[\\s\\S]*owned_encoded_output_materialization_is_accounted_atomic_and_retryable"
         },
         {
           "name": "h264-mp4-thread-bridge-fixture-bounds-evidence-claims",
@@ -15253,7 +15253,7 @@
         {
           "name": "h264-mp4-10bit-thread-bridge-fixture-bounds-evidence-claims",
           "path": "crates/comfy_test_support/fixtures/video/codec-h264-mp4-10bit-thread-bridge/manifest.json",
-          "pattern": "synthetic-retained-h264-mp4-10bit-owned-tensor-thread-bridge[\\s\\S]*sim.comfy.video-codec-thread.v9[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*public_node_backing_video_slice_save_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
+          "pattern": "synthetic-retained-h264-mp4-10bit-owned-tensor-thread-bridge[\\s\\S]*zed.comfy.video-codec-thread.v9[\\s\\S]*one_deliberate_post_encode_copy_observed[\\s\\S]*native_or_workspace_owner_crosses_thread_response[\\s\\S]*public_node_backing_video_slice_save_effect_path_or_output_committer_reachable[\\s\\S]*media_payload_or_handle_published"
         }
       ],
       "known_open_reasons": [],
@@ -16203,7 +16203,7 @@
         {
           "name": "vp9-webm-thread-bridge-carries-source-alpha-projection-without-a-second-actor",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.video-codec-thread.v9[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
+          "pattern": "zed.comfy.video-codec-thread.v9[\\s\\S]*has_alpha[\\s\\S]*retained_video_codec_thread_returns_owned_codec_bytes_and_preserves_ltxv"
         }
       ],
       "known_open_reasons": [],
@@ -16758,7 +16758,7 @@
         {
           "name": "webm-node-service-identity-binds-actor-and-all-limit-values",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "sim.comfy.webm-node-service.v1[\\s\\S]*configuration_sha256[\\s\\S]*batch_limits_configuration_u64[\\s\\S]*metadata_limits_configuration_u64"
+          "pattern": "zed.comfy.webm-node-service.v1[\\s\\S]*configuration_sha256[\\s\\S]*batch_limits_configuration_u64[\\s\\S]*metadata_limits_configuration_u64"
         },
         {
           "name": "webm-node-service-propagates-through-engine-and-cache-identity",
@@ -17996,7 +17996,7 @@
         {
           "name": "gemma4-audio-binds-source-semantic-state-and-size-checked-storage-residency",
           "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
-          "pattern": "sim.comfy.gemma4-audio.v1[\\s\\S]*GEMMA4_MULTIMODAL_SOURCE_SHA256[\\s\\S]*pub fn resident_tensor_allocations[\\s\\S]*insert_gemma4_resident_allocation"
+          "pattern": "zed.comfy.gemma4-audio.v1[\\s\\S]*GEMMA4_MULTIMODAL_SOURCE_SHA256[\\s\\S]*pub fn resident_tensor_allocations[\\s\\S]*insert_gemma4_resident_allocation"
         },
         {
           "name": "gemma4-audio-tests-reduced-exactness-capability-aliasing-and-failure-atomicity",
@@ -18201,7 +18201,7 @@
         {
           "name": "qwen-multimodal-resource-binds-source-and-component-identities",
           "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
-          "pattern": "sim.comfy.qwen-multimodal-resource.v2[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest"
+          "pattern": "zed.comfy.qwen-multimodal-resource.v2[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest"
         },
         {
           "name": "qwen-multimodal-resource-unions-storage-residency",
@@ -18319,7 +18319,7 @@
         {
           "name": "gemma-multimodal-resource-binds-source-and-component-identities",
           "path": "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
-          "pattern": "sim.comfy.gemma-multimodal-resource.v1[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*LLAMA_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*SPIECE_TOKENIZER_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest_sha256[\\s\\S]*audio.semantic_state_digest_sha256"
+          "pattern": "zed.comfy.gemma-multimodal-resource.v1[\\s\\S]*QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256[\\s\\S]*LLAMA_SOURCE_SHA256[\\s\\S]*SD1_CLIP_SOURCE_SHA256[\\s\\S]*SPIECE_TOKENIZER_SOURCE_SHA256[\\s\\S]*tokenizer.semantic_digest[\\s\\S]*decoder.semantic_state_digest[\\s\\S]*vision.semantic_state_digest_sha256[\\s\\S]*audio.semantic_state_digest_sha256"
         },
         {
           "name": "gemma-multimodal-resource-unions-size-consistent-storage-residency",
@@ -19089,7 +19089,7 @@
           "pattern": "\\bNodeRegistry::built_in\\(",
           "path_prefixes": [
             "crates/comfy_",
-            "crates/sim/"
+            "crates/zed/"
           ]
         },
         {
@@ -19325,7 +19325,7 @@
       "call_path_prefixes": [
         "crates/comfy_",
         "crates/extension_host/",
-        "crates/sim/"
+        "crates/zed/"
       ],
       "required_mappings": [
         {
@@ -19404,7 +19404,7 @@
         "AssetPluginCapabilityServices is a narrow asset-only conformance adapter that maps WIT root/path DTOs through AssetNamespace::from_plugin_root and delegates checked reads to SharedAssetService",
         "WorkerCapabilityBridge maps bounded worker DTO bytes to PluginServiceWireRequest/Response and owns no service or authority state",
         "PrivateWorkerPluginExecutor owns only the bounded process actor and transfers a PluginCapabilityInvocation session into RuntimeSupervisor",
-        "SimProviderActuator and SimCredentialActuator are effect adapters over Sim HttpClient and sim_credentials_provider and cannot authorize, retain provider policy, or persist secrets",
+        "SimProviderActuator and SimCredentialActuator are effect adapters over Zed HttpClient and zed_credentials_provider and cannot authorize, retain provider policy, or persist secrets",
         "InvocationHost owns only invocation quotas, handle leases, proposal buffers, cancellation observation, and revocation over one PluginCapabilityServices handle",
         "PluginOutputPublicationAdapter maps proposals into OutputCommitter and owns no final commit"
       ],
@@ -19544,8 +19544,8 @@
           "pattern": "PluginCapabilityBroker[\\s\\S]*RuntimeSupervisor::start[\\s\\S]*execute_plugin_retaining_capabilities\\("
         },
         {
-          "name": "sim-production-composes-existing-service-owners",
-          "path": "crates/sim/src/comfy_plugin_services.rs",
+          "name": "zed-production-composes-existing-service-owners",
+          "path": "crates/zed/src/comfy_plugin_services.rs",
           "pattern": "RealSystemClock[\\s\\S]*PluginCapabilityBroker::new_with_provider_cost_acceptance\\([\\s\\S]*ModelStore::new[\\s\\S]*SimProviderActuator[\\s\\S]*SimCredentialActuator[\\s\\S]*PrivateWorkerPluginExecutor::new_with_provider_authorities"
         }
       ],
@@ -19582,7 +19582,7 @@
         "VAL-SECURITY-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "PluginCapabilityBroker is the single invocation session that coordinates canonical authorization, services, cancellation, deadline, response-bound, and RNG transaction semantics. It does not replace the underlying owners: AssetService/ArtifactIndex, ModelStore, ProviderPolicy, CredentialsProvider, SystemClock, and RngTransaction retain their respective data, security, effect, and rollback authority. The plugin host, worker bridge, and Sim effect actuators are explicit bounded adapters and cannot repeat those decisions or commit outputs."
+      "decision_reason": "PluginCapabilityBroker is the single invocation session that coordinates canonical authorization, services, cancellation, deadline, response-bound, and RNG transaction semantics. It does not replace the underlying owners: AssetService/ArtifactIndex, ModelStore, ProviderPolicy, CredentialsProvider, SystemClock, and RngTransaction retain their respective data, security, effect, and rollback authority. The plugin host, worker bridge, and Zed effect actuators are explicit bounded adapters and cannot repeat those decisions or commit outputs."
     },
     {
       "concern": "plugin_invocation_host",
@@ -20128,8 +20128,8 @@
           "pattern": "provider_policy[\\s\\S]*\\.authorize\\([\\s\\S]*AuthorizedCredentialPresenceRequest"
         },
         {
-          "name": "sim-provider-actuator-consumes-sealed-endpoint-without-policy-revalidation",
-          "path": "crates/sim/src/comfy_plugin_services.rs",
+          "name": "zed-provider-actuator-consumes-sealed-endpoint-without-policy-revalidation",
+          "path": "crates/zed/src/comfy_plugin_services.rs",
           "pattern": "impl ProviderRequestActuator for SimProviderActuator[\\s\\S]*\\.uri\\(request\\.endpoint\\(\\)\\)[\\s\\S]*self\\.client\\.send\\(provider_request\\)"
         }
       ],
@@ -20696,7 +20696,7 @@
       ],
       "allowed_adapters": [
         "NativePackageVerificationAuthority is the one private canonical receipt, signer, framing, and Ed25519 verification owner shared by focused backend domain wrappers",
-        "MetalPackageVerificationKey supplies only the distinct sim-comfy-metal-package-v1 domain and Metal-specific typed errors; ROCm and plugin signatures cannot authorize it",
+        "MetalPackageVerificationKey supplies only the distinct zed-comfy-metal-package-v1 domain and Metal-specific typed errors; ROCm and plugin signatures cannot authorize it",
         "native_ffi_metal delegates recursive path security to ArtifactRoot and exact membership, bounded stable capture, and coverage validation to the canonical native-package admission service; it owns only strict signed DTO validation, mapping into NativeFfiContract rows, and retention of both metallib byte vectors",
         "MetalFfiContractCatalogDto and its nested rows are strict signature-covered boundary DTOs; exact class, selector, nullability, layout, source, target, floor, and metallib validation remains mapped to the reviewed backend ABI owners",
         "NativeMetalPackageSettings is a checked read-only SettingsStore projection containing only package root, signer identity, and public verification key",
@@ -20811,7 +20811,7 @@
         "NativeExecutionController requests execution through RuntimeSupervisor",
         "headless runtime owns API lifecycle but delegates worker lifecycle",
         "worker protocol messages are wire DTOs",
-        "Sim desktop and CLI consumers map one canonical NativeRuntimeProfile into a packaged WorkerLaunchConfig without resolving paths or selecting a fallback backend"
+        "Zed desktop and CLI consumers map one canonical NativeRuntimeProfile into a packaged WorkerLaunchConfig without resolving paths or selecting a fallback backend"
       ],
       "definitions": [
         {
@@ -20853,19 +20853,19 @@
         },
         {
           "name": "desktop-consumes-canonical-packaged-worker-config",
-          "path": "crates/sim/src/sim.rs",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "native_comfy_worker_launch[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
         },
         {
           "name": "cli-consumes-canonical-packaged-worker-config",
-          "path": "crates/sim/src/comfy_cli.rs",
+          "path": "crates/zed/src/comfy_cli.rs",
           "pattern": "build_native_runtime_for_profile[\\s\\S]*headless_native_profile[\\s\\S]*WorkerLaunchConfig::for_packaged_worker_profile"
         }
       ],
       "production_consumers": [
         "NativeExecutionController",
-        "Sim desktop runtime initialization",
-        "Sim headless runtime",
+        "Zed desktop runtime initialization",
+        "Zed headless runtime",
         "worker diagnostics"
       ],
       "requirements": [
@@ -21225,7 +21225,7 @@
       "decision_reason": "WorkerBackendSession is the only owner that pairs a selected Arc<dyn TensorBackend> with its non-cloneable BackendWorkspaceAuthority, runs the real workspace-reservation/allocation/transfer/event readiness transaction, and retains the backend resources for the worker process lifetime. TensorBackend::reserve_workspace is the object-safe canonical backend adapter to the existing backend-neutral lease transaction; durable returned tensors remain separately governed by the exact backend capacity owner. Protocol-7 WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded ABI DTOs that map explicitly through BackendCapabilityMatrix and NativeDeviceProperties, which alone validate semantic capability and device facts. Runtime configuration, certification factories, controllers, and GPUI are focused adapters that only project the accepted name, architecture, physical capacity, and effective ceiling; none may repeat readiness, capability validation, allocator state, workspace authorization, or fallback decisions."
     },
     {
-      "concern": "sim_runtime_profile_settings",
+      "concern": "zed_runtime_profile_settings",
       "canonical_owner": "settings::SettingsStore",
       "owner_files": [
         "crates/settings/src/settings_store.rs"
@@ -21236,9 +21236,9 @@
       "allowed_adapters": [
         "comfy_runtime::NativeRuntimeSettings validates the merged Comfy profile projection without storing or observing it",
         "NativeRuntimeProfile::disabled_migration_replacement constructs the sole safe disabled settings projection for imported legacy evidence",
-        "sim::active_native_comfy_profile_from_settings maps the selected profile into production initialization",
-        "sim::native_comfy_profile_id_from_settings preserves a parseable invalid selection as a disconnected error scope",
-        "sim::NativeComfyRuntimeBinding is a non-persistent behavior projection that detects same-identity runtime-policy changes and rebinds canonical service adapters",
+        "zed::active_native_comfy_profile_from_settings maps the selected profile into production initialization",
+        "zed::native_comfy_profile_id_from_settings preserves a parseable invalid selection as a disconnected error scope",
+        "zed::NativeComfyRuntimeBinding is a non-persistent behavior projection that detects same-identity runtime-policy changes and rebinds canonical service adapters",
         "comfy_ui::init_for_profile binds the GPUI execution model to the selected canonical profile identity"
       ],
       "definitions": [
@@ -21261,20 +21261,20 @@
           "symbol": "NativeRuntimeProfile"
         },
         {
-          "path": "crates/sim/src/sim.rs",
-          "qualified": "sim::active_native_comfy_profile_from_settings",
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::active_native_comfy_profile_from_settings",
           "role": "allowed_adapter",
           "symbol": "active_native_comfy_profile_from_settings"
         },
         {
-          "path": "crates/sim/src/sim.rs",
-          "qualified": "sim::native_comfy_profile_id_from_settings",
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::native_comfy_profile_id_from_settings",
           "role": "allowed_adapter",
           "symbol": "native_comfy_profile_id_from_settings"
         },
         {
-          "path": "crates/sim/src/sim.rs",
-          "qualified": "sim::NativeComfyRuntimeBinding",
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::NativeComfyRuntimeBinding",
           "role": "allowed_adapter",
           "symbol": "NativeComfyRuntimeBinding"
         }
@@ -21291,22 +21291,22 @@
       "required_mappings": [
         {
           "name": "merged-settings-to-native-profile",
-          "path": "crates/sim/src/sim.rs",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "parse_runtime_settings"
         },
         {
           "name": "selected-profile-to-gpui-model",
-          "path": "crates/sim/src/sim.rs",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "init_for_profile"
         },
         {
           "name": "invalid-profile-to-error-scope",
-          "path": "crates/sim/src/sim.rs",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "configured_native_comfy_profile_id"
         },
         {
           "name": "same-profile-policy-change-to-service-rebind",
-          "path": "crates/sim/src/sim.rs",
+          "path": "crates/zed/src/zed.rs",
           "pattern": "NativeComfyRuntimeBinding::new[\\s\\S]*requires_rebind[\\s\\S]*register_native_comfy_execution"
         },
         {
@@ -21320,7 +21320,7 @@
         "comfy-parity-settings-persistence-foundation"
       ],
       "production_consumers": [
-        "Sim native Comfy initialization",
+        "Zed native Comfy initialization",
         "comfy_ui active execution profile",
         "later native settings UI"
       ],
@@ -21338,7 +21338,7 @@
         "VAL-RUNTIME-SETTINGS-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "Sim's existing settings domain alone owns default/user/project/policy precedence, parsing state, persistence, and watchers. Comfy code validates and consumes one selected profile but never creates a parallel store or observer."
+      "decision_reason": "Zed's existing settings domain alone owns default/user/project/policy precedence, parsing state, persistence, and watchers. Comfy code validates and consumes one selected profile but never creates a parallel store or observer."
     },
     {
       "concern": "sqlite_runtime_operational_persistence",
@@ -27488,12 +27488,12 @@
         {
           "name": "patch-graph-cache-composition-preserves-model-identity-and-orders-digests",
           "path": "crates/comfy_model/src/model_family.rs",
-          "pattern": "pub\\(crate\\) fn with_patch_graph_identity\\([\\s\\S]*sim\\.comfy\\.model-weights-cache-identity\\.v1[\\s\\S]*self\\.cache_identity\\.as_bytes\\(\\)[\\s\\S]*ordered_patch_graph_digest\\.as_bytes\\(\\)[\\s\\S]*pub\\(crate\\) fn with_tensors_preserving_identity\\([\\s\\S]*base_artifact_digest: self\\.base_artifact_digest\\.clone\\(\\)[\\s\\S]*cache_identity: self\\.cache_identity\\.clone\\(\\)[\\s\\S]*binding: self\\.binding\\.clone\\(\\)"
+          "pattern": "pub\\(crate\\) fn with_patch_graph_identity\\([\\s\\S]*zed\\.comfy\\.model-weights-cache-identity\\.v1[\\s\\S]*self\\.cache_identity\\.as_bytes\\(\\)[\\s\\S]*ordered_patch_graph_digest\\.as_bytes\\(\\)[\\s\\S]*pub\\(crate\\) fn with_tensors_preserving_identity\\([\\s\\S]*base_artifact_digest: self\\.base_artifact_digest\\.clone\\(\\)[\\s\\S]*cache_identity: self\\.cache_identity\\.clone\\(\\)[\\s\\S]*binding: self\\.binding\\.clone\\(\\)"
         },
         {
           "name": "patch-graph-applied-cache-identity-binds-resolved-compute-and-storage-dtypes",
           "path": "crates/comfy_model/src/patch_graph.rs",
-          "pattern": "fn applied_patch_digest\\([\\s\\S]*sim-comfy-patch-applied-compute-v1[\\s\\S]*for \\(target_key, \\(compute_dtype, output_dtype\\)\\) in touched_dtypes[\\s\\S]*patch_compute_dtype_tag\\(\\*compute_dtype\\)[\\s\\S]*patch_compute_dtype_tag\\(\\*output_dtype\\)[\\s\\S]*fn checked_compute_boundary_distinguishes_normal_and_low_vram_across_ordered_bf16_patches[\\s\\S]*assert_eq!\\(graph\\.identity\\(\\), structural_identity\\)[\\s\\S]*assert_ne!\\(normal\\.cache_identity\\(\\), low_vram\\.cache_identity\\(\\)\\)"
+          "pattern": "fn applied_patch_digest\\([\\s\\S]*zed-comfy-patch-applied-compute-v1[\\s\\S]*for \\(target_key, \\(compute_dtype, output_dtype\\)\\) in touched_dtypes[\\s\\S]*patch_compute_dtype_tag\\(\\*compute_dtype\\)[\\s\\S]*patch_compute_dtype_tag\\(\\*output_dtype\\)[\\s\\S]*fn checked_compute_boundary_distinguishes_normal_and_low_vram_across_ordered_bf16_patches[\\s\\S]*assert_eq!\\(graph\\.identity\\(\\), structural_identity\\)[\\s\\S]*assert_ne!\\(normal\\.cache_identity\\(\\), low_vram\\.cache_identity\\(\\)\\)"
         },
         {
           "name": "patch-graph-tests-execute-semantic-family-and-rollback-closure",

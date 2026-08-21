@@ -2,8 +2,8 @@
 
 ## Scope and authority
 
-The sole Sim comparison target is the filesystem rooted at
-`/Users/ahmad.vegah/repos/projects/sim-dev`. No remote Sim repository was
+The sole Zed comparison target is the filesystem rooted at
+`/Users/ahmad.vegah/repos/projects/zed-dev`. No remote Zed repository was
 inspected. The upstream evidence source is the local, temporary Git object store
 at `/tmp/zed-upstream-port`, populated only from
 `https://github.com/zed-industries/zed.git` for the requested tags.
@@ -23,9 +23,9 @@ diff contains 425 changed paths: 50 additions, 372 modifications, 2 deletions,
 and 1 rename; the aggregate textual delta is 28,677 insertions and 9,160
 deletions with no binary path reported by `git diff --numstat`.
 
-## Local Sim identity and uncertainty
+## Local Zed identity and uncertainty
 
-The supplied Sim tree has no `.git` directory or gitfile. Consequently all of
+The supplied Zed tree has no `.git` directory or gitfile. Consequently all of
 the following are unavailable and must remain explicitly unknown:
 
 - local revision SHA;
@@ -41,19 +41,19 @@ similarity.
 
 The available version evidence is narrower:
 
-- `crates/sim/Cargo.toml` declares Sim `1.10.2`;
-- `Cargo.lock` and `Cargo.lock.dev` identify the Sim package as `1.10.2`;
+- `crates/zed/Cargo.toml` declares Zed `1.10.2`;
+- `Cargo.lock` and `Cargo.lock.dev` identify the Zed package as `1.10.2`;
 - `.agents/specs/comfy-parity/baseline.md` records a prior frozen filesystem
-  fingerprint for a Sim 1.10.2 snapshot, while also recording that Git metadata
+  fingerprint for a Zed 1.10.2 snapshot, while also recording that Git metadata
   was unavailable.
 
-This establishes that the snapshot self-identifies as Sim 1.10.2. It does not
+This establishes that the snapshot self-identifies as Zed 1.10.2. It does not
 establish equality with the upstream Zed v1.10.2 tree or prove an exact upstream
 base SHA.
 
 ## Filesystem preservation boundary
 
-The previous frozen Sim fingerprint is
+The previous frozen Zed fingerprint is
 `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` over
 3,310 inputs. Re-running its documented content-fingerprint recipe against the
 current filesystem produced
@@ -62,9 +62,9 @@ current filesystem produced
 status substitute. Files were also observed changing during discovery.
 
 Because there is no reliable tracked baseline, every pre-existing local file is
-treated as authoritative user/Sim work. An upstream file may be replaced
+treated as authoritative user/Zed work. An upstream file may be replaced
 unchanged only when its current Git blob hash exactly equals the verified
-upstream v1.10.2 blob. All other overlaps require an explicit Sim-aware merge or
+upstream v1.10.2 blob. All other overlaps require an explicit Zed-aware merge or
 an exclusion decision.
 
 ## Endpoint tree relationship

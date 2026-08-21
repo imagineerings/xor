@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract": "sim-comfy-metal-execution-v1",
+  "contract": "zed-comfy-metal-execution-v1",
   "backend": "metal",
   "abi_floor": "macos-13-metal-3",
   "allowed_targets": [

@@ -27,7 +27,7 @@ where
     let thread = new_test_thread(server(&fs, cx).await, project.clone(), "/private/tmp", cx).await;
 
     thread
-        .update(cx, |thread, cx| thread.send_raw("Hello from Sim!", cx))
+        .update(cx, |thread, cx| thread.send_raw("Hello from Zed!", cx))
         .await
         .unwrap();
 
@@ -478,23 +478,23 @@ pub async fn run_until_first_tool_call(
     }
 }
 
-pub fn get_sim_path() -> PathBuf {
-    let mut sim_path = std::env::current_exe().unwrap();
+pub fn get_zed_path() -> PathBuf {
+    let mut zed_path = std::env::current_exe().unwrap();
 
-    while sim_path
+    while zed_path
         .file_name()
         .is_none_or(|name| name.to_string_lossy() != "debug")
     {
-        if !sim_path.pop() {
+        if !zed_path.pop() {
             panic!("Could not find target directory");
         }
     }
 
-    sim_path.push("sim");
+    zed_path.push("zed");
 
-    if !sim_path.exists() {
+    if !zed_path.exists() {
         panic!("\n🚨 Run `cargo build` at least once before running e2e tests\n\n");
     }
 
-    sim_path
+    zed_path
 }

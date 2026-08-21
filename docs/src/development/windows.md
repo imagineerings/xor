@@ -1,15 +1,15 @@
 ---
-title: Building Sim for Windows
-description: "Guide to building sim for windows for Sim development."
+title: Building Zed for Windows
+description: "Guide to building zed for windows for Zed development."
 ---
 
-# Building Sim for Windows
+# Building Zed for Windows
 
 > The following commands may be executed in any shell.
 
 ## Repository
 
-Clone the [Sim repository](https://github.com/simtropolis/sim).
+Clone the [Zed repository](https://github.com/simtropolis/zed).
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ Clone the [Sim repository](https://github.com/simtropolis/sim).
 - Install the Windows 11 or 10 SDK for your system, and make sure at least `Windows 10 SDK version 2104 (10.0.20348.0)` is installed. You can download it from the [Windows SDK Archive](https://developer.microsoft.com/windows/downloads/windows-sdk/).
 - Install [CMake](https://cmake.org/download) (required by [a dependency](https://docs.rs/wasmtime-c-api-impl/latest/wasmtime_c_api/)). Or you can install it through Visual Studio Installer, then manually add the `bin` directory to your `PATH`, for example: `C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin`.
 
-If you cannot compile Sim, make sure a Visual Studio installation includes at least the following components:
+If you cannot compile Zed, make sure a Visual Studio installation includes at least the following components:
 
 ```json
 {
@@ -93,7 +93,7 @@ After this, restart the `postgresql` service. Press `Win`+`R` to open the Run di
 
 ## Building from source
 
-Once you have the dependencies installed, you can build Sim using [Cargo](https://doc.rust-lang.org/cargo/).
+Once you have the dependencies installed, you can build Zed using [Cargo](https://doc.rust-lang.org/cargo/).
 
 For a debug build:
 
@@ -113,19 +113,19 @@ And to run the tests:
 cargo test --workspace
 ```
 
-> **Note:** Visual regression tests are currently macOS-only and require Screen Recording permission. See [Building Sim for macOS](./macos.md#visual-regression-tests) for details.
+> **Note:** Visual regression tests are currently macOS-only and require Screen Recording permission. See [Building Zed for macOS](./macos.md#visual-regression-tests) for details.
 
 ## Installing from msys2
 
-Sim does not support unofficial MSYS2 Sim packages built for Mingw-w64. Please report any issues you may have with [mingw-w64-sim](https://packages.msys2.org/base/mingw-w64-sim) to [msys2/MINGW-packages/issues](https://github.com/msys2/MINGW-packages/issues?q=is%3Aissue+is%3Aopen+sim).
+Zed does not support unofficial MSYS2 Zed packages built for Mingw-w64. Please report any issues you may have with [mingw-w64-zed](https://packages.msys2.org/base/mingw-w64-zed) to [msys2/MINGW-packages/issues](https://github.com/msys2/MINGW-packages/issues?q=is%3Aissue+is%3Aopen+zed).
 
-Please refer to [MSYS2 documentation](https://www.msys2.org/docs/ides-editors/#sim) first.
+Please refer to [MSYS2 documentation](https://www.msys2.org/docs/ides-editors/#zed) first.
 
 ## Troubleshooting
 
 ### Setting `RUSTFLAGS` env var breaks builds
 
-If you set the `RUSTFLAGS` env var, it will override the `rustflags` settings in `.cargo/config.toml` which is required to properly build Sim.
+If you set the `RUSTFLAGS` env var, it will override the `rustflags` settings in `.cargo/config.toml` which is required to properly build Zed.
 
 Because these settings change over time, the resulting build errors may vary from linker failures to other hard-to-diagnose errors.
 
@@ -150,13 +150,13 @@ rustflags = [
 ]
 ```
 
-Or, create a new `.cargo/config.toml` in the parent directory of the Sim repo (see below). This is useful in CI because you do not need to edit the repo's original `.cargo/config.toml`.
+Or, create a new `.cargo/config.toml` in the parent directory of the Zed repo (see below). This is useful in CI because you do not need to edit the repo's original `.cargo/config.toml`.
 
 ```
 upper_dir
 ├── .cargo          // <-- Make this folder
 │   └── config.toml // <-- Make this file
-└── sim
+└── zed
     ├── .cargo
     │   └── config.toml
     └── crates
@@ -179,22 +179,22 @@ Try `cargo clean` and `cargo build`.
 
 This error can happen if you are using the "rust-lld.exe" linker. Consider trying a different linker.
 
-If you are using a global config, consider moving the Sim repository to a nested directory and add a `.cargo/config.toml` with a custom linker config in the parent directory.
+If you are using a global config, consider moving the Zed repository to a nested directory and add a `.cargo/config.toml` with a custom linker config in the parent directory.
 
-See this issue for more information [#12041](https://github.com/simtropolis/sim/issues/12041)
+See this issue for more information [#12041](https://github.com/simtropolis/zed/issues/12041)
 
 ### Invalid RC path selected
 
-Sometimes, depending on the security rules applied to your laptop, you may get the following error while compiling Sim:
+Sometimes, depending on the security rules applied to your laptop, you may get the following error while compiling Zed:
 
 ```
-error: failed to run custom build command for `sim(C:\Users\USER\src\sim\crates\sim)`
+error: failed to run custom build command for `zed(C:\Users\USER\src\zed\crates\zed)`
 
 Caused by:
-  process didn't exit successfully: `C:\Users\USER\src\sim\target\debug\build\sim-b24f1e9300107efc\build-script-build` (exit code: 1)
+  process didn't exit successfully: `C:\Users\USER\src\zed\target\debug\build\zed-b24f1e9300107efc\build-script-build` (exit code: 1)
   --- stdout
   cargo:rerun-if-changed=../../.git/logs/HEAD
-  cargo:rustc-env=SIM_COMMIT_SHA=25e2e9c6727ba9b77415588cfa11fd969612adb7
+  cargo:rustc-env=ZED_COMMIT_SHA=25e2e9c6727ba9b77415588cfa11fd969612adb7
   cargo:rustc-link-arg=/stack:8388608
   cargo:rerun-if-changed=resources/windows/app-icon.ico
   package.metadata.winresource does not exist
@@ -205,17 +205,17 @@ Caused by:
 warning: build failed, waiting for other jobs to finish...
 ```
 
-To fix this issue, manually set the `SIM_RC_TOOLKIT_PATH` environment variable to the RC toolkit path. Usually this is:
+To fix this issue, manually set the `ZED_RC_TOOLKIT_PATH` environment variable to the RC toolkit path. Usually this is:
 `C:\Program Files (x86)\Windows Kits\10\bin\<SDK_version>\x64`.
 
-See this [issue](https://github.com/simtropolis/sim/issues/18393) for more information.
+See this [issue](https://github.com/simtropolis/zed/issues/18393) for more information.
 
 ### Build fails: Path too long
 
 You may receive an error like the following when building
 
 ```
-error: failed to get `pet` as a dependency of package `languages v0.1.0 (D:\a\sim-windows-builds\sim-windows-builds\crates\languages)`
+error: failed to get `pet` as a dependency of package `languages v0.1.0 (D:\a\zed-windows-builds\zed-windows-builds\crates\languages)`
 
 Caused by:
   failed to load source for dependency `pet`
@@ -243,20 +243,20 @@ For more information on this, please see [win32 docs](https://learn.microsoft.co
 
 ### Graphics issues
 
-#### Sim fails to launch
+#### Zed fails to launch
 
-Sim currently uses Vulkan as its graphics API on Windows. If Sim fails to launch, Vulkan is a common cause.
+Zed currently uses Vulkan as its graphics API on Windows. If Zed fails to launch, Vulkan is a common cause.
 
-You can check the Sim log at:
-`C:\Users\YOU\AppData\Local\Sim\logs\Sim.log`
+You can check the Zed log at:
+`C:\Users\YOU\AppData\Local\Zed\logs\Zed.log`
 
 If you see messages like:
 
-- `Sim failed to open a window: NoSupportedDeviceFound`
+- `Zed failed to open a window: NoSupportedDeviceFound`
 - `ERROR_INITIALIZATION_FAILED`
 - `GPU Crashed`
 - `ERROR_SURFACE_LOST_KHR`
 
 Vulkan may not be working correctly on your system. Updating GPU drivers often resolves this.
 
-If there's nothing Vulkan-related in the logs and you happen to have Bandicam installed, try uninstalling it. Sim is currently not compatible with Bandicam.
+If there's nothing Vulkan-related in the logs and you happen to have Bandicam installed, try uninstalling it. Zed is currently not compatible with Bandicam.

@@ -22,5 +22,5 @@ Model world generation requests, controls, sessions, and artifacts as the W2 val
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
   - _Writes: crates/world_model/src/request.rs, crates/world_model/src/controls.rs, crates/world_model/src/session.rs, crates/world_model/src/artifact.rs_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/world-model-runtime/design.md, Cargo.toml, projects/godot_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/world-model-runtime_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/world-model-runtime/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/world-model-runtime/design.md, Cargo.toml, projects/godot_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/world-model-runtime_

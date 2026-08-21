@@ -1838,7 +1838,7 @@ mod tests {
             &BTreeMap::from([(
                 "value".to_owned(),
                 NativeValue::PreservedUnknown {
-                    type_name: "sim.json@1".to_owned(),
+                    type_name: "zed.json@1".to_owned(),
                     value: json!({"b": 2, "a": 1}),
                 },
             )]),

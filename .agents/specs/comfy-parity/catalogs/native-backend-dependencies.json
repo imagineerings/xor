@@ -8,7 +8,7 @@
     "vendor_abi_owner_boundary": "each focused comfy_backend_* adapter",
     "native_ffi_certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "runtime_adapter_boundary": "enabled vendor adapters inspect exact immutable bytes and consume certificates before unsafe loading; CoreX is the sole zero-symbol typed-Unbound forwarding exception with no loader or certificate projection",
-    "platform_loader_non_owner_boundary": "Sim and GPUI platform/UI loaders own no Comfy compute semantics"
+    "platform_loader_non_owner_boundary": "Zed and GPUI platform/UI loaders own no Comfy compute semantics"
   },
   "lockfile": {
     "path": "Cargo.lock",
@@ -553,7 +553,7 @@
       "test_support": [
         "comfy_tensor/corex"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/corex"
       ],
@@ -568,11 +568,11 @@
       "test_support": [
         "comfy_tensor/cuda"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/cuda"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "directml",
@@ -583,11 +583,11 @@
       "test_support": [
         "comfy_tensor/directml"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/directml"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "metal",
@@ -599,11 +599,11 @@
         "comfy_runtime/metal",
         "comfy_tensor/metal"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/metal"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "mlu",
@@ -614,11 +614,11 @@
       "test_support": [
         "comfy_tensor/mlu"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/mlu"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "npu",
@@ -629,11 +629,11 @@
       "test_support": [
         "comfy_tensor/npu"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/npu"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "rocm",
@@ -644,11 +644,11 @@
       "test_support": [
         "comfy_tensor/rocm"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/rocm"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     },
     {
       "feature": "xpu",
@@ -659,11 +659,11 @@
       "test_support": [
         "comfy_tensor/xpu"
       ],
-      "sim": [
+      "zed": [
         "comfy",
         "comfy_runtime/xpu"
       ],
-      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Sim selects runtime/profile presentation only."
+      "reason": "The private worker alone combines runtime certification and tensor execution in production; test support selects tensor conformance, with Metal additionally selecting the existing runtime verifier solely for development hardware certification, and host Zed selects runtime/profile presentation only."
     }
   ],
   "prohibitions": [

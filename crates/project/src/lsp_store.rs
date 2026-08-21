@@ -2745,7 +2745,7 @@ impl LocalLspStore {
             Patch::new(snapshot.edits_since::<PointUtf16>(saved_version).collect())
         });
 
-        let mut sanitisim_diagnostics = Vec::with_capacity(diagnostics.len());
+        let mut sanitized_diagnostics = Vec::with_capacity(diagnostics.len());
 
         for (new_diagnostic, entry) in diagnostics {
             let start;
@@ -2777,14 +2777,14 @@ impl LocalLspStore {
                 }
             }
 
-            sanitisim_diagnostics.push(DiagnosticEntry {
+            sanitized_diagnostics.push(DiagnosticEntry {
                 range,
                 diagnostic: entry.diagnostic,
             });
         }
         drop(edits_since_save);
 
-        let set = DiagnosticSet::new(sanitisim_diagnostics, &snapshot);
+        let set = DiagnosticSet::new(sanitized_diagnostics, &snapshot);
         buffer.update(cx, |buffer, cx| {
             if let Some(registration_id) = registration_id {
                 if let Some(abs_path) = File::from_dyn(buffer.file()).map(|f| f.abs_path(cx)) {
@@ -7013,7 +7013,7 @@ impl LspStore {
         let mut new_label = match completion_item {
             Some(completion_item) => {
                 // Some language servers always return `detail` lazily via resolve, regardless of
-                // the resolvable properties Sim advertises. Regenerate labels here to handle this.
+                // the resolvable properties Zed advertises. Regenerate labels here to handle this.
                 // See: https://github.com/yioneko/vtsls/issues/213
                 let language = snapshot.language();
                 match language {
@@ -12452,46 +12452,46 @@ impl LspStore {
         result
     }
 
-    fn deserialize_symbol(serialisim_symbol: proto::Symbol) -> Result<CoreSymbol> {
-        let source_worktree_id = WorktreeId::from_proto(serialisim_symbol.source_worktree_id);
-        let worktree_id = WorktreeId::from_proto(serialisim_symbol.worktree_id);
-        let kind = unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialisim_symbol.kind) };
+    fn deserialize_symbol(serialized_symbol: proto::Symbol) -> Result<CoreSymbol> {
+        let source_worktree_id = WorktreeId::from_proto(serialized_symbol.source_worktree_id);
+        let worktree_id = WorktreeId::from_proto(serialized_symbol.worktree_id);
+        let kind = unsafe { mem::transmute::<i32, lsp::SymbolKind>(serialized_symbol.kind) };
 
-        let path = if serialisim_symbol.signature.is_empty() {
+        let path = if serialized_symbol.signature.is_empty() {
             SymbolLocation::InProject(ProjectPath {
                 worktree_id,
-                path: RelPath::from_proto(&serialisim_symbol.path)
+                path: RelPath::from_proto(&serialized_symbol.path)
                     .context("invalid symbol path")?,
             })
         } else {
             SymbolLocation::OutsideProject {
-                abs_path: Path::new(&serialisim_symbol.path).into(),
-                signature: serialisim_symbol
+                abs_path: Path::new(&serialized_symbol.path).into(),
+                signature: serialized_symbol
                     .signature
                     .try_into()
                     .map_err(|_| anyhow!("invalid signature"))?,
             }
         };
 
-        let start = serialisim_symbol.start.context("invalid start")?;
-        let end = serialisim_symbol.end.context("invalid end")?;
+        let start = serialized_symbol.start.context("invalid start")?;
+        let end = serialized_symbol.end.context("invalid end")?;
         Ok(CoreSymbol {
-            language_server_name: LanguageServerName(serialisim_symbol.language_server_name.into()),
+            language_server_name: LanguageServerName(serialized_symbol.language_server_name.into()),
             source_worktree_id,
             source_language_server_id: LanguageServerId::from_proto(
-                serialisim_symbol.language_server_id,
+                serialized_symbol.language_server_id,
             ),
             path,
-            name: serialisim_symbol.name,
+            name: serialized_symbol.name,
             range: Unclipped(PointUtf16::new(start.row, start.column))
                 ..Unclipped(PointUtf16::new(end.row, end.column)),
             kind,
-            container_name: serialisim_symbol.container_name,
+            container_name: serialized_symbol.container_name,
         })
     }
 
     pub(crate) fn serialize_completion(completion: &CoreCompletion) -> proto::Completion {
-        let mut serialisim_completion = proto::Completion {
+        let mut serialized_completion = proto::Completion {
             old_replace_start: Some(serialize_anchor(&completion.replace_range.start)),
             old_replace_end: Some(serialize_anchor(&completion.replace_range.end)),
             new_text: completion.new_text.clone(),
@@ -12510,36 +12510,36 @@ impl LspStore {
                     .map(|range| (serialize_anchor(&range.start), serialize_anchor(&range.end)))
                     .unzip();
 
-                serialisim_completion.old_insert_start = old_insert_start;
-                serialisim_completion.old_insert_end = old_insert_end;
-                serialisim_completion.source = proto::completion::Source::Lsp as i32;
-                serialisim_completion.server_id = server_id.0 as u64;
-                serialisim_completion.lsp_completion = serde_json::to_vec(lsp_completion).unwrap();
-                serialisim_completion.lsp_defaults = lsp_defaults
+                serialized_completion.old_insert_start = old_insert_start;
+                serialized_completion.old_insert_end = old_insert_end;
+                serialized_completion.source = proto::completion::Source::Lsp as i32;
+                serialized_completion.server_id = server_id.0 as u64;
+                serialized_completion.lsp_completion = serde_json::to_vec(lsp_completion).unwrap();
+                serialized_completion.lsp_defaults = lsp_defaults
                     .as_deref()
                     .map(|lsp_defaults| serde_json::to_vec(lsp_defaults).unwrap());
-                serialisim_completion.resolved = *resolved;
+                serialized_completion.resolved = *resolved;
             }
             CompletionSource::BufferWord {
                 word_range,
                 resolved,
             } => {
-                serialisim_completion.source = proto::completion::Source::BufferWord as i32;
-                serialisim_completion.buffer_word_start = Some(serialize_anchor(&word_range.start));
-                serialisim_completion.buffer_word_end = Some(serialize_anchor(&word_range.end));
-                serialisim_completion.resolved = *resolved;
+                serialized_completion.source = proto::completion::Source::BufferWord as i32;
+                serialized_completion.buffer_word_start = Some(serialize_anchor(&word_range.start));
+                serialized_completion.buffer_word_end = Some(serialize_anchor(&word_range.end));
+                serialized_completion.resolved = *resolved;
             }
             CompletionSource::Custom => {
-                serialisim_completion.source = proto::completion::Source::Custom as i32;
-                serialisim_completion.resolved = true;
+                serialized_completion.source = proto::completion::Source::Custom as i32;
+                serialized_completion.resolved = true;
             }
             CompletionSource::Dap { sort_text } => {
-                serialisim_completion.source = proto::completion::Source::Dap as i32;
-                serialisim_completion.sort_text = Some(sort_text.clone());
+                serialized_completion.source = proto::completion::Source::Dap as i32;
+                serialized_completion.sort_text = Some(sort_text.clone());
             }
         }
 
-        serialisim_completion
+        serialized_completion
     }
 
     pub(crate) fn deserialize_completion(completion: proto::Completion) -> Result<CoreCompletion> {

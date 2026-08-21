@@ -2,7 +2,7 @@
 
 ## Problem
 
-Sim already has native-agent slash-command dispatch, command autocomplete, project instructions, skills, worktree-aware paths, and coalesced session loading. The existing migration pack obscures those capabilities behind Goose-specific names and proposes parallel parsers, hint files, source registries, embedded apps, and lifecycle managers. Users instead need a small, complete Sim-native feature that adds useful local commands, makes existing developer context observable and reliable, and closes only verified behavior or regression gaps.
+Zed already has native-agent slash-command dispatch, command autocomplete, project instructions, skills, worktree-aware paths, and coalesced session loading. The existing migration pack obscures those capabilities behind Goose-specific names and proposes parallel parsers, hint files, source registries, embedded apps, and lifecycle managers. Users instead need a small, complete Zed-native feature that adds useful local commands, makes existing developer context observable and reliable, and closes only verified behavior or regression gaps.
 
 Goose is evidence for useful observable behavior. Its APIs, configuration paths, file names, and internal architecture are not compatibility requirements.
 
@@ -14,7 +14,7 @@ Goose is evidence for useful observable behavior. Its APIs, configuration paths,
 - Preserve and verify `/compact`, skill commands, autocomplete, collision handling, unknown-command diagnostics, and queued trailing input.
 - Complete the existing dynamically named MCP prompt commands so prompts with zero, one, or multiple declared arguments remain discoverable and safely executable.
 - Reuse the personal `AGENTS.md`, per-worktree project instruction files (including `AGENTS.md` and `.rules`), and trusted `.agents/skills` as developer context.
-- Surface instruction and skill loading failures through existing Sim diagnostics.
+- Surface instruction and skill loading failures through existing Zed diagnostics.
 - Reuse visible worktrees and `ProjectPath` for root identity and project-relative path resolution.
 - Add missing regression coverage around `NativeAgent::pending_sessions` and `ThreadStore` lifecycle behavior.
 
@@ -22,27 +22,27 @@ Goose is evidence for useful observable behavior. Its APIs, configuration paths,
 
 - Recipe execution and recipe-backed commands; these belong to `.agents/specs/goose-migration/recipe-system`.
 - MCP Apps or any embedded HTML/web renderer; these remain behind their separate product and security decision.
-- A `/help` command justified as Goose parity, or additional Goose commands without an approved Sim behavior and owner.
+- A `/help` command justified as Goose parity, or additional Goose commands without an approved Zed behavior and owner.
 - `.goosehints`, Goose configuration directories, `.simhints`, or any parallel hints subsystem.
-- Referenced-file import syntax for instruction files. Sim has no approved native syntax for this feature; skill references continue to use the existing skill tool and file tools.
+- Referenced-file import syntax for instruction files. Zed has no approved native syntax for this feature; skill references continue to use the existing skill tool and file tools.
 - Arbitrary named sources, persistent source registries, or new `SourceRoot`/`Source` abstractions.
 - A generic execution manager, provider/extension restoration layer, or new session lifecycle abstraction.
 - Changes to commands advertised by external ACP agents.
-- Goose's unstable slash-command and source-management ACP custom requests; Sim's native agent already publishes standard ACP available-command updates.
-- Sim-native persistent `/goal` and bounded `/grind`; these are owned by `.agents/specs/goose-migration/goal-grind-commands` and are not implemented by this pack.
+- Goose's unstable slash-command and source-management ACP custom requests; Zed's native agent already publishes standard ACP available-command updates.
+- Zed-native persistent `/goal` and bounded `/grind`; these are owned by `.agents/specs/goose-migration/goal-grind-commands` and are not implemented by this pack.
 
 ## Glossary
 
-- **Native command**: A command owned by Sim's `NativeAgent` and advertised with the existing native command category.
+- **Native command**: A command owned by Zed's `NativeAgent` and advertised with the existing native command category.
 - **Developer context**: Personal instructions, project instructions, trusted skill metadata, and visible worktree identity already supplied to the native agent.
-- **Project instruction**: The first supported instruction file selected for a visible worktree by Sim's existing instruction-file precedence.
+- **Project instruction**: The first supported instruction file selected for a visible worktree by Zed's existing instruction-file precedence.
 - **Local command output**: Conversation UI content produced without sending a user turn to the selected language model.
 
 ## Requirements
 
 ### Requirement 1: Native developer commands
 
-**User story:** As a Sim user, I want discoverable local commands for conversation and developer context operations, so that I can inspect or change the current native-agent session without asking the model to do it.
+**User story:** As a Zed user, I want discoverable local commands for conversation and developer context operations, so that I can inspect or change the current native-agent session without asking the model to do it.
 
 #### Acceptance criteria
 
@@ -62,34 +62,34 @@ Goose is evidence for useful observable behavior. Its APIs, configuration paths,
 14. **1.15** WHEN a user invokes a multi-argument MCP prompt command, THEN THE existing native dispatcher SHALL parse explicit `name=value` arguments, support quoted values through one shared helper, reject duplicate, unknown, malformed, or missing required arguments visibly, and SHALL NOT call the MCP server or language model after validation failure.
 15. **1.16** WHEN a valid MCP prompt command executes, THEN THE system SHALL invoke the existing context-server prompt owner, preserve the user's original command in conversation persistence where the current owner requires it, deliver the returned prompt messages through the existing thread/model flow, and surface server, protocol, or content errors through the existing conversation error UI; the feature SHALL NOT add literal `/prompt` or `/prompts` wrapper commands.
 
-### Requirement 2: Sim-native developer context
+### Requirement 2: Zed-native developer context
 
-**User story:** As a Sim user, I want the native agent to use the project's existing instructions and skills consistently, so that I can understand and trust the context influencing its behavior.
+**User story:** As a Zed user, I want the native agent to use the project's existing instructions and skills consistently, so that I can understand and trust the context influencing its behavior.
 
 #### Acceptance criteria
 
-1. **2.1** WHEN a native-agent project context is built, THEN THE system SHALL reuse the personal Sim `AGENTS.md`, the existing per-worktree project-instruction selection, and trusted global/project `.agents/skills` discovery rather than loading a separate hint format.
+1. **2.1** WHEN a native-agent project context is built, THEN THE system SHALL reuse the personal Zed `AGENTS.md`, the existing per-worktree project-instruction selection, and trusted global/project `.agents/skills` discovery rather than loading a separate hint format.
 2. **2.2** WHEN a project opens, THEN THE system SHALL build developer context from every visible worktree in the existing visible-worktree order and label worktree-scoped context with the owning root.
 3. **2.3** WHEN the system prompt is rendered, THEN THE personal `AGENTS.md` SHALL precede project instructions, project instructions SHALL retain their higher precedence, and skill metadata SHALL remain in the existing available-skills catalog with skill bodies loaded only through the existing skill invocation path.
-4. **2.5** IF a personal instruction, project instruction, or skill cannot be read or parsed, THEN THE system SHALL omit only the unusable source, continue with valid sources, and show a source-labelled diagnostic through Sim's existing settings or conversation issue UI.
+4. **2.5** IF a personal instruction, project instruction, or skill cannot be read or parsed, THEN THE system SHALL omit only the unusable source, continue with valid sources, and show a source-labelled diagnostic through Zed's existing settings or conversation issue UI.
 5. **2.6** IF multiple visible worktrees contain project instructions or same-named skills, THEN THE system SHALL preserve deterministic worktree labels and the existing instruction and skill precedence without silently merging unrelated roots.
-6. **2.7** WHILE a worktree is not trusted for project-local skills, THE system SHALL exclude its `.agents/skills` entries from model and command catalogs while retaining Sim's existing restricted-workspace protections for project instructions and tool execution.
+6. **2.7** WHILE a worktree is not trusted for project-local skills, THE system SHALL exclude its `.agents/skills` entries from model and command catalogs while retaining Zed's existing restricted-workspace protections for project instructions and tool execution.
 7. **2.8** WHEN personal instructions, selected project instructions, visible worktrees, worktree trust, or `.agents/skills` change, THEN active native-agent sessions SHALL use the refreshed context on the next applicable command or model turn without restarting the session.
 
 ### Requirement 4: Project-root ownership and path safety
 
-**User story:** As a Sim user with one or more worktrees, I want developer context to use the same project roots and path rules as the editor, so that context cannot drift from the files and permissions I opened.
+**User story:** As a Zed user with one or more worktrees, I want developer context to use the same project roots and path rules as the editor, so that context cannot drift from the files and permissions I opened.
 
 #### Acceptance criteria
 
 1. **4.1** THE developer context and `/status` output SHALL derive root labels and paths from `Project::visible_worktrees` and existing worktree metadata, with no separately persisted root list.
 2. **4.3** WHEN a project instruction or project skill is opened, THEN THE system SHALL resolve it through the owning worktree and `ProjectPath`-based project APIs rather than concatenating an independently configured source path.
 3. **4.4** WHEN visible worktrees are added, removed, renamed, or rescanned, THEN THE developer context and `/status` output SHALL reflect the current project roots without stale or duplicate entries.
-4. **4.5** THE developer-context feature SHALL preserve existing trust, ignore, sandbox, permission, and path-containment decisions and SHALL NOT broaden access outside a visible worktree or the user's existing global Sim context directories.
+4. **4.5** THE developer-context feature SHALL preserve existing trust, ignore, sandbox, permission, and path-containment decisions and SHALL NOT broaden access outside a visible worktree or the user's existing global Zed context directories.
 
 ### Requirement 5: Native session lifecycle regression contract
 
-**User story:** As a Sim user reopening a session, I want concurrent callers to share the existing native session lifecycle, so that command and context state is not duplicated or lost.
+**User story:** As a Zed user reopening a session, I want concurrent callers to share the existing native session lifecycle, so that command and context state is not duplicated or lost.
 
 #### Acceptance criteria
 
@@ -110,11 +110,11 @@ Goose is evidence for useful observable behavior. Its APIs, configuration paths,
 
 ## Evidence and ownership
 
-- Sim command dispatch: `crates/agent/src/agent.rs` — `build_available_commands_for_project`, `Command::parse`, `NativeAgentConnection::prompt`, `send_compact_command`, `send_skill_invocation`.
-- Sim command UI: `crates/agent_ui/src/message_editor.rs` — `validate_slash_commands`; `crates/agent_ui/src/conversation_view/thread_view.rs` — `leading_native_command`, `send_command_queueing_remainder`.
-- Sim context: `crates/agent_settings/src/user_agents_md.rs` — `UserAgentsMd`; `crates/prompt_store/src/prompts.rs` — `RULES_FILE_NAMES`, `ProjectContext`, `WorktreeContext`; `crates/agent/src/agent.rs` — `build_project_context`, `load_worktree_rules_file`; `crates/agent/src/templates/system_prompt.hbs`.
-- Sim project ownership: `crates/project/src/project.rs` — `ProjectPath`, `Project::absolute_path`, `Project::find_project_path`, `Project::visible_worktrees`.
-- Sim session lifecycle: `crates/agent/src/agent.rs` — `NativeAgent::open_thread`, `pending_sessions`, `close_session`, `save_thread`; `crates/agent/src/thread_store.rs`.
+- Zed command dispatch: `crates/agent/src/agent.rs` — `build_available_commands_for_project`, `Command::parse`, `NativeAgentConnection::prompt`, `send_compact_command`, `send_skill_invocation`.
+- Zed command UI: `crates/agent_ui/src/message_editor.rs` — `validate_slash_commands`; `crates/agent_ui/src/conversation_view/thread_view.rs` — `leading_native_command`, `send_command_queueing_remainder`.
+- Zed context: `crates/agent_settings/src/user_agents_md.rs` — `UserAgentsMd`; `crates/prompt_store/src/prompts.rs` — `RULES_FILE_NAMES`, `ProjectContext`, `WorktreeContext`; `crates/agent/src/agent.rs` — `build_project_context`, `load_worktree_rules_file`; `crates/agent/src/templates/system_prompt.hbs`.
+- Zed project ownership: `crates/project/src/project.rs` — `ProjectPath`, `Project::absolute_path`, `Project::find_project_path`, `Project::visible_worktrees`.
+- Zed session lifecycle: `crates/agent/src/agent.rs` — `NativeAgent::open_thread`, `pending_sessions`, `close_session`, `save_thread`; `crates/agent/src/thread_store.rs`.
 - Goose command evidence only: `projects/goose/crates/goose/src/agents/execute_commands.rs`; `projects/goose/crates/goose/src/agents/state_machine/{ops_slash_command,ops_toolcalling,ops_compaction,ops_skills,ops_retry,ops_llm}.rs`; `projects/goose/crates/goose/src/slash_commands/`; `projects/goose/crates/goose/src/acp/server/slash_commands.rs`; `projects/goose/crates/goose/src/acp/response_builder.rs`; `projects/goose/crates/goose-cli/src/session/{input,mod}.rs`; and `projects/goose/ui/desktop/src/acp/autocomplete.ts`.
 - Goose context/source evidence only: `projects/goose/crates/goose/src/hints/{load_hints,import_files}.rs`; `projects/goose/crates/goose/src/agents/prompt_manager.rs`; `projects/goose/crates/goose/src/{source_roots,sources}.rs`; `projects/goose/crates/goose/src/acp/server/sources.rs`; and the desktop settings/source/skill views cited in `coverage-audit.md`.
 - Goose lifecycle/app evidence only: `projects/goose/crates/goose/src/execution/manager.rs`; relevant `projects/goose/crates/goose/src/acp/server/` session, prompt-run, resource, tool, app, and proxy handlers; and the desktop MCP App surfaces cited in `coverage-audit.md`.
@@ -125,9 +125,9 @@ Goose is evidence for useful observable behavior. Its APIs, configuration paths,
 | Criterion IDs | Disposition |
 | --- | --- |
 | 1.2 | Recipe commands remain owned by `.agents/specs/goose-migration/recipe-system`; this pack has no recipe task. |
-| 2.4 | Referenced-file imports are removed from this feature because Sim has no approved native instruction import syntax. |
+| 2.4 | Referenced-file imports are removed from this feature because Zed has no approved native instruction import syntax. |
 | 3.1-3.5 | MCP Apps are excluded and remain behind the separate product/security decision. |
 | 4.2 | Arbitrary named sources are removed; visible worktrees and existing skill/instruction owners cover this feature. |
-| 5.2 | Generic provider/extension restoration and cancellation are removed; no corresponding gap was confirmed in Sim's session model. |
+| 5.2 | Generic provider/extension restoration and cancellation are removed; no corresponding gap was confirmed in Zed's session model. |
 
-Goose's `/doctor` remains owned by `agent-infrastructure`; dynamically named recipe commands and the CLI-local literal `/recipe` flow remain owned by `recipe-system`; terminal-only `/help`, `/?`, theme, model/mode, edit, new-session, and related presentation commands remain owned by `text-ui` if that product is approved. Sim-native `/goal` and bounded `/grind` are approved and owned by `.agents/specs/goose-migration/goal-grind-commands`. Nested access-triggered context, instruction imports, source CRUD/import/export APIs, agent/check source catalogs, and MCP Apps still require separate product or security decisions recorded in `coverage-audit.md`.
+Goose's `/doctor` remains owned by `agent-infrastructure`; dynamically named recipe commands and the CLI-local literal `/recipe` flow remain owned by `recipe-system`; terminal-only `/help`, `/?`, theme, model/mode, edit, new-session, and related presentation commands remain owned by `text-ui` if that product is approved. Zed-native `/goal` and bounded `/grind` are approved and owned by `.agents/specs/goose-migration/goal-grind-commands`. Nested access-triggered context, instruction imports, source CRUD/import/export APIs, agent/check source catalogs, and MCP Apps still require separate product or security decisions recorded in `coverage-audit.md`.

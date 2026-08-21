@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
     echo "Usage: ${0##*/} <standard|multiplayer> [--dry-run] [--inspect PATH]"
-    echo "Print the canonical Sim feature and artifact policy for a release profile."
+    echo "Print the canonical Zed feature and artifact policy for a release profile."
 }
 
 if [[ $# -eq 0 ]]; then
@@ -95,7 +95,7 @@ fi
 echo "profile=$profile"
 echo "dry_run=$dry_run"
 echo "multiplayer_tools=$multiplayer_tools"
-echo "cargo_package=sim"
+echo "cargo_package=zed"
 echo "cargo_feature_arguments=$cargo_feature_arguments"
 echo "artifact_capability=multiplayer-tools:$multiplayer_tools"
 echo "exclusive_payload_policy=$exclusive_payload_policy"

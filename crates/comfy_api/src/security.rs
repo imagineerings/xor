@@ -125,7 +125,7 @@ impl PluginRouteGrant {
 
     fn subject_id(&self) -> String {
         let mut digest = Sha256::new();
-        digest.update(b"sim-comfy-api-plugin-route-subject-v1\0");
+        digest.update(b"zed-comfy-api-plugin-route-subject-v1\0");
         for component in [&self.principal, &self.plugin_id, &self.plugin_digest] {
             digest.update(
                 u64::try_from(component.len())

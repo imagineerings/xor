@@ -2691,7 +2691,7 @@ impl ModelStateTransformPlan {
             rewrite.validate(0)?;
         }
         let mut digest = Sha256::new();
-        digest.update(b"sim.comfy.model-state-transform-plan.v1\0");
+        digest.update(b"zed.comfy.model-state-transform-plan.v1\0");
         digest.update(format!("{operations:?}\0{unmatched:?}").as_bytes());
         Ok(Self {
             operations,
@@ -3335,14 +3335,14 @@ fn validate_mapping_probe_snapshot(
 
 fn model_profile_identity(profile: &ModelFamilyProfile) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"sim.comfy.model-family-profile.v1\0");
+    digest.update(b"zed.comfy.model-family-profile.v1\0");
     digest.update(format!("{profile:?}").as_bytes());
     format!("{:x}", digest.finalize())
 }
 
 fn model_probe_identity(probe: &ModelProbe) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"sim.comfy.model-family-probe.v1\0");
+    digest.update(b"zed.comfy.model-family-probe.v1\0");
     digest.update(format!("{:?}\0{:?}", probe.tensor_shapes, probe.metadata).as_bytes());
     format!("{:x}", digest.finalize())
 }
@@ -4644,7 +4644,7 @@ impl MappedModelWeights {
     ) -> Result<Self, ModelFamilyError> {
         validate_digest(ordered_patch_graph_digest)?;
         let mut digest = Sha256::new();
-        digest.update(b"sim.comfy.model-weights-cache-identity.v1\0");
+        digest.update(b"zed.comfy.model-weights-cache-identity.v1\0");
         digest.update(self.cache_identity.as_bytes());
         digest.update([0]);
         digest.update(ordered_patch_graph_digest.as_bytes());
@@ -4668,7 +4668,7 @@ impl MappedModelWeights {
 
     fn bind(mut self, binding: ModelFamilyWeightBinding) -> Result<Self, ModelFamilyError> {
         let mut digest = Sha256::new();
-        digest.update(b"sim.comfy.model-weights-binding.v1\0");
+        digest.update(b"zed.comfy.model-weights-binding.v1\0");
         for value in [
             self.base_artifact_digest.as_str(),
             binding.family.feature_id(),

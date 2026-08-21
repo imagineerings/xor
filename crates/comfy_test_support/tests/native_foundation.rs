@@ -381,7 +381,7 @@ fn backend_dependency_ledger_matches(
         && ledger
             .pointer("/ownership/platform_loader_non_owner_boundary")
             .and_then(Value::as_str)
-            == Some("Sim and GPUI platform/UI loaders own no Comfy compute semantics")
+            == Some("Zed and GPUI platform/UI loaders own no Comfy compute semantics")
         && ledger.pointer("/lockfile/sha256").and_then(Value::as_str)
             == Some(lockfile_digest.as_str());
     let Some(ledger_adapters) = ledger.get("adapters").and_then(Value::as_array) else {
@@ -467,7 +467,7 @@ fn downstream_manifest_writes_are_scoped(workspace_root: &Path) -> Result<bool, 
     if !foundation_writes.contains("Cargo.toml")
         || !foundation_writes.contains("Cargo.lock")
         || !foundation_writes.contains("crates/comfy_plugin_host/Cargo.toml")
-        || !foundation_writes.contains("crates/sim/Cargo.toml")
+        || !foundation_writes.contains("crates/zed/Cargo.toml")
     {
         return Ok(false);
     }
@@ -738,7 +738,7 @@ fn audit_production_source_boundaries(
         })
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
-    pending.push(workspace_root.join("crates/sim/src"));
+    pending.push(workspace_root.join("crates/zed/src"));
 
     let mut inspected_source_files = 0;
     let mut production_process_launch_files = BTreeSet::new();
@@ -787,7 +787,7 @@ fn audit_production_source_boundaries(
             }
             let is_development = relative_path.starts_with("crates/comfy_test_support/")
                 || relative_path.contains("/tests/")
-                || relative_path == "crates/sim/src/visual_test_runner.rs";
+                || relative_path == "crates/zed/src/visual_test_runner.rs";
             if is_development {
                 development_process_launch_files.insert(relative_path);
                 continue;
@@ -870,7 +870,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
         "comfy_types",
         "comfy_ui",
         "comfy_worker",
-        "sim",
+        "zed",
     ];
     let tensor_package = metadata_package(&metadata, "comfy_tensor")
         .ok_or("comfy_tensor is absent from locked workspace metadata")?;
@@ -882,8 +882,8 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
         .ok_or("comfy_plugin_host is absent from locked workspace metadata")?;
     let plugin_sdk_package = metadata_package(&metadata, "comfy_plugin_sdk")
         .ok_or("comfy_plugin_sdk is absent from locked workspace metadata")?;
-    let sim_package =
-        metadata_package(&metadata, "sim").ok_or("sim is absent from locked workspace metadata")?;
+    let zed_package =
+        metadata_package(&metadata, "zed").ok_or("zed is absent from locked workspace metadata")?;
     let adapters = [
         ("cuda", "comfy_backend_cuda"),
         ("rocm", "comfy_backend_rocm"),
@@ -1015,9 +1015,9 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
         backend_dependency_ledger_matches(&workspace_root, &metadata, &adapters)?,
     );
     cases.insert(
-        "sim_uses_local_native_comfy_services",
+        "zed_uses_local_native_comfy_services",
         package_has_local_dependencies(
-            sim_package,
+            zed_package,
             &["comfy_api", "comfy_plugin_host", "comfy_ui"],
         ),
     );
@@ -1097,7 +1097,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
     cases.insert(
         "mlu_signed_contract_provisioning_is_native_reviewed_and_complete",
         mlu_package_policy.contains("\"ffi-contracts-v1.json\"")
-            && mlu_package_policy.contains("\"signature_domain\": \"sim-comfy-mlu-package-v1\"")
+            && mlu_package_policy.contains("\"signature_domain\": \"zed-comfy-mlu-package-v1\"")
             && mlu_package_policy.contains("\"redistributes_vendor_runtime\": false")
             && mlu_contract_schema.contains("\"additionalProperties\": false")
             && mlu_contract_schema.contains("comfy_backend_mlu::loader")
@@ -1117,7 +1117,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
     cases.insert(
         "npu_signed_contract_provisioning_is_native_reviewed_and_complete",
         npu_package_policy.contains("\"ffi-contracts-v1.json\"")
-            && npu_package_policy.contains("\"signature_domain\": \"sim-comfy-npu-package-v1\"")
+            && npu_package_policy.contains("\"signature_domain\": \"zed-comfy-npu-package-v1\"")
             && npu_package_policy.contains("\"redistributes_vendor_runtime\": false")
             && npu_contract_schema.contains("\"additionalProperties\": false")
             && npu_contract_schema.contains("comfy_backend_npu::loader")
@@ -1140,7 +1140,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
     cases.insert(
         "cuda_signed_contract_provisioning_is_native_reviewed_and_complete",
         cuda_package_policy.contains("\"ffi-contracts-v1.json\"")
-            && cuda_package_policy.contains("\"signature_domain\": \"sim-comfy-cuda-package-v1\"")
+            && cuda_package_policy.contains("\"signature_domain\": \"zed-comfy-cuda-package-v1\"")
             && cuda_package_policy.contains("\"redistributes_driver\": false")
             && cuda_package_policy.contains("\"structural_receipt_is_authorization\": false")
             && cuda_contract_schema.contains("\"additionalProperties\": false")
@@ -1165,7 +1165,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
     cases.insert(
         "xpu_signed_contract_provisioning_is_native_reviewed_and_complete",
         xpu_package_policy.contains("\"ffi-contracts-v1.json\"")
-            && xpu_package_policy.contains("\"signature_domain\": \"sim-comfy-xpu-package-v1\"")
+            && xpu_package_policy.contains("\"signature_domain\": \"zed-comfy-xpu-package-v1\"")
             && xpu_package_policy.contains("\"redistributes_vendor_runtime\": false")
             && xpu_package_policy.contains("\"structural_receipt_is_authorization\": false")
             && xpu_contract_schema.contains("\"additionalProperties\": false")
@@ -1191,7 +1191,7 @@ fn val_foundation_001() -> Result<(), Box<dyn Error>> {
         directml_package_policy.contains("\"schema_version\": 2")
             && directml_package_policy.contains("\"ffi-contracts-v1.json\"")
             && directml_package_policy
-                .contains("\"signature_domain\": \"sim-comfy-directml-package-v1\"")
+                .contains("\"signature_domain\": \"zed-comfy-directml-package-v1\"")
             && directml_package_policy.contains(
                 "\"signature_authority\": \"comfy_runtime::DirectMlPackageVerificationKey\"",
             )
@@ -1311,7 +1311,7 @@ fn val_e2e_002() -> Result<(), Box<dyn Error>> {
         }),
         &cases,
         &[
-            "packaged Sim worker discovery and signing",
+            "packaged Zed worker discovery and signing",
             "OS-enforced network-denied release host",
             "final native image and diffusion slices",
             "platform orphan-process certification",
@@ -1526,8 +1526,8 @@ fn val_native_boundary_001() -> Result<(), Box<dyn Error>> {
         }),
         &cases,
         &[
-            "final packaged Sim manifest and signature inspection",
-            "release Sim binary string inspection",
+            "final packaged Zed manifest and signature inspection",
+            "release Zed binary string inspection",
             "OS-enforced network-denied isolated-host execution",
             "terminal reverse-dependency and runtime-trace audit after all native tasks",
         ],

@@ -6,7 +6,7 @@
 native-Rust/GPUI specification snapshot.**
 
 This is an independent structural, regeneration, reference, count, source
-closure, native-boundary, and validator audit. It does not assert that Sim has
+closure, native-boundary, and validator audit. It does not assert that Zed has
 implemented the plan or achieved runtime parity. The master ledger correctly
 reports zero equivalent and zero partial rows; unavailable runtime, hardware,
 platform, account, and provider observations remain uncertainty rather than
@@ -77,7 +77,7 @@ The documented recipes independently reproduced every baseline fingerprint:
 | comfy-cli 0.0.0 CI placeholder | 312 | `09d0b5f262bce3105f83777a310f1e391c4624f95142da5e3230626b68a276e6` |
 | Comfy documentation | 5,800 | `1f4c9c460b8f5b35e30eb4d2d64bc201a958f247ab21af6c68743cce28c33931` |
 | Comfy embedded docs 0.5.7 | 10,298 | `5aebf925cf36fe7b8df3c89466ad96ffa42110542a392ec6156b88fc807ec956` |
-| Sim 1.10.2 manifest | 3,310 | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
+| Zed 1.10.2 manifest | 3,310 | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
 
 For all six Comfy source trees, the filesystem path set exactly equals its
 source ledger: no missing path, extra path, or duplicate path. The backend and
@@ -98,7 +98,7 @@ and records that comfy-cli has no nested instruction file.
 `catalogs/features.csv` has 12,712 rows, 12,712 nonblank IDs, and no duplicate
 master ID. Every one of its 12,712 `(source_catalog, source_row)` pointers
 resolves, no two master features claim the same pointer, and every available
-subordinate `sim_status`, `target_status`, or `current_sim_status` equals the
+subordinate `zed_status`, `target_status`, or `current_zed_status` equals the
 master status.
 
 The master counters independently reproduce
@@ -172,7 +172,7 @@ diffusion-foundation task writes the fixture directory and requires every named
 checkpoint; the next E2E task consumes the same JSON and directory.
 
 Design D35 now contains a concrete Rust source trait and
-`sim:comfy-plugin@1.0.0` WIT world. The WIT contract covers explicit port
+`zed:comfy-plugin@1.0.0` WIT world. The WIT contract covers explicit port
 direction/type/cardinality/presence, indexed singular/list input transfer,
 push-plus-finish scalar/tensor/artifact/model outputs, absent optional versus
 empty list, ownership revocation, cancellation, and bounded filesystem,

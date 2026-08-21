@@ -1,17 +1,17 @@
-# Requirements: Sim Game Development Surface
+# Requirements: Zed Game Development Surface
 
 ## Introduction
 
-Sim needs a native game development surface for building 2D and 3D games, with Godot-format project and asset compatibility, world-model foundation harness support, and Comfy-aware workflow orchestration — all without copying duplicate game-engine runtime infrastructure. The migration adds project detection, authoring affordances, language support, generation, and serving primitives while preserving Sim ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Sim-only behavior. Every supported Comfy feature and functionality must be recreated as native Sim functionality backed by Sim services, records, workers, artifacts, provenance, and diagnostics rather than represented as a thin compatibility label or passed through to ComfyUI.
+Zed needs a native game development surface for building 2D and 3D games, with Godot-format project and asset compatibility, world-model foundation harness support, and Comfy-aware workflow orchestration — all without copying duplicate game-engine runtime infrastructure. The migration adds project detection, authoring affordances, language support, generation, and serving primitives while preserving Zed ownership of UI, platform, rendering, task execution, agents, media, storage, and project systems. Comfy provides core functionality for the world-model harness, so implementation decisions must evaluate Comfy workflow, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, and extension semantics before adding Zed-only behavior. Every supported Comfy feature and functionality must be recreated as native Zed functionality backed by Zed services, records, workers, artifacts, provenance, and diagnostics rather than represented as a thin compatibility label or passed through to ComfyUI.
 
 ## Glossary
 
-- **Boundary policy**: the explicit rule set for what Sim adopts as native features, imports at compatibility boundaries, leaves unresolved, or intentionally excludes without external Godot delegation.
+- **Boundary policy**: the explicit rule set for what Zed adopts as native features, imports at compatibility boundaries, leaves unresolved, or intentionally excludes without external Godot delegation.
 - **Execution gate**: a prerequisite validation checkpoint that blocks task execution until satisfied.
 - **Dependency wave**: the ordered implementation phase used to keep shared foundations ahead of dependent integrations.
-- **World-model engine harness**: Sim-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.
-- **Comfy world-model harness substrate**: Sim-managed core protocol, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, blueprint, extension, and packaging behavior derived from `projects/comfy`.
-- **Deferred Godot-origin compatibility**: Godot-format, runtime, editor, export, XR, physics, networking, and legacy language work that is modeled as native Sim functionality but selected later unless it directly supports the target Comfy/world-model game-development product.
+- **World-model engine harness**: Zed-managed typed requests, controls, workers, artifacts, and provenance around `projects/world-model`.
+- **Comfy world-model harness substrate**: Zed-managed core protocol, graph, sampler, scheduler, conditioning, diffusion/world-model execution, node, model, asset, provider, blueprint, extension, and packaging behavior derived from `projects/comfy`.
+- **Deferred Godot-origin compatibility**: Godot-format, runtime, editor, export, XR, physics, networking, and legacy language work that is modeled as native Zed functionality but selected later unless it directly supports the target Comfy/world-model game-development product.
 
 ### Requirement 1: Complete Inventory
 
@@ -25,23 +25,23 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 
 ### Requirement 2: Duplication Avoidance
 
-**User Story:** As a maintainer, I want Sim to reuse existing infrastructure so the migration does not fork duplicate runtimes.
+**User Story:** As a maintainer, I want Zed to reuse existing infrastructure so the migration does not fork duplicate runtimes.
 
 #### Acceptance Criteria
 
-1. **2.1** IF Sim already owns a platform, rendering, UI, media, task, project, agent, or language capability THEN THE migration SHALL reuse that capability.
-2. **2.2** IF a Godot runtime subsystem duplicates Sim runtime architecture THEN THE migration SHALL extend the existing Sim owner or mark the capability unresolved/intentionally excluded; external Godot execution SHALL NOT count as support.
+1. **2.1** IF Zed already owns a platform, rendering, UI, media, task, project, agent, or language capability THEN THE migration SHALL reuse that capability.
+2. **2.2** IF a Godot runtime subsystem duplicates Zed runtime architecture THEN THE migration SHALL extend the existing Zed owner or mark the capability unresolved/intentionally excluded; external Godot execution SHALL NOT count as support.
 3. **2.3** WHEN a new crate is proposed THEN THE migration SHALL justify why existing crates cannot hold the behavior.
 
 ### Requirement 3: Game Project Support
 
-**User Story:** As a game developer, I want Sim to understand Godot-format projects so I can inspect and edit existing assets.
+**User Story:** As a game developer, I want Zed to understand Godot-format projects so I can inspect and edit existing assets.
 
 #### Acceptance Criteria
 
 1. **3.1** WHEN a workspace contains `project.godot` THEN THE system SHALL detect it as a Godot-format game project.
 2. **3.2** WHEN SimScript, legacy `.gd`, scene, resource, shader, or asset files are opened THEN THE system SHALL provide metadata, diagnostics, and preview routing where supported.
-3. **3.3** IF runtime execution is required for a supported capability THEN THE system SHALL execute through a named Sim-native runtime, task, debugger, and export owner; otherwise the capability SHALL remain unresolved or intentionally excluded.
+3. **3.3** IF runtime execution is required for a supported capability THEN THE system SHALL execute through a named Zed-native runtime, task, debugger, and export owner; otherwise the capability SHALL remain unresolved or intentionally excluded.
 
 ### Requirement 4: Unified Game Authoring Product
 
@@ -55,7 +55,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 
 ### Requirement 5: World Model Runtime Harness
 
-**User Story:** As a game creator, I want world foundation models to drive interactive game-world generation from Sim.
+**User Story:** As a game creator, I want world foundation models to drive interactive game-world generation from Zed.
 
 #### Acceptance Criteria
 
@@ -73,7 +73,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 1. **6.1** WHEN a graph is edited THEN THE system SHALL validate node types, ports, dependencies, and cycles.
 2. **6.2** WHEN an agent edits a graph THEN THE system SHALL apply the same validation used by the UI.
 3. **6.3** IF graph execution would use an unavailable backend THEN THE system SHALL block execution with diagnostics.
-4. **6.4** WHEN a Comfy-derived graph, node, workflow, asset, provider, extension, sampler, scheduler, conditioning, latent, VAE, model patch, diffusion, or world-model capability is marked supported THEN THE system SHALL implement the capability through native Sim services rather than a compatibility-only marker or ComfyUI pass-through.
+4. **6.4** WHEN a Comfy-derived graph, node, workflow, asset, provider, extension, sampler, scheduler, conditioning, latent, VAE, model patch, diffusion, or world-model capability is marked supported THEN THE system SHALL implement the capability through native Zed services rather than a compatibility-only marker or ComfyUI pass-through.
 
 ### Requirement 7: Textured 3D Mesh Generation
 
@@ -117,7 +117,7 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 
 ### Requirement 11: Third-Party and License Control
 
-**User Story:** As a maintainer, I want third-party code and assets controlled before dependencies enter Sim.
+**User Story:** As a maintainer, I want third-party code and assets controlled before dependencies enter Zed.
 
 #### Acceptance Criteria
 
@@ -139,22 +139,22 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 
 ### Requirement 13: Comfy Workflow Orchestration Migration
 
-**User Story:** As a workflow creator, I want Comfy features represented in Sim specs so visual AI workflows, assets, and provider nodes can migrate without duplicate infrastructure.
+**User Story:** As a workflow creator, I want Comfy features represented in Zed specs so visual AI workflows, assets, and provider nodes can migrate without duplicate infrastructure.
 
 #### Acceptance Criteria
 
 1. **13.1** WHEN Comfy migration specs are reviewed THEN THE system SHALL include non-overlapping specs for runtime APIs, graph/node runtime, model/memory runtime, diffusion/world-model runtime, assets, workflows/blueprints, media node pipelines, provider API nodes, extension ecosystem, and packaging/quality.
 2. **13.2** IF a Comfy feature overlaps an existing game/world-model migration spec THEN THE Comfy spec SHALL name the owning spec and delegate that behavior.
-3. **13.3** WHEN Comfy endpoints, nodes, assets, providers, or extensions are implemented THEN THE system SHALL use Sim task, media, artifact, secret, storage, diagnostic, and dependency-review infrastructure.
-4. **13.4** WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Sim-only behavior.
-5. **13.5** IF Comfy semantics conflict with existing Sim infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
+3. **13.3** WHEN Comfy endpoints, nodes, assets, providers, or extensions are implemented THEN THE system SHALL use Zed task, media, artifact, secret, storage, diagnostic, and dependency-review infrastructure.
+4. **13.4** WHEN a world-model harness implementation decision involves graph orchestration, prompt/job lifecycle, model resolution, sampler/scheduler behavior, conditioning, diffusion/world-model execution, asset handling, media nodes, provider calls, or extension loading THEN THE system SHALL consult the applicable Comfy spec before introducing Zed-only behavior.
+5. **13.5** IF Comfy semantics conflict with existing Zed infrastructure THEN THE system SHALL document the decision and preserve Comfy workflow compatibility unless safety, security, dependency, or platform gates require divergence.
 6. **13.6** WHEN local diffusion or world-model execution is implemented THEN THE system SHALL preserve Comfy sampler, scheduler, conditioning, latent, VAE, model patch, guidance, and model-family execution semantics unless a documented gate requires divergence.
-7. **13.7** WHEN Comfy-derived behavior is implemented THEN THE system SHALL recreate the feature as native Sim functionality backed by Sim services and data models, not as a thin compatibility label, hidden pass-through to ComfyUI, or unsupported placeholder.
-8. **13.8** WHEN Sim-owned records, services, workers, artifacts, states, queues, diagnostics, or registries implement Comfy-derived behavior THEN THE system SHALL use `Sim*` naming, for example `SimAssetSeedState`, rather than `Comfy*` naming such as `ComfyAssetSeedState`.
+7. **13.7** WHEN Comfy-derived behavior is implemented THEN THE system SHALL recreate the feature as native Zed functionality backed by Zed services and data models, not as a thin compatibility label, hidden pass-through to ComfyUI, or unsupported placeholder.
+8. **13.8** WHEN Zed-owned records, services, workers, artifacts, states, queues, diagnostics, or registries implement Comfy-derived behavior THEN THE system SHALL use `Zed*` naming, for example `SimAssetSeedState`, rather than `Comfy*` naming such as `ComfyAssetSeedState`.
 
 ### Requirement 14: Value-First Product Sequencing
 
-**User Story:** As a product owner, I want Comfy and world-model harness work completed before lower-value Godot-origin compatibility work so each migration task advances the target native Sim product.
+**User Story:** As a product owner, I want Comfy and world-model harness work completed before lower-value Godot-origin compatibility work so each migration task advances the target native Zed product.
 
 #### Acceptance Criteria
 
@@ -163,19 +163,19 @@ Sim needs a native game development surface for building 2D and 3D games, with G
 3. **14.3** WHEN SimScript or natural-language authoring work is selected THEN THE system SHALL treat natural language as the primary authoring interface and SimScript as the executable game language, while legacy `.gd` and Godot-format support remain migration/import sources.
 4. **14.4** WHEN Comfy provider, extension, or packaging hardening is ranked THEN THE system SHALL keep it behind local W2-W4 harness functionality unless the hardening task blocks worker safety, provenance, policy, or dependency-review gates.
 
-### Requirement 15: Native Sim Godot Port
+### Requirement 15: Native Zed Godot Port
 
-**User Story:** As a product and distribution owner, I want Godot to remain a behavioral and compatibility reference so every shipped capability is owned and executed by Sim.
+**User Story:** As a product and distribution owner, I want Godot to remain a behavioral and compatibility reference so every shipped capability is owned and executed by Zed.
 
 #### Acceptance Criteria
 
-1. **15.1** WHEN a Godot-origin capability is supported or classified as fully specified THEN its existing or proposed Sim owner and Sim-native storage, execution, UI, persistence, cancellation, recovery, and lifecycle paths SHALL be explicit.
+1. **15.1** WHEN a Godot-origin capability is supported or classified as fully specified THEN its existing or proposed Zed owner and Zed-native storage, execution, UI, persistence, cancellation, recovery, and lifecycle paths SHALL be explicit.
 2. **15.2** THE system SHALL NOT embed, bundle, invoke, launch, link against, wrap, proxy, communicate with, or depend at build time or runtime on the Godot editor, engine, executable, shared library, server, command-line tool, or hidden instance.
-3. **15.3** WHEN Godot-compatible project, scene, resource, script, API, import, or export data crosses a boundary THEN Sim SHALL parse or emit that representation while keeping authoritative data, resources, scenes, artifacts, and execution state Sim-native.
-4. **15.4** WHEN an existing Sim component owns adjacent behavior THEN the migration SHALL extend it and SHALL NOT create a parallel Godot-specific crate, registry, manager, runtime, task source, UI subsystem, persistence layer, network stack, plugin host, renderer, or platform service.
-5. **15.5** Importers and migration tools MAY read Godot formats, but successful outputs SHALL be Sim-native and failure, cancellation, recovery, and cleanup SHALL not require Godot.
+3. **15.3** WHEN Godot-compatible project, scene, resource, script, API, import, or export data crosses a boundary THEN Zed SHALL parse or emit that representation while keeping authoritative data, resources, scenes, artifacts, and execution state Zed-native.
+4. **15.4** WHEN an existing Zed component owns adjacent behavior THEN the migration SHALL extend it and SHALL NOT create a parallel Godot-specific crate, registry, manager, runtime, task source, UI subsystem, persistence layer, network stack, plugin host, renderer, or platform service.
+5. **15.5** Importers and migration tools MAY read Godot formats, but successful outputs SHALL be Zed-native and failure, cancellation, recovery, and cleanup SHALL not require Godot.
 6. **15.6** Exported projects SHALL execute without Godot installed and package/process/loader/dependency inspection SHALL prove no Godot runtime dependency; separately approved compatibility tooling SHALL remain isolated from shipped runtime artifacts.
 7. **15.7** IF a capability cannot currently be implemented natively THEN it SHALL be unresolved, intentionally excluded with rationale, or blocked on a material product/architecture decision and SHALL NOT be treated as covered by a wrapper, interface, declaration, placeholder, task template, or external delegation.
 8. **15.8** IF Godot source code, generated code, vendor patches, fixtures, docs, or assets would be copied THEN work SHALL remain blocked pending separate licensing and architecture approval for the exact material.
-9. **15.9** WHEN implementation or full specification is claimed THEN acceptance criteria and leaf validation SHALL prove Sim-owned execution in a hermetic environment without Godot.
+9. **15.9** WHEN implementation or full specification is claimed THEN acceptance criteria and leaf validation SHALL prove Zed-owned execution in a hermetic environment without Godot.
 10. **15.10** WHEN specifications are audited THEN all external-Godot plans, duplicate abstractions, placeholder-only support, license/linkage dependencies, and material native architecture decisions SHALL be reported without silently choosing a direction.

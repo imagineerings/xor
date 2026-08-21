@@ -15,7 +15,7 @@ use comfy_tensor::{
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-pub const GUIDANCE_ADAPTER_ID: &str = "sim.comfy.guidance.v1";
+pub const GUIDANCE_ADAPTER_ID: &str = "zed.comfy.guidance.v1";
 const PYTHON_MATH_ISCLOSE_RELATIVE_TOLERANCE: f64 = 1.0e-9;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

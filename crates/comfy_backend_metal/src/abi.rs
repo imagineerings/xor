@@ -3,7 +3,7 @@ use thiserror::Error;
 
 pub const ABI_MANIFEST: &str = include_str!("../abi/symbols-v1.json");
 pub const ABI_FLOOR: &str = "macos-13-metal-3";
-pub const READINESS_FUNCTION: &str = "sim_comfy_metal_readiness_v1";
+pub const READINESS_FUNCTION: &str = "zed_comfy_metal_readiness_v1";
 pub const UNSAFE_OWNER: &str = "comfy_backend_metal::loader";
 pub const METAL_3_FAMILY_VALUE: u64 = 5_001;
 pub const MPS_DATA_TYPE_FLOAT16: u32 = 0x1000_0010;

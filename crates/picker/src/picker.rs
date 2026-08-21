@@ -8,7 +8,7 @@ use gpui::{
 use head::Head;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use sim_actions::editor::{MoveDown, MoveUp};
+use zed_actions::editor::{MoveDown, MoveUp};
 use std::{
     cell::Cell, cell::RefCell, collections::HashMap, ops::Range, rc::Rc, sync::Arc, time::Duration,
 };

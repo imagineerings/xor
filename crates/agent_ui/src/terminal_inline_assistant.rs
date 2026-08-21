@@ -321,7 +321,7 @@ impl TerminalInlineAssistant {
                     )
                 };
 
-                // Fire Sim telemetry
+                // Fire Zed telemetry
                 telemetry::event!(
                     event_type,
                     kind = "inline_terminal",

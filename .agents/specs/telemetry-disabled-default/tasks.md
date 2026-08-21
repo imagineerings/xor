@@ -8,7 +8,7 @@
   - _value: high_
   - _wave: 1_
   - _Depends on: none_
-  - _reads: assets/settings/default.json, crates/settings_content/src/settings_content.rs, crates/client/src/client.rs, crates/sim/src/reliability.rs, crates/onboarding/src/basics_page.rs, crates/settings_ui/src/page_data.rs_
+  - _reads: assets/settings/default.json, crates/settings_content/src/settings_content.rs, crates/client/src/client.rs, crates/zed/src/reliability.rs, crates/onboarding/src/basics_page.rs, crates/settings_ui/src/page_data.rs_
   - _writes: assets/settings/default.json, crates/settings_content/src/settings_content.rs, crates/client/src/telemetry.rs, docs/src/telemetry.md, docs/src/reference/all-settings.md_
   - _validation: cargo test -p client telemetry_disabled_by_default && cargo test -p client telemetry_explicit_opt_in_
   - _Requirements: 1.1, 1.3, 1.4, 2.1, 2.2, 2.4, 3.1, 3.2_

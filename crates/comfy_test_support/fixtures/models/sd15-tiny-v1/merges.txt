@@ -18505,7 +18505,7 @@ centu ries</w>
 vi da</w>
 gra ding</w>
 transpa rent</w>
-sim ple
+zed ple
 do ts</w>
 superint endent</w>
 elev ator</w>
@@ -18549,7 +18549,7 @@ au k</w>
 brother hood</w>
 brow se</w>
 mix es</w>
-sim one</w>
+zed one</w>
 mu sk</w>
 appro ve</w>
 lo la</w>
@@ -20749,7 +20749,7 @@ widesp read</w>
 Ã ł</w>
 dail ies</w>
 vend or</w>
-sim plicity</w>
+zed plicity</w>
 wi der</w>
 len ses</w>
 supp lements</w>
@@ -25124,7 +25124,7 @@ n ino</w>
 ce d
 business man</w>
 ul tr
-sim ply
+zed ply
 compre ssion</w>
 pa ins</w>
 hal t</w>
@@ -32584,7 +32584,7 @@ mar is</w>
 sol itary</w>
 che mo
 rad cliffe</w>
-sim ons</w>
+zed ons</w>
 ros ary</w>
 new er</w>
 jo die</w>
@@ -34976,7 +34976,7 @@ give up</w>
 b our</w>
 am ura</w>
 der land</w>
-sim pler</w>
+zed pler</w>
 wat son
 tri dent</w>
 concor dia</w>
@@ -46635,7 +46635,7 @@ mic hal
 i ban
 je ong
 is real</w>
-sim coe</w>
+zed coe</w>
 exclu sives</w>
 blue bells</w>
 ben e</w>

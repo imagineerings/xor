@@ -1,4 +1,4 @@
-package sim:comfy-plugin@1.0.0;
+package zed:comfy-plugin@1.0.0;
 
 interface types {
     record api-version {

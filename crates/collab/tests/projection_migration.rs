@@ -49,7 +49,7 @@ async fn projection_migration_has_checksum_stable_forward_and_rollback_paths() {
 fn projection_migration_preserves_provenance_resume_and_version_fences() {
     for required in [
         "PRIMARY KEY (community_id, projection_name, source_system, source_record_id)",
-        "source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')",
+        "source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')",
         "octet_length(source_record_id) BETWEEN 1 AND 1024",
         "source_version text",
         "source_observed_at timestamptz NOT NULL",

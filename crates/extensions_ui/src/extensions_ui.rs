@@ -25,7 +25,7 @@ use release_channel::ReleaseChannel;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use settings::{Settings, SettingsContent};
-use sim_actions::ExtensionCategoryFilter;
+use zed_actions::ExtensionCategoryFilter;
 use strum::IntoEnumIterator as _;
 use theme_settings::ThemeSettings;
 use ui::{
@@ -47,7 +47,7 @@ use crate::extension_version_selector::{
 };
 
 actions!(
-    sim,
+    zed,
     [
         /// Installs an extension from a local directory for development.
         InstallDevExtension,
@@ -56,7 +56,7 @@ actions!(
 
 /// Rebuilds an installed dev extension.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, JsonSchema, gpui::Action)]
-#[action(namespace = sim)]
+#[action(namespace = zed)]
 #[serde(deny_unknown_fields)]
 pub struct RebuildDevExtension {
     /// The ID of the dev extension to rebuild.
@@ -115,7 +115,7 @@ pub fn init(cx: &mut App) {
         };
         workspace
             .register_action(
-                move |workspace, action: &sim_actions::Extensions, window, cx| {
+                move |workspace, action: &zed_actions::Extensions, window, cx| {
                     let provides_filter = action.category_filter.map(|category| match category {
                         ExtensionCategoryFilter::Themes => ExtensionProvides::Themes,
                         ExtensionCategoryFilter::IconThemes => ExtensionProvides::IconThemes,
@@ -516,7 +516,7 @@ impl ExtensionsPage {
             workspace
                 .update(cx, |_workspace, cx| {
                     window.dispatch_action(
-                        sim_actions::theme_selector::Toggle {
+                        zed_actions::theme_selector::Toggle {
                             themes_filter: Some(themes),
                         }
                         .boxed_clone(),
@@ -535,7 +535,7 @@ impl ExtensionsPage {
             workspace
                 .update(cx, |_workspace, cx| {
                     window.dispatch_action(
-                        sim_actions::icon_theme_selector::Toggle {
+                        zed_actions::icon_theme_selector::Toggle {
                             themes_filter: Some(icon_themes),
                         }
                         .boxed_clone(),
@@ -1260,7 +1260,7 @@ impl ExtensionsPage {
                                     move |_, cx| {
                                         Tooltip::simple(
                                             format!(
-                                                "v{version} is not compatible with this version of Sim.",
+                                                "v{version} is not compatible with this version of Zed.",
                                             ),
                                              cx,
                                         )
@@ -1634,111 +1634,111 @@ impl ExtensionsPage {
         for feature in &self.upsells {
             let banner = match feature {
                 Feature::AgentClaude => self.render_feature_upsell_banner(
-                    "Claude Agent support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/ai/external-agents#claude-agent".into(),
+                    "Claude Agent support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/ai/external-agents#claude-agent".into(),
                     false,
                     cx,
                 ),
                 Feature::AgentCodex => self.render_feature_upsell_banner(
-                    "Codex CLI support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/ai/external-agents#codex-cli".into(),
+                    "Codex CLI support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/ai/external-agents#codex-cli".into(),
                     false,
                     cx,
                 ),
                 Feature::AgentGemini => self.render_feature_upsell_banner(
-                    "Gemini CLI support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/ai/external-agents#gemini-cli".into(),
+                    "Gemini CLI support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/ai/external-agents#gemini-cli".into(),
                     false,
                     cx,
                 ),
                 Feature::ExtensionBasedpyright => self.render_feature_upsell_banner(
-                    "Basedpyright (Python language server) support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/python#basedpyright".into(),
+                    "Basedpyright (Python language server) support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/python#basedpyright".into(),
                     false,
                     cx,
                 ),
                 Feature::ExtensionRuff => self.render_feature_upsell_banner(
-                    "Ruff (linter for Python) support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/python#code-formatting--linting".into(),
+                    "Ruff (linter for Python) support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/python#code-formatting--linting".into(),
                     false,
                     cx,
                 ),
                 Feature::ExtensionTailwind => self.render_feature_upsell_banner(
-                    "Tailwind CSS support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/tailwindcss".into(),
+                    "Tailwind CSS support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/tailwindcss".into(),
                     false,
                     cx,
                 ),
                 Feature::ExtensionTy => self.render_feature_upsell_banner(
-                    "Ty (Python language server) support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/python".into(),
+                    "Ty (Python language server) support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/python".into(),
                     false,
                     cx,
                 ),
                 Feature::Git => self.render_feature_upsell_banner(
-                    "Sim comes with basic Git support—more features are coming in the future."
+                    "Zed comes with basic Git support—more features are coming in the future."
                         .into(),
-                    "https://sim.dev/docs/git".into(),
+                    "https://zed.dev/docs/git".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageBash => self.render_feature_upsell_banner(
-                    "Shell support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/bash".into(),
+                    "Shell support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/bash".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageC => self.render_feature_upsell_banner(
-                    "C support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/c".into(),
+                    "C support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/c".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageCpp => self.render_feature_upsell_banner(
-                    "C++ support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/cpp".into(),
+                    "C++ support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/cpp".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageGo => self.render_feature_upsell_banner(
-                    "Go support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/go".into(),
+                    "Go support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/go".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguagePython => self.render_feature_upsell_banner(
-                    "Python support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/python".into(),
+                    "Python support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/python".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageReact => self.render_feature_upsell_banner(
-                    "React support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/typescript".into(),
+                    "React support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/typescript".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageRust => self.render_feature_upsell_banner(
-                    "Rust support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/rust".into(),
+                    "Rust support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/rust".into(),
                     false,
                     cx,
                 ),
                 Feature::LanguageTypescript => self.render_feature_upsell_banner(
-                    "Typescript support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/languages/typescript".into(),
+                    "Typescript support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/languages/typescript".into(),
                     false,
                     cx,
                 ),
                 Feature::OpenIn => self.render_feature_upsell_banner(
-                    "Sim supports linking to a source line on GitHub and others.".into(),
-                    "https://sim.dev/docs/git#git-integrations".into(),
+                    "Zed supports linking to a source line on GitHub and others.".into(),
+                    "https://zed.dev/docs/git#git-integrations".into(),
                     false,
                     cx,
                 ),
                 Feature::Vim => self.render_feature_upsell_banner(
-                    "Vim support is built-in to Sim!".into(),
-                    "https://sim.dev/docs/vim".into(),
+                    "Vim support is built-in to Zed!".into(),
+                    "https://zed.dev/docs/vim".into(),
                     true,
                     cx,
                 ),

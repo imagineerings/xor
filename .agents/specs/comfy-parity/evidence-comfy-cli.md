@@ -2,7 +2,7 @@
 
 ## Audit status
 
-This report records the static and existing-test evidence gathered from `projects/comfy/comfy-cli` for the native Rust/GPUI parity design. Comfy CLI is evidence and a development-time conformance client; it does not authorize a production Python dependency. Production Sim must implement execution and lifecycle natively and may accept legacy Python-oriented formats only for migration or compatibility translation into versioned Rust/WASM plugins with explicit ports.
+This report records the static and existing-test evidence gathered from `projects/comfy/comfy-cli` for the native Rust/GPUI parity design. Comfy CLI is evidence and a development-time conformance client; it does not authorize a production Python dependency. Production Zed must implement execution and lifecycle natively and may accept legacy Python-oriented formats only for migration or compatibility translation into versioned Rust/WASM plugins with explicit ports.
 
 No nested `AGENTS.md` or nested Git metadata exists in this source root. README, design, skill, and guide claims are never promoted above `documented-only` without executable or test corroboration.
 
@@ -54,7 +54,7 @@ The available interpreter is Python 3.9.6, below the declared minimum. Typer, qu
 
 The behavioral capability catalogs contain 1,244 stable records, alongside 104 production module/service contracts, 2,295 test-function records, 312 source-file rows, and 66 schema-mapping relationships. Their evidence split is 288 test-backed, 947 code-inferred, 9 documented-only, 0 observed, and 0 unverified. The master ledger promotes both behavioral and production module/service records so every production source row closes against a master feature ID. Test-backed means an existing test explicitly exercises the contract; it does not imply that the test ran in this audit.
 
-Source-audit native-target dispositions are 591 missing, 554 conflicting, 99 deferred, 0 equivalent, 0 partial, and 0 uncertain. The master generator synchronizes target-only columns against independent Sim evidence and the fixed native-only architecture before producing the pack-wide parity matrix.
+Source-audit native-target dispositions are 591 missing, 554 conflicting, 99 deferred, 0 equivalent, 0 partial, and 0 uncertain. The master generator synchronizes target-only columns against independent Zed evidence and the fixed native-only architecture before producing the pack-wide parity matrix.
 
 ## Command and machine-contract findings
 
@@ -69,7 +69,7 @@ Three source orphans are retained rather than normalized away:
 
 `COMMAND_SCHEMAS` contains 64 entries, but only 63 target reachable paths; `comfy version` is not registered. Sixty reachable leaves have no command-schema mapping. This is not interpreted as absence of behavior: many legacy/interactive commands simply have not migrated to the structured envelope registry.
 
-The event contract has a concrete versioning conflict. `run_event.json` declares eight event names. Executable code additionally emits `converted`, `prompt_preview`, `settled`, and `state`; the first two are also described in `docs/json-output.md`. Native Sim must define one authoritative event union and validate every emitted line against it.
+The event contract has a concrete versioning conflict. `run_event.json` declares eight event names. Executable code additionally emits `converted`, `prompt_preview`, `settled`, and `state`; the first two are also described in `docs/json-output.md`. Native Zed must define one authoritative event union and validate every emitted line against it.
 
 ## Typed parameter contracts
 

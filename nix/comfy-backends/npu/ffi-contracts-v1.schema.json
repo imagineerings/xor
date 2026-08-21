@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/npu/ffi-contracts-v1.schema.json",
-  "title": "Sim Huawei Ascend NPU native library contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/npu/ffi-contracts-v1.schema.json",
+  "title": "Zed Huawei Ascend NPU native library contracts v1",
   "$comment": "Callable AscendCL is pinned by exact nonempty symbols. Its dependency-only runtime image is pinned by digest, ABI, owner, and an explicit required_by edge and is never treated as a callable zero-symbol FFI contract.",
   "type": "object",
   "additionalProperties": false,

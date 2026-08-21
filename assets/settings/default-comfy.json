@@ -1,5 +1,5 @@
 {
-  "$schema": "sim://schemas/settings",
+  "$schema": "zed://schemas/settings",
   "comfy_runtime": {
     "active_profile": "00000000-0000-4000-8000-000000000001",
     "group_selected_nodes_padding": 10.0,

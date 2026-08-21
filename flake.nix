@@ -1,5 +1,5 @@
 {
-  description = "Sim is a minimal code editor crafted for speed and collaboration with humans and AI.";
+  description = "Zed is a minimal code editor crafted for speed and collaboration with humans and AI.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -30,10 +30,10 @@
 
   nixConfig = {
     extra-substituters = [
-      "https://sim.cachix.org"
+      "https://zed.cachix.org"
     ];
     extra-trusted-public-keys = [
-      "sim.cachix.org-1:/pHQ6dpMsAZk2DiP4WCL0p9YDNKWj2Q5FL20bNmw1cU="
+      "zed.cachix.org-1:/pHQ6dpMsAZk2DiP4WCL0p9YDNKWj2Q5FL20bNmw1cU="
     ];
   };
 }

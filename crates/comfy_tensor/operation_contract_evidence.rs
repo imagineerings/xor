@@ -595,7 +595,7 @@ mod tests {
             "operation_id": "COMFY-TENSOR-OP-000000000001",
             "baseline_overload_id": "COMFY-TENSOR-OP-000000000001:blocked",
             "baseline_fixture_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-            "overload_id": "sim.native.test.v1",
+            "overload_id": "zed.native.test.v1",
             "owner_task_id": "owner-task",
             "ordered_parameters": [],
             "output_types": ["Tensor<F32>"],

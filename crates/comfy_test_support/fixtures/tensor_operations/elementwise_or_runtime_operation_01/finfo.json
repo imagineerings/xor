@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-0A5DBFB907FD",
   "baseline_overload_id": "COMFY-TENSOR-OP-0A5DBFB907FD:blocked",
   "baseline_fixture_sha256": "966b324ea081db9624bb255e866f2ec200b40654e7995960d0148b78a8b87fc6",
-  "overload_id": "sim.native.tensor.finfo.v1",
+  "overload_id": "zed.native.tensor.finfo.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "dtype", "type": "DType"}

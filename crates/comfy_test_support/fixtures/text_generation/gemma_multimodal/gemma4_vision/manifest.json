@@ -1,5 +1,5 @@
 {
-  "fixture_schema": "sim.comfy.gemma4-vision-fixture.v1",
+  "fixture_schema": "zed.comfy.gemma4-vision-fixture.v1",
   "task_id": "comfy-parity-native-gemma4-vision-projection-foundation",
   "provenance_mode": "code-inferred-reduced-exact-weights",
   "source_snapshot": {

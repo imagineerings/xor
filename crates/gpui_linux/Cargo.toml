@@ -126,9 +126,9 @@ x11rb = { version = "0.13.1", features = [
     "sync",
     "dri3",
 ], optional = true }
-# WARNING: If you change this, you must also publish a new version of sim-xim to crates.io
+# WARNING: If you change this, you must also publish a new version of zed-xim to crates.io
 xim = { git = "https://github.com/simtropolis/xim-rs.git", rev = "420375270d2c7ce59a76129d40e62f0a035dc701", features = [
     "x11rb-xcb",
     "x11rb-client",
-], package = "sim-xim", version = "0.4.0-sim", optional = true }
+], package = "zed-xim", version = "0.4.0-zed", optional = true }
 x11-clipboard = { version = "0.9.3", optional = true }

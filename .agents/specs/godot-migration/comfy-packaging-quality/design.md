@@ -2,7 +2,7 @@
 
 ## Overview
 
-This spec centralizes migration-wide quality controls so other Comfy specs do not each reinvent configuration parsing, feature flags, schema fixtures, dependency review, test strategy, or platform packaging rules. It protects the core Comfy-derived harness behavior rather than defining a user-facing runtime. Comfy compatibility is an input/output contract only; Sim-owned configuration, diagnostics, and launch profile types use native `Sim*` names and do not pass through to ComfyUI launch code.
+This spec centralizes migration-wide quality controls so other Comfy specs do not each reinvent configuration parsing, feature flags, schema fixtures, dependency review, test strategy, or platform packaging rules. It protects the core Comfy-derived harness behavior rather than defining a user-facing runtime. Comfy compatibility is an input/output contract only; Zed-owned configuration, diagnostics, and launch profile types use native `Zed*` names and do not pass through to ComfyUI launch code.
 
 ## Architecture
 
@@ -13,14 +13,14 @@ flowchart LR
     Flags[SimFeatureFlagRegistry] --> Runtime[comfy-runtime-control-plane]
     Schema[SimApiSchemaCatalog] --> Tests[CompatibilityFixtureSuite]
     Deps[SimDependencyReviewGate] --> Packaging[SimPackagingProfileCatalog]
-    Logs[SimDiagnosticsAdapter] --> SimDiag[Sim Diagnostics]
+    Logs[SimDiagnosticsAdapter] --> SimDiag[Zed Diagnostics]
 ```
 
 ## Components and Interfaces
 
 ### SimLaunchProfileParser
 
-- **Purpose**: Parse Comfy-compatible launch options into Sim configuration.
+- **Purpose**: Parse Comfy-compatible launch options into Zed configuration.
 - **Responsibilities**: Networking, directories, upload limits, logging, assets, database, API nodes, custom nodes, manager mode, feature flags, memory, precision, device, cache, and performance options.
 - **Native behavior**: Accepts Comfy-shaped CLI/config options as input, maps
   supported settings to `SimLaunchProfile` records and `RuntimePolicyRequest`,
@@ -41,7 +41,7 @@ flowchart LR
 
 - **Purpose**: Track implemented, planned, cloud-only, external, and unsupported Comfy/OpenAPI routes.
 - **Responsibilities**: Schema coverage, route status, request/response fixtures, and compatibility notes.
-- **Native behavior**: Derives implemented route coverage from Sim's native
+- **Native behavior**: Derives implemented route coverage from Zed's native
   Comfy route catalog, records schema references for supported routes, and
   classifies documented non-local routes as planned, cloud-only, external, or
   unsupported with explicit reasons.
@@ -50,21 +50,21 @@ flowchart LR
 
 - **Purpose**: Provide automated fixtures for migrated Comfy features.
 - **Responsibilities**: Script examples, route snapshots, node schema snapshots, blueprint manifest, provider catalogs, asset API tests, and media capability snapshots.
-- **Native behavior**: Aggregates fixture coverage that exercises Sim-owned
+- **Native behavior**: Aggregates fixture coverage that exercises Zed-owned
   runtime, route, node, workflow, asset, and media records. Future provider and
   detailed media fixtures remain explicitly assigned to their owning specs until
-  those native Sim features land.
+  those native Zed features land.
 
 ### SimDependencyReviewGate
 
 - **Purpose**: Block unreviewed dependencies and large downloads.
 - **Responsibilities**: License, maintenance, security, binary size, platform impact, network requirement, and fallback strategy records.
-- **Native behavior**: Evaluates dependency proposals with Sim-owned
+- **Native behavior**: Evaluates dependency proposals with Zed-owned
   `SimDependencyReview*` records for native libraries, codecs, Python packages,
   provider SDKs, model dependencies, frontend packages, vendored code, network
   access, and large downloads. Compatibility tasks may feed Comfy-derived
   dependency proposals into the gate, but approval and audit state are native
-  Sim governance records rather than ComfyUI pass-through labels.
+  Zed governance records rather than ComfyUI pass-through labels.
 
 ### SimPackagingProfileCatalog
 
@@ -74,16 +74,16 @@ flowchart LR
   custom-node-disabled, asset-enabled, portable-like, and remote-worker launch
   profiles.
 - **Native behavior**: Emits `SimPackagingProfile*` records that configure
-  Sim launch/runtime options and explicitly delegate installer, bundle, and
-  platform distribution details to existing Sim packaging systems.
+  Zed launch/runtime options and explicitly delegate installer, bundle, and
+  platform distribution details to existing Zed packaging systems.
 
 ### SimDiagnosticsAdapter
 
-- **Purpose**: Expose logs and internal diagnostics through Sim diagnostics without making internal endpoints stable public API.
+- **Purpose**: Expose logs and internal diagnostics through Zed diagnostics without making internal endpoints stable public API.
 - **Responsibilities**: Raw and formatted logs, terminal size metadata,
   approved folder roots, and recent input/output/temp file summaries.
 - **Native behavior**: Emits `SimDiagnostics*` records, resolves recent files
-  only beneath approved Sim roots, and marks these diagnostic views as internal
+  only beneath approved Zed roots, and marks these diagnostic views as internal
   unstable so Comfy-compatible tooling cannot treat them as a stable public API
   or ComfyUI pass-through endpoint.
 
@@ -137,7 +137,7 @@ pub enum SimRouteSupport {
 
 ### Property 1: Unsupported Option Visibility
 
-_For any_ Comfy launch option supplied to Sim, if no Sim behavior supports it, the parser SHALL report it as unsupported with a reason and nearest equivalent when one exists.
+_For any_ Comfy launch option supplied to Zed, if no Zed behavior supports it, the parser SHALL report it as unsupported with a reason and nearest equivalent when one exists.
 
 **Validates: Requirement 1.3**
 

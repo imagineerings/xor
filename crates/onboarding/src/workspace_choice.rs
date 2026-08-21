@@ -19,8 +19,8 @@ struct WorkspaceChoice {
 const EDITOR_WORKSPACE_CHOICE: WorkspaceChoice = WorkspaceChoice {
     id: "onboarding-editor-workspace",
     label: "Editor Workspace",
-    description: "Sim's current editor experience.",
-    aria_label: "Editor Workspace. Sim's current editor experience. Both presentations use the same underlying projects and data.",
+    description: "Zed's current editor experience.",
+    aria_label: "Editor Workspace. Zed's current editor experience. Both presentations use the same underlying projects and data.",
     presentation: WorkspacePresentation::Editor,
 };
 

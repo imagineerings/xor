@@ -19,9 +19,9 @@ Model mesh requests and artifacts in W4 after shared world-model request and pro
 
 - [ ] 1. Add mesh request and generated artifact models
   - Model textured mesh requests, backend descriptors, preview metadata, export targets, and provenance.
-  - Represent mesh requests, backend selection, export formats, texture options, and artifact metadata with native Sim `Mesh*` records in `world_model`.
+  - Represent mesh requests, backend selection, export formats, texture options, and artifact metadata with native Zed `Mesh*` records in `world_model`.
   - _Requirements: 1.1, 2.1_
   - _Writes: crates/world_model/src/mesh.rs, crates/world_model/src/mesh_artifact.rs, crates/world_model/src/mesh_tests.rs_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/mesh-generation-pipeline/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/mesh-generation-pipeline/design.md, Cargo.toml, projects/godot_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/mesh-generation-pipeline_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/mesh-generation-pipeline/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/mesh-generation-pipeline/design.md, Cargo.toml, projects/godot_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/mesh-generation-pipeline_

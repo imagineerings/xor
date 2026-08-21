@@ -768,7 +768,7 @@ impl OwnedCudaCore {
             (self.symbols.cu_module_get_function)(
                 &mut function,
                 module.as_ptr(),
-                c"sim_cuda_add_f32".as_ptr(),
+                c"zed_cuda_add_f32".as_ptr(),
             )
         })?;
         self.add_f32 = Some(NonNull::new(function).ok_or(CudaLoadError::NullResource {
@@ -992,7 +992,7 @@ impl OwnedCudaCore {
             return Ok(());
         }
         let function = self.add_f32.ok_or(CudaLoadError::NullResource {
-            operation: "sim_cuda_add_f32",
+            operation: "zed_cuda_add_f32",
         })?;
         let stream = self.stream.ok_or(CudaLoadError::NullResource {
             operation: "cuda_stream",

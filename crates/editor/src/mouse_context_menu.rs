@@ -9,8 +9,8 @@ use crate::{
 use gpui::prelude::FluentBuilder;
 use gpui::{Context, DismissEvent, Entity, Focusable as _, Pixels, Point, Subscription, Window};
 use project::DisableAiSettings;
-use sim_actions::agent::AddSelectionToThread;
-use sim_actions::preview::{
+use zed_actions::agent::AddSelectionToThread;
+use zed_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 use std::ops::Range;

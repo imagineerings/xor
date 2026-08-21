@@ -3,7 +3,7 @@
   "approval": {
     "basis": "user-provided reference artifacts",
     "scope": "structure, density, hierarchy, resizable pane geometry, and interaction state",
-    "theme_policy": "native Sim theme tokens; reference colors are not pixel baselines"
+    "theme_policy": "native Zed theme tokens; reference colors are not pixel baselines"
   },
   "cases": [
     {

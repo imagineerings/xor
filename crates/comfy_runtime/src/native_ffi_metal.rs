@@ -34,7 +34,7 @@ const MAX_COVERAGE_BYTES: usize = 64 * 1024;
 const MAX_PACKAGE_PAYLOADS: usize = 32;
 const MAX_PACKAGE_BYTES: usize = 32 * 1024 * 1024;
 const LOADER_UNSAFE_OWNER: &str = "comfy_backend_metal::loader";
-const FRAMEWORK_PROVENANCE_DOMAIN: &[u8] = b"sim-comfy-metal-framework-contract-v1\0";
+const FRAMEWORK_PROVENANCE_DOMAIN: &[u8] = b"zed-comfy-metal-framework-contract-v1\0";
 const PACKAGE_PAYLOAD_LIMITS: [NativePackagePayloadLimit; 15] = [
     NativePackagePayloadLimit::new("LICENSES", MAX_PACKAGE_FILE_BYTES),
     NativePackagePayloadLimit::new("LICENSES.execution", MAX_PACKAGE_FILE_BYTES),
@@ -556,7 +556,7 @@ fn validate_manifest(
         || manifest.minimum_macos_version != "13.0"
         || manifest.metal_language_version != "metal3.0"
         || manifest.minimum_metal_family != METAL_3_FAMILY_VALUE
-        || manifest.readiness_function != "sim_comfy_metal_readiness_v1"
+        || manifest.readiness_function != "zed_comfy_metal_readiness_v1"
         || manifest.tensor_functions != expected_functions
         || manifest.redistributes_apple_frameworks
         || manifest.required_system_frameworks != expected_frameworks
@@ -566,7 +566,7 @@ fn validate_manifest(
         || manifest.signer.is_empty()
         || manifest.signature_algorithm != "ed25519"
         || manifest.signature_coverage != "package-coverage-v1"
-        || manifest.signature_domain != "sim-comfy-metal-package-v1"
+        || manifest.signature_domain != "zed-comfy-metal-package-v1"
         || !manifest.final_application_signing_required
         || !manifest.runtime_compilation_forbidden
     {
@@ -875,7 +875,7 @@ fn validate_metallibs(
             &manifest.readiness_metallib_sha256,
             "kernels/readiness.metal",
             &manifest.readiness_source_sha256,
-            vec!["sim_comfy_metal_readiness_v1".to_owned()],
+            vec!["zed_comfy_metal_readiness_v1".to_owned()],
             LOADER_UNSAFE_OWNER,
         ),
         (
@@ -1111,7 +1111,7 @@ mod tests {
             tensor_ops_source_sha256: sha256_hex(&tensor_source),
             tensor_ops_metallib_sha256: sha256_hex(&tensor_metallib),
             tensor_ops_metallib_size: tensor_metallib.len().try_into()?,
-            readiness_function: "sim_comfy_metal_readiness_v1".to_owned(),
+            readiness_function: "zed_comfy_metal_readiness_v1".to_owned(),
             tensor_functions: vec![
                 METAL_ADD_F16_FUNCTION.to_owned(),
                 METAL_ADD_F32_FUNCTION.to_owned(),
@@ -1127,7 +1127,7 @@ mod tests {
             signer: "metal.release".to_owned(),
             signature_algorithm: "ed25519".to_owned(),
             signature_coverage: "package-coverage-v1".to_owned(),
-            signature_domain: "sim-comfy-metal-package-v1".to_owned(),
+            signature_domain: "zed-comfy-metal-package-v1".to_owned(),
             final_application_signing_required: true,
             runtime_compilation_forbidden: true,
         };
@@ -1152,7 +1152,7 @@ mod tests {
                     sha256: manifest.readiness_metallib_sha256.clone(),
                     source_path: "kernels/readiness.metal".to_owned(),
                     source_sha256: manifest.readiness_source_sha256.clone(),
-                    required_functions: vec!["sim_comfy_metal_readiness_v1".to_owned()],
+                    required_functions: vec!["zed_comfy_metal_readiness_v1".to_owned()],
                     unsafe_owner: LOADER_UNSAFE_OWNER.to_owned(),
                 },
                 MetalMetallibContract {

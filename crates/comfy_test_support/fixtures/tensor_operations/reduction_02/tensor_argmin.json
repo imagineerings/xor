@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-E0B19A56E204",
   "baseline_overload_id": "COMFY-TENSOR-OP-E0B19A56E204:blocked",
   "baseline_fixture_sha256": "e5dda42dd004ec64a4dd2ebf8664603c911b5ad00774beeddb079a5c85145739",
-  "overload_id": "sim.native.reduction.tensor-argmin.cpu.v1",
+  "overload_id": "zed.native.reduction.tensor-argmin.cpu.v1",
   "owner_task_id": "comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6",
   "ordered_parameters": [
     {

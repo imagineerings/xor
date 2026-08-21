@@ -11,7 +11,7 @@ from pathlib import Path
 
 csv.field_size_limit(16 * 1024 * 1024)
 
-from regenerate_native_sim_evidence import (
+from regenerate_native_zed_evidence import (
     ACCESSIBLE_COMFY_BOOTSTRAP,
     EXECUTION_UI_OWNER,
     TASK_18_COMPONENT_OWNERS,
@@ -45,8 +45,8 @@ ACCESSIBILITY_INVENTORY_SUMMARY = (
     "Exact later-owned accessibility rows retain their prior missing or conflicting status until "
     "their surface tasks and whole-application audits pass."
     if ACCESSIBLE_COMFY_BOOTSTRAP
-    else "Dedicated accessibility rows are `conflicting` because current production Sim defaults "
-    "to `Application::new_inaccessible` unless `SIM_EXPERIMENTAL_A11Y=1`."
+    else "Dedicated accessibility rows are `conflicting` because current production Zed defaults "
+    "to `Application::new_inaccessible` unless `ZED_EXPERIMENTAL_A11Y=1`."
 )
 
 FEATURE_FIELDS = [
@@ -75,11 +75,11 @@ FEATURE_FIELDS = [
     "persistence_serialization",
     "interfaces_side_effects",
     "platform_localization_variants",
-    "current_sim_status",
-    "sim_evidence",
+    "current_zed_status",
+    "zed_evidence",
     "parity_gap",
     "parity_decision",
-    "observable_sim_acceptance",
+    "observable_zed_acceptance",
     "requirement_criteria",
     "design_coverage",
     "task_id",
@@ -776,7 +776,7 @@ def normalize_source_catalog_corrections() -> None:
         rewrite_catalog(config_name, config_rows, [
             "kind", "name", "default", "choices", "value_shape", "mutual_exclusion_group",
             "availability", "evidence_level", "confidence", "behavior", "source_file",
-            "source_symbol", "source_line", "test_evidence", "runtime_observation", "sim_status",
+            "source_symbol", "source_line", "test_evidence", "runtime_observation", "zed_status",
             "parity_gap", "feature_id",
         ])
 
@@ -1409,7 +1409,7 @@ def markdown(value: object, limit: int | None = None) -> str:
     return text
 
 
-def sim_status(availability: str, evidence_level: str) -> str:
+def zed_status(availability: str, evidence_level: str) -> str:
     availability_lower = availability.casefold()
     evidence_lower = evidence_level.casefold()
     if "uncertain" in availability_lower or "unverified" in evidence_lower:
@@ -1734,7 +1734,7 @@ def decorate_trace(feature: dict[str, str], titles: dict[int, str]) -> None:
 
 
 def base_feature(**values: object) -> dict[str, str]:
-    explicit_sim_status = clean(values.get("current_sim_status", ""))
+    explicit_zed_status = clean(values.get("current_zed_status", ""))
     explicit_parity_decision = clean(values.get("parity_decision", ""))
     defaults = {
         "product": "Source product not separately identified",
@@ -1761,11 +1761,11 @@ def base_feature(**values: object) -> dict[str, str]:
         "persistence_serialization": "No additional durable representation or migration was identified beyond the cited source contract.",
         "interfaces_side_effects": "No additional route, event, IPC, subprocess, filesystem, or external side effect was identified beyond the cited source contract.",
         "platform_localization_variants": "Use the source-defined platform, localization, local/remote/cloud, and version variants; none were generalized beyond the evidence.",
-        "sim_evidence": "Repository-wide search and the target architecture audit found no Comfy-specific implementation outside projects/comfy/** and this specification; generic Sim primitives are reusable infrastructure only.",
-        "parity_gap": "Sim has no Comfy-specific implementation of this observable contract.",
-        "observable_sim_acceptance": "With the same deterministic source fixture and preconditions, Sim shall reproduce the cited success, boundary, failure, cancellation, persistence, compatibility, and recovery observations for this feature, or expose the recorded deliberate defer decision without data loss.",
+        "zed_evidence": "Repository-wide search and the target architecture audit found no Comfy-specific implementation outside projects/comfy/** and this specification; generic Zed primitives are reusable infrastructure only.",
+        "parity_gap": "Zed has no Comfy-specific implementation of this observable contract.",
+        "observable_zed_acceptance": "With the same deterministic source fixture and preconditions, Zed shall reproduce the cited success, boundary, failure, cancellation, persistence, compatibility, and recovery observations for this feature, or expose the recorded deliberate defer decision without data loss.",
         "automated_validation": "Not separately specified; route through the trace-linked deterministic validation suite.",
-        "manual_validation": "Not separately specified; compare the source and Sim side by side in every applicable distribution and platform variant.",
+        "manual_validation": "Not separately specified; compare the source and Zed side by side in every applicable distribution and platform variant.",
         "open_questions": "No feature-specific question beyond the recorded runtime, platform, dependency, cloud, and extension uncertainties.",
     }
     feature = {field: "" for field in FEATURE_FIELDS}
@@ -1773,27 +1773,27 @@ def base_feature(**values: object) -> dict[str, str]:
     for key, value in values.items():
         if key in feature:
             feature[key] = clean(value, feature.get(key, ""))
-    feature["current_sim_status"] = explicit_sim_status or sim_status(
+    feature["current_zed_status"] = explicit_zed_status or zed_status(
         feature["availability"], feature["evidence_level"]
     )
     feature["parity_decision"] = explicit_parity_decision or parity_decision(
         feature["product"], feature["domain"], feature["feature_id"], feature["availability"]
     )
     if (
-        not explicit_sim_status
+        not explicit_zed_status
         and feature["parity_decision"].startswith("replace-production-execution")
     ):
-        feature["current_sim_status"] = "conflicting"
+        feature["current_zed_status"] = "conflicting"
         feature["parity_gap"] = joined(
-            "The source contract depends on Python or JavaScript execution that production Sim explicitly forbids.",
+            "The source contract depends on Python or JavaScript execution that production Zed explicitly forbids.",
             "A versioned Rust/WASM replacement, explicit ports, deterministic legacy identifier mapping, and lossless unresolved placeholder behavior are not implemented.",
             feature["parity_gap"],
         )
     if feature["feature_id"].startswith("COMFY-A11Y-"):
         if ACCESSIBLE_COMFY_BOOTSTRAP and feature["feature_id"] in A11Y_FOUNDATION_FEATURES:
-            feature["current_sim_status"] = "partial"
-            feature["sim_evidence"] = (
-                "crates/sim/src/main.rs constructs GPUI with Application::with_platform without "
+            feature["current_zed_status"] = "partial"
+            feature["zed_evidence"] = (
+                "crates/zed/src/main.rs constructs GPUI with Application::with_platform without "
                 "an accessibility environment gate; crates/comfy_ui/src/graph_render.rs exposes "
                 "the native graph application/key context and semantic controls; "
                 "VAL-GPUI-012/013 validate the bootstrap."
@@ -1808,36 +1808,36 @@ def base_feature(**values: object) -> dict[str, str]:
                 "retain-accessible-bootstrap-and-complete-later-surface-audits"
             )
         elif not ACCESSIBLE_COMFY_BOOTSTRAP:
-            feature["current_sim_status"] = "conflicting"
-            feature["sim_evidence"] = (
-                "crates/sim/src/main.rs:build_application defaults to "
-                "Application::new_inaccessible unless SIM_EXPERIMENTAL_A11Y=1; "
-                "the Sim architecture audit classifies this as a production accessibility conflict."
+            feature["current_zed_status"] = "conflicting"
+            feature["zed_evidence"] = (
+                "crates/zed/src/main.rs:build_application defaults to "
+                "Application::new_inaccessible unless ZED_EXPERIMENTAL_A11Y=1; "
+                "the Zed architecture audit classifies this as a production accessibility conflict."
             )
             feature["parity_gap"] = (
                 "The source accessibility contract requires an operable semantic surface, "
-                "while current production Sim defaults to an inaccessible GPUI application."
+                "while current production Zed defaults to an inaccessible GPUI application."
             )
             feature["parity_decision"] = "enable-and-verify-production-gpui-accessibility-before-release"
-    elif explicit_sim_status == "conflicting" and not explicit_parity_decision:
+    elif explicit_zed_status == "conflicting" and not explicit_parity_decision:
         feature["parity_decision"] = parity_decision(
             feature["product"], feature["domain"], feature["feature_id"], feature["availability"]
         )
-    elif explicit_sim_status == "uncertain":
+    elif explicit_zed_status == "uncertain":
         feature["parity_decision"] = "investigate-and-preserve-without-guessing"
-    if feature["current_sim_status"] == "missing" and "no comfy-specific" not in feature["parity_gap"].casefold():
+    if feature["current_zed_status"] == "missing" and "no comfy-specific" not in feature["parity_gap"].casefold():
         feature["parity_gap"] = joined(
-            "No Comfy-specific Sim implementation exists for this contract.",
+            "No Comfy-specific Zed implementation exists for this contract.",
             f"Source-specific gap detail: {feature['parity_gap']}",
         )
-    elif feature["current_sim_status"] == "deferred" and "deliberately defer" not in feature["parity_gap"].casefold():
+    elif feature["current_zed_status"] == "deferred" and "deliberately defer" not in feature["parity_gap"].casefold():
         feature["parity_gap"] = joined(
-            "No Comfy-specific Sim implementation exists; the current parity decision deliberately defers this contract while retaining its data and trace links.",
+            "No Comfy-specific Zed implementation exists; the current parity decision deliberately defers this contract while retaining its data and trace links.",
             f"Source-specific gap detail: {feature['parity_gap']}",
         )
-    elif feature["current_sim_status"] == "uncertain" and "remains uncertain" not in feature["parity_gap"].casefold():
+    elif feature["current_zed_status"] == "uncertain" and "remains uncertain" not in feature["parity_gap"].casefold():
         feature["parity_gap"] = joined(
-            "No verified Comfy-specific Sim implementation exists, and the source or target behavior remains uncertain.",
+            "No verified Comfy-specific Zed implementation exists, and the source or target behavior remains uncertain.",
             f"Uncertainty detail: {feature['parity_gap']}",
         )
     for field in FEATURE_FIELDS:
@@ -1889,10 +1889,10 @@ def add_backend_features(features: list[dict[str, str]]) -> None:
         target_gap = (
             "The source contract executes Python or JavaScript extension code, which the production-native boundary forbids; the versioned Rust/WASM port, explicit socket translation, legacy identifier mapping, and unresolved placeholder are not implemented."
             if legacy_extension_contract
-            else f"Sim has no native Rust implementation of the backend contract `{row['name']}`."
+            else f"Zed has no native Rust implementation of the backend contract `{row['name']}`."
         )
         target_acceptance = joined(
-            f"Using the pinned source only as a development-time oracle, native Rust Sim shall reproduce this source-observable contract: {row['success_behavior']}",
+            f"Using the pinned source only as a development-time oracle, native Rust Zed shall reproduce this source-observable contract: {row['success_behavior']}",
             f"It shall also reproduce the cataloged boundary and recovery behavior: {row['failure_recovery']}",
             (
                 "Legacy Python/JavaScript registrations shall resolve only through a versioned Rust/WASM plugin manifest with explicit input/output ports and deterministic legacy identifier mappings; unsupported imperative hooks remain lossless, visible placeholders."
@@ -1923,10 +1923,10 @@ def add_backend_features(features: list[dict[str, str]]) -> None:
             failure_recovery=row["failure_recovery"], persistence_serialization=row["persistence_side_effects"],
             interfaces_side_effects=row["protocols_dependencies"],
             platform_localization_variants=row["platform_version"],
-            current_sim_status=target_status,
+            current_zed_status=target_status,
             parity_decision=target_decision,
             parity_gap=target_gap,
-            observable_sim_acceptance=target_acceptance, automated_validation=row["automated_validation"],
+            observable_zed_acceptance=target_acceptance, automated_validation=row["automated_validation"],
             manual_validation=row["manual_validation"], open_questions=source_question,
             source_catalog=name, source_row=index,
         ))
@@ -1984,7 +1984,7 @@ def add_backend_source_anchors(features: list[dict[str, str]]) -> None:
             actor = "Model loader, text encoder, tokenizer, node, or operator."
             success = f"The authoritative Python engine resolves {source_file} for its model family, tokenizer, configuration, or model search-path contract."
             failure = "Absent, corrupt, incompatible, or permission-denied model support data produces the engine's explicit unavailable/load error and does not fabricate model capability."
-            acceptance = f"A Python-authoritative fixture shall verify discovery and checksum for {source_file}, one valid consumer path, missing/corrupt behavior, and Sim's matching availability/error projection."
+            acceptance = f"A Python-authoritative fixture shall verify discovery and checksum for {source_file}, one valid consumer path, missing/corrupt behavior, and Zed's matching availability/error projection."
         elif lower.startswith("alembic"):
             domain = "database-migration-support"
             classification = "database migration support template"
@@ -2033,10 +2033,10 @@ def add_backend_source_anchors(features: list[dict[str, str]]) -> None:
             persistence_serialization=f"The file path, bytes, SHA-256 {row['sha256']}, and consuming format/version remain deterministic source evidence; no migration is invented.",
             interfaces_side_effects=row["reason"],
             platform_localization_variants="Availability varies only where the consuming model, template, package, filesystem, database, or platform contract states it; filenames are not localized.",
-            parity_gap=f"Sim has no Comfy-specific consumer, catalog, or compatibility treatment for {source_file}.",
-            observable_sim_acceptance=acceptance,
+            parity_gap=f"Zed has no Comfy-specific consumer, catalog, or compatibility treatment for {source_file}.",
+            observable_zed_acceptance=acceptance,
             automated_validation=acceptance,
-            manual_validation=f"Inspect {source_file} in the pinned source and its consuming source surface; compare discovery, visible availability/error, and retained data in Sim.",
+            manual_validation=f"Inspect {source_file} in the pinned source and its consuming source surface; compare discovery, visible availability/error, and retained data in Zed.",
             open_questions="Runtime consumption remains unobserved where the required dependency, model, accelerator, migration environment, or frontend is unavailable.",
             source_catalog=name,
             source_row=index,
@@ -2077,10 +2077,10 @@ def add_backend_nodes(features: list[dict[str, str]], name: str, inactive: bool 
             persistence_serialization=f"Workflow serialization uses class_type={identifier}; input literals, links, list flags, widgets, and unknown data must remain lossless.",
             interfaces_side_effects=joined(first(row, "schema_source", fallback="Schema-bearing class"), row.get("registration_evidence")),
             platform_localization_variants="Availability can depend on Python package, model, hardware, hosted service, feature flag, and server version; display name/category are server-authoritative.",
-            parity_gap=f"Sim has no native node-registry or execution implementation for {identifier}.",
-            observable_sim_acceptance=(f"The compiled native registry and object-info projection shall reproduce every cataloged schema field for {identifier}; its exact Rust or native-provider implementation shall independently match success, boundaries, output, list/lazy, validation, cache/change, blocker/effect, cancellation, error, persistence, and recovery behavior." if not inactive else f"Sim shall not activate {identifier} from this snapshot; import shall retain its serialized data and report its inactive compatibility status."),
+            parity_gap=f"Zed has no native node-registry or execution implementation for {identifier}.",
+            observable_zed_acceptance=(f"The compiled native registry and object-info projection shall reproduce every cataloged schema field for {identifier}; its exact Rust or native-provider implementation shall independently match success, boundaries, output, list/lazy, validation, cache/change, blocker/effect, cancellation, error, persistence, and recovery behavior." if not inactive else f"Zed shall not activate {identifier} from this snapshot; import shall retain its serialized data and report its inactive compatibility status."),
             automated_validation=f"Run VAL-NODE-001 and VAL-NODE-CLOSURE-001 for {identifier}" + (" plus VAL-NODE-002 for this exact row; representative-only family evidence is insufficient." if not inactive else "; verify it is absent from the active native registry."),
-            manual_validation=f"Inspect {identifier} in source object-info and the Sim node library under each applicable dependency/profile state.",
+            manual_validation=f"Inspect {identifier} in source object-info and the Zed node library under each applicable dependency/profile state.",
             open_questions=("Whether a future upstream registry activates this node; baseline policy must detect that delta." if inactive else "Execution remains unobserved when the required model, accelerator, package, account, or external service is unavailable."),
             source_catalog=name, source_row=index,
         ))
@@ -2119,10 +2119,10 @@ def add_backend_routes(features: list[dict[str, str]]) -> None:
                 row.get("source_excerpt"),
             ),
             platform_localization_variants="Route availability varies by API version, feature module, user mode, server flags, installed dependencies, and local/remote deployment.",
-            parity_gap=f"Sim has no native Rust handler contract for {route_name}.",
-            observable_sim_acceptance=f"For the same valid and malformed fixtures, Sim's native Rust host shall serve {route_name} with matching request decoding, status, headers/content, response schema, side effects, permissions, timeout/idempotency recovery, limits, and aliases while using native runtime services and never forwarding to ComfyUI.",
+            parity_gap=f"Zed has no native Rust handler contract for {route_name}.",
+            observable_zed_acceptance=f"For the same valid and malformed fixtures, Zed's native Rust host shall serve {route_name} with matching request decoding, status, headers/content, response schema, side effects, permissions, timeout/idempotency recovery, limits, and aliases while using native runtime services and never forwarding to ComfyUI.",
             automated_validation=f"Parameterize VAL-HTTP-001 with {row['feature_id']} ({route_name}).",
-            manual_validation=f"Compare the development source oracle and Sim native handler for {route_name} under every applicable permission/feature state; verify no production forwarding or alternate executor.",
+            manual_validation=f"Compare the development source oracle and Zed native handler for {route_name} under every applicable permission/feature state; verify no production forwarding or alternate executor.",
             open_questions=first(row, "unresolved_schema", fallback="Runtime-dependent schema variants require deterministic capture."),
             source_catalog=name, source_row=index,
         ))
@@ -2147,14 +2147,14 @@ def add_backend_websocket(features: list[dict[str, str]]) -> None:
             persistence_serialization=f"Wire kind {row['wire_kind']}; event type {event}; binary code {first(row, 'binary_code', fallback='none')}; schema {row['schema']}",
             interfaces_side_effects=f"WebSocket {row['direction']} {event}",
             platform_localization_variants="Binary framing and JSON schema are platform-neutral; event availability and payload additions are version/capability-dependent.",
-            parity_gap=f"Sim has no native WebSocket adapter for {event}.",
-            observable_sim_acceptance=joined(
-                f"Sim's native event bus and Rust WebSocket host shall reproduce the source trigger/success contract for {event}: {row['trigger_success']}",
+            parity_gap=f"Zed has no native WebSocket adapter for {event}.",
+            observable_zed_acceptance=joined(
+                f"Zed's native event bus and Rust WebSocket host shall reproduce the source trigger/success contract for {event}: {row['trigger_success']}",
                 f"It shall reproduce the source error/recovery and ordering contracts: {row['error_recovery']}; {row['ordering_concurrency']}",
                 "Exact framing, client routing, reconnect projection, unknown fields, cancellation, and shutdown shall be native; no event may be consumed from or forwarded to another Comfy server.",
             ),
             automated_validation=f"Parameterize VAL-WS-001 with {row['feature_id']} ({event}), including malformed, ordering, reconnect, stale-SID, and binary-boundary fixtures.",
-            manual_validation=f"Observe {event} during a deterministic source and Sim run, including reconnect and cancellation where applicable.",
+            manual_validation=f"Observe {event} during a deterministic source and Zed run, including reconnect and cancellation where applicable.",
             source_catalog=name, source_row=index,
         ))
 
@@ -2170,18 +2170,18 @@ def add_backend_config(features: list[dict[str, str]]) -> None:
             source_evidence=f"{row['source_file']}:{row['source_line']}", source_symbol=row["source_symbol"],
             test_evidence=first(row, "test_evidence", fallback="No focused existing test was located."),
             runtime_observation=first(row, "runtime_observation", fallback="Not observed in this audit; see baseline constraints."),
-            actor="Source operator, development oracle, or native Sim runtime-profile administrator.", trigger=f"Configure the source oracle or import/map {row['name']} into native Sim policy.",
+            actor="Source operator, development oracle, or native Zed runtime-profile administrator.", trigger=f"Configure the source oracle or import/map {row['name']} into native Zed policy.",
             preconditions="Parser/configuration initialization runs and the applicable platform, backend, dependency, or mutually exclusive group permits the option.",
             inputs_defaults=joined(f"default={row['default']}", f"choices={first(row, 'choices', fallback='unrestricted')}", f"shape={row['value_shape']}", f"mutual_exclusion={first(row, 'mutual_exclusion_group', fallback='none')}") ,
-            permissions_flags=f"Availability: {row['availability']}; privileged network, filesystem, device, and remote-access effects require explicit Sim policy.",
+            permissions_flags=f"Availability: {row['availability']}; privileged network, filesystem, device, and remote-access effects require explicit Zed policy.",
             observable_success=row["behavior"],
             interaction_accessibility="A mapped native setting shall expose a labeled, keyboard-operable control when user-configurable; oracle-only or inactive legacy flags shall be labeled as non-production.",
             state_concurrency="Native startup configuration is resolved before worker, device, cache, plugin, and API-host initialization; source-only flags never launch a source process.",
             failure_recovery="Invalid values, mutual-exclusion conflicts, unavailable devices/dependencies, and unsafe network/path combinations shall be rejected with parser- or UI-visible detail; prior durable configuration remains recoverable.",
             persistence_serialization=f"Preserve source name {row['name']}, shape, default, choices, and exclusion group as a native mapping or inactive legacy record; production does not serialize Comfy launch argv.",
             interfaces_side_effects=row["behavior"], platform_localization_variants="CLI spelling is stable; availability and defaults may vary by operating system, device backend, package, and upstream version.",
-            parity_gap=f"Sim has no native-policy or inactive-legacy mapping for {row['name']}.",
-            observable_sim_acceptance=f"Sim shall classify {row['name']} as an equivalent native runtime/API/device/memory setting, development-oracle control, or inactive legacy flag; mapped values preserve defaults/choices/exclusions/effects/errors, and production never launches ComfyUI or Python.",
+            parity_gap=f"Zed has no native-policy or inactive-legacy mapping for {row['name']}.",
+            observable_zed_acceptance=f"Zed shall classify {row['name']} as an equivalent native runtime/API/device/memory setting, development-oracle control, or inactive legacy flag; mapped values preserve defaults/choices/exclusions/effects/errors, and production never launches ComfyUI or Python.",
             automated_validation=f"Generate native mapping, invalid-value, legacy-import, and release-boundary cases for {row['feature_id']}; oracle argv comparison runs only in development test support.",
             manual_validation=f"Inspect the native runtime settings or inactive legacy record for {row['name']} and verify the production process/network trace remains source-free.",
             source_catalog=name, source_row=index,
@@ -2210,8 +2210,8 @@ def add_backend_models(features: list[dict[str, str]]) -> None:
             persistence_serialization=f"Preserve identifier/format and source-relative model path semantics: {row['identifier_or_format']}.",
             interfaces_side_effects=joined(row.get("success_behavior"), row.get("dependencies_platform")),
             platform_localization_variants=row["dependencies_platform"],
-            current_sim_status="partial" if corex_fail_closed else "",
-            sim_evidence=(
+            current_zed_status="partial" if corex_fail_closed else "",
+            zed_evidence=(
                 "crates/comfy_backend_corex contains the compiled zero-symbol provenance and structural-package adapter; its loader has no runtime loading path, every certificate projection is rejected, and canonical NativeBackendBindingStatus remains Unbound on every host."
                 if corex_fail_closed
                 else ""
@@ -2219,17 +2219,17 @@ def add_backend_models(features: list[dict[str, str]]) -> None:
             parity_gap=(
                 "CoreX execution is intentionally unavailable in this pack. Proprietary IXRT/IXBLAS ABI, library, signing, production-integration, and hardware work is transferred to .agents/specs/comfy-corex-enablement and remains pending there."
                 if corex_fail_closed
-                else f"Sim has no native model/device/sampling implementation for {row['name']}."
+                else f"Zed has no native model/device/sampling implementation for {row['name']}."
             ),
             parity_decision=(
                 "compiled-fail-closed-typed-unbound;future-spec:comfy-corex-enablement"
                 if corex_fail_closed
                 else ""
             ),
-            observable_sim_acceptance=(
-                "Sim shall preserve the CoreX identifier, compile the focused native adapter, expose canonical typed Unbound with the exact missing-evidence reason, reject every trust or availability projection, and never load CoreX libraries or fall back to CPU until the separate future specification is completely implemented and certified."
+            observable_zed_acceptance=(
+                "Zed shall preserve the CoreX identifier, compile the focused native adapter, expose canonical typed Unbound with the exact missing-evidence reason, reject every trust or availability projection, and never load CoreX libraries or fall back to CPU until the separate future specification is completely implemented and certified."
                 if corex_fail_closed
-                else f"Sim shall implement {row['name']} behind its native tensor/model/sampler/device contracts, preserve the exact identifier/format, publish verified availability, and match source detection/load/intermediate/success/failure/offload/cancellation/OOM behavior without a Python or external-server fallback."
+                else f"Zed shall implement {row['name']} behind its native tensor/model/sampler/device contracts, preserve the exact identifier/format, publish verified availability, and match source detection/load/intermediate/success/failure/offload/cancellation/OOM behavior without a Python or external-server fallback."
             ),
             automated_validation=f"Run the applicable VAL-TENSOR-001, VAL-DEVICE-001, VAL-MEMORY-001, VAL-MODEL-FORMAT-001, VAL-MODEL-FAMILY-001, VAL-SAMPLER-001, VAL-SCHEDULER-001, or VAL-LATENT-001 fixture for {row['feature_id']}.",
             manual_validation=f"Compare source-oracle and native {row['name']} detection, selection, loading/progress, intermediate checkpoints, memory/offload, cancellation, and failure on every applicable certified hardware/platform profile.",
@@ -2244,7 +2244,7 @@ def add_backend_conditioning_contracts(
     trace_mappings = {}
     for index, row in enumerate(read_rows(name), 2):
         feature_id = row["contract_id"]
-        completed = row["current_sim_status"] == "equivalent"
+        completed = row["current_zed_status"] == "equivalent"
         trace_mappings[feature_id] = (
             row["implementation_task"],
             row["validation_surface"],
@@ -2277,15 +2277,15 @@ def add_backend_conditioning_contracts(
             persistence_serialization="The catalog row is a development-time trace record; only its checked native domain and explicitly versioned boundary DTOs may persist production state.",
             interfaces_side_effects="No Python or JavaScript code executes and no ComfyUI process or server is launched, embedded, managed, or contacted.",
             platform_localization_variants="The selected native backend must preserve the same semantics on every certified platform and fail typed where unavailable.",
-            current_sim_status=row["current_sim_status"],
-            sim_evidence=row["sim_evidence"],
+            current_zed_status=row["current_zed_status"],
+            zed_evidence=row["zed_evidence"],
             parity_gap=(
                 "No currently observed native execution gap remains for this exact fingerprinted contract."
                 if completed
                 else f"Executable closure remains assigned to {row['implementation_task']} until its fresh validation evidence and artifact digest pass."
             ),
             parity_decision=f"native-rust-owner:{row['native_owner']};disposition:{row['disposition']}",
-            observable_sim_acceptance=f"The exact source and symbol digests map to {row['native_owner']}, task {row['implementation_task']}, executable validation {row['validation_surface']}, and closure artifact {row['closure_artifact'] or 'none'}; generation and executable validation reject any missing, duplicate, stale, or retargeted row.",
+            observable_zed_acceptance=f"The exact source and symbol digests map to {row['native_owner']}, task {row['implementation_task']}, executable validation {row['validation_surface']}, and closure artifact {row['closure_artifact'] or 'none'}; generation and executable validation reject any missing, duplicate, stale, or retargeted row.",
             automated_validation=f"Run {row['validation_surface']} and verify explicit closure artifact {row['closure_artifact'] or 'none'}, then run python3 .agents/specs/comfy-parity/regenerate_all.py --check-twice; require the exact source and symbol digests plus a non-skipped executable fixture.",
             manual_validation="No production oracle execution is permitted; inspect only the native result, typed diagnostics, ownership scan, and durable validation artifact.",
             open_questions="No ownership ambiguity is permitted; unavailable hardware remains an explicit named validation gap rather than a pass.",
@@ -2316,10 +2316,10 @@ def add_backend_tensor_runtime(features: list[dict[str, str]]) -> None:
             persistence_serialization="Live tensor storage is not durable; operation ID/version, descriptor, inputs, artifact/cache identity, RNG phase, and committed outputs are durable where required.",
             interfaces_side_effects=joined(row.get("vjp_jvp_requirement"), row.get("cancellation_requirement")),
             platform_localization_variants=row["device_requirement"],
-            current_sim_status="missing",
-            parity_gap=f"Sim has no Comfy tensor facade or native implementation/conformance matrix for {row['symbol']}.",
+            current_zed_status="missing",
+            parity_gap=f"Zed has no Comfy tensor facade or native implementation/conformance matrix for {row['symbol']}.",
             parity_decision=row["native_rust_decision"],
-            observable_sim_acceptance=joined(row["shape_requirement"], row["dtype_requirement"], row["layout_requirement"], row["device_requirement"], row["numerics_requirement"], row["vjp_jvp_requirement"], row["cancellation_requirement"]),
+            observable_zed_acceptance=joined(row["shape_requirement"], row["dtype_requirement"], row["layout_requirement"], row["device_requirement"], row["numerics_requirement"], row["vjp_jvp_requirement"], row["cancellation_requirement"]),
             automated_validation=f"Parameterize VAL-TENSOR-001 for {operation_id}; include VAL-AUTOGRAD-001 when reachable from the autograd ledger and VAL-DEVICE-001 for every certified backend.",
             manual_validation=f"Compare {row['symbol']} at representative cited call sites using source-fingerprinted CPU and certified device fixtures; inspect effective dtype/layout/device, numerical tolerance, cancellation, and errors.",
             open_questions=row["limitations"], source_catalog="backend-tensor-operations.csv", source_row=index,
@@ -2342,9 +2342,9 @@ def add_backend_tensor_runtime(features: list[dict[str, str]]) -> None:
             persistence_serialization="Live tapes and saved tensors are not durable; explicitly restartable training state uses versioned native model/optimizer records only.",
             interfaces_side_effects=joined(row.get("apply_sites"), row.get("method_or_state_sites")),
             platform_localization_variants="Forward and reverse contracts apply per supported dtype/device backend; unavailable combinations remain explicit.",
-            current_sim_status="missing", parity_gap=f"Sim has no native Comfy autograd implementation for {row['symbol']}.",
-            parity_decision="implement-in-the-sim-owned-native-autograd-engine-with-no-python-fallback",
-            observable_sim_acceptance=joined(row["forward_contract"], row["reverse_contract"], row["native_requirement"], row["state_and_lifetime_requirement"]),
+            current_zed_status="missing", parity_gap=f"Zed has no native Comfy autograd implementation for {row['symbol']}.",
+            parity_decision="implement-in-the-zed-owned-native-autograd-engine-with-no-python-fallback",
+            observable_zed_acceptance=joined(row["forward_contract"], row["reverse_contract"], row["native_requirement"], row["state_and_lifetime_requirement"]),
             automated_validation=f"Parameterize VAL-AUTOGRAD-001 for {autograd_id}, including analytical/finite-difference, repeat/backward lifetime, cancellation, and supported device cases.",
             manual_validation=f"Compare forward, VJP/gradient, tape lifetime, memory, cancellation, and error behavior for {row['symbol']} at each reachable family.",
             open_questions=row["limitations"], source_catalog="backend-autograd.csv", source_row=index,
@@ -2366,9 +2366,9 @@ def add_backend_tensor_runtime(features: list[dict[str, str]]) -> None:
             state_concurrency=joined(row["phase_identity_requirement"], row["state_requirement"]),
             failure_recovery=row["cancellation_retry_requirement"], persistence_serialization=joined(row["phase_identity_requirement"], row["state_requirement"]),
             interfaces_side_effects=joined(row["seed_mapping_requirement"], row["device_requirement"]), platform_localization_variants=row["device_requirement"],
-            current_sim_status="missing", parity_gap=f"Sim has no versioned native RNG phase implementation for `{row['phase']}` / {row['symbol']}.",
+            current_zed_status="missing", parity_gap=f"Zed has no versioned native RNG phase implementation for `{row['phase']}` / {row['symbol']}.",
             parity_decision=row["native_rust_decision"],
-            observable_sim_acceptance=joined(row["phase_identity_requirement"], row["seed_mapping_requirement"], row["state_requirement"], row["device_requirement"], row["cancellation_retry_requirement"]),
+            observable_zed_acceptance=joined(row["phase_identity_requirement"], row["seed_mapping_requirement"], row["state_requirement"], row["device_requirement"], row["cancellation_retry_requirement"]),
             automated_validation=f"Parameterize VAL-RNG-001 for {rng_id}; compare exact CPU sequences where specified and distribution/checkpoint/device/cancel/retry behavior elsewhere.",
             manual_validation=f"Compare phase `{row['phase']}` source and native streams across seed, batch, node, retry, cancellation, and certified devices without cross-phase perturbation.",
             open_questions=row["limitations"], source_catalog="backend-rng.csv", source_row=index,
@@ -2393,8 +2393,8 @@ def add_backend_formats(features: list[dict[str, str]]) -> None:
             state_concurrency="Parsing is bounded and non-destructive; saving uses one immutable snapshot and does not race dirty edits or external changes.",
             failure_recovery=row["failure_recovery"], persistence_serialization=joined(row["schema_format"], row["migration_backward_compatibility"]),
             interfaces_side_effects=row["serialization_behavior"], platform_localization_variants=row["migration_backward_compatibility"],
-            parity_gap=f"Sim has no native lossless adapter for {row['name']}.",
-            observable_sim_acceptance=row["acceptance_criteria"], automated_validation=row["validation"],
+            parity_gap=f"Zed has no native lossless adapter for {row['name']}.",
+            observable_zed_acceptance=row["acceptance_criteria"], automated_validation=row["validation"],
             manual_validation=f"Round-trip {row['name']} side by side, inspect embedded/serialized fields, and exercise corrupt, truncated, unknown-version, metadata-disabled, and external-change cases.",
             open_questions=row["open_questions"], source_catalog=name, source_row=index,
         ))
@@ -2419,8 +2419,8 @@ def add_backend_external_services(features: list[dict[str, str]]) -> None:
             failure_recovery=row["error_retry_cancel"], persistence_serialization="Provider inputs and returned typed media/node outputs remain in workflow/prompt/output records; secret values are references and never workflow bytes.",
             interfaces_side_effects=joined(route_name, row.get("success_behavior")),
             platform_localization_variants="Hosted availability, billing, models, pricing, region, policy, provider version, and account state may differ; none was called at runtime in this audit.",
-            parity_gap=f"Sim has no authorized native provider contract for {route_name}.",
-            observable_sim_acceptance=f"When an approved provider fixture is enabled, {route_name} shall match authentication separation, request/response schema, progress, bounded polling/retry, interruption/cancellation, cost/error display, media handling, and secret redaction; otherwise Sim shall preserve the node and explain deferral.",
+            parity_gap=f"Zed has no authorized native provider contract for {route_name}.",
+            observable_zed_acceptance=f"When an approved provider fixture is enabled, {route_name} shall match authentication separation, request/response schema, progress, bounded polling/retry, interruption/cancellation, cost/error display, media handling, and secret redaction; otherwise Zed shall preserve the node and explain deferral.",
             automated_validation=f"Use a non-network provider fake for {row['feature_id']} covering success, invalid input, 408/429/5xx, Retry-After, timeout, cancellation, malformed media, and unavailable entitlement.",
             manual_validation="Do not use a real paid account in baseline validation; inspect gated UI, consent/cost text, secret handling, and disabled/offline behavior with fixtures.",
             open_questions="Live provider, billing, entitlement, regional, retention, and cancellation guarantees require an approved service contract before implementation.",
@@ -2450,10 +2450,10 @@ def add_backend_schemas(features: list[dict[str, str]]) -> None:
             persistence_serialization=joined(row["fields"], row["required"], row["bases"]),
             interfaces_side_effects=f"Used by: {first(row, 'used_by', fallback='usage not statically resolved')}",
             platform_localization_variants="Field names are protocol/persistence identifiers; availability and consumers may be version, route, database, asset, cloud, or feature dependent.",
-            parity_gap=f"Sim has no native typed/lossless adapter for schema {row['schema_name']}.",
-            observable_sim_acceptance=f"Valid, boundary, missing-required, wrong-type, unknown-field, malformed, and future-version fixtures for {row['schema_name']} shall encode/decode without silent loss and match every consuming route/event/persistence status and error.",
+            parity_gap=f"Zed has no native typed/lossless adapter for schema {row['schema_name']}.",
+            observable_zed_acceptance=f"Valid, boundary, missing-required, wrong-type, unknown-field, malformed, and future-version fixtures for {row['schema_name']} shall encode/decode without silent loss and match every consuming route/event/persistence status and error.",
             automated_validation=f"Generate schema contract and round-trip cases for {row['feature_id']} from fields, required set, bases, and consumers.",
-            manual_validation=f"Inspect a representative {row['schema_name']} payload in source and Sim developer diagnostics; verify sensitive fields are redacted.",
+            manual_validation=f"Inspect a representative {row['schema_name']} payload in source and Zed developer diagnostics; verify sensitive fields are redacted.",
             open_questions=("Availability is uncertain until the documented OpenAPI component is reconciled with a reachable runtime consumer." if row["availability"] == "uncertain" else "No schema-specific question beyond unavailable runtime consumers and future-version behavior."),
             source_catalog=name, source_row=index,
         ))
@@ -2472,7 +2472,7 @@ def add_frontend(features: list[dict[str, str]]) -> None:
             interaction_accessibility=row["interaction_accessibility"], state_concurrency=row["state_concurrency"],
             failure_recovery=row["error_recovery"], persistence_serialization=row["persistence_serialization"],
             interfaces_side_effects=row["interfaces_side_effects"], platform_localization_variants=row["platform_localization_variants"],
-            parity_gap=f"Sim has no native Rust/GPUI implementation of frontend contract `{row['name']}`.", observable_sim_acceptance=row["sim_acceptance"], automated_validation=row["automated_validation"],
+            parity_gap=f"Zed has no native Rust/GPUI implementation of frontend contract `{row['name']}`.", observable_zed_acceptance=row["zed_acceptance"], automated_validation=row["automated_validation"],
             manual_validation=row["manual_validation"], open_questions=row["open_questions_assumptions"],
             source_catalog=name, source_row=index,
         ))
@@ -2509,11 +2509,11 @@ def add_frontend_component_surfaces(features: list[dict[str, str]]) -> None:
             interfaces_side_effects=row["interfaces_side_effects"],
             platform_localization_variants=row["platform_localization_variants"],
             parity_gap=(
-                f"This source-specific presentational contract is not separately mapped through a consuming Sim Comfy surface: {row['infrastructure_disposition_reason']}"
+                f"This source-specific presentational contract is not separately mapped through a consuming Zed Comfy surface: {row['infrastructure_disposition_reason']}"
                 if infrastructure
-                else f"Sim has no Comfy-specific GPUI surface for the exact {row['source_file']} interaction and state contract."
+                else f"Zed has no Comfy-specific GPUI surface for the exact {row['source_file']} interaction and state contract."
             ),
-            observable_sim_acceptance=row["observable_sim_acceptance"],
+            observable_zed_acceptance=row["observable_zed_acceptance"],
             automated_validation=row["automated_validation"],
             manual_validation=row["manual_validation"],
             open_questions=row["open_questions"],
@@ -2562,13 +2562,13 @@ def add_frontend_functional_modules(features: list[dict[str, str]]) -> None:
             interfaces_side_effects=row["interfaces_side_effects"],
             platform_localization_variants=row["platform_cloud_variants"],
             parity_gap=(
-                f"This source module is infrastructure rather than a separately ported surface; Sim must preserve {row['infrastructure_disposition']} through its consuming capability and validation fixture."
+                f"This source module is infrastructure rather than a separately ported surface; Zed must preserve {row['infrastructure_disposition']} through its consuming capability and validation fixture."
                 if infrastructure
-                else f"Sim has no Comfy-specific Rust/GPUI module reproducing {row['primary_symbol']}'s source-specific state, transition, failure, and side-effect contract."
+                else f"Zed has no Comfy-specific Rust/GPUI module reproducing {row['primary_symbol']}'s source-specific state, transition, failure, and side-effect contract."
             ),
-            observable_sim_acceptance=row["independent_validation"],
+            observable_zed_acceptance=row["independent_validation"],
             automated_validation=row["independent_validation"],
-            manual_validation=f"Exercise {row['primary_symbol']} through {row['broad_anchor']} in the source frontend and the trace-linked Sim surface; compare visible state, ordering, errors, recovery, persistence, and side effects.",
+            manual_validation=f"Exercise {row['primary_symbol']} through {row['broad_anchor']} in the source frontend and the trace-linked Zed surface; compare visible state, ordering, errors, recovery, persistence, and side effects.",
             open_questions="Runtime-only dependency responses, browser/OS timing, remote/cloud entitlement, and dynamically registered extension behavior remain unverified unless the row cites a focused existing test.",
             source_catalog=name,
             source_row=index,
@@ -2691,17 +2691,17 @@ def add_frontend_supplemental(features: list[dict[str, str]]) -> None:
             interfaces_side_effects="Writes or removes the named browser-storage entry; consuming auth, workspace, billing, editor, or UI state may update immediately.",
             platform_localization_variants="Browser storage availability and distribution gates apply; key names and serialized values are not localized.",
             parity_gap=(
-                "Sim lacks a secure credential-reference import/migration path for this raw browser secret and must not reproduce insecure raw-key persistence."
+                "Zed lacks a secure credential-reference import/migration path for this raw browser secret and must not reproduce insecure raw-key persistence."
                 if secret_bearing
-                else "Sim has no Comfy-specific persisted-state adapter for this key or dynamic pattern."
+                else "Zed has no Comfy-specific persisted-state adapter for this key or dynamic pattern."
             ),
-            observable_sim_acceptance=(
-                f"Sim shall import or consume {row['key_or_pattern']} only through an explicit compatibility flow, move secret bytes into the platform secret provider, persist only an opaque reference, redact diagnostics, and match source expiry/clear/error behavior."
+            observable_zed_acceptance=(
+                f"Zed shall import or consume {row['key_or_pattern']} only through an explicit compatibility flow, move secret bytes into the platform secret provider, persist only an opaque reference, redact diagnostics, and match source expiry/clear/error behavior."
                 if secret_bearing
-                else f"Sim shall preserve the observable defaults, value shape, update timing, restart scope, malformed-value fallback, and clear/consume behavior of {row['key_or_pattern']}."
+                else f"Zed shall preserve the observable defaults, value shape, update timing, restart scope, malformed-value fallback, and clear/consume behavior of {row['key_or_pattern']}."
             ),
             automated_validation=f"Round-trip valid, absent, malformed, unavailable-storage, concurrent-update, restart, and clear/consume fixtures for {row['feature_id']}; assert secret redaction when applicable.",
-            manual_validation=f"Exercise the source consumer for {row['key_or_pattern']}; inspect its visible restoration/failure behavior and compare with Sim without exposing sensitive values.",
+            manual_validation=f"Exercise the source consumer for {row['key_or_pattern']}; inspect its visible restoration/failure behavior and compare with Zed without exposing sensitive values.",
             open_questions="Browser-to-native migration lifetime and secure-secret import policy require an explicit compatibility decision for sensitive entries." if secret_bearing else "No additional question beyond browser/native storage lifetime and migration compatibility.",
             source_catalog=persisted_name,
             source_row=index,
@@ -2740,11 +2740,11 @@ def add_frontend_supplemental(features: list[dict[str, str]]) -> None:
             interaction_accessibility="Telemetry is noninteractive and must not alter focus, labels, keyboard behavior, timing-critical feedback, or accessibility state.",
             state_concurrency="Emission is error-isolated; duplicate prevention and transition detection follow the cited producer.",
             failure_recovery="Uninitialized or failing telemetry is ignored/logged and never blocks navigation, installation, execution completion, or download.",
-            persistence_serialization="Provider-defined analytics retention only; Sim shall not place telemetry payloads in workflow/project persistence.",
+            persistence_serialization="Provider-defined analytics retention only; Zed shall not place telemetry payloads in workflow/project persistence.",
             interfaces_side_effects=f"Optional analytics-provider event {row['wire_name']}.",
             platform_localization_variants="Distribution/provider/consent differences apply; event identifiers are stable and unlocalized.",
-            parity_gap="Sim has no Comfy-specific consent-gated event mapping for this source event.",
-            observable_sim_acceptance=f"With telemetry enabled and a fake provider, Sim emits {row['wire_name']} once with the matching payload at the same state transition; with telemetry disabled or failing, behavior is unchanged.",
+            parity_gap="Zed has no Comfy-specific consent-gated event mapping for this source event.",
+            observable_zed_acceptance=f"With telemetry enabled and a fake provider, Zed emits {row['wire_name']} once with the matching payload at the same state transition; with telemetry disabled or failing, behavior is unchanged.",
             automated_validation=f"Capture {row['wire_name']} with a fake telemetry provider and assert payload, cardinality, gate, and failure isolation.",
             manual_validation="Inspect consent-disabled and provider-failure states without using a real account or external analytics mutation.",
             open_questions="Provider retention, production endpoint, and consent policy require approved service configuration.",
@@ -2782,10 +2782,10 @@ def add_frontend_supplemental(features: list[dict[str, str]]) -> None:
             persistence_serialization="Menu state is transient unless the action changes a separately cataloged workflow, setting, browser-storage, asset, queue, workspace, or account record.",
             interfaces_side_effects=joined(first(row, "action_or_target"), first(row, "consumer_source")),
             platform_localization_variants=f"availability={availability}; labels localize through the source catalog except protocol/developer literals.",
-            parity_gap="Sim has no Comfy-specific GPUI menu/action/focus implementation for this item or infrastructure contract.",
-            observable_sim_acceptance=f"Under the same condition, Sim exposes {row['label_or_action']} on the corresponding GPUI menu surface with matching state, action, focus, keyboard, dismissal, confirmation, and error behavior.",
+            parity_gap="Zed has no Comfy-specific GPUI menu/action/focus implementation for this item or infrastructure contract.",
+            observable_zed_acceptance=f"Under the same condition, Zed exposes {row['label_or_action']} on the corresponding GPUI menu surface with matching state, action, focus, keyboard, dismissal, confirmation, and error behavior.",
             automated_validation=f"Add a deterministic GPUI menu test for {row['feature_id']} covering visibility, enabled/check state, keyboard/pointer activation, action cardinality, focus return, and applicable failure/confirmation.",
-            manual_validation=f"Compare {row['menu_surface']} > {row['menu_path']} > {row['label_or_action']} side by side in source and Sim.",
+            manual_validation=f"Compare {row['menu_surface']} > {row['menu_path']} > {row['label_or_action']} side by side in source and Zed.",
             open_questions="Dynamic extension/data-driven entries require fixture enumeration at runtime; this row records the static producer or consumer boundary.",
             source_catalog=menu_name, source_row=index,
         ))
@@ -2809,11 +2809,11 @@ def add_frontend_supplemental(features: list[dict[str, str]]) -> None:
             persistence_serialization="History mode depends on file protocol; installation/onboarding state persists through the Desktop bridge rather than URL alone.",
             interfaces_side_effects="Vue Router navigation and lazy WelcomeView module load.",
             platform_localization_variants="File protocol uses hash history; Electron/non-file uses base-aware web history; view text is localized.",
-            parity_gap="Sim has no Comfy Desktop first-run route equivalent wired to native GPUI navigation.",
-            observable_sim_acceptance="Fresh Desktop launch reaches the Welcome/source-choice surface at the root route equivalent on every supported platform and can continue/recover without URL-history assumptions.",
+            parity_gap="Zed has no Comfy Desktop first-run route equivalent wired to native GPUI navigation.",
+            observable_zed_acceptance="Fresh Desktop launch reaches the Welcome/source-choice surface at the root route equivalent on every supported platform and can continue/recover without URL-history assumptions.",
             automated_validation="Launch Desktop UI at file and hosted root fixtures; assert WelcomeView and first-run actions, then port as a GPUI interaction test.",
             manual_validation="Compare fresh-launch root navigation and focus on each supported Desktop platform.",
-            open_questions="Native Sim may not expose URL routes; it still requires the same externally observable first-run navigation state.",
+            open_questions="Native Zed may not expose URL routes; it still requires the same externally observable first-run navigation state.",
             source_catalog=route_name, source_row=index,
         ))
 
@@ -2837,8 +2837,8 @@ def add_frontend_supplemental(features: list[dict[str, str]]) -> None:
             persistence_serialization="OAuth challenge/decision remains transient; loaded template JSON/media enters separately cataloged workflow/template persistence.",
             interfaces_side_effects=f"{row['method']} {row['route']} via {row['access_helper']}.",
             platform_localization_variants="Localized template index selection and same-origin Cloud ingress/proxy behavior apply; Desktop/remote base URL mapping must preserve semantics.",
-            parity_gap="Sim lacks a typed Comfy-specific client/static-resource adapter for this contract.",
-            observable_sim_acceptance=f"Against an identical deterministic server/static fixture, Sim issues or resolves {row['method']} {row['route']} with matching credentials, path validation, parsing, fallback, error, and retry behavior.",
+            parity_gap="Zed lacks a typed Comfy-specific client/static-resource adapter for this contract.",
+            observable_zed_acceptance=f"Against an identical deterministic server/static fixture, Zed issues or resolves {row['method']} {row['route']} with matching credentials, path validation, parsing, fallback, error, and retry behavior.",
             automated_validation=f"Add protocol/static-resource fixtures for {row['feature_id']} covering success, missing, wrong content type, malformed body, auth redirect, traversal attempt, and fallback where applicable.",
             manual_validation="Inspect OAuth consent or template browsing with a local fake only; do not use real accounts or paid services.",
             open_questions="Hosted OAuth ingress/cookie and production template-cache headers remain runtime-unverified.",
@@ -2906,23 +2906,23 @@ def desktop_native_target(row: dict[str, str]) -> dict[str, str]:
 
     if remote_comfy:
         gap = (
-            "The source connects a production UI to an external ComfyUI execution endpoint, which the native-only production boundary forbids; Sim has no inactive legacy-record migration and no verified non-transmission guard."
+            "The source connects a production UI to an external ComfyUI execution endpoint, which the native-only production boundary forbids; Zed has no inactive legacy-record migration and no verified non-transmission guard."
         )
         decision = "preserve-as-inactive-legacy-migration-data-and-never-connect-or-transmit"
         acceptance = (
-            "Sim shall import the source URL/profile only as visibly inactive, non-secret legacy migration data; it shall never resolve, open, probe, authenticate to, or transmit workflow data to that endpoint. The UI shall offer native-profile migration or explicit removal, preserve unknown fields until confirmed, and cover invalid URL, secret-bearing URL, cancellation, restart, and deletion recovery."
+            "Zed shall import the source URL/profile only as visibly inactive, non-secret legacy migration data; it shall never resolve, open, probe, authenticate to, or transmit workflow data to that endpoint. The UI shall offer native-profile migration or explicit removal, preserve unknown fields until confirmed, and cover invalid URL, secret-bearing URL, cancellation, restart, and deletion recovery."
         )
     elif legacy_plugin:
         gap = (
-            "The source installs or updates Python custom nodes or ComfyUI-Manager state, which production Sim forbids; the equivalent Rust/WASM plugin lifecycle and legacy mapping are not implemented."
+            "The source installs or updates Python custom nodes or ComfyUI-Manager state, which production Zed forbids; the equivalent Rust/WASM plugin lifecycle and legacy mapping are not implemented."
         )
         decision = "map-to-versioned-rust-wasm-plugin-lifecycle-and-inactive-legacy-records"
         acceptance = (
-            f"Sim shall preserve the visible operation states and failures of the source observation (`{row['observable_behavior']}`) while operating only on signed/versioned Rust or WASM plugins with explicit ports, grants, snapshots, rollback, cancellation, and deterministic legacy identifier mappings. Python packages and Manager configuration remain inactive migration data and are never executed or updated."
+            f"Zed shall preserve the visible operation states and failures of the source observation (`{row['observable_behavior']}`) while operating only on signed/versioned Rust or WASM plugins with explicit ports, grants, snapshots, rollback, cancellation, and deterministic legacy identifier mappings. Python packages and Manager configuration remain inactive migration data and are never executed or updated."
         )
     elif hosted_web_shell:
         gap = (
-            "The source behavior is implemented through an Electron/browser/JavaScript shell, which is not a production Sim execution surface; the matching native GPUI interaction is not implemented."
+            "The source behavior is implemented through an Electron/browser/JavaScript shell, which is not a production Zed execution surface; the matching native GPUI interaction is not implemented."
         )
         decision = "implement-the-observable-shell-interaction-as-native-gpui-without-browser-execution"
         acceptance = (
@@ -2930,20 +2930,20 @@ def desktop_native_target(row: dict[str, str]) -> dict[str, str]:
         )
     else:
         gap = (
-            "The source owns a Python/ComfyUI installation, process, dependency, or release lifecycle that production Sim forbids; the corresponding native profile, Rust worker, artifact, update, and recovery lifecycle is not implemented."
+            "The source owns a Python/ComfyUI installation, process, dependency, or release lifecycle that production Zed forbids; the corresponding native profile, Rust worker, artifact, update, and recovery lifecycle is not implemented."
         )
         decision = "map-source-lifecycle-to-native-rust-worker-artifact-profile-and-recovery-services"
         acceptance = (
-            f"Sim shall reproduce the user-visible lifecycle states of the source observation (`{row['observable_behavior']}`) through native runtime profiles, Sim-owned Rust workers, artifacts, journals, logs, cancellation, rollback, and crash recovery. Legacy installation records remain read-only migration inputs; production shall not probe, create, launch, update, or delete Python/ComfyUI environments."
+            f"Zed shall reproduce the user-visible lifecycle states of the source observation (`{row['observable_behavior']}`) through native runtime profiles, Zed-owned Rust workers, artifacts, journals, logs, cancellation, rollback, and crash recovery. Legacy installation records remain read-only migration inputs; production shall not probe, create, launch, update, or delete Python/ComfyUI environments."
         )
 
     return {
-        "current_sim_status": "conflicting",
+        "current_zed_status": "conflicting",
         "parity_decision": decision,
         "parity_gap": gap,
-        "observable_sim_acceptance": acceptance,
+        "observable_zed_acceptance": acceptance,
         "manual_validation": (
-            f"Use {row['name']} in the source Desktop only as a development oracle, then exercise its native or inactive-migration mapping in Sim; verify visible states, persistence, cancellation/recovery, and a process/network trace proving no Python, hosted frontend, or external Comfy execution."
+            f"Use {row['name']} in the source Desktop only as a development oracle, then exercise its native or inactive-migration mapping in Zed; verify visible states, persistence, cancellation/recovery, and a process/network trace proving no Python, hosted frontend, or external Comfy execution."
         ),
         "open_questions": (
             "The native-only decision is fixed; source runtime timing and platform details that were not observed remain explicit validation uncertainties."
@@ -2962,11 +2962,11 @@ def add_desktop_features(features: list[dict[str, str]]) -> None:
             actor=row["actor_trigger"], trigger=row["actor_trigger"],
             observable_success=row["observable_behavior"], failure_recovery=row["failure_cancellation_recovery"],
             persistence_serialization=row["persistence_side_effects"], interfaces_side_effects=row["persistence_side_effects"],
-            current_sim_status=target.get("current_sim_status", ""),
+            current_zed_status=target.get("current_zed_status", ""),
             parity_decision=target.get("parity_decision", ""),
             parity_gap=target.get("parity_gap", row["parity_gap"]),
-            observable_sim_acceptance=target.get("observable_sim_acceptance", row["acceptance"]), automated_validation=row["validation"],
-            manual_validation=target.get("manual_validation", f"Exercise {row['name']} in source Desktop and Sim on every applicable platform/source/profile; compare focus, lifecycle, errors, cancellation, persistence, and recovery."),
+            observable_zed_acceptance=target.get("observable_zed_acceptance", row["acceptance"]), automated_validation=row["validation"],
+            manual_validation=target.get("manual_validation", f"Exercise {row['name']} in source Desktop and Zed on every applicable platform/source/profile; compare focus, lifecycle, errors, cancellation, persistence, and recovery."),
             open_questions=target.get("open_questions", row["open_questions"]), source_catalog=name, source_row=index,
         ))
 
@@ -3004,10 +3004,10 @@ def add_desktop_renderer_surfaces(features: list[dict[str, str]]) -> None:
             persistence_serialization=row["persistence_serialization"],
             interfaces_side_effects=joined(row["interfaces_side_effects"], row["emits"], f"parent={row['parent_feature_ids']}"),
             platform_localization_variants="Renderer text follows Desktop localization; native title-bar/window behavior retains macOS, Windows, and Linux branches, while cloud, remote, legacy, update, and operation surfaces retain their cited availability.",
-            current_sim_status=row["sim_status"],
-            sim_evidence=row["sim_evidence"],
+            current_zed_status=row["zed_status"],
+            zed_evidence=row["zed_evidence"],
             parity_gap=row["parity_gap"],
-            observable_sim_acceptance=row["observable_sim_acceptance"],
+            observable_zed_acceptance=row["observable_zed_acceptance"],
             automated_validation=row["automated_validation"],
             manual_validation=row["manual_validation"],
             open_questions=row["open_questions"],
@@ -3051,27 +3051,27 @@ def desktop_derived_native_target(
 
     if remote_source:
         decision = "preserve-as-inactive-legacy-migration-data-and-never-connect-or-transmit"
-        gap = "This source/setting opens an external ComfyUI execution endpoint, which production Sim forbids; an inactive non-transmitting migration record is not implemented."
+        gap = "This source/setting opens an external ComfyUI execution endpoint, which production Zed forbids; an inactive non-transmitting migration record is not implemented."
         replacement = "preserve its typed values and unknown fields as an inactive legacy record, never resolve/probe/open/authenticate/transmit to it, and offer native-profile migration or explicit removal"
     elif legacy_plugin:
         decision = "map-to-versioned-rust-wasm-plugin-lifecycle-and-inactive-legacy-records"
-        gap = "This source contract installs, updates, configures, reports, or identifies Python custom nodes/Manager state; production Sim permits only versioned Rust/WASM plugins and inactive legacy data."
+        gap = "This source contract installs, updates, configures, reports, or identifies Python custom nodes/Manager state; production Zed permits only versioned Rust/WASM plugins and inactive legacy data."
         replacement = "preserve the source name/schema/progress/error data while mapping executable lifecycle only to signed versioned Rust/WASM plugins with explicit ports, grants, cancellation, snapshot, and rollback; never execute or update the Python/Manager artifact"
     elif legacy_installation:
         decision = "preserve-legacy-installation-records-read-only-and-map-assets-to-native-profiles"
-        gap = "This source entry owns or adopts a Python/ComfyUI installation mode that production Sim forbids; its read-only migration and native profile mapping are not implemented."
+        gap = "This source entry owns or adopts a Python/ComfyUI installation mode that production Zed forbids; its read-only migration and native profile mapping are not implemented."
         replacement = "retain the source record read-only, preview eligible model/workflow/output/settings adoption into a native profile, require confirmation, and never probe, launch, update, or delete the legacy installation"
     else:
         decision = "map-python-comfy-lifecycle-to-native-rust-worker-artifact-and-operation-semantics"
-        gap = "This control, artifact, event, flag, or bridge contract is tied to Python/ComfyUI lifecycle behavior that production Sim forbids; its native mapping or inactive legacy treatment is not implemented."
-        replacement = "preserve the source identifier, typed payload, visible progress/error/cancel/restart semantics, and persisted unknown data while mapping effects only to Sim-owned Rust worker/artifact/plugin operations or an inactive legacy record; never invoke Python, pip, main.py, Manager, or ComfyUI"
+        gap = "This control, artifact, event, flag, or bridge contract is tied to Python/ComfyUI lifecycle behavior that production Zed forbids; its native mapping or inactive legacy treatment is not implemented."
+        replacement = "preserve the source identifier, typed payload, visible progress/error/cancel/restart semantics, and persisted unknown data while mapping effects only to Zed-owned Rust worker/artifact/plugin operations or an inactive legacy record; never invoke Python, pip, main.py, Manager, or ComfyUI"
 
     return {
-        "current_sim_status": "conflicting",
+        "current_zed_status": "conflicting",
         "parity_decision": decision,
         "parity_gap": gap,
-        "observable_sim_acceptance": f"For `{name}`, Sim shall {replacement}. Validation shall cover source-shaped valid/invalid payloads, permission denial, cancellation, failure, restart, migration confirmation, and a process/network trace proving the prohibited effect never occurs.",
-        "manual_validation": f"Observe `{name}` in source Desktop only as a development oracle, then inspect the native or inactive migration mapping in Sim and verify no Python/ComfyUI process, package update, hosted frontend, or external execution connection occurs.",
+        "observable_zed_acceptance": f"For `{name}`, Zed shall {replacement}. Validation shall cover source-shaped valid/invalid payloads, permission denial, cancellation, failure, restart, migration confirmation, and a process/network trace proving the prohibited effect never occurs.",
+        "manual_validation": f"Observe `{name}` in source Desktop only as a development oracle, then inspect the native or inactive migration mapping in Zed and verify no Python/ComfyUI process, package update, hosted frontend, or external execution connection occurs.",
         "open_questions": "The native-only boundary is fixed; unavailable platform timing, legacy data variants, and live service responses remain explicit source-runtime uncertainties.",
     }
 
@@ -3214,12 +3214,12 @@ def add_desktop_derived(features: list[dict[str, str]]) -> None:
                 state_concurrency=state_concurrency,
                 failure_recovery=failure, persistence_serialization=persistence, interfaces_side_effects=interfaces,
                 platform_localization_variants=first(row, "platform", "availability", fallback="Platform and locale variants follow the cited Desktop source and matched localization ledger."),
-                current_sim_status=target.get("current_sim_status", ""),
+                current_zed_status=target.get("current_zed_status", ""),
                 parity_decision=target.get("parity_decision", ""),
-                parity_gap=target.get("parity_gap", f"Sim has generic native primitives but no Comfy-specific implementation of {name}."),
-                observable_sim_acceptance=target.get("observable_sim_acceptance", f"For {name}, native Sim behavior shall match the cited invocation, typed values, visible success/error/cancel states, trust boundary, side effects, focus/accessibility, platform condition, persistence, restart, and recovery; Electron mechanics may be replaced by typed Rust services."),
+                parity_gap=target.get("parity_gap", f"Zed has generic native primitives but no Comfy-specific implementation of {name}."),
+                observable_zed_acceptance=target.get("observable_zed_acceptance", f"For {name}, native Zed behavior shall match the cited invocation, typed values, visible success/error/cancel states, trust boundary, side effects, focus/accessibility, platform condition, persistence, restart, and recovery; Electron mechanics may be replaced by typed Rust services."),
                 automated_validation=(f"Parameterize VAL-DESKTOP-001 with {feature_id} and source parent {source_feature}." if effective_domain in {"desktop-ipc", "desktop-preload"} else f"Run the trace-linked Desktop/GPUI contract for {feature_id} with deterministic native-service fixtures."),
-                manual_validation=target.get("manual_validation", f"Compare {name} in packaged source Desktop and Sim on every applicable platform, including keyboard-only, cancellation, unavailable dependency, restart, and crash recovery."),
+                manual_validation=target.get("manual_validation", f"Compare {name} in packaged source Desktop and Zed on every applicable platform, including keyboard-only, cancellation, unavailable dependency, restart, and crash recovery."),
                 open_questions=target.get("open_questions", open_questions),
                 source_catalog=catalog_name, source_row=index,
             ))
@@ -3229,25 +3229,25 @@ def cross_product_native_target(row: dict[str, str]) -> dict[str, str]:
     feature_id = clean(row.get("feature_id"))
     if feature_id in {"COMFY-COMPAT-030", "COMFY-COMPAT-035"}:
         return {
-            "current_sim_status": "conflicting",
+            "current_zed_status": "conflicting",
             "parity_decision": "replace-python-javascript-extension-execution-with-versioned-rust-wasm-ports",
-            "parity_gap": "The source compatibility contract executes Python modules, web-directory JavaScript, DOM, or LiteGraph hooks that production Sim forbids; the Rust/WASM mapping and lossless placeholder are not implemented.",
-            "observable_sim_acceptance": "Sim shall preserve every legacy extension identifier, serialized field, widget value, unknown payload, and web-directory reference without importing or executing Python/JavaScript. A supported mapping shall require a versioned Rust/WASM manifest with explicit ports, grants, deterministic provenance, and user-visible acceptance; otherwise the workflow opens with an exact unsupported placeholder and round-trips unchanged.",
+            "parity_gap": "The source compatibility contract executes Python modules, web-directory JavaScript, DOM, or LiteGraph hooks that production Zed forbids; the Rust/WASM mapping and lossless placeholder are not implemented.",
+            "observable_zed_acceptance": "Zed shall preserve every legacy extension identifier, serialized field, widget value, unknown payload, and web-directory reference without importing or executing Python/JavaScript. A supported mapping shall require a versioned Rust/WASM manifest with explicit ports, grants, deterministic provenance, and user-visible acceptance; otherwise the workflow opens with an exact unsupported placeholder and round-trips unchanged.",
         }
     if feature_id in {"COMFY-COMPAT-045", "COMFY-COMPAT-046", "COMFY-COMPAT-048", "COMFY-COMPAT-049"}:
         external = feature_id == "COMFY-COMPAT-046"
         return {
-            "current_sim_status": "conflicting",
+            "current_zed_status": "conflicting",
             "parity_decision": (
                 "preserve-external-endpoint-as-inactive-non-transmitting-migration-data"
                 if external
                 else "preserve-legacy-installation-read-only-and-map-assets-to-native-profiles"
             ),
-            "parity_gap": "The source mode launches, adopts, bundles, manages, or connects to a Python/ComfyUI execution environment that production Sim forbids; safe inactive migration is not implemented.",
-            "observable_sim_acceptance": (
-                "Sim shall import the endpoint only as visibly inactive legacy data, preserve unknown fields and secrets safely, never resolve/probe/open/authenticate/transmit to it, and offer native-profile migration or deletion with confirmation."
+            "parity_gap": "The source mode launches, adopts, bundles, manages, or connects to a Python/ComfyUI execution environment that production Zed forbids; safe inactive migration is not implemented.",
+            "observable_zed_acceptance": (
+                "Zed shall import the endpoint only as visibly inactive legacy data, preserve unknown fields and secrets safely, never resolve/probe/open/authenticate/transmit to it, and offer native-profile migration or deletion with confirmation."
                 if external
-                else "Sim shall retain the legacy installation/profile record read-only, preview eligible model/workflow/output/settings adoption into a native runtime profile, preserve unknown fields until confirmation, and never probe, launch, update, execute, or delete the Python/ComfyUI environment."
+                else "Zed shall retain the legacy installation/profile record read-only, preview eligible model/workflow/output/settings adoption into a native runtime profile, preserve unknown fields until confirmation, and never probe, launch, update, execute, or delete the Python/ComfyUI environment."
             ),
         }
     return {}
@@ -3284,12 +3284,12 @@ def add_cross_product(features: list[dict[str, str]]) -> None:
                 persistence_serialization=first(row, "persistence_serialization", "serialization_behavior", "migration_backward_compatibility", "format_schema", fallback="Round-trip the cited representation and preserve unknown fields/bytes unless a confirmed migration changes them."),
                 interfaces_side_effects=first(row, "interfaces_side_effects", "protocols_dependencies", "interfaces", "side_effects", fallback="Crosses the source-defined REST, WebSocket, IPC, file, media metadata, extension, or custom-node boundary."),
                 platform_localization_variants=first(row, "platform_localization_variants", "platform_version", "variants", "products", fallback="Local, remote, cloud, Desktop, portable, legacy/current, platform, and feature-flag variants remain explicit."),
-                current_sim_status=target.get("current_sim_status", first(row, "sim_status", fallback="missing")),
+                current_zed_status=target.get("current_zed_status", first(row, "zed_status", fallback="missing")),
                 parity_decision=target.get("parity_decision", ""),
-                parity_gap=target.get("parity_gap", first(row, "parity_gap", "exact_parity_gap", fallback="Sim has no Comfy-specific cross-product compatibility adapter.")),
-                observable_sim_acceptance=target.get("observable_sim_acceptance", first(row, "observable_sim_acceptance", "acceptance_criteria", "acceptance", fallback="The same deterministic artifact or wire fixture shall produce semantically equivalent results in every applicable source product and Sim, with unknown data and failure state retained.")),
+                parity_gap=target.get("parity_gap", first(row, "parity_gap", "exact_parity_gap", fallback="Zed has no Comfy-specific cross-product compatibility adapter.")),
+                observable_zed_acceptance=target.get("observable_zed_acceptance", first(row, "observable_zed_acceptance", "acceptance_criteria", "acceptance", fallback="The same deterministic artifact or wire fixture shall produce semantically equivalent results in every applicable source product and Zed, with unknown data and failure state retained.")),
                 automated_validation=first(row, "automated_validation", "validation", fallback=f"Run the trace-linked deterministic cross-product contract for {feature_id}."),
-                manual_validation=first(row, "manual_validation", fallback=f"Exchange {feature_id} among source products and Sim; inspect structure, visible state, side effects, errors, recovery, and restart behavior."),
+                manual_validation=first(row, "manual_validation", fallback=f"Exchange {feature_id} among source products and Zed; inspect structure, visible state, side effects, errors, recovery, and restart behavior."),
                 open_questions=first(row, "open_questions", "assumptions", fallback="Dynamic extensions, unavailable legacy runtimes, cloud services, and platform-native paths remain explicit runtime uncertainties."),
                 source_catalog=catalog_name, source_row=index,
         ))
@@ -3306,27 +3306,27 @@ def normalize_cross_product_native_decision() -> None:
             row.update({
                 "name": "Native Rust production compatibility boundary",
                 "classification": "required native parity decision",
-                "contract": "Production Sim implements execution, nodes, tensors, autograd, RNG, model loading, samplers, schedulers, devices, memory, caching, media, cancellation, and recovery in Sim-owned Rust crates/workers. ComfyUI is development-oracle only. Python/JavaScript extensions are replaced by versioned Rust/WASM explicit-port APIs and deterministic legacy mappings.",
+                "contract": "Production Zed implements execution, nodes, tensors, autograd, RNG, model loading, samplers, schedulers, devices, memory, caching, media, cancellation, and recovery in Zed-owned Rust crates/workers. ComfyUI is development-oracle only. Python/JavaScript extensions are replaced by versioned Rust/WASM explicit-port APIs and deterministic legacy mappings.",
                 "success_behavior": "The native image and diffusion slices run with no source trees, no Python/Node/browser, no external Comfy connection, and no network while native HTTP/WebSocket/CLI projections use the same Rust runtime.",
                 "failure_recovery": "Legacy endpoint, Python installation, and extension data is preserved as inactive migration evidence or exact placeholders; no fallback process or request starts.",
                 "source_evidence": "User-approved native-only architecture constraint; requirements.md Requirements 33-44; design.md D1/D12/D25-D40",
                 "test_evidence": "VAL-NATIVE-BOUNDARY-001; VAL-NATIVE-E2E-001; VAL-NATIVE-E2E-002; VAL-PLUGIN-001",
-                "sim_status": "missing",
-                "parity_gap": "The required native runtime, worker, tensor/model/sampler/node/plugin/API/media implementation and release boundary gates do not exist in Sim.",
+                "zed_status": "missing",
+                "parity_gap": "The required native runtime, worker, tensor/model/sampler/node/plugin/API/media implementation and release boundary gates do not exist in Zed.",
                 "open_questions": "Backend ecosystem/vendor FFI/codec/package choices require implementation ADRs, but cannot relax the native-only boundary.",
             })
             changed = True
             continue
         if any(token in domain for token in ("python extensions", "web extensions")):
-            row["sim_status"] = "conflicting"
-            row["parity_gap"] = "The source executes Python or JavaScript with ambient APIs, which production Sim prohibits; versioned Rust/WASM explicit ports, legacy mappings, grants, limits, and lossless placeholders are not implemented."
+            row["zed_status"] = "conflicting"
+            row["parity_gap"] = "The source executes Python or JavaScript with ambient APIs, which production Zed prohibits; versioned Rust/WASM explicit ports, legacy mappings, grants, limits, and lossless placeholders are not implemented."
             changed = True
         elif domain == "modes" and any(token in name for token in ("managed local", "external remote", "portable", "legacy desktop")):
-            row["sim_status"] = "conflicting"
-            row["parity_gap"] = "The source mode depends on a Python/Comfy server lifecycle or endpoint that production Sim forbids; its observable data/lifecycle needs a native profile, artifact, worker, provider, or migration mapping."
+            row["zed_status"] = "conflicting"
+            row["parity_gap"] = "The source mode depends on a Python/Comfy server lifecycle or endpoint that production Zed forbids; its observable data/lifecycle needs a native profile, artifact, worker, provider, or migration mapping."
             changed = True
-        elif row["sim_status"] == "missing":
-            row["parity_gap"] = f"Sim has no native Rust/GPUI implementation of the cross-product contract `{row['name']}`."
+        elif row["zed_status"] == "missing":
+            row["parity_gap"] = f"Zed has no native Rust/GPUI implementation of the cross-product contract `{row['name']}`."
             changed = True
     if changed:
         rewrite_catalog("cross-compatibility.csv", rows, list(rows[0]))
@@ -3342,7 +3342,7 @@ def sync_cross_product_trace(features: list[dict[str, str]]) -> None:
             if feature is None:
                 continue
             mappings = {
-                "sim_status": feature["current_sim_status"],
+                "zed_status": feature["current_zed_status"],
                 "parity_gap": feature["parity_gap"],
                 "requirements": feature["requirement_criteria"],
                 "design": feature["design_coverage"],
@@ -3401,7 +3401,7 @@ def add_comfy_cli(features: list[dict[str, str]]) -> None:
                 documentation=first(row, "help", "claim", fallback="No separate prose claim was used beyond this row."),
                 actor="CLI user, automation client, plugin/provider author, registry operator, or native runtime operator.",
                 trigger=f"Invoke or consume the comfy-cli {domain} `{name}`.",
-                preconditions=f"The CLI contract is reachable and its source availability is {availability}; production Sim uses only the native `sim comfy` mapping.",
+                preconditions=f"The CLI contract is reachable and its source availability is {availability}; production Zed uses only the native `zed comfy` mapping.",
                 inputs_defaults=joined(row.get("flags"), row.get("kind"), row.get("default"), row.get("required"), row.get("hidden"), row.get("envvar"), row.get("schema_id"), row.get("required"), row.get("top_level_properties"), fallback="Use the exact source declaration in the cited row."),
                 permissions_flags=joined(row.get("hidden"), row.get("cloud_disabled"), row.get("mode"), row.get("availability"), fallback="Native filesystem, network, provider, plugin, and secret permissions apply before side effects."),
                 observable_success=behavior,
@@ -3410,13 +3410,13 @@ def add_comfy_cli(features: list[dict[str, str]]) -> None:
                 failure_recovery=joined(row.get("meaning"), row.get("hint"), row.get("notes"), fallback="Invalid input, missing dependencies, offline, permission denial, cancellation, timeout, interrupted operation, and restart remain native validation cases."),
                 persistence_serialization=joined(row.get("schema_id"), row.get("schema"), row.get("behavior"), row.get("version"), fallback="No separate persisted form beyond the cited CLI contract."),
                 interfaces_side_effects=joined(row.get("command_path"), row.get("flags"), row.get("method"), row.get("path"), row.get("event"), row.get("key"), fallback="CLI stdout/stderr/exit and the cited native operation."),
-                platform_localization_variants="The source requires Python 3.10+, but production parity maps the observable contract to native Rust on supported Sim platforms; cloud/provider and platform gates remain explicit.",
-                current_sim_status=first(row, "target_status", fallback="missing"),
-                parity_gap="Sim has no native `sim comfy` implementation of this exact command, flag, schema, event, error, configuration, format, registry, extension, or lifecycle contract.",
+                platform_localization_variants="The source requires Python 3.10+, but production parity maps the observable contract to native Rust on supported Zed platforms; cloud/provider and platform gates remain explicit.",
+                current_zed_status=first(row, "target_status", fallback="missing"),
+                parity_gap="Zed has no native `zed comfy` implementation of this exact command, flag, schema, event, error, configuration, format, registry, extension, or lifecycle contract.",
                 parity_decision=first(row, "parity_decision", "native_decision", fallback=parity_decision("Comfy CLI", domain, feature_id, availability)),
-                observable_sim_acceptance=f"The native `sim comfy` mapping for {feature_id} shall reproduce the cataloged input, output, event/error, side effect, invalid, offline, cancellation, retry, restart, and version behavior, or emit the recorded architecture-conflicting migration/defer response without launching Python or ComfyUI.",
+                observable_zed_acceptance=f"The native `zed comfy` mapping for {feature_id} shall reproduce the cataloged input, output, event/error, side effect, invalid, offline, cancellation, retry, restart, and version behavior, or emit the recorded architecture-conflicting migration/defer response without launching Python or ComfyUI.",
                 automated_validation=f"Parameterize VAL-CLI-001 and VAL-NATIVE-API-001 with {feature_id}.",
-                manual_validation=f"Compare source help/behavior and native `sim comfy` for {feature_id}; inspect output, exit/error, progress, cancellation, filesystem/provider effects, and recovery.",
+                manual_validation=f"Compare source help/behavior and native `zed comfy` for {feature_id}; inspect output, exit/error, progress, cancellation, filesystem/provider effects, and recovery.",
                 open_questions=first(row, "notes", fallback="Runtime validation is absent because the host Python is below the declared minimum and required CLI dependencies are unavailable."),
                 source_catalog=filename,
                 source_row=index,
@@ -3440,11 +3440,11 @@ def add_documentation_features(features: list[dict[str, str]]) -> None:
             persistence_serialization="The path, title, role, navigation membership, redirects, localization, and source fingerprint are versioned documentation records.",
             interfaces_side_effects="Documentation rendering and navigation only; no executable product side effect is inferred.",
             platform_localization_variants="English is source-of-truth; localized/generated mirrors and navigation differences are reconciled separately.",
-            parity_gap="Sim has no evidence-linked native help/documentation surface for this page or its independently corroborated capability.",
+            parity_gap="Zed has no evidence-linked native help/documentation surface for this page or its independently corroborated capability.",
             parity_decision=row["native_parity_treatment"],
-            observable_sim_acceptance=f"Sim shall link or present the applicable native help for {row['record_id']}, preserve its documented-only classification until corroborated, and reproduce accessible navigation/error behavior without treating prose as executable evidence.",
+            observable_zed_acceptance=f"Zed shall link or present the applicable native help for {row['record_id']}, preserve its documented-only classification until corroborated, and reproduce accessible navigation/error behavior without treating prose as executable evidence.",
             automated_validation=f"Run VAL-DOCS-001 for {row['record_id']} and every listed corroborated feature ID.",
-            manual_validation=f"Open {row['path']} and the mapped Sim help surface; verify title, content role, links, locale, accessibility, and corroboration label.",
+            manual_validation=f"Open {row['path']} and the mapped Zed help surface; verify title, content role, links, locale, accessibility, and corroboration label.",
             open_questions="Documentation claims remain non-executable unless the corroborated feature IDs name code/test evidence.",
             source_catalog="docs-pages.csv", source_row=index,
         ))
@@ -3468,9 +3468,9 @@ def add_documentation_features(features: list[dict[str, str]]) -> None:
             persistence_serialization=f"Package version/fingerprint, node document name, locales, docs-site path, assets, and sync state remain deterministic records.",
             interfaces_side_effects="Read-only embedded resource lookup; no executable node, route, process, or network effect.",
             platform_localization_variants=f"Locales: {row['locales']}; English files carry AI-generated provenance={row['all_english_docs_ai_generated_marker']}.",
-            parity_gap="Sim has no versioned native embedded node-help resource or reconciliation for this record.",
+            parity_gap="Zed has no versioned native embedded node-help resource or reconciliation for this record.",
             parity_decision=row["native_parity_treatment"],
-            observable_sim_acceptance=f"Sim shall resolve {row['record_id']} to native node help or an exact documented-only/unverified placeholder, retain locale and fingerprint provenance, and never infer execution support from the document.",
+            observable_zed_acceptance=f"Zed shall resolve {row['record_id']} to native node help or an exact documented-only/unverified placeholder, retain locale and fingerprint provenance, and never infer execution support from the document.",
             automated_validation=f"Run VAL-DOCS-001 for {row['record_id']} and its registry/docs-site reconciliation.",
             manual_validation=f"Open {row['node_document_name']} in every available locale and compare links, assets, fallback, provenance, and mapped node availability.",
             open_questions="Provider-unverified node claims and package/docs-site version skew remain explicit until executable evidence is available.",
@@ -3513,11 +3513,11 @@ def add_documentation_features(features: list[dict[str, str]]) -> None:
                 persistence_serialization=joined(row.get("openapi_version"), row.get("api_info_version"), row.get("source"), row.get("destination"), row.get("contract"), fallback="The catalog record and source snapshot are the durable evidence."),
                 interfaces_side_effects=joined(row.get("method"), row.get("path"), row.get("contract"), fallback="No production side effect is inferred from documentation alone."),
                 platform_localization_variants="English is source-of-truth; cloud, developer, version, locale, and generated-content variants remain as cataloged.",
-                parity_gap=f"Sim has no explicit native mapping/help/defer treatment for documentation record {feature_id}.",
+                parity_gap=f"Zed has no explicit native mapping/help/defer treatment for documentation record {feature_id}.",
                 parity_decision=first(row, "native_parity_treatment", "native_rust_wasm_port", fallback="retain-as-documented-only-until-executable-corroboration"),
-                observable_sim_acceptance=f"Sim shall preserve and label {feature_id}, link corroborated runtime contracts where present, implement only code/test-supported native behavior, and retain uncorroborated prose as documented-only or explicit defer.",
+                observable_zed_acceptance=f"Zed shall preserve and label {feature_id}, link corroborated runtime contracts where present, implement only code/test-supported native behavior, and retain uncorroborated prose as documented-only or explicit defer.",
                 automated_validation=f"Run VAL-DOCS-001 for {feature_id} and every corroborated feature ID.",
-                manual_validation=f"Inspect the source documentation/tooling/configuration and its Sim mapping; verify version, link/path, availability, accessibility, and evidence label.",
+                manual_validation=f"Inspect the source documentation/tooling/configuration and its Zed mapping; verify version, link/path, availability, accessibility, and evidence label.",
                 open_questions="Any uncorroborated server-side, cloud/paid, generated, or legacy behavior remains uncertain rather than executable evidence.",
                 source_catalog=filename, source_row=index,
             ))
@@ -3531,8 +3531,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
         if feature is None:
             raise RuntimeError(f"Task 18 master feature is missing {feature_id}")
         if kind == "native":
-            feature["current_sim_status"] = "partial"
-            feature["sim_evidence"] = (
+            feature["current_zed_status"] = "partial"
+            feature["zed_evidence"] = (
                 "crates/comfy_ui/src/execution_catalog.rs assigns this row to the native "
                 "profile-scoped Execution dock model; crates/comfy_runtime/src/"
                 "execution_presentation.rs and crates/comfy_ui/src/execution_panel.rs provide "
@@ -3547,8 +3547,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
                 f"native:ExecutionDockPanel;owner:{EXECUTION_UI_OWNER}"
             )
         elif kind == "shared_closure":
-            feature["current_sim_status"] = "partial"
-            feature["sim_evidence"] = (
+            feature["current_zed_status"] = "partial"
+            feature["zed_evidence"] = (
                 "crates/comfy_ui/src/execution_catalog.rs records an explicit SharedClosure "
                 "disposition. Task 18 implements the native execution presentation portion "
                 f"while `{owner}` retains the exact remaining contract."
@@ -3562,8 +3562,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
                 f"closure-owner:{owner}"
             )
         elif kind == "foundation":
-            feature["current_sim_status"] = "partial"
-            feature["sim_evidence"] = (
+            feature["current_zed_status"] = "partial"
+            feature["zed_evidence"] = (
                 "crates/comfy_ui/src/execution_catalog.rs records an explicit Foundation "
                 f"disposition owned by `{owner}` and consumed by the Task 18 presentation model."
             )
@@ -3576,8 +3576,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
                 f"consumer:{EXECUTION_UI_OWNER}"
             )
         elif kind == "later_owned":
-            feature["current_sim_status"] = "deferred"
-            feature["sim_evidence"] = (
+            feature["current_zed_status"] = "deferred"
+            feature["zed_evidence"] = (
                 "crates/comfy_ui/src/execution_catalog.rs retains a typed LaterOwned "
                 f"disposition for `{owner}`; Task 18 does not claim this behavior."
             )
@@ -3595,8 +3595,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
             raise RuntimeError(f"Task 18 command feature is missing {feature_id}")
         if feature_id in TASK_18_QUEUE_DISPOSITIONS:
             continue
-        feature["current_sim_status"] = "partial" if native else "deferred"
-        feature["sim_evidence"] = (
+        feature["current_zed_status"] = "partial" if native else "deferred"
+        feature["zed_evidence"] = (
             f"crates/comfy_ui/src/actions.rs registers `{command_id}` with an exact "
             f"Execution-dock placement and `{owner}` ownership; native action={'yes' if native else 'no'}."
         )
@@ -3616,8 +3616,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
         if feature is None:
             raise RuntimeError(f"Task 18 menu feature is missing {feature_id}")
         native = owner == EXECUTION_UI_OWNER
-        feature["current_sim_status"] = "partial" if native else "deferred"
-        feature["sim_evidence"] = (
+        feature["current_zed_status"] = "partial" if native else "deferred"
+        feature["zed_evidence"] = (
             "crates/comfy_ui/src/shell.rs assigns this job/run menu row an exact native "
             f"placement and `{owner}` action owner."
         )
@@ -3646,8 +3646,8 @@ def apply_task18_target_evidence(features: list[dict[str, str]]) -> None:
         if not expected_disposition.endswith(f"owner:{owner}"):
             raise RuntimeError(f"Task 18 component owner drift for {feature_id}")
         native = owner == EXECUTION_UI_OWNER
-        feature["current_sim_status"] = "partial" if native else "deferred"
-        feature["sim_evidence"] = (
+        feature["current_zed_status"] = "partial" if native else "deferred"
+        feature["zed_evidence"] = (
             "crates/comfy_ui/src/execution_panel.rs, queue_panel.rs, history_panel.rs, "
             "output_view.rs, and graph_render.rs consolidate the source component contract into "
             "one native GPUI model and projection."
@@ -3675,8 +3675,8 @@ def apply_task112_target_evidence(features: list[dict[str, str]]) -> None:
     if feature is None:
         raise RuntimeError("Task 112 master feature is missing COMFY-MODEL-0015")
 
-    feature["current_sim_status"] = "partial"
-    feature["sim_evidence"] = (
+    feature["current_zed_status"] = "partial"
+    feature["zed_evidence"] = (
         "crates/comfy_tensor/src/backends/apple_metal_mps_comfy_model_0015.rs "
         "implements the exact twelve-row native Metal semantic TensorBackend over the "
         "certified opaque comfy_backend_metal::MetalRuntime; focused VAL-DEVICE-001, "
@@ -3756,9 +3756,9 @@ def apply_native_menu_target_evidence(features: list[dict[str, str]]) -> None:
             adapter = ";adapter:canonical-command"
         else:
             adapter = ";adapter:generated-menu-registry"
-        feature["current_sim_status"] = "partial" if placed else "deferred"
+        feature["current_zed_status"] = "partial" if placed else "deferred"
         if context_infrastructure:
-            feature["sim_evidence"] = (
+            feature["zed_evidence"] = (
                 "catalogs/native-menu-dispositions.csv assigns this row as the exact "
                 f"`{context_infrastructure}` prerequisite consumed by the native graph "
                 "context-menu path; crates/comfy_ui/src/generated_menu_catalog.rs provides "
@@ -3771,7 +3771,7 @@ def apply_native_menu_target_evidence(features: list[dict[str, str]]) -> None:
                 "context-menu surfaces; the named owner retains final release closure."
             )
         else:
-            feature["sim_evidence"] = (
+            feature["zed_evidence"] = (
                 "catalogs/native-menu-dispositions.csv assigns this row one exact placement and "
                 "executable owner; crates/comfy_ui/src/generated_menu_catalog.rs is the generated "
                 "typed projection and crates/comfy_ui/src/shell.rs verifies command-backed rows "
@@ -3888,10 +3888,10 @@ def synchronize_source_catalog_targets(features: list[dict[str, str]]) -> None:
             if feature is None:
                 continue
             replacements = {
-                "sim_status": feature["current_sim_status"],
-                "current_sim_status": feature["current_sim_status"],
-                "target_status": feature["current_sim_status"],
-                "sim_evidence": feature["sim_evidence"],
+                "zed_status": feature["current_zed_status"],
+                "current_zed_status": feature["current_zed_status"],
+                "target_status": feature["current_zed_status"],
+                "zed_evidence": feature["zed_evidence"],
                 "parity_gap": feature["parity_gap"],
                 "exact_parity_gap": feature["parity_gap"],
                 "target_gap": feature["parity_gap"],
@@ -3899,11 +3899,11 @@ def synchronize_source_catalog_targets(features: list[dict[str, str]]) -> None:
             }
             if path.name in acceptance_catalogs:
                 replacements.update({
-                    "acceptance": feature["observable_sim_acceptance"],
-                    "acceptance_criteria": feature["observable_sim_acceptance"],
-                    "sim_acceptance": feature["observable_sim_acceptance"],
-                    "observable_sim_acceptance": feature["observable_sim_acceptance"],
-                    "target_acceptance": feature["observable_sim_acceptance"],
+                    "acceptance": feature["observable_zed_acceptance"],
+                    "acceptance_criteria": feature["observable_zed_acceptance"],
+                    "zed_acceptance": feature["observable_zed_acceptance"],
+                    "observable_zed_acceptance": feature["observable_zed_acceptance"],
+                    "target_acceptance": feature["observable_zed_acceptance"],
                 })
             if path.name in question_catalogs:
                 replacements.update({
@@ -4202,7 +4202,7 @@ def write_source_inventory(features: list[dict[str, str]]) -> None:
     classification = Counter(feature["classification"] for feature in features)
     evidence = Counter(feature["evidence_level"] for feature in features)
     availability = Counter(feature["availability"] for feature in features)
-    status = Counter(feature["current_sim_status"] for feature in features)
+    status = Counter(feature["current_zed_status"] for feature in features)
     for target_status in ("equivalent", "partial", "missing", "conflicting", "deferred", "uncertain"):
         status.setdefault(target_status, 0)
     catalog_counts = Counter(feature["source_catalog"] for feature in features)
@@ -4273,7 +4273,7 @@ def write_source_inventory(features: list[dict[str, str]]) -> None:
 
 ## Inventory boundary
 
-The normative feature ledger is [`catalogs/features.csv`](catalogs/features.csv). It contains **{len(features):,}** stable, non-reused feature contracts derived from ComfyUI, ComfyUI-Frontend, Comfy-Desktop, comfy-cli, docs, embedded-docs, Sim target evidence, and cross-product compatibility surfaces. Separate registry, localization, telemetry, test, generated-documentation, and source-file ledgers remain authoritative for count reconciliation even where an individual row is metadata or coverage support rather than a distinct user workflow.
+The normative feature ledger is [`catalogs/features.csv`](catalogs/features.csv). It contains **{len(features):,}** stable, non-reused feature contracts derived from ComfyUI, ComfyUI-Frontend, Comfy-Desktop, comfy-cli, docs, embedded-docs, Zed target evidence, and cross-product compatibility surfaces. Separate registry, localization, telemetry, test, generated-documentation, and source-file ledgers remain authoritative for count reconciliation even where an individual row is metadata or coverage support rather than a distinct user workflow.
 
 No source application, account, paid service, dependency set, or remote state was modified. Runtime evidence includes the safe ComfyUI parser/feature-flag probes, docs link and Bun tests, and embedded-docs link check recorded in [baseline.md](baseline.md). The comfy-cli runtime probe failed before command construction because Python 3.9.6 is below the declared 3.10 minimum and `questionary` is unavailable. Existing tests support `test-backed` classifications only where focused; a test-backed row is not represented as locally passing unless the baseline records a successful run.
 
@@ -4299,7 +4299,7 @@ Direct runtime validation covers **{observed:,}/{len(runtime_eligible):,} ({runt
 
 {counter_table(availability, "Availability")}
 
-## Current Sim status
+## Current Zed status
 
 {counter_table(status, "Status")}
 
@@ -4315,7 +4315,7 @@ The frontend localization ledger contains {len(read_rows('frontend-localization.
 
 {chr(10).join(source_lines)}
 
-Every source file in all six source repositories has a ledger row and either one or more feature/record mappings or an explicit production, infrastructure, generated, translated mirror, test-only/support, asset, documentation, staging, deprecated/dead, or placeholder classification with a reason. Infrastructure, translations, and test-support files are not promoted into fictional executable behavior. Sim target evidence is separately mapped in `catalogs/sim-architecture.csv` and [evidence-sim.md](evidence-sim.md).
+Every source file in all six source repositories has a ledger row and either one or more feature/record mappings or an explicit production, infrastructure, generated, translated mirror, test-only/support, asset, documentation, staging, deprecated/dead, or placeholder classification with a reason. Infrastructure, translations, and test-support files are not promoted into fictional executable behavior. Zed target evidence is separately mapped in `catalogs/zed-architecture.csv` and [evidence-zed.md](evidence-zed.md).
 
 ## Tests, fixtures, stories, and snapshots
 
@@ -4344,14 +4344,14 @@ def write_parity_matrix(features: list[dict[str, str]]) -> None:
         "",
         "Each row is one stable source contract. `Source behavior/evidence` is a concise index into the richer machine ledger and product-specific catalogs. A `deferred` status never removes the source contract or its validation obligation; it records a deliberate compatibility/service decision.",
         "",
-        "| Feature ID | Product / domain / name | Source behavior / evidence | Sim status / evidence | Gap | Parity decision |",
+        "| Feature ID | Product / domain / name | Source behavior / evidence | Zed status / evidence | Gap | Parity decision |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for feature in features:
         source = joined(feature["observable_success"], f"Evidence: {feature['evidence_level']} — {feature['source_evidence']}")
-        sim = joined(feature["current_sim_status"], feature["sim_evidence"])
+        zed = joined(feature["current_zed_status"], feature["zed_evidence"])
         lines.append(
-            f"| `{markdown(feature['feature_id'])}` | {markdown(feature['product'])} / {markdown(feature['domain'])} / {markdown(feature['name'])} | {markdown(source, 900)} | {markdown(sim, 500)} | {markdown(feature['parity_gap'], 500)} | {markdown(feature['parity_decision'])} |"
+            f"| `{markdown(feature['feature_id'])}` | {markdown(feature['product'])} / {markdown(feature['domain'])} / {markdown(feature['name'])} | {markdown(source, 900)} | {markdown(zed, 500)} | {markdown(feature['parity_gap'], 500)} | {markdown(feature['parity_decision'])} |"
         )
     lines.append("")
     (ROOT / "parity-matrix.md").write_text("\n".join(lines), encoding="utf-8")
@@ -4426,7 +4426,7 @@ def write_traceability(features: list[dict[str, str]]) -> None:
 
 
 def write_reconciliation_json(features: list[dict[str, str]]) -> None:
-    fields = ("product", "domain", "classification", "availability", "evidence_level", "current_sim_status", "source_catalog")
+    fields = ("product", "domain", "classification", "availability", "evidence_level", "current_zed_status", "source_catalog")
     runtime_eligible = [
         feature
         for feature in features
@@ -4453,7 +4453,7 @@ def write_reconciliation_json(features: list[dict[str, str]]) -> None:
     }
     counts = {field: Counter(feature[field] for feature in features) for field in fields}
     for target_status in ("equivalent", "partial", "missing", "conflicting", "deferred", "uncertain"):
-        counts["current_sim_status"].setdefault(target_status, 0)
+        counts["current_zed_status"].setdefault(target_status, 0)
     summary = {
         "feature_rows": len(features),
         "counts": {field: dict(sorted(counter.items())) for field, counter in counts.items()},
@@ -4467,7 +4467,7 @@ def write_reconciliation_json(features: list[dict[str, str]]) -> None:
             "feature_rows": len(features),
         },
         "production_native_boundary": {
-            "decision": "Production Sim implements Comfy execution entirely in native Rust and may use source applications only as development-time conformance oracles.",
+            "decision": "Production Zed implements Comfy execution entirely in native Rust and may use source applications only as development-time conformance oracles.",
             "python_comfy_process_allowed": False,
             "external_comfy_connection_allowed": False,
             "python_extension_execution_allowed": False,

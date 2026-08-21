@@ -6,11 +6,11 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Key Architectural Decisions
 
-- **Integrate with `crates/telemetry/`**: Sim already has `crates/telemetry/`. Extend it with new tracing backends (Langfuse, OTel OTLP) rather than creating parallel systems.
+- **Integrate with `crates/telemetry/`**: Zed already has `crates/telemetry/`. Extend it with new tracing backends (Langfuse, OTel OTLP) rather than creating parallel systems.
 - **Langfuse as optional backend**: Implement Langfuse as a `TelemetryBackend` that wraps the Langfuse SDK. When enabled, all telemetry events are also sent to Langfuse.
 - **OTel via `opentelemetry` crate**: Use the Rust OpenTelemetry SDK with OTLP exporter. This is a new dependency but aligns with industry standards.
 - **Rate limiter in `crates/language_models/`**: Rate limiting is provider-specific. Integrate it into the provider request path.
-- **Analytics through existing telemetry**: PostHog is only a conditional exporter behind Sim's consent and telemetry abstraction, never a new parallel analytics crate.
+- **Analytics through existing telemetry**: PostHog is only a conditional exporter behind Zed's consent and telemetry abstraction, never a new parallel analytics crate.
 - **Token counter in `crates/language_model_core/`**: Token counting is a fundamental capability that all model interactions need.
 
 ## 2. Architecture
@@ -265,7 +265,7 @@ _For any_ text [of known token count for a given model], THE token counter SHALL
 - Source: `projects/goose/crates/goose/src/token_counter.rs`
 - Source: `projects/goose/crates/goose/src/tool_monitor.rs`
 - Source: `projects/goose/crates/goose/src/tool_inspection.rs`
-- Sim: `crates/telemetry/`
+- Zed: `crates/telemetry/`
 
 ## Requirements traceability
 
@@ -303,6 +303,6 @@ _For any_ text [of known token count for a given model], THE token counter SHALL
 
 ## Audit design corrections
 
-- **D-TELEMETRY-OWNERSHIP:** Extend Sim's existing tracing and telemetry initialization. Langfuse, OTLP, and any analytics vendor are exporters over shared redacted events, never parallel instrumentation pipelines.
+- **D-TELEMETRY-OWNERSHIP:** Extend Zed's existing tracing and telemetry initialization. Langfuse, OTLP, and any analytics vendor are exporters over shared redacted events, never parallel instrumentation pipelines.
 - **D-TELEMETRY-PRIVACY:** Define consent, sampling, attribute allowlists, cardinality, retention/deletion, queue bounds, retry/backpressure, dropped-event accounting, and shutdown flush before enabling an exporter.
 - **D-TOOL-OBSERVATION:** Tool timing/inspection reuses the agent event and permission path; persisted/remote observations exclude arguments and results unless separately approved.

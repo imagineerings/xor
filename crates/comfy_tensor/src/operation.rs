@@ -2754,14 +2754,14 @@ pub trait CachedAllocationOwner: Send + Sync {
 
     fn allocator_backend_name(&self) -> &'static str {
         match self.cache_device().kind() {
-            DeviceKind::Cpu => "sim-native-cpu-host-v1",
-            DeviceKind::Cuda | DeviceKind::Rocm => "sim-native-cuda-caching-v1",
-            DeviceKind::Metal => "sim-native-metal-heap-v1",
-            DeviceKind::Xpu => "sim-native-xpu-caching-v1",
-            DeviceKind::DirectMl => "sim-native-directml-residency-v1",
-            DeviceKind::Npu => "sim-native-npu-caching-v1",
-            DeviceKind::Mlu => "sim-native-mlu-caching-v1",
-            DeviceKind::CoreX => "sim-native-corex-caching-v1",
+            DeviceKind::Cpu => "zed-native-cpu-host-v1",
+            DeviceKind::Cuda | DeviceKind::Rocm => "zed-native-cuda-caching-v1",
+            DeviceKind::Metal => "zed-native-metal-heap-v1",
+            DeviceKind::Xpu => "zed-native-xpu-caching-v1",
+            DeviceKind::DirectMl => "zed-native-directml-residency-v1",
+            DeviceKind::Npu => "zed-native-npu-caching-v1",
+            DeviceKind::Mlu => "zed-native-mlu-caching-v1",
+            DeviceKind::CoreX => "zed-native-corex-caching-v1",
         }
     }
 
@@ -2787,7 +2787,7 @@ pub trait TensorBackend: CachedAllocationOwner + Send + Sync {
     ) -> Result<BackendWorkspaceLease, TensorError> {
         context.check()?;
         Err(TensorError::UnsupportedCapability {
-            operation: "sim.tensor.workspace.reserve".to_owned(),
+            operation: "zed.tensor.workspace.reserve".to_owned(),
             device: self.device(),
             reason: format!(
                 "the selected backend does not expose workspace reservation for {requested} bytes"
@@ -2976,7 +2976,7 @@ pub trait TensorBackend: CachedAllocationOwner + Send + Sync {
     ) -> Result<(Tensor, EventFence), TensorError> {
         context.check()?;
         Err(TensorError::UnsupportedCapability {
-            operation: "sim.tensor.indexing.rectangular-slice-replacement.v1".to_owned(),
+            operation: "zed.tensor.indexing.rectangular-slice-replacement.v1".to_owned(),
             device: self.device(),
             reason: "the selected backend does not expose exact rectangular slice replacement"
                 .to_owned(),
@@ -3274,7 +3274,7 @@ mod tests {
         assert!(OperationContractId::try_from(OperationContractIdWire("  ".to_owned())).is_err());
         assert!(
             OperationContractId::try_from(OperationContractIdWire(
-                "sim.native-internal.operation.v1".to_owned()
+                "zed.native-internal.operation.v1".to_owned()
             ))
             .is_err()
         );

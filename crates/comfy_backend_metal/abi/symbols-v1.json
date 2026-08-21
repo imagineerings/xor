@@ -76,6 +76,6 @@
     {"path":"usr/include/dlfcn.h","sha256":"04294faa7f4d8f08cef5b11c0813595ba0e87aa345677576ff62423aefa77e33"},
     {"path":"usr/include/objc/runtime.h","sha256":"e34d98bb24db821fde2a06653daa66b72cbeaa8baa55a38c34a6fbdba1adef8c"}
   ],
-  "readiness_function": "sim_comfy_metal_readiness_v1",
+  "readiness_function": "zed_comfy_metal_readiness_v1",
   "unsafe_owner": "comfy_backend_metal::loader"
 }

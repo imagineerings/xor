@@ -1,18 +1,18 @@
-# Design: Sim Game Development Surface
+# Design: Zed Game Development Surface
 
 ## Architecture
 
-The game development surface is organized as Sim-native integration layers:
+The game development surface is organized as Zed-native integration layers:
 
 - `crates/world_model`: world-model request/control/worker/graph/mesh/artifact/provenance primitives.
 - Comfy harness modules inside `crates/world_model`: core runtime control-plane adapters, Comfy graph/node schemas, sampler/scheduler execution semantics, conditioning, latent/VAE behavior, model patching, diffusion/world-model runner profiles, model folder and memory policy, asset APIs, workflow/blueprint catalogs, provider connectors, extension loading policy, and compatibility fixtures.
-- Existing Sim crates: project, worktree, language, LSP, DAP, tasks, debugger, media, UI, agent, app registry, settings, persistence, networking, extensions, rendering, diagnostics, and platform crates own Godot-origin behavior in their existing domains.
+- Existing Zed crates: project, worktree, language, LSP, DAP, tasks, debugger, media, UI, agent, app registry, settings, persistence, networking, extensions, rendering, diagnostics, and platform crates own Godot-origin behavior in their existing domains.
 
 ### Design Principle: Native Integration
 
-Every supported Godot-originated feature is modeled, stored, presented, executed, canceled, recovered, and retired through a named Sim owner. Godot is a behavioral and compatibility reference only: no compatibility shim, hidden instance, process invocation, runtime linkage, external Godot task, registrar layer, or parallel Godot-specific subsystem may establish support. SimScript uses the existing `LanguageRegistry`; legacy `.gd` files and Godot-format assets are compatibility inputs whose successful outputs are Sim-native. Capabilities without an approved native owner remain unresolved or intentionally excluded.
+Every supported Godot-originated feature is modeled, stored, presented, executed, canceled, recovered, and retired through a named Zed owner. Godot is a behavioral and compatibility reference only: no compatibility shim, hidden instance, process invocation, runtime linkage, external Godot task, registrar layer, or parallel Godot-specific subsystem may establish support. SimScript uses the existing `LanguageRegistry`; legacy `.gd` files and Godot-format assets are compatibility inputs whose successful outputs are Zed-native. Capabilities without an approved native owner remain unresolved or intentionally excluded.
 
-Every Comfy-derived world-model harness capability follows the same native-integration rule. A supported Comfy workflow, graph, node, sampler, scheduler, conditioning, latent, VAE, model patch, diffusion/world-model runner, model, asset, provider, extension, API route, or packaging/quality feature must be implemented through Sim-owned services, typed records, worker boundaries, artifact/provenance models, and diagnostics. Compatibility data may define expected behavior and fixtures, but support is not satisfied by a label, a hidden ComfyUI proxy, or a pass-through to ComfyUI.
+Every Comfy-derived world-model harness capability follows the same native-integration rule. A supported Comfy workflow, graph, node, sampler, scheduler, conditioning, latent, VAE, model patch, diffusion/world-model runner, model, asset, provider, extension, API route, or packaging/quality feature must be implemented through Zed-owned services, typed records, worker boundaries, artifact/provenance models, and diagnostics. Compatibility data may define expected behavior and fixtures, but support is not satisfied by a label, a hidden ComfyUI proxy, or a pass-through to ComfyUI.
 
 ### Design Principle: Value-First Sequencing
 
@@ -22,7 +22,7 @@ The migration gatekeeper ranks available work by target-product value after gate
 
 ### Coverage catalog and validator
 
-The specification-owned catalog and validators—not a product crate—record grouped coverage, native owners, compatibility boundaries, unresolved/excluded behavior, and no-Godot evidence. Product code uses existing Sim owners directly.
+The specification-owned catalog and validators—not a product crate—record grouped coverage, native owners, compatibility boundaries, unresolved/excluded behavior, and no-Godot evidence. Product code uses existing Zed owners directly.
 
 ### WorldModelHarness
 
@@ -50,7 +50,7 @@ pub trait DiffusionGraphValidator {
 
 ### SimHarnessLayer
 
-Owns Comfy-derived world-model harness semantics, protocol adapters, and compatibility catalogs while delegating storage, media, tasks, secrets, UI, model serving, and dependency review to Sim systems.
+Owns Comfy-derived world-model harness semantics, protocol adapters, and compatibility catalogs while delegating storage, media, tasks, secrets, UI, model serving, and dependency review to Zed systems.
 
 ```rust
 pub trait SimHarnessLayer {
@@ -100,7 +100,7 @@ pub enum DependencyWave {
 
 ### Property 1: No Runtime Duplication
 
-_For any_ Godot subsystem that duplicates Sim platform, rendering, UI, input, physics, networking, audio, XR, or text infrastructure, the design SHALL extend the existing owner or classify the capability unresolved/intentionally excluded; it SHALL NOT invoke or wrap Godot.
+_For any_ Godot subsystem that duplicates Zed platform, rendering, UI, input, physics, networking, audio, XR, or text infrastructure, the design SHALL extend the existing owner or classify the capability unresolved/intentionally excluded; it SHALL NOT invoke or wrap Godot.
 
 **Validates: Requirement 2.1, 2.2**
 
@@ -130,7 +130,7 @@ _For any_ generated video, mesh, texture, or exported artifact, the artifact rec
 
 ### Property 6: Comfy Ownership Boundaries
 
-_For any_ Comfy feature, if an existing Sim or game/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
+_For any_ Comfy feature, if an existing Zed or game/world-model migration spec owns the underlying UI, task, media, asset, secret, model-serving, mesh, or dependency-review behavior, the Comfy harness layer SHALL delegate to that owner and SHALL NOT add a parallel subsystem.
 
 **Validates: Requirement 2.1, 2.2, 13.2, 13.3**
 
@@ -142,13 +142,13 @@ _For any_ world-model harness implementation decision involving prompt jobs, gra
 
 ### Property 7A: Native Comfy Recreation
 
-_For any_ Comfy-derived endpoint, node, workflow, model, asset, provider, extension, media operation, or execution behavior, the implementation SHALL provide a native Sim feature backed by Sim services and data models rather than a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
+_For any_ Comfy-derived endpoint, node, workflow, model, asset, provider, extension, media operation, or execution behavior, the implementation SHALL provide a native Zed feature backed by Zed services and data models rather than a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
 
 **Validates: Requirement 13.7**
 
 ### Property 8: Direct Registry Integration
 
-_For any_ game feature that maps to an existing Sim capability (language support, task providers, preview routing), the integration SHALL use Sim's native registries directly rather than through an intermediate abstraction layer.
+_For any_ game feature that maps to an existing Zed capability (language support, task providers, preview routing), the integration SHALL use Zed's native registries directly rather than through an intermediate abstraction layer.
 
 **Validates: Requirement 2.1**
 
@@ -164,9 +164,9 @@ _For any_ SimScript or natural-language authoring task, the task SHALL model nat
 
 **Validates: Requirement 14.3**
 
-### Property 11: Native Sim ownership without Godot
+### Property 11: Native Zed ownership without Godot
 
-_For any_ supported or fully specified Godot-origin capability, the catalog and owner spec SHALL name the Sim-native storage, execution, UI, lifecycle, and compatibility paths and SHALL prove operation with Godot absent from the machine, package, process tree, loader, and dependency graph.
+_For any_ supported or fully specified Godot-origin capability, the catalog and owner spec SHALL name the Zed-native storage, execution, UI, lifecycle, and compatibility paths and SHALL prove operation with Godot absent from the machine, package, process tree, loader, and dependency graph.
 
 **Validates: Requirement 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8, 15.9, 15.10**
 
@@ -246,9 +246,9 @@ This reconciliation table preserves the existing design decisions and IDs while 
 | 14.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
 | 14.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
 | 14.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
-| 15.1 | Property 11 and owner-spec D-NATIVE elements | Native owner and Sim storage/execution/UI/lifecycle review |
+| 15.1 | Property 11 and owner-spec D-NATIVE elements | Native owner and Zed storage/execution/UI/lifecycle review |
 | 15.2 | Property 11 and owner-spec D-NATIVE elements | Hermetic process, package, loader, and dependency inspection |
-| 15.3 | Property 11 and owner-spec D-NATIVE elements | Compatibility-boundary and Sim-native output validation |
+| 15.3 | Property 11 and owner-spec D-NATIVE elements | Compatibility-boundary and Zed-native output validation |
 | 15.4 | Property 11 and owner-spec D-NATIVE elements | Existing-owner reuse and duplicate-abstraction scan |
 | 15.5 | Property 11 and owner-spec D-NATIVE elements | Import success/failure/cancellation/recovery without Godot |
 | 15.6 | Property 11 and owner-spec D-NATIVE elements | Exported-artifact execution on a no-Godot machine image |

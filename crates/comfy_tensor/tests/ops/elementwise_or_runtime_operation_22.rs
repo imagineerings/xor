@@ -360,7 +360,7 @@ fn policy_and_device_adapters_project_canonical_state_only() -> Result<(), Box<d
     let cuda = DeviceId::new(DeviceKind::Cuda, 2);
     let properties = NativeDeviceProperties::new(
         cuda,
-        "Sim Native CUDA Fixture",
+        "Zed Native CUDA Fixture",
         16 * 1024 * 1024,
         9,
         0,
@@ -375,7 +375,7 @@ fn policy_and_device_adapters_project_canonical_state_only() -> Result<(), Box<d
     )?;
     assert_eq!(
         cuda_get_device_name_exact_native(&cuda_capabilities, cuda, &cancellation)?,
-        "Sim Native CUDA Fixture"
+        "Zed Native CUDA Fixture"
     );
     assert!(
         cuda_get_device_name_exact_native(&cuda_capabilities, DeviceId::CPU, &cancellation)

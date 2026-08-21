@@ -384,7 +384,7 @@ mod tests {
         )
         .expect("tenant");
         let scope = AuthorizationScope::new("channels:write").expect("scope");
-        let principal = AuthenticatedPrincipal::sim_account(
+        let principal = AuthenticatedPrincipal::zed_account(
             principal(),
             community(),
             ServiceAccountId::new(1),

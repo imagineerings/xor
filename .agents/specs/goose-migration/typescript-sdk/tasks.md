@@ -26,7 +26,7 @@ Publish this package only after the SDK product decision and ACP server compatib
   - Route connection/session messages and clean up pending work on abort/disconnect/malformed input.
   - _Requirements: 2.2, 2.3, 2.4_
   - _Depends on: 2_
-  - _Reads: projects/goose/ui/sdk/src/http-stream.ts, approved Sim ACP HTTP transport design_
+  - _Reads: projects/goose/ui/sdk/src/http-stream.ts, approved Zed ACP HTTP transport design_
   - _Writes: TypeScript SDK HTTP stream adapter and transport tests_
   - _Validation: server compatibility, stream correlation, abort, disconnect, malformed-message, and cleanup tests_
 
@@ -34,7 +34,7 @@ Publish this package only after the SDK product decision and ACP server compatib
   - Use the approved server method inventory as the single source of truth.
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 5.1, 5.2_
   - _Depends on: 2_
-  - _Reads: projects/goose/ui/sdk/src/generated, projects/goose/crates/goose-sdk-types/src, approved Sim ACP schema definitions_
+  - _Reads: projects/goose/ui/sdk/src/generated, projects/goose/crates/goose-sdk-types/src, approved Zed ACP schema definitions_
   - _Writes: SDK generation script and committed generated TypeScript outputs_
   - _Validation: generation freshness check and request/response/notification compatibility tests for every approved method_
 
@@ -50,7 +50,7 @@ Publish this package only after the SDK product decision and ACP server compatib
   - Resolve explicit overrides and installed optional packages without implicit downloads.
   - _Requirements: 6.1, 6.2, 6.3_
   - _Depends on: 1_
-  - _Reads: projects/goose/ui/sdk/src/resolve-binary.ts, approved Sim native package matrix_
+  - _Reads: projects/goose/ui/sdk/src/resolve-binary.ts, approved Zed native package matrix_
   - _Writes: Node-only binary resolver and platform fixture tests_
   - _Validation: override, supported package, unsupported OS/architecture, missing package, and no-download tests_
 
@@ -58,6 +58,6 @@ Publish this package only after the SDK product decision and ACP server compatib
   - Exercise standard ACP, approved custom methods, streams, capabilities, and failure behavior.
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3_
   - _Depends on: 2, 3, 4, 5, 6_
-  - _Reads: all SDK source, approved Sim ACP server fixtures, Goose SDK compatibility fixtures_
+  - _Reads: all SDK source, approved Zed ACP server fixtures, Goose SDK compatibility fixtures_
   - _Writes: TypeScript SDK end-to-end fixtures and compatibility matrix_
   - _Validation: package tests/typecheck and end-to-end compatibility suite against each approved transport_

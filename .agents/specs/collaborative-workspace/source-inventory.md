@@ -2,12 +2,12 @@
 
 ## Purpose and audit basis
 
-This inventory is the coverage ledger for migrating `projects/buzz` into Sim. A row is complete only when its capability IDs have a disposition in `reuse-audit.md`, requirements coverage, and one or more leaf tasks in `tasks.md`. The audit was made from the source tree on 2026-08-13, including Buzz manifests, Rust modules, SQL migrations, protocol documents, desktop feature directories and Tauri modules, mobile and web source trees, deployment charts, workflows, scripts, tests, examples, and benchmarks. Generated assets, lockfiles, vendored package metadata, and duplicated test fixtures are covered by their owning component rather than listed file-by-file.
+This inventory is the coverage ledger for migrating `projects/buzz` into Zed. A row is complete only when its capability IDs have a disposition in `reuse-audit.md`, requirements coverage, and one or more leaf tasks in `tasks.md`. The audit was made from the source tree on 2026-08-13, including Buzz manifests, Rust modules, SQL migrations, protocol documents, desktop feature directories and Tauri modules, mobile and web source trees, deployment charts, workflows, scripts, tests, examples, and benchmarks. Generated assets, lockfiles, vendored package metadata, and duplicated test fixtures are covered by their owning component rather than listed file-by-file.
 
 Coverage states:
 
 - **Inventoried**: source and observable responsibility identified.
-- **Mapped**: canonical Sim disposition exists in `reuse-audit.md`.
+- **Mapped**: canonical Zed disposition exists in `reuse-audit.md`.
 - **Approval gate**: implementation depends on an explicit architecture or product decision.
 
 ## Visual reference artifacts
@@ -61,7 +61,7 @@ The hashes establish provenance for the specification baseline. An intentional r
 | CAP-034 | Remote-agent providers | Discovery-only `buzz-backend-*` ABI, hostile-output handling, remote lifecycle, presence-as-status, Kubernetes binding | `docs/remote-agents.md`, `buzz-backend-kubernetes` | Mapped |
 | CAP-035 | Relay mesh and shared compute | Iroh/QUIC mesh membership, gossip, fenced wire contract, compute advertisements, remote execution/mesh LLM | `buzz-relay-mesh`, desktop `mesh-compute`, Tauri `mesh_llm`, `VISION_MESH.md` | Mapped; ADR-006 |
 | CAP-036 | Native collaborative desktop | Communities/projects/tasks rail; human/agent timeline; review pane; composer; status; settings; local archive and terminal | `desktop/src/app`, 29 desktop feature areas, `screenshots/screenshot-{1,2}.png` | Mapped |
-| CAP-037 | Onboarding and workspace selection | Identity/community setup, backup, welcome guide agents, configurable post-onboarding navigation | desktop `onboarding`; target Sim `crates/onboarding` | Mapped |
+| CAP-037 | Onboarding and workspace selection | Identity/community setup, backup, welcome guide agents, configurable post-onboarding navigation | desktop `onboarding`; target Zed `crates/onboarding` | Mapped |
 | CAP-038 | Agent-first CLI | Signed commands for channels, DMs, messages, projects, repos, patches, PRs, agents, workflows, memory, moderation, social and uploads | `crates/buzz-cli` | Mapped |
 | CAP-039 | Web client | Invite redemption and NIP-98-authenticated repository browsing/download | `web/src` | Mapped |
 | CAP-040 | Mobile client | Communities, auth/pairing, activity, messaging/threads, forum/pulse, profile/presence, search, media and push-oriented lifecycle | `mobile/lib` | Mapped |
@@ -77,36 +77,36 @@ Every Buzz workspace package is assigned below. A package may serve several capa
 
 | Buzz package | Responsibility | Capability IDs | Expected final disposition |
 | --- | --- | --- | --- |
-| `buzz-core` | Pure event, tenant, network, pairing, identity and protocol rules | CAP-001-004, CAP-007, CAP-010-014, CAP-018-020, CAP-023-030, CAP-033 | Split into Sim-owned domain/protocol modules; retire package name after parity |
-| `buzz-sdk` | Typed signed-event builders and mentions | CAP-001-002, CAP-007-020, CAP-023-030 | Retain as Nostr compatibility adapter, then rename under Sim ownership |
-| `buzz-relay` | WebSocket/HTTP ingest, read, fan-out, Git/media/audio/workflow orchestration | CAP-002-006, CAP-008-020, CAP-027-032, CAP-041, CAP-043 | Temporary service boundary; consolidate into Sim collaboration deployment after ADR-001 |
+| `buzz-core` | Pure event, tenant, network, pairing, identity and protocol rules | CAP-001-004, CAP-007, CAP-010-014, CAP-018-020, CAP-023-030, CAP-033 | Split into Zed-owned domain/protocol modules; retire package name after parity |
+| `buzz-sdk` | Typed signed-event builders and mentions | CAP-001-002, CAP-007-020, CAP-023-030 | Retain as Nostr compatibility adapter, then rename under Zed ownership |
+| `buzz-relay` | WebSocket/HTTP ingest, read, fan-out, Git/media/audio/workflow orchestration | CAP-002-006, CAP-008-020, CAP-027-032, CAP-041, CAP-043 | Temporary service boundary; consolidate into Zed collaboration deployment after ADR-001 |
 | `buzz-db` | Postgres event store and projections | CAP-003, CAP-005, CAP-010-020, CAP-024, CAP-027-030 | Port migrations/projections; one owner per aggregate |
-| `buzz-auth` | NIP auth, scopes, access and replay | CAP-007-008 | Merge with Sim service auth behind explicit Nostr adapter |
+| `buzz-auth` | NIP auth, scopes, access and replay | CAP-007-008 | Merge with Zed service auth behind explicit Nostr adapter |
 | `buzz-pubsub` | Redis realtime/presence/typing | CAP-006, CAP-014 | Port missing semantics into collaboration service; retire duplicate connection registry |
 | `buzz-search` | Community-scoped FTS | CAP-015 | Port server search projections; native client uses common search result model |
 | `buzz-audit` | Hash-chain audit | CAP-028 | Port as lower-level service module |
 | `buzz-deletion` | Community deletion state machine | CAP-030, CAP-041 | Port unchanged semantics, adapt storage interfaces |
 | `buzz-workflow` | Workflow engine | CAP-027 | Port as non-GPUI domain/service component; complete known stubs before parity claim |
-| `buzz-media` | S3/Blossom media | CAP-031 | Retain wire adapter; integrate media domain with Sim HTTP/credentials |
-| `buzz-push-gateway` | NIP-PL push executor | CAP-016, CAP-043 | Long-term compatibility service with Sim-owned deployment and domain contracts |
+| `buzz-media` | S3/Blossom media | CAP-031 | Retain wire adapter; integrate media domain with Zed HTTP/credentials |
+| `buzz-push-gateway` | NIP-PL push executor | CAP-016, CAP-043 | Long-term compatibility service with Zed-owned deployment and domain contracts |
 | `buzz-relay-mesh` | Iroh mesh | CAP-035 | Port unique capability; keep transport isolated behind mesh domain interface |
 | `buzz-conformance` | Independent relay trace checker | CAP-003, CAP-044 | Retain independent from production dependencies |
-| `buzz-datastore-tracing` | Privacy-preserving database tracing macros | CAP-028, CAP-043-044 | Merge into Sim observability conventions |
+| `buzz-datastore-tracing` | Privacy-preserving database tracing macros | CAP-028, CAP-043-044 | Merge into Zed observability conventions |
 | `buzz-ws-client` | Shared NIP-42 WebSocket client | CAP-002, CAP-004 | Merge into client transport adapter |
 | `buzz-test-client` | Relay integration/E2E harness | CAP-044 | Retain as black-box compatibility suite until final parity |
-| `buzz-admin` | Operator CLI | CAP-030, CAP-041 | Merge commands into canonical Sim operator surface; retain command shim during transition |
-| `buzz-cli` | Agent-first user/agent CLI | CAP-038, CAP-042 | Merge into Sim CLI namespace; retain `buzz` shim for scripts |
-| `buzz-acp` | Relay-to-ACP harness | CAP-021, CAP-025-026, CAP-034 | Adapt to Sim ACP runtime; retain remote launcher compatibility until migrated |
-| `buzz-agent` | Minimal ACP agent | CAP-022 | Reuse Sim agent where parity holds; retain external ACP conformance profile |
-| `buzz-dev-mcp` | Developer MCP tools | CAP-022 | Map to Sim tools; retain only protocol-compatibility shims |
-| `buzz-persona` | Persona pack parser/merge/validation | CAP-023-024 | Port parser into Sim agent configuration owner |
-| `sprig` | Bundled ACP/agent/MCP runtime | CAP-021-022, CAP-034 | Retain remote compatibility image, then rebuild from Sim-owned binaries |
-| `buzz-backend-kubernetes` | Remote Kubernetes provider | CAP-034, CAP-043 | Port provider ABI and implementation under Sim remote-agent ownership |
-| `buzz-pair-relay` | Ephemeral pairing relay | CAP-033 | Retain compatibility service with Sim release ownership |
-| `buzz-pairing-cli` | Pairing interop CLI | CAP-033, CAP-038 | Retain as conformance utility or Sim CLI subcommand |
-| `git-credential-nostr` | NIP-98 Git credential helper | CAP-019 | Retain compatibility binary; use Sim credential store |
-| `git-sign-nostr` | Git signing helper | CAP-019 | Retain compatibility binary; integrate with Sim Git settings |
-| `buzz-voice` | Local voice primitives/models | CAP-032 | Merge with Sim audio/voice owners after ADR-004 |
+| `buzz-admin` | Operator CLI | CAP-030, CAP-041 | Merge commands into canonical Zed operator surface; retain command shim during transition |
+| `buzz-cli` | Agent-first user/agent CLI | CAP-038, CAP-042 | Merge into Zed CLI namespace; retain `buzz` shim for scripts |
+| `buzz-acp` | Relay-to-ACP harness | CAP-021, CAP-025-026, CAP-034 | Adapt to Zed ACP runtime; retain remote launcher compatibility until migrated |
+| `buzz-agent` | Minimal ACP agent | CAP-022 | Reuse Zed agent where parity holds; retain external ACP conformance profile |
+| `buzz-dev-mcp` | Developer MCP tools | CAP-022 | Map to Zed tools; retain only protocol-compatibility shims |
+| `buzz-persona` | Persona pack parser/merge/validation | CAP-023-024 | Port parser into Zed agent configuration owner |
+| `sprig` | Bundled ACP/agent/MCP runtime | CAP-021-022, CAP-034 | Retain remote compatibility image, then rebuild from Zed-owned binaries |
+| `buzz-backend-kubernetes` | Remote Kubernetes provider | CAP-034, CAP-043 | Port provider ABI and implementation under Zed remote-agent ownership |
+| `buzz-pair-relay` | Ephemeral pairing relay | CAP-033 | Retain compatibility service with Zed release ownership |
+| `buzz-pairing-cli` | Pairing interop CLI | CAP-033, CAP-038 | Retain as conformance utility or Zed CLI subcommand |
+| `git-credential-nostr` | NIP-98 Git credential helper | CAP-019 | Retain compatibility binary; use Zed credential store |
+| `git-sign-nostr` | Git signing helper | CAP-019 | Retain compatibility binary; integrate with Zed Git settings |
+| `buzz-voice` | Local voice primitives/models | CAP-032 | Merge with Zed audio/voice owners after ADR-004 |
 | `countdown-bot` | Example event-driven bot | CAP-010-011, CAP-044 | Port as compatibility example/test fixture |
 
 ## Protocol extensions and kind families

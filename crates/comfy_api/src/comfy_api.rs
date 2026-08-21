@@ -1625,10 +1625,10 @@ fn plugin_route_request(
     request: &HttpRequest,
     host_profile_id: &str,
 ) -> Result<Option<security::PluginRouteRequest>, NativeApiHostError> {
-    let profile_id = request_header(request, "x-sim-plugin-profile");
-    let plugin_id = request_header(request, "x-sim-plugin-id");
-    let plugin_digest = request_header(request, "x-sim-plugin-digest");
-    let capabilities = request_header(request, "x-sim-plugin-capabilities");
+    let profile_id = request_header(request, "x-zed-plugin-profile");
+    let plugin_id = request_header(request, "x-zed-plugin-id");
+    let plugin_digest = request_header(request, "x-zed-plugin-digest");
+    let capabilities = request_header(request, "x-zed-plugin-capabilities");
     if profile_id.is_none()
         && plugin_id.is_none()
         && plugin_digest.is_none()
@@ -1741,7 +1741,7 @@ fn stable_request_digest(
     authority: &NativeRequestAuthority,
 ) -> String {
     let mut digest = Sha256::new();
-    update_digest(&mut digest, b"sim-native-http-request-v2");
+    update_digest(&mut digest, b"zed-native-http-request-v2");
     update_digest(&mut digest, authority.profile_id.as_bytes());
     update_digest(&mut digest, authority.principal.as_bytes());
     update_digest(
@@ -1780,9 +1780,9 @@ fn stable_request_digest(
         "if-match",
         "if-none-match",
         "range",
-        "x-sim-plugin-capabilities",
-        "x-sim-plugin-digest",
-        "x-sim-plugin-id",
+        "x-zed-plugin-capabilities",
+        "x-zed-plugin-digest",
+        "x-zed-plugin-id",
     ];
     for header_name in SEMANTIC_HEADERS {
         update_digest(&mut digest, header_name.as_bytes());
@@ -1823,7 +1823,7 @@ fn scoped_websocket_client_id(
     requested_client_id: &ClientId,
 ) -> Result<ClientId, NativeApiHostError> {
     let mut digest = Sha256::new();
-    update_digest(&mut digest, b"sim-native-websocket-client-v1");
+    update_digest(&mut digest, b"zed-native-websocket-client-v1");
     update_digest(&mut digest, profile_id.as_bytes());
     update_digest(&mut digest, principal.as_bytes());
     update_digest(&mut digest, requested_client_id.as_str().as_bytes());
@@ -1876,7 +1876,7 @@ fn scoped_identity_digest(
     authority: &NativeRequestAuthority,
 ) -> String {
     let mut digest = Sha256::new();
-    update_digest(&mut digest, b"sim-native-http-identity-v1");
+    update_digest(&mut digest, b"zed-native-http-identity-v1");
     update_digest(&mut digest, domain);
     update_digest(&mut digest, authority.profile_id.as_bytes());
     update_digest(&mut digest, authority.principal.as_bytes());
@@ -2161,11 +2161,11 @@ pub(crate) mod tests {
     fn plugin_authority_headers_require_canonical_capability_identifiers()
     -> Result<(), Box<dyn Error>> {
         let request = HttpRequest::new(comfy_types::HttpMethod::Post, "/api/jobs/cancel")
-            .with_header("x-sim-plugin-profile", "profile-a")
-            .with_header("x-sim-plugin-id", "provider-plugin")
-            .with_header("x-sim-plugin-digest", "sha256:provider-plugin")
+            .with_header("x-zed-plugin-profile", "profile-a")
+            .with_header("x-zed-plugin-id", "provider-plugin")
+            .with_header("x-zed-plugin-digest", "sha256:provider-plugin")
             .with_header(
-                "x-sim-plugin-capabilities",
+                "x-zed-plugin-capabilities",
                 "provider_network:payment|https://payment.invalid/api/jobs/cancel",
             );
         let parsed = plugin_route_request(&request, "profile-a")?
@@ -2180,10 +2180,10 @@ pub(crate) mod tests {
         );
 
         let malformed = HttpRequest::new(comfy_types::HttpMethod::Post, "/api/jobs/cancel")
-            .with_header("x-sim-plugin-profile", "profile-a")
-            .with_header("x-sim-plugin-id", "provider-plugin")
-            .with_header("x-sim-plugin-digest", "sha256:provider-plugin")
-            .with_header("x-sim-plugin-capabilities", "provider:payment");
+            .with_header("x-zed-plugin-profile", "profile-a")
+            .with_header("x-zed-plugin-id", "provider-plugin")
+            .with_header("x-zed-plugin-digest", "sha256:provider-plugin")
+            .with_header("x-zed-plugin-capabilities", "provider:payment");
         assert!(matches!(
             plugin_route_request(&malformed, "profile-a"),
             Err(NativeApiHostError::Http {
@@ -2658,7 +2658,7 @@ pub(crate) mod tests {
         assert_eq!(features.status, 200);
         assert_eq!(
             body_json(&features)
-                .and_then(|value| value.pointer("/sim_native_api/native_execution"))
+                .and_then(|value| value.pointer("/zed_native_api/native_execution"))
                 .and_then(Value::as_bool),
             Some(true)
         );
@@ -2922,11 +2922,11 @@ pub(crate) mod tests {
                 .with_header("authorization", format!("Bearer {token}"))
                 .with_header("content-type", "application/json")
                 .with_header("idempotency-key", format!("plugin-{token}"))
-                .with_header("x-sim-plugin-profile", "profile-a")
-                .with_header("x-sim-plugin-id", "provider-plugin")
-                .with_header("x-sim-plugin-digest", "sha256:provider-plugin")
+                .with_header("x-zed-plugin-profile", "profile-a")
+                .with_header("x-zed-plugin-id", "provider-plugin")
+                .with_header("x-zed-plugin-digest", "sha256:provider-plugin")
                 .with_header(
-                    "x-sim-plugin-capabilities",
+                    "x-zed-plugin-capabilities",
                     "provider_network:payment|https://payment.invalid/api/jobs/cancel",
                 )
                 .with_body(bytes::Bytes::from_static(br#"{}"#))

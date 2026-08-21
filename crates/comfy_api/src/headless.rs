@@ -1765,7 +1765,7 @@ mod tests {
         )?;
         let migration = service.execute(NativeAutomationRequest::migration(
             "COMFY-CLI-CMD-install",
-            "sim comfy runtime install",
+            "zed comfy runtime install",
             "legacy Python installation is migration evidence only",
         ))?;
         assert!(matches!(

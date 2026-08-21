@@ -1,7 +1,7 @@
 #include <metal_stdlib>
 using namespace metal;
 
-kernel void sim_comfy_metal_add_f32_v1(
+kernel void zed_comfy_metal_add_f32_v1(
     device const float *left [[buffer(0)]],
     device const float *right [[buffer(1)]],
     device float *output [[buffer(2)]],
@@ -13,7 +13,7 @@ kernel void sim_comfy_metal_add_f32_v1(
     }
 }
 
-kernel void sim_comfy_metal_add_f16_v1(
+kernel void zed_comfy_metal_add_f16_v1(
     device const half *left [[buffer(0)]],
     device const half *right [[buffer(1)]],
     device half *output [[buffer(2)]],

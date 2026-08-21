@@ -259,7 +259,7 @@ fn certified_execution_session_harness_uses_the_production_adapter_path()
         4_096,
         2_048,
     )
-    .map_err(|error| map_execution_error("sim.npu.test-harness", 0, error))?;
+    .map_err(|error| map_execution_error("zed.npu.test-harness", 0, error))?;
     let cancellation = CancellationToken::default();
     let test_control = session.clone();
     let (backend, authority) =
@@ -297,7 +297,7 @@ fn certified_execution_session_harness_uses_the_production_adapter_path()
 
     test_control
         .fail_next_test_call_with_oom()
-        .map_err(|error| map_execution_error("sim.npu.test-harness", 0, error))?;
+        .map_err(|error| map_execution_error("zed.npu.test-harness", 0, error))?;
     assert!(matches!(
         backend.allocate(descriptor(vec![1])?, &execution),
         Err(TensorError::AllocationFailed { .. })
@@ -306,7 +306,7 @@ fn certified_execution_session_harness_uses_the_production_adapter_path()
 
     test_control
         .fail_next_test_call_with_device_loss()
-        .map_err(|error| map_execution_error("sim.npu.test-harness", 0, error))?;
+        .map_err(|error| map_execution_error("zed.npu.test-harness", 0, error))?;
     assert!(matches!(
         backend.allocate(descriptor(vec![1])?, &execution),
         Err(TensorError::DeviceLost { .. })
@@ -316,7 +316,7 @@ fn certified_execution_session_harness_uses_the_production_adapter_path()
     let injected_cancellation = CancellationToken::default();
     test_control
         .cancel_after_next_test_call(injected_cancellation.clone())
-        .map_err(|error| map_execution_error("sim.npu.test-harness", 0, error))?;
+        .map_err(|error| map_execution_error("zed.npu.test-harness", 0, error))?;
     let cancelling_context = context(execution.scratch, &injected_cancellation);
     assert!(matches!(
         backend.allocate(descriptor(vec![1])?, &cancelling_context),

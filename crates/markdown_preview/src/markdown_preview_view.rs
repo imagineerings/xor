@@ -22,7 +22,7 @@ use markdown::{
 use project::search::SearchQuery;
 use project::{Project, ProjectPath};
 use settings::{SeedQuerySetting, Settings, update_settings_file};
-use sim_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
+use zed_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
 use theme::{SystemAppearance, Theme, ThemeRegistry};
 use theme_settings::ThemeSettings;
 use ui::utils::WithRemSize;
@@ -1468,7 +1468,7 @@ impl SearchableItem for MarkdownPreviewView {
 }
 
 impl SerializableItem for MarkdownPreviewView {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "MarkdownPreviewView"
     }
 
@@ -1902,7 +1902,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn preview_serialisim_path_updates_when_source_file_is_renamed(cx: &mut TestAppContext) {
+    async fn preview_serialized_path_updates_when_source_file_is_renamed(cx: &mut TestAppContext) {
         let app_state = init_test(cx);
         app_state
             .fs
@@ -2032,7 +2032,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn follow_preview_serialisim_path_updates_when_followed_editor_changes(
+    async fn follow_preview_serialized_path_updates_when_followed_editor_changes(
         cx: &mut TestAppContext,
     ) {
         let app_state = init_test(cx);

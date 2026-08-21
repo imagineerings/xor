@@ -11,7 +11,7 @@ use project::{DisableAiSettings, Project};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
 pub use settings::SidebarSide;
-use sim_actions::agents_sidebar::ToggleThreadSwitcher;
+use zed_actions::agents_sidebar::ToggleThreadSwitcher;
 use std::cell::Cell;
 use std::future::Future;
 use std::path::PathBuf;
@@ -142,12 +142,12 @@ pub trait Sidebar: Focusable + Render + EventEmitter<SidebarEvent> + Sized {
     fn cycle_thread(&mut self, _forward: bool, _window: &mut Window, _cx: &mut Context<Self>) {}
 
     /// Return an opaque JSON blob of sidebar-specific state to persist.
-    fn serialisim_state(&self, _cx: &App) -> Option<String> {
+    fn serialized_state(&self, _cx: &App) -> Option<String> {
         None
     }
 
     /// Restore sidebar state from a previously-serialized blob.
-    fn restore_serialisim_state(
+    fn restore_serialized_state(
         &mut self,
         _state: &str,
         _window: &mut Window,
@@ -172,8 +172,8 @@ pub trait SidebarHandle: 'static + Send + Sync {
     fn is_threads_list_view_active(&self, cx: &App) -> bool;
 
     fn side(&self, cx: &App) -> SidebarSide;
-    fn serialisim_state(&self, cx: &App) -> Option<String>;
-    fn restore_serialisim_state(&self, state: &str, window: &mut Window, cx: &mut App);
+    fn serialized_state(&self, cx: &App) -> Option<String>;
+    fn restore_serialized_state(&self, state: &str, window: &mut Window, cx: &mut App);
 }
 
 #[derive(Clone)]
@@ -254,13 +254,13 @@ impl<T: Sidebar> SidebarHandle for Entity<T> {
         self.read(cx).side(cx)
     }
 
-    fn serialisim_state(&self, cx: &App) -> Option<String> {
-        self.read(cx).serialisim_state(cx)
+    fn serialized_state(&self, cx: &App) -> Option<String> {
+        self.read(cx).serialized_state(cx)
     }
 
-    fn restore_serialisim_state(&self, state: &str, window: &mut Window, cx: &mut App) {
+    fn restore_serialized_state(&self, state: &str, window: &mut Window, cx: &mut App) {
         self.update(cx, |this, cx| {
-            this.restore_serialisim_state(state, window, cx)
+            this.restore_serialized_state(state, window, cx)
         })
     }
 }
@@ -1660,7 +1660,7 @@ impl MultiWorkspace {
                             })
                             .collect::<Vec<_>>(),
                         sidebar_open: this.sidebar_open,
-                        sidebar_state: this.sidebar.as_ref().and_then(|s| s.serialisim_state(cx)),
+                        sidebar_state: this.sidebar.as_ref().and_then(|s| s.serialized_state(cx)),
                     };
                     (this.window_id, state)
                 })
@@ -1905,7 +1905,7 @@ impl MultiWorkspace {
     /// workspace serialization (SQLite) and multi-workspace state (KVP),
     /// and writes session bindings so the serialized data can be read
     /// back by `last_session_workspace_locations` +
-    /// `read_serialisim_multi_workspaces`.
+    /// `read_serialized_multi_workspaces`.
     #[cfg(any(test, feature = "test-support"))]
     pub fn flush_all_serialization(
         &mut self,

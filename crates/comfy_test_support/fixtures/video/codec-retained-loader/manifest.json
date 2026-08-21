@@ -7,7 +7,7 @@
     "canonical_file_count": 949,
     "canonical_tree_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
     "requirements_sha256": "48f4835af39b753fb2e637ec17813716024e08952e82e6e4e536a0fcfd944d0e",
-    "loader_policy_source": "sim-reviewed-glibc-dlmopen-and-live-link-map-proof"
+    "loader_policy_source": "zed-reviewed-glibc-dlmopen-and-live-link-map-proof"
   },
   "dependencies": {
     "codec_dependency_closure_manifest_sha256": "12a664c88dc63529e78e410263815e7deb627fb8d246290d5c59a8f3c50b2e49"
@@ -54,7 +54,7 @@
     "explicit_dlsym_or_callable_address_projection": false,
     "reviewed_ffmpeg_c_layout": false,
     "encoder_availability_probed": false,
-    "sim_invoked_codec_api": false,
+    "zed_invoked_codec_api": false,
     "media_allocation": false,
     "effect_or_cache_publication": false,
     "persistence_or_recovery": false,

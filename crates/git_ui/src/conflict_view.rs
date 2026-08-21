@@ -15,7 +15,7 @@ use project::{
     git_store::{GitStore, GitStoreEvent, RepositoryEvent},
 };
 use settings::Settings;
-use sim_actions::agent::{
+use zed_actions::agent::{
     ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
 };
 use std::{ops::Range, sync::Arc};

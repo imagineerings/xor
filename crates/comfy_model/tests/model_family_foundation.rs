@@ -3052,7 +3052,7 @@ fn patch_graph_is_ordered_copy_on_write_transactional_and_typed()
     let reordered_patch = reordered.apply(&backend, &source, &context)?;
     let applied_identity = |ordered_digest: &str, compute_dtype: &str, storage_dtype: &str| {
         let mut digest = Sha256::new();
-        digest.update(b"sim-comfy-patch-applied-compute-v1\0");
+        digest.update(b"zed-comfy-patch-applied-compute-v1\0");
         digest.update(u64::try_from(ordered_digest.len())?.to_le_bytes());
         digest.update(ordered_digest.as_bytes());
         digest.update(u64::try_from("configured".len())?.to_le_bytes());
@@ -3066,7 +3066,7 @@ fn patch_graph_is_ordered_copy_on_write_transactional_and_typed()
     };
     let graph_applied_identity = applied_identity(&graph.identity().ordered_digest, "f32", "f32")?;
     let mut expected_cache_identity = Sha256::new();
-    expected_cache_identity.update(b"sim.comfy.model-weights-cache-identity.v1\0");
+    expected_cache_identity.update(b"zed.comfy.model-weights-cache-identity.v1\0");
     expected_cache_identity.update(source.cache_identity().as_bytes());
     expected_cache_identity.update([0]);
     expected_cache_identity.update(graph_applied_identity.as_bytes());
@@ -3081,7 +3081,7 @@ fn patch_graph_is_ordered_copy_on_write_transactional_and_typed()
     let reordered_applied_identity =
         applied_identity(&reordered.identity().ordered_digest, "f32", "f32")?;
     let mut expected_composed_identity = Sha256::new();
-    expected_composed_identity.update(b"sim.comfy.model-weights-cache-identity.v1\0");
+    expected_composed_identity.update(b"zed.comfy.model-weights-cache-identity.v1\0");
     expected_composed_identity.update(patched.cache_identity().as_bytes());
     expected_composed_identity.update([0]);
     expected_composed_identity.update(reordered_applied_identity.as_bytes());

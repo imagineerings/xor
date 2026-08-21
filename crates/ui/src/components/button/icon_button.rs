@@ -281,7 +281,7 @@ impl Component for IconButton {
 
     fn description() -> &'static str {
         "A compact button that displays a single icon with an optional tooltip.\
-        The most frequently used button in the Sim codebase."
+        The most frequently used button in the Zed codebase."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {

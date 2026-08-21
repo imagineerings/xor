@@ -186,7 +186,7 @@ impl MetalTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.metal.transfer.host-to-device",
+            "zed.metal.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -227,7 +227,7 @@ impl MetalTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.metal.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.metal.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -261,7 +261,7 @@ impl MetalTensorBackend {
         let allocation = self
             .runtime
             .allocate(bytes)
-            .map_err(|error| map_execution_error("sim.metal.allocate", error))?;
+            .map_err(|error| map_execution_error("zed.metal.allocate", error))?;
         cancellation.check()?;
         Ok(allocation)
     }
@@ -275,7 +275,7 @@ impl MetalTensorBackend {
         self.streams.get_or_try_insert_with(stream, || {
             self.runtime
                 .create_stream()
-                .map_err(|error| map_execution_error("sim.metal.stream.create", error))
+                .map_err(|error| map_execution_error("zed.metal.stream.create", error))
         })
     }
 
@@ -290,7 +290,7 @@ impl MetalTensorBackend {
         cancellation.check()?;
         self.runtime
             .copy_host_to_device(stream, destination, offset, bytes)
-            .map_err(|error| map_execution_error("sim.metal.transfer.host-to-device", error))?;
+            .map_err(|error| map_execution_error("zed.metal.transfer.host-to-device", error))?;
         cancellation.check()?;
         Ok(())
     }
@@ -306,7 +306,7 @@ impl MetalTensorBackend {
         cancellation.check()?;
         self.runtime
             .copy_device_to_host(stream, source, offset, bytes)
-            .map_err(|error| map_execution_error("sim.metal.transfer.device-to-host", error))?;
+            .map_err(|error| map_execution_error("zed.metal.transfer.device-to-host", error))?;
         cancellation.check()?;
         Ok(())
     }
@@ -353,7 +353,7 @@ impl MetalTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| self.unsupported(
-                "sim.metal.storage.lookup",
+                "zed.metal.storage.lookup",
                 "tensor storage is not owned by this certified Metal backend instance",
             ))
     }
@@ -423,7 +423,7 @@ impl MetalTensorBackend {
             });
         }
         if source.descriptor().device() == self.device {
-            self.require_input("sim.metal.copy", source, context)?;
+            self.require_input("zed.metal.copy", source, context)?;
             return Ok(PreparedCopySource::Metal {
                 storage: self.storage(source)?,
                 byte_offset: tensor_byte_offset(source.descriptor())?,
@@ -434,7 +434,7 @@ impl MetalTensorBackend {
                 || !source.descriptor().is_contiguous()?
             {
                 return Err(self.unsupported(
-                    "sim.metal.copy",
+                    "zed.metal.copy",
                     "CPU copy source must use canonical contiguous layout",
                 ));
             }
@@ -447,7 +447,7 @@ impl MetalTensorBackend {
             });
         }
         Err(self.unsupported(
-            "sim.metal.copy",
+            "zed.metal.copy",
             "source must be contiguous CPU storage or this Metal backend instance",
         ))
     }
@@ -474,7 +474,7 @@ impl MetalTensorBackend {
                 let wait_result = self
                     .runtime
                     .wait_event(&event)
-                    .map_err(|wait_error| map_execution_error("sim.metal.event.wait", wait_error));
+                    .map_err(|wait_error| map_execution_error("zed.metal.event.wait", wait_error));
                 drop(self.events.complete(context.stream, sequence)?);
                 match wait_result {
                     Ok(()) => {}
@@ -534,7 +534,7 @@ impl CachedAllocationOwner for MetalTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-metal-v1"
+        "zed-native-metal-v1"
     }
 
     fn release_cached_allocations(
@@ -569,7 +569,7 @@ impl TensorBackend for MetalTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.metal.allocate",
+            "zed.metal.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -600,7 +600,7 @@ impl TensorBackend for MetalTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.metal.copy",
+            "zed.metal.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -609,7 +609,7 @@ impl TensorBackend for MetalTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.metal.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.metal.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -689,12 +689,12 @@ impl TensorBackend for MetalTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.metal.event.record", OperationSupport::record_event())?;
+            .require("zed.metal.event.record", OperationSupport::record_event())?;
         let stream = self.stream(context.stream, context.cancellation)?;
         self.record_native_event(context, || {
             self.runtime
                 .record_event(&stream)
-                .map_err(|error| map_execution_error("sim.metal.event.record", error))
+                .map_err(|error| map_execution_error("zed.metal.event.record", error))
         })
     }
 
@@ -705,7 +705,7 @@ impl TensorBackend for MetalTensorBackend {
     ) -> Result<(), TensorError> {
         check_backend_context_identity(self.backend_id, context)?;
         self.capabilities
-            .require("sim.metal.event.wait", OperationSupport::wait_event())?;
+            .require("zed.metal.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "Metal event belongs to a different backend instance".to_owned(),
@@ -729,7 +729,7 @@ impl TensorBackend for MetalTensorBackend {
         let result = self
             .runtime
             .wait_event(&native_event)
-            .map_err(|error| map_execution_error("sim.metal.event.wait", error));
+            .map_err(|error| map_execution_error("zed.metal.event.wait", error));
         drop(self.events.complete(event.stream, event.sequence)?);
         if context.cancellation.is_cancelled() {
             return Err(TensorError::Cancelled);
@@ -744,7 +744,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.fill", context)
+        self.unsupported_result("zed.metal.fill", context)
     }
 
     fn unary(
@@ -754,7 +754,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.unary", context)
+        self.unsupported_result("zed.metal.unary", context)
     }
 
     fn binary(
@@ -766,11 +766,11 @@ impl TensorBackend for MetalTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.metal.binary", context);
+            return self.unsupported_result("zed.metal.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.metal.binary.add",
+                "zed.metal.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -779,7 +779,7 @@ impl TensorBackend for MetalTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.metal.binary.add",
+            "zed.metal.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -814,7 +814,7 @@ impl TensorBackend for MetalTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.metal.binary.add",
+                "zed.metal.binary.add",
                 "the reviewed Metal Add ABI requires zero-offset whole buffers",
             ));
         }
@@ -837,7 +837,7 @@ impl TensorBackend for MetalTensorBackend {
         let element_type = match output.dtype() {
             DType::F16 => MetalElementType::F16,
             DType::F32 => MetalElementType::F32,
-            _ => return Err(self.unsupported("sim.metal.binary.add", "unsupported dtype")),
+            _ => return Err(self.unsupported("zed.metal.binary.add", "unsupported dtype")),
         };
         let output_byte_length = output.byte_len()?;
         let mut output_allocation = None;
@@ -854,7 +854,7 @@ impl TensorBackend for MetalTensorBackend {
                     &allocation,
                     elements,
                 )
-                .map_err(|error| map_execution_error("sim.metal.binary.add", error))?;
+                .map_err(|error| map_execution_error("zed.metal.binary.add", error))?;
             output_allocation = Some(allocation);
             Ok(event)
         })?;
@@ -871,7 +871,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.binary-scalar", context)
+        self.unsupported_result("zed.metal.binary-scalar", context)
     }
 
     fn reduction(
@@ -881,7 +881,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.reduction", context)
+        self.unsupported_result("zed.metal.reduction", context)
     }
 
     fn indexing(
@@ -891,7 +891,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.indexing", context)
+        self.unsupported_result("zed.metal.indexing", context)
     }
 
     fn resize(
@@ -901,7 +901,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.resize", context)
+        self.unsupported_result("zed.metal.resize", context)
     }
 
     fn convolution(
@@ -911,7 +911,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.convolution", context)
+        self.unsupported_result("zed.metal.convolution", context)
     }
 
     fn linear_algebra(
@@ -921,7 +921,7 @@ impl TensorBackend for MetalTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.linear-algebra", context)
+        self.unsupported_result("zed.metal.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -931,7 +931,7 @@ impl TensorBackend for MetalTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.metal.custom-kernel", context)
+        self.unsupported_result("zed.metal.custom-kernel", context)
     }
 }
 

@@ -834,7 +834,7 @@ pub(crate) mod tests {
             "libavutil.so.59" => "LIBAVUTIL_59",
             "libswresample.so.5" => "LIBSWRESAMPLE_5",
             "libswscale.so.8" => "LIBSWSCALE_8",
-            _ => "SIM_FIXTURE_1",
+            _ => "ZED_FIXTURE_1",
         };
         let version_name_offset = u32::try_from(strings.len()).unwrap_or_default();
         strings.extend_from_slice(version_namespace.as_bytes());

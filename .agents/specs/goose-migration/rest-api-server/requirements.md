@@ -8,13 +8,13 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 
 ### In scope
 
-- Source-backed ACP stdio and authenticated HTTP transport behavior, if Sim approves a standalone agent-server product surface.
-- Reuse of Sim's agent sessions, thread database, permissions, provider registry, and domain services.
+- Source-backed ACP stdio and authenticated HTTP transport behavior, if Zed approves a standalone agent-server product surface.
+- Reuse of Zed's agent sessions, thread database, permissions, provider registry, and domain services.
 - Standard ACP operations and a versioned adapter for approved Goose custom methods.
 
 ### Out of scope
 
-- Resource-oriented REST routes, SSE application endpoints, OpenAPI, Swagger UI, tunnels, and setup routes unless separately approved as Sim product requirements.
+- Resource-oriented REST routes, SSE application endpoints, OpenAPI, Swagger UI, tunnels, and setup routes unless separately approved as Zed product requirements.
 
 ## Requirements
 
@@ -26,11 +26,11 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 
 1. **1.1** THE migration SHALL treat ACP stdio and ACP HTTP transport as the only current Goose server parity surfaces.
 2. **1.2** THE migration SHALL NOT implement REST/OpenAPI routes without a separately approved product requirement.
-3. **1.3** THE server adapter SHALL reuse Sim's existing agent, session, provider, permission, and settings owners.
+3. **1.3** THE server adapter SHALL reuse Zed's existing agent, session, provider, permission, and settings owners.
 
 ### Requirement 2: ACP stdio server
 
-**User story:** As an ACP client developer, I want to launch Sim as an ACP agent over stdio, so that I can embed it in an ACP-compatible host.
+**User story:** As an ACP client developer, I want to launch Zed as an ACP agent over stdio, so that I can embed it in an ACP-compatible host.
 
 #### Acceptance criteria
 
@@ -60,7 +60,7 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 #### Acceptance criteria
 
 1. **4.1** THE server SHALL support the approved standard ACP initialization, authentication, session creation, load, list, prompt, cancel, fork, resume, close, mode, model, and configuration operations.
-2. **4.2** THE server SHALL use Sim's thread database for persistence, deletion cascades, parent-child relationships, and project working directories.
+2. **4.2** THE server SHALL use Zed's thread database for persistence, deletion cascades, parent-child relationships, and project working directories.
 3. **4.3** THE server SHALL expose a versioned custom-method inventory generated from canonical request/response definitions.
 4. **4.4** WHERE a domain capability is unavailable, THE related custom method SHALL return an explicit unsupported error rather than a successful placeholder.
 5. **4.5** THE server SHALL route provider, extension, recipe, schedule, dictation, app/resource, prompt, source, diagnostic, and permission methods to their canonical domain owners.
@@ -68,11 +68,11 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 
 ### Requirement 5: Security, permissions, and compatibility
 
-**User story:** As a Sim user, I want remote and embedded clients constrained by the same safety policy as the desktop UI, so that protocol access cannot bypass protections.
+**User story:** As a Zed user, I want remote and embedded clients constrained by the same safety policy as the desktop UI, so that protocol access cannot bypass protections.
 
 #### Acceptance criteria
 
-1. **5.1** THE server SHALL enforce Sim's filesystem roots, sandbox, tool permission, credential, and secret-redaction policies for every transport.
+1. **5.1** THE server SHALL enforce Zed's filesystem roots, sandbox, tool permission, credential, and secret-redaction policies for every transport.
 2. **5.2** THE server SHALL NOT expose provider tokens, extension environment secrets, sensitive logs, or unrestricted local resources through custom methods.
 3. **5.3** THE server SHALL reject unsupported or malformed methods and fields with stable protocol errors.
 4. **5.4** THE server SHALL support compatibility tests against the audited Goose ACP schema and TypeScript client.
@@ -81,7 +81,7 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 
 ## Open questions
 
-- Should Sim ship a standalone ACP server at all, and if so over stdio, HTTP, or both?
+- Should Zed ship a standalone ACP server at all, and if so over stdio, HTTP, or both?
 - Which Goose custom methods are compatibility commitments versus intentionally unsupported extensions?
 - Is a separate REST/OpenAPI product desired independently of Goose migration? This specification does not approve it.
 
@@ -92,4 +92,4 @@ Current Goose does not contain the REST/OpenAPI server described by the previous
 - `projects/goose/crates/goose/src/acp/transport/{mod,auth,tls}.rs`.
 - `projects/goose/crates/goose/src/acp/server/custom_dispatch.rs`.
 - `projects/goose/crates/goose-sdk-types/src/custom_requests/*`.
-- Sim reuse points: `crates/acp_thread`, `crates/agent`, `crates/agent_servers`, `crates/settings`, `crates/credentials_provider`.
+- Zed reuse points: `crates/acp_thread`, `crates/agent`, `crates/agent_servers`, `crates/settings`, `crates/credentials_provider`.

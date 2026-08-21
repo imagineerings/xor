@@ -753,7 +753,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xhigh_effort_is_serialisim_for_adaptive_thinking() {
+    fn test_xhigh_effort_is_serialized_for_adaptive_thinking() {
         let request = LanguageModelRequest {
             messages: vec![LanguageModelRequestMessage {
                 role: Role::User,

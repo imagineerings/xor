@@ -271,7 +271,7 @@ fn val_native_e2e_002() -> Result<(), Box<dyn Error>> {
                         == Some("SaveImage")
             })
             && workflow_metadata.as_ref() == Some(&expected_workflow)
-            && frontend_version == Some(json!("sim-native-diffusion-v1")),
+            && frontend_version == Some(json!("zed-native-diffusion-v1")),
     );
 
     let warm = execute(&mut supervisor, &plan, AttemptId(Uuid::from_u128(2)))?;

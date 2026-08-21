@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "x86_64-apple-darwin",
         "MTLCreateSystemDefaultDevice",
         "MPSSupportsMTLDevice",
-        "sim_comfy_metal_readiness_v1",
+        "zed_comfy_metal_readiness_v1",
         "comfy_backend_metal::loader",
     ] {
         if !manifest.contains(required) || !reviewed.contains(required) {

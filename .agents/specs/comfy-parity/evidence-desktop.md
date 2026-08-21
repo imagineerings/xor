@@ -2,9 +2,9 @@
 
 ## Audit status
 
-This report records the static and existing-test evidence gathered for the vendored Comfy-Desktop source. It deliberately preserves runtime, cloud, account, packaging-host, and target-Sim uncertainties. The core machine-readable feature ledger contains 206 independently testable capabilities. A second renderer-surface ledger adds 43 source-specific contracts for production Vue files that previously appeared only through broad parent mappings; it contains 41 functional surfaces and two explicit presentational/infrastructure dispositions. Every row has a stable identifier, source evidence, availability, evidence level, observable behavior, Sim status, acceptance statement, and validation approach.
+This report records the static and existing-test evidence gathered for the vendored Comfy-Desktop source. It deliberately preserves runtime, cloud, account, packaging-host, and target-Zed uncertainties. The core machine-readable feature ledger contains 206 independently testable capabilities. A second renderer-surface ledger adds 43 source-specific contracts for production Vue files that previously appeared only through broad parent mappings; it contains 41 functional surfaces and two explicit presentational/infrastructure dispositions. Every row has a stable identifier, source evidence, availability, evidence level, observable behavior, Zed status, acceptance statement, and validation approach.
 
-The generated master catalog reconciles each Desktop row against the native-only Sim target. Existing-test evidence means that a source test expressly covers the behavior; it does not claim that the test ran in this environment.
+The generated master catalog reconciles each Desktop row against the native-only Zed target. Existing-test evidence means that a source test expressly covers the behavior; it does not claim that the test ran in this environment.
 
 ## Source baseline
 
@@ -70,7 +70,7 @@ Availability uses the requested values: `active`, `conditional`, `platform-speci
 | Code-inferred | 19 | 9.2% |
 | Observed | 0 | 0.0% |
 
-The 206 source rows retain their source evidence here; `features.csv`, `parity-matrix.md`, and `traceability.md` carry the reconciled native-only Sim status, gap, acceptance, task, and validation mappings.
+The 206 source rows retain their source evidence here; `features.csv`, `parity-matrix.md`, and `traceability.md` carry the reconciled native-only Zed status, gap, acceptance, task, and validation mappings.
 
 ### Renderer surface gap closure
 
@@ -87,9 +87,9 @@ The 206 source rows retain their source evidence here; `features.csv`, `parity-m
 | Cloud/paid | 1 |
 | Infrastructure-only availability | 2 |
 
-The functional rows include the system-modal host, title-popup menu/root, model-directory list, app updates, instance and snapshot pickers, context/dialog hosts, import/restore/diff/preview/inspector surfaces, cloud-choice modal, settings root, argument/channel/environment/path fields, action menus, status facts, and shared/per-instance storage. The micro-section layout wrapper and decorative Comfy C logo are the only infrastructure rows; their Sim status is `deferred` because they are validated through consuming GPUI surfaces rather than requiring standalone workflows.
+The functional rows include the system-modal host, title-popup menu/root, model-directory list, app updates, instance and snapshot pickers, context/dialog hosts, import/restore/diff/preview/inspector surfaces, cloud-choice modal, settings root, argument/channel/environment/path fields, action menus, status facts, and shared/per-instance storage. The micro-section layout wrapper and decorative Comfy C logo are the only infrastructure rows; their Zed status is `deferred` because they are validated through consuming GPUI surfaces rather than requiring standalone workflows.
 
-The ledger retains source accessibility limitations instead of normalizing them away. In particular, `MenuView` has `tabindex=-1` without local keyboard activation, `ContextMenu` has buttons and Escape but no menu role or roving arrow focus, and snapshot diff/file-preview/inspector disclosure headings are click-only `div` elements without button/expanded keyboard semantics. Sim acceptance requires a keyboard-accessible path while preserving the observable state and action result.
+The ledger retains source accessibility limitations instead of normalizing them away. In particular, `MenuView` has `tabindex=-1` without local keyboard activation, `ContextMenu` has buttons and Escape but no menu role or roving arrow focus, and snapshot diff/file-preview/inspector disclosure headings are click-only `div` elements without button/expanded keyboard semantics. Zed acceptance requires a keyboard-accessible path while preserving the observable state and action result.
 
 ## Registry reconciliation
 
@@ -194,9 +194,9 @@ Other compatibility-bearing persistence includes window/session JSON, Windows da
 
 Popup creation is allowlisted to Comfy checkout, production/dev Firebase auth, Google accounts, and GitHub OAuth prefixes; other HTTP(S) links are externalized. Firebase interception requires exact HTTPS handler hosts/path and only Google/GitHub providers. Its callback server binds `127.0.0.1` on fixed port 9876, caps the body at 64 KiB, sends no-store responses, and injects validated auth state into the shared partition. Checkout return detection uses exact/suffix-safe Comfy host checks and the child closes on Escape, explicit close, or a validated return navigation.
 
-Hosted/panel/title/popup web content uses `nodeIntegration: false` and `contextIsolation: true`. Some trusted local preload views disable Chromium sandboxing because Rollup emits shared preload chunks; this is a stated source limitation, not a parity recommendation. Two constant `data:` overlays (checkout backdrop/close control) enable Node integration and non-isolated IPC, but main filters the sender WebContents identity and no remote content is loaded into those overlays. Sim should preserve the narrow capability boundary without reproducing Electron-specific sandbox concessions.
+Hosted/panel/title/popup web content uses `nodeIntegration: false` and `contextIsolation: true`. Some trusted local preload views disable Chromium sandboxing because Rollup emits shared preload chunks; this is a stated source limitation, not a parity recommendation. Two constant `data:` overlays (checkout backdrop/close control) enable Node integration and non-isolated IPC, but main filters the sender WebContents identity and no remote content is loaded into those overlays. Zed should preserve the narrow capability boundary without reproducing Electron-specific sandbox concessions.
 
-The context bridges do not expose raw Node or `ipcRenderer`. Main revalidates privileged IDs, actions, URLs, paths, popup messages, and file containment. The title-popup settings shim uses Electron's private `ipcMain._invokeHandlers` map; this is source-compatible with the pinned Electron but explicitly fragile and should become ordinary typed service calls in Sim.
+The context bridges do not expose raw Node or `ipcRenderer`. Main revalidates privileged IDs, actions, URLs, paths, popup messages, and file containment. The title-popup settings shim uses Electron's private `ipcMain._invokeHandlers` map; this is source-compatible with the pinned Electron but explicitly fragile and should become ordinary typed service calls in Zed.
 
 Cloud capacity has `normal`, `degraded`, and `disabled` values; paid tier relaxes disabled to degraded confirmation while free tier is blocked. The 139-row telemetry/event ledger records every production literal, including 19 tracked-step bases that derive `.start`, `.end`, and `.error` wire names, ten separately literal derived failure names, 23 Datadog-mirrored names, and four infrastructure-only rows. The still-emitted `comfy.desktop.session.installation_started` compatibility shadow is explicitly `deprecated/dead`; no production literal qualified as developer-only or uncertain, and disabled tray behavior remains classified in the menu ledger. Telemetry uses tri-state consent, token/path/PII scrubbing, a per-event cap of 60/minute, and a process cap of 5,000 events; only the consent-decision event crosses the denied/undecided gate. The catalogs retain cloud/paid behavior, but this pass did not authenticate, bill, mutate a cloud account, or emit to either provider.
 
@@ -237,12 +237,12 @@ Consequences:
 - `draggableList.ts`: tested pointer-drag helper with no production importer; classified infrastructure-only rather than an active interaction.
 - Stale legacy settings/component paths and generated/declaration/assets are retained in source coverage with an explicit classification.
 
-## Recommended Sim placement from desktop evidence
+## Recommended Zed placement from desktop evidence
 
-Desktop's observable lifecycle maps to native Sim components rather than its
+Desktop's observable lifecycle maps to native Zed components rather than its
 Python/Electron implementation:
 
-- `RuntimeSupervisor` owns Sim Rust workers, device groups, private IPC,
+- `RuntimeSupervisor` owns Zed Rust workers, device groups, private IPC,
   readiness, cancellation fences, logs, crash recovery, and bounded restart.
   Legacy Desktop/Comfy installations are read-only migration sources and are
   never launched, updated, deleted, or connected as execution engines.
@@ -261,26 +261,26 @@ Python/Electron implementation:
   inactive legacy records, or explicit defers.
 - Every failure reaches durable visible state. Cancellation aborts eligible
   tasks, waits on non-preemptible device fences, terminates only verified
-  Sim-owned workers, cleans proven temporary state, and emits one terminal
+  Zed-owned workers, cleans proven temporary state, and emits one terminal
   attempt/operation state.
 
 The first native slice is the deterministic image workflow in the Rust worker,
 including GPUI output, cache, cancellation, worker kill/recovery, restart, and
 native-only package gates. Desktop installation/update/recovery surfaces follow
 after that runtime exists; they operate on native backends, models, plugins,
-codecs, registries, and Sim workers, never a Python test server.
+codecs, registries, and Zed workers, never a Python test server.
 
 ## Open decisions and uncertainty queue
 
 1. The native graph editor is the production surface. Unsupported imperative
    web hooks require Rust/WASM mappings or placeholders; no embedded renderer
    or browser fallback executes them.
-2. How cloud authentication, checkout, billing, and provider telemetry are licensed/configured for Sim; no real account was used.
+2. How cloud authentication, checkout, billing, and provider telemetry are licensed/configured for Zed; no real account was used.
 3. Which updater/distribution mechanism replaces Electron Builder/NSIS/DMG/AppImage/DEB while preserving staged update, system-managed, rollback, and recovery behavior.
 4. Which hidden Git/portable/legacy source data is safe and useful for one-way
    import into native profiles versus retained as inactive compatibility-only
    evidence.
-5. Which current Electron persisted files require direct import versus a one-way migration into Sim schemas.
+5. Which current Electron persisted files require direct import versus a one-way migration into Zed schemas.
 6. Runtime confirmation of native menu expansion, focus order, screen-reader announcements, multi-display restore, duplicate-window rules, and close/OS-shutdown races on all three platforms.
 7. Version negotiation and migration policy for private/conditional Electron
    contracts, legacy feature flags/Manager markers/custom-node updates, native

@@ -29,7 +29,7 @@
   ],
   "resource_contract": {
     "role": "CLIP",
-    "format": "sim-native-qwen-multimodal-clip-v1",
+    "format": "zed-native-qwen-multimodal-clip-v1",
     "source_adapter": "standard-comfy-text-generation-adapter",
     "production_profiles_are_source_exact": true,
     "reduced_fixtures_are_not_publishable": true,

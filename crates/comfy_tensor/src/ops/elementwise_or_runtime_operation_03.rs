@@ -23,9 +23,9 @@ pub const TORCH_SAVE_OPERATION_ID: &str = "COMFY-TENSOR-OP-2464198E16CB";
 pub const SIGMOID_OPERATION_ID: &str = "COMFY-TENSOR-OP-1917B7227A5C";
 pub const EXPM1_OPERATION_ID: &str = "COMFY-TENSOR-OP-263D166C9D1F";
 pub const XPU_DEVICE_COUNT_OPERATION_ID: &str = "COMFY-TENSOR-OP-2255F11A43BA";
-pub const REAL_ADD_OPERATION_ID: &str = "SIM-TENSOR-REAL-ADD-V1";
-pub const REAL_MULTIPLY_OPERATION_ID: &str = "SIM-TENSOR-REAL-MULTIPLY-V1";
-pub const REAL_LERP_OPERATION_ID: &str = "SIM-TENSOR-REAL-LERP-V1";
+pub const REAL_ADD_OPERATION_ID: &str = "ZED-TENSOR-REAL-ADD-V1";
+pub const REAL_MULTIPLY_OPERATION_ID: &str = "ZED-TENSOR-REAL-MULTIPLY-V1";
+pub const REAL_LERP_OPERATION_ID: &str = "ZED-TENSOR-REAL-LERP-V1";
 
 const MAXIMUM_ARCHIVE_DEPTH: usize = 64;
 const MAXIMUM_ARCHIVE_NODES: usize = 1_000_000;
@@ -362,7 +362,7 @@ pub fn torch_save_exact_native(
     }
     entries.push(ZipEntry::new(
         "archive/.data/serialization_id",
-        b"sim-native-comfy-tensor-v1".to_vec(),
+        b"zed-native-comfy-tensor-v1".to_vec(),
     ));
     cancellation.check()?;
     write_stored_zip(&entries, cancellation)

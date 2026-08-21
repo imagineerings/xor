@@ -40,7 +40,7 @@ pub const CLIP_VISION_SOURCE_SHA256: &str =
     "08be993d86c3b494b58305fb868638b4b525bbe40abead89e9c94da021716845";
 pub const CLIP_VISION_SOURCE_TYPE_ID: &str = "CLIP_VISION";
 pub const CLIP_VISION_RESOURCE_ROLE: &str = "clip_vision";
-const CLIP_VISION_RESOURCE_FORMAT: &str = "sim-native-comfy-clip-vision-v1";
+const CLIP_VISION_RESOURCE_FORMAT: &str = "zed-native-comfy-clip-vision-v1";
 pub const CLIP_VISION_CATALOG_SYMBOLS: [&str; 9] = [
     "clip_preprocess",
     "siglip2_flex_calc_resolution",
@@ -498,7 +498,7 @@ fn project_clip_vision_output(
     }
 
     let mut projection = NativeStructuredProjection::new::<ClipVisionOutput>(
-        b"sim.comfy.model.clip-vision-output.v1",
+        b"zed.comfy.model.clip-vision-output.v1",
     )?;
     projection.hash_float_tensor(last_hidden_state)?;
     match intermediate {
@@ -632,7 +632,7 @@ impl ClipVisionSemanticHasher {
 fn clip_vision_architecture_digest(
     configuration: &ClipVisionConfiguration,
 ) -> Result<String, ClipVisionError> {
-    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-architecture.v1")?;
+    let mut digest = ClipVisionSemanticHasher::new(b"zed.comfy.model.clip-vision-architecture.v1")?;
     digest.field(CLIP_VISION_SOURCE_SHA256.as_bytes())?;
     digest.field(CLIP_VISION_SOURCE_TYPE_ID.as_bytes())?;
     digest.field(CLIP_VISION_RESOURCE_ROLE.as_bytes())?;
@@ -735,7 +735,7 @@ fn clip_vision_state_digest(
     cancellation: &CancellationToken,
 ) -> Result<String, ClipVisionError> {
     cancellation.check()?;
-    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-state.v1")?;
+    let mut digest = ClipVisionSemanticHasher::new(b"zed.comfy.model.clip-vision-state.v1")?;
     digest.u64(u64::try_from(state.len()).map_err(|_| ClipVisionError::Overflow("state entries"))?);
     for (name, tensor) in state {
         cancellation.check()?;
@@ -786,7 +786,7 @@ fn clip_vision_module_state_digest(
     cancellation: &CancellationToken,
 ) -> Result<String, ClipVisionError> {
     cancellation.check()?;
-    let mut digest = ClipVisionSemanticHasher::new(b"sim.comfy.model.clip-vision-modules.v1")?;
+    let mut digest = ClipVisionSemanticHasher::new(b"zed.comfy.model.clip-vision-modules.v1")?;
     append_module_digest(
         &mut digest,
         "patch_embedding",

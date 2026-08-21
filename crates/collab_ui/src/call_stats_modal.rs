@@ -4,7 +4,7 @@ use gpui::{
     Window,
 };
 use livekit_client::ConnectionQuality;
-use sim_actions::ShowCallStats;
+use zed_actions::ShowCallStats;
 use ui::prelude::*;
 use workspace::{ModalView, Workspace};
 

@@ -1,10 +1,10 @@
-Sim native Metal execution ABI review v1
+Zed native Metal execution ABI review v1
 
 Toolchain: Xcode 26.2 build 17C52, macOS SDK 26.2
 Targets: aarch64-apple-darwin, x86_64-apple-darwin
 Floor: macos-13-metal-3
 Unsafe owner: comfy_backend_metal::execution
-Contract: sim-comfy-metal-execution-v1
+Contract: zed-comfy-metal-execution-v1
 Reviewed selectors: 29 exact Objective-C type encodings and return-nullability contracts
 Reviewed SDK headers: 12 exact SHA-256 identities
 
@@ -32,8 +32,8 @@ queue, command-buffer, and encoder selectors through the focused unsafe owner,
 checks the raw pointer before constructing a metal foreign type or reference, and
 maps nil resource creation to a typed allocation failure.
 
-The reviewed source exports only sim_comfy_metal_add_f16_v1 and
-sim_comfy_metal_add_f32_v1. Both accept two contiguous input buffers, one
+The reviewed source exports only zed_comfy_metal_add_f16_v1 and
+zed_comfy_metal_add_f32_v1. Both accept two contiguous input buffers, one
 contiguous output buffer, and a checked u32 element count. Runtime compilation
 is forbidden. The signed-package task must retain the exact precompiled
 metallib bytes and NativeFfiRegistry certification for the runtime lifetime.

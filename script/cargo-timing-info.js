@@ -8,23 +8,23 @@ function getSimDataDir() {
   const platform = process.platform;
 
   if (platform === "darwin") {
-    // macOS: ~/Library/Application Support/Sim
-    return path.join(os.homedir(), "Library", "Application Support", "Sim");
+    // macOS: ~/Library/Application Support/Zed
+    return path.join(os.homedir(), "Library", "Application Support", "Zed");
   } else if (platform === "linux" || platform === "freebsd") {
-    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/sim
+    // Linux/FreeBSD: $FLATPAK_XDG_DATA_HOME or XDG_DATA_HOME/zed
     if (process.env.FLATPAK_XDG_DATA_HOME) {
-      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "sim");
+      return path.join(process.env.FLATPAK_XDG_DATA_HOME, "zed");
     }
     const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share");
-    return path.join(xdgDataHome, "sim");
+    return path.join(xdgDataHome, "zed");
   } else if (platform === "win32") {
-    // Windows: LocalAppData/Sim
+    // Windows: LocalAppData/Zed
     const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-    return path.join(localAppData, "Sim");
+    return path.join(localAppData, "Zed");
   } else {
     // Fallback to XDG config dir
     const xdgConfigHome = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-    return path.join(xdgConfigHome, "sim");
+    return path.join(xdgConfigHome, "zed");
   }
 }
 

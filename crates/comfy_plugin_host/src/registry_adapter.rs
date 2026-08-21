@@ -919,7 +919,7 @@ fn plugin_value_from_stored(
             }
             let value = ModelValue::new(
                 stored.digest_sha256(),
-                "sim-native-control-v1",
+                "zed-native-control-v1",
                 stored.digest_sha256(),
             )
             .map_err(plugin_failure)?;
@@ -932,7 +932,7 @@ fn plugin_value_from_stored(
             let identity = stored.model().identity();
             let value = ModelValue::new(
                 identity.identifier(),
-                "sim-native-guider-v1",
+                "zed-native-guider-v1",
                 stored.semantic_digest_sha256(),
             )
             .map_err(plugin_failure)?;
@@ -944,7 +944,7 @@ fn plugin_value_from_stored(
             }
             let value = ModelValue::new(
                 stored.identity().as_str(),
-                "sim-native-sampler-v1",
+                "zed-native-sampler-v1",
                 stored.semantic_digest_sha256(),
             )
             .map_err(plugin_failure)?;
@@ -1998,7 +1998,7 @@ mod tests {
             let value = model_value_for(
                 type_name,
                 &format!("{type_name}-identity"),
-                "sim-native-test-v1",
+                "zed-native-test-v1",
                 &digest,
             )?;
             let handle = opaque_handle(

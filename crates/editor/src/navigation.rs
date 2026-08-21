@@ -1081,9 +1081,9 @@ impl Editor {
 
             if let Some(url) = url {
                 cx.update(|window, cx| {
-                    if parse_sim_link(&url, cx).is_some() {
+                    if parse_zed_link(&url, cx).is_some() {
                         window.dispatch_action(
-                            Box::new(sim_actions::OpenSimUrl { url: url.into() }),
+                            Box::new(zed_actions::OpenSimUrl { url: url.into() }),
                             cx,
                         );
                     } else {
@@ -1723,9 +1723,9 @@ impl Editor {
                 match first_url_or_file {
                     Some(Either::Left(url)) => {
                         cx.update(|window, cx| {
-                            if parse_sim_link(&url, cx).is_some() {
+                            if parse_zed_link(&url, cx).is_some() {
                                 window.dispatch_action(
-                                    Box::new(sim_actions::OpenSimUrl { url: url.into() }),
+                                    Box::new(zed_actions::OpenSimUrl { url: url.into() }),
                                     cx,
                                 );
                             } else {

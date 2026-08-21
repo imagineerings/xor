@@ -90,7 +90,7 @@ pub struct LanguageSettings {
     pub line_ending: LineEndingSetting,
     /// How to perform a buffer format.
     pub formatter: settings::FormatterList,
-    /// Sim's Prettier integration settings.
+    /// Zed's Prettier integration settings.
     pub prettier: PrettierSettings,
     /// Whether to automatically close JSX tags.
     pub jsx_tag_auto_close: bool,
@@ -246,13 +246,13 @@ pub struct LanguageTaskSettings {
     /// Extra task variables to set for a particular language.
     pub variables: HashMap<String, String>,
     pub enabled: bool,
-    /// Use LSP tasks over Sim language extension ones.
+    /// Use LSP tasks over Zed language extension ones.
     /// If no LSP tasks are returned due to error/timeout or regular execution,
-    /// Sim language extension tasks will be used instead.
+    /// Zed language extension tasks will be used instead.
     ///
-    /// Other Sim tasks will still be shown:
-    /// * Sim task from either of the task config file
-    /// * Sim task from history (e.g. one-off task was spawned before)
+    /// Other Zed tasks will still be shown:
+    /// * Zed task from either of the task config file
+    /// * Zed task from history (e.g. one-off task was spawned before)
     pub prefer_lsp: bool,
 }
 
@@ -347,7 +347,7 @@ impl LanguageSettings {
 
     /// Returns the customized list of language servers from the list of
     /// available language servers.
-    pub fn customisim_language_servers(
+    pub fn customized_language_servers(
         &self,
         available_language_servers: &[LanguageServerName],
     ) -> Vec<LanguageServerName> {

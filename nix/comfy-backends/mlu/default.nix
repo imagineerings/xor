@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-mlu-metadata";
+  pname = "zed-comfy-backend-mlu-metadata";
   version = "neuware1.20-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/mlu"
+    destination="$out/lib/zed/comfy-backends/mlu"
     mkdir -p "$destination/abi"
     cp ${../../../crates/comfy_backend_mlu/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_mlu/LICENSES} "$destination/"
@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim Cambricon MLU ABI metadata without vendor runtime redistribution";
+    description = "Reviewed Zed Cambricon MLU ABI metadata without vendor runtime redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "x86_64-linux" "aarch64-linux" ];
   };

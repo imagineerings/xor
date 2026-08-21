@@ -1606,7 +1606,7 @@ fn canonical_sd1_artifact_admission_rejects_noncanonical_id_domains_and_merge_ca
         .is_err()
     );
 
-    let extended_merges = format!("{merges}__sim_invalid_left __sim_invalid_right\n");
+    let extended_merges = format!("{merges}__zed_invalid_left __zed_invalid_right\n");
     assert!(
         ClipBpeTokenizer::from_json_and_merges(
             ModelTokenizerDescriptor::checked("comfy.sd1.tokenizer")?,

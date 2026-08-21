@@ -15,7 +15,7 @@ CREATE INDEX collaboration_events_search_fts
 CREATE TABLE public.collaboration_search_documents (
     community_id uuid NOT NULL,
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024

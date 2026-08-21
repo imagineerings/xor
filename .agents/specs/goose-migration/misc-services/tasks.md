@@ -7,7 +7,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
 ## Tasks
 
 - [ ] 0. Resolve and, if approved, specify the Ask AI service boundary
-  - Confirm whether Sim needs a separately deployed documentation Q&A service or whether existing in-product help and documentation search are the intended owner
+  - Confirm whether Zed needs a separately deployed documentation Q&A service or whether existing in-product help and documentation search are the intended owner
   - If approved, define source ingestion, freshness, citation, authentication, privacy, deployment, and failure behavior before implementation
   - Do not create a standalone service until that product and operational boundary is approved
 
@@ -51,7 +51,7 @@ Implement the remaining smaller goose components: session import formats, Nostr 
   - _Writes: examples/_
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
-- [ ] 4. Reconcile development and CI workflows with existing Sim tooling
+- [ ] 4. Reconcile development and CI workflows with existing Zed tooling
   - Windows build script
   - Exclude the obsolete REST/OpenAPI validation premise; validate ACP/generated SDK contracts in their owning specs
   - Diagnostics viewer

@@ -45,16 +45,16 @@ At the measured Phase 1 starting point, the repository had 41 active top-level G
 
 ### Requirement 2: Keep generated archived workflows inactive
 
-<!-- impl: tooling/xtask/src/tasks/workflows.rs#ARCHIVED_SIM_WORKFLOWS -->
+<!-- impl: tooling/xtask/src/tasks/workflows.rs#ARCHIVED_ZED_WORKFLOWS -->
 
 **User story:** As a developer running `cargo xtask workflows`, I want archived generated workflows to remain archived, so that regeneration cannot silently expand the active CI surface.
 
 #### Acceptance criteria
 
-1. **2.1** WHEN `cargo xtask workflows` runs, THE generator SHALL write only `run_tests.yml` and `release.yml` as active Sim workflows.
+1. **2.1** WHEN `cargo xtask workflows` runs, THE generator SHALL write only `run_tests.yml` and `release.yml` as active Zed workflows.
 2. **2.2** WHEN `cargo xtask workflows` runs, THE generator SHALL NOT modify, remove, or recreate any workflow under `.github/workflows/archive/`.
-3. **2.3** THE `ARCHIVED_SIM_WORKFLOWS` policy SHALL include every generated Sim workflow archived in Phase 1 and SHALL exclude both retained core workflows.
-4. **2.4** WHEN generator policy is tested, THE test SHALL fail if a Sim workflow is neither in the active allowlist nor the archived generated set.
+3. **2.3** THE `ARCHIVED_ZED_WORKFLOWS` policy SHALL include every generated Zed workflow archived in Phase 1 and SHALL exclude both retained core workflows.
+4. **2.4** WHEN generator policy is tested, THE test SHALL fail if a Zed workflow is neither in the active allowlist nor the archived generated set.
 
 ### Requirement 3: Restore on-demand bundling in a later phase
 
@@ -213,4 +213,4 @@ At the measured Phase 1 starting point, the repository had 41 active top-level G
 - Phase 1 must use `git mv` for every archived workflow.
 - Phase 1 must preserve unrelated worktree changes and must not commit.
 - Archived workflows remain inert until their explicit later task is authorized and completed.
-- Restoration tasks must remove generated workflows from `ARCHIVED_SIM_WORKFLOWS` when reactivating them.
+- Restoration tasks must remove generated workflows from `ARCHIVED_ZED_WORKFLOWS` when reactivating them.

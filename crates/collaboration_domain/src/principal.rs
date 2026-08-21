@@ -189,7 +189,7 @@ pub struct AuthenticatedPrincipal {
 }
 
 impl AuthenticatedPrincipal {
-    pub fn sim_account(
+    pub fn zed_account(
         principal_id: PrincipalId,
         community_id: CommunityId,
         service_account_id: ServiceAccountId,
@@ -482,9 +482,9 @@ mod tests {
     }
 
     #[test]
-    fn authenticated_principal_keeps_sim_accounts_and_direct_nostr_keys_distinct() {
+    fn authenticated_principal_keeps_zed_accounts_and_direct_nostr_keys_distinct() {
         let community_id = community(1);
-        let sim_account = AuthenticatedPrincipal::sim_account(
+        let zed_account = AuthenticatedPrincipal::zed_account(
             principal(1),
             community_id,
             ServiceAccountId::new(20),
@@ -499,7 +499,7 @@ mod tests {
         );
 
         assert!(matches!(
-            sim_account.kind(),
+            zed_account.kind(),
             AuthenticatedPrincipalKind::SimAccount { service_account_id }
                 if *service_account_id == ServiceAccountId::new(20)
         ));
@@ -511,7 +511,7 @@ mod tests {
                 active_binding: None,
             } if *public_key == key(4)
         ));
-        assert_ne!(sim_account.principal_id(), nostr_identity.principal_id());
+        assert_ne!(zed_account.principal_id(), nostr_identity.principal_id());
     }
 
     #[test]

@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-8E3FD7459720",
   "baseline_overload_id": "COMFY-TENSOR-OP-8E3FD7459720:blocked",
   "baseline_fixture_sha256": "d81123fb02b8f9575c8d6a3866fb7b4f5b8b5326f6545924eeca4d2650a698d1",
-  "overload_id": "sim.native.tensor.linalg-vector-norm.cpu-f32.v1",
+  "overload_id": "zed.native.tensor.linalg-vector-norm.cpu-f32.v1",
   "owner_task_id": "comfy-parity-tensor-ops-linear-algebra-comfy-tensor-op-061170cbb6f7",
   "ordered_parameters": [
     {

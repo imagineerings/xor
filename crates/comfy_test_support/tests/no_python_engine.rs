@@ -58,7 +58,7 @@ fn production_sources(workspace_root: &Path) -> Result<Vec<(String, String)>, Bo
         let crate_name = entry.file_name();
         let crate_name = crate_name.to_string_lossy();
         if (crate_name.starts_with("comfy_") && crate_name != "comfy_test_support")
-            || crate_name == "sim"
+            || crate_name == "zed"
         {
             let source_directory = entry.path().join("src");
             if source_directory.is_dir() {

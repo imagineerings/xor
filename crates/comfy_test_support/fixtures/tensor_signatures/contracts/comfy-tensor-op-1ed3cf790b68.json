@@ -492,7 +492,7 @@
       "source_path": "comfy/ldm/modules/attention.py",
       "source_sha256": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
       "status": "static-call-observed",
-      "target_syntax": "sim.add_"
+      "target_syntax": "zed.add_"
     },
     {
       "catalog_field": "production_call_sites",

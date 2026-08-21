@@ -91,7 +91,7 @@ impl RuntimeAdapter {
             Self::Native(runtime) => runtime
                 .allocate(device, byte_length, cancellation)
                 .map(AllocationAdapter::Native)
-                .map_err(|error| map_execution_error("sim.mlu.allocate", device, error)),
+                .map_err(|error| map_execution_error("zed.mlu.allocate", device, error)),
             #[cfg(test)]
             Self::Test(runtime) => runtime
                 .validate_allocation(
@@ -114,7 +114,7 @@ impl RuntimeAdapter {
             Self::Native(runtime) => runtime
                 .create_stream(device, cancellation)
                 .map(StreamAdapter::Native)
-                .map_err(|error| map_execution_error("sim.mlu.stream.create", device, error)),
+                .map_err(|error| map_execution_error("zed.mlu.stream.create", device, error)),
             #[cfg(test)]
             Self::Test(runtime) => {
                 runtime.synchronize(device)?;
@@ -135,7 +135,7 @@ impl RuntimeAdapter {
                 .copy_from_host(destination, destination_offset, bytes, cancellation)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.mlu.transfer.host-to-device",
+                        "zed.mlu.transfer.host-to-device",
                         destination.device(),
                         error,
                     )
@@ -203,7 +203,7 @@ impl RuntimeAdapter {
             (Self::Native(runtime), AllocationAdapter::Native(source)) => runtime
                 .copy_to_host(source, source_offset, bytes, cancellation)
                 .map_err(|error| {
-                    map_execution_error("sim.mlu.transfer.device-to-host", source.device(), error)
+                    map_execution_error("zed.mlu.transfer.device-to-host", source.device(), error)
                 }),
             #[cfg(test)]
             (
@@ -253,7 +253,7 @@ impl RuntimeAdapter {
                     byte_length,
                     cancellation,
                 )
-                .map_err(|error| map_execution_error("sim.mlu.copy", destination.device(), error)),
+                .map_err(|error| map_execution_error("zed.mlu.copy", destination.device(), error)),
             #[cfg(test)]
             (
                 Self::Test(runtime),
@@ -329,7 +329,7 @@ impl RuntimeAdapter {
                     cancellation,
                 )
                 .map(EventAdapter::Native)
-                .map_err(|error| map_execution_error("sim.mlu.binary.add", stream.device(), error)),
+                .map_err(|error| map_execution_error("zed.mlu.binary.add", stream.device(), error)),
             #[cfg(test)]
             (
                 Self::Test(runtime),
@@ -380,7 +380,7 @@ impl RuntimeAdapter {
                 .record_event(stream, cancellation)
                 .map(EventAdapter::Native)
                 .map_err(|error| {
-                    map_execution_error("sim.mlu.event.record", stream.device(), error)
+                    map_execution_error("zed.mlu.event.record", stream.device(), error)
                 }),
             #[cfg(test)]
             (Self::Test(runtime), StreamAdapter::Test { device }) => {
@@ -399,7 +399,7 @@ impl RuntimeAdapter {
         match (self, event) {
             (Self::Native(runtime), EventAdapter::Native(event)) => runtime
                 .wait_event(event, cancellation)
-                .map_err(|error| map_execution_error("sim.mlu.event.wait", event.device(), error)),
+                .map_err(|error| map_execution_error("zed.mlu.event.wait", event.device(), error)),
             #[cfg(test)]
             (Self::Test(runtime), EventAdapter::Test { device }) => {
                 runtime.synchronize(*device)?;
@@ -481,7 +481,7 @@ impl MluTensorBackend {
         let device_count = runtime.device_count();
         if device_ordinal >= device_count {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.mlu.select-device".to_owned(),
+                operation: "zed.mlu.select-device".to_owned(),
                 device: DeviceId::new(DeviceKind::Mlu, device_ordinal),
                 reason: format!("device ordinal is outside certified count {device_count}"),
             });
@@ -526,7 +526,7 @@ impl MluTensorBackend {
         cancellation.check()?;
         if device.kind() != DeviceKind::Mlu || device.ordinal() >= device_count {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.mlu.select-device".to_owned(),
+                operation: "zed.mlu.select-device".to_owned(),
                 device,
                 reason: format!("device ordinal is outside certified count {device_count}"),
             });
@@ -577,7 +577,7 @@ impl MluTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.mlu.transfer.host-to-device",
+            "zed.mlu.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -624,7 +624,7 @@ impl MluTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.mlu.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.mlu.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -717,7 +717,7 @@ impl MluTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.mlu.storage.lookup".to_owned(),
+                operation: "zed.mlu.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified MLU backend instance"
                     .to_owned(),
@@ -824,7 +824,7 @@ impl CachedAllocationOwner for MluTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-mlu-cnrt-v1"
+        "zed-native-mlu-cnrt-v1"
     }
 
     fn release_cached_allocations(
@@ -859,7 +859,7 @@ impl TensorBackend for MluTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.mlu.allocate",
+            "zed.mlu.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -892,7 +892,7 @@ impl TensorBackend for MluTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.mlu.copy",
+            "zed.mlu.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -901,7 +901,7 @@ impl TensorBackend for MluTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.mlu.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.mlu.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -929,7 +929,7 @@ impl TensorBackend for MluTensorBackend {
         }
 
         let source = if source.descriptor().device() == self.device {
-            self.require_input("sim.mlu.copy", source, context)?;
+            self.require_input("zed.mlu.copy", source, context)?;
             let source_offset = tensor_byte_offset(source.descriptor())?;
             let source_storage = self.storage(source)?;
             let allocation = source_storage.allocation.clone();
@@ -959,7 +959,7 @@ impl TensorBackend for MluTensorBackend {
                 || !source.descriptor().is_contiguous()?
             {
                 return Err(self.unsupported(
-                    "sim.mlu.copy",
+                    "zed.mlu.copy",
                     "CPU source tensor must have canonical contiguous layout and strides",
                 ));
             }
@@ -973,7 +973,7 @@ impl TensorBackend for MluTensorBackend {
             PreflightSource::Cpu(bytes)
         } else {
             return Err(self.unsupported(
-                "sim.mlu.copy",
+                "zed.mlu.copy",
                 "source must be host-addressable CPU storage or this MLU backend instance",
             ));
         };
@@ -1043,7 +1043,7 @@ impl TensorBackend for MluTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.mlu.event.record", OperationSupport::record_event())?;
+            .require("zed.mlu.event.record", OperationSupport::record_event())?;
         let stream = self.stream(context.stream, context.cancellation)?;
         let event = self.runtime.record_event(&stream, context.cancellation)?;
         self.track_event(event, context)
@@ -1056,7 +1056,7 @@ impl TensorBackend for MluTensorBackend {
     ) -> Result<(), TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.mlu.event.wait", OperationSupport::wait_event())?;
+            .require("zed.mlu.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "MLU event belongs to a different backend instance".to_owned(),
@@ -1101,7 +1101,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.fill", context)
+        self.unsupported_result("zed.mlu.fill", context)
     }
 
     fn unary(
@@ -1111,7 +1111,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.unary", context)
+        self.unsupported_result("zed.mlu.unary", context)
     }
 
     fn binary(
@@ -1123,11 +1123,11 @@ impl TensorBackend for MluTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.mlu.binary", context);
+            return self.unsupported_result("zed.mlu.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.mlu.binary.add",
+                "zed.mlu.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -1136,7 +1136,7 @@ impl TensorBackend for MluTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.mlu.binary.add",
+            "zed.mlu.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -1177,7 +1177,7 @@ impl TensorBackend for MluTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.mlu.binary.add",
+                "zed.mlu.binary.add",
                 "the certified CNNL Add wrapper does not accept offset tensor views",
             ));
         }
@@ -1193,7 +1193,7 @@ impl TensorBackend for MluTensorBackend {
         };
         if dimensions.len() > 8 {
             return Err(self.unsupported(
-                "sim.mlu.binary.add",
+                "zed.mlu.binary.add",
                 "CNNL array descriptors require rank 1 through 8 with positive dimensions",
             ));
         }
@@ -1227,7 +1227,7 @@ impl TensorBackend for MluTensorBackend {
             DType::F32 => MluElementType::F32,
             _ => {
                 return Err(self.unsupported(
-                    "sim.mlu.binary.add",
+                    "zed.mlu.binary.add",
                     "only reviewed f16/f32 CNNL Add kernels are available",
                 ));
             }
@@ -1257,7 +1257,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.binary-scalar", context)
+        self.unsupported_result("zed.mlu.binary-scalar", context)
     }
 
     fn reduction(
@@ -1267,7 +1267,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.reduction", context)
+        self.unsupported_result("zed.mlu.reduction", context)
     }
 
     fn indexing(
@@ -1277,7 +1277,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.indexing", context)
+        self.unsupported_result("zed.mlu.indexing", context)
     }
 
     fn resize(
@@ -1287,7 +1287,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.resize", context)
+        self.unsupported_result("zed.mlu.resize", context)
     }
 
     fn convolution(
@@ -1297,7 +1297,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.convolution", context)
+        self.unsupported_result("zed.mlu.convolution", context)
     }
 
     fn linear_algebra(
@@ -1307,7 +1307,7 @@ impl TensorBackend for MluTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.linear-algebra", context)
+        self.unsupported_result("zed.mlu.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -1317,7 +1317,7 @@ impl TensorBackend for MluTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.mlu.custom-kernel", context)
+        self.unsupported_result("zed.mlu.custom-kernel", context)
     }
 }
 
@@ -1503,7 +1503,7 @@ impl TestRuntime {
     fn check(&self, device: u32, requested: usize) -> Result<(), TensorError> {
         if device >= self.device_count {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.mlu.test.select-device".to_owned(),
+                operation: "zed.mlu.test.select-device".to_owned(),
                 device: DeviceId::new(DeviceKind::Mlu, device),
                 reason: format!("device ordinal is outside test count {}", self.device_count),
             });

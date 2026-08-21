@@ -1,5 +1,5 @@
 {
-  "fixture_schema": "sim.comfy.video-codec-ltxv-tensor-preprocess.v1",
+  "fixture_schema": "zed.comfy.video-codec-ltxv-tensor-preprocess.v1",
   "truth_mode": "synthetic-source-compatible-ltxv-tensor-preprocess",
   "source": {
     "comfyui_version": "0.27.1",

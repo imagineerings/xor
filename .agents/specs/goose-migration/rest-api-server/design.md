@@ -2,12 +2,12 @@
 
 ## Overview
 
-If the product decision approves a standalone server, a thin ACP adapter will expose Sim's existing agent/session services over stdio and/or authenticated HTTP. It will not create REST resources, a second session database, a second provider registry, or a second permission system.
+If the product decision approves a standalone server, a thin ACP adapter will expose Zed's existing agent/session services over stdio and/or authenticated HTTP. It will not create REST resources, a second session database, a second provider registry, or a second permission system.
 
 ## Existing context
 
 - Goose's current server entry points are `Command::Acp` and `Command::Serve`, backed by `acp/server.rs` and `acp/transport/*`.
-- Sim already implements ACP client/session abstractions in `crates/acp_thread`, external agent lifecycle in `crates/agent_servers`, and native sessions in `crates/agent`.
+- Zed already implements ACP client/session abstractions in `crates/acp_thread`, external agent lifecycle in `crates/agent_servers`, and native sessions in `crates/agent`.
 - Domain services planned elsewhere own recipes, schedules, dictation, providers, extensions, prompts, sources, and MCP Apps.
 
 ## Design decisions
@@ -27,7 +27,7 @@ If the product decision approves a standalone server, a thin ACP adapter will ex
 ### D-ACP-HTTP
 
 - Responsibility: connection/session streams, generated secret authentication, optional TLS, limits, and idle cleanup.
-- Integration: reuse Sim HTTP/TLS primitives and ACP message types.
+- Integration: reuse Zed HTTP/TLS primitives and ACP message types.
 - Rationale: matches current Goose observable transport behavior without inventing REST routes.
 
 ### D-ACP-CUSTOM-METHODS
@@ -39,7 +39,7 @@ If the product decision approves a standalone server, a thin ACP adapter will ex
 ### D-ACP-SERVER-SECURITY
 
 - Responsibility: enforce authentication, filesystem/sandbox/permission policy, redaction, isolation, and safe errors.
-- Integration: existing Sim credential, sandbox, tool-permission, logging, and session boundaries.
+- Integration: existing Zed credential, sandbox, tool-permission, logging, and session boundaries.
 - Rationale: remote transport must not be a policy bypass.
 
 ## Requirements traceability

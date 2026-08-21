@@ -19,33 +19,33 @@ if [[ "$rust_tools" = true ]]; then
 else
     script/bundle-linux --flatpak
 fi
-archive_match="sim(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
+archive_match="zed(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
 archive=$(ls "target/release" | grep -E ${archive_match})
-channel=$(<crates/sim/RELEASE_CHANNEL)
+channel=$(<crates/zed/RELEASE_CHANNEL)
 
 export CHANNEL="$channel"
 export ARCHIVE="$archive"
 if [[ "$channel" == "dev" ]]; then
-    export APP_ID="dev.sim.SimDev"
-    export APP_NAME="Sim Devel"
+    export APP_ID="dev.zed.SimDev"
+    export APP_NAME="Zed Devel"
     export BRANDING_LIGHT="#99c1f1"
     export BRANDING_DARK="#1a5fb4"
     export ICON_FILE="app-icon-dev"
 elif [[ "$channel" == "nightly" ]]; then
-    export APP_ID="dev.sim.SimNightly"
-    export APP_NAME="Sim Nightly"
+    export APP_ID="dev.zed.SimNightly"
+    export APP_NAME="Zed Nightly"
     export BRANDING_LIGHT="#e9aa6a"
     export BRANDING_DARK="#1a5fb4"
     export ICON_FILE="app-icon-nightly"
 elif [[ "$channel" == "preview" ]]; then
-    export APP_ID="dev.sim.SimPreview"
-    export APP_NAME="Sim Preview"
+    export APP_ID="dev.zed.SimPreview"
+    export APP_NAME="Zed Preview"
     export BRANDING_LIGHT="#99c1f1"
     export BRANDING_DARK="#1a5fb4"
     export ICON_FILE="app-icon-preview"
 elif [[ "$channel" == "stable" ]]; then
-    export APP_ID="dev.sim.Sim"
-    export APP_NAME="Sim"
+    export APP_ID="dev.zed.Zed"
+    export APP_NAME="Zed"
     export BRANDING_LIGHT="#99c1f1"
     export BRANDING_DARK="#1a5fb4"
     export ICON_FILE="app-icon"
@@ -54,7 +54,7 @@ else
     exit
 fi
 
-envsubst < "crates/sim/resources/flatpak/manifest-template.json" > "$APP_ID.json"
+envsubst < "crates/zed/resources/flatpak/manifest-template.json" > "$APP_ID.json"
 flatpak-builder --user --install --force-clean build "$APP_ID.json"
 flatpak build-bundle ~/.local/share/flatpak/repo "target/release/$APP_ID.flatpak" "$APP_ID"
 echo "Created 'target/release/$APP_ID.flatpak'"

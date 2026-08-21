@@ -2,7 +2,7 @@
 
 ## Inventory boundary
 
-The normative feature ledger is [`catalogs/features.csv`](catalogs/features.csv). It contains **13,295** stable, non-reused feature contracts derived from ComfyUI, ComfyUI-Frontend, Comfy-Desktop, comfy-cli, docs, embedded-docs, Sim target evidence, and cross-product compatibility surfaces. Separate registry, localization, telemetry, test, generated-documentation, and source-file ledgers remain authoritative for count reconciliation even where an individual row is metadata or coverage support rather than a distinct user workflow.
+The normative feature ledger is [`catalogs/features.csv`](catalogs/features.csv). It contains **13,295** stable, non-reused feature contracts derived from ComfyUI, ComfyUI-Frontend, Comfy-Desktop, comfy-cli, docs, embedded-docs, Zed target evidence, and cross-product compatibility surfaces. Separate registry, localization, telemetry, test, generated-documentation, and source-file ledgers remain authoritative for count reconciliation even where an individual row is metadata or coverage support rather than a distinct user workflow.
 
 No source application, account, paid service, dependency set, or remote state was modified. Runtime evidence includes the safe ComfyUI parser/feature-flag probes, docs link and Bun tests, and embedded-docs link check recorded in [baseline.md](baseline.md). The comfy-cli runtime probe failed before command construction because Python 3.9.6 is below the declared 3.10 minimum and `questionary` is unavailable. Existing tests support `test-backed` classifications only where focused; a test-backed row is not represented as locally passing unless the baseline records a successful run.
 
@@ -534,7 +534,7 @@ Direct runtime validation covers **103/13,242 (0.78%)** independently testable m
 | conditional;deprecated/dead | 1 |
 | **Total** | **13,295** |
 
-## Current Sim status
+## Current Zed status
 
 | Status | Features |
 | --- | ---: |
@@ -646,7 +646,7 @@ The frontend localization ledger contains 12,586 rows; the Desktop localization 
 | docs | 5,800 | CI workflow=9; CMS staging content=14; English built-in-node documentation=896; English product documentation=307; English reusable snippet=56; configuration/schema/lock/registry=20; executable automation/tooling=45; governance/tool documentation=16; localized generated content=3723; media asset=708; repository/site infrastructure=6 |
 | embedded-docs | 10,298 | CI workflow=4; English node documentation=855; executable/package tooling=4; governance/tool documentation=1; localized node documentation=9405; node ancillary asset=1; node media asset=23; package configuration=2; repository/package infrastructure=3 |
 
-Every source file in all six source repositories has a ledger row and either one or more feature/record mappings or an explicit production, infrastructure, generated, translated mirror, test-only/support, asset, documentation, staging, deprecated/dead, or placeholder classification with a reason. Infrastructure, translations, and test-support files are not promoted into fictional executable behavior. Sim target evidence is separately mapped in `catalogs/sim-architecture.csv` and [evidence-sim.md](evidence-sim.md).
+Every source file in all six source repositories has a ledger row and either one or more feature/record mappings or an explicit production, infrastructure, generated, translated mirror, test-only/support, asset, documentation, staging, deprecated/dead, or placeholder classification with a reason. Infrastructure, translations, and test-support files are not promoted into fictional executable behavior. Zed target evidence is separately mapped in `catalogs/zed-architecture.csv` and [evidence-zed.md](evidence-zed.md).
 
 ## Tests, fixtures, stories, and snapshots
 

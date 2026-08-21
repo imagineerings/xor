@@ -374,7 +374,7 @@ pub async fn write_multi_workspace_state(
     }
 }
 
-pub fn read_serialisim_multi_workspaces(
+pub fn read_serialized_multi_workspaces(
     session_workspaces: Vec<model::SessionWorkspace>,
     cx: &App,
 ) -> Vec<model::SerializedMultiWorkspace> {
@@ -593,9 +593,9 @@ impl Domain for WorkspaceDb {
             CREATE TABLE workspaces(
                 workspace_id INTEGER PRIMARY KEY,
                 workspace_location BLOB UNIQUE,
-                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Sim.
-                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Sim.
-                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Sim.
+                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Zed.
+                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Zed.
+                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Zed.
                 left_sidebar_open INTEGER, // Boolean
                 timestamp TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 FOREIGN KEY(dock_pane) REFERENCES panes(pane_id)
@@ -659,9 +659,9 @@ impl Domain for WorkspaceDb {
             CREATE TABLE workspaces_2(
                 workspace_id INTEGER PRIMARY KEY,
                 workspace_location BLOB UNIQUE,
-                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Sim.
-                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Sim.
-                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Sim.
+                dock_visible INTEGER, // Deprecated. Preserving so users can downgrade Zed.
+                dock_anchor TEXT, // Deprecated. Preserving so users can downgrade Zed.
+                dock_pane INTEGER, // Deprecated.  Preserving so users can downgrade Zed.
                 left_sidebar_open INTEGER, // Boolean
                 timestamp TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 window_state TEXT,
@@ -696,7 +696,7 @@ impl Domain for WorkspaceDb {
         ),
         // Add fullscreen field to workspace
         // Deprecated, `WindowBounds` holds the fullscreen state now.
-        // Preserving so users can downgrade Sim.
+        // Preserving so users can downgrade Zed.
         sql!(
             ALTER TABLE workspaces ADD COLUMN fullscreen INTEGER; //bool
         ),
@@ -2252,7 +2252,7 @@ impl WorkspaceDb {
     }
 
     // Returns the locations of the workspaces that were still opened when the last
-    // session was closed (i.e. when Sim was quit).
+    // session was closed (i.e. when Zed was quit).
     // If `last_session_window_order` is provided, the returned locations are ordered
     // according to that.
     pub async fn last_session_workspace_locations(
@@ -4718,7 +4718,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_read_serialisim_multi_workspaces_with_state(cx: &mut gpui::TestAppContext) {
+    async fn test_read_serialized_multi_workspaces_with_state(cx: &mut gpui::TestAppContext) {
         use crate::persistence::model::MultiWorkspaceState;
 
         // Write multi-workspace state for two windows via the scoped KVP.
@@ -4779,7 +4779,7 @@ mod tests {
             },
         ];
 
-        let results = cx.update(|cx| read_serialisim_multi_workspaces(session_workspaces, cx));
+        let results = cx.update(|cx| read_serialized_multi_workspaces(session_workspaces, cx));
 
         // Should produce 3 results: window 10, window 20, and the orphan.
         assert_eq!(results.len(), 3);
@@ -5842,7 +5842,7 @@ mod tests {
         );
 
         let multi_workspaces =
-            cx.update(|_, cx| read_serialisim_multi_workspaces(session_workspaces, cx));
+            cx.update(|_, cx| read_serialized_multi_workspaces(session_workspaces, cx));
         assert_eq!(
             multi_workspaces.len(),
             1,
@@ -5879,11 +5879,11 @@ mod tests {
         let app_state =
             multi_workspace.read_with(cx, |mw, cx| mw.workspace().read(cx).app_state().clone());
 
-        let serialisim_mw = multi_workspaces.into_iter().next().unwrap();
+        let serialized_mw = multi_workspaces.into_iter().next().unwrap();
         let restored_handle: gpui::WindowHandle<MultiWorkspace> = cx
             .update(|_, cx| {
                 cx.spawn(async move |mut cx| {
-                    crate::restore_multiworkspace(serialisim_mw, app_state, &mut cx).await
+                    crate::restore_multiworkspace(serialized_mw, app_state, &mut cx).await
                 })
             })
             .await

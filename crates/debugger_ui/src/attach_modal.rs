@@ -268,7 +268,7 @@ impl PickerDelegate for AttachModalDelegate {
 
                 let definition = definition.clone();
                 cx.spawn_in(window, async move |this, cx| {
-                    let Ok(scenario) = adapter.config_from_sim_format(definition).await else {
+                    let Ok(scenario) = adapter.config_from_zed_format(definition).await else {
                         return;
                     };
 

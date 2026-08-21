@@ -25,7 +25,7 @@
     "successful_response_retains_scratch_lease": false,
     "successful_response_backend_accounts_encoded_storage": true,
     "mixed_ltxv_vp9_av1_and_eight_or_ten_bit_h264_requests_share_one_actor": true,
-    "actor_identity_version": "sim.comfy.video-codec-thread.v9"
+    "actor_identity_version": "zed.comfy.video-codec-thread.v9"
   },
   "synthetic_fixture": {
     "encoded_bytes": "H10P4",

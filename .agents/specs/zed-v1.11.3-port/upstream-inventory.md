@@ -195,178 +195,178 @@ Thus 160 commits produce 161 independently reviewable port decisions.
 
 ## Endpoint changed-path ledger
 
-This ledger accounts for every added, modified, deleted, and renamed endpoint path. Current relation is content-addressed against the supplied local Sim filesystem and the verified upstream trees; it is merge-strategy evidence, not a port decision.
+This ledger accounts for every added, modified, deleted, and renamed endpoint path. Current relation is content-addressed against the supplied local Zed filesystem and the verified upstream trees; it is merge-strategy evidence, not a port decision.
 
 | Status | Endpoint path | Category | Right-range change IDs | Current relation |
 | --- | --- | --- | --- | --- |
 | A | `.agents/skills/lint-creator/SKILL.md` | production | ZUP-067 | absent locally |
-| M | `.github/CODEOWNERS.hold` | CI/release | ZUP-043 | Sim-diverged |
-| M | `.github/workflows/after_release.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/autofix_pr.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/bump_collab_staging.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/bump_patch_version.yml` | CI/release | ZUP-090 | Sim-diverged |
+| M | `.github/CODEOWNERS.hold` | CI/release | ZUP-043 | Zed-diverged |
+| M | `.github/workflows/after_release.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/autofix_pr.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/bump_collab_staging.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/bump_patch_version.yml` | CI/release | ZUP-090 | Zed-diverged |
 | M | `.github/workflows/bump_zed_version.yml` | CI/release | ZUP-090 | absent locally |
-| M | `.github/workflows/cherry_pick.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/comment_on_potential_duplicate_issues.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/community_close_stale_issues.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/community_update_all_top_ranking_issues.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/community_update_weekly_top_ranking_issues.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/compliance_check.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/congrats.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/danger.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/deploy_collab.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/deploy_docs.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/deploy_nightly_docs.yml` | CI/release | ZUP-090 | Sim-diverged |
+| M | `.github/workflows/cherry_pick.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/comment_on_potential_duplicate_issues.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/community_close_stale_issues.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/community_update_all_top_ranking_issues.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/community_update_weekly_top_ranking_issues.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/compliance_check.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/congrats.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/danger.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/deploy_collab.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/deploy_docs.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/deploy_nightly_docs.yml` | CI/release | ZUP-090 | Zed-diverged |
 | M | `.github/workflows/docs_suggestions.yml` | CI/release | ZUP-090 | equals v1.10.2 |
-| M | `.github/workflows/extension_auto_bump.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/extension_bump.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/extension_tests.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/extension_workflow_rollout.yml` | CI/release | ZUP-082, ZUP-090 | Sim-diverged |
-| M | `.github/workflows/good_first_issue_notifier.yml` | CI/release | ZUP-090 | Sim-diverged |
+| M | `.github/workflows/extension_auto_bump.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/extension_bump.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/extension_tests.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/extension_workflow_rollout.yml` | CI/release | ZUP-082, ZUP-090 | Zed-diverged |
+| M | `.github/workflows/good_first_issue_notifier.yml` | CI/release | ZUP-090 | Zed-diverged |
 | A | `.github/workflows/guild_assignment_status.yml` | CI/release | ZUP-016 | absent locally |
 | A | `.github/workflows/guild_new_pr_notify.yml` | CI/release | ZUP-016 | absent locally |
 | A | `.github/workflows/guild_stale_assignments.yml` | CI/release | ZUP-016 | absent locally |
 | A | `.github/workflows/guild_weekly_shipped.yml` | CI/release | ZUP-016 | absent locally |
-| M | `.github/workflows/hotfix-review-monitor.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/nix_build.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/pr_issue_labeler.yml` | CI/release | ZUP-016 | Sim-diverged |
-| M | `.github/workflows/publish_extension_cli.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/release.yml` | CI/release | ZUP-090, ZUP-146 | Sim-diverged |
-| M | `.github/workflows/release_nightly.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/run_bundling.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/run_tests.yml` | CI/release | ZUP-090, ZUP-091, ZUP-096 | Sim-diverged |
-| M | `.github/workflows/slack_notify_community_automation_failure.yml` | CI/release | ZUP-016, ZUP-090 | Sim-diverged |
-| M | `.github/workflows/slack_notify_first_responders.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/slack_notify_label_created.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/stale-pr-reminder.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `.github/workflows/update_duplicate_magnets.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `Cargo.lock` | manifest/dependency | ZUP-002, ZUP-003, ZUP-011, ZUP-015, ZUP-033, ZUP-044, ZUP-047, ZUP-050, ZUP-061, ZUP-099, ZUP-102, ZUP-113, ZUP-117, ZUP-128, ZUP-130, ZUP-148, ZUP-151, ZUP-154, ZUP-159 | Sim-diverged |
-| M | `Cargo.toml` | manifest/dependency | ZUP-015, ZUP-061, ZUP-067, ZUP-099, ZUP-117, ZUP-128 | Sim-diverged |
+| M | `.github/workflows/hotfix-review-monitor.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/nix_build.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/pr_issue_labeler.yml` | CI/release | ZUP-016 | Zed-diverged |
+| M | `.github/workflows/publish_extension_cli.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/release.yml` | CI/release | ZUP-090, ZUP-146 | Zed-diverged |
+| M | `.github/workflows/release_nightly.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/run_bundling.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/run_tests.yml` | CI/release | ZUP-090, ZUP-091, ZUP-096 | Zed-diverged |
+| M | `.github/workflows/slack_notify_community_automation_failure.yml` | CI/release | ZUP-016, ZUP-090 | Zed-diverged |
+| M | `.github/workflows/slack_notify_first_responders.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/slack_notify_label_created.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/stale-pr-reminder.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `.github/workflows/update_duplicate_magnets.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `Cargo.lock` | manifest/dependency | ZUP-002, ZUP-003, ZUP-011, ZUP-015, ZUP-033, ZUP-044, ZUP-047, ZUP-050, ZUP-061, ZUP-099, ZUP-102, ZUP-113, ZUP-117, ZUP-128, ZUP-130, ZUP-148, ZUP-151, ZUP-154, ZUP-159 | Zed-diverged |
+| M | `Cargo.toml` | manifest/dependency | ZUP-015, ZUP-061, ZUP-067, ZUP-099, ZUP-117, ZUP-128 | Zed-diverged |
 | M | `assets/icons/folder_share.svg` | asset/settings | ZUP-004 | equals v1.10.2 |
 | M | `assets/icons/folder_shared.svg` | asset/settings | ZUP-004 | equals v1.10.2 |
 | M | `assets/icons/square_dot.svg` | asset/settings | ZUP-088 | equals v1.10.2 |
 | M | `assets/icons/square_minus.svg` | asset/settings | ZUP-088 | equals v1.10.2 |
 | M | `assets/icons/square_plus.svg` | asset/settings | ZUP-088 | equals v1.10.2 |
 | A | `assets/icons/user_arrow_up.svg` | asset/settings | ZUP-004 | absent locally |
-| M | `assets/keymaps/default-linux.json` | keymap/action | ZUP-035, ZUP-152 | Sim-diverged |
-| M | `assets/keymaps/default-macos.json` | keymap/action | ZUP-035, ZUP-152 | Sim-diverged |
-| M | `assets/keymaps/default-windows.json` | keymap/action | ZUP-035, ZUP-152 | Sim-diverged |
-| M | `assets/keymaps/linux/jetbrains.json` | keymap/action | ZUP-063 | Sim-diverged |
-| M | `assets/keymaps/macos/jetbrains.json` | keymap/action | ZUP-063 | Sim-diverged |
+| M | `assets/keymaps/default-linux.json` | keymap/action | ZUP-035, ZUP-152 | Zed-diverged |
+| M | `assets/keymaps/default-macos.json` | keymap/action | ZUP-035, ZUP-152 | Zed-diverged |
+| M | `assets/keymaps/default-windows.json` | keymap/action | ZUP-035, ZUP-152 | Zed-diverged |
+| M | `assets/keymaps/linux/jetbrains.json` | keymap/action | ZUP-063 | Zed-diverged |
+| M | `assets/keymaps/macos/jetbrains.json` | keymap/action | ZUP-063 | Zed-diverged |
 | M | `assets/keymaps/specific-overrides-macos.json` | keymap/action | ZUP-029 | equals v1.10.2 |
 | M | `assets/keymaps/specific-overrides.json` | keymap/action | ZUP-029 | equals v1.10.2 |
 | D | `assets/keymaps/storybook.json` | keymap/action | ZUP-043 | equals v1.10.2 |
-| M | `assets/settings/default.json` | asset/settings | ZUP-009, ZUP-021, ZUP-140 | Sim-diverged |
-| M | `crates/acp_thread/src/acp_thread.rs` | production | ZUP-048, ZUP-142 | Sim-diverged |
-| M | `crates/acp_thread/src/connection.rs` | production | ZUP-030 | Sim-diverged |
+| M | `assets/settings/default.json` | asset/settings | ZUP-009, ZUP-021, ZUP-140 | Zed-diverged |
+| M | `crates/acp_thread/src/acp_thread.rs` | production | ZUP-048, ZUP-142 | Zed-diverged |
+| M | `crates/acp_thread/src/connection.rs` | production | ZUP-030 | Zed-diverged |
 | M | `crates/acp_thread/src/diff.rs` | production | ZUP-137 | equals v1.10.2 |
-| M | `crates/acp_thread/src/mention.rs` | production | ZUP-071 | Sim-diverged |
-| M | `crates/agent/src/agent.rs` | production | ZUP-078 | Sim-diverged |
-| M | `crates/agent/src/db.rs` | production | ZUP-134 | Sim-diverged |
-| M | `crates/agent/src/thread.rs` | production | ZUP-078 | Sim-diverged |
+| M | `crates/acp_thread/src/mention.rs` | production | ZUP-071 | Zed-diverged |
+| M | `crates/agent/src/agent.rs` | production | ZUP-078 | Zed-diverged |
+| M | `crates/agent/src/db.rs` | production | ZUP-134 | Zed-diverged |
+| M | `crates/agent/src/thread.rs` | production | ZUP-078 | Zed-diverged |
 | M | `crates/agent/src/tools/find_path_tool.rs` | production | ZUP-071 | equals v1.10.2 |
-| M | `crates/agent/src/tools/grep_tool.rs` | production | ZUP-071 | Sim-diverged |
-| M | `crates/agent_servers/src/acp.rs` | production | ZUP-080 | Sim-diverged |
-| M | `crates/agent_ui/Cargo.toml` | manifest/dependency | ZUP-003 | Sim-diverged |
-| M | `crates/agent_ui/src/agent_diff.rs` | production | ZUP-088, ZUP-098 | Sim-diverged |
-| M | `crates/agent_ui/src/agent_panel.rs` | production | ZUP-003, ZUP-004, ZUP-035, ZUP-083, ZUP-149, ZUP-152 | Sim-diverged |
-| M | `crates/agent_ui/src/agent_registry_ui.rs` | production | ZUP-083 | Sim-diverged |
-| M | `crates/agent_ui/src/agent_ui.rs` | production | ZUP-071, ZUP-078 | Sim-diverged |
-| M | `crates/agent_ui/src/completion_provider.rs` | production | ZUP-004 | Sim-diverged |
-| M | `crates/agent_ui/src/config_options.rs` | production | ZUP-080 | Sim-diverged |
-| M | `crates/agent_ui/src/conversation_view.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/agent_ui/src/conversation_view/elicitation.rs` | production | ZUP-117 | Sim-diverged |
-| M | `crates/agent_ui/src/conversation_view/thread_view.rs` | production | ZUP-004, ZUP-030, ZUP-069, ZUP-071, ZUP-078, ZUP-088 | Sim-diverged |
+| M | `crates/agent/src/tools/grep_tool.rs` | production | ZUP-071 | Zed-diverged |
+| M | `crates/agent_servers/src/acp.rs` | production | ZUP-080 | Zed-diverged |
+| M | `crates/agent_ui/Cargo.toml` | manifest/dependency | ZUP-003 | Zed-diverged |
+| M | `crates/agent_ui/src/agent_diff.rs` | production | ZUP-088, ZUP-098 | Zed-diverged |
+| M | `crates/agent_ui/src/agent_panel.rs` | production | ZUP-003, ZUP-004, ZUP-035, ZUP-083, ZUP-149, ZUP-152 | Zed-diverged |
+| M | `crates/agent_ui/src/agent_registry_ui.rs` | production | ZUP-083 | Zed-diverged |
+| M | `crates/agent_ui/src/agent_ui.rs` | production | ZUP-071, ZUP-078 | Zed-diverged |
+| M | `crates/agent_ui/src/completion_provider.rs` | production | ZUP-004 | Zed-diverged |
+| M | `crates/agent_ui/src/config_options.rs` | production | ZUP-080 | Zed-diverged |
+| M | `crates/agent_ui/src/conversation_view.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/agent_ui/src/conversation_view/elicitation.rs` | production | ZUP-117 | Zed-diverged |
+| M | `crates/agent_ui/src/conversation_view/thread_view.rs` | production | ZUP-004, ZUP-030, ZUP-069, ZUP-071, ZUP-078, ZUP-088 | Zed-diverged |
 | M | `crates/agent_ui/src/diagnostics.rs` | production | ZUP-137 | equals v1.10.2 |
 | M | `crates/agent_ui/src/entry_view_state.rs` | production | ZUP-098 | equals v1.10.2 |
-| M | `crates/agent_ui/src/message_editor.rs` | production | ZUP-004 | Sim-diverged |
-| M | `crates/agent_ui/src/ui/mention_crease.rs` | production | ZUP-071 | Sim-diverged |
-| M | `crates/auto_update/src/auto_update.rs` | production | ZUP-036, ZUP-038, ZUP-042, ZUP-068, ZUP-092, ZUP-112 | Sim-diverged |
+| M | `crates/agent_ui/src/message_editor.rs` | production | ZUP-004 | Zed-diverged |
+| M | `crates/agent_ui/src/ui/mention_crease.rs` | production | ZUP-071 | Zed-diverged |
+| M | `crates/auto_update/src/auto_update.rs` | production | ZUP-036, ZUP-038, ZUP-042, ZUP-068, ZUP-092, ZUP-112 | Zed-diverged |
 | M | `crates/bedrock/src/models.rs` | production | ZUP-051, ZUP-055, ZUP-070, ZUP-128 | equals v1.10.2 |
-| M | `crates/buffer_diff/src/buffer_diff.rs` | production | ZUP-098 | Sim-diverged |
-| M | `crates/client/src/test.rs` | test/fixture | ZUP-094 | Sim-diverged |
+| M | `crates/buffer_diff/src/buffer_diff.rs` | production | ZUP-098 | Zed-diverged |
+| M | `crates/client/src/test.rs` | test/fixture | ZUP-094 | Zed-diverged |
 | M | `crates/client/src/zed_urls.rs` | production | ZUP-050 | absent locally |
-| M | `crates/cloud_api_client/src/cloud_api_client.rs` | production | ZUP-129 | Sim-diverged |
-| M | `crates/cloud_api_types/src/cloud_api_types.rs` | production | ZUP-022, ZUP-094 | Sim-diverged |
-| M | `crates/collab/src/auth.rs` | production | ZUP-094 | Sim-diverged |
+| M | `crates/cloud_api_client/src/cloud_api_client.rs` | production | ZUP-129 | Zed-diverged |
+| M | `crates/cloud_api_types/src/cloud_api_types.rs` | production | ZUP-022, ZUP-094 | Zed-diverged |
+| M | `crates/collab/src/auth.rs` | production | ZUP-094 | Zed-diverged |
 | M | `crates/collab/src/db.rs` | production | ZUP-034 | equals v1.10.2 |
-| M | `crates/collab/src/rpc.rs` | production | ZUP-034 | Sim-diverged |
-| M | `crates/collab/tests/integration/channel_tests.rs` | test/fixture | ZUP-045 | Sim-diverged |
-| M | `crates/collab/tests/integration/test_server.rs` | test/fixture | ZUP-045 | Sim-diverged |
-| M | `crates/command_palette/src/command_palette.rs` | production | ZUP-028 | Sim-diverged |
+| M | `crates/collab/src/rpc.rs` | production | ZUP-034 | Zed-diverged |
+| M | `crates/collab/tests/integration/channel_tests.rs` | test/fixture | ZUP-045 | Zed-diverged |
+| M | `crates/collab/tests/integration/test_server.rs` | test/fixture | ZUP-045 | Zed-diverged |
+| M | `crates/command_palette/src/command_palette.rs` | production | ZUP-028 | Zed-diverged |
 | M | `crates/context_server/src/client.rs` | production | ZUP-058 | equals v1.10.2 |
-| M | `crates/context_server/src/context_server.rs` | production | ZUP-058 | Sim-diverged |
-| M | `crates/context_server/src/protocol.rs` | production | ZUP-058 | Sim-diverged |
+| M | `crates/context_server/src/context_server.rs` | production | ZUP-058 | Zed-diverged |
+| M | `crates/context_server/src/protocol.rs` | production | ZUP-058 | Zed-diverged |
 | M | `crates/context_server/src/transport.rs` | production | ZUP-058 | equals v1.10.2 |
 | M | `crates/context_server/src/transport/http.rs` | production | ZUP-058 | equals v1.10.2 |
 | M | `crates/copilot_ui/Cargo.toml` | manifest/dependency | ZUP-113 | equals v1.10.2 |
-| M | `crates/copilot_ui/src/sign_in.rs` | production | ZUP-113 | Sim-diverged |
-| M | `crates/dev_container/src/devcontainer_manifest.rs` | production | ZUP-060 | Sim-diverged |
+| M | `crates/copilot_ui/src/sign_in.rs` | production | ZUP-113 | Zed-diverged |
+| M | `crates/dev_container/src/devcontainer_manifest.rs` | production | ZUP-060 | Zed-diverged |
 | M | `crates/edit_prediction_cli/src/filter_languages.rs` | production | ZUP-139 | equals v1.10.2 |
-| M | `crates/edit_prediction_ui/src/rate_prediction_modal.rs` | production | ZUP-137 | Sim-diverged |
-| M | `crates/editor/Cargo.toml` | manifest/dependency | ZUP-130 | Sim-diverged |
+| M | `crates/edit_prediction_ui/src/rate_prediction_modal.rs` | production | ZUP-137 | Zed-diverged |
+| M | `crates/editor/Cargo.toml` | manifest/dependency | ZUP-130 | Zed-diverged |
 | M | `crates/editor/src/bracket_colorization.rs` | production | ZUP-005 | equals v1.10.2 |
-| M | `crates/editor/src/clipboard.rs` | production | ZUP-019 | Sim-diverged |
+| M | `crates/editor/src/clipboard.rs` | production | ZUP-019 | Zed-diverged |
 | M | `crates/editor/src/code_context_menus.rs` | production | ZUP-093 | equals v1.10.2 |
-| M | `crates/editor/src/completions.rs` | production | ZUP-025 | Sim-diverged |
+| M | `crates/editor/src/completions.rs` | production | ZUP-025 | Zed-diverged |
 | M | `crates/editor/src/config.rs` | production | ZUP-098 | equals v1.10.2 |
-| M | `crates/editor/src/edit_prediction.rs` | production | ZUP-137 | Sim-diverged |
-| M | `crates/editor/src/editor.rs` | production | ZUP-005, ZUP-018, ZUP-026, ZUP-031, ZUP-079, ZUP-088, ZUP-098, ZUP-137, ZUP-143 | Sim-diverged |
-| M | `crates/editor/src/editor_tests.rs` | test/fixture | ZUP-019, ZUP-025, ZUP-026, ZUP-031, ZUP-101 | Sim-diverged |
-| M | `crates/editor/src/element.rs` | production | ZUP-018, ZUP-088, ZUP-098 | Sim-diverged |
-| M | `crates/editor/src/element/header.rs` | production | ZUP-057, ZUP-088, ZUP-137 | Sim-diverged |
+| M | `crates/editor/src/edit_prediction.rs` | production | ZUP-137 | Zed-diverged |
+| M | `crates/editor/src/editor.rs` | production | ZUP-005, ZUP-018, ZUP-026, ZUP-031, ZUP-079, ZUP-088, ZUP-098, ZUP-137, ZUP-143 | Zed-diverged |
+| M | `crates/editor/src/editor_tests.rs` | test/fixture | ZUP-019, ZUP-025, ZUP-026, ZUP-031, ZUP-101 | Zed-diverged |
+| M | `crates/editor/src/element.rs` | production | ZUP-018, ZUP-088, ZUP-098 | Zed-diverged |
+| M | `crates/editor/src/element/header.rs` | production | ZUP-057, ZUP-088, ZUP-137 | Zed-diverged |
 | M | `crates/editor/src/git.rs` | production | ZUP-079, ZUP-098 | equals v1.10.2 |
 | M | `crates/editor/src/git/blame.rs` | production | ZUP-079 | equals v1.10.2 |
-| M | `crates/editor/src/hover_popover.rs` | production | ZUP-130 | Sim-diverged |
+| M | `crates/editor/src/hover_popover.rs` | production | ZUP-130 | Zed-diverged |
 | M | `crates/editor/src/input.rs` | production | ZUP-133 | equals v1.10.2 |
-| M | `crates/editor/src/items.rs` | production | ZUP-137 | Sim-diverged |
-| M | `crates/editor/src/split.rs` | production | ZUP-088, ZUP-098 | Sim-diverged |
-| M | `crates/extension_host/src/extension_store_test.rs` | test/fixture | ZUP-127 | Sim-diverged |
-| M | `crates/file_finder/src/file_finder.rs` | production | ZUP-133 | Sim-diverged |
-| M | `crates/fs/Cargo.toml` | manifest/dependency | ZUP-159 | Sim-diverged |
+| M | `crates/editor/src/items.rs` | production | ZUP-137 | Zed-diverged |
+| M | `crates/editor/src/split.rs` | production | ZUP-088, ZUP-098 | Zed-diverged |
+| M | `crates/extension_host/src/extension_store_test.rs` | test/fixture | ZUP-127 | Zed-diverged |
+| M | `crates/file_finder/src/file_finder.rs` | production | ZUP-133 | Zed-diverged |
+| M | `crates/fs/Cargo.toml` | manifest/dependency | ZUP-159 | Zed-diverged |
 | M | `crates/fs/src/fake_git_repo.rs` | production | ZUP-122 | equals v1.10.2 |
-| M | `crates/fs/src/fs.rs` | production | ZUP-024, ZUP-033, ZUP-124 | Sim-diverged |
-| M | `crates/fs/src/fs_watcher.rs` | production | ZUP-124 | Sim-diverged |
+| M | `crates/fs/src/fs.rs` | production | ZUP-024, ZUP-033, ZUP-124 | Zed-diverged |
+| M | `crates/fs/src/fs_watcher.rs` | production | ZUP-124 | Zed-diverged |
 | M | `crates/git/src/commit.rs` | production | ZUP-074 | equals v1.10.2 |
-| M | `crates/git/src/repository.rs` | production | ZUP-074, ZUP-122 | Sim-diverged |
-| M | `crates/git_ui/Cargo.toml` | manifest/dependency | ZUP-050 | Sim-diverged |
+| M | `crates/git/src/repository.rs` | production | ZUP-074, ZUP-122 | Zed-diverged |
+| M | `crates/git_ui/Cargo.toml` | manifest/dependency | ZUP-050 | Zed-diverged |
 | A | `crates/git_ui/src/branch_diff.rs` | production | ZUP-098 | absent locally |
-| M | `crates/git_ui/src/commit_modal.rs` | production | ZUP-088 | Sim-diverged |
-| M | `crates/git_ui/src/commit_view.rs` | production | ZUP-098 | Sim-diverged |
-| M | `crates/git_ui/src/conflict_view.rs` | production | ZUP-098 | Sim-diverged |
+| M | `crates/git_ui/src/commit_modal.rs` | production | ZUP-088 | Zed-diverged |
+| M | `crates/git_ui/src/commit_view.rs` | production | ZUP-098 | Zed-diverged |
+| M | `crates/git_ui/src/conflict_view.rs` | production | ZUP-098 | Zed-diverged |
 | A | `crates/git_ui/src/diff_multibuffer.rs` | production | ZUP-098 | absent locally |
 | M | `crates/git_ui/src/file_diff_view.rs` | production | ZUP-098, ZUP-137 | equals v1.10.2 |
-| M | `crates/git_ui/src/git_graph.rs` | production | ZUP-072, ZUP-103, ZUP-119 | Sim-diverged |
-| M | `crates/git_ui/src/git_panel.rs` | production | ZUP-050, ZUP-052, ZUP-059, ZUP-066, ZUP-076, ZUP-088, ZUP-098, ZUP-119, ZUP-121, ZUP-123, ZUP-126 | Sim-diverged |
-| M | `crates/git_ui/src/git_ui.rs` | production | ZUP-088, ZUP-098 | Sim-diverged |
+| M | `crates/git_ui/src/git_graph.rs` | production | ZUP-072, ZUP-103, ZUP-119 | Zed-diverged |
+| M | `crates/git_ui/src/git_panel.rs` | production | ZUP-050, ZUP-052, ZUP-059, ZUP-066, ZUP-076, ZUP-088, ZUP-098, ZUP-119, ZUP-121, ZUP-123, ZUP-126 | Zed-diverged |
+| M | `crates/git_ui/src/git_ui.rs` | production | ZUP-088, ZUP-098 | Zed-diverged |
 | M | `crates/git_ui/src/multi_diff_view.rs` | production | ZUP-098, ZUP-137 | equals v1.10.2 |
-| M | `crates/git_ui/src/project_diff.rs` | production | ZUP-088, ZUP-098, ZUP-119 | Sim-diverged |
+| M | `crates/git_ui/src/project_diff.rs` | production | ZUP-088, ZUP-098, ZUP-119 | Zed-diverged |
 | M | `crates/git_ui/src/remote_output.rs` | production | ZUP-126 | equals v1.10.2 |
 | M | `crates/git_ui/src/solo_diff_view.rs` | production | ZUP-088 | equals v1.10.2 |
 | A | `crates/git_ui/src/staged_diff.rs` | production | ZUP-098 | absent locally |
-| M | `crates/git_ui/src/text_diff_view.rs` | production | ZUP-098, ZUP-137 | Sim-diverged |
+| M | `crates/git_ui/src/text_diff_view.rs` | production | ZUP-098, ZUP-137 | Zed-diverged |
 | A | `crates/git_ui/src/unstaged_diff.rs` | production | ZUP-098 | absent locally |
-| M | `crates/gpui/Cargo.toml` | manifest/dependency | ZUP-156 | Sim-diverged |
+| M | `crates/gpui/Cargo.toml` | manifest/dependency | ZUP-156 | Zed-diverged |
 | A | `crates/gpui/examples/window_movable.rs` | platform/GPUI | ZUP-156 | absent locally |
 | M | `crates/gpui/src/elements/animation.rs` | platform/GPUI | ZUP-105 | equals v1.10.2 |
-| M | `crates/gpui/src/elements/div.rs` | platform/GPUI | ZUP-114 | Sim-diverged |
-| M | `crates/gpui/src/platform.rs` | platform/GPUI | ZUP-104, ZUP-156 | Sim-diverged |
+| M | `crates/gpui/src/elements/div.rs` | platform/GPUI | ZUP-114 | Zed-diverged |
+| M | `crates/gpui/src/platform.rs` | platform/GPUI | ZUP-104, ZUP-156 | Zed-diverged |
 | M | `crates/gpui/src/svg_renderer.rs` | platform/GPUI | ZUP-116 | equals v1.10.2 |
-| M | `crates/gpui/src/window.rs` | platform/GPUI | ZUP-104, ZUP-115, ZUP-156 | Sim-diverged |
+| M | `crates/gpui/src/window.rs` | platform/GPUI | ZUP-104, ZUP-115, ZUP-156 | Zed-diverged |
 | M | `crates/gpui_linux/src/linux/dispatcher.rs` | platform/GPUI | ZUP-155 | equals v1.10.2 |
 | M | `crates/gpui_linux/src/linux/headless.rs` | platform/GPUI | ZUP-053 | equals v1.10.2 |
 | M | `crates/gpui_linux/src/linux/headless/client.rs` | platform/GPUI | ZUP-053 | equals v1.10.2 |
 | A | `crates/gpui_linux/src/linux/headless/window.rs` | platform/GPUI | ZUP-053 | absent locally |
-| M | `crates/gpui_linux/src/linux/wayland/client.rs` | platform/GPUI | ZUP-065 | Sim-diverged |
+| M | `crates/gpui_linux/src/linux/wayland/client.rs` | platform/GPUI | ZUP-065 | Zed-diverged |
 | M | `crates/gpui_linux/src/linux/wayland/window.rs` | platform/GPUI | ZUP-104 | equals v1.10.2 |
-| M | `crates/gpui_linux/src/linux/x11/window.rs` | platform/GPUI | ZUP-115 | Sim-diverged |
+| M | `crates/gpui_linux/src/linux/x11/window.rs` | platform/GPUI | ZUP-115 | Zed-diverged |
 | M | `crates/gpui_macos/src/text_system.rs` | platform/GPUI | ZUP-106 | equals v1.10.2 |
-| M | `crates/gpui_macos/src/window.rs` | platform/GPUI | ZUP-108, ZUP-156 | Sim-diverged |
-| M | `crates/gpui_wgpu/src/wgpu_renderer.rs` | platform/GPUI | ZUP-125 | Sim-diverged |
+| M | `crates/gpui_macos/src/window.rs` | platform/GPUI | ZUP-108, ZUP-156 | Zed-diverged |
+| M | `crates/gpui_wgpu/src/wgpu_renderer.rs` | platform/GPUI | ZUP-125 | Zed-diverged |
 | M | `crates/gpui_windows/src/dispatcher.rs` | platform/GPUI | ZUP-155 | equals v1.10.2 |
 | M | `crates/gpui_windows/src/events.rs` | platform/GPUI | ZUP-107 | equals v1.10.2 |
-| M | `crates/gpui_windows/src/platform.rs` | platform/GPUI | ZUP-064 | Sim-diverged |
-| M | `crates/gpui_windows/src/window.rs` | platform/GPUI | ZUP-107 | Sim-diverged |
+| M | `crates/gpui_windows/src/platform.rs` | platform/GPUI | ZUP-064 | Zed-diverged |
+| M | `crates/gpui_windows/src/window.rs` | platform/GPUI | ZUP-107 | Zed-diverged |
 | M | `crates/grammars/src/bash/config.toml` | production | ZUP-139 | equals v1.10.2 |
 | M | `crates/grammars/src/go/outline.scm` | production | ZUP-136 | equals v1.10.2 |
 | M | `crates/grammars/src/javascript/outline.scm` | production | ZUP-007 | equals v1.10.2 |
@@ -375,42 +375,42 @@ This ledger accounts for every added, modified, deleted, and renamed endpoint pa
 | M | `crates/grammars/src/tsx/runnables.scm` | production | ZUP-007 | equals v1.10.2 |
 | M | `crates/grammars/src/typescript/outline.scm` | production | ZUP-007 | equals v1.10.2 |
 | M | `crates/grammars/src/typescript/runnables.scm` | production | ZUP-007 | equals v1.10.2 |
-| M | `crates/icons/src/icons.rs` | production | ZUP-004 | Sim-diverged |
-| M | `crates/keymap_editor/src/keymap_editor.rs` | production | ZUP-037, ZUP-134 | Sim-diverged |
-| M | `crates/language/src/buffer.rs` | production | ZUP-006, ZUP-100 | Sim-diverged |
-| M | `crates/language/src/buffer_tests.rs` | test/fixture | ZUP-006, ZUP-100 | Sim-diverged |
-| M | `crates/language/src/language_settings.rs` | production | ZUP-041 | Sim-diverged |
-| M | `crates/language_extension/src/extension_lsp_adapter.rs` | production | ZUP-127 | Sim-diverged |
+| M | `crates/icons/src/icons.rs` | production | ZUP-004 | Zed-diverged |
+| M | `crates/keymap_editor/src/keymap_editor.rs` | production | ZUP-037, ZUP-134 | Zed-diverged |
+| M | `crates/language/src/buffer.rs` | production | ZUP-006, ZUP-100 | Zed-diverged |
+| M | `crates/language/src/buffer_tests.rs` | test/fixture | ZUP-006, ZUP-100 | Zed-diverged |
+| M | `crates/language/src/language_settings.rs` | production | ZUP-041 | Zed-diverged |
+| M | `crates/language_extension/src/extension_lsp_adapter.rs` | production | ZUP-127 | Zed-diverged |
 | M | `crates/language_extension/src/language_extension.rs` | production | ZUP-127 | equals v1.10.2 |
 | M | `crates/language_model/src/fake_provider.rs` | production | ZUP-030 | equals v1.10.2 |
-| M | `crates/language_model/src/language_model.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_model/src/registry.rs` | production | ZUP-078 | Sim-diverged |
+| M | `crates/language_model/src/language_model.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_model/src/registry.rs` | production | ZUP-078 | Zed-diverged |
 | M | `crates/language_model_core/Cargo.toml` | manifest/dependency | ZUP-102 | equals v1.10.2 |
 | M | `crates/language_model_core/src/tool_schema.rs` | production | ZUP-102 | equals v1.10.2 |
 | M | `crates/language_models/Cargo.toml` | manifest/dependency | ZUP-128 | equals v1.10.2 |
-| M | `crates/language_models/src/language_models.rs` | production | ZUP-078 | Sim-diverged |
-| M | `crates/language_models/src/provider/anthropic.rs` | production | ZUP-030 | Sim-diverged |
+| M | `crates/language_models/src/language_models.rs` | production | ZUP-078 | Zed-diverged |
+| M | `crates/language_models/src/provider/anthropic.rs` | production | ZUP-030 | Zed-diverged |
 | M | `crates/language_models/src/provider/anthropic_compatible.rs` | production | ZUP-030 | equals v1.10.2 |
-| M | `crates/language_models/src/provider/bedrock.rs` | production | ZUP-030, ZUP-051, ZUP-056, ZUP-128 | Sim-diverged |
-| M | `crates/language_models/src/provider/cloud.rs` | production | ZUP-030 | Sim-diverged |
+| M | `crates/language_models/src/provider/bedrock.rs` | production | ZUP-030, ZUP-051, ZUP-056, ZUP-128 | Zed-diverged |
+| M | `crates/language_models/src/provider/cloud.rs` | production | ZUP-030 | Zed-diverged |
 | M | `crates/language_models/src/provider/copilot_chat.rs` | production | ZUP-030 | equals v1.10.2 |
-| M | `crates/language_models/src/provider/deepseek.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/google.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/llama_cpp.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/lmstudio.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/mistral.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/ollama.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/open_ai.rs` | production | ZUP-030, ZUP-147 | Sim-diverged |
+| M | `crates/language_models/src/provider/deepseek.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/google.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/llama_cpp.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/lmstudio.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/mistral.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/ollama.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/open_ai.rs` | production | ZUP-030, ZUP-147 | Zed-diverged |
 | M | `crates/language_models/src/provider/open_ai_compatible.rs` | production | ZUP-030 | equals v1.10.2 |
-| M | `crates/language_models/src/provider/open_router.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/openai_subscribed.rs` | production | ZUP-030, ZUP-064, ZUP-150 | Sim-diverged |
-| M | `crates/language_models/src/provider/opencode.rs` | production | ZUP-030, ZUP-111 | Sim-diverged |
-| M | `crates/language_models/src/provider/vercel_ai_gateway.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/provider/x_ai.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/language_models/src/settings.rs` | production | ZUP-128 | Sim-diverged |
-| M | `crates/language_tools/src/lsp_button.rs` | production | ZUP-020 | Sim-diverged |
-| M | `crates/languages/src/go.rs` | production | ZUP-136 | Sim-diverged |
-| M | `crates/languages/src/typescript.rs` | production | ZUP-007, ZUP-157 | Sim-diverged |
+| M | `crates/language_models/src/provider/open_router.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/openai_subscribed.rs` | production | ZUP-030, ZUP-064, ZUP-150 | Zed-diverged |
+| M | `crates/language_models/src/provider/opencode.rs` | production | ZUP-030, ZUP-111 | Zed-diverged |
+| M | `crates/language_models/src/provider/vercel_ai_gateway.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/provider/x_ai.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/language_models/src/settings.rs` | production | ZUP-128 | Zed-diverged |
+| M | `crates/language_tools/src/lsp_button.rs` | production | ZUP-020 | Zed-diverged |
+| M | `crates/languages/src/go.rs` | production | ZUP-136 | Zed-diverged |
+| M | `crates/languages/src/typescript.rs` | production | ZUP-007, ZUP-157 | Zed-diverged |
 | M | `crates/livekit_api/Cargo.toml` | manifest/dependency | ZUP-045 | equals v1.10.2 |
 | M | `crates/livekit_api/src/livekit_api.rs` | production | ZUP-045 | equals v1.10.2 |
 | M | `crates/livekit_api/src/token.rs` | production | ZUP-045 | equals v1.10.2 |
@@ -418,73 +418,73 @@ This ledger accounts for every added, modified, deleted, and renamed endpoint pa
 | M | `crates/livekit_client/src/test.rs` | test/fixture | ZUP-045 | equals v1.10.2 |
 | M | `crates/markdown/Cargo.toml` | manifest/dependency | ZUP-011 | equals v1.10.2 |
 | M | `crates/markdown/src/html/html_rendering.rs` | production | ZUP-133 | equals v1.10.2 |
-| M | `crates/markdown/src/markdown.rs` | production | ZUP-009, ZUP-011 | Sim-diverged |
-| M | `crates/multi_buffer/src/multi_buffer.rs` | production | ZUP-098, ZUP-137 | Sim-diverged |
-| M | `crates/node_runtime/src/node_runtime.rs` | production | ZUP-153, ZUP-157 | Sim-diverged |
-| M | `crates/onboarding/src/basics_page.rs` | production | ZUP-083 | Sim-diverged |
-| M | `crates/open_ai/src/completion.rs` | production | ZUP-128 | Sim-diverged |
+| M | `crates/markdown/src/markdown.rs` | production | ZUP-009, ZUP-011 | Zed-diverged |
+| M | `crates/multi_buffer/src/multi_buffer.rs` | production | ZUP-098, ZUP-137 | Zed-diverged |
+| M | `crates/node_runtime/src/node_runtime.rs` | production | ZUP-153, ZUP-157 | Zed-diverged |
+| M | `crates/onboarding/src/basics_page.rs` | production | ZUP-083 | Zed-diverged |
+| M | `crates/open_ai/src/completion.rs` | production | ZUP-128 | Zed-diverged |
 | M | `crates/open_ai/src/responses.rs` | production | ZUP-128 | equals v1.10.2 |
 | M | `crates/opencode/src/opencode.rs` | production | ZUP-111 | equals v1.10.2 |
-| M | `crates/outline_panel/src/outline_panel.rs` | production | ZUP-119, ZUP-133 | Sim-diverged |
+| M | `crates/outline_panel/src/outline_panel.rs` | production | ZUP-119, ZUP-133 | Zed-diverged |
 | M | `crates/picker/src/footer.rs` | production | ZUP-088 | equals v1.10.2 |
-| M | `crates/picker/src/picker.rs` | production | ZUP-086 | Sim-diverged |
+| M | `crates/picker/src/picker.rs` | production | ZUP-086 | Zed-diverged |
 | M | `crates/picker/src/preview.rs` | production | ZUP-047 | equals v1.10.2 |
 | M | `crates/picker_preview/Cargo.toml` | manifest/dependency | ZUP-047 | equals v1.10.2 |
 | M | `crates/picker_preview/src/picker_preview.rs` | production | ZUP-047 | equals v1.10.2 |
-| M | `crates/project/src/context_server_store.rs` | production | ZUP-058 | Sim-diverged |
-| M | `crates/project/src/git_store.rs` | production | ZUP-012, ZUP-066, ZUP-098, ZUP-122 | Sim-diverged |
+| M | `crates/project/src/context_server_store.rs` | production | ZUP-058 | Zed-diverged |
+| M | `crates/project/src/git_store.rs` | production | ZUP-012, ZUP-066, ZUP-098, ZUP-122 | Zed-diverged |
 | R076 | `crates/project/src/git_store/branch_diff.rs` → `crates/project/src/git_store/diff_buffer_list.rs` | production | ZUP-098 | absent locally |
-| M | `crates/project/src/lsp_store.rs` | production | ZUP-006, ZUP-101, ZUP-118, ZUP-132, ZUP-135 | Sim-diverged |
-| M | `crates/project/src/project.rs` | production | ZUP-017, ZUP-034, ZUP-098 | Sim-diverged |
+| M | `crates/project/src/lsp_store.rs` | production | ZUP-006, ZUP-101, ZUP-118, ZUP-132, ZUP-135 | Zed-diverged |
+| M | `crates/project/src/project.rs` | production | ZUP-017, ZUP-034, ZUP-098 | Zed-diverged |
 | M | `crates/project/src/project_search.rs` | production | ZUP-017, ZUP-087 | equals v1.10.2 |
 | M | `crates/project/src/search.rs` | production | ZUP-017 | equals v1.10.2 |
-| M | `crates/project/src/worktree_store.rs` | production | ZUP-034 | Sim-diverged |
+| M | `crates/project/src/worktree_store.rs` | production | ZUP-034 | Zed-diverged |
 | M | `crates/project/tests/integration/context_server_store.rs` | test/fixture | ZUP-058 | equals v1.10.2 |
-| M | `crates/project/tests/integration/project_tests.rs` | test/fixture | ZUP-034, ZUP-098, ZUP-135 | Sim-diverged |
-| M | `crates/project_panel/Cargo.toml` | manifest/dependency | ZUP-033 | Sim-diverged |
-| M | `crates/project_panel/src/project_panel.rs` | production | ZUP-013, ZUP-033, ZUP-114, ZUP-119, ZUP-141 | Sim-diverged |
-| M | `crates/project_panel/src/project_panel_tests.rs` | test/fixture | ZUP-013 | Sim-diverged |
+| M | `crates/project/tests/integration/project_tests.rs` | test/fixture | ZUP-034, ZUP-098, ZUP-135 | Zed-diverged |
+| M | `crates/project_panel/Cargo.toml` | manifest/dependency | ZUP-033 | Zed-diverged |
+| M | `crates/project_panel/src/project_panel.rs` | production | ZUP-013, ZUP-033, ZUP-114, ZUP-119, ZUP-141 | Zed-diverged |
+| M | `crates/project_panel/src/project_panel_tests.rs` | test/fixture | ZUP-013 | Zed-diverged |
 | M | `crates/project_panel/src/tests/undo.rs` | test/fixture | ZUP-033 | equals v1.10.2 |
 | M | `crates/project_symbols/Cargo.toml` | manifest/dependency | ZUP-047 | equals v1.10.2 |
-| M | `crates/project_symbols/src/project_symbols.rs` | production | ZUP-047 | Sim-diverged |
-| M | `crates/proto/proto/call.proto` | protocol/schema | ZUP-034 | Sim-diverged |
-| M | `crates/proto/proto/git.proto` | protocol/schema | ZUP-098 | Sim-diverged |
-| M | `crates/proto/proto/worktree.proto` | protocol/schema | ZUP-034 | Sim-diverged |
-| M | `crates/proto/src/proto.rs` | protocol/schema | ZUP-034 | Sim-diverged |
-| M | `crates/remote/src/transport/ssh.rs` | production | ZUP-134 | Sim-diverged |
-| M | `crates/remote/src/transport/wsl.rs` | production | ZUP-134 | Sim-diverged |
-| M | `crates/remote_server/src/headless_project.rs` | production | ZUP-017, ZUP-034, ZUP-127 | Sim-diverged |
-| M | `crates/remote_server/src/remote_editing_tests.rs` | test/fixture | ZUP-034 | Sim-diverged |
+| M | `crates/project_symbols/src/project_symbols.rs` | production | ZUP-047 | Zed-diverged |
+| M | `crates/proto/proto/call.proto` | protocol/schema | ZUP-034 | Zed-diverged |
+| M | `crates/proto/proto/git.proto` | protocol/schema | ZUP-098 | Zed-diverged |
+| M | `crates/proto/proto/worktree.proto` | protocol/schema | ZUP-034 | Zed-diverged |
+| M | `crates/proto/src/proto.rs` | protocol/schema | ZUP-034 | Zed-diverged |
+| M | `crates/remote/src/transport/ssh.rs` | production | ZUP-134 | Zed-diverged |
+| M | `crates/remote/src/transport/wsl.rs` | production | ZUP-134 | Zed-diverged |
+| M | `crates/remote_server/src/headless_project.rs` | production | ZUP-017, ZUP-034, ZUP-127 | Zed-diverged |
+| M | `crates/remote_server/src/remote_editing_tests.rs` | test/fixture | ZUP-034 | Zed-diverged |
 | M | `crates/reqwest_client/src/reqwest_client.rs` | production | ZUP-036, ZUP-038, ZUP-039 | equals v1.10.2 |
-| M | `crates/search/src/buffer_search.rs` | production | ZUP-088, ZUP-098 | Sim-diverged |
-| M | `crates/search/src/text_finder.rs` | production | ZUP-029, ZUP-085, ZUP-087 | Sim-diverged |
+| M | `crates/search/src/buffer_search.rs` | production | ZUP-088, ZUP-098 | Zed-diverged |
+| M | `crates/search/src/text_finder.rs` | production | ZUP-029, ZUP-085, ZUP-087 | Zed-diverged |
 | M | `crates/search/src/text_finder/delegate.rs` | production | ZUP-029, ZUP-087 | equals v1.10.2 |
 | M | `crates/search/src/text_finder/render.rs` | production | ZUP-029 | equals v1.10.2 |
 | M | `crates/session/src/session.rs` | production | ZUP-118 | equals v1.10.2 |
-| M | `crates/settings/src/vscode_import.rs` | production | ZUP-021, ZUP-140 | Sim-diverged |
-| M | `crates/settings_content/src/language.rs` | production | ZUP-041, ZUP-158 | Sim-diverged |
-| M | `crates/settings_content/src/language_model.rs` | production | ZUP-111, ZUP-128 | Sim-diverged |
-| M | `crates/settings_content/src/settings_content.rs` | production | ZUP-021 | Sim-diverged |
+| M | `crates/settings/src/vscode_import.rs` | production | ZUP-021, ZUP-140 | Zed-diverged |
+| M | `crates/settings_content/src/language.rs` | production | ZUP-041, ZUP-158 | Zed-diverged |
+| M | `crates/settings_content/src/language_model.rs` | production | ZUP-111, ZUP-128 | Zed-diverged |
+| M | `crates/settings_content/src/settings_content.rs` | production | ZUP-021 | Zed-diverged |
 | M | `crates/settings_content/src/terminal.rs` | production | ZUP-140 | equals v1.10.2 |
-| M | `crates/settings_content/src/theme.rs` | production | ZUP-009 | Sim-diverged |
-| M | `crates/settings_ui/src/page_data.rs` | production | ZUP-021, ZUP-140 | Sim-diverged |
-| M | `crates/settings_ui/src/pages/edit_prediction_provider_setup.rs` | production | ZUP-110 | Sim-diverged |
-| M | `crates/settings_ui/src/pages/llm_providers_page.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/settings_ui/src/settings_ui.rs` | production | ZUP-030 | Sim-diverged |
-| M | `crates/terminal/src/alacritty.rs` | production | ZUP-048 | Sim-diverged |
-| M | `crates/terminal/src/terminal.rs` | production | ZUP-048, ZUP-140 | Sim-diverged |
+| M | `crates/settings_content/src/theme.rs` | production | ZUP-009 | Zed-diverged |
+| M | `crates/settings_ui/src/page_data.rs` | production | ZUP-021, ZUP-140 | Zed-diverged |
+| M | `crates/settings_ui/src/pages/edit_prediction_provider_setup.rs` | production | ZUP-110 | Zed-diverged |
+| M | `crates/settings_ui/src/pages/llm_providers_page.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/settings_ui/src/settings_ui.rs` | production | ZUP-030 | Zed-diverged |
+| M | `crates/terminal/src/alacritty.rs` | production | ZUP-048 | Zed-diverged |
+| M | `crates/terminal/src/terminal.rs` | production | ZUP-048, ZUP-140 | Zed-diverged |
 | M | `crates/terminal/src/terminal_settings.rs` | production | ZUP-140 | equals v1.10.2 |
-| M | `crates/terminal_view/Cargo.toml` | manifest/dependency | ZUP-003 | Sim-diverged |
-| M | `crates/terminal_view/src/terminal_element.rs` | production | ZUP-065 | Sim-diverged |
-| M | `crates/terminal_view/src/terminal_panel.rs` | production | ZUP-049 | Sim-diverged |
-| M | `crates/terminal_view/src/terminal_view.rs` | production | ZUP-003, ZUP-065 | Sim-diverged |
+| M | `crates/terminal_view/Cargo.toml` | manifest/dependency | ZUP-003 | Zed-diverged |
+| M | `crates/terminal_view/src/terminal_element.rs` | production | ZUP-065 | Zed-diverged |
+| M | `crates/terminal_view/src/terminal_panel.rs` | production | ZUP-049 | Zed-diverged |
+| M | `crates/terminal_view/src/terminal_view.rs` | production | ZUP-003, ZUP-065 | Zed-diverged |
 | A | `crates/theme/src/color_space.rs` | production | ZUP-005 | absent locally |
-| M | `crates/theme/src/theme.rs` | production | ZUP-005 | Sim-diverged |
-| M | `crates/theme_settings/src/settings.rs` | production | ZUP-009 | Sim-diverged |
+| M | `crates/theme/src/theme.rs` | production | ZUP-005 | Zed-diverged |
+| M | `crates/theme_settings/src/settings.rs` | production | ZUP-009 | Zed-diverged |
 | M | `crates/title_bar/src/update_version.rs` | production | ZUP-042, ZUP-068, ZUP-092 | equals v1.10.2 |
-| M | `crates/ui/src/components/button/icon_button.rs` | production | ZUP-050 | Sim-diverged |
+| M | `crates/ui/src/components/button/icon_button.rs` | production | ZUP-050 | Zed-diverged |
 | M | `crates/ui/src/components/button/split_button.rs` | production | ZUP-088 | equals v1.10.2 |
-| M | `crates/ui/src/components/collab/update_button.rs` | production | ZUP-042 | Sim-diverged |
+| M | `crates/ui/src/components/collab/update_button.rs` | production | ZUP-042 | Zed-diverged |
 | M | `crates/ui/src/components/context_menu.rs` | production | ZUP-103 | equals v1.10.2 |
 | M | `crates/ui/src/components/data_table.rs` | production | ZUP-103, ZUP-119 | equals v1.10.2 |
 | M | `crates/ui/src/components/data_table/table_row.rs` | production | ZUP-103 | equals v1.10.2 |
@@ -493,17 +493,17 @@ This ledger accounts for every added, modified, deleted, and renamed endpoint pa
 | M | `crates/ui/src/components/indent_guides.rs` | production | ZUP-119 | equals v1.10.2 |
 | M | `crates/ui/src/components/progress/circular_progress.rs` | production | ZUP-042 | equals v1.10.2 |
 | M | `crates/ui/src/components/redistributable_columns.rs` | production | ZUP-103 | equals v1.10.2 |
-| M | `crates/vim/src/command.rs` | production | ZUP-026 | Sim-diverged |
-| M | `crates/vim/src/helix.rs` | production | ZUP-032, ZUP-143 | Sim-diverged |
+| M | `crates/vim/src/command.rs` | production | ZUP-026 | Zed-diverged |
+| M | `crates/vim/src/helix.rs` | production | ZUP-032, ZUP-143 | Zed-diverged |
 | M | `crates/vim/src/normal.rs` | production | ZUP-026 | equals v1.10.2 |
-| M | `crates/vim/src/test.rs` | test/fixture | ZUP-143 | Sim-diverged |
-| M | `crates/vim/src/visual.rs` | production | ZUP-032 | Sim-diverged |
-| M | `crates/workspace/src/multi_workspace.rs` | production | ZUP-027 | Sim-diverged |
+| M | `crates/vim/src/test.rs` | test/fixture | ZUP-143 | Zed-diverged |
+| M | `crates/vim/src/visual.rs` | production | ZUP-032 | Zed-diverged |
+| M | `crates/workspace/src/multi_workspace.rs` | production | ZUP-027 | Zed-diverged |
 | M | `crates/workspace/src/multi_workspace_tests.rs` | test/fixture | ZUP-027, ZUP-034 | equals v1.10.2 |
-| M | `crates/workspace/src/pane.rs` | production | ZUP-013, ZUP-089, ZUP-109 | Sim-diverged |
-| M | `crates/workspace/src/workspace.rs` | production | ZUP-131 | Sim-diverged |
-| M | `crates/worktree/src/worktree.rs` | production | ZUP-034 | Sim-diverged |
-| M | `crates/worktree/tests/integration/worktree_tests.rs` | test/fixture | ZUP-034 | Sim-diverged |
+| M | `crates/workspace/src/pane.rs` | production | ZUP-013, ZUP-089, ZUP-109 | Zed-diverged |
+| M | `crates/workspace/src/workspace.rs` | production | ZUP-131 | Zed-diverged |
+| M | `crates/worktree/src/worktree.rs` | production | ZUP-034 | Zed-diverged |
+| M | `crates/worktree/tests/integration/worktree_tests.rs` | test/fixture | ZUP-034 | Zed-diverged |
 | M | `crates/zed/Cargo.toml` | manifest/dependency | ZUP-002, ZUP-148, ZUP-151, ZUP-154 | absent locally |
 | M | `crates/zed/src/main.rs` | production | ZUP-073 | absent locally |
 | M | `crates/zed/src/zed.rs` | production | ZUP-040, ZUP-075, ZUP-098, ZUP-156 | absent locally |
@@ -512,54 +512,54 @@ This ledger accounts for every added, modified, deleted, and renamed endpoint pa
 | M | `crates/zed_actions/src/lib.rs` | production | ZUP-030, ZUP-040, ZUP-083, ZUP-098, ZUP-123 | absent locally |
 | M | `crates/zeta_prompt/src/multi_region.rs` | production | ZUP-133 | equals v1.10.2 |
 | M | `crates/zlog/src/filter.rs` | production | ZUP-001 | equals v1.10.2 |
-| M | `docs/src/ai/agent-panel.md` | documentation | ZUP-054 | Sim-diverged |
-| M | `docs/src/ai/edit-prediction.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/ai/mcp.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/ai/parallel-agents.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/ai/use-a-gateway.md` | documentation | ZUP-128 | Sim-diverged |
-| M | `docs/src/ai/use-api-access.md` | documentation | ZUP-111 | Sim-diverged |
-| M | `docs/src/authentication.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/command-palette.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/configuring-languages.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/debugger.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/development/glossary.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/development/windows.md` | documentation | ZUP-014 | Sim-diverged |
-| M | `docs/src/diagnostics.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/environment.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/extensions/debugger-extensions.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/extensions/developing-extensions.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/finding-navigating.md` | documentation | ZUP-062 | Sim-diverged |
-| M | `docs/src/git.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/ansible.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/cpp.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/elixir.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/gleam.md` | documentation | ZUP-081 | Sim-diverged |
-| M | `docs/src/languages/go.md` | documentation | ZUP-084 | Sim-diverged |
-| M | `docs/src/languages/java.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/javascript.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/json.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/kotlin.md` | documentation | ZUP-077 | Sim-diverged |
-| M | `docs/src/languages/powershell.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/python.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/rust.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/languages/tailwindcss.md` | documentation | ZUP-081, ZUP-084 | Sim-diverged |
-| M | `docs/src/languages/typescript.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/linux.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/performance.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/project-panel.md` | documentation | ZUP-138, ZUP-141 | Sim-diverged |
-| M | `docs/src/reference/all-settings.md` | documentation | ZUP-138, ZUP-140 | Sim-diverged |
-| M | `docs/src/remote-development.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/repl.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/terminal.md` | documentation | ZUP-140 | Sim-diverged |
-| M | `docs/src/vim.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `docs/src/worktree-trust.md` | documentation | ZUP-138 | Sim-diverged |
-| M | `extensions/workflows/run_tests.yml` | CI/release | ZUP-090 | Sim-diverged |
-| M | `extensions/workflows/shared/bump_version.yml` | CI/release | ZUP-090 | Sim-diverged |
+| M | `docs/src/ai/agent-panel.md` | documentation | ZUP-054 | Zed-diverged |
+| M | `docs/src/ai/edit-prediction.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/ai/mcp.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/ai/parallel-agents.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/ai/use-a-gateway.md` | documentation | ZUP-128 | Zed-diverged |
+| M | `docs/src/ai/use-api-access.md` | documentation | ZUP-111 | Zed-diverged |
+| M | `docs/src/authentication.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/command-palette.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/configuring-languages.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/debugger.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/development/glossary.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/development/windows.md` | documentation | ZUP-014 | Zed-diverged |
+| M | `docs/src/diagnostics.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/environment.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/extensions/debugger-extensions.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/extensions/developing-extensions.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/finding-navigating.md` | documentation | ZUP-062 | Zed-diverged |
+| M | `docs/src/git.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/ansible.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/cpp.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/elixir.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/gleam.md` | documentation | ZUP-081 | Zed-diverged |
+| M | `docs/src/languages/go.md` | documentation | ZUP-084 | Zed-diverged |
+| M | `docs/src/languages/java.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/javascript.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/json.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/kotlin.md` | documentation | ZUP-077 | Zed-diverged |
+| M | `docs/src/languages/powershell.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/python.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/rust.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/languages/tailwindcss.md` | documentation | ZUP-081, ZUP-084 | Zed-diverged |
+| M | `docs/src/languages/typescript.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/linux.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/performance.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/project-panel.md` | documentation | ZUP-138, ZUP-141 | Zed-diverged |
+| M | `docs/src/reference/all-settings.md` | documentation | ZUP-138, ZUP-140 | Zed-diverged |
+| M | `docs/src/remote-development.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/repl.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/terminal.md` | documentation | ZUP-140 | Zed-diverged |
+| M | `docs/src/vim.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `docs/src/worktree-trust.md` | documentation | ZUP-138 | Zed-diverged |
+| M | `extensions/workflows/run_tests.yml` | CI/release | ZUP-090 | Zed-diverged |
+| M | `extensions/workflows/shared/bump_version.yml` | CI/release | ZUP-090 | Zed-diverged |
 | M | `script/check-keymaps` | tooling/generated | ZUP-043 | equals v1.10.2 |
-| M | `script/community-pr-track-mapping.json` | tooling/generated | ZUP-010 | Sim-diverged |
+| M | `script/community-pr-track-mapping.json` | tooling/generated | ZUP-010 | Zed-diverged |
 | M | `script/danger/package.json` | tooling/generated | ZUP-046 | equals v1.10.2 |
 | M | `script/danger/pnpm-lock.yaml` | tooling/generated | ZUP-046 | equals v1.10.2 |
-| M | `script/github-community-pr-board.py` | tooling/generated | ZUP-016 | Sim-diverged |
+| M | `script/github-community-pr-board.py` | tooling/generated | ZUP-016 | Zed-diverged |
 | A | `script/github-guild-board.py` | tooling/generated | ZUP-016 | absent locally |
 | D | `script/storybook` | tooling/generated | ZUP-043 | equals v1.10.2 |
 | M | `script/update_top_ranking_issues/uv.lock` | tooling/generated | ZUP-120 | equals v1.10.2 |
@@ -601,29 +601,29 @@ This ledger accounts for every added, modified, deleted, and renamed endpoint pa
 | M | `tooling/xtask/src/tasks/workflow_checks.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
 | A | `tooling/xtask/src/tasks/workflow_checks/check_permissions.rs` | tooling/generated | ZUP-090 | absent locally |
 | M | `tooling/xtask/src/tasks/workflow_checks/check_run_patterns.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
-| M | `tooling/xtask/src/tasks/workflows.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/after_release.rs` | tooling/generated | ZUP-090 | Sim-diverged |
+| M | `tooling/xtask/src/tasks/workflows.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/after_release.rs` | tooling/generated | ZUP-090 | Zed-diverged |
 | M | `tooling/xtask/src/tasks/workflows/autofix_pr.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
-| M | `tooling/xtask/src/tasks/workflows/bump_patch_version.rs` | tooling/generated | ZUP-090 | Sim-diverged |
+| M | `tooling/xtask/src/tasks/workflows/bump_patch_version.rs` | tooling/generated | ZUP-090 | Zed-diverged |
 | M | `tooling/xtask/src/tasks/workflows/bump_zed_version.rs` | tooling/generated | ZUP-090 | absent locally |
 | M | `tooling/xtask/src/tasks/workflows/cherry_pick.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
-| M | `tooling/xtask/src/tasks/workflows/compliance_check.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/danger.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/deploy_collab.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/deploy_docs.rs` | tooling/generated | ZUP-090 | Sim-diverged |
+| M | `tooling/xtask/src/tasks/workflows/compliance_check.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/danger.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/deploy_collab.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/deploy_docs.rs` | tooling/generated | ZUP-090 | Zed-diverged |
 | M | `tooling/xtask/src/tasks/workflows/extension_auto_bump.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
-| M | `tooling/xtask/src/tasks/workflows/extension_bump.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/extension_tests.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/extension_workflow_rollout.rs` | tooling/generated | ZUP-082, ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/extensions/bump_version.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/extensions/run_tests.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/nix_build.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/publish_extension_cli.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/release.rs` | tooling/generated | ZUP-090, ZUP-146 | Sim-diverged |
+| M | `tooling/xtask/src/tasks/workflows/extension_bump.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/extension_tests.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/extension_workflow_rollout.rs` | tooling/generated | ZUP-082, ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/extensions/bump_version.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/extensions/run_tests.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/nix_build.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/publish_extension_cli.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/release.rs` | tooling/generated | ZUP-090, ZUP-146 | Zed-diverged |
 | M | `tooling/xtask/src/tasks/workflows/release_nightly.rs` | tooling/generated | ZUP-090 | equals v1.10.2 |
-| M | `tooling/xtask/src/tasks/workflows/run_bundling.rs` | tooling/generated | ZUP-090 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/run_tests.rs` | tooling/generated | ZUP-090, ZUP-091, ZUP-096 | Sim-diverged |
-| M | `tooling/xtask/src/tasks/workflows/steps.rs` | tooling/generated | ZUP-090 | Sim-diverged |
+| M | `tooling/xtask/src/tasks/workflows/run_bundling.rs` | tooling/generated | ZUP-090 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/run_tests.rs` | tooling/generated | ZUP-090, ZUP-091, ZUP-096 | Zed-diverged |
+| M | `tooling/xtask/src/tasks/workflows/steps.rs` | tooling/generated | ZUP-090 | Zed-diverged |
 
 ## Net-unchanged right-range paths
 

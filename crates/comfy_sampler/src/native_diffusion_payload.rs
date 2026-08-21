@@ -141,7 +141,7 @@ impl NativeControlPayload {
         }
         execution.validate()?;
         let digest_sha256 = sha256_tagged(
-            "sim.comfy.native-control-payload.v1",
+            "zed.comfy.native-control-payload.v1",
             [
                 role.source_type_id().as_bytes(),
                 execution.execution_digest().as_bytes(),
@@ -232,16 +232,16 @@ impl NativeControlExecution {
             .require_vae_execution_digest(vae_execution_digest.as_deref())
             .map_err(|error| NativeDiffusionPayloadError::Invalid(error.to_string()))?;
         let vae_binding_digest = vae_execution_digest.as_deref().map_or_else(
-            || sha256_tagged("sim.comfy.controlnet.vae-binding.absent.v1", []),
+            || sha256_tagged("zed.comfy.controlnet.vae-binding.absent.v1", []),
             |digest| {
                 sha256_tagged(
-                    "sim.comfy.controlnet.vae-binding.exact.v1",
+                    "zed.comfy.controlnet.vae-binding.exact.v1",
                     [digest.as_bytes()],
                 )
             },
         );
         let execution_digest = sha256_tagged(
-            "sim.comfy.controlnet.prebound-execution.v1",
+            "zed.comfy.controlnet.prebound-execution.v1",
             [
                 chain.identity().digest().as_bytes(),
                 executor_digest.as_bytes(),
@@ -393,11 +393,11 @@ impl NativeConditioningPayload {
         )?;
         let identity_digest = identity.digest()?;
         let control_digest = control.as_ref().map_or_else(
-            || sha256_tagged("sim.comfy.controlnet.absent.v1", []),
+            || sha256_tagged("zed.comfy.controlnet.absent.v1", []),
             |control| control.execution_digest().to_owned(),
         );
         let execution_digest = sha256_tagged(
-            "sim.comfy.conditioning.execution.v1",
+            "zed.comfy.conditioning.execution.v1",
             [
                 identity_digest.as_bytes(),
                 GUIDANCE_ADAPTER_ID.as_bytes(),
@@ -588,7 +588,7 @@ impl NativeDiffusionPayload {
             ));
         }
         let digest_sha256 = sha256_tagged(
-            "sim.comfy.native-diffusion-model-payload.v1",
+            "zed.comfy.native-diffusion-model-payload.v1",
             [
                 model.identity().digest_sha256().as_bytes(),
                 conditioning.execution_digest().as_bytes(),
@@ -607,7 +607,7 @@ impl NativeDiffusionPayload {
         require_role(&clip, NativeModelResourceRole::Clip)?;
         clip.validate()?;
         let digest_sha256 = sha256_tagged(
-            "sim.comfy.native-diffusion-clip-payload.v1",
+            "zed.comfy.native-diffusion-clip-payload.v1",
             [clip.identity().digest_sha256().as_bytes()],
         );
         Ok(Self {
@@ -620,7 +620,7 @@ impl NativeDiffusionPayload {
         require_role(&vae, NativeModelResourceRole::Vae)?;
         vae.validate()?;
         let digest_sha256 = sha256_tagged(
-            "sim.comfy.native-diffusion-vae-payload.v1",
+            "zed.comfy.native-diffusion-vae-payload.v1",
             [vae.identity().digest_sha256().as_bytes()],
         );
         Ok(Self {

@@ -84,7 +84,7 @@ fn projection_source() -> ProjectionSource {
     ProjectionSource::new(
         "conversation_activity",
         Provenance::new(
-            SourceSystem::Sim,
+            SourceSystem::Zed,
             SourceRecordId::new("conversation:42").expect("source ID"),
             1_900_000_000_001,
         )
@@ -131,7 +131,7 @@ INSERT INTO public.collaboration_recovery_commands (
         let operation = OutboxOperation::new(
             "recovery.accepted",
             Provenance::new(
-                SourceSystem::Sim,
+                SourceSystem::Zed,
                 SourceRecordId::new(command.operation_id().to_string()).expect("source ID"),
                 1_900_000_000_000,
             )
@@ -498,7 +498,7 @@ INSERT INTO public.collaboration_recovery_projection (
 #[tokio::test]
 async fn collaboration_storage_recovery_preserves_authority_across_failures() {
     let admin_url = admin_database_url();
-    let database_name = format!("sim_collaboration_recovery_{}", Uuid::new_v4().simple());
+    let database_name = format!("zed_collaboration_recovery_{}", Uuid::new_v4().simple());
     let database_url = isolated_database_url(&admin_url, &database_name)
         .expect("isolated database URL must be valid");
     let admin_pool = PgPoolOptions::new()

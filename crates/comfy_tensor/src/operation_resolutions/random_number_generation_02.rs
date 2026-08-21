@@ -4,7 +4,7 @@
         operation_id: "COMFY-TENSOR-OP-FD729B8A5363",
         baseline_overload_id: "COMFY-TENSOR-OP-FD729B8A5363:blocked",
         baseline_fixture_sha256: "9859b7a115de51af013dce1e7770c77495336ff7a3f0a3b284cbb0aac77a6b1e",
-        overload_id: "sim.native.rng.randn.cpu-floating-strided.v1",
+        overload_id: "zed.native.rng.randn.cpu-floating-strided.v1",
         ordered_parameters_json: "[{\"name\":\"shape\",\"type\":\"&[u64]\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"dtype\",\"type\":\"DType\",\"default\":\"F32\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"layout\",\"type\":\"Layout\",\"default\":\"Strided\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"device\",\"type\":\"DeviceId\",\"default\":\"CPU\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"transaction\",\"type\":\"RngTransaction\",\"default\":null,\"keyword_only\":true,\"kind\":\"keyword_only\"}]",
         output_arity: "2",
         output_types_json: "[\"Tensor\",\"RngTransaction\"]",

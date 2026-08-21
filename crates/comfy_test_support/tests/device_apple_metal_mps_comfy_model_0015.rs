@@ -32,7 +32,7 @@ use tempfile::TempDir;
 
 const CERTIFICATION_RELATIVE_PATH: &str = ".agents/specs/comfy-parity/catalogs/native-device-certification/apple-metal-mps-comfy-model-0015.json";
 const PACKAGE_SIGNER: &str = "metal.lab.mt-mbp-l2kh69c7rg";
-const ATTESTATION_SIGNER: &str = "sim.hardware.lab.mt-mbp-l2kh69c7rg";
+const ATTESTATION_SIGNER: &str = "zed.hardware.lab.mt-mbp-l2kh69c7rg";
 const ATTESTATION_PUBLIC_KEY: &str =
     "0f17d6edad8968968b48bb4a00a332ba1759342aeb750cebaca3f3413f7951cf";
 const ATTESTATION_SIGNING_KEY_PATH_ENV: &str = "COMFY_METAL_CERTIFICATION_SIGNING_KEY_PKCS8_PATH";
@@ -220,7 +220,7 @@ fn prepare_package(
         );
     }
     let evidence = PackageEvidence {
-        format: "sim-comfy-metal-package-v1".to_owned(),
+        format: "zed-comfy-metal-package-v1".to_owned(),
         signer,
         signer_public_key: public_key,
         signature,
@@ -386,9 +386,9 @@ fn execute_hardware_matrix(
     let symbols = vec![
         "MPSSupportsMTLDevice".to_owned(),
         "MTLCreateSystemDefaultDevice".to_owned(),
-        "sim_comfy_metal_add_f16_v1".to_owned(),
-        "sim_comfy_metal_add_f32_v1".to_owned(),
-        "sim_comfy_metal_readiness_v1".to_owned(),
+        "zed_comfy_metal_add_f16_v1".to_owned(),
+        "zed_comfy_metal_add_f32_v1".to_owned(),
+        "zed_comfy_metal_readiness_v1".to_owned(),
     ];
     let provenance = collect_provenance(workspace)?;
     let payload = CertificationPayload {
@@ -634,7 +634,7 @@ fn observe_environment() -> Result<CertificationEnvironment> {
         .ok_or_else(|| anyhow!("xcodebuild returned no build identity"))?
         .to_owned();
     Ok(CertificationEnvironment {
-        lab_id: "sim-metal-lab-mt-mbp-l2kh69c7rg".to_owned(),
+        lab_id: "zed-metal-lab-mt-mbp-l2kh69c7rg".to_owned(),
         hostname: command_stdout("hostname", &[])?,
         os_name: "macOS".to_owned(),
         os_version: command_stdout("sw_vers", &["-productVersion"])?,

@@ -308,7 +308,7 @@ pub fn scaled_dot_product_attention_tensor_with_context(
         context.cancellation.check()?;
         for byte in dtype.encode_scalar(
             Scalar::Float(f64::from(value)),
-            "sim.comfy-model.scaled-dot-product-attention",
+            "zed.comfy-model.scaled-dot-product-attention",
             query.descriptor().device(),
         )? {
             encoded.try_push(byte)?;
@@ -652,7 +652,7 @@ mod tests {
         for value in values {
             bytes.extend_from_slice(&dtype.encode_scalar(
                 Scalar::Float(f64::from(*value)),
-                "sim.comfy-model.attention-test",
+                "zed.comfy-model.attention-test",
                 DeviceId::CPU,
             )?);
         }

@@ -421,7 +421,7 @@ fn raw_quantized_storage_digest(
 ) -> Result<[u8; 32], comfy_types::CancellationError> {
     cancellation.check()?;
     let mut hasher = Sha256::new();
-    hash_quantized_part(&mut hasher, b"sim.quantized-matrix.raw.v1");
+    hash_quantized_part(&mut hasher, b"zed.quantized-matrix.raw.v1");
     match storage {
         QuantizedStorage::Int8Tensorwise { values, scale } => {
             hash_quantized_part(&mut hasher, b"int8_tensorwise");
@@ -496,7 +496,7 @@ fn source_identity(
 ) -> Result<QuantizedSourceIdentity, QuantizationError> {
     cancellation.check()?;
     let mut hasher = Sha256::new();
-    hash_quantized_part(&mut hasher, b"sim.quantized-source.v1");
+    hash_quantized_part(&mut hasher, b"zed.quantized-source.v1");
     hash_quantized_part(&mut hasher, dtype_identity(dtype));
     hash_quantized_usize(&mut hasher, rows);
     hash_quantized_usize(&mut hasher, columns);
@@ -522,7 +522,7 @@ fn quantized_content_identity(
 ) -> Result<QuantizedContentIdentity, QuantizationError> {
     let storage_digest = raw_quantized_storage_digest(storage, cancellation)?;
     let mut hasher = Sha256::new();
-    hash_quantized_part(&mut hasher, b"sim.quantized-content.v1");
+    hash_quantized_part(&mut hasher, b"zed.quantized-content.v1");
     hash_quantized_part(&mut hasher, source_identity.as_bytes());
     hash_quantized_part(&mut hasher, dtype_identity(dtype));
     hash_quantized_usize(&mut hasher, rows);
@@ -544,7 +544,7 @@ fn quantized_linear_content_identity(
 ) -> Result<QuantizedContentIdentity, QuantizationError> {
     cancellation.check()?;
     let mut hasher = Sha256::new();
-    hash_quantized_part(&mut hasher, b"sim.quantized-linear-content.v1");
+    hash_quantized_part(&mut hasher, b"zed.quantized-linear-content.v1");
     hash_quantized_part(&mut hasher, source_identity.as_bytes());
     hash_quantized_part(&mut hasher, dtype_identity(dtype));
     hash_quantized_usize(&mut hasher, rows);
@@ -1403,7 +1403,7 @@ mod tests {
         assert!(matches!(
             map_materialization_error(
                 TensorError::UnsupportedCapability {
-                    operation: "sim.quantized.materialize".to_owned(),
+                    operation: "zed.quantized.materialize".to_owned(),
                     device: cuda,
                     reason: "test backend has no host materializer".to_owned(),
                 },

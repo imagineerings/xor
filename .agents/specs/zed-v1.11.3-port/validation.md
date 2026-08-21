@@ -66,8 +66,8 @@ cargo test -p git -p git_ui -p project -p worktree -p workspace
 - Exercise bare/linked worktree grouping, partial staging/unstaging, type-changed
   files, diff bases, tags, graph columns, search, panel deletion/middle-click,
   LSP rename/watch behavior, and reopen/discard regression cases.
-- Run Sim multi-workspace/sidebar/persistence and Comfy panel regression tests.
-- Expected signal: repository/index/buffer state is correct and Sim workspace
+- Run Zed multi-workspace/sidebar/persistence and Comfy panel regression tests.
+- Expected signal: repository/index/buffer state is correct and Zed workspace
   architecture remains intact.
 
 ### VAL-AGENT: Agent/provider/service behavior
@@ -80,15 +80,15 @@ cargo test -p agent -p agent_ui -p acp_thread -p context_server -p language_mode
   provider-auth, Bedrock routing/cache/Mantle, OpenCode, OAuth retry/scope,
   LiveKit token, cloud/user IDs, and agent hyperlink/search tests.
 - Use fake/local services; no paid calls, credentials, or external mutations.
-- Exercise Sim credential provider, stateless mode, URLs, subscriptions, and
+- Exercise Zed credential provider, stateless mode, URLs, subscriptions, and
   thread-sidebar integration.
-- Expected signal: errors propagate to UI, schemas remain compatible, and Sim
-  service/product seams remain Sim-native.
+- Expected signal: errors propagate to UI, schemas remain compatible, and Zed
+  service/product seams remain Zed-native.
 
 ### VAL-SHELL: App shell, schemas, docs, tooling, and exclusions
 
 ```sh
-cargo check -p sim
+cargo check -p zed
 ```
 
 ```sh
@@ -97,11 +97,11 @@ cd docs && npx prettier --check src/
 
 - Run keymap/action checks, settings schema generation/checks, workflow generator
   checks, asset validation, license/tooling tests, and generated-pair diffs.
-- Verify `crates/sim/Cargo.toml` and `Cargo.lock` report 1.11.3 and release channel
-  remains Sim stable.
+- Verify `crates/zed/Cargo.toml` and `Cargo.lock` report 1.11.3 and release channel
+  remains Zed stable.
 - Negative checks: no Zed merch action, Zed Guild/community board workflows, or
   Zed issue-ranking dependency is introduced.
-- Expected signal: Sim app integration and docs are coherent with no Zed product
+- Expected signal: Zed app integration and docs are coherent with no Zed product
   boundary leakage.
 
 ### VAL-REPOSITORY: Final local repository gates
@@ -139,10 +139,10 @@ python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/zed-v1.11.3
 - **VAL-EDITOR:** `cargo test -p editor -p language -p search -p terminal -p terminal_view -p markdown --offline` passed: editor 809 passed/1 declared ignored, language 139, Markdown 117, search 44, terminal 91, and terminal-view 63. Focused settings-content (32 passed/1 declared ignored plus 2 doctests), editor undo, kill-ring, zero-width selection, and language hard-tab regressions also passed.
 - **VAL-GIT:** Git passed 55 tests, Git UI passed 131, and `CARGO_INCREMENTAL=0 cargo test -p workspace --offline` passed 220. Port-relevant bare/linked worktree, symlink watcher, root-rescan, draft persistence, repository status, file status, work-directory rename, and remote-update tests passed. The combined five-crate command was interrupted after four project tests exceeded 60 seconds in parallel; each passed when filtered. A later worktree aggregate similarly left nine filesystem/scheduler tests parked after all port-relevant worktree tests had passed. These are recorded as aggregate scheduler/harness limitations, not blanket suite passes.
 - **VAL-AGENT:** `acp_thread` passed 121 tests and `agent` passed 678 with 11 declared ignored. `agent_ui` passed 388 tests before a broad fuzzy-match expectation failed against the current matcher; after using provider-specific queries, its focused regression passed. The clean combined `CARGO_INCREMENTAL=0 cargo test -p context_server -p language_model_core -p language_models --offline` rerun passed context-server 96, language-model core 37, and language-model providers 74 tests, with zero failures. Focused provider configuration/reset, fake-provider, schema-reference, OpenCode protocol, Bedrock, and MCP post-initialize OAuth transition tests also passed.
-- **VAL-SHELL:** `CARGO_NET_OFFLINE=true cargo xtask workflows` regenerated generator-owned YAML, and `CARGO_NET_OFFLINE=true cargo xtask check-workflows` passed after explicit least-privilege permissions were added to hand-authored workflows. Focused checks for `auto_update`, `ui`, language models, settings content, editor, Git UI, project, Copilot UI, and xtask passed. `crates/sim/Cargo.toml` and `Cargo.lock` both contain Sim version 1.11.3. The docs tree is an mdBook with no `package.json` or lockfile, so the planned `npx prettier --check src/` command has no locally defined toolchain.
-- **VAL-REPOSITORY:** `cargo fmt --all -- --check` passed. `CARGO_NET_OFFLINE=true ./script/clippy -p ui -p language_model -p language_models -p git -p settings_content -p auto_update -p gpui -p fs -p reqwest_client -p node_runtime -p xtask` passed with warnings denied. The exact repository-wide `CARGO_NET_OFFLINE=true ./script/clippy` reached only `webrtc-sys`; its build script attempted `https://github.com/zed-industries/livekit-rust-sdks/releases/download/webrtc-0001d84-4/webrtc-mac-arm64-release.zip`. The user's network scope forbids that non-upstream evidence/binary fetch, so the full gate cannot complete. `cargo check -p sim --offline` has the same boundary; no Rust source diagnostic preceded it.
-- **Environment limits:** repeated broad, non-incremental test linking grew `target/debug/deps` to roughly 95 GiB and exhausted the filesystem. Only reproducible `target/debug/incremental` compiler cache was removed, with user approval; source and user artifacts were preserved. The supplied Sim tree contains no `.git`, so a post-change Git status/diff and local revision proof are impossible.
-- **VAL-AUDIT:** The final independent read-only audit reconciled all 160 commits, 161 decisions, 425 endpoint paths, classifications, accepted production implementations, Sim-specific seams, and tests/adaptations. It found no unexplained implementation omission, conflict marker, duplicate regression, parse error, or stub. Audit follow-ups verified that all forward rows have classification-specific current status, all Sim shell paths resolve, and every matrix row records row-specific current behavior/resolution/local paths/validation. Overall completion remains contingent on the repository-wide and cross-platform gates described above.
+- **VAL-SHELL:** `CARGO_NET_OFFLINE=true cargo xtask workflows` regenerated generator-owned YAML, and `CARGO_NET_OFFLINE=true cargo xtask check-workflows` passed after explicit least-privilege permissions were added to hand-authored workflows. Focused checks for `auto_update`, `ui`, language models, settings content, editor, Git UI, project, Copilot UI, and xtask passed. `crates/zed/Cargo.toml` and `Cargo.lock` both contain Zed version 1.11.3. The docs tree is an mdBook with no `package.json` or lockfile, so the planned `npx prettier --check src/` command has no locally defined toolchain.
+- **VAL-REPOSITORY:** `cargo fmt --all -- --check` passed. `CARGO_NET_OFFLINE=true ./script/clippy -p ui -p language_model -p language_models -p git -p settings_content -p auto_update -p gpui -p fs -p reqwest_client -p node_runtime -p xtask` passed with warnings denied. The exact repository-wide `CARGO_NET_OFFLINE=true ./script/clippy` reached only `webrtc-sys`; its build script attempted `https://github.com/zed-industries/livekit-rust-sdks/releases/download/webrtc-0001d84-4/webrtc-mac-arm64-release.zip`. The user's network scope forbids that non-upstream evidence/binary fetch, so the full gate cannot complete. `cargo check -p zed --offline` has the same boundary; no Rust source diagnostic preceded it.
+- **Environment limits:** repeated broad, non-incremental test linking grew `target/debug/deps` to roughly 95 GiB and exhausted the filesystem. Only reproducible `target/debug/incremental` compiler cache was removed, with user approval; source and user artifacts were preserved. The supplied Zed tree contains no `.git`, so a post-change Git status/diff and local revision proof are impossible.
+- **VAL-AUDIT:** The final independent read-only audit reconciled all 160 commits, 161 decisions, 425 endpoint paths, classifications, accepted production implementations, Zed-specific seams, and tests/adaptations. It found no unexplained implementation omission, conflict marker, duplicate regression, parse error, or stub. Audit follow-ups verified that all forward rows have classification-specific current status, all Zed shell paths resolve, and every matrix row records row-specific current behavior/resolution/local paths/validation. Overall completion remains contingent on the repository-wide and cross-platform gates described above.
 
 ## Explicit pre-implementation blockers
 
@@ -158,13 +158,13 @@ current authority:
   installed under the network restriction.
 - `ZUP-091-LICENSE` and `ZUP-097`: license files/symlinks depend exclusively on
   the deferred ZUP-067 lint workspace.
-- `ZUP-094`: the local tree does not contain the authoritative Sim cloud server
-  schema/rollout required to replace `AuthenticatedUser.id`; remote Sim
+- `ZUP-094`: the local tree does not contain the authoritative Zed cloud server
+  schema/rollout required to replace `AuthenticatedUser.id`; remote Zed
   inspection is expressly prohibited.
 - `ZUP-099`: the security-critical tree-sitter Markdown fork/revision is absent
   from the local cache and fetching it is outside current network authority.
-- `ZUP-159`: Sim intentionally points at `simtropolis/trash-rs`; the requested
-  revision cannot be verified in that fork without prohibited remote Sim access,
+- `ZUP-159`: Zed intentionally points at `simtropolis/trash-rs`; the requested
+  revision cannot be verified in that fork without prohibited remote Zed access,
   and changing provenance to Zed's fork is not authorized.
 
 These entries remain in inventory, traceability, negative/blocker validation,

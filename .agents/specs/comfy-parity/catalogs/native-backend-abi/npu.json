@@ -35,7 +35,7 @@
     "redistributes_cann": false,
     "license_approval_required_for_cann_redistribution": true,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-npu-package-v1",
+    "signature_domain": "zed-comfy-npu-package-v1",
     "final_application_signing_required": true
   },
   "foundation_state": "owned-execution-session-unbound-until-registry-certified-retained-images",

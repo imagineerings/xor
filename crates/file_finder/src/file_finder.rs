@@ -27,7 +27,7 @@ use project::{
 };
 use project_panel::project_panel_settings::ProjectPanelSettings;
 use settings::Settings;
-use sim_actions::search::ToggleIncludeIgnored;
+use zed_actions::search::ToggleIncludeIgnored;
 use std::{
     borrow::Cow,
     cmp,

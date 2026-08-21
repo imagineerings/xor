@@ -8,7 +8,7 @@ use gpui::{
 };
 use picker::{Picker, PickerDelegate};
 use settings::{Settings, SettingsStore, update_settings_file};
-use sim_actions::{ExtensionCategoryFilter, Extensions};
+use zed_actions::{ExtensionCategoryFilter, Extensions};
 use std::sync::Arc;
 use theme::{Appearance, SystemAppearance, Theme, ThemeMeta, ThemeRegistry};
 use theme_settings::{
@@ -29,13 +29,13 @@ actions!(
 );
 
 pub fn init(cx: &mut App) {
-    cx.on_action(|action: &sim_actions::theme_selector::Toggle, cx| {
+    cx.on_action(|action: &zed_actions::theme_selector::Toggle, cx| {
         let action = action.clone();
         with_active_or_new_workspace(cx, move |workspace, window, cx| {
             toggle_theme_selector(workspace, &action, window, cx);
         });
     });
-    cx.on_action(|action: &sim_actions::icon_theme_selector::Toggle, cx| {
+    cx.on_action(|action: &zed_actions::icon_theme_selector::Toggle, cx| {
         let action = action.clone();
         with_active_or_new_workspace(cx, move |workspace, window, cx| {
             toggle_icon_theme_selector(workspace, &action, window, cx);
@@ -45,7 +45,7 @@ pub fn init(cx: &mut App) {
 
 fn toggle_theme_selector(
     workspace: &mut Workspace,
-    toggle: &sim_actions::theme_selector::Toggle,
+    toggle: &zed_actions::theme_selector::Toggle,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
@@ -63,7 +63,7 @@ fn toggle_theme_selector(
 
 fn toggle_icon_theme_selector(
     workspace: &mut Workspace,
-    toggle: &sim_actions::icon_theme_selector::Toggle,
+    toggle: &zed_actions::icon_theme_selector::Toggle,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
@@ -550,7 +550,7 @@ impl PickerDelegate for ThemeSelectorDelegate {
                                 .color(Color::Muted),
                         )
                         .on_click(cx.listener(|_, _, _, cx| {
-                            cx.open_url("https://sim.dev/docs/themes");
+                            cx.open_url("https://zed.dev/docs/themes");
                         })),
                 )
                 .child(
@@ -635,7 +635,7 @@ mod tests {
         workspace: &Entity<workspace::Workspace>,
         cx: &mut VisualTestContext,
     ) -> Entity<Picker<ThemeSelectorDelegate>> {
-        cx.dispatch_action(sim_actions::theme_selector::Toggle {
+        cx.dispatch_action(zed_actions::theme_selector::Toggle {
             themes_filter: None,
         });
         cx.run_until_parked();

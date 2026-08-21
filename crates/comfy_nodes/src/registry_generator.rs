@@ -69,7 +69,7 @@ const INACTIVE_HEADER: &[&str] = &[
     "source_symbol",
     "source_line",
     "test_evidence",
-    "sim_status",
+    "zed_status",
     "parity_gap",
     "feature_id",
 ];
@@ -787,7 +787,7 @@ fn parse_registered_row(
         test_evidence: row[26].clone(),
         registration_evidence: row[27].clone(),
         inactive_reason: None,
-        sim_status: None,
+        zed_status: None,
         parity_gap: None,
         feature_id: row[28].clone(),
         catalog_status: status_for_availability(&row[6], false),
@@ -833,7 +833,7 @@ fn parse_inactive_row(
         test_evidence: row[14].clone(),
         registration_evidence: String::new(),
         inactive_reason: Some(row[8].clone()),
-        sim_status: Some(row[15].clone()),
+        zed_status: Some(row[15].clone()),
         parity_gap: Some(row[16].clone()),
         feature_id: row[17].clone(),
         catalog_status: status_for_availability(&row[5], true),
@@ -1171,7 +1171,7 @@ mod tests {
                 .source_line
                 .map_or_else(String::new, |line| line.to_string()),
             descriptor.test_evidence.clone(),
-            descriptor.sim_status.clone().unwrap_or_default(),
+            descriptor.zed_status.clone().unwrap_or_default(),
             descriptor.parity_gap.clone().unwrap_or_default(),
             descriptor.feature_id.clone(),
         ]

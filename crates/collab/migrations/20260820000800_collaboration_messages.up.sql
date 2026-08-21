@@ -18,7 +18,7 @@ CREATE TABLE public.collaboration_messages (
     ),
     message_version numeric(20, 0) NOT NULL CHECK (message_version >= 1),
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -123,7 +123,7 @@ CREATE TABLE public.collaboration_message_auxiliary_events (
     ),
     is_tombstone boolean NOT NULL,
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024

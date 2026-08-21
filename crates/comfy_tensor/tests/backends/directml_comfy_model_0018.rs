@@ -24,7 +24,7 @@ fn test_certified_backend(
     has_fp16: bool,
 ) -> Result<(DirectMlTensorBackend, ScratchReservation), TensorError> {
     let session = DirectMlExecutionSession::for_test_harness(physical_capacity_bytes, has_fp16)
-        .map_err(|error| map_execution_error("sim.directml.test-harness", error))?;
+        .map_err(|error| map_execution_error("zed.directml.test-harness", error))?;
     let cancellation = CancellationToken::default();
     let (backend, authority) = DirectMlTensorBackend::from_certified_session(
         session,
@@ -53,7 +53,7 @@ fn test_certified_backend_with_control(
         physical_capacity_bytes,
         has_fp16,
     )
-    .map_err(|error| map_execution_error("sim.directml.test-harness", error))?;
+    .map_err(|error| map_execution_error("zed.directml.test-harness", error))?;
     let cancellation = CancellationToken::default();
     let (backend, authority) = DirectMlTensorBackend::from_certified_session(
         session,
@@ -267,7 +267,7 @@ fn certified_properties_keep_physical_total_and_live_allocation_ceiling_distinct
     let session = DirectMlExecutionSession::for_test_harness_with_memory_properties(
         96, 160, 64, true,
     )
-    .map_err(|error| map_execution_error("sim.directml.test-memory-properties", error))?;
+    .map_err(|error| map_execution_error("zed.directml.test-memory-properties", error))?;
     let cancellation = CancellationToken::default();
     let (backend, authority) =
         DirectMlTensorBackend::from_certified_session(session, 128, &cancellation)?;
@@ -842,7 +842,7 @@ fn post_fence_cancellation_retires_event_and_allows_resource_reuse() -> Result<(
     assert_eq!(backend.events.pending_len()?, 1);
     control
         .cancel_after_next_wait()
-        .map_err(|error| map_execution_error("sim.directml.test.cancel-after-wait", error))?;
+        .map_err(|error| map_execution_error("zed.directml.test.cancel-after-wait", error))?;
     assert!(matches!(
         backend.wait_event(event, &live_context),
         Err(TensorError::Cancelled)
@@ -875,7 +875,7 @@ fn physical_oom_device_loss_and_logical_rejection_release_capacity() -> Result<(
     backend.wait_event(live_event, &live_context)?;
     control
         .fail_next_event_with_device_loss()
-        .map_err(|error| map_execution_error("sim.directml.test.device-loss", error))?;
+        .map_err(|error| map_execution_error("zed.directml.test.device-loss", error))?;
     let lost_event = backend.record_event(&live_context)?;
     assert!(matches!(
         backend.wait_event(lost_event, &live_context),
@@ -995,7 +995,7 @@ fn canonical_registries_bound_streams_and_pending_events() -> Result<(), TensorE
 
     control
         .fail_next_event_with_command_failure()
-        .map_err(|error| map_execution_error("sim.directml.test.command-failure", error))?;
+        .map_err(|error| map_execution_error("zed.directml.test.command-failure", error))?;
     let logical_before = backend.memory_snapshot();
     let physical_before = backend.physical_memory_snapshot();
     let add_limit_error = backend

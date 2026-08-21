@@ -29,7 +29,7 @@ const MODEL_HEADER: &[&str] = &[
     "source_symbol",
     "source_line",
     "test_evidence",
-    "sim_status",
+    "zed_status",
     "parity_gap",
     "feature_id",
 ];
@@ -268,7 +268,7 @@ fn parse_row(
         (10, "dependencies_platform"),
         (11, "source_file"),
         (12, "source_symbol"),
-        (15, "sim_status"),
+        (15, "zed_status"),
         (16, "parity_gap"),
         (17, "feature_id"),
     ] {
@@ -308,7 +308,7 @@ fn parse_row(
         source_symbol: field(12, "source_symbol")?.to_owned(),
         source_line: parse_optional_u32(row_number, "source_line", field(13, "source_line")?)?,
         test_evidence: field(14, "test_evidence")?.to_owned(),
-        sim_status: parse_parity_status(row_number, field(15, "sim_status")?)?,
+        zed_status: parse_parity_status(row_number, field(15, "zed_status")?)?,
         parity_gap: field(16, "parity_gap")?.to_owned(),
         feature_id: feature_id.to_owned(),
     })
@@ -371,7 +371,7 @@ fn parse_parity_status(row: usize, value: &str) -> Result<ModelParityStatus, Mod
         "partial" => Ok(ModelParityStatus::Partial),
         _ => Err(ModelRegistryError::InvalidDescriptor {
             row,
-            field: "sim_status",
+            field: "zed_status",
         }),
     }
 }
@@ -579,7 +579,7 @@ fn descriptor_catalog_row(descriptor: &CatalogModelDescriptor) -> Vec<String> {
             .source_line
             .map_or_else(String::new, |line| line.to_string()),
         descriptor.test_evidence.clone(),
-        descriptor.sim_status.as_str().to_owned(),
+        descriptor.zed_status.as_str().to_owned(),
         descriptor.parity_gap.clone(),
         descriptor.feature_id.clone(),
     ]
@@ -639,11 +639,11 @@ mod tests {
         assert_eq!(sd15.name, "SD15");
         assert_eq!(sd15.source_symbol, "SD15");
         assert_eq!(sd15.source_line, Some(44));
-        assert_eq!(sd15.sim_status, ModelParityStatus::Missing);
+        assert_eq!(sd15.zed_status, ModelParityStatus::Missing);
         let metal = registry
             .by_feature("COMFY-MODEL-0015")
             .ok_or("Apple Metal MPS descriptor is missing")?;
-        assert_eq!(metal.sim_status, ModelParityStatus::Partial);
+        assert_eq!(metal.zed_status, ModelParityStatus::Partial);
         Ok(())
     }
 
@@ -760,7 +760,7 @@ mod tests {
         assert_eq!(
             typed_projection
                 .iter()
-                .filter(|descriptor| descriptor.sim_status == ModelParityStatus::Partial)
+                .filter(|descriptor| descriptor.zed_status == ModelParityStatus::Partial)
                 .map(|descriptor| descriptor.feature_id.as_str())
                 .collect::<Vec<_>>(),
             vec!["COMFY-MODEL-0015", "COMFY-MODEL-0020"]

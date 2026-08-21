@@ -31,7 +31,7 @@
     "libMIOpen.so*"
   ],
   "signature_algorithm": "ed25519",
-  "signature_domain": "sim-comfy-rocm-package-v1",
+  "signature_domain": "zed-comfy-rocm-package-v1",
   "signature_payload_format": "domain-nul-u64be-signer-u64be-coverage",
   "signature_receipt_format": "canonical-json-v1",
   "signature_coverage": "package-coverage-v1",

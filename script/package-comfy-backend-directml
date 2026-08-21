@@ -46,7 +46,7 @@ REQUIRED_PAYLOADS = [
     "package-coverage.sha256",
     "package-policy.json",
 ]
-SIGNATURE_DOMAIN = "sim-comfy-directml-package-v1"
+SIGNATURE_DOMAIN = "zed-comfy-directml-package-v1"
 UNSAFE_OWNER = "comfy_backend_directml::loader"
 CERTIFICATE_OWNER = "comfy_runtime::NativeFfiRegistry"
 MAXIMUM_CATALOG_BYTES = 1024 * 1024
@@ -182,7 +182,7 @@ def load_repository_contracts(repository_root):
     abi = strict_json(abi_raw, "reviewed DirectML ABI manifest")
     policy = strict_json(policy_raw, "reviewed DirectML package policy")
     schema = strict_json(schema_raw, "reviewed DirectML contract schema")
-    if schema.get("$id") != "https://sim.dev/schemas/comfy/directml/ffi-contracts-v1.schema.json":
+    if schema.get("$id") != "https://zed.dev/schemas/comfy/directml/ffi-contracts-v1.schema.json":
         raise PackagingError("reviewed DirectML contract schema identity differs")
     if policy.get("schema_version") != 2 or policy.get("backend") != "directml":
         raise PackagingError("reviewed DirectML package policy identity differs")
@@ -645,7 +645,7 @@ def run_self_test(repository_root):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build the reviewed offline Sim DirectML adapter package"
+        description="Build the reviewed offline Zed DirectML adapter package"
     )
     parser.add_argument("--inspect-structure", type=Path)
     parser.add_argument("--self-test", action="store_true")

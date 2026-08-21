@@ -249,7 +249,7 @@ pub struct NativeStructuredValue {
 }
 
 impl NativeStructuredValue {
-    const MARKER: &'static str = "sim.native-structured-value@1";
+    const MARKER: &'static str = "zed.native-structured-value@1";
 
     pub fn checked(
         type_name: impl Into<String>,
@@ -2820,7 +2820,7 @@ pub trait NativeNode: Send + Sync {
     fn implementation_version(&self) -> &str;
 
     fn implementation_namespace(&self) -> &str {
-        "sim.native_rust"
+        "zed.native_rust"
     }
 
     fn demanded_lazy_inputs(
@@ -3129,7 +3129,7 @@ fn output_request_digest(
     content: &[u8],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.native-output-effect.v2");
+    hasher.update(b"zed.comfy.native-output-effect.v2");
     hasher.update([match namespace {
         NativeOutputNamespace::Output => 0,
         NativeOutputNamespace::Temporary => 1,

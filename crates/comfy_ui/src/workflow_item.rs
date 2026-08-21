@@ -1142,7 +1142,7 @@ impl GraphWorkspaceItem {
             )
         );
         if requires_group_padding && !cx.has_global::<SettingsStore>() {
-            self.model.report_error("Sim settings store is unavailable");
+            self.model.report_error("Zed settings store is unavailable");
             cx.notify();
             return false;
         }
@@ -1248,7 +1248,7 @@ impl GraphWorkspaceItem {
             return false;
         }
         if !cx.has_global::<SettingsStore>() {
-            self.model.report_error("Sim settings store is unavailable");
+            self.model.report_error("Zed settings store is unavailable");
             cx.notify();
             return false;
         }
@@ -2619,7 +2619,7 @@ async fn atomic_create_workflow_file(
     text: &str,
     operation_id: uuid::Uuid,
 ) -> anyhow::Result<()> {
-    let staging_path = target.with_file_name(format!(".sim-workflow-save-{operation_id}.tmp"));
+    let staging_path = target.with_file_name(format!(".zed-workflow-save-{operation_id}.tmp"));
     fs.write(&staging_path, text.as_bytes())
         .await
         .with_context(|| {
@@ -3163,7 +3163,7 @@ impl Item for GraphWorkspaceItem {
 }
 
 impl SerializableItem for GraphWorkspaceItem {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "ComfyNativeGraph"
     }
 
@@ -3502,7 +3502,7 @@ mod settings_ownership_tests {
         item.read_with(cx, |item, _| {
             assert_eq!(
                 item.model.last_error.as_deref(),
-                Some("Sim settings store is unavailable")
+                Some("Zed settings store is unavailable")
             );
             assert_eq!(workflow_evidence(item), before);
         });

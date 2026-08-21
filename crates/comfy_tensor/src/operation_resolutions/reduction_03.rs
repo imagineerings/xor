@@ -4,7 +4,7 @@
         operation_id: "COMFY-TENSOR-OP-FF3F06B4B591",
         baseline_overload_id: "COMFY-TENSOR-OP-FF3F06B4B591:blocked",
         baseline_fixture_sha256: "b52d6a11a1bf92369e13e73db7c71d58ab594b0fcee22c3a9c78d35e2fe4b59b",
-        overload_id: "sim.native.reduction.tensor-norm.vector-norm-adapter.v1",
+        overload_id: "zed.native.reduction.tensor-norm.vector-norm-adapter.v1",
         ordered_parameters_json: "[{\"name\":\"input\",\"type\":\"&Tensor\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"order\",\"type\":\"f64\",\"default\":2,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"dimensions\",\"type\":\"Option<&[i64]>\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"keep_dimensions\",\"type\":\"bool\",\"default\":false,\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"dtype\",\"type\":\"Option<DType>\",\"default\":null,\"keyword_only\":true,\"kind\":\"keyword_only\"}]",
         output_arity: "1",
         output_types_json: "[\"Tensor\"]",

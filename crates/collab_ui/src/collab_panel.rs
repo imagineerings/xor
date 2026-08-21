@@ -463,7 +463,7 @@ impl CollabPanel {
         workspace: WeakEntity<Workspace>,
         mut cx: AsyncWindowContext,
     ) -> anyhow::Result<Entity<Self>> {
-        let serialisim_panel = match workspace
+        let serialized_panel = match workspace
             .read_with(&cx, |workspace, _| {
                 CollabPanel::serialization_key(workspace)
             })
@@ -486,9 +486,9 @@ impl CollabPanel {
 
         workspace.update_in(&mut cx, |workspace, window, cx| {
             let panel = CollabPanel::new(workspace, window, cx);
-            if let Some(serialisim_panel) = serialisim_panel {
+            if let Some(serialized_panel) = serialized_panel {
                 panel.update(cx, |panel, cx| {
-                    panel.collapsed_channels = serialisim_panel
+                    panel.collapsed_channels = serialized_panel
                         .collapsed_channels
                         .unwrap_or_default()
                         .iter()
@@ -1400,7 +1400,7 @@ impl CollabPanel {
                             })
                             .detach_and_prompt_err("Failed to grant write access", window, cx, |e, _, _| {
                                 match e.error_code() {
-                                    ErrorCode::NeedsCla => Some("This user has not yet signed the CLA at https://sim.dev/cla.".into()),
+                                    ErrorCode::NeedsCla => Some("This user has not yet signed the CLA at https://zed.dev/cla.".into()),
                                     _ => None,
                                 }
                             })

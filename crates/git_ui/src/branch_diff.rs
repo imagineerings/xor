@@ -25,7 +25,7 @@ use project::{
     },
 };
 use settings::Settings;
-use sim_actions::agent::ReviewBranchDiff;
+use zed_actions::agent::ReviewBranchDiff;
 use std::{
     any::{Any, TypeId},
     sync::Arc,
@@ -606,7 +606,7 @@ impl Render for BranchDiff {
 }
 
 impl SerializableItem for BranchDiff {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "BranchDiff"
     }
 

@@ -17,7 +17,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 1: Recipe Engine
 
-**User Story:** As a sim user, I want to create and run recipes, so that I can automate complex multi-step workflows with the agent.
+**User Story:** As a zed user, I want to create and run recipes, so that I can automate complex multi-step workflows with the agent.
 
 #### Acceptance Criteria
 
@@ -30,7 +30,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 2: Recipe Templates
 
-**User Story:** As a sim user, I want to create parameterized recipes with variables, so that I can reuse recipes with different inputs.
+**User Story:** As a zed user, I want to create parameterized recipes with variables, so that I can reuse recipes with different inputs.
 
 #### Acceptance Criteria
 
@@ -40,7 +40,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 3: Recipe Validation
 
-**User Story:** As a sim user, I want recipes to be validated before execution, so that errors are caught early.
+**User Story:** As a zed user, I want recipes to be validated before execution, so that errors are caught early.
 
 #### Acceptance Criteria
 
@@ -50,7 +50,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 4: Local and Built-in Recipes
 
-**User Story:** As a sim user, I want to load recipes from local files and from built-in sources, so that I can use community recipes and share my own.
+**User Story:** As a zed user, I want to load recipes from local files and from built-in sources, so that I can use community recipes and share my own.
 
 #### Acceptance Criteria
 
@@ -60,7 +60,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 5: YAML Recipe Format
 
-**User Story:** As a sim user, I want recipes defined in a clear YAML format, so that they are human-readable and easy to write.
+**User Story:** As a zed user, I want recipes defined in a clear YAML format, so that they are human-readable and easy to write.
 
 #### Acceptance Criteria
 
@@ -70,7 +70,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 6: Recipe CLI Commands
 
-**User Story:** As a sim user, I want CLI commands to manage recipes, so that I can list, search, print, and run recipes from the terminal.
+**User Story:** As a zed user, I want CLI commands to manage recipes, so that I can list, search, print, and run recipes from the terminal.
 
 #### Acceptance Criteria
 
@@ -82,7 +82,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 7: GitHub Recipes
 
-**User Story:** As a sim user, I want to load recipes directly from GitHub repositories, so that I can share and discover community recipes.
+**User Story:** As a zed user, I want to load recipes directly from GitHub repositories, so that I can share and discover community recipes.
 
 #### Acceptance Criteria
 
@@ -92,7 +92,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 8: Secret Discovery
 
-**User Story:** As a sim user, I want recipes to discover required secrets and credentials, so that I can securely use recipes that need API keys.
+**User Story:** As a zed user, I want recipes to discover required secrets and credentials, so that I can securely use recipes that need API keys.
 
 #### Acceptance Criteria
 
@@ -102,7 +102,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 9: Recipe Deeplink
 
-**User Story:** As a sim user, I want to share recipe links that automatically open goose with that recipe, so that I can share workflows with others.
+**User Story:** As a zed user, I want to share recipe links that automatically open goose with that recipe, so that I can share workflows with others.
 
 #### Acceptance Criteria
 
@@ -112,7 +112,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 10: Recipe Scanner
 
-**User Story:** As a sim developer, I want to scan and test recipes in isolated environments, so that I can ensure recipes work correctly before shipping.
+**User Story:** As a zed developer, I want to scan and test recipes in isolated environments, so that I can ensure recipes work correctly before shipping.
 
 #### Acceptance Criteria
 
@@ -122,7 +122,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 
 ### Requirement 11: Workflow Recipes
 
-**User Story:** As a sim user, I want pre-built workflow recipes for common tasks, so that I can use them out of the box.
+**User Story:** As a zed user, I want pre-built workflow recipes for common tasks, so that I can use them out of the box.
 
 #### Acceptance Criteria
 
@@ -160,7 +160,7 @@ Migrate the goose recipe engine — a system for defining, templating, validatin
 1. **14.1** WHERE scheduling is approved, ONE recipe/session service SHALL persist cron jobs, timezone, pause state, recipe snapshot/reference, generated session IDs, and last/next run state across restarts
 2. **14.2** THE service SHALL support list, add, remove, pause, unpause, run now, list generated sessions, inspect running work, and cancel a running job through shared CLI, ACP, and UI adapters
 3. **14.3** THE scheduler SHALL define DST, missed-run, overlap, retry, restart-recovery, recipe-change, notification, and cleanup behavior
-4. **14.4** AN optional agent schedule tool SHALL use the same service, validate cron and bounded recipe input, apply Sim permission confirmation, exclude or redact secrets, and emit an audit record
+4. **14.4** AN optional agent schedule tool SHALL use the same service, validate cron and bounded recipe input, apply Zed permission confirmation, exclude or redact secrets, and emit an audit record
 
 ## References
 

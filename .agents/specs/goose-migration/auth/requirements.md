@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Reconcile Goose authentication behavior with Sim's existing OAuth callback server, credentials provider, HTTP client, and provider integrations. Goose's `oidc-proxy` is not an end-user login service: it validates GitHub Actions OIDC JWTs, rate-limits each token, and injects an upstream API key for CI requests. That deployment remains conditional on an explicit operational decision.
+Reconcile Goose authentication behavior with Zed's existing OAuth callback server, credentials provider, HTTP client, and provider integrations. Goose's `oidc-proxy` is not an end-user login service: it validates GitHub Actions OIDC JWTs, rate-limits each token, and injects an upstream API key for CI requests. That deployment remains conditional on an explicit operational decision.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Reconcile Goose authentication behavior with Sim's existing OAuth callback serve
 
 #### Acceptance Criteria
 
-1. **2.1** THE system SHALL persist OAuth credentials through Sim's existing credentials-provider abstraction with provider/server identity, scopes, access expiry, and optional refresh metadata
+1. **2.1** THE system SHALL persist OAuth credentials through Zed's existing credentials-provider abstraction with provider/server identity, scopes, access expiry, and optional refresh metadata
 2. **2.2** WHEN credentials are refreshed, revoked, replaced, or cleared, THE canonical store SHALL update atomically and all consumers SHALL observe the same state
 3. **2.3** CONCURRENT refresh requests for the same credential SHALL be coalesced or serialized so that stale refresh results cannot overwrite newer credentials
 4. **2.4** CREDENTIAL material SHALL be redacted from logs, telemetry, diagnostics, exported settings, errors, and crash reports; unavailable or corrupt credential storage SHALL produce a visible error rather than silently forgetting authentication
@@ -37,7 +37,7 @@ Reconcile Goose authentication behavior with Sim's existing OAuth callback serve
 1. **3.1** FOR an approved provider that advertises device authorization, THE system SHALL request a device code and display the verification URL, user code, and bounded expiry without displaying the device token
 2. **3.2** THE poller SHALL honor the provider interval, `authorization_pending`, `slow_down`, denial, expiry, HTTP retry policy, user cancellation, and overall timeout
 3. **3.3** WHEN authorization succeeds, THE system SHALL persist access, refresh, expiry, and scope metadata through Requirement 2 and SHALL support provider-defined refresh semantics
-4. **3.4** DEVICE flow SHALL remain provider-capability driven; Sim SHALL NOT expose a generic device-flow option for a provider that does not support it
+4. **3.4** DEVICE flow SHALL remain provider-capability driven; Zed SHALL NOT expose a generic device-flow option for a provider that does not support it
 
 ### Requirement 4: GitHub Actions OIDC Upstream Proxy
 
@@ -58,6 +58,6 @@ Reconcile Goose authentication behavior with Sim's existing OAuth callback serve
 - Goose: `projects/goose/crates/goose/src/providers/oauth_device_flow.rs` — `run_device_flow`, `poll_for_tokens`, `refresh_device_flow_token`
 - Goose: `projects/goose/crates/goose/src/providers/{githubcopilot,kimicode,xai_oauth}.rs`
 - Goose: `projects/goose/oidc-proxy/src/index.js` — `fetch`, `verifyOidcToken`, `checkTokenBucket`; `README.md`; tests and `wrangler.toml`
-- Sim: `crates/oauth_callback_server/src/oauth_callback_server.rs`
-- Sim: `crates/credentials_provider/`
-- Sim: `crates/http_client/`
+- Zed: `crates/oauth_callback_server/src/oauth_callback_server.rs`
+- Zed: `crates/credentials_provider/`
+- Zed: `crates/http_client/`

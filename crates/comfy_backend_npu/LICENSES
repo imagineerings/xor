@@ -1,8 +1,8 @@
-Sim Huawei Ascend NPU adapter metadata
+Zed Huawei Ascend NPU adapter metadata
 ======================================
 
 The Rust adapter, reviewed ABI manifest, packaging scripts, and Nix metadata are
-part of Sim and are licensed under GPL-3.0-or-later.
+part of Zed and are licensed under GPL-3.0-or-later.
 
 Huawei CANN and AscendCL are separately installed vendor software. CANN runtime
 libraries are not redistributed by this package. A release may not bundle

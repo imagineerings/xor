@@ -489,7 +489,7 @@ impl Item for UnstagedDiff {
 }
 
 impl SerializableItem for UnstagedDiff {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "UnstagedDiff"
     }
 

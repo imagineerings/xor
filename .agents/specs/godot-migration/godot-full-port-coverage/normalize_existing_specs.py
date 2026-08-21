@@ -106,7 +106,7 @@ def add_declared_coverage_requirement(pack: Path) -> None:
 
 #### Acceptance criteria
 
-1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Sim behavior and source-backed compatibility record.
+1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Zed behavior and source-backed compatibility record.
 2. **9.2** THE system SHALL NOT count labels, placeholders, metadata-only fixtures, or hidden upstream pass-throughs as implementation evidence.
 3. **9.3** WHEN backlog behavior is materialized THEN focused validation SHALL cover success, failure, cancellation, persistence, security, and relevant platform outcomes.
 4. **9.4** WHEN coverage status changes THEN THE owner SHALL preserve stable capability identity, owner traceability, and evidence for the new classification.

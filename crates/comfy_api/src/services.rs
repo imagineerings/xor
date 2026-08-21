@@ -570,7 +570,7 @@ impl NativeRuntimeHttpServices {
         Ok(NativeServiceResponse::json(
             200,
             json!({
-                "sim_native_api": {
+                "zed_native_api": {
                     "protocol_version": comfy_types::NATIVE_PROTOCOL_VERSION,
                     "profile_id": self.profile_identity,
                     "native_execution": true,
@@ -1457,7 +1457,7 @@ impl NativeHttpServices for NativeRuntimeHttpServices {
             NativeServiceOperation::Root => capability_unavailable(
                 &request.route.canonical_feature_id,
                 "gpui_frontend",
-                "Sim's GPUI frontend is not served as a web static bundle",
+                "Zed's GPUI frontend is not served as a web static bundle",
             ),
             NativeServiceOperation::Features => self.features(),
             NativeServiceOperation::PromptStatus => self.prompt_status(),
@@ -1498,7 +1498,7 @@ impl NativeHttpServices for NativeRuntimeHttpServices {
             NativeServiceOperation::StaticAsset => capability_unavailable(
                 &request.route.canonical_feature_id,
                 "gpui_frontend",
-                "Sim does not expose GPUI resources through a web static-file root",
+                "Zed does not expose GPUI resources through a web static-file root",
             ),
             NativeServiceOperation::WebSocketUpgrade => capability_unavailable(
                 &request.route.canonical_feature_id,
@@ -1682,7 +1682,7 @@ fn project_component_node(
         .map(|schema| &schema.node)
         .or_else(|| runtime.source_schema.as_ref().map(|schema| &schema.node));
     let source_presentation = catalog_schema.map(|schema| &schema.presentation);
-    let sim_schema = if let Some(schema) = catalog_schema {
+    let zed_schema = if let Some(schema) = catalog_schema {
         serde_json::to_value(schema)
     } else {
         serde_json::to_value(runtime.source_schema.as_ref())
@@ -1716,9 +1716,9 @@ fn project_component_node(
         "price_badge": source_node_schema.and_then(|schema| schema.price_badge.as_ref()).and_then(project_schema_value),
         "search_aliases": presentation.search_aliases,
         "essentials_category": source_node_schema.and_then(|schema| schema.essentials_category.as_deref()),
-        "sim_native_binding": native_binding_projection(disposition, unavailable_reason),
-        "sim_source": source.map(native_source_projection),
-        "sim_schema": sim_schema,
+        "zed_native_binding": native_binding_projection(disposition, unavailable_reason),
+        "zed_source": source.map(native_source_projection),
+        "zed_schema": zed_schema,
     });
     if source_node_schema
         .is_some_and(|schema| schema.provenance == NativeSchemaProvenance::SourceV1)
@@ -1833,7 +1833,7 @@ fn project_input_options(
     }
     if !preserved.is_empty() {
         options.insert(
-            "sim_source_expressions".to_owned(),
+            "zed_source_expressions".to_owned(),
             Value::Object(preserved),
         );
     }
@@ -1934,12 +1934,12 @@ fn project_inactive_source_node(source: &ObjectInfoNode) -> Value {
         "api_node": source.source_python_module.starts_with("comfy_api_nodes."),
         "search_aliases": [],
         "essentials_category": null,
-        "sim_native_binding": native_binding_projection(
+        "zed_native_binding": native_binding_projection(
             NativeNodeBindingDisposition::Unavailable,
             source.inactive_reason.as_deref(),
         ),
-        "sim_source": native_source_projection(source),
-        "sim_schema": {
+        "zed_source": native_source_projection(source),
+        "zed_schema": {
             "schema_source": source.schema_source,
             "input": source.input,
             "output": source.output,
@@ -2038,9 +2038,9 @@ fn project_unbound_source_node(source: &ObjectInfoNode) -> Value {
         "price_badge": schema.node.price_badge.as_ref().and_then(project_schema_value),
         "search_aliases": [],
         "essentials_category": schema.node.essentials_category,
-        "sim_native_binding": native_binding_projection(disposition, reason),
-        "sim_source": native_source_projection(source),
-        "sim_schema": schema,
+        "zed_native_binding": native_binding_projection(disposition, reason),
+        "zed_source": native_source_projection(source),
+        "zed_schema": schema,
     })
 }
 
@@ -2477,9 +2477,9 @@ fn history_record(
     for output in &attempt.outputs {
         let node = outputs
             .entry(output.node_id.0.clone())
-            .or_insert_with(|| json!({"sim_native_outputs": []}));
+            .or_insert_with(|| json!({"zed_native_outputs": []}));
         let list = node
-            .get_mut("sim_native_outputs")
+            .get_mut("zed_native_outputs")
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
                 NativeServiceError::new(
@@ -3330,10 +3330,10 @@ pub(crate) mod tests {
         assert_eq!(body.as_object().map(Map::len), Some(801));
         assert_eq!(body["LoadImage"]["python_module"], "nodes");
         assert_eq!(
-            body["LoadImage"]["sim_source"]["catalog_status"],
+            body["LoadImage"]["zed_source"]["catalog_status"],
             "descriptor-only"
         );
-        assert!(body["LoadImage"]["sim_source"]["feature_id"].is_string());
+        assert!(body["LoadImage"]["zed_source"]["feature_id"].is_string());
         assert_eq!(
             body["LoadImage"]["input"]["required"]["image"][0],
             json!([])
@@ -3400,7 +3400,7 @@ pub(crate) mod tests {
         assert_eq!(open_ai["input"]["optional"]["custom_width"][1]["max"], 3840);
         assert_eq!(open_ai["input"]["optional"]["custom_width"][1]["step"], 16);
         assert_eq!(
-            open_ai["sim_schema"]["inputs"][1]["maximum"]["kind"],
+            open_ai["zed_schema"]["inputs"][1]["maximum"]["kind"],
             "preserved_expression"
         );
         assert_eq!(body["AddNoise"]["experimental"], true);
@@ -3453,21 +3453,21 @@ pub(crate) mod tests {
             "comfy_extras.nodes_logic"
         );
         assert_eq!(
-            catalog["AutogrowNamesTestNode"]["sim_native_binding"]["disposition"],
+            catalog["AutogrowNamesTestNode"]["zed_native_binding"]["disposition"],
             "unavailable"
         );
         assert_eq!(
-            catalog["AutogrowNamesTestNode"]["sim_native_binding"]["reason"],
-            catalog["AutogrowNamesTestNode"]["sim_source"]["inactive_reason"]
+            catalog["AutogrowNamesTestNode"]["zed_native_binding"]["reason"],
+            catalog["AutogrowNamesTestNode"]["zed_source"]["inactive_reason"]
         );
         assert_eq!(
-            catalog["AutogrowNamesTestNode"]["sim_source"]["catalog_status"],
+            catalog["AutogrowNamesTestNode"]["zed_source"]["catalog_status"],
             "inactive"
         );
-        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["inactive_reason"].is_string());
-        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["availability"].is_string());
-        assert!(catalog["AutogrowNamesTestNode"]["sim_source"]["feature_id"].is_string());
-        assert!(catalog["AutogrowNamesTestNode"]["sim_schema"]["schema_source"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["zed_source"]["inactive_reason"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["zed_source"]["availability"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["zed_source"]["feature_id"].is_string());
+        assert!(catalog["AutogrowNamesTestNode"]["zed_schema"]["schema_source"].is_string());
 
         let error = services
             .dispatch(request(
@@ -3521,23 +3521,23 @@ pub(crate) mod tests {
             "comfy_api_nodes.nodes_beeble"
         );
         assert_eq!(
-            provider_catalog["BeebleSwitchXImageEdit"]["sim_native_binding"],
+            provider_catalog["BeebleSwitchXImageEdit"]["zed_native_binding"],
             json!({
                 "disposition": "provider_required",
                 "reason": "requires a verified native provider",
             })
         );
         assert_eq!(
-            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["catalog_status"],
+            provider_catalog["BeebleSwitchXImageEdit"]["zed_source"]["catalog_status"],
             "provider-required"
         );
         assert!(
-            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["inactive_reason"].is_null()
+            provider_catalog["BeebleSwitchXImageEdit"]["zed_source"]["inactive_reason"].is_null()
         );
         assert!(
-            provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["availability"].is_string()
+            provider_catalog["BeebleSwitchXImageEdit"]["zed_source"]["availability"].is_string()
         );
-        assert!(provider_catalog["BeebleSwitchXImageEdit"]["sim_source"]["feature_id"].is_string());
+        assert!(provider_catalog["BeebleSwitchXImageEdit"]["zed_source"]["feature_id"].is_string());
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         Ok(())
     }

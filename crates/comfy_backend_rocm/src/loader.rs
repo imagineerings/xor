@@ -976,7 +976,7 @@ fn resolve_library_set(roots: &[DiscoveryRoot]) -> Result<RocmLibrarySet, RocmLo
     Err(RocmLoadError::MissingLibrary {
         library: first_missing,
         searched: if searched.is_empty() {
-            "<none>; set COMFY_ROCM_ROOT or ROCM_PATH, or install the signed Sim adapter package"
+            "<none>; set COMFY_ROCM_ROOT or ROCM_PATH, or install the signed Zed adapter package"
                 .to_owned()
         } else {
             searched.join(", ")
@@ -1178,7 +1178,7 @@ fn validate_signed_package(root: &Path) -> Result<PackageSignatureContract, Rocm
         || manifest.ffi_contracts_sha256 != ffi_contracts_sha256
         || manifest.signer.is_empty()
         || manifest.signature_algorithm != "ed25519"
-        || manifest.signature_domain != "sim-comfy-rocm-package-v1"
+        || manifest.signature_domain != "zed-comfy-rocm-package-v1"
         || manifest.signature_coverage != "package-coverage-v1"
         || !manifest.runtime_root.is_absolute()
     {
@@ -1273,7 +1273,7 @@ fn validate_policy_contract(root: &Path, policy: &PackagePolicy) -> Result<(), R
         || !exact(&policy.required_payloads, REQUIRED)
         || !exact(&policy.forbidden_payloads, FORBIDDEN)
         || policy.signature_algorithm != "ed25519"
-        || policy.signature_domain != "sim-comfy-rocm-package-v1"
+        || policy.signature_domain != "zed-comfy-rocm-package-v1"
         || policy.signature_payload_format != "domain-nul-u64be-signer-u64be-coverage"
         || policy.signature_receipt_format != "canonical-json-v1"
         || policy.signature_coverage != "package-coverage-v1"
@@ -3876,9 +3876,9 @@ mod tests {
                 "abi_manifest_sha256":"{ABI_MANIFEST_SHA256}",
                 "ffi_contracts_sha256":"{ffi_contracts_sha256}",
                 "redistributes_amd_runtime":false,
-                "signer":"sim.release",
+                "signer":"zed.release",
                 "signature_algorithm":"ed25519",
-                "signature_domain":"sim-comfy-rocm-package-v1",
+                "signature_domain":"zed-comfy-rocm-package-v1",
                 "signature_coverage":"package-coverage-v1",
                 "runtime_root":{}
             }}"#,
@@ -4079,7 +4079,7 @@ mod tests {
         let mut retained = Vec::new();
         let mut paths = BTreeMap::new();
         for library in library_set.libraries() {
-            let name = CString::new(format!("sim-test-{}", library.library_id()))?;
+            let name = CString::new(format!("zed-test-{}", library.library_id()))?;
             // SAFETY: the name is NUL terminated and a successful descriptor is transferred
             // immediately into its sole File owner.
             let descriptor = unsafe {
@@ -4145,7 +4145,7 @@ mod tests {
             "redistributes_amd_runtime":true,
             "signer":"fixture",
             "signature_algorithm":"ed25519",
-            "signature_domain":"sim-comfy-rocm-package-v1",
+            "signature_domain":"zed-comfy-rocm-package-v1",
             "signature_coverage":"package-coverage-v1",
             "runtime_root":"/opt/rocm"
         }"#,
@@ -4181,7 +4181,7 @@ mod tests {
             _package_root: &Path,
             contract: &PackageSignatureContract,
         ) -> Result<(), String> {
-            if contract.signer() != "sim.release"
+            if contract.signer() != "zed.release"
                 || contract.abi_manifest_sha256() != ABI_MANIFEST_SHA256
                 || contract.signature_algorithm() != "ed25519"
                 || contract.signature_coverage() != "package-coverage-v1"
@@ -4196,8 +4196,8 @@ mod tests {
                     .any(|window| window == b"adapter-manifest.json")
                 || !contract
                     .adapter_manifest_bytes()
-                    .windows("sim.release".len())
-                    .any(|window| window == b"sim.release")
+                    .windows("zed.release".len())
+                    .any(|window| window == b"zed.release")
             {
                 return Err("wrong signature contract".to_owned());
             }

@@ -84,7 +84,7 @@ CATALOG_FILES = {
 
 @dataclass(frozen=True)
 class CapabilityOwner:
-    sim_owner: str
+    zed_owner: str
     disposition: str
 
 
@@ -160,7 +160,7 @@ class InventoryChecker:
                 )
                 continue
             self.owners[capability_id] = CapabilityOwner(
-                sim_owner=columns[3], disposition=columns[4]
+                zed_owner=columns[3], disposition=columns[4]
             )
 
         requirements_path = self.spec_root / "requirements.md"
@@ -308,7 +308,7 @@ class InventoryChecker:
                         )
                         continue
                     owner = self.owners.get(capability_id)
-                    if owner is None or not owner.sim_owner or not owner.disposition:
+                    if owner is None or not owner.zed_owner or not owner.disposition:
                         self._error(
                             f"{location} ({identifier}): {capability_id} is missing "
                             "canonical owner/disposition reference"
@@ -329,9 +329,9 @@ class InventoryChecker:
         for capability_id in sorted(expected_capabilities):
             owner = self.owners.get(capability_id)
             if owner is not None:
-                if not owner.sim_owner:
+                if not owner.zed_owner:
                     self._error(
-                        f"reuse-audit.md {capability_id}: missing existing Sim owner/gap"
+                        f"reuse-audit.md {capability_id}: missing existing Zed owner/gap"
                     )
                 if not owner.disposition:
                     self._error(

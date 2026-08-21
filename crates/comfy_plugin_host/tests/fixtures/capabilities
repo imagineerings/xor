@@ -4,7 +4,7 @@ network-provider|demo|https://demo.invalid/v1/generate
 secret|secret.demo
 clock|workflow
 randomness|sampler
-model|sim-asset://model/fixture.json
+model|zed-asset://model/fixture.json
 transactional-output|outputs
 transactional-output|output-transaction
 sanitized-log|info

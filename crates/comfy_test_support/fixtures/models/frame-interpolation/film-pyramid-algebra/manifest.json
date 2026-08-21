@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-film-pyramid-algebra-v1",
+  "artifact": "zed-native-film-pyramid-algebra-v1",
   "evidence_kind": "source-fingerprinted analytic tensor-algebra oracle",
   "source": {
     "repository": "ComfyUI",

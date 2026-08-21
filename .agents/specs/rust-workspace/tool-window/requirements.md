@@ -2,13 +2,13 @@
 
 ## Problem
 
-Rust developers in Sim can browse files and use Rust language-server features, but they cannot inspect the Cargo structure of an open project as a workspace model. Discovering workspace membership, targets, defined and enabled features, and dependency declarations currently requires opening manifests or running Cargo manually. Sim needs a dockable Cargo view that makes this structure navigable while establishing only the reusable tree-panel behavior that later language ecosystems demonstrably need.
+Rust developers in Zed can browse files and use Rust language-server features, but they cannot inspect the Cargo structure of an open project as a workspace model. Discovering workspace membership, targets, defined and enabled features, and dependency declarations currently requires opening manifests or running Cargo manually. Zed needs a dockable Cargo view that makes this structure navigable while establishing only the reusable tree-panel behavior that later language ecosystems demonstrably need.
 
 ## Scope
 
 ### In scope
 
-- A user-facing **Cargo** panel integrated with Sim's existing workspace docks, panel actions, settings, and menus.
+- A user-facing **Cargo** panel integrated with Zed's existing workspace docks, panel actions, settings, and menus.
 - Cargo workspace and standalone-package discovery across all visible project worktrees.
 - A finite, navigable tree of workspace members, targets, features, and direct dependencies.
 - Cargo metadata collection in the project host environment for local, remote-server, and multiplayer projects.
@@ -27,7 +27,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 - Java, C#, Gradle, Maven, or .NET providers.
 - A public extension or plugin API for build-system providers.
 - A new `metal_rust` umbrella crate; that name remains available if a later distribution architecture demonstrates a need for it.
-- Making Sim's existing Rust language registration, rust-analyzer integration, Rust grammar, task context provider, or existing task-target discovery optional; that broader separation is a follow-up feature.
+- Making Zed's existing Rust language registration, rust-analyzer integration, Rust grammar, task context provider, or existing task-target discovery optional; that broader separation is a follow-up feature.
 - Search, filtering, drag-and-drop, multi-selection, or exact RustRover visual and toolbar parity.
 - Persisting row selection or expansion state across application restarts; preservation is limited to refreshes during the current panel lifetime.
 
@@ -41,7 +41,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 - **Project host**: The process with authoritative filesystem, environment, trust, and command-execution access for the project. It is the desktop process for a local project, the remote server for SSH/WSL-style projects, and the sharing host for a multiplayer project.
 - **Tree host**: The Cargo-agnostic UI state and rendering component that presents a provider-supplied tree projection.
 - **Provider**: The Cargo-specific adapter that discovers models, requests refreshes, projects Cargo data into tree nodes, and handles node activation.
-- **`rust-tools`**: The compile-time capability used by Sim and the remote server to include this specification's Cargo tooling. For this MVP it does not imply that all pre-existing Rust language support is feature-gated.
+- **`rust-tools`**: The compile-time capability used by Zed and the remote server to include this specification's Cargo tooling. For this MVP it does not imply that all pre-existing Rust language support is feature-gated.
 - **Metal Rust**: Permitted product or distribution branding for a build that includes Rust tooling; it is not the Cargo panel title, Cargo module prefix, or the existing Apple Metal GPU feature.
 
 ## Requirements
@@ -78,7 +78,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 
 ### Requirement 3: Navigation, interaction, and accessibility
 
-**User story:** As a keyboard or pointer user, I want the Cargo tree to behave like an accessible Sim panel, so that I can inspect and navigate project structure efficiently.
+**User story:** As a keyboard or pointer user, I want the Cargo tree to behave like an accessible Zed panel, so that I can inspect and navigate project structure efficiently.
 
 #### Acceptance criteria
 
@@ -123,13 +123,13 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 
 ### Requirement 6: Local, remote, multiplayer, trust, and privacy behavior
 
-**User story:** As a developer working locally, over a remote server, or with collaborators, I want the Cargo model to come from the authoritative project host without bypassing Sim's security boundaries.
+**User story:** As a developer working locally, over a remote server, or with collaborators, I want the Cargo model to come from the authoritative project host without bypassing Zed's security boundaries.
 
 #### Acceptance criteria
 
 1. **6.1** WHEN Cargo metadata is requested for a local project, remote-server project, or shared project, THEN THE `cargo` process SHALL run only on the project host that owns the relevant files and project environment.
 2. **6.2** WHEN the panel is attached to a remote-server or multiplayer client, THEN THE client SHALL request the same typed Cargo snapshot through the existing project RPC architecture and SHALL NOT execute Cargo against client-local absolute paths.
-3. **6.3** BEFORE the project host executes Cargo for a worktree governed by Sim's worktree trust mechanism, THE system SHALL use the existing trust authority; WHILE the worktree is restricted, THE panel SHALL show a restricted state and SHALL NOT spawn Cargo for it.
+3. **6.3** BEFORE the project host executes Cargo for a worktree governed by Zed's worktree trust mechanism, THE system SHALL use the existing trust authority; WHILE the worktree is restricted, THE panel SHALL show a restricted state and SHALL NOT spawn Cargo for it.
 4. **6.4** WHEN a previously restricted worktree becomes trusted, THEN THE provider SHALL invalidate that worktree and allow the normal debounced or explicit refresh path to load it.
 5. **6.5** WHEN serving a multiplayer client, THE host SHALL return only workspace members, navigation paths, diagnostics, and dependency details permitted by that client's shared-worktree visibility, and SHALL NOT expose host-only absolute paths, environment variables, credentials, or private-file contents.
 6. **6.6** WHILE a remote project is disconnected, THE panel SHALL retain any last successful tree as read-only stale data, disable refresh and navigation that require the connection, and SHALL refresh after reconnection rather than presenting the stale tree as current.
@@ -137,7 +137,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 
 ### Requirement 7: Bounded reusable architecture and naming
 
-**User story:** As a Sim maintainer, I want the Cargo panel to establish a small reusable tree boundary without encoding Cargo as the model for every language ecosystem.
+**User story:** As a Zed maintainer, I want the Cargo panel to establish a small reusable tree boundary without encoding Cargo as the model for every language ecosystem.
 
 #### Acceptance criteria
 
@@ -150,7 +150,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 
 ### Requirement 8: Verification and performance confidence
 
-**User story:** As a Sim maintainer, I want deterministic coverage of the Cargo model and panel lifecycle, so that the feature can evolve without relying on a developer machine's Cargo installation or network.
+**User story:** As a Zed maintainer, I want deterministic coverage of the Cargo model and panel lifecycle, so that the feature can evolve without relying on a developer machine's Cargo installation or network.
 
 #### Acceptance criteria
 
@@ -163,12 +163,12 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 
 ### Requirement 9: Rust tooling build variants
 
-**User story:** As a Sim distributor, I want the Cargo tool window behind a compile-time Rust tooling capability, so that a core editor build does not carry or initialize tooling it does not ship.
+**User story:** As a Zed distributor, I want the Cargo tool window behind a compile-time Rust tooling capability, so that a core editor build does not carry or initialize tooling it does not ship.
 
 #### Acceptance criteria
 
-1. **9.1** WHERE `rust-tools` is enabled for the Sim application, THE built application SHALL include `cargo_ui`, register and initialize the Cargo panel, its Cargo settings, actions, context key bindings, and View-menu entry, and expose the user-facing title `Cargo`.
-2. **9.2** WHERE `rust-tools` is disabled for the Sim application, THE built application SHALL contain no Cargo panel registration, Cargo action or context-key initialization, Cargo settings registration, or Cargo View-menu entry.
+1. **9.1** WHERE `rust-tools` is enabled for the Zed application, THE built application SHALL include `cargo_ui`, register and initialize the Cargo panel, its Cargo settings, actions, context key bindings, and View-menu entry, and expose the user-facing title `Cargo`.
+2. **9.2** WHERE `rust-tools` is disabled for the Zed application, THE built application SHALL contain no Cargo panel registration, Cargo action or context-key initialization, Cargo settings registration, or Cargo View-menu entry.
 3. **9.3** WHERE the Cargo workspace project capability is disabled, THE `project` build SHALL exclude `CargoWorkspaceStore` construction and request handling and SHALL not include `cargo_metadata` in its selected normal dependency graph.
 4. **9.4** WHERE `rust-tools` is disabled, THE application and remote server SHALL perform no Cargo workspace discovery and SHALL spawn no Cargo metadata process on behalf of the Cargo panel/store capability, including after project activation, worktree changes, sharing, or remote connection events; separately triggered pre-existing Rust task-target discovery remains outside this guarantee.
 5. **9.5** THE generic `language_tools` tree host SHALL compile and remain usable without `rust-tools` and SHALL have no dependency on `cargo_ui`, `cargo_metadata`, or Cargo workspace domain types.
@@ -176,7 +176,7 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 7. **9.7** WHERE a Cargo-capable client connects to a project host built without Cargo workspace support, THE panel SHALL show an actionable unsupported-host state, SHALL not retry rapidly, and SHALL not fall back to client-local Cargo execution.
 8. **9.8** WHERE a client is built without `rust-tools`, THE client SHALL ignore the availability of Cargo workspace support on a host and SHALL send no Cargo workspace requests.
 9. **9.9** THE protobuf build MAY compile inert Cargo request and response definitions in both variants, but disabled application and headless builds SHALL register no Cargo request handler and SHALL instantiate no Cargo store.
-10. **9.10** THE continuous-integration and release-build validation SHALL compile Sim and `remote_server` with the capability enabled and disabled and SHALL verify that disabled selected dependency graphs exclude `cargo_ui`, `cargo_metadata`, and dependencies introduced solely for the Cargo panel.
+10. **9.10** THE continuous-integration and release-build validation SHALL compile Zed and `remote_server` with the capability enabled and disabled and SHALL verify that disabled selected dependency graphs exclude `cargo_ui`, `cargo_metadata`, and dependencies introduced solely for the Cargo panel.
 
 ## Constraints
 
@@ -189,5 +189,5 @@ Rust developers in Sim can browse files and use Rust language-server features, b
 - The panel is read-only with respect to user intent: it invokes only Cargo metadata and never directly edits manifests, dependency declarations, feature definitions, or source files.
 - Keep existing Rust language initialization outside this feature boundary. `rust-tools` gates the new Cargo tool window only until a separate feature specifies how to isolate rust-analyzer integration, grammars, tasks, and all existing Rust language code.
 - Interpret disabled Cargo-execution assertions at the new `CargoWorkspaceStore`/panel runner boundary. Existing task-specific `cargo metadata --no-deps` behavior in `crates/languages/src/rust.rs` is intentionally preserved and requires its own follow-up boundary if distributions must remove every Cargo invocation.
-- Preserve `default = []` for current package feature behavior and make distribution feature selection explicit; a Rust-oriented or `Metal Rust` distribution enables `rust-tools` for both Sim and its matching remote-server artifact.
+- Preserve `default = []` for current package feature behavior and make distribution feature selection explicit; a Rust-oriented or `Metal Rust` distribution enables `rust-tools` for both Zed and its matching remote-server artifact.
 - Use `language_tools`, `cargo_workspace`, and `cargo_ui` for implementation. `Metal Rust` is branding only for this scope; do not introduce `metal_cargo` or broad `metal_*` renames.

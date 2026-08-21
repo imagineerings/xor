@@ -20,18 +20,18 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 1: Langfuse Tracing
 
-**User Story:** As a sim developer, I want to trace LLM calls and agent operations in Langfuse, so that I can debug and optimize agent behavior.
+**User Story:** As a zed developer, I want to trace LLM calls and agent operations in Langfuse, so that I can debug and optimize agent behavior.
 
 #### Acceptance Criteria
 
-1. **1.1** WHERE a Langfuse exporter is approved, THE system SHALL extend Sim's existing tracing/telemetry pipeline rather than create a second agent event stream
+1. **1.1** WHERE a Langfuse exporter is approved, THE system SHALL extend Zed's existing tracing/telemetry pipeline rather than create a second agent event stream
 2. **1.2** WHEN enabled with explicit consent, approved LLM calls, agent turns, and tool operations SHALL produce correlated traces with a documented redacted attribute schema
 3. **1.3** EXPORT SHALL be asynchronous and bounded with sampling, batching, retry/backoff, backpressure/drop accounting, shutdown flush, and failure isolation from agent execution
 4. **1.4** ENDPOINT, TLS, credentials, sampling, enablement, and retention SHALL be configurable; secrets, prompt/tool content, paths, user identifiers, and attachments SHALL be excluded unless separately disclosed and approved
 
 ### Requirement 2: OpenTelemetry OTLP Export
 
-**User Story:** As a sim operator, I want to export telemetry data via OpenTelemetry OTLP, so that I can integrate with my existing observability infrastructure.
+**User Story:** As a zed operator, I want to export telemetry data via OpenTelemetry OTLP, so that I can integrate with my existing observability infrastructure.
 
 #### Acceptance Criteria
 
@@ -41,7 +41,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 3: Observation Layer
 
-**User Story:** As a sim developer, I want detailed observations about agent operations, so that I can analyze performance, latency, and behavior.
+**User Story:** As a zed developer, I want detailed observations about agent operations, so that I can analyze performance, latency, and behavior.
 
 #### Acceptance Criteria
 
@@ -52,7 +52,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 4: Rate Limiter
 
-**User Story:** As a sim user, I want the agent to respect rate limits when calling external APIs, so that I don't get throttled or exceed quota.
+**User Story:** As a zed user, I want the agent to respect rate limits when calling external APIs, so that I don't get throttled or exceed quota.
 
 #### Acceptance Criteria
 
@@ -63,18 +63,18 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 5: PostHog Analytics
 
-**User Story:** As a sim developer, I want product analytics via PostHog, so that I can understand how users interact with the agent.
+**User Story:** As a zed developer, I want product analytics via PostHog, so that I can understand how users interact with the agent.
 
 #### Acceptance Criteria
 
-1. **5.1** WHERE product analytics events are approved, THE system SHALL use Sim's existing telemetry abstraction; PostHog is an exporter choice, not a parallel client or mandatory vendor
+1. **5.1** WHERE product analytics events are approved, THE system SHALL use Zed's existing telemetry abstraction; PostHog is an exporter choice, not a parallel client or mandatory vendor
 2. **5.2** EACH approved event SHALL have a stable schema, purpose, consent basis, cardinality bound, and owner and SHALL exclude prompts, tool arguments/results, file paths, secrets, and direct identifiers by default
-3. **5.3** ANALYTICS SHALL respect Sim's distribution/channel consent and disablement policy and SHALL configure endpoint/credentials outside user-readable settings
+3. **5.3** ANALYTICS SHALL respect Zed's distribution/channel consent and disablement policy and SHALL configure endpoint/credentials outside user-readable settings
 4. **5.4** QUEUING, retry, offline behavior, backpressure, shutdown, deletion/retention, and exporter failure SHALL not block or fail agent operations and SHALL be testable
 
 ### Requirement 6: Token Counter
 
-**User Story:** As a sim user, I want to track token usage across LLM requests, so that I can monitor costs and usage.
+**User Story:** As a zed user, I want to track token usage across LLM requests, so that I can monitor costs and usage.
 
 #### Acceptance Criteria
 
@@ -85,7 +85,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 7: Tool Monitoring
 
-**User Story:** As a sim user, I want visibility into tool usage, so that I can see which tools are used most frequently and their performance.
+**User Story:** As a zed user, I want visibility into tool usage, so that I can see which tools are used most frequently and their performance.
 
 #### Acceptance Criteria
 
@@ -95,7 +95,7 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 
 ### Requirement 8: Tool Inspection
 
-**User Story:** As a sim user, I want to inspect available tools and their schemas, so that I can understand what the agent can do.
+**User Story:** As a zed user, I want to inspect available tools and their schemas, so that I can understand what the agent can do.
 
 #### Acceptance Criteria
 
@@ -111,4 +111,4 @@ Migrate goose's observability and analytics infrastructure: Langfuse tracing, Op
 - Source: `projects/goose/crates/goose/src/token_counter.rs`
 - Source: `projects/goose/crates/goose/src/tool_monitor.rs`
 - Source: `projects/goose/crates/goose/src/tool_inspection.rs`
-- Existing sim: `crates/telemetry/`
+- Existing zed: `crates/telemetry/`

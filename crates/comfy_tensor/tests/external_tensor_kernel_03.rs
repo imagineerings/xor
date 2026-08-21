@@ -21,37 +21,37 @@ use sha2::{Digest, Sha256};
 const EXPECTED: [(&str, &str, &str); 7] = [
     (
         "COMFY-TENSOR-OP-F37B4E403ACF",
-        "sim.native.kornia.lab-to-rgb-0.8.2-f32.v1",
+        "zed.native.kornia.lab-to-rgb-0.8.2-f32.v1",
         "10e55e2fae5c07c34094194468cca6fa93a9e651abaee4d8758201b8324258df",
     ),
     (
         "COMFY-TENSOR-OP-C5A306EB73FD",
-        "sim.native.kornia.morphology-bottom-hat-0.8.2-flat-geodesic.v1",
+        "zed.native.kornia.morphology-bottom-hat-0.8.2-flat-geodesic.v1",
         "7834635173a02cfece9a4522525bf65e53d929b5b0e3952286e330a88d5a2328",
     ),
     (
         "COMFY-TENSOR-OP-F73C7107B450",
-        "sim.native.torchaudio.bass-biquad-2.10.0-f32.v1",
+        "zed.native.torchaudio.bass-biquad-2.10.0-f32.v1",
         "f5467af3c463f32cc79e56e80f659bb26231c0b2229334ac3e211a9e1105bc31",
     ),
     (
         "COMFY-TENSOR-OP-EBA0D3470A35",
-        "sim.native.torchaudio.mel-scale-2.10.0-slaney-f32.v1",
+        "zed.native.torchaudio.mel-scale-2.10.0-slaney-f32.v1",
         "ec64ad096b6fc5243917e1a24ea682ee1d89447bf7de122df8fafe8e88ca8ebc",
     ),
     (
         "COMFY-TENSOR-OP-E937CE70AC37",
-        "sim.native.torchvision.box-convert-0.27-cxcywh-xyxy-f32.v1",
+        "zed.native.torchvision.box-convert-0.27-cxcywh-xyxy-f32.v1",
         "d098104be1596881ec5059b8547a72912cb7897ab3b6a0ea6cedddca7c8d26c2",
     ),
     (
         "COMFY-TENSOR-OP-FBC26239461B",
-        "sim.native.torchvision.compose-normalize-0.27-f32.v1",
+        "zed.native.torchvision.compose-normalize-0.27-f32.v1",
         "335930a1f84a18b4f2f3fc6e97384e8c16e063c8f08410e43edbc71ff23cbced",
     ),
     (
         "COMFY-TENSOR-OP-D2AF4145E6CE",
-        "sim.native.torchvision.to-tensor-0.27-rgb8-boundary.v1",
+        "zed.native.torchvision.to-tensor-0.27-rgb8-boundary.v1",
         "e5b04f615210697627188e780e7390eb3f41fdf471a12d5c6413469abe978242",
     ),
 ];

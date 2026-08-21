@@ -23,7 +23,7 @@
     "actor": "the existing single retained native video codec thread and capacity-one request channel",
     "portable_output": "one moved exact-length contiguous rank-one CPU U8 Tensor plus content and source VIDEO SHA-256, dimensions, reduced frame rate, frame count, MP4, H.264, eight-bit YUV420P identity, and no alpha",
     "post_actor_copy_count": 0,
-    "service_identity_version": "sim.comfy.component-h264-mp4-backing-service.v1",
+    "service_identity_version": "zed.comfy.component-h264-mp4-backing-service.v1",
     "service_identity_binds_actor_and_all_planning_and_sequence_limits": true,
     "execution_configuration_component": "h264-mp4"
   },

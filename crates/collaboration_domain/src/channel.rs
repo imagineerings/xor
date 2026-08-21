@@ -471,7 +471,7 @@ mod tests {
     }
 
     fn principal() -> AuthenticatedPrincipal {
-        AuthenticatedPrincipal::sim_account(
+        AuthenticatedPrincipal::zed_account(
             principal_id(),
             community_id(),
             ServiceAccountId::new(1),

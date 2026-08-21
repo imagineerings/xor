@@ -623,7 +623,7 @@ impl ControlChain {
         conditioning: &ControlConditioning,
     ) -> Result<ControlExecutionIdentity, ControlNetError> {
         let mut hasher = Sha256::new();
-        hash_field(&mut hasher, b"sim-controlnet-execution-v1");
+        hash_field(&mut hasher, b"zed-controlnet-execution-v1");
         hash_field(&mut hasher, self.identity.digest().as_bytes());
         hash_tensor_binding(&mut hasher, &conditioning.noisy);
         hash_tensor_binding(&mut hasher, &conditioning.timestep);
@@ -1600,7 +1600,7 @@ fn compute_chain_identity(
     nodes: &[ControlNode],
 ) -> Result<ControlExecutionIdentity, ControlNetError> {
     let mut hasher = Sha256::new();
-    hash_field(&mut hasher, b"sim-controlnet-chain-v1");
+    hash_field(&mut hasher, b"zed-controlnet-chain-v1");
     hash_u64(
         &mut hasher,
         u64::try_from(nodes.len())

@@ -2,11 +2,11 @@
 
 ## Overview
 
-The package composes the upstream ACP TypeScript client, an optional ACP HTTP stream, generated custom-method bindings, MCP Apps metadata types, and a narrow native-binary resolver. It is generated from the same canonical definitions used by the approved Sim ACP server.
+The package composes the upstream ACP TypeScript client, an optional ACP HTTP stream, generated custom-method bindings, MCP Apps metadata types, and a narrow native-binary resolver. It is generated from the same canonical definitions used by the approved Zed ACP server.
 
 ## Existing context
 
-Goose's SDK implementation lives in `projects/goose/ui/sdk/src`. Its `GooseClient` wraps `@agentclientprotocol/sdk`; it does not issue REST resource requests. Sim currently has ACP Rust/client code but no audited public TypeScript package.
+Goose's SDK implementation lives in `projects/goose/ui/sdk/src`. Its `GooseClient` wraps `@agentclientprotocol/sdk`; it does not issue REST resource requests. Zed currently has ACP Rust/client code but no audited public TypeScript package.
 
 ## Design decisions
 
@@ -53,7 +53,7 @@ Goose's SDK implementation lives in `projects/goose/ui/sdk/src`. Its `GooseClien
 
 ## Testing strategy
 
-- Run the SDK against ACP fixture streams and, if approved, the Sim stdio/HTTP server.
+- Run the SDK against ACP fixture streams and, if approved, the Zed stdio/HTTP server.
 - Verify every generated custom method in both directions.
 - Inject out-of-order/malformed messages, aborts, dropped streams, unknown methods, and newer metadata.
 - Test package exports in supported Node/browser/Electron environments.

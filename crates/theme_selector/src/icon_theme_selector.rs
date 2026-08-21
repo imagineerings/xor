@@ -6,7 +6,7 @@ use gpui::{
 };
 use picker::{Picker, PickerDelegate};
 use settings::{Settings as _, SettingsStore, update_settings_file};
-use sim_actions::{ExtensionCategoryFilter, Extensions};
+use zed_actions::{ExtensionCategoryFilter, Extensions};
 use std::sync::Arc;
 use theme::{Appearance, SystemAppearance, ThemeMeta, ThemeRegistry};
 use theme_settings::{IconThemeName, IconThemeSelection, ThemeSettings};
@@ -341,7 +341,7 @@ impl PickerDelegate for IconThemeSelectorDelegate {
                                 .color(Color::Muted),
                         )
                         .on_click(|_event, _window, cx| {
-                            cx.open_url("https://sim.dev/docs/icon-themes");
+                            cx.open_url("https://zed.dev/docs/icon-themes");
                         }),
                 )
                 .child(
@@ -427,7 +427,7 @@ mod tests {
         workspace: &Entity<workspace::Workspace>,
         cx: &mut VisualTestContext,
     ) -> Entity<Picker<IconThemeSelectorDelegate>> {
-        cx.dispatch_action(sim_actions::icon_theme_selector::Toggle {
+        cx.dispatch_action(zed_actions::icon_theme_selector::Toggle {
             themes_filter: None,
         });
         cx.run_until_parked();

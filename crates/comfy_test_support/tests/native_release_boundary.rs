@@ -26,8 +26,8 @@ const INPUT_FIXTURE: &[u8] = include_bytes!("../fixtures/native_image/input.json
 const RELEASE_POLICY: &[u8] = include_bytes!("../fixtures/release-boundary.json");
 const DEFAULT_SETTINGS: &str = include_str!("../../../assets/settings/default.json");
 const DEFAULT_COMFY_SETTINGS: &str = include_str!("../../../assets/settings/default-comfy.json");
-const SIM_SOURCE: &str = include_str!("../../sim/src/sim.rs");
-const COMFY_CLI_SOURCE: &str = include_str!("../../sim/src/comfy_cli.rs");
+const ZED_SOURCE: &str = include_str!("../../zed/src/zed.rs");
+const COMFY_CLI_SOURCE: &str = include_str!("../../zed/src/comfy_cli.rs");
 const COMFY_MENU_SOURCE: &str = include_str!("../../comfy_ui/src/shell.rs");
 const WORKER_SOURCE: &[u8] = include_bytes!("../../comfy_worker/src/comfy_worker.rs");
 const RUNTIME_SUPERVISOR_SOURCE: &str =
@@ -35,7 +35,7 @@ const RUNTIME_SUPERVISOR_SOURCE: &str =
 const MAC_BUNDLE: &str = include_str!("../../../script/bundle-mac");
 const LINUX_BUNDLE: &str = include_str!("../../../script/bundle-linux");
 const WINDOWS_BUNDLE: &str = include_str!("../../../script/bundle-windows.ps1");
-const WINDOWS_INSTALLER: &str = include_str!("../../sim/resources/windows/sim.iss");
+const WINDOWS_INSTALLER: &str = include_str!("../../zed/resources/windows/zed.iss");
 const ROCM_PACKAGE_POLICY: &str =
     include_str!("../../../nix/comfy-backends/rocm/package-policy.json");
 const ROCM_CONTRACT_SCHEMA: &str =
@@ -217,8 +217,8 @@ fn dependency_boundary_cases(
                 .map(move |dependency| format!("{package_name}->{dependency}"))
         })
         .collect::<Vec<_>>();
-    let sim = package(metadata, "sim").ok_or("cargo metadata omitted Sim")?;
-    let sim_dependencies = normal_dependency_names(sim);
+    let zed = package(metadata, "zed").ok_or("cargo metadata omitted Zed")?;
+    let zed_dependencies = normal_dependency_names(zed);
     let worker = package(metadata, "comfy_worker").ok_or("cargo metadata omitted comfy_worker")?;
     let runtime =
         package(metadata, "comfy_runtime").ok_or("cargo metadata omitted comfy_runtime")?;
@@ -235,7 +235,7 @@ fn dependency_boundary_cases(
         let runtime_values = package_feature_values(runtime, feature);
         let worker_values = package_feature_values(worker, feature);
         let test_support_values = package_feature_values(test_support, feature);
-        let sim_values = package_feature_values(sim, feature);
+        let zed_values = package_feature_values(zed, feature);
         let test_support_is_exact = if feature == "metal" {
             test_support_values.len() == 2
                 && test_support_values.contains(runtime_feature.as_str())
@@ -249,9 +249,9 @@ fn dependency_boundary_cases(
             && worker_values.contains(runtime_feature.as_str())
             && worker_values.contains(tensor_feature.as_str())
             && test_support_is_exact
-            && sim_values.len() == 2
-            && sim_values.contains("comfy")
-            && sim_values.contains(runtime_feature.as_str())
+            && zed_values.len() == 2
+            && zed_values.contains("comfy")
+            && zed_values.contains(runtime_feature.as_str())
     });
     let worker_has_binary =
         worker
@@ -272,7 +272,7 @@ fn dependency_boundary_cases(
             !production_comfy_packages.is_empty() && direct_dependency_hits.is_empty(),
         ),
         (
-            "sim_uses_production_comfy_crates_without_test_support",
+            "zed_uses_production_comfy_crates_without_test_support",
             [
                 "comfy_api",
                 "comfy_model",
@@ -283,8 +283,8 @@ fn dependency_boundary_cases(
                 "comfy_ui",
             ]
             .into_iter()
-            .all(|dependency| sim_dependencies.contains(dependency))
-                && !sim_dependencies.contains("comfy_test_support"),
+            .all(|dependency| zed_dependencies.contains(dependency))
+                && !zed_dependencies.contains("comfy_test_support"),
         ),
         ("worker_is_a_packaged_binary_target", worker_has_binary),
         (
@@ -298,20 +298,20 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
     BTreeMap::from([
         (
             "mac_default_bundle_omits_native_worker",
-            MAC_BUNDLE.contains("mode=default packages=sim,cli sim_features=none include_comfy_worker=false")
+            MAC_BUNDLE.contains("mode=default packages=zed,cli zed_features=none include_comfy_worker=false")
                 && MAC_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
                 && MAC_BUNDLE.contains("--comfy  Include the Comfy integration, Metal backend, worker, and assets."),
         ),
         (
             "mac_bundle_builds_places_and_signs_native_worker",
             MAC_BUNDLE.contains("--package comfy_worker")
-                && MAC_BUNDLE.contains("--features sim/comfy,sim/metal,comfy_worker/metal")
+                && MAC_BUNDLE.contains("--features zed/comfy,zed/metal,comfy_worker/metal")
                 && MAC_BUNDLE.contains("Contents/MacOS/comfy-worker")
                 && MAC_BUNDLE.contains("codesign --deep --force --timestamp --options runtime --sign \"$IDENTITY\" \"${app_path}/Contents/MacOS/comfy-worker\""),
         ),
         (
             "linux_default_bundle_omits_native_worker",
-            LINUX_BUNDLE.contains("mode=default packages=sim,cli sim_features=none include_comfy_worker=false")
+            LINUX_BUNDLE.contains("mode=default packages=zed,cli zed_features=none include_comfy_worker=false")
                 && LINUX_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
                 && LINUX_BUNDLE.contains("--comfy        Include the Comfy integration, accelerator backends, worker, and assets."),
         ),
@@ -319,14 +319,14 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             "linux_bundle_builds_strips_and_places_native_worker",
             LINUX_BUNDLE.contains("--package comfy_worker")
                 && LINUX_BUNDLE.contains(
-                    "--features sim/comfy,sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu",
+                    "--features zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu",
                 )
                 && LINUX_BUNDLE.contains("release/comfy-worker\"")
                 && LINUX_BUNDLE.contains("libexec/comfy-worker"),
         ),
         (
             "windows_default_bundle_omits_native_worker",
-            WINDOWS_BUNDLE.contains("mode=default packages=sim,cli,auto_update_helper sim_features=none include_comfy_worker=false")
+            WINDOWS_BUNDLE.contains("mode=default packages=zed,cli,auto_update_helper zed_features=none include_comfy_worker=false")
                 && WINDOWS_BUNDLE.contains("if ($Comfy)")
                 && WINDOWS_INSTALLER.contains("#ifdef Comfy")
                 && WINDOWS_INSTALLER.contains("#endif"),
@@ -335,7 +335,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             "windows_bundle_builds_places_signs_and_installs_native_worker",
             WINDOWS_BUNDLE.contains("--package comfy_worker")
                 && WINDOWS_BUNDLE.contains(
-                    "--features sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml",
+                    "--features zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml",
                 )
                 && WINDOWS_BUNDLE.contains("comfy-worker.exe\" -Destination \"$innoDir\\comfy-worker.exe")
                 && WINDOWS_BUNDLE.contains("$files += \",$innoDir\\comfy-worker.exe\"")
@@ -353,9 +353,9 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
                     .matches("std::env::current_exe()")
                     .count()
                     == 1
-                && SIM_SOURCE.contains("WorkerLaunchConfig::for_packaged_worker_profile")
+                && ZED_SOURCE.contains("WorkerLaunchConfig::for_packaged_worker_profile")
                 && COMFY_CLI_SOURCE.contains("WorkerLaunchConfig::for_packaged_worker_profile")
-                && !SIM_SOURCE.contains("std::env::current_exe()")
+                && !ZED_SOURCE.contains("std::env::current_exe()")
                 && !COMFY_CLI_SOURCE.contains("std::env::current_exe()"),
         ),
         (
@@ -432,7 +432,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
                 && METAL_LOADER.contains("dladdr")
                 && METAL_LOADER.contains("class_getImageName")
                 && METAL_LOADER.contains("method_getTypeEncoding")
-                && METAL_READINESS_SOURCE.contains("sim_comfy_metal_readiness_v1"),
+                && METAL_READINESS_SOURCE.contains("zed_comfy_metal_readiness_v1"),
         ),
         (
             "metal_package_trust_precedes_canonical_registry_mapping",
@@ -461,7 +461,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             ROCM_RUNTIME_TRUST.contains("pub struct MluPackageVerificationKey")
                 && ROCM_RUNTIME_TRUST.contains("MLU_PACKAGE_SIGNATURE_DOMAIN")
                 && MLU_PACKAGE_POLICY.contains("ffi-contracts-v1.json")
-                && MLU_PACKAGE_POLICY.contains("sim-comfy-mlu-package-v1")
+                && MLU_PACKAGE_POLICY.contains("zed-comfy-mlu-package-v1")
                 && MLU_CONTRACT_SCHEMA.contains("\"additionalProperties\": false")
                 && MLU_PACKAGER.contains("separately reviewed bounded regular file")
                 && MLU_RUNTIME_FFI
@@ -488,7 +488,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             ROCM_RUNTIME_TRUST.contains("pub struct NpuPackageVerificationKey")
                 && ROCM_RUNTIME_TRUST.contains("NPU_PACKAGE_SIGNATURE_DOMAIN")
                 && NPU_PACKAGE_POLICY.contains("ffi-contracts-v1.json")
-                && NPU_PACKAGE_POLICY.contains("sim-comfy-npu-package-v1")
+                && NPU_PACKAGE_POLICY.contains("zed-comfy-npu-package-v1")
                 && NPU_PACKAGE_POLICY
                     .contains("\"certificate_owner\": \"comfy_runtime::NativeFfiRegistry\"")
                 && NPU_CONTRACT_SCHEMA.contains("\"additionalProperties\": false")
@@ -517,7 +517,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             ROCM_RUNTIME_TRUST.contains("pub struct CudaPackageVerificationKey")
                 && ROCM_RUNTIME_TRUST.contains("CUDA_PACKAGE_SIGNATURE_DOMAIN")
                 && CUDA_PACKAGE_POLICY.contains("ffi-contracts-v1.json")
-                && CUDA_PACKAGE_POLICY.contains("sim-comfy-cuda-package-v1")
+                && CUDA_PACKAGE_POLICY.contains("zed-comfy-cuda-package-v1")
                 && CUDA_PACKAGE_POLICY
                     .contains("\"certificate_owner\": \"comfy_runtime::NativeFfiRegistry\"")
                 && CUDA_PACKAGE_POLICY
@@ -544,7 +544,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             ROCM_RUNTIME_TRUST.contains("pub struct XpuPackageVerificationKey")
                 && ROCM_RUNTIME_TRUST.contains("XPU_PACKAGE_SIGNATURE_DOMAIN")
                 && XPU_PACKAGE_POLICY.contains("ffi-contracts-v1.json")
-                && XPU_PACKAGE_POLICY.contains("sim-comfy-xpu-package-v1")
+                && XPU_PACKAGE_POLICY.contains("zed-comfy-xpu-package-v1")
                 && XPU_PACKAGE_POLICY
                     .contains("\"certificate_owner\": \"comfy_runtime::NativeFfiRegistry\"")
                 && XPU_PACKAGE_POLICY
@@ -570,7 +570,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
             ROCM_RUNTIME_TRUST.contains("pub struct DirectMlPackageVerificationKey")
                 && ROCM_RUNTIME_TRUST.contains("DIRECTML_PACKAGE_SIGNATURE_DOMAIN")
                 && DIRECTML_PACKAGE_POLICY.contains("ffi-contracts-v1.json")
-                && DIRECTML_PACKAGE_POLICY.contains("sim-comfy-directml-package-v1")
+                && DIRECTML_PACKAGE_POLICY.contains("zed-comfy-directml-package-v1")
                 && DIRECTML_PACKAGE_POLICY
                     .contains("comfy_runtime::DirectMlPackageVerificationKey")
                 && DIRECTML_PACKAGE_POLICY
@@ -634,9 +634,9 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
                     .contains("\"redistributes_apple_frameworks\": false")
                 && METAL_EXECUTION_PACKAGE_POLICY.contains("tensor_ops.metallib")
                 && METAL_EXECUTION_PACKAGE_POLICY.contains("tensor_ops.metal")
-                && METAL_EXECUTION_ABI.contains("sim-comfy-metal-execution-v1")
-                && METAL_EXECUTION_ABI.contains("sim_comfy_metal_add_f16_v1")
-                && METAL_EXECUTION_ABI.contains("sim_comfy_metal_add_f32_v1")
+                && METAL_EXECUTION_ABI.contains("zed-comfy-metal-execution-v1")
+                && METAL_EXECUTION_ABI.contains("zed_comfy_metal_add_f16_v1")
+                && METAL_EXECUTION_ABI.contains("zed_comfy_metal_add_f32_v1")
                 && METAL_EXECUTION_ABI.contains("\"return_nullability\": \"nullable\"")
                 && METAL_EXECUTION_BINDINGS.contains("Xcode 26.2 build 17C52")
                 && METAL_EXECUTION_BINDINGS.contains("29 exact Objective-C type encodings")
@@ -646,8 +646,8 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
                 && METAL_EXECUTION_ABI_VERIFIER.contains("expected_return_nullability")
                 && METAL_EXECUTION_LICENSES.contains("tensor_ops.metallib")
                 && !METAL_EXECUTION_LICENSES.contains("readiness.metallib")
-                && METAL_EXECUTION_KERNELS.contains("kernel void sim_comfy_metal_add_f16_v1")
-                && METAL_EXECUTION_KERNELS.contains("kernel void sim_comfy_metal_add_f32_v1")
+                && METAL_EXECUTION_KERNELS.contains("kernel void zed_comfy_metal_add_f16_v1")
+                && METAL_EXECUTION_KERNELS.contains("kernel void zed_comfy_metal_add_f32_v1")
                 && METAL_EXECUTION_SOURCE.contains("pub unsafe fn from_certified_metallibs")
                 && METAL_EXECUTION_SOURCE.contains("readiness_metallib: Arc<[u8]>")
                 && METAL_EXECUTION_SOURCE.contains("tensor_ops_metallib: Arc<[u8]>")
@@ -680,7 +680,7 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
 }
 
 fn application_surface_cases() -> BTreeMap<&'static str, bool> {
-    let worker_launch = SIM_SOURCE
+    let worker_launch = ZED_SOURCE
         .split_once("fn native_comfy_worker_launch(")
         .and_then(|(_, source)| source.split_once("fn register_native_comfy_execution("))
         .map(|(source, _)| source)
@@ -1103,7 +1103,7 @@ fn write_artifact(
             "input_sha256": format!("{:x}", Sha256::digest(INPUT_FIXTURE)),
             "default_settings_sha256": format!("{:x}", Sha256::digest(DEFAULT_SETTINGS.as_bytes())),
             "default_comfy_settings_sha256": format!("{:x}", Sha256::digest(DEFAULT_COMFY_SETTINGS.as_bytes())),
-            "sim_source_sha256": format!("{:x}", Sha256::digest(SIM_SOURCE.as_bytes())),
+            "zed_source_sha256": format!("{:x}", Sha256::digest(ZED_SOURCE.as_bytes())),
             "comfy_cli_source_sha256": format!("{:x}", Sha256::digest(COMFY_CLI_SOURCE.as_bytes())),
             "comfy_menu_source_sha256": format!("{:x}", Sha256::digest(COMFY_MENU_SOURCE.as_bytes())),
             "worker_source_sha256": format!("{:x}", Sha256::digest(WORKER_SOURCE)),

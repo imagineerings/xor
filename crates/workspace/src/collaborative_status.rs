@@ -268,10 +268,10 @@ mod tests {
         );
 
         let dirty_branch = CollaborativeStatusProjection {
-            project: "sim".into(),
-            worktree: Some("sim".into()),
+            project: "zed".into(),
+            worktree: Some("zed".into()),
             repository: Some(CollaborativeRepositoryStatus {
-                label: "sim".into(),
+                label: "zed".into(),
                 branch: Some("feature/collaborative".into()),
                 dirty: true,
             }),

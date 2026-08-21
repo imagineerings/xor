@@ -1,4 +1,4 @@
-schema=sim-comfy-xpu-reviewed-execution-bindings-v1
+schema=zed-comfy-xpu-reviewed-execution-bindings-v1
 abi_floor=level-zero-loader-1.11.0-api-1.6.3+onednn-3.5.0
 level_zero_commit=f35123bead54a471a7e5f3bf8d439a4a44527d8e
 level_zero_header=include/ze_api.h sha256=72108c7826744ed58e1c86e6abfd407d89fdf8e1b09e96ac0439f40c3b6d0175

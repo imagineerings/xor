@@ -15,7 +15,7 @@ pub use uuid;
 
 pub use release_channel::RELEASE_CHANNEL;
 use release_channel::ReleaseChannel;
-use sim_env_vars::SIM_STATELESS;
+use zed_env_vars::ZED_STATELESS;
 use sqlez::domain::Migrator;
 use sqlez::thread_safe_connection::ThreadSafeConnection;
 use sqlez_macros::sql;
@@ -175,7 +175,7 @@ pub async fn open_db<M: Migrator + 'static>(
     db_dir: &Path,
     scope: impl DbScope,
 ) -> ThreadSafeConnection {
-    if *SIM_STATELESS {
+    if *ZED_STATELESS {
         return open_fallback_db::<M>().await;
     }
 

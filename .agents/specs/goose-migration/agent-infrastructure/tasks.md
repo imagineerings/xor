@@ -143,7 +143,7 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
   - _Writes: crates/agent_ui/src/diagnostics.rs, crates/diagnostics/, selected provider-health integration_
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
-- [ ] 11. Reconcile model downloads with existing Sim HTTP and cache owners
+- [ ] 11. Reconcile model downloads with existing Zed HTTP and cache owners
   - URL download with progress reporting
   - Resume support for interrupted downloads
 
@@ -184,14 +184,14 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
     - _Reads: .agents/specs/goose-migration/agent-infrastructure/requirements.md, .agents/specs/goose-migration/agent-infrastructure/design.md, .agents/specs/goose-migration/coverage-catalog.md, projects/goose/crates/goose/src/agents/platform_extensions/, crates/agent/src/tools.rs, crates/agent/src/tools/_
     - _Writes: crates/agent/src/tools.rs, selected existing tool/skill owners_
     - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
-  - [ ] 12.6. Configuration migration and Sim mode
+  - [ ] 12.6. Configuration migration and Zed mode
     - Config migrator — version detection, migration steps, rollback
-    - Sim mode — Focus, Creative, Balanced modes
+    - Zed mode — Focus, Creative, Balanced modes
 
   - _Requirements: 16.1, 16.2, 16.3, 17.1, 17.2, 17.3_
   - _Depends on: none_
-  - _Reads: .agents/specs/goose-migration/agent-infrastructure/requirements.md, .agents/specs/goose-migration/agent-infrastructure/design.md, .agents/specs/goose-migration/coverage-catalog.md, crates/agent_settings/src/sim_mode.rs_
-  - _Writes: crates/agent_settings/src/sim_mode.rs_
+  - _Reads: .agents/specs/goose-migration/agent-infrastructure/requirements.md, .agents/specs/goose-migration/agent-infrastructure/design.md, .agents/specs/goose-migration/coverage-catalog.md, crates/agent_settings/src/zed_mode.rs_
+  - _Writes: crates/agent_settings/src/zed_mode.rs_
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
 - [ ] 13. Write tests
@@ -211,7 +211,7 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
 - [ ] 14. Add approved containerized extension execution
   - Route only selected extension processes through an existing development container
   - Validate container/workdir/binary/mount policy and propagate lifecycle failures
-  - Preserve Sim permissions, secrets, filesystem, network, and cleanup policy
+  - Preserve Zed permissions, secrets, filesystem, network, and cleanup policy
   - _Requirements: 18.1, 18.2, 18.3, 18.4_
   - _Depends on: 3_
   - _Reads: projects/goose/crates/goose/src/agents/container.rs, projects/goose/crates/goose-cli/src/cli.rs, crates/dev_container, crates/agent_servers_
@@ -223,4 +223,4 @@ Implement ~17 agent infrastructure features across existing and new crates. Most
 - Many of these features are small enough to implement in a single session
 - Platform extensions build on the existing tool registration pattern in `crates/agent/src/tools/`
 - Config migration runs automatically on settings load
-- Sim mode settings are consumed by the agent's prompt builder
+- Zed mode settings are consumed by the agent's prompt builder

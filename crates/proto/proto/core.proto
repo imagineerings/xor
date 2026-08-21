@@ -1,5 +1,5 @@
 syntax = "proto3";
-package sim.messages;
+package zed.messages;
 
 message PeerId {
   uint32 owner_id = 1;

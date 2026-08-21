@@ -1,24 +1,24 @@
 ---
 title: CLI Reference
-description: "Reference for Sim's command-line interface (CLI), including opening files and directories, integrating with tools, and controlling Sim from scripts."
+description: "Reference for Zed's command-line interface (CLI), including opening files and directories, integrating with tools, and controlling Zed from scripts."
 ---
 
 # CLI Reference
 
-Use Sim's command-line interface (CLI) to open files and directories, integrate with other tools, and control Sim from scripts.
+Use Zed's command-line interface (CLI) to open files and directories, integrate with other tools, and control Zed from scripts.
 
 ## Installation
 
-**macOS:** Run the {#action cli::InstallCliBinary} command from the command palette ({#kb command_palette::Toggle}) to install the `sim` CLI to `/usr/local/bin/sim`.
+**macOS:** Run the {#action cli::InstallCliBinary} command from the command palette ({#kb command_palette::Toggle}) to install the `zed` CLI to `/usr/local/bin/zed`.
 
-**Linux:** The CLI is included with Sim packages. The binary name may vary by distribution (commonly `sim` or `zeditor`).
+**Linux:** The CLI is included with Zed packages. The binary name may vary by distribution (commonly `zed` or `zeditor`).
 
-**Windows:** The CLI is included with Sim. Add Sim's installation directory to your PATH, or use the full path to `sim.exe`.
+**Windows:** The CLI is included with Zed. Add Zed's installation directory to your PATH, or use the full path to `zed.exe`.
 
 ## Usage
 
 ```sh
-sim [OPTIONS] [PATHS]...
+zed [OPTIONS] [PATHS]...
 ```
 
 ## Opening Files and Directories
@@ -26,26 +26,26 @@ sim [OPTIONS] [PATHS]...
 Open a file:
 
 ```sh
-sim myfile.txt
+zed myfile.txt
 ```
 
 Open a directory as a workspace:
 
 ```sh
-sim ~/projects/myproject
+zed ~/projects/myproject
 ```
 
 Open multiple files or directories:
 
 ```sh
-sim file1.txt file2.txt ~/projects/myproject
+zed file1.txt file2.txt ~/projects/myproject
 ```
 
 Open a file at a specific line and column:
 
 ```sh
-sim myfile.txt:42        # Open at line 42
-sim myfile.txt:42:10     # Open at line 42, column 10
+zed myfile.txt:42        # Open at line 42
+zed myfile.txt:42:10     # Open at line 42, column 10
 ```
 
 ## Options
@@ -54,11 +54,11 @@ sim myfile.txt:42:10     # Open at line 42, column 10
 
 Wait for all opened files to be closed before the CLI exits. When opening a directory, waits until the window is closed.
 
-This is useful for integrating Sim with tools that expect an editor to block until editing is complete (e.g., `git commit`):
+This is useful for integrating Zed with tools that expect an editor to block until editing is complete (e.g., `git commit`):
 
 ```sh
-export EDITOR="sim --wait"
-git commit  # Opens Sim and waits for you to close the commit message file
+export EDITOR="zed --wait"
+git commit  # Opens Zed and waits for you to close the commit message file
 ```
 
 ### `-n`, `--new`
@@ -66,7 +66,7 @@ git commit  # Opens Sim and waits for you to close the commit message file
 Open paths in a new workspace window, even if the paths are already open in an existing window:
 
 ```sh
-sim -n ~/projects/myproject
+zed -n ~/projects/myproject
 ```
 
 ### `-a`, `--add`
@@ -74,7 +74,7 @@ sim -n ~/projects/myproject
 Add paths to the currently focused workspace instead of opening a new window. When multiple workspace windows are open, files open in the focused window:
 
 ```sh
-sim -a newfile.txt
+zed -a newfile.txt
 ```
 
 ### `-r`, `--reuse`
@@ -82,7 +82,7 @@ sim -a newfile.txt
 Reuse an existing window, replacing its current workspace with the new paths:
 
 ```sh
-sim -r ~/projects/different-project
+zed -r ~/projects/different-project
 ```
 
 By default (without `-n`, `-a`, or `-r`), directories open in the current window's sidebar. You can change this default with the `cli_default_open_behavior` setting. See [Windows & Projects](../windows-and-projects.md) for more details.
@@ -92,16 +92,16 @@ By default (without `-n`, `-a`, or `-r`), directories open in the current window
 Open a diff view comparing two files. Can be specified multiple times:
 
 ```sh
-sim --diff file1.txt file2.txt
-sim --diff old.rs new.rs --diff old2.rs new2.rs
+zed --diff file1.txt file2.txt
+zed --diff old.rs new.rs --diff old2.rs new2.rs
 ```
 
 ### `--foreground`
 
-Run Sim in the foreground, keeping the terminal attached. Useful for debugging:
+Run Zed in the foreground, keeping the terminal attached. Useful for debugging:
 
 ```sh
-sim --foreground
+zed --foreground
 ```
 
 ### `--user-data-dir <DIR>`
@@ -109,33 +109,33 @@ sim --foreground
 Use a custom directory for all user data (database, extensions, logs) instead of the default location:
 
 ```sh
-sim --user-data-dir ~/.sim-custom
+zed --user-data-dir ~/.zed-custom
 ```
 
 Default locations:
 
-- **macOS:** `~/Library/Application Support/Sim`
-- **Linux:** `$XDG_DATA_HOME/sim` (typically `~/.local/share/sim`)
-- **Windows:** `%LOCALAPPDATA%\Sim`
+- **macOS:** `~/Library/Application Support/Zed`
+- **Linux:** `$XDG_DATA_HOME/zed` (typically `~/.local/share/zed`)
+- **Windows:** `%LOCALAPPDATA%\Zed`
 
 ### `-v`, `--version`
 
-Print Sim's version and exit:
+Print Zed's version and exit:
 
 ```sh
-sim --version
+zed --version
 ```
 
 ### `--completions <SHELL>`
 
-Generate shell completions for the `sim` CLI:
+Generate shell completions for the `zed` CLI:
 
 #### Bash
 
 Add to `~/.bashrc`:
 
 ```bash
-eval "$(sim --completions bash)"
+eval "$(zed --completions bash)"
 ```
 
 #### Elvish
@@ -143,9 +143,9 @@ eval "$(sim --completions bash)"
 Add to `~/.config/elvish/rc.elv`:
 
 ```elvish
-set edit:completion:arg-completer[sim] = { |@args|
-    eval (sim --completions elvish | slurp)
-    $edit:completion:arg-completer[sim] $@args
+set edit:completion:arg-completer[zed] = { |@args|
+    eval (zed --completions elvish | slurp)
+    $edit:completion:arg-completer[zed] $@args
 }
 ```
 
@@ -154,7 +154,7 @@ set edit:completion:arg-completer[sim] = { |@args|
 Add to `~/.config/fish/config.fish`:
 
 ```fish
-sim --completions fish | source
+zed --completions fish | source
 ```
 
 #### Nushell
@@ -163,7 +163,7 @@ Add to `~/.config/nushell/config.nu`:
 
 ```nu
 mkdir ($nu.data-dir | path join "vendor/autoload")
-^sim --completions nushell | save --force ($nu.data-dir | path join "vendor/autoload/sim.nu")
+^zed --completions nushell | save --force ($nu.data-dir | path join "vendor/autoload/zed.nu")
 ```
 
 #### Powershell
@@ -171,7 +171,7 @@ mkdir ($nu.data-dir | path join "vendor/autoload")
 Add to `$PROFILE`:
 
 ```powershell
-(&sim --completions powershell) | Out-String | Invoke-Expression
+(&zed --completions powershell) | Out-String | Invoke-Expression
 ```
 
 #### Zsh
@@ -179,23 +179,23 @@ Add to `$PROFILE`:
 Add to `~/.zshrc`:
 
 ```zsh
-eval "$(sim --completions zsh)"
+eval "$(zed --completions zsh)"
 ```
 
 ### `--uninstall`
 
-Uninstall Sim and remove all related files (macOS and Linux only):
+Uninstall Zed and remove all related files (macOS and Linux only):
 
 ```sh
-sim --uninstall
+zed --uninstall
 ```
 
-### `--sim <PATH>`
+### `--zed <PATH>`
 
-Specify a custom path to the Sim application or binary:
+Specify a custom path to the Zed application or binary:
 
 ```sh
-sim --sim /path/to/Sim.app myfile.txt
+zed --zed /path/to/Zed.app myfile.txt
 ```
 
 ## Reading from Standard Input
@@ -203,33 +203,33 @@ sim --sim /path/to/Sim.app myfile.txt
 Read content from stdin by passing `-` as the path:
 
 ```sh
-echo "Hello, World!" | sim -
-cat myfile.txt | sim -
-ps aux | sim -
+echo "Hello, World!" | zed -
+cat myfile.txt | zed -
+ps aux | zed -
 ```
 
-This creates a temporary file with the stdin content and opens it in Sim.
+This creates a temporary file with the stdin content and opens it in Zed.
 
 ## URL Handling
 
-The CLI can open `sim://`, `file://`, and `ssh://` URLs:
+The CLI can open `zed://`, `file://`, and `ssh://` URLs:
 
 ```sh
-sim sim://settings
-sim file:///Users/whatever/.zshrc
-sim ssh://me@example.com/abs/path
-sim ssh://me@example.com:/abs/path
-sim ssh://me@example.com/~/project
-sim ssh://me@example.com:~/project
+zed zed://settings
+zed file:///Users/whatever/.zshrc
+zed ssh://me@example.com/abs/path
+zed ssh://me@example.com:/abs/path
+zed ssh://me@example.com/~/project
+zed ssh://me@example.com:~/project
 ```
 
-## Using Sim as Your Default Editor
+## Using Zed as Your Default Editor
 
-Set Sim as your default editor for Git and other tools:
+Set Zed as your default editor for Git and other tools:
 
 ```sh
-export EDITOR="sim --wait"
-export VISUAL="sim --wait"
+export EDITOR="zed --wait"
+export VISUAL="zed --wait"
 ```
 
 Add these lines to your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`).
@@ -239,14 +239,14 @@ Add these lines to your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`)
 On macOS, you can launch a specific release channel by passing the channel name as the first argument:
 
 ```sh
-sim --stable myfile.txt
-sim --preview myfile.txt
-sim --nightly myfile.txt
+zed --stable myfile.txt
+zed --preview myfile.txt
+zed --nightly myfile.txt
 ```
 
 ## WSL Integration (Windows)
 
-On Windows, the CLI supports opening paths from WSL distributions. This is handled automatically when launching Sim from within WSL.
+On Windows, the CLI supports opening paths from WSL distributions. This is handled automatically when launching Zed from within WSL.
 
 ## Exit Codes
 

@@ -6,6 +6,6 @@
       mkSim = import ../toolchain.nix { inherit inputs; };
     in
     {
-      sim-editor = mkSim final;
+      zed-editor = mkSim final;
     };
 }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Sim storage, artifact, and media services. Every supported Comfy asset behavior is recreated as native Sim functionality: compatibility adapters may preserve external route shapes, but core modules, types, and records use `SimAsset*` and `SimUserData*` names and do not pass through to ComfyUI.
+The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Zed storage, artifact, and media services. Every supported Comfy asset behavior is recreated as native Zed functionality: compatibility adapters may preserve external route shapes, but core modules, types, and records use `SimAsset*` and `SimUserData*` names and do not pass through to ComfyUI.
 
 ## Architecture
 
@@ -13,7 +13,7 @@ flowchart LR
     Service --> Tags[SimAssetTagService]
     Service --> Seed[SimAssetSeeder]
     Seed --> Scanner[SimAssetFilesystemScanner]
-    Service --> Media[Sim Media Preview]
+    Service --> Media[Zed Media Preview]
     Service --> Provenance[Generated Artifact Store]
 ```
 
@@ -25,7 +25,7 @@ flowchart LR
 - **Responsibilities**: Hash lookup, reference CRUD, owner scoping, soft delete, cache state, and metadata indexing.
 - **Native asset records**: Asset content, owner-scoped references, tag links,
   metadata entries, soft-delete timestamps, provenance ids, and cache state are
-  stored as Sim-owned repository records. Hash dedupe reuses content while
+  stored as Zed-owned repository records. Hash dedupe reuses content while
   preserving distinct reference metadata, and repository behavior does not
   depend on ComfyUI's asset database or storage layer.
 
@@ -43,17 +43,17 @@ pub trait SimAssetRepository {
 - **Purpose**: Expose Comfy-compatible `/api/assets` and `/api/tags` routes.
 - **Responsibilities**: Query validation, multipart parsing, upload dedupe, download streaming, tag mutation, and error shape normalization.
 - **Native query validation**: Hashes, cursors, metadata filters, sort/order,
-  tags, pagination, and owner scopes are parsed into typed Sim query models
+  tags, pagination, and owner scopes are parsed into typed Zed query models
   before any repository access. Compatibility route adapters may translate
   legacy parameter names, but they do not forward ComfyUI query strings or
   rely on ComfyUI validation behavior.
 - **Native CRUD/upload service**: List, detail, create-from-hash, upload,
-  update, delete, and hash-exists operations execute against Sim repository
+  update, delete, and hash-exists operations execute against Zed repository
   records and owner scopes. Comfy-compatible routes adapt request/response
   shapes only; they do not proxy asset mutations to ComfyUI.
 - **Native download/preview resolution**: Download descriptors resolve from
-  owner-scoped Sim asset records, force safe content types and content
-  disposition, and return Sim media preview routes for preview references
+  owner-scoped Zed asset records, force safe content types and content
+  disposition, and return Zed media preview routes for preview references
   instead of forwarding to ComfyUI preview handlers.
 
 ### SimAssetSeeder
@@ -61,17 +61,17 @@ pub trait SimAssetRepository {
 - **Purpose**: Synchronize filesystem roots into asset records.
 - **Responsibilities**: Scan models/input/output roots, pause during generation, resume after output registration, report progress, cancel, and prune missing references.
 - **Native seeding and pruning**: Model, input, and output root scans
-  register files through Sim asset APIs with progress, cancellation, and
-  diagnostics. Prune marks out-of-root references missing in Sim cache state
+  register files through Zed asset APIs with progress, cancellation, and
+  diagnostics. Prune marks out-of-root references missing in Zed cache state
   without deleting content or invoking ComfyUI scanners.
 
 ### SimAssetOutputRegistrar and SimAssetEnrichmentQueue
 
 - **Purpose**: Extract safe metadata for assets.
 - **Responsibilities**: MIME type, image dimensions, safetensors metadata, filename metadata, and generated artifact metadata links.
-- **Native output enrichment**: Generated outputs register through Sim asset
+- **Native output enrichment**: Generated outputs register through Zed asset
   APIs with job ids, provenance ids, optional hashes, cache state, and extracted
-  metadata. Enrichment jobs update Sim system metadata and enrichment levels
+  metadata. Enrichment jobs update Zed system metadata and enrichment levels
   after execution without calling ComfyUI output registration or metadata
   extraction handlers.
 
@@ -80,7 +80,7 @@ pub trait SimAssetRepository {
 - **Purpose**: Provide Comfy-compatible user files and settings.
 - **Responsibilities**: User resolution, system-user protection, path confinement, list/read/write/move/delete, and settings JSON persistence.
 - **Native tags and user data**: Tag mutation, tag listing, refinement
-  histograms, user files, and settings execute against Sim-owned asset records
+  histograms, user files, and settings execute against Zed-owned asset records
   and user storage paths. Comfy-compatible endpoints adapt names and response
   shapes only; they do not call ComfyUI tag, settings, or user-data handlers.
 

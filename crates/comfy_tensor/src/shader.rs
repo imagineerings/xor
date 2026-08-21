@@ -995,12 +995,12 @@ fn lower_es_300_source(source: &str) -> Result<String, NativeShaderError> {
          int u_int8; int u_int9; int u_int10; int u_int11;\n\
          int u_int12; int u_int13; int u_int14; int u_int15;\n\
          int u_int16; int u_int17; int u_int18; int u_int19;\n\
-         int sim_bool0; int sim_bool1; int sim_bool2; int sim_bool3; int sim_bool4;\n\
-         int sim_bool5; int sim_bool6; int sim_bool7; int sim_bool8; int sim_bool9;\n\
+         int zed_bool0; int zed_bool1; int zed_bool2; int zed_bool3; int zed_bool4;\n\
+         int zed_bool5; int zed_bool6; int zed_bool7; int zed_bool8; int zed_bool9;\n\
          };\n",
     );
     for index in 0..MAX_SHADER_BOOLS {
-        lowered.push_str(&format!("#define u_bool{index} (sim_bool{index} != 0)\n"));
+        lowered.push_str(&format!("#define u_bool{index} (zed_bool{index} != 0)\n"));
     }
     for line in lines {
         let trimmed = line.trim();
@@ -1016,9 +1016,9 @@ fn lower_es_300_source(source: &str) -> Result<String, NativeShaderError> {
         if let Some((name, texture_binding)) = sampled_uniform_binding(trimmed) {
             let sampler_binding = texture_binding + 1;
             lowered.push_str(&format!(
-                "layout(set = 0, binding = {texture_binding}) uniform texture2D sim_texture_{name};\n\
-                 layout(set = 0, binding = {sampler_binding}) uniform sampler sim_sampler_{name};\n\
-                 #define {name} sampler2D(sim_texture_{name}, sim_sampler_{name})\n"
+                "layout(set = 0, binding = {texture_binding}) uniform texture2D zed_texture_{name};\n\
+                 layout(set = 0, binding = {sampler_binding}) uniform sampler zed_sampler_{name};\n\
+                 #define {name} sampler2D(zed_texture_{name}, zed_sampler_{name})\n"
             ));
             continue;
         }
@@ -1155,8 +1155,8 @@ void main() {
             .iter()
             .filter_map(|(_, variable)| variable.name.as_deref())
             .collect::<Vec<_>>();
-        assert!(globals.contains(&"sim_texture_u_image0"));
-        assert!(globals.contains(&"sim_sampler_u_image0"));
+        assert!(globals.contains(&"zed_texture_u_image0"));
+        assert!(globals.contains(&"zed_sampler_u_image0"));
         assert!(module.output_count == 1);
         assert!(module.pass_count == 1);
         Ok(())
@@ -1196,9 +1196,9 @@ void main() {
         assert_eq!(compiled.output_count, MAX_SHADER_OUTPUTS);
         assert_eq!(compiled.pass_count, 3);
         for required in [
-            "binding = 0) uniform texture2D sim_texture_u_image0",
-            "binding = 8) uniform texture2D sim_texture_u_image4",
-            "binding = 16) uniform texture2D sim_texture_u_curve3",
+            "binding = 0) uniform texture2D zed_texture_u_image0",
+            "binding = 8) uniform texture2D zed_texture_u_image4",
+            "binding = 16) uniform texture2D zed_texture_u_curve3",
             "layout(std140, set = 0, binding = 18)",
         ] {
             assert!(compiled.source.contains(required), "missing {required}");

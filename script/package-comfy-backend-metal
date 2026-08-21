@@ -14,7 +14,7 @@ execution_policy="$workspace/nix/comfy-backends/metal/execution-policy.json"
 contract_schema="$workspace/nix/comfy-backends/metal/ffi-contracts-v1.schema.json"
 execution_packager="$workspace/script/package-comfy-backend-metal-execution"
 signature_algorithm="ed25519"
-signature_domain="sim-comfy-metal-package-v1"
+signature_domain="zed-comfy-metal-package-v1"
 coverage_file_name="package-coverage.sha256"
 
 usage() {
@@ -518,10 +518,10 @@ manifest = {
     "tensor_ops_source_sha256": tensor_source_digest,
     "tensor_ops_metallib_sha256": tensor_metallib_digest,
     "tensor_ops_metallib_size": int(tensor_metallib_size),
-    "readiness_function": "sim_comfy_metal_readiness_v1",
+    "readiness_function": "zed_comfy_metal_readiness_v1",
     "tensor_functions": [
-        "sim_comfy_metal_add_f16_v1",
-        "sim_comfy_metal_add_f32_v1",
+        "zed_comfy_metal_add_f16_v1",
+        "zed_comfy_metal_add_f32_v1",
     ],
     "redistributes_apple_frameworks": False,
     "required_system_frameworks": [
@@ -749,8 +749,8 @@ if manifest["tensor_ops_metallib_sha256"] != expected_tensor_metallib_digest:
 if manifest["tensor_ops_metallib_size"] != (root / "kernels/tensor_ops.metallib").stat().st_size:
     raise SystemExit("adapter manifest tensor metallib size does not match the payload")
 if manifest["tensor_functions"] != [
-    "sim_comfy_metal_add_f16_v1",
-    "sim_comfy_metal_add_f32_v1",
+    "zed_comfy_metal_add_f16_v1",
+    "zed_comfy_metal_add_f32_v1",
 ]:
     raise SystemExit("adapter manifest tensor functions differ from the reviewed contract")
 
@@ -1087,7 +1087,7 @@ mutate(
 mutate(
     "wrong-function",
     lambda document: document["metallibs"][1].update(
-        {"required_functions": ["sim_comfy_metal_add_f32_v1"]}
+        {"required_functions": ["zed_comfy_metal_add_f32_v1"]}
     ),
 )
 (destination / "oversized-catalog.json").write_bytes(b" " * (1024 * 1024 + 1))

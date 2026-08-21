@@ -1680,7 +1680,7 @@ mod tests {
             "assets/settings/default-comfy.json",
             "crates/settings_content/src/settings_content.rs",
             "crates/comfy_runtime/src/settings.rs",
-            "crates/sim/src/sim.rs",
+            "crates/zed/src/zed.rs",
         ] {
             fixture_digests.insert(
                 relative_path,
@@ -1791,7 +1791,7 @@ mod tests {
     #[test]
     fn rocm_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/rocm-package-reviewed";
+        let package_root = "/opt/zed/rocm-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -1866,7 +1866,7 @@ mod tests {
     #[test]
     fn metal_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/metal-package-reviewed";
+        let package_root = "/opt/zed/metal-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -1945,7 +1945,7 @@ mod tests {
     #[test]
     fn mlu_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/mlu-package-reviewed";
+        let package_root = "/opt/zed/mlu-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2001,7 +2001,7 @@ mod tests {
     #[test]
     fn npu_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/npu-package-reviewed";
+        let package_root = "/opt/zed/npu-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2057,7 +2057,7 @@ mod tests {
     #[test]
     fn cuda_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/cuda-package-reviewed";
+        let package_root = "/opt/zed/cuda-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2119,7 +2119,7 @@ mod tests {
     #[test]
     fn xpu_package_settings_preserve_only_explicit_public_authority() -> Result<(), Box<dyn Error>>
     {
-        let package_root = "/opt/sim/xpu-package-reviewed";
+        let package_root = "/opt/zed/xpu-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2181,7 +2181,7 @@ mod tests {
     #[test]
     fn directml_package_settings_preserve_only_explicit_public_authority()
     -> Result<(), Box<dyn Error>> {
-        let package_root = "/opt/sim/directml-package-reviewed";
+        let package_root = "/opt/zed/directml-package-reviewed";
         let content: ComfyRuntimeSettingsContent = serde_json::from_value(json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2734,7 +2734,7 @@ mod tests {
             serde_json::to_value(configured_security_content)? == configured_security_value,
         );
 
-        let rocm_package_root = "/opt/sim/rocm-package-reviewed";
+        let rocm_package_root = "/opt/zed/rocm-package-reviewed";
         let rocm_authority_value = json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2808,7 +2808,7 @@ mod tests {
             ),
         );
 
-        let directml_package_root = "/opt/sim/directml-package-reviewed";
+        let directml_package_root = "/opt/zed/directml-package-reviewed";
         let directml_authority_value = json!({
             "active_profile": DEFAULT_NATIVE_PROFILE_ID,
             "profiles": [{
@@ -2912,7 +2912,7 @@ mod tests {
             .active_profile()
             .ok_or("merged active profile is absent")?;
         cases.insert(
-            "sim_settings_precedence_is_reused",
+            "zed_settings_precedence_is_reused",
             merged_profile.name == "Layer override"
                 && merged_profile.memory_policy == MemoryPolicy::Conservative
                 && merged_profile.device == DeviceKind::Cpu,

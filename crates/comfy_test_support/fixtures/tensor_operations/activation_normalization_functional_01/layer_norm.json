@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-B8FC03A4DCA1",
   "baseline_overload_id": "COMFY-TENSOR-OP-B8FC03A4DCA1:blocked",
   "baseline_fixture_sha256": "8ead46af11d8f8429a526fc9ca17debac19052eabc2d4c700b90852f5c2aa729",
-  "overload_id": "sim.native.functional.layer_norm.cpu_f32.v1",
+  "overload_id": "zed.native.functional.layer_norm.cpu_f32.v1",
   "owner_task_id": "comfy-parity-tensor-ops-activation-normalization-functional-comfy-tensor-op-0538873a73b1",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "input", "type": "contiguous f32 tensor slice"},

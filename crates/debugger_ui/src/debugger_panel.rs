@@ -29,7 +29,7 @@ use project::{DebugScenarioContext, Fs, ProjectPath, TaskSourceKind, WorktreeId}
 use project::{Project, debugger::session::ThreadStatus};
 use rpc::proto::{self};
 use settings::Settings;
-use sim_actions::debug_panel::ToggleFocus;
+use zed_actions::debug_panel::ToggleFocus;
 use std::sync::{Arc, LazyLock};
 use task::{DebugScenario, SharedTaskContext};
 use tree_sitter::{Query, StreamingIterator as _};
@@ -639,7 +639,7 @@ impl DebugPanel {
             IconButton::new("debug-edit-debug-json", IconName::Code)
                 .icon_size(IconSize::Small)
                 .on_click(|_, window, cx| {
-                    window.dispatch_action(sim_actions::OpenProjectDebugTasks.boxed_clone(), cx);
+                    window.dispatch_action(zed_actions::OpenProjectDebugTasks.boxed_clone(), cx);
                 })
                 .tooltip(Tooltip::text("Edit debug.json"))
         };
@@ -647,7 +647,7 @@ impl DebugPanel {
         let documentation_button = || {
             IconButton::new("debug-open-documentation", IconName::CircleHelp)
                 .icon_size(IconSize::Small)
-                .on_click(move |_, _, cx| cx.open_url("https://sim.dev/docs/debugger"))
+                .on_click(move |_, _, cx| cx.open_url("https://zed.dev/docs/debugger"))
                 .tooltip(Tooltip::text("Open Documentation"))
         };
 
@@ -1152,10 +1152,10 @@ impl DebugPanel {
                     return Task::ready(Err(anyhow!("Couldn't get worktree path")));
                 };
 
-                let serialisim_scenario = serde_json::to_value(scenario);
+                let serialized_scenario = serde_json::to_value(scenario);
 
                 cx.spawn_in(window, async move |workspace, cx| {
-                    let serialisim_scenario = serialisim_scenario?;
+                    let serialized_scenario = serialized_scenario?;
                     let fs =
                         workspace.read_with(cx, |workspace, _| workspace.app_state().fs.clone())?;
 
@@ -1184,7 +1184,7 @@ impl DebugPanel {
                             .read(cx)
                             .project_path_for_absolute_path(path, cx)
                             .context(
-                                "Couldn't get project path for .sim/debug.json in active worktree",
+                                "Couldn't get project path for .zed/debug.json in active worktree",
                             )
                     })??;
 
@@ -1199,7 +1199,7 @@ impl DebugPanel {
                         .update(|_, cx| editor.act_as::<Editor>(cx))?
                         .context("expected editor")?;
 
-                    let new_scenario = serde_json_lenient::to_string_pretty(&serialisim_scenario)?
+                    let new_scenario = serde_json_lenient::to_string_pretty(&serialized_scenario)?
                         .lines()
                         .map(|l| format!("  {l}"))
                         .join("\n");
@@ -1461,9 +1461,9 @@ async fn register_session_inner(
         .detach();
     })
     .ok();
-    let serialisim_layout = this
+    let serialized_layout = this
         .update(cx, |_, cx| {
-            persistence::get_serialisim_layout(&adapter_name, &db::kvp::KeyValueStore::global(cx))
+            persistence::get_serialized_layout(&adapter_name, &db::kvp::KeyValueStore::global(cx))
         })
         .ok()
         .flatten();
@@ -1490,7 +1490,7 @@ async fn register_session_inner(
                 .as_ref()
                 .map(|p| p.read(cx).running_state().read(cx).debug_terminal.clone()),
             session,
-            serialisim_layout,
+            serialized_layout,
             this.position(window, cx).axis(),
             window,
             cx,
@@ -1839,7 +1839,7 @@ impl Render for DebugPanel {
                                 )
                                 .on_click(|_, window, cx| {
                                     window.dispatch_action(
-                                        sim_actions::OpenProjectDebugTasks.boxed_clone(),
+                                        zed_actions::OpenProjectDebugTasks.boxed_clone(),
                                         cx,
                                     );
                                 }),
@@ -1851,7 +1851,7 @@ impl Render for DebugPanel {
                                         .size(IconSize::Small)
                                         .color(Color::Muted),
                                 )
-                                .on_click(|_, _, cx| cx.open_url("https://sim.dev/docs/debugger")),
+                                .on_click(|_, _, cx| cx.open_url("https://zed.dev/docs/debugger")),
                         )
                         .child(
                             Button::new(
@@ -1865,9 +1865,9 @@ impl Render for DebugPanel {
                             )
                             .on_click(|_, window, cx| {
                                 window.dispatch_action(
-                                    sim_actions::Extensions {
+                                    zed_actions::Extensions {
                                         category_filter: Some(
-                                            sim_actions::ExtensionCategoryFilter::DebugAdapters,
+                                            zed_actions::ExtensionCategoryFilter::DebugAdapters,
                                         ),
                                         id: None,
                                     }

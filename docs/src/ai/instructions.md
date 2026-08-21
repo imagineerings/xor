@@ -1,31 +1,31 @@
 ---
-title: Agent Instructions - Sim
-description: Configure always-on personal and project instructions for Sim Agent with AGENTS.md and compatible project instruction files.
+title: Agent Instructions - Zed
+description: Configure always-on personal and project instructions for Zed Agent with AGENTS.md and compatible project instruction files.
 ---
 
 # Instructions
 
-Instructions are always-on context for the Sim Agent. Use instructions for persistent guidance that should apply to every relevant agent interaction.
+Instructions are always-on context for the Zed Agent. Use instructions for persistent guidance that should apply to every relevant agent interaction.
 
 Use [Skills](./skills.md) instead when you want reusable task instructions that can be invoked by name.
 
-Sim supports [`AGENTS.md`](https://agents.md/) as the primary instruction file for personal and project-level agent guidance.
+Zed supports [`AGENTS.md`](https://agents.md/) as the primary instruction file for personal and project-level agent guidance.
 
 ## Personal Instructions {#personal-instructions}
 
-Personal instructions apply to every project you open with the Sim Agent.
+Personal instructions apply to every project you open with the Zed Agent.
 
 Create or edit:
 
 ```text
-~/.config/sim/AGENTS.md
+~/.config/zed/AGENTS.md
 ```
 
-On Windows, the equivalent file is under `%APPDATA%\Sim\AGENTS.md`.
+On Windows, the equivalent file is under `%APPDATA%\Zed\AGENTS.md`.
 
 ## Project Instructions {#project-instructions}
 
-Project instruction files apply to the current project. Sim uses the first matching file in this list:
+Project instruction files apply to the current project. Zed uses the first matching file in this list:
 
 - `.rules`
 - `.cursorrules`
@@ -41,14 +41,14 @@ Project instructions override personal `AGENTS.md` when they conflict.
 
 ## Instruction File Support {#support}
 
-| File                              | Sim Agent                                              | External Agents       | Terminal Threads                 |
+| File                              | Zed Agent                                              | External Agents       | Terminal Threads                 |
 | --------------------------------- | ------------------------------------------------------ | --------------------- | -------------------------------- |
-| `~/.config/sim/AGENTS.md`         | Loaded as personal instructions                        | Not generally used    | Not used unless the CLI reads it |
+| `~/.config/zed/AGENTS.md`         | Loaded as personal instructions                        | Not generally used    | Not used unless the CLI reads it |
 | Project `AGENTS.md`               | Loaded as project instructions                         | Depends on the agent  | Depends on the CLI               |
-| `CLAUDE.md`                       | Loaded as compatible project instructions by Sim Agent | Claude reads natively | Claude Code CLI reads natively   |
-| `.github/copilot-instructions.md` | Loaded as compatible project instructions by Sim Agent | Depends on the agent  | Depends on the CLI               |
+| `CLAUDE.md`                       | Loaded as compatible project instructions by Zed Agent | Claude reads natively | Claude Code CLI reads natively   |
+| `.github/copilot-instructions.md` | Loaded as compatible project instructions by Zed Agent | Depends on the agent  | Depends on the CLI               |
 
-External Agents and Terminal Threads may read their own native instruction files directly. Do not assume Sim's instruction loader controls those agents.
+External Agents and Terminal Threads may read their own native instruction files directly. Do not assume Zed's instruction loader controls those agents.
 
 ## Instructions vs. Skills {#instructions-vs-skills}
 

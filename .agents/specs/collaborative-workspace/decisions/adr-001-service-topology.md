@@ -2,13 +2,13 @@
 
 - **Status:** Accepted
 - **Decision date:** 2026-08-14
-- **Approval:** The product owner approved the recommended ADR-001 decision: the existing Sim `collab` deployment is the final collaboration-service owner, and a Buzz-derived ingress sidecar is temporary and bounded.
+- **Approval:** The product owner approved the recommended ADR-001 decision: the existing Zed `collab` deployment is the final collaboration-service owner, and a Buzz-derived ingress sidecar is temporary and bounded.
 - **Requirements:** 2.1, 2.2, 2.3
 - **Capabilities:** CAP-003, CAP-005, CAP-043
 
 ## Context
 
-Buzz currently treats `buzz-relay` and its signed Nostr event log as the collaboration authority. It uses Axum 0.8 and SQLx 0.9 around Postgres, Redis, object storage and protocol-specific services. Sim already operates the `collab` binary and owns its deployment, authentication integration and relational collaboration data through Axum 0.6, SeaORM 1.1.10 and SQLx 0.8. Directly combining those dependency graphs before compatibility work would create an unsafe migration and release boundary.
+Buzz currently treats `buzz-relay` and its signed Nostr event log as the collaboration authority. It uses Axum 0.8 and SQLx 0.9 around Postgres, Redis, object storage and protocol-specific services. Zed already operates the `collab` binary and owns its deployment, authentication integration and relational collaboration data through Axum 0.6, SeaORM 1.1.10 and SQLx 0.8. Directly combining those dependency graphs before compatibility work would create an unsafe migration and release boundary.
 
 The final product cannot operate two collaboration control planes or two authoritative message, identity, presence, workflow, project, Git, transcript or agent-session stores. Existing Buzz signed events and wire protocols must nevertheless remain verifiable and interoperable throughout migration.
 
@@ -16,11 +16,11 @@ The final product cannot operate two collaboration control planes or two authori
 
 ### Final process topology
 
-The existing Sim `collab` deployment is the final service and operational owner for server-side collaboration. In the final topology it hosts, or directly supervises as non-authoritative protocol listeners, all Sim RPC, Nostr WebSocket/HTTP, authentication, search, media, Git, workflow, notification, administration and compatibility ingress required by this specification.
+The existing Zed `collab` deployment is the final service and operational owner for server-side collaboration. In the final topology it hosts, or directly supervises as non-authoritative protocol listeners, all Zed RPC, Nostr WebSocket/HTTP, authentication, search, media, Git, workflow, notification, administration and compatibility ingress required by this specification.
 
 Protocol listeners translate admitted requests into a shared, versioned collaboration-domain command contract. They do not author independent domain state. Cross-subsystem coordination occurs through canonical commands, authoritative records and an ordered transactional outbox rather than private listener databases.
 
-Sim build, packaging, release, configuration, secrets, logging, telemetry, health, readiness and deployment conventions are canonical. `projects/buzz` remains a buildable reference and migration source until its retirement gates pass; it is not shipped as a nested product or permanent service control plane.
+Zed build, packaging, release, configuration, secrets, logging, telemetry, health, readiness and deployment conventions are canonical. `projects/buzz` remains a buildable reference and migration source until its retirement gates pass; it is not shipped as a nested product or permanent service control plane.
 
 ### Temporary Nostr ingress sidecar
 
@@ -37,28 +37,28 @@ The sidecar may read canonical compatibility projections and the signed event lo
 
 ### Dependency-version ownership
 
-The Sim workspace and `crates/collab/Cargo.toml` own final server dependency versions. Axum, SQLx, SeaORM, Tokio, TLS, serialization and observability dependencies must be aligned and validated in the Sim workspace before Nostr routes move in-process. During the bounded sidecar period, legacy versions may remain isolated in the compatibility binary, but the binary communicates only through the versioned adapter contract and cannot leak its framework types into the domain or persistence layers.
+The Zed workspace and `crates/collab/Cargo.toml` own final server dependency versions. Axum, SQLx, SeaORM, Tokio, TLS, serialization and observability dependencies must be aligned and validated in the Zed workspace before Nostr routes move in-process. During the bounded sidecar period, legacy versions may remain isolated in the compatibility binary, but the binary communicates only through the versioned adapter contract and cannot leak its framework types into the domain or persistence layers.
 
-Dependency alignment is complete only when the combined service passes protocol fixtures, database migration tests, tenant-isolation tests, load/backpressure tests and rollback drills under the Sim release toolchain.
+Dependency alignment is complete only when the combined service passes protocol fixtures, database migration tests, tenant-isolation tests, load/backpressure tests and rollback drills under the Zed release toolchain.
 
 ### Database and migration authority
 
-There is one Postgres deployment for server collaboration data and one Sim-owned migration authority. The canonical migration runner owns ordering, checksums, forward/backward compatibility metadata, locks and release gates for both preserved Buzz tables and new/consolidated Sim tables. The sidecar and compatibility clients never execute schema migrations.
+There is one Postgres deployment for server collaboration data and one Zed-owned migration authority. The canonical migration runner owns ordering, checksums, forward/backward compatibility metadata, locks and release gates for both preserved Buzz tables and new/consolidated Zed tables. The sidecar and compatibility clients never execute schema migrations.
 
 Authority is assigned by aggregate:
 
 | Aggregate or state | Canonical authoring owner | Compatibility or derived representation |
 | --- | --- | --- |
-| Nostr-authored messages, social records and externally authored workflow records | Verified, immutable signed event log in the collaboration database | Tenant-fenced relational projections, search documents, Nostr query responses and Sim RPC payloads |
-| Service-issued membership, authorization summaries and bounds | Authorized Sim collaboration domain service | Relay-signed protocol events and client projections |
-| Local projects, worktrees and files | Existing Sim `project` and `worktree` owners | Community/project mappings and signed protocol references |
-| Local Git working tree, index and diffs | Existing Sim `git`, `project::git_store` and `git_ui` owners | Hosted refs, patches, reviews and status events |
-| Native ACP sessions, transcripts and actions | Existing Sim `agent`, `acp_thread`, `agent_ui` and permission stores | Agent/job/activity events and compatibility frames |
+| Nostr-authored messages, social records and externally authored workflow records | Verified, immutable signed event log in the collaboration database | Tenant-fenced relational projections, search documents, Nostr query responses and Zed RPC payloads |
+| Service-issued membership, authorization summaries and bounds | Authorized Zed collaboration domain service | Relay-signed protocol events and client projections |
+| Local projects, worktrees and files | Existing Zed `project` and `worktree` owners | Community/project mappings and signed protocol references |
+| Local Git working tree, index and diffs | Existing Zed `git`, `project::git_store` and `git_ui` owners | Hosted refs, patches, reviews and status events |
+| Native ACP sessions, transcripts and actions | Existing Zed `agent`, `acp_thread`, `agent_ui` and permission stores | Agent/job/activity events and compatibility frames |
 | Projection rows | Their declared authoritative record and version | Rebuildable rows carrying community, source kind, source ID, source version and projection timestamp |
 | Redis presence, typing, fan-out and caches | No durable authority; current canonical service decision plus TTL | Derived, tenant-scoped, expiring runtime state rebuilt from live input or authoritative events |
-| Object and hosted-Git blobs | Sim-owned storage metadata referencing content-addressed objects | Blossom, Git smart-HTTP and legacy object coordinates |
+| Object and hosted-Git blobs | Zed-owned storage metadata referencing content-addressed objects | Blossom, Git smart-HTTP and legacy object coordinates |
 
-Existing Sim local project, Git and ACP persistence remains separate because it owns different local aggregates, not duplicate collaboration authority. Overlapping Buzz and Sim channel/member/room tables are consolidated only after provenance-aware backfill and differential-read evidence.
+Existing Zed local project, Git and ACP persistence remains separate because it owns different local aggregates, not duplicate collaboration authority. Overlapping Buzz and Zed channel/member/room tables are consolidated only after provenance-aware backfill and differential-read evidence.
 
 ### Write, projection and reconciliation rules
 
@@ -82,7 +82,7 @@ The sidecar may receive traffic only after all of the following are true:
 
 The sidecar must be removed when all of the following are true:
 
-- final Sim-owned Axum/SQLx/SeaORM dependency alignment is complete;
+- final Zed-owned Axum/SQLx/SeaORM dependency alignment is complete;
 - Nostr WebSocket and HTTP routes run in the final `collab` service deployment;
 - Buzz differential protocol, authentication, authorization, pagination, backpressure and reconnect suites pass against the in-process routes;
 - supported desktop, CLI, web and mobile compatibility clients pass version negotiation and end-to-end fixtures;
@@ -98,7 +98,7 @@ Before canonical write cutover, rollback stops the new ingress and resumes the p
 
 ## Consequences
 
-- Sim has one final collaboration service owner, one server migration authority and one authoring owner per aggregate.
+- Zed has one final collaboration service owner, one server migration authority and one authoring owner per aggregate.
 - Buzz protocol code can be preserved and tested without making Buzz a second product.
 - Dependency alignment and in-process route movement become explicit implementation and removal work rather than an assumed manifest merge.
 - Postgres projection convergence is aggregate-specific and evidence-gated; Redis remains disposable derived state.
@@ -109,8 +109,8 @@ Before canonical write cutover, rollback stops the new ingress and resumes the p
 1. **Permanent Buzz relay beside `collab`:** rejected because it preserves a second control plane, migration authority and failure surface.
 2. **Immediate manifest and schema merge:** rejected because current Axum/SQLx/SeaORM generations and overlapping schemas require compatibility and rollback evidence first.
 3. **Independent databases with application dual writes:** rejected because partial failure creates competing truths and unverifiable ordering.
-4. **Replacing the signed event log with Sim projections:** rejected because it breaks signed-event provenance, Nostr replacement semantics and established client interoperability.
-5. **Making the signed event log authoritative for local projects, Git or ACP transcripts:** rejected because those aggregates already have complete canonical Sim owners.
+4. **Replacing the signed event log with Zed projections:** rejected because it breaks signed-event provenance, Nostr replacement semantics and established client interoperability.
+5. **Making the signed event log authoritative for local projects, Git or ACP transcripts:** rejected because those aggregates already have complete canonical Zed owners.
 
 ## Implementation and validation trace
 

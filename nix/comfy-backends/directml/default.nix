@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-directml-metadata";
+  pname = "zed-comfy-backend-directml-metadata";
   version = "1.13.1-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/directml"
+    destination="$out/lib/zed/comfy-backends/directml"
     mkdir -p "$destination/abi"
     cp ${../../../crates/comfy_backend_directml/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_directml/LICENSES} "$destination/"
@@ -24,7 +24,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim DirectML 1.13 ABI metadata without binary redistribution";
+    description = "Reviewed Zed DirectML 1.13 ABI metadata without binary redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "aarch64-windows" "x86_64-windows" ];
   };

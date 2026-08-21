@@ -143,7 +143,7 @@ required = {
     "runtime_compilation_for_core_kernels": False,
     "license_approval_required_for_vendor_runtime": True,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-cuda-package-v1",
+    "signature_domain": "zed-comfy-cuda-package-v1",
     "signature_coverage": "package-coverage-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "unsafe_owner": "comfy_backend_cuda::loader",
@@ -169,7 +169,7 @@ kernel_manifest, _ = strict_json(root / "kernels/manifest-v1.json")
 if kernel_manifest.get("runtime_compilation_for_core_kernels") is not False or len(kernel_manifest.get("kernels", [])) != 1:
     raise SystemExit("CUDA kernel manifest differs")
 kernel = kernel_manifest["kernels"][0]
-if kernel.get("path") != "kernels/core-v1.ptx" or kernel.get("entry") != "sim_cuda_add_f32":
+if kernel.get("path") != "kernels/core-v1.ptx" or kernel.get("entry") != "zed_cuda_add_f32":
     raise SystemExit("CUDA kernel identity differs")
 if kernel.get("sha256") != hashlib.sha256((root / kernel["path"]).read_bytes()).hexdigest():
     raise SystemExit("CUDA PTX digest differs")
@@ -287,7 +287,7 @@ manifest = {
     "license_approval_required_for_vendor_runtime": True,
     "signer": signer,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-cuda-package-v1",
+    "signature_domain": "zed-comfy-cuda-package-v1",
     "signature_coverage": "package-coverage-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "unsafe_owner": "comfy_backend_cuda::loader",
@@ -345,7 +345,7 @@ catalog = {
 }
 output.write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
-    build_package "$temporary/package" x86_64-unknown-linux-gnu sim.test "$receipt" "$contracts"
+    build_package "$temporary/package" x86_64-unknown-linux-gnu zed.test "$receipt" "$contracts"
     cp "$temporary/package/kernels/core-v1.ptx" "$temporary/original.ptx"
     printf '\n' >> "$temporary/package/kernels/core-v1.ptx"
     if inspect "$temporary/package" >/dev/null 2>&1; then
@@ -357,7 +357,7 @@ PY
         echo "CUDA driver payload was accepted" >&2
         exit 1
     fi
-    if build_package "$temporary/wrong-target" aarch64-apple-darwin sim.test "$receipt" "$contracts" >/dev/null 2>&1; then
+    if build_package "$temporary/wrong-target" aarch64-apple-darwin zed.test "$receipt" "$contracts" >/dev/null 2>&1; then
         echo "unsupported CUDA package target was accepted" >&2
         exit 1
     fi

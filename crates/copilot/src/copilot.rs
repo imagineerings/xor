@@ -661,11 +661,11 @@ impl Copilot {
 
             let editor_info = request::SetEditorInfoParams {
                 editor_info: request::EditorInfo {
-                    name: "sim".into(),
+                    name: "zed".into(),
                     version: env!("CARGO_PKG_VERSION").into(),
                 },
                 editor_plugin_info: request::EditorPluginInfo {
-                    name: "sim-copilot".into(),
+                    name: "zed-copilot".into(),
                     version: "0.0.1".into(),
                 },
             };
@@ -712,9 +712,9 @@ impl Copilot {
         this.update(cx, |this, cx| {
             cx.notify();
 
-            if env::var("SIM_FORCE_COPILOT_ERROR").is_ok() {
+            if env::var("ZED_FORCE_COPILOT_ERROR").is_ok() {
                 this.server = CopilotServer::Error(
-                    "Forced error for testing (SIM_FORCE_COPILOT_ERROR)".into(),
+                    "Forced error for testing (ZED_FORCE_COPILOT_ERROR)".into(),
                 );
                 return;
             }

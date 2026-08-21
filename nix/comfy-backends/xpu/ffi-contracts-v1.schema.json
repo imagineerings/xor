@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/xpu/ffi-contracts-v1.schema.json",
-  "title": "Sim Intel XPU native library contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/xpu/ffi-contracts-v1.schema.json",
+  "title": "Zed Intel XPU native library contracts v1",
   "$comment": "The runtime additionally enforces exact target-specific filenames, ABI-manifest symbol order, sorted unique identities and symbols, compiled policy digests, and signed package coverage before constructing NativeFfiRegistry.",
   "type": "object",
   "additionalProperties": false,

@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-frame-interpolation-resource-exhaustion-v1",
+  "artifact": "zed-native-frame-interpolation-resource-exhaustion-v1",
   "evidence_kind": "source-fingerprinted typed resource-exhaustion classification",
   "source": {
     "repository": "ComfyUI",

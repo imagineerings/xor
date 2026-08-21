@@ -336,7 +336,7 @@ mod tests {
     use gpui::TestAppContext;
     use multi_buffer::ToPoint;
     use settings::{DocumentSymbols, SettingsStore};
-    use sim_actions::editor::{MoveDown, MoveUp};
+    use zed_actions::editor::{MoveDown, MoveUp};
     use text::Point;
     use util::path;
 

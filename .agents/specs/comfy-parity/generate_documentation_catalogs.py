@@ -647,7 +647,7 @@ for environment_name in environment_names:
             "record_id": stable_id("COMFY-DOC-TOOL", f"environment:{environment_name}"),
             "kind": "tool environment variable",
             "name": environment_name,
-            "contract": "Documentation-repository tooling configuration or credential; not a production Sim environment variable.",
+            "contract": "Documentation-repository tooling configuration or credential; not a production Zed environment variable.",
             "source_evidence": first_evidence(environment_name),
             "availability": "developer-only",
             "evidence_level": "code-inferred",
@@ -908,7 +908,7 @@ lifecycle_contracts = [
     ("CMS staged publish", "Prepare English, translate locales, sync drafts, then explicitly publish", "", "documentation infrastructure only"),
     ("Cloud async job", "Submit, poll/watch, cancel, and collect output", "", "deferred provider contract until executable service evidence"),
     ("CLI local/cloud routing", "Resolve local or cloud with per-call/environment/persisted override", "", "reconcile with executable comfy-cli catalog"),
-    ("CLI background server", "Launch in background and stop later", "", "conformance-oracle lifecycle only; production Sim remains native"),
+    ("CLI background server", "Launch in background and stop later", "", "conformance-oracle lifecycle only; production Zed remains native"),
     ("Desktop install and first run", "Platform installation/onboarding pages describe managed lifecycle", "", "reconcile against Desktop executable catalog"),
     ("Desktop snapshots and migration", "Snapshot, rollback, instance management, and migration pages", "", "reconcile against Desktop executable catalog"),
     ("Documentation redirect migration", "65 source paths redirect to current documentation destinations", "", "documentation-site compatibility only"),
@@ -1333,7 +1333,7 @@ matches.
 
 The tooling catalog has 108 rows: 28 package scripts, 41 distinct static tool
 flag literals, 30 tooling environment variables, and nine CI workflows. These
-are developer/infrastructure behavior, not production Sim flags. The
+are developer/infrastructure behavior, not production Zed flags. The
 configuration/format catalog has 20 source configuration/schema/lock/registry
 files and 15 documented format contracts.
 

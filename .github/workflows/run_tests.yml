@@ -17,7 +17,7 @@ on:
 permissions: {}
 jobs:
   orchestrate:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::harden_runner
@@ -139,7 +139,7 @@ jobs:
       run_tests: ${{ steps.filter.outputs.run_tests }}
       changed_extensions: ${{ steps.filter.outputs.changed_extensions }}
   check_style:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-4x8-ubuntu-2204
     steps:
     - name: steps::harden_runner
@@ -183,7 +183,7 @@ jobs:
         "$GITHUB_WORKSPACE/ts_query_ls" format --check . || {
             echo "Found unformatted queries, please format them with ts_query_ls."
             echo "For easy use, install the Tree-sitter query extension:"
-            echo "sim://extension/tree-sitter-query"
+            echo "zed://extension/tree-sitter-query"
             false
         }
     timeout-minutes: 60
@@ -209,7 +209,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::clippy
       run: ./script/clippy.ps1
       shell: pwsh
@@ -253,7 +253,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::clippy
       run: ./script/clippy
     - name: steps::show_sccache_stats
@@ -284,7 +284,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::clippy
       run: ./script/clippy
     - name: steps::show_sccache_stats
@@ -317,7 +317,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::clippy
       run: ./script/clippy --target x86_64-apple-darwin
     - name: steps::show_sccache_stats
@@ -353,7 +353,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::cargo_nextest
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn${{ needs.orchestrate.outputs.changed_packages && format(' -E "{0}"', needs.orchestrate.outputs.changed_packages) || '' }}
       shell: pwsh
@@ -411,7 +411,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::cargo_nextest
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn${{ needs.orchestrate.outputs.changed_packages && format(' -E "{0}"', needs.orchestrate.outputs.changed_packages) || '' }}
     - name: steps::show_sccache_stats
@@ -463,7 +463,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: steps::cargo_nextest
       run: cargo nextest run --workspace --no-fail-fast --no-tests=warn${{ needs.orchestrate.outputs.changed_packages && format(' -E "{0}"', needs.orchestrate.outputs.changed_packages) || '' }}
     - name: steps::show_sccache_stats
@@ -541,7 +541,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - id: run_doctests
       name: run_tests::doctests::run_doctests
       run: |
@@ -589,7 +589,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: cargo build -p collab
       run: cargo build -p collab
     - name: cargo build --workspace --bins --examples
@@ -621,7 +621,7 @@ jobs:
         cache: rust
         path: ~/.rustup
     - name: run_tests::build_visual_tests_binary::cargo_build_visual_tests
-      run: cargo build -p sim --bin sim_visual_test_runner --features visual-tests
+      run: cargo build -p zed --bin zed_visual_test_runner --features visual-tests
     - name: steps::cleanup_cargo_config
       if: always()
       run: |
@@ -657,7 +657,7 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: run_tests::check_wasm::cargo_check_wasm
       run: cargo -Zbuild-std=std,panic_abort check --target wasm32-unknown-unknown -p gpui_platform
       env:
@@ -742,21 +742,21 @@ jobs:
         R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        SCCACHE_BUCKET: sccache-sim
+        SCCACHE_BUCKET: sccache-zed
     - name: ./script/check-rust-tools-feature-boundary
       run: ./script/check-rust-tools-feature-boundary
-    - name: cargo check -p sim --features rust-tools
-      run: cargo check -p sim --features rust-tools
-    - name: cargo check -p sim --no-default-features
-      run: cargo check -p sim --no-default-features
+    - name: cargo check -p zed --features rust-tools
+      run: cargo check -p zed --features rust-tools
+    - name: cargo check -p zed --no-default-features
+      run: cargo check -p zed --no-default-features
     - name: cargo check -p remote_server --features rust-tools
       run: cargo check -p remote_server --features rust-tools
     - name: cargo check -p remote_server --no-default-features
       run: cargo check -p remote_server --no-default-features
-    - name: cargo test -p sim --features test-support,rust-tools cargo_panel
-      run: cargo test -p sim --features test-support,rust-tools cargo_panel
-    - name: cargo test -p sim --no-default-features cargo_panel_disabled
-      run: cargo test -p sim --no-default-features cargo_panel_disabled
+    - name: cargo test -p zed --features test-support,rust-tools cargo_panel
+      run: cargo test -p zed --features test-support,rust-tools cargo_panel
+    - name: cargo test -p zed --no-default-features cargo_panel_disabled
+      run: cargo test -p zed --no-default-features cargo_panel_disabled
     - name: cargo test -p tasks_ui --features rust-test-actions rust_test_actions
       run: cargo test -p tasks_ui --features rust-test-actions rust_test_actions
     - name: cargo test -p remote_server --features test-support,rust-tools rust_test_provider
@@ -895,9 +895,9 @@ jobs:
     runs-on: namespace-profile-16x32-ubuntu-2204
     env:
       GIT_AUTHOR_NAME: Protobuf Action
-      GIT_AUTHOR_EMAIL: ci@sim.dev
+      GIT_AUTHOR_EMAIL: ci@zed.dev
       GIT_COMMITTER_NAME: Protobuf Action
-      GIT_COMMITTER_EMAIL: ci@sim.dev
+      GIT_COMMITTER_EMAIL: ci@zed.dev
     steps:
     - name: steps::harden_runner
       uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411
@@ -969,7 +969,7 @@ jobs:
     - check_licenses
     - check_scripts
     - extension_tests
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') && always()
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions') && always()
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: run_tests::tests_pass

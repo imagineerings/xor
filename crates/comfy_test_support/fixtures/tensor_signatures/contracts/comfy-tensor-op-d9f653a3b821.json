@@ -23423,7 +23423,7 @@
       "source_path": "comfy/ldm/modules/attention.py",
       "source_sha256": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
       "status": "static-call-observed",
-      "target_syntax": "sim.to"
+      "target_syntax": "zed.to"
     },
     {
       "catalog_field": "production_call_sites",
@@ -37926,7 +37926,7 @@
       "source_path": "comfy_extras/nodes_sag.py",
       "source_sha256": "e600938bc4fc7e868bf705fc0c7eb2ddb11d9989a357c88da6c0cc6d6e0be1a0",
       "status": "static-call-observed",
-      "target_syntax": "sim.to"
+      "target_syntax": "zed.to"
     },
     {
       "catalog_field": "production_call_sites",

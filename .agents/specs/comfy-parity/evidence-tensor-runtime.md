@@ -2,7 +2,7 @@
 
 ## Scope and baseline
 
-This evidence pack statically inventories the tensor/operator, autograd, and random-number surfaces that the pinned ComfyUI source uses and turns each surface into an explicit native Rust conformance obligation. Production Sim may use ComfyUI only as a development-time oracle. None of these rows authorizes a Python runtime, a PyTorch process, JavaScript execution, or an external ComfyUI dependency in production.
+This evidence pack statically inventories the tensor/operator, autograd, and random-number surfaces that the pinned ComfyUI source uses and turns each surface into an explicit native Rust conformance obligation. Production Zed may use ComfyUI only as a development-time oracle. None of these rows authorizes a Python runtime, a PyTorch process, JavaScript execution, or an external ComfyUI dependency in production.
 
 The source baseline is ComfyUI `0.27.1` with `949` regular files and all-file fingerprint `21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f`. The generator scanned `683` Python files and reconciled every one against [`catalogs/backend-source-coverage.csv`](catalogs/backend-source-coverage.csv); it does not duplicate the canonical 949-row source closure. `683` files parsed directly with the host AST. `0` file used syntax-only normalization of Python 3.10 `match`/`case` headers so Python 3.9 could preserve and inspect the original call expressions and line numbers. The canonical source catalog's `infrastructure-only` label can mean an internal implementation-support module with no independently named feature row. Calls in executable product paths are therefore counted as production execution evidence while the original source classification remains preserved on each row; only `.ci`, `.github`, and `script_examples` Python is placed in the support tier.
 
@@ -38,7 +38,7 @@ Existing tests are linked when they directly call the same symbol. Such a link r
 | type-contract | 15 |
 | value-or-constant-contract | 64 |
 
-Every row carries native shape, dtype, layout, device, numerics, VJP/JVP, and cancellation requirements. The implementation boundary is a Sim-owned `comfy_tensor` facade. A selected compute crate may sit behind that facade, but its types, handles, serialization, and backend assumptions cannot become workflow or Rust/WASM plugin ABI.
+Every row carries native shape, dtype, layout, device, numerics, VJP/JVP, and cancellation requirements. The implementation boundary is a Zed-owned `comfy_tensor` facade. A selected compute crate may sit behind that facade, but its types, handles, serialization, and backend assumptions cannot become workflow or Rust/WASM plugin ABI.
 
 ## Autograd reconciliation
 
@@ -74,7 +74,7 @@ Native parity requires graph ownership, saved-tensor lifetimes, broadcasting red
 | test-fixture | 5 |
 | training-and-data-order | 6 |
 
-Sim must not use a process-global RNG as an implicit compatibility mechanism. Each row requires a versioned phase identity derived from workflow seed, node identity, execution ordinal, phase, sample or batch index, and declared retry policy. Cancellation, validation failure, OOM retry, and worker recovery may not commit partial RNG advancement. CPU-seeded transfer and native-device generation remain distinct contracts because they can produce different observable sequences.
+Zed must not use a process-global RNG as an implicit compatibility mechanism. Each row requires a versioned phase identity derived from workflow seed, node identity, execution ordinal, phase, sample or batch index, and declared retry policy. Cancellation, validation failure, OOM retry, and worker recovery may not commit partial RNG advancement. CPU-seeded transfer and native-device generation remain distinct contracts because they can produce different observable sequences.
 
 ## Boundaries and limitations
 

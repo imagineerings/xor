@@ -343,7 +343,7 @@
       "wire negotiation contract": 1,
       "workflow extension": 2
     },
-    "current_sim_status": {
+    "current_zed_status": {
       "conflicting": 788,
       "deferred": 2274,
       "equivalent": 53,
@@ -595,7 +595,7 @@
   },
   "feature_rows": 13295,
   "production_native_boundary": {
-    "decision": "Production Sim implements Comfy execution entirely in native Rust and may use source applications only as development-time conformance oracles.",
+    "decision": "Production Zed implements Comfy execution entirely in native Rust and may use source applications only as development-time conformance oracles.",
     "external_comfy_connection_allowed": false,
     "javascript_extension_execution_allowed": false,
     "python_comfy_process_allowed": false,

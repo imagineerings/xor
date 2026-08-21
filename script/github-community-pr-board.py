@@ -57,7 +57,7 @@ RETRY_DELAY_SECONDS = 5
 
 GITHUB_API_URL = "https://api.github.com"
 REPO_OWNER = "simtropolis"
-REPO_NAME = "sim"
+REPO_NAME = "zed"
 STAFF_TEAM_SLUG = "staff"
 
 SKIP_LABELS = {"staff", "bot"}

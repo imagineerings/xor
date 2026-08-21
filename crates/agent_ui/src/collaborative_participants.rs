@@ -76,7 +76,7 @@ impl CollaborativeParticipantAdapter {
                 .map(SharedUri::from);
             let model = thread_view.current_model_id(cx).map(SharedString::from);
             let runtime = if thread_view.as_native_connection(cx).is_some() {
-                "Sim Agent".into()
+                "Zed Agent".into()
             } else {
                 "ACP".into()
             };

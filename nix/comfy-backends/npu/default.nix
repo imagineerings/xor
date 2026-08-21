@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-npu-metadata";
+  pname = "zed-comfy-backend-npu-metadata";
   version = "cann-8.0-rc3-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/npu"
+    destination="$out/lib/zed/comfy-backends/npu"
     mkdir -p "$destination/abi"
     cp ${../../../crates/comfy_backend_npu/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_npu/LICENSES} "$destination/"
@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim Huawei Ascend NPU ABI metadata without CANN redistribution";
+    description = "Reviewed Zed Huawei Ascend NPU ABI metadata without CANN redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "aarch64-linux" "x86_64-linux" ];
   };

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use gpui::{Action, SharedString};
-use sim_actions::OpenBrowser;
+use zed_actions::OpenBrowser;
 use ui::{IconName, IconPosition};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,7 +198,7 @@ impl WorkspaceError for PortalError {
     fn primary_action(&self) -> ErrorAction {
         ErrorAction::link(
             "See docs",
-            "https://sim.dev/docs/linux#i-cant-open-any-files",
+            "https://zed.dev/docs/linux#i-cant-open-any-files",
         )
     }
 }

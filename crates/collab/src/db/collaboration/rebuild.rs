@@ -516,7 +516,7 @@ async fn finish_transaction<T>(
 
 const fn source_system_name(source_system: SourceSystem) -> &'static str {
     match source_system {
-        SourceSystem::Sim => "sim",
+        SourceSystem::Zed => "zed",
         SourceSystem::Buzz => "buzz",
         SourceSystem::Nostr => "nostr",
         SourceSystem::Acp => "acp",

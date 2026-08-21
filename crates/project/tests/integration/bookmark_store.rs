@@ -23,7 +23,7 @@ mod integration {
         Arc::from(Path::new(path))
     }
 
-    fn serialisim_bookmark(row: u32) -> SerializedBookmark {
+    fn serialized_bookmark(row: u32) -> SerializedBookmark {
         SerializedBookmark {
             row,
             label: String::new(),
@@ -88,7 +88,7 @@ mod integration {
             project
                 .bookmark_store()
                 .read(cx)
-                .all_serialisim_bookmarks(cx)
+                .all_serialized_bookmarks(cx)
         })
     }
 
@@ -100,7 +100,7 @@ mod integration {
             let path = project_path(path_str);
             map.insert(
                 path.clone(),
-                rows.iter().map(|&row| serialisim_bookmark(row)).collect(),
+                rows.iter().map(|&row| serialized_bookmark(row)).collect(),
             );
         }
         map
@@ -114,11 +114,11 @@ mod integration {
         project
             .update(cx, |project, cx| {
                 project.bookmark_store().update(cx, |store, cx| {
-                    store.load_serialisim_bookmarks(serialized, cx)
+                    store.load_serialized_bookmarks(serialized, cx)
                 })
             })
             .await
-            .expect("with_serialisim_bookmarks should succeed");
+            .expect("with_serialized_bookmarks should succeed");
     }
 
     fn clear_bookmarks(project: &Entity<Project>, cx: &mut TestAppContext) {
@@ -159,7 +159,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_empty(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_empty(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -172,7 +172,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_single_file(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_single_file(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -194,7 +194,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_includes_labels(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_includes_labels(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -220,7 +220,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_multiple_files(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_multiple_files(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -254,7 +254,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_after_toggle_off(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_after_toggle_off(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -277,7 +277,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_with_clear(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_with_clear(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -304,7 +304,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_returns_sorted_by_path(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_returns_sorted_by_path(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -336,7 +336,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_all_serialisim_bookmarks_deduplicates_same_row(cx: &mut TestAppContext) {
+    async fn test_all_serialized_bookmarks_deduplicates_same_row(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -368,7 +368,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_with_serialisim_bookmarks_restores_bookmarks(cx: &mut TestAppContext) {
+    async fn test_with_serialized_bookmarks_restores_bookmarks(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -398,7 +398,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_with_serialisim_bookmarks_skips_out_of_range_rows(cx: &mut TestAppContext) {
+    async fn test_with_serialized_bookmarks_skips_out_of_range_rows(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -440,7 +440,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_with_serialisim_bookmarks_skips_empty_entries(cx: &mut TestAppContext) {
+    async fn test_with_serialized_bookmarks_skips_empty_entries(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 
@@ -465,7 +465,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_with_serialisim_bookmarks_all_out_of_range_produces_no_entry(
+    async fn test_with_serialized_bookmarks_all_out_of_range_produces_no_entry(
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
@@ -504,7 +504,7 @@ mod integration {
     }
 
     #[gpui::test]
-    async fn test_with_serialisim_bookmarks_replaces_existing(cx: &mut TestAppContext) {
+    async fn test_with_serialized_bookmarks_replaces_existing(cx: &mut TestAppContext) {
         init_test(cx);
         cx.executor().allow_parking();
 

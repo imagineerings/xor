@@ -2,20 +2,20 @@
 
 ## 1. Overview
 
-Migrate goose's Electron/React desktop app features by building GPUI-based equivalents within sim's existing desktop application. Sim already provides a full GPUI desktop (`crates/sim/`), agent panel (`crates/agent_ui/`), settings UI (`crates/settings_ui/`), workspace system (`crates/workspace/`), notifications (`crates/notifications/`), updates (`crates/auto_update_ui/`), and onboarding (`crates/onboarding/`). Goose adds recipe execution UI, scheduling UI, startup diagnostics, shared sessions, ACP connection management, and enhanced agent settings.
+Migrate goose's Electron/React desktop app features by building GPUI-based equivalents within zed's existing desktop application. Zed already provides a full GPUI desktop (`crates/zed/`), agent panel (`crates/agent_ui/`), settings UI (`crates/settings_ui/`), workspace system (`crates/workspace/`), notifications (`crates/notifications/`), updates (`crates/auto_update_ui/`), and onboarding (`crates/onboarding/`). Goose adds recipe execution UI, scheduling UI, startup diagnostics, shared sessions, ACP connection management, and enhanced agent settings.
 
 ### Key Architectural Decisions
 
 - **No Electron/React port**: All UI is built as native GPUI views. Goose's React components inform the design but are not directly ported.
 - **Integrate into existing agent panel**: Recipe browser, diagnostics, and connection status are added as sub-views within or alongside the existing `AgentPanel` in `crates/agent_ui/`.
 - **Settings extensions go into `crates/settings_ui/`**: Scheduling and extension management UIs follow the existing settings panel patterns.
-- **Shared sessions via deeplinks**: Use sim's existing `parse_sim_link` deeplink mechanism for sharing sessions.
+- **Shared sessions via deeplinks**: Use zed's existing `parse_zed_link` deeplink mechanism for sharing sessions.
 
 ## 2. Architecture
 
 ```mermaid
 graph TD
-    subgraph "Existing Sim Desktop (crates/sim/)"
+    subgraph "Existing Zed Desktop (crates/zed/)"
         GPUI[GPUI Framework]
         Workspace[Workspace System]
         AgentPanel[AgentPanel - crates/agent_ui/]
@@ -57,7 +57,7 @@ graph TD
     Workspace --> AgentPanel
     Workspace --> RecipeUI
     Notifications --> Agent
-    AutoUpdateUI -->|update check sim| Agent
+    AutoUpdateUI -->|update check zed| Agent
 ```
 
 ## 3. Components and Interfaces
@@ -171,9 +171,9 @@ pub struct SharedSessionData {
     pub metadata: ShareMetadata,
 }
 
-// Deeplink handler in crates/sim/
+// Deeplink handler in crates/zed/
 fn handle_shared_session_link(url: &Url, cx: &mut App) {
-    // Parses sim://session/<encoded-data>
+    // Parses zed://session/<encoded-data>
     // Imports session
     // Opens in agent panel
 }
@@ -243,20 +243,20 @@ _For any_ schedule [created via the scheduling UI], [at the configured cron time
 ## 7. Testing Strategy
 
 - **Unit tests**: Each GPUI component's state transitions and event handling
-- **Visual tests**: Use sim's visual test framework for component screenshots
+- **Visual tests**: Use zed's visual test framework for component screenshots
 - **Integration tests**: Recipe browser with mock recipe engine
 - **Accessibility tests**: Keyboard navigation, screen reader labels
 
 ## References
 
 - Source: `projects/goose/ui/desktop/` — Electron/React app (design reference only)
-- Sim: `crates/sim/` — main desktop binary
-- Sim: `crates/agent_ui/` — agent panel, conversation, configuration
-- Sim: `crates/settings_ui/` — settings panel
-- Sim: `crates/workspace/` — workspace/panel management
-- Sim: `crates/notifications/` — notification system
-- Sim: `crates/auto_update/`, `crates/auto_update_ui/` — update system
-- Sim: `crates/onboarding/` — onboarding
+- Zed: `crates/zed/` — main desktop binary
+- Zed: `crates/agent_ui/` — agent panel, conversation, configuration
+- Zed: `crates/settings_ui/` — settings panel
+- Zed: `crates/workspace/` — workspace/panel management
+- Zed: `crates/notifications/` — notification system
+- Zed: `crates/auto_update/`, `crates/auto_update_ui/` — update system
+- Zed: `crates/onboarding/` — onboarding
 
 ## Requirements traceability
 

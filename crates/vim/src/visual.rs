@@ -1418,7 +1418,7 @@ mod test {
             "
         });
 
-        // https://github.com/simtropolis/sim/issues/6274
+        // https://github.com/simtropolis/zed/issues/6274
         cx.set_shared_state(indoc! {
             "Theˇ quick brown
 

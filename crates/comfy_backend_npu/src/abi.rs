@@ -430,7 +430,7 @@ impl AbiManifest {
         if self.package.redistributes_cann
             || !self.package.license_approval_required_for_redistribution
             || self.package.signature_algorithm != "ed25519"
-            || self.package.signature_domain != "sim-comfy-npu-package-v1"
+            || self.package.signature_domain != "zed-comfy-npu-package-v1"
             || self.package.coverage != "package-coverage-v1"
             || !self.package.final_application_signing_required
         {

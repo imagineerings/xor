@@ -2,13 +2,13 @@
 
 ## Scope and authority
 
-This review covers the execution boundaries created when collaboration events reach Sim's native ACP runtime, model providers, MCP servers, native tools, managed subprocesses, signed jobs, remote-provider binaries, remote substrates and shared compute. It implements the security review required by acceptance criteria 11.1, 11.5, 19.1 and 19.2 for CAP-021, CAP-022 and CAP-034.
+This review covers the execution boundaries created when collaboration events reach Zed's native ACP runtime, model providers, MCP servers, native tools, managed subprocesses, signed jobs, remote-provider binaries, remote substrates and shared compute. It implements the security review required by acceptance criteria 11.1, 11.5, 19.1 and 19.2 for CAP-021, CAP-022 and CAP-034.
 
 The canonical owners remain those approved in the collaborative-workspace design:
 
 - `crates/agent`, `crates/acp_thread`, `crates/agent_servers` and existing tool-permission/UI paths own sessions, ACP protocol, prompts, tool authorization, transcript state and cancellation.
 - `crates/sandbox` and the final native tool implementations own operating-system, filesystem and network enforcement. A compatibility adapter never becomes an authorization authority.
-- `crates/credentials_provider` and `crates/sim_credentials_provider` own secret retrieval. Agent, persona, provider and project configuration persist references, never secret values.
+- `crates/credentials_provider` and `crates/zed_credentials_provider` own secret retrieval. Agent, persona, provider and project configuration persist references, never secret values.
 - `crates/remote` owns provider discovery/protocol/process bounds and remote transport. `crates/agent` binds one canonical job/session executor to it.
 - `crates/collaboration_domain` and `crates/collab` own signed job authorization and the exactly-one executor lease. Presence is status, not authority or a management channel.
 
@@ -18,15 +18,15 @@ This document does not redesign tenant admission/signing (Task 4.1), workflows/w
 
 - `projects/buzz/docs/remote-agents.md` defines the hostile provider boundary, provider output caps, secret separation, presence-only status, reconciliation and shutdown invariants, and eight explicit implementation defects.
 - `.agents/specs/goose-migration/security-permissions/requirements.md` requires adversarial-input inspection, egress inspection, deterministic permissions, conservative optional read-only judgment and private, scoped permission persistence.
-- `.agents/specs/goose-migration/security-permissions/design.md` keeps Sim's existing permission and sandbox owners canonical.
+- `.agents/specs/goose-migration/security-permissions/design.md` keeps Zed's existing permission and sandbox owners canonical.
 - `.agents/specs/goose-migration/security-permissions/tasks.md` remains the implementation plan for content inspection and general permission hardening. Collaborative Workspace reuses it; it does not create a second scanner, permission store or confirmation UI.
-- Current Sim integration points include `crates/agent/src/tool_permissions.rs`, `crates/agent/src/tools/tool_permissions.rs`, `crates/acp_thread/src/connection.rs`, `crates/agent_servers/src/acp.rs`, `crates/sandbox/src/sandbox.rs` and `crates/remote/src/remote_client.rs`.
+- Current Zed integration points include `crates/agent/src/tool_permissions.rs`, `crates/agent/src/tools/tool_permissions.rs`, `crates/acp_thread/src/connection.rs`, `crates/agent_servers/src/acp.rs`, `crates/sandbox/src/sandbox.rs` and `crates/remote/src/remote_client.rs`.
 
 ## Protected assets
 
 1. Human intent represented by a scoped permission decision.
 2. Project/worktree files, Git state, terminals, processes, network access and external accounts.
-3. Sim account credentials, Nostr signing keys, provider tokens, MCP credentials and remote-substrate credentials.
+3. Zed account credentials, Nostr signing keys, provider tokens, MCP credentials and remote-substrate credentials.
 4. Canonical ACP transcript, agent session, job, lease, result, presence and activity provenance.
 5. Private persona, team, environment, memory, snapshot and usage state.
 6. Tenant/community isolation and the nonexistence of private conversations, jobs or resources.
@@ -37,7 +37,7 @@ This document does not redesign tenant admission/signing (Task 4.1), workflows/w
 
 - Collaboration content, repository files, terminal output, Web content, model output and protocol frames are hostile even when signed or produced by a member.
 - ACP agents, MCP servers, model providers, remote-provider binaries, custom runtime images and mesh peers may be buggy or malicious. A valid signature identifies a principal; it does not make content or code safe.
-- A remote provider must receive some execution secrets to deploy an agent. After that deliberate handoff, Sim cannot contain a malicious provider or substrate administrator. Sim must make the trust decision explicit, minimize the values sent, pin the executable identity used for negotiation and deployment, and prevent echoed secrets from reaching state or UI.
+- A remote provider must receive some execution secrets to deploy an agent. After that deliberate handoff, Zed cannot contain a malicious provider or substrate administrator. Zed must make the trust decision explicit, minimize the values sent, pin the executable identity used for negotiation and deployment, and prevent echoed secrets from reaching state or UI.
 - The operating system sandbox, project authorization, credentials provider and canonical job lease are trusted enforcement points. UI labels, model judgments, tool annotations, presence and provider claims are not.
 - Content inspection can reduce risk but has false positives and false negatives. Scanner absence, timeout or failure can never grant tool, filesystem, network, credential or execution authority.
 - A user-approved persistent permission is trusted only within its normalized user/project/tool/argument scope and expiry. It is not transferable across tenants, worktrees, identities, sessions or materially different arguments.
@@ -127,14 +127,14 @@ Every boundary below has an input bound, output bound, permission control, cance
 - **Untrusted input:** agent executable bytes, JSON-RPC/ACP frames, session updates, permission requests, terminal requests and stderr.
 - **Input bound:** allowlisted executable/config, negotiated protocol, bounded line/frame/depth/schema and deadline; malformed IDs or updates fail the scoped request, not the app.
 - **Output bound:** bound stderr history, streaming accumulator, terminal output and transcript item size; accept only known correlated updates and preserve explicit truncation.
-- **Permission control:** ACP permission requests are untrusted requests routed through Sim's existing authorization UI/store; agent-provided option labels never decide authority.
+- **Permission control:** ACP permission requests are untrusted requests routed through Zed's existing authorization UI/store; agent-provided option labels never decide authority.
 - **Cancellation and cleanup:** session cancel closes pending responders/permission prompts, sends protocol cancellation, kills owned terminals/child process after grace, drains pipes and joins reader tasks.
 - **Secret control:** child environment is allowlisted; credentials are injected only for approved runtime needs and stderr/transcript redaction runs before persistence.
 - **Assigned tests:** Tasks 28.2, 28.4 and 28.6 plus Goose permission tasks 6–10 cover malformed frames, permission cancellation, crash, stderr redaction and process cleanup.
 
 ### EX-03 — model-provider request and streaming response
 
-- **Owner:** existing Sim language-model/provider and credentials-provider integrations used by the native agent runtime.
+- **Owner:** existing Zed language-model/provider and credentials-provider integrations used by the native agent runtime.
 - **Untrusted input:** prompt/context assembled from users, repositories, tools and private agent state; provider stream/output and usage metadata.
 - **Input bound:** cap prompt bytes/tokens, attachments, tool schemas and request deadline before network send; select credentials by explicit provider/account reference.
 - **Output bound:** cap tokens, bytes, tool-call count, nesting and streaming buffer; reject malformed or unknown tool calls without speculative repair that widens authority.
@@ -200,7 +200,7 @@ Every boundary below has an input bound, output bound, permission control, cance
 
 ### EX-09 — local managed-agent pool and child lifecycle
 
-- **Owner:** Sim native agent/session runtime and `agent_servers`; no Buzz harness remains as a second owner.
+- **Owner:** Zed native agent/session runtime and `agent_servers`; no Buzz harness remains as a second owner.
 - **Untrusted input:** runtime command/args, persona/team configuration, child output and lifecycle signals.
 - **Input bound:** resolve one approved runtime descriptor, cap parallelism/turn/idle lifetime and validate environment key/value shape before spawn.
 - **Output bound:** bound per-turn response, logs, usage and observer summaries; unknown lifecycle output maps to a generic untrusted event.
@@ -233,7 +233,7 @@ Every boundary below has an input bound, output bound, permission control, cance
 
 ### EX-12 — remote substrate harness and agent process
 
-- **Owner:** canonical remote-agent lifecycle bound to the same Sim job/session identity; substrate adapter implements but does not own transcript or permission state.
+- **Owner:** canonical remote-agent lifecycle bound to the same Zed job/session identity; substrate adapter implements but does not own transcript or permission state.
 - **Untrusted input:** remote image/runtime, substrate state, container/process output, presence and provider-reported instance ID.
 - **Input bound:** approved immutable image/provenance, resource/lifetime limits, nonempty identity/owner and bounded launch environment before mutation; unsupported local-loopback mesh provider is rejected.
 - **Output bound:** bounded lifecycle/status/result frames with provenance; substrate logs are redacted and externally retained according to policy, never treated as control.
@@ -268,7 +268,7 @@ Every boundary below has an input bound, output bound, permission control, cance
 
 Buzz provider protocol v1 defines `info` and `deploy`, deliberately has no `undeploy`, and treats relay presence as the only post-deploy status signal. Task 33.3 names a canonical `deploy/inspect/terminate` lifecycle. This is a compatibility tension, not permission to add undocumented legacy wire calls:
 
-- The Sim lifecycle abstraction may expose inspect and terminate to callers.
+- The Zed lifecycle abstraction may expose inspect and terminate to callers.
 - A Buzz v1 adapter reports inspection from canonical job/session state plus self-signed presence with an explicit staleness marker; it never presents presence as authoritative substrate state.
 - Termination first uses the owner-authorized canonical cancellation/`!shutdown` path. Provider/substrate cleanup is invoked only when a negotiated provider version explicitly supports it and the user authorized the destructive scope.
 - If reliable termination/inspection is unavailable, the UI reports that limitation and recovery action. It cannot return a fabricated success.

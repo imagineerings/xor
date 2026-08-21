@@ -2,7 +2,7 @@
 
 ## Overview
 
-Workflows and blueprints are treated as first-class world-model harness project resources backed by Sim project storage. This spec adds import, export, catalog, subgraph, node replacement, and embedded metadata services while relying on graph runtime validation and graph UI rendering elsewhere.
+Workflows and blueprints are treated as first-class world-model harness project resources backed by Zed project storage. This spec adds import, export, catalog, subgraph, node replacement, and embedded metadata services while relying on graph runtime validation and graph UI rendering elsewhere.
 
 ## Architecture
 
@@ -23,7 +23,7 @@ flowchart LR
 
 - **Purpose**: Import shipped Comfy blueprint JSON and associated GLSL/helper assets.
 - **Responsibilities**: Preserve names, source paths, categories, dependency references, and attribution.
-- **Native catalog**: Shipped blueprint fixtures are normalized into Sim-owned
+- **Native catalog**: Shipped blueprint fixtures are normalized into Zed-owned
   blueprint records with preserved graph JSON, source path, category,
   dependency records, node type inventory, and attribution. Unsupported nodes or
   missing dependencies produce diagnostics without dropping the blueprint, and
@@ -31,10 +31,10 @@ flowchart LR
 
 ### WorkflowStore
 
-- **Purpose**: Persist workflows and versions in Sim project storage.
+- **Purpose**: Persist workflows and versions in Zed project storage.
 - **Responsibilities**: Load, save, API export, metadata preservation, provenance links, and default view handling.
 - **Native workflow records**: Workflow documents preserve graph JSON, UI
-  metadata, default view, source references, version ids, and optional Sim
+  metadata, default view, source references, version ids, and optional Zed
   provenance artifact links. API export converts saved workflow node/link
   records into the prompt graph shape accepted by the native runtime control
   plane instead of forwarding export to ComfyUI.
@@ -52,19 +52,19 @@ pub trait WorkflowStore {
 - **Purpose**: Expose reusable graph fragments from blueprints and extensions.
 - **Responsibilities**: Stable id generation, source metadata, sanitized listing, and full data retrieval.
 - **Native subgraph records**: Blueprint and custom-node subgraphs are indexed as
-  Sim-owned records with stable ids derived from source type and source path,
+  Zed-owned records with stable ids derived from source type and source path,
   sanitized listing metadata, node-pack/source metadata, and full graph JSON
   retrieval for execution/import callers. The index does not defer discovery or
   graph reads to a ComfyUI extension registry.
 
 ### WorkflowTemplateAdapter
 
-- **Purpose**: Expose custom-node workflow examples through Sim template
+- **Purpose**: Expose custom-node workflow examples through Zed template
   services.
 - **Responsibilities**: Stable template ids, safe template/asset path records,
   sanitized listings, static asset references, and full workflow graph retrieval.
 - **Native template records**: Custom-node workflow examples are normalized into
-  Sim-owned template records with node-pack metadata, static asset references,
+  Zed-owned template records with node-pack metadata, static asset references,
   sanitized metadata, diagnostics, and full graph JSON. The adapter does not
   serve templates by proxying a ComfyUI extension directory.
 
@@ -72,7 +72,7 @@ pub trait WorkflowStore {
 
 - **Purpose**: Store node replacement metadata for old workflow compatibility.
 - **Responsibilities**: Register replacement entries, dedupe duplicate mappings, and provide mappings to graph validation.
-- **Native replacement records**: Replacement mappings are stored as Sim-owned
+- **Native replacement records**: Replacement mappings are stored as Zed-owned
   catalog entries with source metadata, input/output mappings, duplicate and
   conflict diagnostics, and a direct bridge to native graph replacement before
   validation or workflow import. The catalog does not rely on ComfyUI node
@@ -83,7 +83,7 @@ pub trait WorkflowStore {
 - **Purpose**: Recover prompt/workflow metadata from generated files.
 - **Responsibilities**: Read supported metadata fields, associate recovered workflows with assets, and return non-fatal diagnostics.
 - **Native metadata records**: Embedded prompt/workflow metadata from supported
-  generated PNG, WebP, and FLAC metadata maps is parsed into Sim workflow
+  generated PNG, WebP, and FLAC metadata maps is parsed into Zed workflow
   documents, prompt JSON, source artifact links, provenance updates, and
   diagnostics. Metadata failures preserve the asset record and are not delegated
   to ComfyUI image/audio metadata readers.
@@ -91,9 +91,9 @@ pub trait WorkflowStore {
 ### AppModeBridge
 
 - **Purpose**: Preserve app-like workflow controls for the unified authoring app.
-- **Responsibilities**: Parse app-mode metadata, expose Sim control records,
+- **Responsibilities**: Parse app-mode metadata, expose Zed control records,
   preserve graph-workflow fallback, and report invalid control metadata.
-- **Native app-mode records**: App-mode controls are stored as Sim-owned
+- **Native app-mode records**: App-mode controls are stored as Zed-owned
   metadata with control kind, label, default value, choices, target node/input,
   and UI ownership. The bridge stores data for the unified authoring app and
   graph editor instead of implementing UI or forwarding to ComfyUI frontend
@@ -165,7 +165,7 @@ _For any_ generated file import, metadata extraction failure SHALL NOT block ass
 
 - Import tests over the full 89-entry `projects/comfy/blueprints` fixture list.
 - Snapshot tests for blueprint catalog entries and native subgraph ids/listings.
-- Round-trip tests for workflow load/save/API export through native Sim records.
+- Round-trip tests for workflow load/save/API export through native Zed records.
 - Replacement catalog and graph-rewrite tests shared with native graph validation.
 - Metadata extraction tests for supported generated-file metadata containers and
   non-fatal asset preservation.

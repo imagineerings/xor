@@ -8,9 +8,9 @@ use collaboration_domain::CommunityId;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-#[path = "../../sim/src/migration/buzz/agent_staging.rs"]
+#[path = "../../zed/src/migration/buzz/agent_staging.rs"]
 mod agent_staging;
-#[path = "../../sim/src/migration/buzz/desktop_state.rs"]
+#[path = "../../zed/src/migration/buzz/desktop_state.rs"]
 mod desktop_state;
 
 use agent_staging::{
@@ -296,12 +296,12 @@ fn hash_part(hasher: &mut Sha256, bytes: &[u8]) {
 #[test]
 fn resumes_idempotently_then_halts_and_restores_on_divergence() {
     let pre_boundary = DeploymentFixture {
-        binary: b"sim-before".to_vec(),
+        binary: b"zed-before".to_vec(),
         configuration: b"gateway_enabled=false".to_vec(),
         data: b"canonical-before".to_vec(),
     };
     let candidate = DeploymentFixture {
-        binary: b"sim-candidate".to_vec(),
+        binary: b"zed-candidate".to_vec(),
         configuration: b"gateway_enabled=false;migration=verify".to_vec(),
         data: b"canonical-candidate".to_vec(),
     };

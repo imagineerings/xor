@@ -9,7 +9,7 @@ The canonical ownership split is mandatory:
 - `collaboration_domain` owns provider-neutral notification eligibility, lease identity, generation, expiration, revocation, endpoint-generation references and sanitized wake outcomes.
 - `collab` owns trusted community/origin binding, current read authorization, accepted lease state, event-to-wake matching and the durable idempotent wake outbox. A lease is never a read grant.
 - `nostr_compat` owns the byte-exact kind `30350` event, NIP-44 content and NIP-PL descriptor codecs, but never selects a tenant, authorizes a match or opens platform credentials.
-- The Sim-owned push gateway owns App Attest installation authority, assertion counters, encrypted APNs-token custody, relay-scoped opaque grants, NIP-98 admission, delivery replay/quota reservations, provider credentials and response sanitization.
+- The Zed-owned push gateway owns App Attest installation authority, assertion counters, encrypted APNs-token custody, relay-scoped opaque grants, NIP-98 admission, delivery replay/quota reservations, provider credentials and response sanitization.
 - The mobile client owns notification permission, platform-token acquisition, installation assertions, lease publication and authenticated fetch after a fixed wake. APNs acceptance is not message delivery or read state.
 - APNs production and sandbox validation are the only approved first-cutover profiles. FCM and UnifiedPush remain unavailable until the eight-part ADR-005 approval gate is satisfied; an adapter cannot silently substitute a webhook, rich payload or another transport.
 
@@ -151,14 +151,14 @@ The platform provider observes endpoint, timing, frequency and its own routing m
 
 ### PUSH-B10 — configuration, metrics and unsupported platforms
 
-- **Owner:** Sim deployment/configuration and private operational surface.
+- **Owner:** Zed deployment/configuration and private operational surface.
 - **Rule:** public HTTPS URL, production/sandbox profile coherence, distinct keyrings, secrets, schema/privileges, resource limits and readiness are validated at startup. Metrics have a closed static label set and remain off the public listener.
 - **Fallback:** missing/mismatched configuration is not ready. FCM/UnifiedPush are absent from descriptors and clients visibly use foreground/manual sync.
 - **Tests:** Tasks 22.10, 22.12, 43.7, 44.5 and 48.2.
 
 ## Known gaps and strengthening obligations
 
-1. Buzz implements the complete lease/matcher/outbox path across `buzz-relay`, `buzz-db`, migrations and the gateway; auditing the gateway crate alone would omit the authoritative match and retry semantics. Tasks 22.6–22.13 must consolidate all four owners into Sim rather than porting a standalone second queue.
+1. Buzz implements the complete lease/matcher/outbox path across `buzz-relay`, `buzz-db`, migrations and the gateway; auditing the gateway crate alone would omit the authoritative match and retry semantics. Tasks 22.6–22.13 must consolidate all four owners into Zed rather than porting a standalone second queue.
 2. Buzz's relay worker has several fallible wake completion/retry calls whose errors are discarded after warnings or not surfaced. The canonical executor must record disposition failures, allow claim recovery and alert on stuck age; Task 22.8 owns that strengthening.
 3. A gateway delivery task is detached after send-begin so handler cancellation cannot undo replay fences, but process termination can leave a retryable request reservation until bounded request expiry. This is accepted best-effort behavior only with Task 22.12 recovery/age evidence.
 4. App Attest does not prove that the submitted APNs token belongs to the attested application key. Endpoint uniqueness, rotation, rate limits and revocation bound the bootstrap assumption; Task 22.9 must preserve the explicit claim.

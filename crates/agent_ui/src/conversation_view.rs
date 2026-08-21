@@ -17,7 +17,7 @@ use anyhow::{Result, anyhow};
 #[cfg(feature = "audio")]
 use audio::{Audio, Sound};
 use buffer_diff::BufferDiff;
-use client::sim_urls;
+use client::zed_urls;
 use collections::{HashMap, HashSet, IndexMap};
 use editor::scroll::Autoscroll;
 use editor::{
@@ -50,7 +50,7 @@ use crate::{AgentThreadSource, DEFAULT_THREAD_TITLE, resolve_agent_image};
 use lru::LruCache;
 use rope::Point;
 use settings::{NotifyWhenAgentWaiting, Settings as _, SettingsStore};
-use sim_actions::agent::{Chat, ToggleModelSelector};
+use zed_actions::agent::{Chat, ToggleModelSelector};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -2115,7 +2115,7 @@ impl ConversationView {
         window.spawn(cx, async move |cx| {
             let mut task = login.clone();
             if let Some(cmd) = &task.command {
-                // Have "node" command use Sim's managed Node runtime by default
+                // Have "node" command use Zed's managed Node runtime by default
                 if cmd == "node" {
                     let resolved_node_runtime = project.update(cx, |project, cx| {
                         let agent_server_store = project.agent_server_store().clone();
@@ -2724,7 +2724,7 @@ impl ConversationView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let (heading_label, description_label) = (
-            format!("Upgrade {} to work with Sim", self.agent.agent_id()),
+            format!("Upgrade {} to work with Zed", self.agent.agent_id()),
             if version.is_empty() {
                 format!(
                     "Currently using {}, which does not report a valid --version",
@@ -3165,7 +3165,7 @@ impl ConversationView {
     }
 
     fn current_model_name(&self, cx: &App) -> SharedString {
-        // For native agent (Sim Agent), use the specific model name (e.g., "Claude 3.5 Sonnet")
+        // For native agent (Zed Agent), use the specific model name (e.g., "Claude 3.5 Sonnet")
         // For ACP agents, use the agent name (e.g., "Claude Agent", "Gemini CLI")
         // This provides better clarity about what refused the request
         if self.as_native_connection(cx).is_some() {
@@ -3279,7 +3279,7 @@ fn native_available_skills(
 }
 
 fn placeholder_text(agent_name: &str, has_commands: bool) -> String {
-    if agent_name == agent::SIM_AGENT_ID.as_ref() {
+    if agent_name == agent::ZED_AGENT_ID.as_ref() {
         format!(
             "Message the {}, @ to include context, / for commands",
             agent_name
@@ -11256,7 +11256,7 @@ pub(crate) mod tests {
         cx.focus(&editor);
 
         editor.update_in(cx, |_editor, window, cx| {
-            window.dispatch_action(Box::new(sim_actions::editor::MoveUp), cx);
+            window.dispatch_action(Box::new(zed_actions::editor::MoveUp), cx);
         });
         cx.run_until_parked();
 
@@ -11274,7 +11274,7 @@ pub(crate) mod tests {
 
         // With a non-empty editor, another MoveUp must not consume the queue.
         editor.update_in(cx, |_editor, window, cx| {
-            window.dispatch_action(Box::new(sim_actions::editor::MoveUp), cx);
+            window.dispatch_action(Box::new(zed_actions::editor::MoveUp), cx);
         });
         cx.run_until_parked();
 

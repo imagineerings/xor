@@ -462,7 +462,7 @@ fn fixed_event_id(bytes: Vec<u8>) -> Result<EventId, SearchRepositoryError> {
 
 fn source_system_from_database(value: &str) -> Result<SourceSystem, SearchRepositoryError> {
     match value {
-        "sim" => Ok(SourceSystem::Sim),
+        "zed" => Ok(SourceSystem::Zed),
         "buzz" => Ok(SourceSystem::Buzz),
         "nostr" => Ok(SourceSystem::Nostr),
         "acp" => Ok(SourceSystem::Acp),

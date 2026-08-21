@@ -9,7 +9,7 @@ Canonical ownership remains unchanged:
 - `crates/collaboration_workflow` owns the I/O-free definition, condition, retry and run-state model. Definitions cannot execute actions or store secrets.
 - `crates/collab` owns authenticated trigger admission, durable run/step/approval state, leases, retries, cancellation, action orchestration and audit linkage.
 - Existing canonical collaboration commands own message, DM, channel, reaction, agent-job and other product mutations. A workflow executor is a caller of those commands, never a second permission or persistence path.
-- Sim's credentials provider owns webhook and action secrets. Definitions contain opaque secret references; resolved values are late-bound for one attempt and are never projected, persisted in traces or returned to clients.
+- Zed's credentials provider owns webhook and action secrets. Definitions contain opaque secret references; resolved values are late-bound for one attempt and are never projected, persisted in traces or returned to clients.
 - `crates/nostr_compat` owns signed workflow/approval event compatibility. Wire events authenticate requests but cannot independently mutate run or approval state.
 - The canonical audit writer owns tamper-evident records keyed by stable operation IDs. Workflow logs and activity projections are bounded, redacted views rather than authority.
 

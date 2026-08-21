@@ -21,7 +21,7 @@
     "profile": "ffmpeg-7.1",
     "encoding": "canonical-json-with-trailing-newline",
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-video-codec-dependency-contract-v1",
+    "signature_domain": "zed-comfy-video-codec-dependency-contract-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "unsafe_owner": "comfy_runtime::native_video_codec_ffi",
     "primary_catalog_digest_bound": true,

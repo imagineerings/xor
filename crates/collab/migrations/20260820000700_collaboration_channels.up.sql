@@ -14,7 +14,7 @@ CREATE TABLE public.collaboration_communities (
     ),
     aggregate_version numeric(20, 0) NOT NULL CHECK (aggregate_version >= 1),
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -53,7 +53,7 @@ CREATE TABLE public.collaboration_community_memberships (
     joined_at timestamptz NOT NULL,
     updated_at timestamptz NOT NULL,
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -89,7 +89,7 @@ CREATE TABLE public.collaboration_join_policy_acceptances (
     policy_version text NOT NULL CHECK (octet_length(policy_version) BETWEEN 1 AND 256),
     accepted_at timestamptz NOT NULL,
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -141,7 +141,7 @@ CREATE TABLE public.collaboration_channels (
     expires_at timestamptz,
     channel_version numeric(20, 0) NOT NULL CHECK (channel_version >= 1),
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -195,7 +195,7 @@ CREATE TABLE public.collaboration_channel_invites (
     created_by_principal_id uuid NOT NULL,
     invite_version numeric(20, 0) NOT NULL CHECK (invite_version >= 1),
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024
@@ -246,7 +246,7 @@ CREATE TABLE public.collaboration_channel_memberships (
     updated_at timestamptz NOT NULL,
     hidden_at timestamptz,
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024

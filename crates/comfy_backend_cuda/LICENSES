@@ -1,11 +1,11 @@
-Sim NVIDIA CUDA adapter metadata
+Zed NVIDIA CUDA adapter metadata
 
-Sim adapter source, checked declarations, package tooling, PTX/kernel metadata, and
+Zed adapter source, checked declarations, package tooling, PTX/kernel metadata, and
 notices are licensed GPL-3.0-or-later.
 
 The NVIDIA CUDA driver, CUDA Toolkit, NVRTC, cuBLASLt, cuDNN, SDK headers,
 libraries, firmware, and generated vendor binaries are NVIDIA materials governed
-by their respective NVIDIA licenses. Sim must not redistribute the NVIDIA display
+by their respective NVIDIA licenses. Zed must not redistribute the NVIDIA display
 driver. No CUDA Toolkit, cuBLASLt, cuDNN, PTX, or binary runtime payload is included
 in this foundation package: redistribution requires a separately recorded legal
 approval and exact allowlisted digests.
@@ -23,7 +23,7 @@ cudnn_version_v9.h files from the official cuDNN 9.0.0.312 CUDA 12 archive.
 The unversioned cudnn.h archive entry is a symbolic link and is deliberately not
 treated as immutable regular-file evidence.
 
-The package signature covers only Sim-owned metadata. It does not certify an SDK,
+The package signature covers only Zed-owned metadata. It does not certify an SDK,
 driver, library, PTX image, device, or runtime version. The runtime must compare
 exact immutable library bytes and the complete reviewed symbol contract through
 comfy_runtime::NativeFfiRegistry before the unsafe loader can run.

@@ -277,7 +277,7 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
         },
         provenance: ManifestProvenance {
             source: "fixture://test.echo-plugin".to_owned(),
-            publisher: "Sim test publisher".to_owned(),
+            publisher: "Zed test publisher".to_owned(),
             registry: Some("fixture://signed-registry".to_owned()),
         },
         provider_binding: None,
@@ -341,21 +341,21 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
     )?;
     let mut provider_binding = ProviderBindingSet {
         schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
-        implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
             feature_id: "COMFY-NODE-0141".to_owned(),
             node_id: "ElevenLabsAudioIsolation".to_owned(),
             contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
                 .to_owned(),
-            transport_schema: "sim:comfy-provider-transport@1".parse()?,
-            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+            transport_schema: "zed:comfy-provider-transport@1".parse()?,
+            materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
         }],
     };
     provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
     Ok(PluginManifest {
         schema_version: 1,
-        identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -371,7 +371,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         },
         provenance: ManifestProvenance {
             source: "fixture://test.provider-plugin".to_owned(),
-            publisher: "Sim provider fixture".to_owned(),
+            publisher: "Zed provider fixture".to_owned(),
             registry: Some("fixture://signed-registry".to_owned()),
         },
         provider_binding: Some(provider_binding),
@@ -601,7 +601,7 @@ impl PluginCapabilityServices for TestPluginServices {
         let mut bytes = Vec::with_capacity(length);
         while bytes.len() < length {
             let mut hasher = Sha256::new();
-            hasher.update(b"sim-comfy-plugin-random-v1");
+            hasher.update(b"zed-comfy-plugin-random-v1");
             hasher.update(seed);
             hasher.update(counter.to_le_bytes());
             let block = hasher.finalize();
@@ -655,9 +655,9 @@ fn component_resources() -> Result<Arc<dyn PluginCapabilityServices>, Box<dyn Er
         .insert("workflow".to_owned(), 1_234);
     resources.random_seeds.insert("sampler".to_owned(), [7; 32]);
     resources.models.insert(
-        "sim-asset://model/fixture.json".to_owned(),
+        "zed-asset://model/fixture.json".to_owned(),
         ModelValue::new(
-            "sim-asset://model/fixture.json",
+            "zed-asset://model/fixture.json",
             "json-config",
             "4".repeat(64),
         )?,
@@ -1918,7 +1918,7 @@ fn assert_no_wasi_component(component: &[u8]) -> Result<(), Box<dyn Error>> {
             return Err("compiled plugin fixture unexpectedly imports WASI".into());
         }
     }
-    let host_interface = b"sim:comfy-plugin/host@1.0.0";
+    let host_interface = b"zed:comfy-plugin/host@1.0.0";
     if !component
         .windows(host_interface.len())
         .any(|window| window == host_interface)
@@ -2181,7 +2181,7 @@ fn api_catalog_projection_is_exact() -> Result<bool, Box<dyn Error>> {
             && projected["output_node"] == binding.native.output_node
             && deprecated_is_exact
             && experimental_is_exact
-            && projected["sim_schema"] == source_schema;
+            && projected["zed_schema"] == source_schema;
         if !exact {
             eprintln!("{class_type} catalog/API mismatch: {projected:#}");
         }
@@ -2704,7 +2704,7 @@ async fn val_worker_plugin_001(executor: BackgroundExecutor) {
         )
         .await;
         let trapped = errors
-            .get("sim.comfy.component-host.v1")
+            .get("zed.comfy.component-host.v1")
             .ok_or("fuel-bounded component update unexpectedly succeeded")?;
         assert!(
             trapped.contains("fuel") || trapped.contains("trap"),
@@ -3191,8 +3191,8 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
         let registry_adapter_source = fs::read_to_string(
             workspace_root.join("crates/comfy_plugin_host/src/registry_adapter.rs"),
         )?;
-        let sim_source = fs::read_to_string(workspace_root.join("crates/sim/src/sim.rs"))?;
-        let main_source = fs::read_to_string(workspace_root.join("crates/sim/src/main.rs"))?;
+        let zed_source = fs::read_to_string(workspace_root.join("crates/zed/src/zed.rs"))?;
+        let main_source = fs::read_to_string(workspace_root.join("crates/zed/src/main.rs"))?;
         let component_runtime_definitions =
             source_occurrences(&sources, "pub struct ComponentRuntime");
         let component_host_definitions = source_occurrences(&sources, "pub struct ComponentHost {");
@@ -3203,7 +3203,7 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
                 .collect::<Vec<_>>();
         let native_registry_definitions =
             source_occurrences(&sources, "pub struct NativeNodeRegistry");
-        let sim_initialization = main_source.find("sim::init(cx);");
+        let zed_initialization = main_source.find("zed::init(cx);");
         let extension_initialization = main_source.find("extension_host::init(");
 
         cases.extend(BTreeMap::from([
@@ -3226,17 +3226,17 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
                     && extension_source.contains("adapter.synchronize(components.clone())"),
             ),
             (
-                "production_sim_bootstrap_precedes_extension_store",
-                sim_initialization.is_some()
+                "production_zed_bootstrap_precedes_extension_store",
+                zed_initialization.is_some()
                     && extension_initialization.is_some()
-                    && sim_initialization < extension_initialization
-                    && sim_source.contains("init_comfy_component_host(cx)")
-                    && sim_source.contains("register_component_lifecycle_adapter(")
-                    && sim_source
+                    && zed_initialization < extension_initialization
+                    && zed_source.contains("init_comfy_component_host(cx)")
+                    && zed_source.contains("register_component_lifecycle_adapter(")
+                    && zed_source
                         .matches("register_component_lifecycle_adapter(")
                         .count()
                         == 1
-                    && sim_source.contains("ComfyComponentHostGlobal"),
+                    && zed_source.contains("ComfyComponentHostGlobal"),
             ),
             (
                 "component_host_is_single_verified_adapter",
@@ -3316,8 +3316,8 @@ async fn val_plugin_host_001(executor: BackgroundExecutor) {
             "crates/comfy_test_support/tests/plugin_e2e.rs",
             "crates/extension_host/src/extension_host.rs",
             "crates/extension_host/src/wasm_host.rs",
-            "crates/sim/src/main.rs",
-            "crates/sim/src/sim.rs",
+            "crates/zed/src/main.rs",
+            "crates/zed/src/zed.rs",
         ];
         let fixture_digests = fixture_paths
             .into_iter()

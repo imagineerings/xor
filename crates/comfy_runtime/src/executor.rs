@@ -931,7 +931,7 @@ fn provider_contract_sha256(
         .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
     let mut hasher = Sha256::new();
     for field in [
-        b"sim:comfy-native-provider-contract@1".as_slice(),
+        b"zed:comfy-native-provider-contract@1".as_slice(),
         feature_id.as_bytes(),
         implementation_namespace.as_bytes(),
         descriptor.as_slice(),
@@ -957,7 +957,7 @@ fn provider_activation_sha256(
         .map_err(|_| NativeNodeRegistryError::InvalidProviderActivation)?;
     let mut hasher = Sha256::new();
     for field in [
-        b"sim:comfy-provider-activation-set@1".as_slice(),
+        b"zed:comfy-provider-activation-set@1".as_slice(),
         profile_id.as_bytes(),
         component_snapshot_sha256.as_bytes(),
         component_digest_sha256.as_bytes(),
@@ -1849,7 +1849,7 @@ fn prepared_effect_transaction_id(
     request_digest_sha256: &str,
 ) -> Uuid {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.prepared-effect-transaction.v1");
+    hasher.update(b"zed.comfy.prepared-effect-transaction.v1");
     hasher.update(identity.service_id().as_bytes());
     hasher.update(identity.attempt_id().0.as_bytes());
     hasher.update(identity.node_id().0.as_bytes());
@@ -1863,7 +1863,7 @@ fn prepared_effect_transaction_id(
 
 fn node_effect_service_id(prompt_id: PromptId, attempt_id: AttemptId, node_id: &NodeId) -> Uuid {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.node-effect-service.v1");
+    hasher.update(b"zed.comfy.node-effect-service.v1");
     hasher.update(prompt_id.0.as_bytes());
     hasher.update(attempt_id.0.as_bytes());
     hasher.update(node_id.0.as_bytes());
@@ -3421,7 +3421,7 @@ fn structured_tree_value(
                 ExecutionError::HandleStore("structured input field has no value".to_owned())
             })?
         } else {
-            structured_tree_value(&name, "sim.structured@1", child)?
+            structured_tree_value(&name, "zed.structured@1", child)?
         };
         if fields.insert(name, value).is_some() {
             return Err(ExecutionError::HandleStore(
@@ -3463,7 +3463,7 @@ fn normalize_structured_field(value: NativeValue) -> NativeValue {
             match primitive {
                 Some(value) => NativeValue::Primitive { value },
                 None => NativeValue::PreservedUnknown {
-                    type_name: "sim.json@1".to_owned(),
+                    type_name: "zed.json@1".to_owned(),
                     value: Value::Number(value),
                 },
             }
@@ -3472,7 +3472,7 @@ fn normalize_structured_field(value: NativeValue) -> NativeValue {
             value: comfy_nodes::NativePrimitive::String(value),
         },
         value @ (Value::Array(_) | Value::Object(_)) => NativeValue::PreservedUnknown {
-            type_name: "sim.json@1".to_owned(),
+            type_name: "zed.json@1".to_owned(),
             value,
         },
     }
@@ -3755,7 +3755,7 @@ pub(crate) mod tests {
         Ok(NativeStoredPayload::Provider(Arc::new(
             NativeProviderPayload::checked(
                 NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
-                "sim.test.provider",
+                "zed.test.provider",
                 semantic_digest_sha256,
                 abi_bytes,
             )?,
@@ -4701,7 +4701,7 @@ pub(crate) mod tests {
         assert_eq!(registry.presentation("Component"), Some(&presentation));
         assert_eq!(
             registry.binding_source("Component"),
-            Some("sim.native_rust")
+            Some("zed.native_rust")
         );
         registry.validate_comprehensive_bindings()?;
         Ok(())
@@ -5170,7 +5170,7 @@ pub(crate) mod tests {
         let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"shared-payload"));
         let shared = Arc::new(NativeProviderPayload::checked(
             NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
-            "sim.test.provider",
+            "zed.test.provider",
             semantic_digest_sha256,
             b"shared-payload".to_vec(),
         )?);
@@ -5213,7 +5213,7 @@ pub(crate) mod tests {
         let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"guarded-shared-payload"));
         let shared = Arc::new(NativeProviderPayload::checked(
             NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
-            "sim.test.provider",
+            "zed.test.provider",
             semantic_digest_sha256,
             b"guarded-shared-payload".to_vec(),
         )?);
@@ -5608,7 +5608,7 @@ pub(crate) mod tests {
         let semantic_digest_sha256 = format!("{:x}", Sha256::digest(b"cache-shared-payload"));
         let shared = Arc::new(NativeProviderPayload::checked(
             NativeHandleType::new(NativeHandleKind::ProviderTask, "TEST_PROVIDER_TASK")?,
-            "sim.test.provider",
+            "zed.test.provider",
             semantic_digest_sha256,
             b"cache-shared-payload".to_vec(),
         )?);
@@ -5889,7 +5889,7 @@ pub(crate) mod tests {
             feature_id: catalog_descriptor.feature_id.clone(),
             descriptor,
             presentation,
-            provider: "sim.provider.test".to_owned(),
+            provider: "zed.provider.test".to_owned(),
             reason: "verified provider activation is required".to_owned(),
         };
         let NativeNodeBinding::ProviderRequired {
@@ -5911,13 +5911,13 @@ pub(crate) mod tests {
         registry.validate_comprehensive_bindings()?;
 
         let transport_schema: comfy_plugin_sdk::CanonicalTypeId =
-            "sim:comfy-provider-transport@1".parse()?;
+            "zed:comfy-provider-transport@1".parse()?;
         let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
-            "sim:comfy-provider-materializer@1".parse()?;
+            "zed:comfy-provider-materializer@1".parse()?;
         assert!(matches!(
             registry.provider_binding_contract_sha256(
                 &descriptor.class_type,
-                "sim:unsupported-provider-transport@1",
+                "zed:unsupported-provider-transport@1",
                 &materializer_schema.to_string(),
             ),
             Err(NativeNodeRegistryError::InvalidProviderActivation)
@@ -5926,7 +5926,7 @@ pub(crate) mod tests {
             registry.provider_binding_contract_sha256(
                 &descriptor.class_type,
                 &transport_schema.to_string(),
-                "sim:unsupported-provider-materializer@1",
+                "zed:unsupported-provider-materializer@1",
             ),
             Err(NativeNodeRegistryError::InvalidProviderActivation)
         ));
@@ -5946,7 +5946,7 @@ pub(crate) mod tests {
         };
         let mut binding_set = ProviderBindingSet {
             schema_version: comfy_plugin_sdk::PROVIDER_BINDING_SCHEMA_VERSION,
-            implementation_namespace: "sim.provider.test".to_owned(),
+            implementation_namespace: "zed.provider.test".to_owned(),
             bindings_sha256: "0".repeat(64),
             bindings: vec![claim.clone()],
         };
@@ -5954,7 +5954,7 @@ pub(crate) mod tests {
         let mismatched_node: Arc<dyn NativeNode> = Arc::new(ConfiguredNode {
             class_type: descriptor.class_type.clone(),
             version: descriptor.implementation_version.clone(),
-            namespace: "sim.provider.mismatch".to_owned(),
+            namespace: "zed.provider.mismatch".to_owned(),
         });
         let mismatched_activation = NativeProviderBindingActivationSet::checked(
             "profile-a",
@@ -6021,7 +6021,7 @@ pub(crate) mod tests {
         if catalog_descriptors.len() != 2 {
             return Err("generated catalog did not include two provider bindings".into());
         }
-        let provider = "sim.provider.complete";
+        let provider = "zed.provider.complete";
         let bindings = catalog_descriptors
             .iter()
             .map(|catalog_descriptor| NativeNodeBinding::ProviderRequired {
@@ -6065,9 +6065,9 @@ pub(crate) mod tests {
         let mut registry = NativeNodeRegistry::default();
         registry.register_native_bindings(bindings.clone())?;
         let transport_schema: comfy_plugin_sdk::CanonicalTypeId =
-            "sim:comfy-provider-transport@1".parse()?;
+            "zed:comfy-provider-transport@1".parse()?;
         let materializer_schema: comfy_plugin_sdk::CanonicalTypeId =
-            "sim:comfy-provider-materializer@1".parse()?;
+            "zed:comfy-provider-materializer@1".parse()?;
         let mut claims = Vec::new();
         let mut activations = Vec::new();
         for binding in bindings {

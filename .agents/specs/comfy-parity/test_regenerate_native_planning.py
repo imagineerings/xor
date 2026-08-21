@@ -2754,7 +2754,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_api/src/services.rs", foundation_writes)
         self.assertIn("crates/comfy_plugin_host/src/registry_adapter.rs", foundation_writes)
         self.assertIn("crates/comfy_ui/src/execution_model.rs", foundation_writes)
-        self.assertIn("crates/sim/src/sim.rs", foundation_writes)
+        self.assertIn("crates/zed/src/zed.rs", foundation_writes)
         self.assertIn(
             "crates/comfy_test_support/tests/plugin_e2e.rs", foundation_writes
         )
@@ -2887,8 +2887,8 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn("crates/comfy_api/src/security.rs", provider_writes)
         self.assertIn("crates/comfy_api/src/headless.rs", provider_writes)
         self.assertIn("crates/comfy_ui/src/execution_model.rs", provider_writes)
-        self.assertIn("crates/sim/src/comfy_plugin_services.rs", provider_writes)
-        self.assertIn("crates/sim/src/sim.rs", provider_writes)
+        self.assertIn("crates/zed/src/comfy_plugin_services.rs", provider_writes)
+        self.assertIn("crates/zed/src/zed.rs", provider_writes)
         provider_task = tasks_by_id["comfy-parity-native-node-provider-invocation-foundation"]
         self.assertEqual(
             provider_task["criterion_ids"],
@@ -2928,17 +2928,17 @@ class ValidationGenerationTests(unittest.TestCase):
             ["comfy-parity-native-node-asset-effect-foundation"],
         )
         for path in [
-            "crates/sim/Cargo.toml",
-            "crates/sim/src/main.rs",
-            "crates/sim/src/sim.rs",
-            "crates/sim/src/sim/app_menus.rs",
+            "crates/zed/Cargo.toml",
+            "crates/zed/src/main.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/zed/app_menus.rs",
             "crates/extension_host/Cargo.toml",
             "crates/extension_host/src/extension_host.rs",
             "script/check-comfy-feature-boundary",
             "script/bundle-mac",
             "script/bundle-linux",
             "script/bundle-windows.ps1",
-            "crates/sim/resources/windows/sim.iss",
+            "crates/zed/resources/windows/zed.iss",
             "crates/comfy_test_support/tests/native_release_boundary.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
@@ -2946,9 +2946,9 @@ class ValidationGenerationTests(unittest.TestCase):
         ]:
             self.assertIn(path, build_boundary_task["writes"])
         for command in [
-            "cargo check --locked -p sim --no-default-features",
-            "cargo test --locked -p sim --no-default-features",
-            "cargo check --locked -p sim --features comfy",
+            "cargo check --locked -p zed --no-default-features",
+            "cargo test --locked -p zed --no-default-features",
+            "cargo check --locked -p zed --features comfy",
             "PYTHONDONTWRITEBYTECODE=1 python3 .agents/specs/comfy-parity/validate_backend_dependencies.py",
             "cargo test --locked -p comfy_test_support --test native_release_boundary val_native_boundary_001_packaged_release -- --exact --nocapture",
             "cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001 -- --exact --nocapture",
@@ -2984,7 +2984,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn("crates/comfy_worker/src/comfy_worker.rs", registry_writes)
         self.assertIn("crates/comfy_api/src/services.rs", registry_writes)
-        self.assertIn("crates/sim/src/sim.rs", registry_writes)
+        self.assertIn("crates/zed/src/zed.rs", registry_writes)
 
         schema_commands = planning.task_validation_commands(
             tasks_by_id["comfy-parity-native-node-schema-metadata-foundation"]

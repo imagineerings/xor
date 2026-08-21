@@ -1,4 +1,4 @@
-schema=sim-comfy-npu-reviewed-bindings-v1
+schema=zed-comfy-npu-reviewed-bindings-v1
 abi_floor=CANN-8.0.RC3-AscendCL
 source=https://www.hiascend.com/doc_center/source/zh/canncommercial/80RC3/apiref/appdevgapi/CANN%208.0.RC3%20%E5%BA%94%E7%94%A8%E5%BC%80%E5%8F%91%E6%8E%A5%E5%8F%A3%2001.pdf
 source_sha256=91d8bd8a346bda371c8175066ac5155fb27ccfe4ba63091730ec29dcd96dd091

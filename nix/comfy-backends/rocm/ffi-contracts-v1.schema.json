@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/rocm/ffi-contracts-v1.schema.json",
-  "title": "Sim ROCm native FFI contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/rocm/ffi-contracts-v1.schema.json",
+  "title": "Zed ROCm native FFI contracts v1",
   "$comment": "The packaging validator additionally enforces UTF-8 byte size, sorted unique identities and symbols, exact filename/SONAME equality, the complete primary set, and recursive identity equality with rocm-dependency:<soname>.",
   "type": "object",
   "additionalProperties": false,

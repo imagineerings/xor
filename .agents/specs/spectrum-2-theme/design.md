@@ -4,15 +4,15 @@
 
 ### Rationale
 
-Sim's default themes ("One Dark" / "One Light") are derived from Atom One, a scheme designed in 2014. This design replaces them with a theme inspired by Adobe Spectrum 2 — a modern design system built around layered surfaces, semantic color tokens, restrained accent usage, and accessibility.
+Zed's default themes ("One Dark" / "One Light") are derived from Atom One, a scheme designed in 2014. This design replaces them with a theme inspired by Adobe Spectrum 2 — a modern design system built around layered surfaces, semantic color tokens, restrained accent usage, and accessibility.
 
-The core design decision is: **translate Spectrum 2's design language into Sim's existing theme schema without modifying any Rust code or the schema itself.** This is purely a data change — a new JSON file with carefully curated color values.
+The core design decision is: **translate Spectrum 2's design language into Zed's existing theme schema without modifying any Rust code or the schema itself.** This is purely a data change — a new JSON file with carefully curated color values.
 
 ### Key Architectural Decisions
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| File location | Local `~/.config/sim/themes/` | Installed as a user theme, not replacing the built-in. Allows One theme to remain available. |
+| File location | Local `~/.config/zed/themes/` | Installed as a user theme, not replacing the built-in. Allows One theme to remain available. |
 | Naming | "Spectrum 2 Inspired" (family), "Spectrum 2 Inspired Light" / "Spectrum 2 Inspired Dark" | Clearly communicates inspiration without claiming Adobe branding. |
 | Palette approach | Hand-curated hex values, not algorithmic | Provides precise control over perceived lightness, saturation, and hue relationships. |
 | Surface layering | 4 distinct layers (background → panel → editor → elevated) | Creates clear visual hierarchy without hard borders. |
@@ -21,16 +21,16 @@ The core design decision is: **translate Spectrum 2's design language into Sim's
 
 ### Technology Stack
 
-- **Format**: JSON (Sim theme schema `v0.2.0`)
+- **Format**: JSON (Zed theme schema `v0.2.0`)
 - **No dependencies**: The theme is self-contained, no build step, no imports
-- **Validation**: JSON Schema at `https://sim.dev/schema/themes/v0.2.0.json`
+- **Validation**: JSON Schema at `https://zed.dev/schema/themes/v0.2.0.json`
 
 ## 2. Architecture
 
 ### Theme File Structure
 
 ```
-~/.config/sim/themes/
+~/.config/zed/themes/
 └── spectrum-2-inspired.json
     ├── $schema
     ├── name: "Spectrum 2 Inspired"
@@ -44,7 +44,7 @@ The core design decision is: **translate Spectrum 2's design language into Sim's
 
 ```mermaid
 flowchart LR
-    A[spectrum-2-themed.json] --> B[Sim Theme Loader]
+    A[spectrum-2-themed.json] --> B[Zed Theme Loader]
     B --> C[ThemeRegistry]
     C --> D[ThemeColors]
     C --> E[StatusColors]
@@ -63,7 +63,7 @@ The theme loader reads the JSON, deserializes it into thematic structs, and dist
 ### Color Mapping Architecture
 
 ```
-Spectrum 2 Concept           → Sim Theme Key
+Spectrum 2 Concept           → Zed Theme Key
 ────────────────────────────────────────────────
 base (most background)       → background
 layer-1 (panel surface)      → panel.background
@@ -86,13 +86,13 @@ informative (blue semantic)  → info, hint, renamed
 
 **Purpose**: Define all color values for both light and dark appearance variants.
 
-**Interface contract**: Must conform to `https://sim.dev/schema/themes/v0.2.0.json`.
+**Interface contract**: Must conform to `https://zed.dev/schema/themes/v0.2.0.json`.
 
 **Structure**:
 
 ```json
 {
-  "$schema": "https://sim.dev/schema/themes/v0.2.0.json",
+  "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
   "name": "Spectrum 2 Inspired",
   "author": "Ahmad Vegah",
   "themes": [
@@ -120,9 +120,9 @@ informative (blue semantic)  → info, hint, renamed
 
 ### 3.2 Surface Layer Definitions
 
-The surface layer system maps Spectrum 2's concept of `base` → `layer-1` → `layer-2` → `elevated` onto Sim's theme keys:
+The surface layer system maps Spectrum 2's concept of `base` → `layer-1` → `layer-2` → `elevated` onto Zed's theme keys:
 
-| Layer | Light | Dark | Sim Keys |
+| Layer | Light | Dark | Zed Keys |
 |---|---|---|---|
 | **App background** (Spectrum `base`) | `#F8F8FA` | `#15161A` | `background` |
 | **Panel surface** (Spectrum `layer-1`) | `#F1F2F4` | `#202127` | `surface.background`, `panel.background`, `tab_bar.background`, `status_bar.background`, `title_bar.background`, `toolbar.background` |
@@ -131,7 +131,7 @@ The surface layer system maps Spectrum 2's concept of `base` → `layer-1` → `
 
 ### 3.3 Accent Color Assignments
 
-**Primary accent (blue)** — mapped to these Sim keys:
+**Primary accent (blue)** — mapped to these Zed keys:
 
 | Token | Light | Dark |
 |---|---|---|
@@ -701,8 +701,8 @@ All colors use 8-digit hex RGBA: `#RRGGBBAA`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> JSON_File: User places theme in ~/.config/sim/themes/
-    JSON_File --> ThemeRegistry: Sim loads on startup
+    [*] --> JSON_File: User places theme in ~/.config/zed/themes/
+    JSON_File --> ThemeRegistry: Zed loads on startup
     ThemeRegistry --> SchemaValidation: Validate against v0.2.0 schema
     SchemaValidation --> ParsedTheme: Valid
     SchemaValidation --> ErrorLog: Invalid (skip)
@@ -781,8 +781,8 @@ _For any_ active theme variant, `terminal.foreground` SHALL have a contrast rati
 |---|---|---|---|
 | Invalid hex color | Typo in JSON value | Theme fails to load, falls back to default | Validate hex format before deployment using JSON schema linting |
 | Missing required key | Incomplete theme | UI element gets default/factory color | Reference `one.json` as complete key checklist |
-| Schema violation | Structural JSON error | Sim logs error, skips theme | Validate with `ajv` or similar JSON schema validator before copying |
-| File not found | Wrong path | Theme not available in selector | Ensure correct path `~/.config/sim/themes/` |
+| Schema violation | Structural JSON error | Zed logs error, skips theme | Validate with `ajv` or similar JSON schema validator before copying |
+| File not found | Wrong path | Theme not available in selector | Ensure correct path `~/.config/zed/themes/` |
 | Duplicate name | Another theme with same name | Conflicts in ThemeRegistry | Use unique name "Spectrum 2 Inspired" |
 | Override collision | User has `theme_overrides` for One theme | Overrides no-op for Spectrum theme | Document that overrides are theme-scoped |
 | Wrong contrast | Color looks different on different displays | Reduced readability | Test across multiple displays and OS color profiles |
@@ -791,7 +791,7 @@ _For any_ active theme variant, `terminal.foreground` SHALL have a contrast rati
 
 Since this is a data-only change, error handling is straightforward:
 1. **Before deployment**: Validate the JSON against the schema using `script/validate-theme` or schema linting
-2. **After deployment**: If the theme fails to load, Sim falls back to factory defaults — the app remains functional
+2. **After deployment**: If the theme fails to load, Zed falls back to factory defaults — the app remains functional
 3. **User recovery**: User can switch back to One Dark/Light via the Theme Selector at any time
 
 ## 7. Testing Strategy
@@ -800,7 +800,7 @@ Since this is a data-only change, error handling is straightforward:
 
 Each of these is a visual/manual check:
 
-1. **Surface layering**: Open Sim with 3 panels (project panel, editor, terminal). Verify each surface layer is visually distinct.
+1. **Surface layering**: Open Zed with 3 panels (project panel, editor, terminal). Verify each surface layer is visually distinct.
 2. **Accent consistency**: Click through inputs, buttons, tabs. Verify focused border and accent colors match.
 3. **Syntax scanning**: Open TypeScript, Rust, JSON, and Markdown files. Verify each token type is readable and distinct.
 4. **Diagnostics**: Trigger errors, warnings, info diagnostics. Verify colors match expected semantics.
@@ -847,8 +847,8 @@ Build `spectrum-2-inspired.json` with the complete color maps defined in section
 ### Step 3: Install
 
 ```bash
-mkdir -p ~/.config/sim/themes
-cp spectrum-2-inspired.json ~/.config/sim/themes/
+mkdir -p ~/.config/zed/themes
+cp spectrum-2-inspired.json ~/.config/zed/themes/
 ```
 
 ### Step 4: Test
@@ -857,7 +857,7 @@ Test across all surface types listed in section 7 and adjust color values based 
 
 ### Step 5: Update Settings
 
-The user can then configure Sim to use the new theme:
+The user can then configure Zed to use the new theme:
 
 ```json
 {

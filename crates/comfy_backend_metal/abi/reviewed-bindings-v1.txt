@@ -3,7 +3,7 @@ Xcode 26.2 build 17C52; macosx26.2 SDK; floor macos-13-metal-3
 Targets: aarch64-apple-darwin, x86_64-apple-darwin
 Unsafe owner: comfy_backend_metal::loader
 C symbols: MTLCreateSystemDefaultDevice, MPSSupportsMTLDevice
-Readiness function: sim_comfy_metal_readiness_v1
+Readiness function: zed_comfy_metal_readiness_v1
 Full header SHA-256 values are fixed in abi/symbols-v1.json and were measured from the installed Xcode SDK without redistributing headers.
 Reviewed declaration ranges:
 MTLDevice.h:130-137 9d25ce2b2c75969360d3f1464a97555a73f2549a9fc0e3daae25b081f7b905ac

@@ -131,7 +131,7 @@ fn f32_values(tensor: &Tensor) -> Vec<f32> {
 
 #[test]
 fn public_reference_projection_is_limited_to_the_generated_closed_catalog() {
-    assert!(OperationContractId::new("sim.native-internal.forged").is_err());
+    assert!(OperationContractId::new("zed.native-internal.forged").is_err());
     let references = OPERATION_CONTRACTS
         .iter()
         .filter_map(|contract| contract.typed_reference())
@@ -334,7 +334,7 @@ fn cpu_instance_properties_match_the_injected_allocation_ceiling() {
         None => panic!("constructed CPU backend has no native properties"),
     };
     assert_eq!(properties.device(), DeviceId::CPU);
-    assert_eq!(properties.name(), "Sim native Rust CPU");
+    assert_eq!(properties.name(), "Zed native Rust CPU");
     assert_eq!(properties.total_memory_bytes(), 33);
     assert_eq!(
         properties.total_memory_bytes(),

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.
+Implement an interactive terminal UI mode for zed's CLI using crossterm/ratatui, with a configuration wizard, extension management, markdown rendering, onboarding, and slash commands. This extends `crates/cli/` with a new `goose interactive` subcommand.
 
 ## Repo Reconciliation
 
@@ -48,7 +48,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - Step-by-step wizard for provider setup
   - Input types: text (with secret masking), confirm, select, file
   - Validation per step
-  - Persist to sim settings
+  - Persist to zed settings
 
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _Depends on: none_
@@ -135,7 +135,7 @@ Implement an interactive terminal UI mode for sim's CLI using crossterm/ratatui,
   - _Writes: crates/cli/_
   - _Validation: Review dry-run/state-preservation tests plus shell quoting, redaction, nested-hook, opt-out, and unsupported-platform tests_
 
-- [ ] 12. Reconcile every Goose command with a Sim domain owner
+- [ ] 12. Reconcile every Goose command with a Zed domain owner
   - Inventory session, provider, extension, plugin, skill, recipe, schedule, gateway, local-model, ACP, MCP, update, and validation commands
   - Record reuse, extension, exclusion, or unresolved status and route approved commands to their existing domain services
   - Add compatibility diagnostics for approved deprecated command names without duplicating domain logic

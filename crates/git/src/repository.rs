@@ -631,8 +631,8 @@ pub struct GitExcludeOverride {
 }
 
 impl GitExcludeOverride {
-    const START_BLOCK_MARKER: &str = "\n\n#  ====== Auto-added by Sim: =======\n";
-    const END_BLOCK_MARKER: &str = "\n#  ====== End of auto-added by Sim =======\n";
+    const START_BLOCK_MARKER: &str = "\n\n#  ====== Auto-added by Zed: =======\n";
+    const END_BLOCK_MARKER: &str = "\n#  ====== End of auto-added by Zed =======\n";
 
     pub async fn new(git_exclude_path: PathBuf) -> Result<Self> {
         let original_excludes =
@@ -696,7 +696,7 @@ impl GitExcludeOverride {
             }
         }
 
-        // Older versions of Sim didn't have end-of-block markers,
+        // Older versions of Zed didn't have end-of-block markers,
         // so it's impossible to determine auto-generated lines.
         // Conservatively remove the standard list of excludes
         let standard_excludes = format!(
@@ -1334,7 +1334,7 @@ pub async fn get_git_committer(cx: &AsyncApp) -> GitCommitter {
     }
 
     let git_binary_path =
-        if cfg!(target_os = "macos") && option_env!("SIM_BUNDLE").as_deref() == Some("true") {
+        if cfg!(target_os = "macos") && option_env!("ZED_BUNDLE").as_deref() == Some("true") {
             cx.update(|cx| {
                 cx.path_for_auxiliary_executable("git")
                     .context("could not find git binary path")
@@ -3707,7 +3707,7 @@ async fn run_git_command(
             .env("SSH_ASKPASS", ask_pass.script_path())
             .env("SSH_ASKPASS_REQUIRE", "force");
         #[cfg(target_os = "windows")]
-        command.env("SIM_ASKPASS_SOCKET", ask_pass.socket_path());
+        command.env("ZED_ASKPASS_SOCKET", ask_pass.socket_path());
         let git_process = command.spawn()?;
 
         run_askpass_command(ask_pass, git_process).await
@@ -3916,10 +3916,10 @@ fn parse_upstream_track(upstream_track: &str) -> Result<UpstreamTracking> {
 
 fn checkpoint_author_envs() -> HashMap<String, String> {
     HashMap::from_iter([
-        ("GIT_AUTHOR_NAME".to_string(), "Sim".to_string()),
-        ("GIT_AUTHOR_EMAIL".to_string(), "hi@sim.dev".to_string()),
-        ("GIT_COMMITTER_NAME".to_string(), "Sim".to_string()),
-        ("GIT_COMMITTER_EMAIL".to_string(), "hi@sim.dev".to_string()),
+        ("GIT_AUTHOR_NAME".to_string(), "Zed".to_string()),
+        ("GIT_AUTHOR_EMAIL".to_string(), "hi@zed.dev".to_string()),
+        ("GIT_COMMITTER_NAME".to_string(), "Zed".to_string()),
+        ("GIT_COMMITTER_EMAIL".to_string(), "hi@zed.dev".to_string()),
     ])
 }
 
@@ -3953,9 +3953,9 @@ mod tests {
             .env("GIT_CONFIG_GLOBAL", "")
             .env("GIT_CONFIG_SYSTEM", "")
             .env("GIT_AUTHOR_NAME", "test")
-            .env("GIT_AUTHOR_EMAIL", "test@sim.dev")
+            .env("GIT_AUTHOR_EMAIL", "test@zed.dev")
             .env("GIT_COMMITTER_NAME", "test")
-            .env("GIT_COMMITTER_EMAIL", "test@sim.dev")
+            .env("GIT_COMMITTER_EMAIL", "test@zed.dev")
             .output()
             .expect("failed to run git command");
         assert!(
@@ -5048,14 +5048,14 @@ mod tests {
     fn test_branches_parsing() {
         // suppress "help: octal escapes are not supported, `\0` is always null"
         #[allow(clippy::octal_escapes)]
-        let input = "*\0060964da10574cd9bf06463a53bf6e0769c5c45e\0\0refs/heads/sim-patches\0refs/remotes/origin/sim-patches\0\01733187470\0John Doe\0generated protobuf\n";
+        let input = "*\0060964da10574cd9bf06463a53bf6e0769c5c45e\0\0refs/heads/zed-patches\0refs/remotes/origin/zed-patches\0\01733187470\0John Doe\0generated protobuf\n";
         assert_eq!(
             parse_branch_input(input).unwrap(),
             vec![Branch {
                 is_head: true,
-                ref_name: "refs/heads/sim-patches".into(),
+                ref_name: "refs/heads/zed-patches".into(),
                 upstream: Some(Upstream {
-                    ref_name: "refs/remotes/origin/sim-patches".into(),
+                    ref_name: "refs/remotes/origin/zed-patches".into(),
                     tracking: UpstreamTracking::Tracked(UpstreamTrackingStatus {
                         ahead: 0,
                         behind: 0
@@ -5090,7 +5090,7 @@ mod tests {
                         sha: "eb0cae33272689bd11030822939dd2701c52f81e".into(),
                         subject: "Add feature".into(),
                         commit_timestamp: 1762948725,
-                        author_name: SharedString::new_static("Sim"),
+                        author_name: SharedString::new_static("Zed"),
                         has_parent: true,
                     })
                 },
@@ -5102,7 +5102,7 @@ mod tests {
                         sha: "895951d681e5561478c0acdd6905e8aacdfd2249".into(),
                         subject: "Initial commit".into(),
                         commit_timestamp: 1762948695,
-                        author_name: SharedString::new_static("Sim"),
+                        author_name: SharedString::new_static("Zed"),
                         has_parent: false,
                     })
                 }
@@ -5750,7 +5750,7 @@ mod tests {
             "remote",
             "add",
             "origin",
-            "https://github.com/simtropolis/sim.git",
+            "https://github.com/simtropolis/zed.git",
         ])
         .await
         .unwrap();
@@ -5767,7 +5767,7 @@ mod tests {
         assert_eq!(remote_urls.len(), 2);
         assert_eq!(
             remote_urls.get("origin").unwrap(),
-            "https://github.com/simtropolis/sim.git"
+            "https://github.com/simtropolis/zed.git"
         );
         assert_eq!(
             remote_urls.get("upstream").unwrap(),

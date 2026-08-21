@@ -226,7 +226,7 @@ manifest = {
     "package_receipt_is_authorization": False,
     "signer": signer,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-corex-package-v1",
+    "signature_domain": "zed-comfy-corex-package-v1",
     "signature_coverage": "package-coverage-v1",
     "runtime_verification_owner": "comfy_runtime::NativeFfiRegistry",
     "binding_status_owner": "comfy_types::NativeBackendBindingStatus",
@@ -258,7 +258,7 @@ pathlib.Path(sys.argv[1]).write_text(
     encoding="ascii",
 )
 PY
-    package_backend "$temporary/package" "x86_64-unknown-linux-gnu" "$receipt" "sim-test"
+    package_backend "$temporary/package" "x86_64-unknown-linux-gnu" "$receipt" "zed-test"
     cp "$temporary/package/adapter-manifest.json" "$temporary/manifest.json"
     printf '\n' >> "$temporary/package/adapter-manifest.json"
     if inspect_structure "$temporary/package" >/dev/null 2>&1; then

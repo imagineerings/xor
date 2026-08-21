@@ -71,13 +71,13 @@ mod provider_wit_contract {
         path: "../comfy_plugin_sdk/wit",
         world: "comfy-provider-plugin",
         with: {
-            "sim:comfy-plugin/types@1.0.0": super::wit_contract::sim::comfy_plugin::types,
-            "sim:comfy-plugin/host@1.0.0": super::wit_contract::sim::comfy_plugin::host,
+            "zed:comfy-plugin/types@1.0.0": super::wit_contract::zed::comfy_plugin::types,
+            "zed:comfy-plugin/host@1.0.0": super::wit_contract::zed::comfy_plugin::host,
         },
     });
 }
 
-type WitInvocationError = wit_contract::sim::comfy_plugin::types::InvocationError;
+type WitInvocationError = wit_contract::zed::comfy_plugin::types::InvocationError;
 
 pub const DEFAULT_API_FEATURES: &[&str] = &[
     "capabilities.transactional",
@@ -277,10 +277,10 @@ impl WasmPluginInstance {
         self.check_active()?;
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_manifest(&mut self.store),
             WasmBindings::Provider(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_manifest(&mut self.store),
         };
         match result {
@@ -318,10 +318,10 @@ impl WasmPluginInstance {
         }
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_create_node(&mut self.store, node_id),
             WasmBindings::Provider(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_create_node(&mut self.store, node_id),
         };
         match result {
@@ -344,7 +344,7 @@ impl WasmPluginInstance {
             return Err(PluginError::ProviderInvocationUnavailable);
         };
         let binding_set = bindings
-            .sim_comfy_plugin_provider_binding()
+            .zed_comfy_plugin_provider_binding()
             .call_binding_set(&mut self.store)
             .map_err(|error| self.wasm_call_error(error))?;
         let actual = match sdk_provider_binding_set(binding_set) {
@@ -365,10 +365,10 @@ impl WasmPluginInstance {
         self.check_active()?;
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_invoke(&mut self.store, instance),
             WasmBindings::Provider(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_invoke(&mut self.store, instance),
         };
         match result {
@@ -387,12 +387,12 @@ impl WasmPluginInstance {
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => {
                 bindings
-                    .sim_comfy_plugin_plugin()
+                    .zed_comfy_plugin_plugin()
                     .call_cancel(&mut self.store, instance, reason)
             }
             WasmBindings::Provider(bindings) => {
                 bindings
-                    .sim_comfy_plugin_plugin()
+                    .zed_comfy_plugin_plugin()
                     .call_cancel(&mut self.store, instance, reason)
             }
         };
@@ -413,10 +413,10 @@ impl WasmPluginInstance {
         self.check_active()?;
         let result = match &self.bindings {
             WasmBindings::Legacy(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_drop_node(&mut self.store, instance),
             WasmBindings::Provider(bindings) => bindings
-                .sim_comfy_plugin_plugin()
+                .zed_comfy_plugin_plugin()
                 .call_drop_node(&mut self.store, instance),
         };
         match result {
@@ -480,7 +480,7 @@ impl WasmPluginInstance {
             return Err(PluginError::ProviderInvocationUnavailable);
         };
         let response = match bindings
-            .sim_comfy_plugin_provider_binding()
+            .zed_comfy_plugin_provider_binding()
             .call_invoke_provider(&mut self.store, class_type, request)
         {
             Ok(Ok(response)) => response,
@@ -1050,7 +1050,7 @@ impl InvocationHost {
 
     fn finish_provider_response(
         mut self,
-        response: wit_contract::sim::comfy_plugin::types::ProviderInvocationResponse,
+        response: wit_contract::zed::comfy_plugin::types::ProviderInvocationResponse,
     ) -> Result<ProviderInvocationResult, InvocationError> {
         self.check_active()?;
         self.check_cancellation()?;
@@ -1468,18 +1468,18 @@ impl PluginInvocation for InvocationHost {
     }
 }
 
-impl wit_contract::sim::comfy_plugin::types::Host for WasmStoreState {}
+impl wit_contract::zed::comfy_plugin::types::Host for WasmStoreState {}
 
-impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
+impl wit_contract::zed::comfy_plugin::host::Host for WasmStoreState {
     fn get_input_state(
         &mut self,
         port_id: String,
-    ) -> Result<wit_contract::sim::comfy_plugin::host::InputState, WitInvocationError> {
+    ) -> Result<wit_contract::zed::comfy_plugin::host::InputState, WitInvocationError> {
         let state = self
             .invocation_mut()?
             .input_state(&port_id)
             .map_err(wit_error)?;
-        Ok(wit_contract::sim::comfy_plugin::host::InputState {
+        Ok(wit_contract::zed::comfy_plugin::host::InputState {
             present: state.present,
             length: state.length,
             type_id: state.type_id.to_string(),
@@ -1495,7 +1495,7 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
         &mut self,
         port_id: String,
         index: u32,
-    ) -> Result<wit_contract::sim::comfy_plugin::host::EncodedValue, WitInvocationError> {
+    ) -> Result<wit_contract::zed::comfy_plugin::host::EncodedValue, WitInvocationError> {
         let value = self
             .invocation_mut()?
             .read_scalar_input(&port_id, index)
@@ -1503,7 +1503,7 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
         let abi_bytes = value.abi_bytes().map_err(|error| {
             wit_host_failure(&format!("plugin value ABI encoding failed: {error}"))
         })?;
-        Ok(wit_contract::sim::comfy_plugin::host::EncodedValue {
+        Ok(wit_contract::zed::comfy_plugin::host::EncodedValue {
             type_id: value.type_id().to_string(),
             family: wit_value_family(value.family()),
             abi_bytes,
@@ -1514,7 +1514,7 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
         &mut self,
         port_id: String,
         index: u32,
-    ) -> Result<wit_contract::sim::comfy_plugin::host::ValueHandle, WitInvocationError> {
+    ) -> Result<wit_contract::zed::comfy_plugin::host::ValueHandle, WitInvocationError> {
         self.invocation_mut()?
             .take_input(&port_id, index)
             .map(wit_value_handle)
@@ -1523,8 +1523,8 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
 
     fn read_handle(
         &mut self,
-        handle: wit_contract::sim::comfy_plugin::host::ValueHandle,
-    ) -> Result<wit_contract::sim::comfy_plugin::host::EncodedValue, WitInvocationError> {
+        handle: wit_contract::zed::comfy_plugin::host::ValueHandle,
+    ) -> Result<wit_contract::zed::comfy_plugin::host::EncodedValue, WitInvocationError> {
         let handle = sdk_value_handle(handle);
         let value = self
             .invocation_mut()?
@@ -1533,7 +1533,7 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
         let abi_bytes = value.abi_bytes().map_err(|error| {
             wit_host_failure(&format!("plugin value ABI encoding failed: {error}"))
         })?;
-        Ok(wit_contract::sim::comfy_plugin::host::EncodedValue {
+        Ok(wit_contract::zed::comfy_plugin::host::EncodedValue {
             type_id: value.type_id().to_string(),
             family: wit_value_family(value.family()),
             abi_bytes,
@@ -1542,8 +1542,8 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
 
     fn create_output_value(
         &mut self,
-        value: wit_contract::sim::comfy_plugin::host::EncodedValue,
-    ) -> Result<wit_contract::sim::comfy_plugin::host::ValueHandle, WitInvocationError> {
+        value: wit_contract::zed::comfy_plugin::host::EncodedValue,
+    ) -> Result<wit_contract::zed::comfy_plugin::host::ValueHandle, WitInvocationError> {
         let invocation = self.invocation_mut()?;
         invocation.begin_port_call().map_err(wit_error)?;
         let decoded = PluginValue::from_abi_bytes(&value.abi_bytes, &invocation.registry)
@@ -1564,7 +1564,7 @@ impl wit_contract::sim::comfy_plugin::host::Host for WasmStoreState {
     fn push_output(
         &mut self,
         port_id: String,
-        handle: wit_contract::sim::comfy_plugin::host::ValueHandle,
+        handle: wit_contract::zed::comfy_plugin::host::ValueHandle,
     ) -> Result<(), WitInvocationError> {
         self.invocation_mut()?
             .push_output(&port_id, sdk_value_handle(handle))
@@ -1730,15 +1730,15 @@ impl WasmStoreState {
     }
 }
 
-fn wit_value_handle(handle: ValueHandle) -> wit_contract::sim::comfy_plugin::host::ValueHandle {
-    wit_contract::sim::comfy_plugin::host::ValueHandle {
+fn wit_value_handle(handle: ValueHandle) -> wit_contract::zed::comfy_plugin::host::ValueHandle {
+    wit_contract::zed::comfy_plugin::host::ValueHandle {
         invocation: handle.invocation,
         slot: handle.slot,
         generation: handle.generation,
     }
 }
 
-fn sdk_value_handle(handle: wit_contract::sim::comfy_plugin::host::ValueHandle) -> ValueHandle {
+fn sdk_value_handle(handle: wit_contract::zed::comfy_plugin::host::ValueHandle) -> ValueHandle {
     ValueHandle {
         invocation: handle.invocation,
         slot: handle.slot,
@@ -1747,7 +1747,7 @@ fn sdk_value_handle(handle: wit_contract::sim::comfy_plugin::host::ValueHandle) 
 }
 
 fn sdk_manifest_projection(
-    projection: wit_contract::sim::comfy_plugin::types::ManifestProjection,
+    projection: wit_contract::zed::comfy_plugin::types::ManifestProjection,
 ) -> Result<ComponentManifestProjection, PluginError> {
     Ok(ComponentManifestProjection {
         component_world: projection.component_world,
@@ -1814,7 +1814,7 @@ fn sdk_manifest_projection(
 }
 
 fn sdk_provider_binding_set(
-    binding_set: wit_contract::sim::comfy_plugin::types::ProviderBindingSet,
+    binding_set: wit_contract::zed::comfy_plugin::types::ProviderBindingSet,
 ) -> Result<ProviderBindingSet, PluginError> {
     Ok(ProviderBindingSet {
         schema_version: binding_set.schema_version,
@@ -1839,7 +1839,7 @@ fn sdk_provider_binding_set(
 }
 
 fn sdk_projected_node(
-    node: wit_contract::sim::comfy_plugin::types::Node,
+    node: wit_contract::zed::comfy_plugin::types::Node,
 ) -> Result<PluginNode, PluginError> {
     Ok(PluginNode {
         id: node.id,
@@ -1852,35 +1852,35 @@ fn sdk_projected_node(
             .map(sdk_projected_port)
             .collect::<Result<Vec<_>, PluginError>>()?,
         determinism: match node.determinism {
-            wit_contract::sim::comfy_plugin::types::DeterminismPolicy::Deterministic => {
+            wit_contract::zed::comfy_plugin::types::DeterminismPolicy::Deterministic => {
                 comfy_plugin_sdk::DeterminismPolicy::Deterministic
             }
-            wit_contract::sim::comfy_plugin::types::DeterminismPolicy::Seeded => {
+            wit_contract::zed::comfy_plugin::types::DeterminismPolicy::Seeded => {
                 comfy_plugin_sdk::DeterminismPolicy::Seeded
             }
-            wit_contract::sim::comfy_plugin::types::DeterminismPolicy::External => {
+            wit_contract::zed::comfy_plugin::types::DeterminismPolicy::External => {
                 comfy_plugin_sdk::DeterminismPolicy::External
             }
         },
         cache: match node.cache {
-            wit_contract::sim::comfy_plugin::types::CachePolicy::InputIdentity => {
+            wit_contract::zed::comfy_plugin::types::CachePolicy::InputIdentity => {
                 comfy_plugin_sdk::CachePolicy::InputIdentity
             }
-            wit_contract::sim::comfy_plugin::types::CachePolicy::Never => {
+            wit_contract::zed::comfy_plugin::types::CachePolicy::Never => {
                 comfy_plugin_sdk::CachePolicy::Never
             }
-            wit_contract::sim::comfy_plugin::types::CachePolicy::PluginKey => {
+            wit_contract::zed::comfy_plugin::types::CachePolicy::PluginKey => {
                 comfy_plugin_sdk::CachePolicy::PluginKey
             }
         },
         effects: match node.effects {
-            wit_contract::sim::comfy_plugin::types::EffectPolicy::Pure => {
+            wit_contract::zed::comfy_plugin::types::EffectPolicy::Pure => {
                 comfy_plugin_sdk::EffectPolicy::Pure
             }
-            wit_contract::sim::comfy_plugin::types::EffectPolicy::Transactional => {
+            wit_contract::zed::comfy_plugin::types::EffectPolicy::Transactional => {
                 comfy_plugin_sdk::EffectPolicy::Transactional
             }
-            wit_contract::sim::comfy_plugin::types::EffectPolicy::Provider => {
+            wit_contract::zed::comfy_plugin::types::EffectPolicy::Provider => {
                 comfy_plugin_sdk::EffectPolicy::Provider
             }
         },
@@ -1888,7 +1888,7 @@ fn sdk_projected_node(
 }
 
 fn sdk_projected_port(
-    port: wit_contract::sim::comfy_plugin::types::Port,
+    port: wit_contract::zed::comfy_plugin::types::Port,
 ) -> Result<comfy_plugin_sdk::PluginPort, PluginError> {
     let type_id = port.type_id.parse().map_err(PluginContractError::from)?;
     let default = port.default.map(sdk_projected_scalar).transpose()?;
@@ -1896,39 +1896,39 @@ fn sdk_projected_port(
         id: port.id,
         name: port.name,
         direction: match port.direction {
-            wit_contract::sim::comfy_plugin::types::PortDirection::Input => PortDirection::Input,
-            wit_contract::sim::comfy_plugin::types::PortDirection::Output => PortDirection::Output,
+            wit_contract::zed::comfy_plugin::types::PortDirection::Input => PortDirection::Input,
+            wit_contract::zed::comfy_plugin::types::PortDirection::Output => PortDirection::Output,
         },
         type_id,
         cardinality: match port.cardinality {
-            wit_contract::sim::comfy_plugin::types::PortCardinality::Singular => {
+            wit_contract::zed::comfy_plugin::types::PortCardinality::Singular => {
                 PortCardinality::Singular
             }
-            wit_contract::sim::comfy_plugin::types::PortCardinality::List => PortCardinality::List,
+            wit_contract::zed::comfy_plugin::types::PortCardinality::List => PortCardinality::List,
         },
         presence: match port.presence {
-            wit_contract::sim::comfy_plugin::types::PortPresence::Required => {
+            wit_contract::zed::comfy_plugin::types::PortPresence::Required => {
                 PortPresence::Required
             }
-            wit_contract::sim::comfy_plugin::types::PortPresence::Optional => {
+            wit_contract::zed::comfy_plugin::types::PortPresence::Optional => {
                 PortPresence::Optional
             }
-            wit_contract::sim::comfy_plugin::types::PortPresence::Hidden => PortPresence::Hidden,
+            wit_contract::zed::comfy_plugin::types::PortPresence::Hidden => PortPresence::Hidden,
         },
         hidden: port.hidden,
         lazy: port.lazy,
         default,
         serialization: match port.serialization {
-            wit_contract::sim::comfy_plugin::types::PortSerialization::Inline => {
+            wit_contract::zed::comfy_plugin::types::PortSerialization::Inline => {
                 PortSerialization::Inline
             }
-            wit_contract::sim::comfy_plugin::types::PortSerialization::Handle => {
+            wit_contract::zed::comfy_plugin::types::PortSerialization::Handle => {
                 PortSerialization::Handle
             }
-            wit_contract::sim::comfy_plugin::types::PortSerialization::ArtifactReference => {
+            wit_contract::zed::comfy_plugin::types::PortSerialization::ArtifactReference => {
                 PortSerialization::ArtifactReference
             }
-            wit_contract::sim::comfy_plugin::types::PortSerialization::OpaquePreserved => {
+            wit_contract::zed::comfy_plugin::types::PortSerialization::OpaquePreserved => {
                 PortSerialization::OpaquePreserved
             }
         },
@@ -1937,7 +1937,7 @@ fn sdk_projected_port(
 }
 
 fn sdk_projected_scalar(
-    scalar: wit_contract::sim::comfy_plugin::types::ScalarValue,
+    scalar: wit_contract::zed::comfy_plugin::types::ScalarValue,
 ) -> Result<comfy_plugin_sdk::ScalarValue, PluginError> {
     const MAX_SCALAR_NODES: usize = 65_536;
     const MAX_SCALAR_DEPTH: usize = 64;
@@ -1955,7 +1955,7 @@ fn sdk_projected_scalar(
     let mut parent_counts = vec![0_u8; scalar.nodes.len()];
     let mut encoded_bytes = 0_usize;
     for node in &scalar.nodes {
-        use wit_contract::sim::comfy_plugin::types::ScalarNode;
+        use wit_contract::zed::comfy_plugin::types::ScalarNode;
         let children: &[u32] = match node {
             ScalarNode::ListValue(children) => children,
             ScalarNode::RecordValue(entries) => {
@@ -2054,7 +2054,7 @@ fn sdk_projected_scalar(
 
     let mut values = vec![None; scalar.nodes.len()];
     for index in order {
-        use wit_contract::sim::comfy_plugin::types::ScalarNode;
+        use wit_contract::zed::comfy_plugin::types::ScalarNode;
         let value = match &scalar.nodes[index] {
             ScalarNode::NullValue => comfy_plugin_sdk::ScalarValue::Null,
             ScalarNode::BooleanValue(value) => comfy_plugin_sdk::ScalarValue::Boolean(*value),
@@ -2087,9 +2087,9 @@ fn sdk_projected_scalar(
 }
 
 fn projected_scalar_children(
-    node: &wit_contract::sim::comfy_plugin::types::ScalarNode,
+    node: &wit_contract::zed::comfy_plugin::types::ScalarNode,
 ) -> Vec<u32> {
-    use wit_contract::sim::comfy_plugin::types::ScalarNode;
+    use wit_contract::zed::comfy_plugin::types::ScalarNode;
     match node {
         ScalarNode::ListValue(children) => children.clone(),
         ScalarNode::RecordValue(entries) => entries.iter().map(|entry| entry.value_node).collect(),
@@ -2124,13 +2124,13 @@ fn take_projected_scalar_child(
 }
 
 fn sdk_api_version(
-    version: wit_contract::sim::comfy_plugin::types::ApiVersion,
+    version: wit_contract::zed::comfy_plugin::types::ApiVersion,
 ) -> comfy_plugin_sdk::ApiVersion {
     comfy_plugin_sdk::ApiVersion::new(version.major, version.minor, version.patch)
 }
 
 fn wit_error(error: InvocationError) -> WitInvocationError {
-    use wit_contract::sim::comfy_plugin::types::{
+    use wit_contract::zed::comfy_plugin::types::{
         CapabilityError, InvocationError as WitError, PortIndexError, QuotaError, ValueFamilyError,
     };
     match error {
@@ -2199,7 +2199,7 @@ fn wit_error(error: InvocationError) -> WitInvocationError {
 }
 
 fn sdk_error(error: WitInvocationError) -> InvocationError {
-    use wit_contract::sim::comfy_plugin::types::InvocationError as WitError;
+    use wit_contract::zed::comfy_plugin::types::InvocationError as WitError;
     match error {
         WitError::Cancelled => InvocationError::Cancelled,
         WitError::TimedOut => InvocationError::TimedOut,
@@ -2263,9 +2263,9 @@ fn wit_host_failure(message: &str) -> WitInvocationError {
 
 fn wit_value_family(
     family: comfy_plugin_sdk::ValueFamily,
-) -> wit_contract::sim::comfy_plugin::types::ValueFamily {
+) -> wit_contract::zed::comfy_plugin::types::ValueFamily {
     use comfy_plugin_sdk::ValueFamily;
-    use wit_contract::sim::comfy_plugin::types::ValueFamily as WitFamily;
+    use wit_contract::zed::comfy_plugin::types::ValueFamily as WitFamily;
     match family {
         ValueFamily::Scalar => WitFamily::Scalar,
         ValueFamily::Tensor => WitFamily::Tensor,
@@ -2275,10 +2275,10 @@ fn wit_value_family(
 }
 
 fn sdk_value_family(
-    family: wit_contract::sim::comfy_plugin::types::ValueFamily,
+    family: wit_contract::zed::comfy_plugin::types::ValueFamily,
 ) -> comfy_plugin_sdk::ValueFamily {
     use comfy_plugin_sdk::ValueFamily;
-    use wit_contract::sim::comfy_plugin::types::ValueFamily as WitFamily;
+    use wit_contract::zed::comfy_plugin::types::ValueFamily as WitFamily;
     match family {
         WitFamily::Scalar => ValueFamily::Scalar,
         WitFamily::Tensor => ValueFamily::Tensor,
@@ -2289,8 +2289,8 @@ fn sdk_value_family(
 
 fn wit_port_cardinality(
     cardinality: PortCardinality,
-) -> wit_contract::sim::comfy_plugin::types::PortCardinality {
-    use wit_contract::sim::comfy_plugin::types::PortCardinality as WitCardinality;
+) -> wit_contract::zed::comfy_plugin::types::PortCardinality {
+    use wit_contract::zed::comfy_plugin::types::PortCardinality as WitCardinality;
     match cardinality {
         PortCardinality::Singular => WitCardinality::Singular,
         PortCardinality::List => WitCardinality::List,
@@ -2299,8 +2299,8 @@ fn wit_port_cardinality(
 
 fn wit_port_presence(
     presence: PortPresence,
-) -> wit_contract::sim::comfy_plugin::types::PortPresence {
-    use wit_contract::sim::comfy_plugin::types::PortPresence as WitPresence;
+) -> wit_contract::zed::comfy_plugin::types::PortPresence {
+    use wit_contract::zed::comfy_plugin::types::PortPresence as WitPresence;
     match presence {
         PortPresence::Required => WitPresence::Required,
         PortPresence::Optional => WitPresence::Optional,
@@ -2310,8 +2310,8 @@ fn wit_port_presence(
 
 fn wit_port_serialization(
     serialization: PortSerialization,
-) -> wit_contract::sim::comfy_plugin::types::PortSerialization {
-    use wit_contract::sim::comfy_plugin::types::PortSerialization as WitSerialization;
+) -> wit_contract::zed::comfy_plugin::types::PortSerialization {
+    use wit_contract::zed::comfy_plugin::types::PortSerialization as WitSerialization;
     match serialization {
         PortSerialization::Inline => WitSerialization::Inline,
         PortSerialization::Handle => WitSerialization::Handle,
@@ -2322,9 +2322,9 @@ fn wit_port_serialization(
 
 fn wit_capability_kind(
     kind: comfy_plugin_sdk::CapabilityKind,
-) -> wit_contract::sim::comfy_plugin::types::CapabilityKind {
+) -> wit_contract::zed::comfy_plugin::types::CapabilityKind {
     use comfy_plugin_sdk::CapabilityKind;
-    use wit_contract::sim::comfy_plugin::types::CapabilityKind as WitKind;
+    use wit_contract::zed::comfy_plugin::types::CapabilityKind as WitKind;
     match kind {
         CapabilityKind::Filesystem => WitKind::Filesystem,
         CapabilityKind::NetworkProvider => WitKind::NetworkProvider,
@@ -2342,10 +2342,10 @@ fn wit_capability_kind(
 }
 
 fn sdk_capability_kind(
-    kind: wit_contract::sim::comfy_plugin::types::CapabilityKind,
+    kind: wit_contract::zed::comfy_plugin::types::CapabilityKind,
 ) -> comfy_plugin_sdk::CapabilityKind {
     use comfy_plugin_sdk::CapabilityKind;
-    use wit_contract::sim::comfy_plugin::types::CapabilityKind as WitKind;
+    use wit_contract::zed::comfy_plugin::types::CapabilityKind as WitKind;
     match kind {
         WitKind::Filesystem => CapabilityKind::Filesystem,
         WitKind::NetworkProvider => CapabilityKind::NetworkProvider,
@@ -2362,8 +2362,8 @@ fn sdk_capability_kind(
     }
 }
 
-fn wit_cancel_reason(reason: CancelReason) -> wit_contract::sim::comfy_plugin::types::CancelReason {
-    use wit_contract::sim::comfy_plugin::types::CancelReason as WitReason;
+fn wit_cancel_reason(reason: CancelReason) -> wit_contract::zed::comfy_plugin::types::CancelReason {
+    use wit_contract::zed::comfy_plugin::types::CancelReason as WitReason;
     match reason {
         CancelReason::User => WitReason::User,
         CancelReason::Timeout => WitReason::Timeout,
@@ -2710,7 +2710,7 @@ mod tests {
 
     #[test]
     fn typed_scalar_projection_rejects_hostile_graphs() -> Result<(), PluginError> {
-        use wit_contract::sim::comfy_plugin::types::{
+        use wit_contract::zed::comfy_plugin::types::{
             ScalarNode as WitScalarNode, ScalarRecordEntry, ScalarValue as WitScalarValue,
         };
 

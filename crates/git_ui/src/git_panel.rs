@@ -15,7 +15,7 @@ use crate::{
 use agent_settings::{AgentSettings, UserAgentsMd};
 use anyhow::Context as _;
 use askpass::AskPassDelegate;
-use client::sim_urls;
+use client::zed_urls;
 use collections::{BTreeMap, HashMap, HashSet};
 use db::kvp::KeyValueStore;
 use editor::{Editor, EditorElement, EditorMode, MultiBuffer, MultiBufferOffset, SizingBehavior};
@@ -69,7 +69,7 @@ use settings::{
     GitPanelClickBehavior, GitPanelGroupBy, GitPanelSortBy, Settings, SettingsStore, StatusStyle,
     update_settings_file,
 };
-use sim_actions::{
+use zed_actions::{
     DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize, git_panel::ToggleFocus,
 };
 use smallvec::SmallVec;
@@ -208,7 +208,7 @@ fn git_panel_context_menu(
                 StashAll.boxed_clone(),
             )
             .action_disabled_when(!has_stash_items, "Stash Pop", StashPop.boxed_clone())
-            .action("View Stash", sim_actions::git::ViewStash.boxed_clone())
+            .action("View Stash", zed_actions::git::ViewStash.boxed_clone())
             .separator()
             .action_disabled_when(
                 !has_tracked_changes,
@@ -876,7 +876,7 @@ impl Render for GenerateCommitMessageConfigurationTooltip {
                                 .label_size(LabelSize::Small)
                                 .on_click(|_, window, cx| {
                                     window.dispatch_action(
-                                        sim_actions::OpenSettingsAt {
+                                        zed_actions::OpenSettingsAt {
                                             path: "llm_providers".to_string(),
                                             target: None,
                                         }
@@ -895,7 +895,7 @@ impl Render for GenerateCommitMessageConfigurationTooltip {
                                 )
                                 .label_size(LabelSize::Small)
                                 .on_click(move |_, _, cx| {
-                                    cx.open_url(&sim_urls::llm_provider_docs(cx))
+                                    cx.open_url(&zed_urls::llm_provider_docs(cx))
                                 }),
                         ),
                 )
@@ -905,7 +905,7 @@ impl Render for GenerateCommitMessageConfigurationTooltip {
 
 impl GitPanel {
     // Only the test-support constructors call this thin wrapper now; production
-    // registration goes through `new_with_serialisim_panel` directly. Gate it to
+    // registration goes through `new_with_serialized_panel` directly. Gate it to
     // the same cfg as `new_test` so the non-test lib build doesn't see it as dead.
     #[cfg(any(test, feature = "test-support"))]
     fn new(
@@ -913,12 +913,12 @@ impl GitPanel {
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) -> Entity<Self> {
-        Self::new_with_serialisim_panel(workspace, None, window, cx)
+        Self::new_with_serialized_panel(workspace, None, window, cx)
     }
 
-    fn new_with_serialisim_panel(
+    fn new_with_serialized_panel(
         workspace: &mut Workspace,
-        serialisim_panel: Option<SerializedGitPanel>,
+        serialized_panel: Option<SerializedGitPanel>,
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) -> Entity<Self> {
@@ -927,7 +927,7 @@ impl GitPanel {
         let fs = app_state.fs.clone();
         let git_store = project.read(cx).git_store().clone();
         let active_repository = project.read(cx).active_repository(cx);
-        let signoff_enabled = serialisim_panel
+        let signoff_enabled = serialized_panel
             .as_ref()
             .is_some_and(|panel| panel.signoff_enabled);
         let active_work_directory_abs_path = active_repository.as_ref().map(|repository| {
@@ -937,7 +937,7 @@ impl GitPanel {
                 .to_string_lossy()
                 .into_owned()
         });
-        let active_draft = serialisim_panel.as_ref().and_then(|panel| {
+        let active_draft = serialized_panel.as_ref().and_then(|panel| {
             let path = active_work_directory_abs_path.as_ref()?;
             panel.commit_messages.get(path)
         });
@@ -955,7 +955,7 @@ impl GitPanel {
         let initial_commit_message = active_draft
             .and_then(|draft| draft.message.clone())
             .unwrap_or_default();
-        let pending_commit_message_restores = serialisim_panel
+        let pending_commit_message_restores = serialized_panel
             .map(|panel| panel.commit_messages)
             .unwrap_or_default();
 
@@ -1220,7 +1220,7 @@ impl GitPanel {
 
     fn serialize(&mut self, cx: &mut Context<Self>) {
         let signoff_enabled = self.signoff_enabled;
-        let commit_messages = self.serialisim_commit_messages(cx);
+        let commit_messages = self.serialized_commit_messages(cx);
         let kvp = KeyValueStore::global(cx);
 
         self.pending_serialization = cx.spawn(async move |git_panel, cx| {
@@ -1258,7 +1258,7 @@ impl GitPanel {
         });
     }
 
-    fn serialisim_commit_messages(&self, cx: &App) -> BTreeMap<String, SerializedCommitMessage> {
+    fn serialized_commit_messages(&self, cx: &App) -> BTreeMap<String, SerializedCommitMessage> {
         let active_work_directory_abs_path = self.active_repository.as_ref().map(|repository| {
             repository
                 .read(cx)
@@ -4717,7 +4717,7 @@ impl GitPanel {
                         // button is pressed.
                         this.action("Create Pull Request", move |window, cx| {
                             window
-                                .dispatch_action(Box::new(sim_actions::git::CreatePullRequest), cx);
+                                .dispatch_action(Box::new(zed_actions::git::CreatePullRequest), cx);
                         })
                     }
                     (Toast, false) => this,
@@ -5378,10 +5378,10 @@ impl GitPanel {
                                 this.flex_1().min_h_0().pb(footer_size)
                             })
                             .pr_2p5()
-                            .on_action(|&sim_actions::editor::MoveUp, _, cx| {
+                            .on_action(|&zed_actions::editor::MoveUp, _, cx| {
                                 cx.stop_propagation();
                             })
-                            .on_action(|&sim_actions::editor::MoveDown, _, cx| {
+                            .on_action(|&zed_actions::editor::MoveDown, _, cx| {
                                 cx.stop_propagation();
                             })
                             .child(EditorElement::new(&self.commit_editor, panel_editor_style)),
@@ -6023,7 +6023,7 @@ impl GitPanel {
                                             time::OffsetDateTime::from_unix_timestamp(ts).ok()
                                         })
                                         .map(|dt| {
-                                            time_format::format_localisim_timestamp(
+                                            time_format::format_localized_timestamp(
                                                 dt,
                                                 now,
                                                 local_offset,
@@ -6156,7 +6156,7 @@ impl GitPanel {
     fn render_empty_state(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let content = match (self.git_access, &self.active_repository) {
             (GitAccess::No, Some(repository)) => self.render_unsafe_repo_ui(repository, cx),
-            (_, None) => self.render_uninitialisim_ui(cx),
+            (_, None) => self.render_uninitialized_ui(cx),
             (_, Some(_)) => self.render_no_changes_ui(cx),
         };
 
@@ -6239,7 +6239,7 @@ impl GitPanel {
                 .into_any_element()
     }
 
-    fn render_uninitialisim_ui(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_uninitialized_ui(&self, cx: &mut Context<Self>) -> AnyElement {
         let worktree_count = self.project.read(cx).visible_worktrees(cx).count();
         if worktree_count > 0 && self.active_repository.is_none() {
             v_flex()
@@ -7168,7 +7168,7 @@ impl GitPanel {
         workspace: WeakEntity<Workspace>,
         mut cx: AsyncWindowContext,
     ) -> anyhow::Result<Entity<Self>> {
-        let serialisim_panel = match workspace
+        let serialized_panel = match workspace
             .read_with(&cx, |workspace, cx| {
                 Self::serialization_key(workspace).map(|key| (key, KeyValueStore::global(cx)))
             })
@@ -7189,7 +7189,7 @@ impl GitPanel {
         };
 
         workspace.update_in(&mut cx, |workspace, window, cx| {
-            GitPanel::new_with_serialisim_panel(workspace, serialisim_panel, window, cx)
+            GitPanel::new_with_serialized_panel(workspace, serialized_panel, window, cx)
         })
     }
 
@@ -7698,7 +7698,7 @@ impl RenderOnce for PanelRepoFooter {
             .label_size(LabelSize::Small)
             .truncate(true)
             .on_click(|_, window, cx| {
-                window.dispatch_action(sim_actions::git::Switch.boxed_clone(), cx);
+                window.dispatch_action(zed_actions::git::Switch.boxed_clone(), cx);
             });
 
         let branch_selector = PopoverMenu::new("popover-button")
@@ -7709,7 +7709,7 @@ impl RenderOnce for PanelRepoFooter {
             })
             .trigger_with_tooltip(
                 branch_selector_button,
-                Tooltip::for_action_title("Switch Branch", &sim_actions::git::Switch),
+                Tooltip::for_action_title("Switch Branch", &zed_actions::git::Switch),
             )
             .anchor(Anchor::BottomLeft)
             .offset(gpui::Point {
@@ -7820,7 +7820,7 @@ impl Component for PanelRepoFooter {
                 is_head: true,
                 ref_name: branch_name.to_string().into(),
                 upstream: upstream.map(|tracking| Upstream {
-                    ref_name: format!("sim/{}", branch_name).into(),
+                    ref_name: format!("zed/{}", branch_name).into(),
                     tracking,
                 }),
                 most_recent_commit: Some(CommitSummary {
@@ -7936,7 +7936,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("sim"),
+                                    SharedString::from("zed"),
                                     Some(custom("main", behind_upstream)),
                                 ))
                                 .into_any_element(),
@@ -7947,7 +7947,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("sim"),
+                                    SharedString::from("zed"),
                                     Some(custom(
                                         "redesign-and-update-git-ui-list-entry-style",
                                         behind_upstream,
@@ -7997,7 +7997,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("sim"),
+                                    SharedString::from("zed"),
                                     Some(custom("update-README", behind_upstream)),
                                 ))
                                 .into_any_element(),
@@ -8498,7 +8498,7 @@ mod tests {
         fs.insert_tree(
             "/root",
             json!({
-                "sim": {
+                "zed": {
                     ".git": {},
                     "crates": {
                         "gpui": {
@@ -8514,7 +8514,7 @@ mod tests {
         .await;
 
         fs.set_status_for_repo(
-            Path::new(path!("/root/sim/.git")),
+            Path::new(path!("/root/zed/.git")),
             &[
                 ("crates/gpui/gpui.rs", StatusCode::Modified.worktree()),
                 ("crates/util/util.rs", StatusCode::Modified.worktree()),
@@ -8522,7 +8522,7 @@ mod tests {
         );
 
         let project =
-            Project::test(fs.clone(), [path!("/root/sim/crates/gpui").as_ref()], cx).await;
+            Project::test(fs.clone(), [path!("/root/zed/crates/gpui").as_ref()], cx).await;
         let window_handle =
             cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
         let workspace = window_handle
@@ -9272,7 +9272,7 @@ mod tests {
         cx.run_until_parked();
 
         let message_b = "Restore repository B message";
-        let serialisim_panel = panel.update(cx, |panel, cx| {
+        let serialized_panel = panel.update(cx, |panel, cx| {
             panel.commit_message_buffer(cx).update(cx, |buffer, cx| {
                 let start = buffer.anchor_before(0);
                 let end = buffer.anchor_after(buffer.len());
@@ -9281,7 +9281,7 @@ mod tests {
 
             SerializedGitPanel {
                 signoff_enabled: false,
-                commit_messages: panel.serialisim_commit_messages(cx),
+                commit_messages: panel.serialized_commit_messages(cx),
             }
         });
 
@@ -9300,7 +9300,7 @@ mod tests {
         }
 
         let restored_panel = workspace.update_in(cx, |workspace, window, cx| {
-            GitPanel::new_with_serialisim_panel(workspace, Some(serialisim_panel), window, cx)
+            GitPanel::new_with_serialized_panel(workspace, Some(serialized_panel), window, cx)
         });
         cx.run_until_parked();
 
@@ -9323,7 +9323,7 @@ mod tests {
             });
         });
 
-        let mismatched_serialisim_panel = SerializedGitPanel {
+        let mismatched_serialized_panel = SerializedGitPanel {
             signoff_enabled: false,
             commit_messages: BTreeMap::from_iter([(
                 path!("/root/other-project").to_string(),
@@ -9335,9 +9335,9 @@ mod tests {
             )]),
         };
         let mismatched_panel = workspace.update_in(cx, |workspace, window, cx| {
-            GitPanel::new_with_serialisim_panel(
+            GitPanel::new_with_serialized_panel(
                 workspace,
-                Some(mismatched_serialisim_panel),
+                Some(mismatched_serialized_panel),
                 window,
                 cx,
             )
@@ -9449,7 +9449,7 @@ mod tests {
             assert!(!panel.amend_pending());
             // Only the active repository may serialize a pending amend, and we
             // just left repository A's amend, so nothing is left pending.
-            let serialized = panel.serialisim_commit_messages(cx);
+            let serialized = panel.serialized_commit_messages(cx);
             assert!(serialized.values().all(|message| !message.amend_pending));
         });
 

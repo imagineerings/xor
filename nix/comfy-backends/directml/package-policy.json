@@ -68,7 +68,7 @@
   "authenticode_is_authorization": false,
   "final_application_signing_required": true,
   "signature_algorithm": "ed25519",
-  "signature_domain": "sim-comfy-directml-package-v1",
+  "signature_domain": "zed-comfy-directml-package-v1",
   "signature_payload_format": "domain-nul-u64be-signer-u64be-coverage",
   "signature_receipt_format": "canonical-json-v1",
   "signature_coverage": "package-coverage-v1",

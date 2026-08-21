@@ -383,7 +383,7 @@ fn validate_manifest(
         || !manifest.license_approval_required_for_vendor_runtime
         || !manifest.runtime_compilation_forbidden
         || manifest.signature_algorithm != "ed25519"
-        || manifest.signature_domain != "sim-comfy-mlu-package-v1"
+        || manifest.signature_domain != "zed-comfy-mlu-package-v1"
         || manifest.signature_coverage != "package-coverage-v1"
         || manifest.certificate_owner != "comfy_runtime::NativeFfiRegistry"
         || manifest.unsafe_owner != UNSAFE_OWNER
@@ -640,7 +640,7 @@ mod tests {
             "runtime_compilation_forbidden": true,
             "signer": "mlu.release",
             "signature_algorithm": "ed25519",
-            "signature_domain": "sim-comfy-mlu-package-v1",
+            "signature_domain": "zed-comfy-mlu-package-v1",
             "signature_coverage": "package-coverage-v1",
             "certificate_owner": "comfy_runtime::NativeFfiRegistry",
             "unsafe_owner": UNSAFE_OWNER,
@@ -828,7 +828,7 @@ mod tests {
         let key_pair = Ed25519KeyPair::from_seed_unchecked(SIGNING_KEY)
             .map_err(|error| io::Error::other(format!("fixture key rejected: {error:?}")))?;
         let settings = crate::NativeMluPackageSettings::from_public_authority(
-            "/opt/sim/mlu-package",
+            "/opt/zed/mlu-package",
             "mlu.release",
             &key_pair
                 .public_key()

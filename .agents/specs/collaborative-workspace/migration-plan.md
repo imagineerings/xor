@@ -11,7 +11,7 @@
 
 ## Compile-time enable, disable and rollback
 
-`multiplayer-tools` is a compile-time release capability, not an authority-cutover switch. Standard Sim is built without it; Multiplayer Sim enables it explicitly on the `sim` package and multiplayer service/package profiles. The feature is established before further unrelated Collaborative Workspace leaves and does not change any canonical owner, migration phase or accepted ADR.
+`multiplayer-tools` is a compile-time release capability, not an authority-cutover switch. Standard Zed is built without it; Multiplayer Zed enables it explicitly on the `zed` package and multiplayer service/package profiles. The feature is established before further unrelated Collaborative Workspace leaves and does not change any canonical owner, migration phase or accepted ADR.
 
 Disabling the feature is a binary rollback only. The unflagged application reads the stable workspace-presentation representation, resolves a saved Collaborative selection to Editor in memory and leaves the saved preference, collaborative records, credentials and signing material untouched. No down migration runs and no multiplayer asset or service starts. Re-enabling a schema-compatible flagged build restores the saved presentation and reconnects through normal compatibility/version checks.
 
@@ -37,7 +37,7 @@ Rollback gates are: both configuration matrices green; default dependency denial
 
 ### Phase 1: Native GPUI vertical slice
 
-- Add reversible `WorkspacePresentation` selection to existing Sim onboarding/settings.
+- Add reversible `WorkspacePresentation` selection to existing Zed onboarding/settings.
 - Compose the collaborative shell from existing project/worktree, sidebar/thread, ACP/action-log and diff entities.
 - Ship behind a local presentation feature flag. No server or data authority changes.
 - Validate reference geometry, accessibility and persistence.
@@ -50,10 +50,10 @@ Rollback gates are: both configuration matrices green; default dependency denial
 
 ### Phase 2: Canonical domain, identity and service foundations
 
-- Extract/port pure Buzz event/tenant rules into the approved Sim collaboration-domain boundary.
+- Extract/port pure Buzz event/tenant rules into the approved Zed collaboration-domain boundary.
 - Add exact Nostr adapters and stable internal command/projection contracts.
-- Implement explicit Sim-account ↔ Nostr-key binding and import Buzz keys through Sim credentials providers.
-- Establish typed tenant admission and common authorization across existing Sim RPC and temporary Buzz Nostr ingress.
+- Implement explicit Zed-account ↔ Nostr-key binding and import Buzz keys through Zed credentials providers.
+- Establish typed tenant admission and common authorization across existing Zed RPC and temporary Buzz Nostr ingress.
 - Align Axum/SQLx/SeaORM dependencies before combining service processes. Until then, run the Buzz-derived Nostr ingress as a versioned sidecar using the same tenant catalog and outbox contract.
 - Create projection provenance, migration checkpoints and drift observability.
 
@@ -91,15 +91,15 @@ Rollback gates are: both configuration matrices green; default dependency denial
 
 ### Phase 5: Project, Git and agent authority integration
 
-- Map Sim projects/repositories to NIP-MP/NIP-34 identities without replacing local `Project`/`GitStore` authority.
+- Map Zed projects/repositories to NIP-MP/NIP-34 identities without replacing local `Project`/`GitStore` authority.
 - Cut review/CI/status events to canonical collaboration writes and link them to native diff/action IDs.
-- Adapt channel mentions, jobs and NIP-AO to Sim ACP execution.
+- Adapt channel mentions, jobs and NIP-AO to Zed ACP execution.
 - Import personas, teams, managed agents, engrams, metrics, snapshots and local archives; preserve cryptographic coordinates and privacy gates.
-- Port remote-provider execution with Sim process/permission/credential owners.
+- Port remote-provider execution with Zed process/permission/credential owners.
 
 **Entry:** ADR-003, communication cutover stable.
 
-**Exit:** no native agent session is executed by both Sim and Buzz runtimes; old Git/agent clients remain wire-compatible; imported agent state passes fidelity tests.
+**Exit:** no native agent session is executed by both Zed and Buzz runtimes; old Git/agent clients remain wire-compatible; imported agent state passes fidelity tests.
 
 **Rollback:** stop new job admission, allow running sessions to terminate/cancel, restore runtime routing and retained configuration; never run both owners for the same session/job ID.
 
@@ -107,19 +107,19 @@ Rollback gates are: both configuration matrices green; default dependency denial
 
 - Port/complete workflows, approvals, audit, moderation, retention/deletion, media, huddles, push, pairing and mesh/shared compute.
 - Cut each aggregate separately after shadow/differential evidence.
-- Move operational dashboards, health/readiness, metrics and admin controls to Sim ownership.
+- Move operational dashboards, health/readiness, metrics and admin controls to Zed ownership.
 
 **Entry:** corresponding ADRs and security reviews; core collaboration stable.
 
-**Exit:** all CAP-027 through CAP-035 behavior has a canonical Sim owner; documented workflow/rate-limit/huddle gaps are completed or explicitly accepted.
+**Exit:** all CAP-027 through CAP-035 behavior has a canonical Zed owner; documented workflow/rate-limit/huddle gaps are completed or explicitly accepted.
 
 **Rollback:** per-aggregate routing rollback before new-only writes; workflows/jobs are quiesced, not duplicated; deletion cannot roll back after its recorded irreversible checkpoint.
 
 ### Phase 7: Client and deployment migration
 
 - Repoint CLI, web, mobile and admin clients using the published compatibility matrix.
-- Replace Buzz desktop distribution with Sim Collaborative Workspace.
-- Merge Compose/Helm/release ownership; retain required compatibility binaries/sidecars as versioned Sim artifacts.
+- Replace Buzz desktop distribution with Zed Collaborative Workspace.
+- Merge Compose/Helm/release ownership; retain required compatibility binaries/sidecars as versioned Zed artifacts.
 - Run canary cohorts per community with automated rollback gates.
 
 **Entry:** server capabilities and compatibility tests green.
@@ -155,19 +155,19 @@ Rollback gates are: both configuration matrices green; default dependency denial
 | Git repo registry/object storage | Git hosting adapter | Preserve coordinates, repo names, refs and object hashes; import permission records | `git fsck`, ref/object hashes, clone/push differential | Retain source bucket/volume read-only |
 | Media object store/index | Media owner | Copy or re-index by content hash; preserve URLs/aliases during compatibility | Object hash, MIME, size, tenant prefix and sampled decode | Keep original bucket and URL routing |
 | Redis presence/typing/cache | Derived runtime state | Do not copy; allow expiry and repopulate from live clients/events | Empty-start and expiry behavior | Restart old service; no data restore |
-| Desktop keyring/fallback keys | Sim credentials provider | Enumerate identifiers; import one at a time; read-back/sign challenge; delete source only after user/verification gate | Public-key match and signed challenge | Preserve source record until cutover confirmation |
-| Desktop config, drafts, read state and local archive | Sim settings/session/collaboration stores | Versioned idempotent import with per-record source version | Fixture corpus, counts/hashes and UI readback | Keep original file/database backup |
-| Personas/teams/agents/snapshots/engrams/metrics | Sim agent + collaboration owners | Import private aggregate first, then verify/rebuild public projections | Cryptographic coordinate, CAS chain, redaction and snapshot fidelity | Preserve export and old records |
-| Sim existing project/Git/ACP state | Existing Sim owners | No data move; add stable collaboration bindings | Existing regression suites and binding round trip | Remove inert bindings if rolled back |
+| Desktop keyring/fallback keys | Zed credentials provider | Enumerate identifiers; import one at a time; read-back/sign challenge; delete source only after user/verification gate | Public-key match and signed challenge | Preserve source record until cutover confirmation |
+| Desktop config, drafts, read state and local archive | Zed settings/session/collaboration stores | Versioned idempotent import with per-record source version | Fixture corpus, counts/hashes and UI readback | Keep original file/database backup |
+| Personas/teams/agents/snapshots/engrams/metrics | Zed agent + collaboration owners | Import private aggregate first, then verify/rebuild public projections | Cryptographic coordinate, CAS chain, redaction and snapshot fidelity | Preserve export and old records |
+| Zed existing project/Git/ACP state | Existing Zed owners | No data move; add stable collaboration bindings | Existing regression suites and binding round trip | Remove inert bindings if rolled back |
 
 ## Temporary bridges
 
 | Bridge | Allowed phase | Direction | Reconciliation | Removal criterion |
 | --- | --- | --- | --- | --- |
-| Nostr ingress sidecar → Sim domain service | 2-7 | Commands/events inward; protocol responses outward | Operation/event ID, domain version and response fixture | Axum/SQLx alignment complete and Nostr routes hosted by final service deployment |
+| Nostr ingress sidecar → Zed domain service | 2-7 | Commands/events inward; protocol responses outward | Operation/event ID, domain version and response fixture | Axum/SQLx alignment complete and Nostr routes hosted by final service deployment |
 | Legacy Buzz reads versus canonical projections | 3-4 | Read-only shadow comparison | Tenant/query/cursor keyed differential metrics | Observation window has zero unexplained divergence |
 | Canonical outbox → legacy projections | 4-6 only if needed | One-way derived write | Outbox sequence, source ID/version and drift scan | Every supported client reads canonical projection/adapter |
-| Buzz ACP/provider shim → Sim agent runtime | 5-7 | Job/session command inward; observer/activity outward | Stable session/job ID and exactly-one executor lease | Remote images/providers use Sim-owned runtime directly |
+| Buzz ACP/provider shim → Zed agent runtime | 5-7 | Job/session command inward; observer/activity outward | Stable session/job ID and exactly-one executor lease | Remote images/providers use Zed-owned runtime directly |
 | `buzz` CLI shim | 2-8 and optional long-term | CLI syntax to canonical APIs | Golden stdout/stderr/exit-code tests | Approved usage threshold and documented replacement |
 | Buzz Opus huddle adapter | 6-8 or approved long-term | Audio/lifecycle compatibility | Huddle/session/participant IDs and event parity | ADR-004 criterion and supported-client floor reached |
 | Old URLs/deep links | 1-8 and optional long-term | Alias to canonical navigator | Normalized entity IDs and telemetry-free local counters | Explicit compatibility policy permits removal |
@@ -224,6 +224,6 @@ Any cross-tenant mismatch, signature/authorization disagreement, data-loss count
 ### `projects/buzz`
 
 - Every CAP ID satisfies Requirement 20.4.
-- Required protocol/formal/test sources have a permanent Sim-owned location.
+- Required protocol/formal/test sources have a permanent Zed-owned location.
 - Apache notices and history policy approved.
 - Workspace builds, packages and deployments contain no unintended path dependency on retired sources.

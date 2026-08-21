@@ -1,4 +1,4 @@
-//! Provides constructs for the Sim app version and release channel.
+//! Provides constructs for the Zed app version and release channel.
 
 #![deny(missing_docs)]
 
@@ -7,15 +7,15 @@ use std::{env, str::FromStr, sync::LazyLock};
 use gpui::{App, Global};
 use semver::Version;
 
-const SIM_DOCS_URL: &str = "https://sim.dev/docs";
+const ZED_DOCS_URL: &str = "https://zed.dev/docs";
 
 /// stable | dev | nightly | preview
 pub static RELEASE_CHANNEL_NAME: LazyLock<String> = LazyLock::new(|| {
     if cfg!(debug_assertions) {
-        env::var("SIM_RELEASE_CHANNEL")
-            .unwrap_or_else(|_| include_str!("../../sim/RELEASE_CHANNEL").trim().to_string())
+        env::var("ZED_RELEASE_CHANNEL")
+            .unwrap_or_else(|_| include_str!("../../zed/RELEASE_CHANNEL").trim().to_string())
     } else {
-        include_str!("../../sim/RELEASE_CHANNEL").trim().to_string()
+        include_str!("../../zed/RELEASE_CHANNEL").trim().to_string()
     }
 });
 
@@ -30,14 +30,14 @@ pub static RELEASE_CHANNEL: LazyLock<ReleaseChannel> =
 #[cfg(target_os = "windows")]
 pub fn app_identifier() -> &'static str {
     match *RELEASE_CHANNEL {
-        ReleaseChannel::Dev => "Sim-Editor-Dev",
-        ReleaseChannel::Nightly => "Sim-Editor-Nightly",
-        ReleaseChannel::Preview => "Sim-Editor-Preview",
-        ReleaseChannel::Stable => "Sim-Editor-Stable",
+        ReleaseChannel::Dev => "Zed-Editor-Dev",
+        ReleaseChannel::Nightly => "Zed-Editor-Nightly",
+        ReleaseChannel::Preview => "Zed-Editor-Preview",
+        ReleaseChannel::Stable => "Zed-Editor-Stable",
     }
 }
 
-/// The Git commit SHA that Sim was built at.
+/// The Git commit SHA that Zed was built at.
 #[derive(Clone, Eq, Debug, PartialEq)]
 pub struct AppCommitSha(String);
 
@@ -77,7 +77,7 @@ struct GlobalAppVersion(Version);
 
 impl Global for GlobalAppVersion {}
 
-/// The version of Sim.
+/// The version of Zed.
 pub struct AppVersion;
 
 impl AppVersion {
@@ -87,8 +87,8 @@ impl AppVersion {
         build_id: Option<&str>,
         commit_sha: Option<AppCommitSha>,
     ) -> Version {
-        let mut version: Version = if let Ok(from_env) = env::var("SIM_APP_VERSION") {
-            from_env.parse().expect("invalid SIM_APP_VERSION")
+        let mut version: Version = if let Ok(from_env) = env::var("ZED_APP_VERSION") {
+            from_env.parse().expect("invalid ZED_APP_VERSION")
         } else {
             pkg_version.parse().expect("invalid version in Cargo.toml")
         };
@@ -120,12 +120,12 @@ impl AppVersion {
     }
 }
 
-/// A Sim release channel.
+/// A Zed release channel.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum ReleaseChannel {
     /// The development release channel.
     ///
-    /// Used for local debug builds of Sim.
+    /// Used for local debug builds of Zed.
     #[default]
     Dev,
 
@@ -155,7 +155,7 @@ pub fn init_test(app_version: Version, release_channel: ReleaseChannel, cx: &mut
     cx.set_global(GlobalReleaseChannel(release_channel))
 }
 
-/// Returns the Sim docs URL for the current release channel for the given
+/// Returns the Zed docs URL for the current release channel for the given
 /// `slug`.
 pub fn docs_url(slug: &str, cx: &App) -> String {
     ReleaseChannel::try_global(cx)
@@ -191,10 +191,10 @@ impl ReleaseChannel {
     /// Returns the display name for this [`ReleaseChannel`].
     pub fn display_name(&self) -> &'static str {
         match self {
-            ReleaseChannel::Dev => "Sim Dev",
-            ReleaseChannel::Nightly => "Sim Nightly",
-            ReleaseChannel::Preview => "Sim Preview",
-            ReleaseChannel::Stable => "Sim",
+            ReleaseChannel::Dev => "Zed Dev",
+            ReleaseChannel::Nightly => "Zed Nightly",
+            ReleaseChannel::Preview => "Zed Preview",
+            ReleaseChannel::Stable => "Zed",
         }
     }
 
@@ -210,13 +210,13 @@ impl ReleaseChannel {
 
     /// Returns the application ID that's used by Wayland as application ID
     /// and WM_CLASS on X11.
-    /// This also has to match the bundle identifier for Sim on macOS.
+    /// This also has to match the bundle identifier for Zed on macOS.
     pub fn app_id(&self) -> &'static str {
         match self {
-            ReleaseChannel::Dev => "dev.sim.Sim-Dev",
-            ReleaseChannel::Nightly => "dev.sim.Sim-Nightly",
-            ReleaseChannel::Preview => "dev.sim.Sim-Preview",
-            ReleaseChannel::Stable => "dev.sim.Sim",
+            ReleaseChannel::Dev => "dev.zed.Zed-Dev",
+            ReleaseChannel::Nightly => "dev.zed.Zed-Nightly",
+            ReleaseChannel::Preview => "dev.zed.Zed-Preview",
+            ReleaseChannel::Stable => "dev.zed.Zed",
         }
     }
 
@@ -230,7 +230,7 @@ impl ReleaseChannel {
         }
     }
 
-    /// Returns the Sim docs URL for this [`ReleaseChannel`] for the given
+    /// Returns the Zed docs URL for this [`ReleaseChannel`] for the given
     /// `slug`.
     pub fn docs_url(&self, slug: &str) -> String {
         let channel_path_segment = match self {
@@ -240,10 +240,10 @@ impl ReleaseChannel {
         };
 
         match channel_path_segment {
-            Some(channel) if slug.is_empty() => format!("{SIM_DOCS_URL}/{channel}"),
-            Some(channel) => format!("{SIM_DOCS_URL}/{channel}/{slug}"),
-            None if slug.is_empty() => SIM_DOCS_URL.to_string(),
-            None => format!("{SIM_DOCS_URL}/{slug}"),
+            Some(channel) if slug.is_empty() => format!("{ZED_DOCS_URL}/{channel}"),
+            Some(channel) => format!("{ZED_DOCS_URL}/{channel}/{slug}"),
+            None if slug.is_empty() => ZED_DOCS_URL.to_string(),
+            None => format!("{ZED_DOCS_URL}/{slug}"),
         }
     }
 }
@@ -274,19 +274,19 @@ mod tests {
     fn test_docs_url_for_release_channel() {
         assert_eq!(
             ReleaseChannel::Dev.docs_url("settings"),
-            "https://sim.dev/docs/nightly/settings"
+            "https://zed.dev/docs/nightly/settings"
         );
         assert_eq!(
             ReleaseChannel::Nightly.docs_url("settings"),
-            "https://sim.dev/docs/nightly/settings"
+            "https://zed.dev/docs/nightly/settings"
         );
         assert_eq!(
             ReleaseChannel::Preview.docs_url("settings"),
-            "https://sim.dev/docs/preview/settings"
+            "https://zed.dev/docs/preview/settings"
         );
         assert_eq!(
             ReleaseChannel::Stable.docs_url("settings"),
-            "https://sim.dev/docs/settings"
+            "https://zed.dev/docs/settings"
         );
     }
 }

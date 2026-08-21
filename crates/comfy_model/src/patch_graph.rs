@@ -2934,7 +2934,7 @@ fn semantic_ordered_digest(
     let encoded = serde_json::to_vec(operations)
         .map_err(|error| PatchGraphError::Serialization(error.to_string()))?;
     let mut digest = Sha256::new();
-    digest.update(b"sim-comfy-patch-graph-semantic-v2\0");
+    digest.update(b"zed-comfy-patch-graph-semantic-v2\0");
     update_text(&mut digest, base_digest)?;
     update_len(&mut digest, encoded.len())?;
     digest.update(encoded);
@@ -2950,7 +2950,7 @@ fn applied_patch_digest(
         return Ok(ordered_digest.to_owned());
     }
     let mut digest = Sha256::new();
-    digest.update(b"sim-comfy-patch-applied-compute-v1\0");
+    digest.update(b"zed-comfy-patch-applied-compute-v1\0");
     update_text(&mut digest, ordered_digest)?;
     update_text(
         &mut digest,
@@ -2984,7 +2984,7 @@ fn ordered_digest(
     operations: &[PatchOperation],
 ) -> Result<String, PatchGraphError> {
     let mut digest = Sha256::new();
-    digest.update(b"sim-comfy-patch-graph-v1\0");
+    digest.update(b"zed-comfy-patch-graph-v1\0");
     update_text(&mut digest, base_digest)?;
     update_len(&mut digest, operations.len())?;
     for operation in operations {

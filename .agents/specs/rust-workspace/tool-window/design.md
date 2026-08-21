@@ -16,13 +16,13 @@ The MVP displays direct dependency declarations only. Resolve nodes annotate eac
 ## Existing context
 
 - `workspace::dock::Panel` in `crates/workspace/src/dock.rs` defines persistent name/key, dock position, size, icon, activation, and focus behavior. `Workspace::add_panel` and dock persistence already own panel placement and active-panel restoration.
-- The existing `crates/language_tools` crate already owns Sim's syntax-tree, highlight-tree, key-context, and language-server tool views and is initialized from `crates/sim/src/main.rs`. The reusable project-tree host extends this crate; no duplicate `language_tools` crate or second initialization entry is needed.
-- `crates/sim/Cargo.toml` currently has `default = []` and uses optional dependencies plus feature forwarding for the Comfy product boundary. `script/check-comfy-feature-boundary` verifies this with manifest and `cargo tree` assertions; the Cargo feature boundary should reuse that check pattern without coupling Rust tooling to Comfy or Apple Metal features.
-- `crates/languages/src/lib.rs` unconditionally constructs `rust::RustContextProvider` and `rust::RustLspAdapter` and registers the Rust language from the shared `languages::init` call used by both `crates/sim/src/main.rs` and `HeadlessProject`. The existing `languages` features gate grammar loading and test support, not Rust as an ecosystem. Therefore this specification cannot honestly make all Rust language support optional.
+- The existing `crates/language_tools` crate already owns Zed's syntax-tree, highlight-tree, key-context, and language-server tool views and is initialized from `crates/zed/src/main.rs`. The reusable project-tree host extends this crate; no duplicate `language_tools` crate or second initialization entry is needed.
+- `crates/zed/Cargo.toml` currently has `default = []` and uses optional dependencies plus feature forwarding for the Comfy product boundary. `script/check-comfy-feature-boundary` verifies this with manifest and `cargo tree` assertions; the Cargo feature boundary should reuse that check pattern without coupling Rust tooling to Comfy or Apple Metal features.
+- `crates/languages/src/lib.rs` unconditionally constructs `rust::RustContextProvider` and `rust::RustLspAdapter` and registers the Rust language from the shared `languages::init` call used by both `crates/zed/src/main.rs` and `HeadlessProject`. The existing `languages` features gate grammar loading and test support, not Rust as an ecosystem. Therefore this specification cannot honestly make all Rust language support optional.
 - `crates/project/Cargo.toml` has no ecosystem-store feature boundaries today, but `Project` directly owns local/remote `TaskStore` and `ToolchainStore` entities and wires sharing/request handlers during construction. `HeadlessProject` mirrors those lifecycles. A conditionally compiled project module fits those established ownership paths more narrowly than an external store crate.
 - `crates/remote_server/Cargo.toml` has independent features and release scripts build `remote_server` in a separate Cargo invocation specifically to avoid feature unification. Its `rust-tools` selection must therefore be explicit and must match the desktop artifact produced for a Rust-oriented distribution.
-- `crates/proto/build.rs` always compiles the single `proto/sim.proto` root and all imported protocol files. Feature-dependent proto generation would require parallel schemas or conditional build-script/import/envelope logic, so keeping small Cargo messages inert in both variants is the lower-risk wire-compatible choice.
-- `script/bundle-mac`, `script/bundle-linux`, and `script/bundle-windows.ps1` currently select optional product features explicitly in their Cargo commands and expose dry-run build plans. Release workflows invoke those scripts. Rust-oriented distribution builds should pass one explicit `rust-tools` selection through both the Sim and remote-server commands, while core builds omit it.
+- `crates/proto/build.rs` always compiles the single `proto/zed.proto` root and all imported protocol files. Feature-dependent proto generation would require parallel schemas or conditional build-script/import/envelope logic, so keeping small Cargo messages inert in both variants is the lower-risk wire-compatible choice.
+- `script/bundle-mac`, `script/bundle-linux`, and `script/bundle-windows.ps1` currently select optional product features explicitly in their Cargo commands and expose dry-run build plans. Release workflows invoke those scripts. Rust-oriented distribution builds should pass one explicit `rust-tools` selection through both the Zed and remote-server commands, while core builds omit it.
 - `ProjectPanel` and `OutlinePanel` register actions from `init`, load asynchronously, implement `Panel`, flatten hierarchical state, use `uniform_list`, and bind selection/open/expand actions. Their settings demonstrate left/right dock persistence and status-bar button visibility.
 - `ui::TreeViewItem` has useful disclosure and accessibility behavior but hard-codes only root/child ARIA levels and lacks arbitrary-depth icons and secondary labels. The Cargo tree therefore reuses lower-level `ListItem`, `Disclosure`, `Icon`, `IndentGuide`, and `uniform_list` patterns rather than expanding `TreeViewItem` as unrelated shared-component work.
 - `project::ManifestTree` finds an outermost manifest root for language-server/toolchain lookup from a known path. It does not enumerate every manifest or expose a Cargo workspace model, so it is not the Cargo panel's data source.
@@ -32,7 +32,7 @@ The MVP displays direct dependency declarations only. Resolve nodes annotate eac
 - `TrustedWorktreesStore::can_trust` and `TrustedWorktreesEvent` are the existing authority for local, SSH, and WSL execution trust. The Cargo store must use this authority before spawning a project command.
 - `TaskStore` and `ToolchainStore` demonstrate local/remote store modes, typed project RPC request handlers, project sharing, and headless remote-server construction. `CargoWorkspaceStore` follows that pattern rather than adding client-local remote path handling.
 - `Worktree` entries carry `is_private`, and shared worktree updates exclude private entries for multiplayer peers. Cargo response projection must apply the same visibility boundary before serializing packages or navigation paths.
-- `initialize_panels` in `crates/sim/src/sim.rs` loads standard panels concurrently. `main.rs`, visual-test initialization, `app_menus.rs`, root workspace membership, and `crates/sim/Cargo.toml` are the established registration points.
+- `initialize_panels` in `crates/zed/src/zed.rs` loads standard panels concurrently. `main.rs`, visual-test initialization, `app_menus.rs`, root workspace membership, and `crates/zed/Cargo.toml` are the established registration points.
 - Settings content lives in `crates/settings_content`, while registered setting values live in their owning crates. `SettingsStore::update_default_settings` and explicit `Settings::register` permit optional `cargo_ui` to install typed Cargo defaults before registering its setting. Optional Cargo action bindings should likewise be installed from `cargo_ui::init` rather than placed in always-loaded platform keymaps.
 
 ## Architecture
@@ -68,7 +68,7 @@ Only the local store sees absolute paths, environment variables, child-process h
 - Extend the existing `crates/language_tools` crate with `src/language_tool_tree.rs`, exported through its established `src/language_tools.rs` root. The module contains the generic tree state, provider contract, flattened-row model, and renderer alongside, but independent from, the crate's existing developer tool views.
 - Add `crates/cargo_ui` with `src/cargo_ui.rs`, `src/cargo_panel.rs`, and `src/cargo_panel_settings.rs`. It contains the user-facing panel, Cargo tree projection, actions, settings, and panel tests.
 - Add `crates/project/src/cargo_workspace_store.rs` to the existing project crate. Cargo discovery and transport belong beside worktree, environment, toolchain, and task stores because they need the same local/remote lifecycle.
-- Add Cargo-specific protocol messages in `crates/proto/proto/cargo.proto` and register them through `sim.proto`/`proto.rs` using the existing typed request mechanism.
+- Add Cargo-specific protocol messages in `crates/proto/proto/cargo.proto` and register them through `zed.proto`/`proto.rs` using the existing typed request mechanism.
 - Use `language_tools`, `cargo_ui`, `cargo_workspace`, `CargoWorkspaceStore`, and focused `cargo_*` identifiers. `Metal Rust` may name a product/distribution, and a later umbrella crate may be called `metal_rust`, but this feature does not add that crate. Do not use `metal_cargo` or rename Rust directories to `metal_*`: existing `comfy_backend_metal`, `native_ffi_metal`, and GPUI Metal renderer code already use Metal for Apple GPU rendering and compute.
 
 This creates only the `cargo_ui` crate. It reuses the existing generic `language_tools` ownership unit and avoids a separate Cargo-model crate by placing project-host behavior in the existing `project` crate.
@@ -85,7 +85,7 @@ This creates only the `cargo_ui` crate. It reuses the existing generic `language
 
 The host never sees `CargoPackage`, dependency kinds, feature resolution, manifest paths, or Cargo commands. It dispatches selection, disclosure, activation, and context-menu events by opaque ID to the owning provider callback. This permits a future Gradle provider to project modules/tasks/configurations and a .NET provider to project solutions/projects/frameworks without implementing Cargo-shaped types.
 
-The host uses a full-size `uniform_list` over a flattened vector of visible rows so the list receives the panel's remaining flex height instead of collapsing to a zero-height viewport. Each row records its arbitrary ARIA level, branch/expanded state, parent ID, and node ID. The list container uses `Role::Tree`; rows use `Role::TreeItem`, `aria_level`, `aria_selected`, and conditional `aria_expanded`. `Disclosure`, existing icon components, and standard tooltip/context-menu components provide Sim-consistent rendering. A render-level GPUI regression asserts that a populated snapshot produces a non-zero list viewport and measured row.
+The host uses a full-size `uniform_list` over a flattened vector of visible rows so the list receives the panel's remaining flex height instead of collapsing to a zero-height viewport. Each row records its arbitrary ARIA level, branch/expanded state, parent ID, and node ID. The list container uses `Role::Tree`; rows use `Role::TreeItem`, `aria_level`, `aria_selected`, and conditional `aria_expanded`. `Disclosure`, existing icon components, and standard tooltip/context-menu components provide Zed-consistent rendering. A render-level GPUI regression asserts that a populated snapshot produces a non-zero list viewport and measured row.
 
 <!-- impl: crates/language_tools/src/language_tool_tree.rs#language_tool_tree -->
 
@@ -287,7 +287,7 @@ Add `CargoPanelSettingsContent` with only settings needed by the MVP:
 
 `settings_content` and `settings` each add a forwarding `rust-tools` feature. Only that feature compiles the `CargoPanelSettingsContent` value and `SettingsContent::cargo_panel` field. `cargo_ui` enables `settings/rust-tools`, owns `CargoPanelSettings`, and does not submit it through unconditional inventory registration. During feature-gated `cargo_ui::init`, it first uses `SettingsStore::update_default_settings` to install the typed defaults and then explicitly registers `CargoPanelSettings`. The shared `assets/settings/default.json` remains Cargo-free. Thus a disabled build has no Cargo settings schema field, defaults, registered setting, or initialization, while enabled user settings still use the normal merged settings store. Workspace dock persistence retains panel position, size, and prior open/active layout. Tree selection/expansion is not serialized across application restarts.
 
-Only `#[cfg(feature = "rust-tools")]` call sites in `sim` invoke `cargo_ui::init`, load `CargoPanel` from `initialize_panels`, or add the View-menu action. `cargo_ui::init` registers toggle/focus and generic tree actions for every new Workspace and installs Cargo-panel context key bindings programmatically, so disabled builds do not parse static keymap entries referring to absent Cargo actions. `CargoPanel::load` creates `CargoTreeProvider` from the workspace project and returns a panel entity. No default global shortcut is required.
+Only `#[cfg(feature = "rust-tools")]` call sites in `zed` invoke `cargo_ui::init`, load `CargoPanel` from `initialize_panels`, or add the View-menu action. `cargo_ui::init` registers toggle/focus and generic tree actions for every new Workspace and installs Cargo-panel context key bindings programmatically, so disabled builds do not parse static keymap entries referring to absent Cargo actions. `CargoPanel::load` creates `CargoTreeProvider` from the workspace project and returns a panel entity. No default global shortcut is required.
 
 The panel icon uses an existing neutral Rust/package-capable icon such as `FileRust` or `Box` unless product design adds a dedicated Cargo icon in a separate reviewed asset change. The reference image guides the compact toolbar/tree layout, not exact icon or spacing parity.
 
@@ -313,7 +313,7 @@ Repository-level validation uses focused package tests followed by `./script/cli
 
 The selected boundary follows Cargo dependency direction and existing store ownership:
 
-- `crates/sim/Cargo.toml` adds `rust-tools = ["dep:cargo_ui"]` and declares `cargo_ui` optional. Existing `default = []` remains unchanged. All `cargo_ui` imports, initialization, panel loading, action/menu references, visual-test wiring, and Cargo-specific tests in `sim` use `#[cfg(feature = "rust-tools")]`.
+- `crates/zed/Cargo.toml` adds `rust-tools = ["dep:cargo_ui"]` and declares `cargo_ui` optional. Existing `default = []` remains unchanged. All `cargo_ui` imports, initialization, panel loading, action/menu references, visual-test wiring, and Cargo-specific tests in `zed` use `#[cfg(feature = "rust-tools")]`.
 - `crates/cargo_ui/Cargo.toml` depends on `project` with `features = ["cargo-workspace"]`. Enabling the optional UI therefore brings in exactly the project-host capability it consumes.
 - `crates/cargo_ui/Cargo.toml` also enables `settings/rust-tools`; `settings` forwards to `settings_content/rust-tools`. The only Cargo-specific shared settings code is a data-only content type/field behind that feature, while defaults and registration remain in optional `cargo_ui`.
 - `crates/project/Cargo.toml` adds `cargo-workspace = ["dep:cargo_metadata"]` and makes `cargo_metadata` optional. `cargo_workspace.rs`, `cargo_workspace_store.rs`, their project fields/accessors/construction/sharing handlers, and related tests are conditionally compiled. This keeps `cargo_metadata` out of a selected core dependency graph.
@@ -322,16 +322,16 @@ The selected boundary follows Cargo dependency direction and existing store owne
 
 Keeping `CargoWorkspaceStore` inside `project` is smaller than moving it to an optional Cargo crate. The store needs private/established `Project` and `HeadlessProject` construction, sharing, environment, worktree, trust, and entity-handler paths. A new crate could depend on `project`, but then `project` could not own that store without a dependency cycle; avoiding the cycle would require a new store-registration extension mechanism broader than this MVP. Conditional project modules preserve the existing TaskStore/ToolchainStore lifecycle pattern while removing their Cargo-only code and dependency when disabled.
 
-`cargo.proto` remains imported by `sim.proto`, and typed Cargo message/request associations remain compiled in `proto` for both variants. These definitions are inert data types: the disabled `project`, `sim`, and `remote_server` variants construct no store, register no handler, and send no request. Conditional proto generation would complicate the single generated envelope and risk feature-mismatched wire schemas for negligible dependency savings; `proto` does not depend on `cargo_metadata` or `cargo_ui`.
+`cargo.proto` remains imported by `zed.proto`, and typed Cargo message/request associations remain compiled in `proto` for both variants. These definitions are inert data types: the disabled `project`, `zed`, and `remote_server` variants construct no store, register no handler, and send no request. Conditional proto generation would complicate the single generated envelope and risk feature-mismatched wire schemas for negligible dependency savings; `proto` does not depend on `cargo_metadata` or `cargo_ui`.
 
 Distribution selection is explicit rather than a Cargo default:
 
-- Rust-oriented or `Metal Rust` bundle invocations pass `sim/rust-tools` to the Sim build and `rust-tools` to the separately built remote server.
+- Rust-oriented or `Metal Rust` bundle invocations pass `zed/rust-tools` to the Zed build and `rust-tools` to the separately built remote server.
 - Core-editor bundle invocations omit those features and use `--no-default-features` in validation.
 - Comfy/accelerator selection is orthogonal; bundle scripts compose `rust-tools` with any selected Comfy features rather than making either imply the other.
-- Dry-run bundle output reports the Sim and remote-server feature sets so release CI can detect a mismatched artifact pair.
+- Dry-run bundle output reports the Zed and remote-server feature sets so release CI can detect a mismatched artifact pair.
 
-Add `script/check-rust-tools-feature-boundary`, modeled on `script/check-comfy-feature-boundary`, to parse the Sim, Cargo UI, project, remote-server, settings, and settings-content manifests; assert optional-feature forwarding and cfg integration; inspect `cargo tree --locked` for disabled Sim/remote/language-tools graphs; verify the disabled settings schema/defaults are Cargo-free; and check dry-run release plans. CI runs that boundary check plus enabled and disabled `cargo check` commands for both binaries. Workspace-wide all-feature builds continue to compile `cargo_ui` as a member; dependency exclusion claims apply to the selected package build graphs used for product variants.
+Add `script/check-rust-tools-feature-boundary`, modeled on `script/check-comfy-feature-boundary`, to parse the Zed, Cargo UI, project, remote-server, settings, and settings-content manifests; assert optional-feature forwarding and cfg integration; inspect `cargo tree --locked` for disabled Zed/remote/language-tools graphs; verify the disabled settings schema/defaults are Cargo-free; and check dry-run release plans. CI runs that boundary check plus enabled and disabled `cargo check` commands for both binaries. Workspace-wide all-feature builds continue to compile `cargo_ui` as a member; dependency exclusion claims apply to the selected package build graphs used for product variants.
 
 The name `rust-tools` is intentionally scoped to this new capability in the MVP. Existing `languages::init` continues to register Rust and rust-analyzer-related behavior in both configurations. Making that pre-existing Rust stack optional requires a separate follow-up specification covering the `languages` crate, grammar loading, tasks, extensions, settings, and remote compatibility.
 
@@ -369,7 +369,7 @@ _For any_ two clients viewing the same shared Cargo snapshot, changing focus, se
 
 ### Property 5: Disabled Cargo boundary is inert
 
-_For any_ Sim or remote-server build whose selected features exclude `rust-tools`, no user or project lifecycle event can construct a Cargo workspace store, register a Cargo workspace request handler, send a Cargo workspace request, or spawn Cargo metadata through this feature's runner, and the selected normal dependency graph excludes `cargo_ui` and `cargo_metadata`. Separately triggered legacy task-target discovery is not attributed to this property.
+_For any_ Zed or remote-server build whose selected features exclude `rust-tools`, no user or project lifecycle event can construct a Cargo workspace store, register a Cargo workspace request handler, send a Cargo workspace request, or spawn Cargo metadata through this feature's runner, and the selected normal dependency graph excludes `cargo_ui` and `cargo_metadata`. Separately triggered legacy task-target discovery is not attributed to this property.
 
 **Validates: Requirement 9.2**
 
@@ -438,16 +438,16 @@ Also validates Requirements 9.3, 9.4, 9.8, and 9.10.
 | 8.4 | D2-D5, D9-D11, D15 layered refresh suite | Integration | Store/provider/host tests cover their owned invalidation, debounce, concurrency, transport, and failure behavior. |
 | 8.5 | D14-D15 large synthetic model | Performance | 10,000-row test checks IDs/order/flattening and visible-range render count. |
 | 8.6 | D15 injected runner | Isolation | Test harness fails if production Cargo/network/real-workspace mutation is attempted. |
-| 9.1 | D13, D16 enabled Sim boundary | Build integration | Enabled-build test observes Cargo settings/actions/menu/panel registration and `Cargo` title. |
-| 9.2 | D13, D16 disabled Sim boundary | Build integration | Disabled source/build check finds no linked `cargo_ui`, registered Cargo setting/action, panel loader, or menu item. |
+| 9.1 | D13, D16 enabled Zed boundary | Build integration | Enabled-build test observes Cargo settings/actions/menu/panel registration and `Cargo` title. |
+| 9.2 | D13, D16 disabled Zed boundary | Build integration | Disabled source/build check finds no linked `cargo_ui`, registered Cargo setting/action, panel loader, or menu item. |
 | 9.3 | D3, D16 optional project module/dependency | Dependency | Disabled project tree/check excludes `cargo_metadata` and compiles without Cargo store APIs. |
-| 9.4 | D3, D11, D16 disabled lifecycle | Integration | Disabled Sim/remote integration harness records zero Cargo-workspace discovery requests and feature-runner spawns across lifecycle events. |
+| 9.4 | D3, D11, D16 disabled lifecycle | Integration | Disabled Zed/remote integration harness records zero Cargo-workspace discovery requests and feature-runner spawns across lifecycle events. |
 | 9.5 | D1-D2, D16 generic host independence | Dependency | `language_tools` check/tree and fake-provider tests pass without Cargo packages or types. |
 | 9.6 | D3, D11, D16 matched enabled variants | Integration | Local, remote-server, and multiplayer tests produce the same typed projection with host-only execution. |
 | 9.7 | D11, D16 unsupported host | Error path | Feature-mismatch test maps absent handler to one actionable unsupported state and records no local fallback/retry. |
 | 9.8 | D11, D16 disabled client | Integration | Client-off test records no Cargo requests even when the fake host advertises/accepts them. |
 | 9.9 | D11, D16 inert protocol | Protocol | Disabled proto round-trip succeeds while source/integration checks find no store or handler registration. |
-| 9.10 | D15-D16 build matrix/boundary script | Build matrix | CI checks enabled/disabled Sim and remote builds plus disabled dependency trees and bundle feature parity. |
+| 9.10 | D15-D16 build matrix/boundary script | Build matrix | CI checks enabled/disabled Zed and remote builds plus disabled dependency trees and bundle feature parity. |
 
 ## Requirements traceability
 
@@ -463,10 +463,10 @@ This compatibility index points the repository's feature-spec validator to the c
 - **Store lifecycle tests in `project`**: Use a fake metadata runner, fake trust authority, test worktrees, and mock proto clients to cover local/remote/shared modes, privacy, invalidation, cancellation, stale generations, and disconnects.
 - **Generic host GPUI tests in `language_tools`**: Use a fake arbitrary tree provider and GPUI executor timers for refresh/debounce; assert flattened rows, keyboard/pointer behavior, accessibility state, selection fallback, and visible-range rendering.
 - **Cargo panel GPUI tests in `cargo_ui`**: Feed typed Cargo snapshots through a fake store, verify exact hierarchy/labels/toolbars/context actions/navigation/statuses, and confirm panel settings/dock behavior.
-- **Integration tests in `sim`/remote server**: Verify initialization, View menu action, standard panel loading, settings registration, and headless Cargo store request registration.
+- **Integration tests in `zed`/remote server**: Verify initialization, View menu action, standard panel loading, settings registration, and headless Cargo store request registration.
 - **Build-boundary tests**: Run `script/check-rust-tools-feature-boundary`, enabled and disabled package checks, and local/remote feature-mismatch tests. Assert selected disabled graphs exclude `cargo_ui` and `cargo_metadata`, while the shared proto and generic tree host still compile.
 - **Large-workspace test**: Generate at least 10,000 projected rows in memory; assert deterministic projection and bounded rendered elements without elapsed-time thresholds.
-- **Validation commands**: Run focused package tests for `project`, `language_tools`, `cargo_ui`, `proto`, `remote_server`, and `sim`; run enabled/disabled `cargo check` and dependency-boundary checks; then run `./script/clippy`. Test commands must use repository-supported test selection and must not invoke real Cargo metadata fixtures against the checked-out repository.
+- **Validation commands**: Run focused package tests for `project`, `language_tools`, `cargo_ui`, `proto`, `remote_server`, and `zed`; run enabled/disabled `cargo check` and dependency-boundary checks; then run `./script/clippy`. Test commands must use repository-supported test selection and must not invoke real Cargo metadata fixtures against the checked-out repository.
 
 ## Resolved decisions
 
@@ -477,7 +477,7 @@ This compatibility index points the repository's feature-spec validator to the c
 - The panel starts closed, runs metadata lazily when first activated, and preserves tree UI state only across in-session refreshes.
 - Cargo executes on the authoritative project host and uses typed RPC for remote/multiplayer clients.
 - No public provider/plugin registry is included.
-- `rust-tools` gates this Cargo feature across Sim and remote-server builds while `project/cargo-workspace` gates the Cargo store and optional `cargo_metadata` dependency.
+- `rust-tools` gates this Cargo feature across Zed and remote-server builds while `project/cargo-workspace` gates the Cargo store and optional `cargo_metadata` dependency.
 - Existing Rust language/rust-analyzer/grammar/task registration remains unconditional and is a separate follow-up boundary.
 - Cargo protobuf messages remain compiled but inert when tooling is disabled.
 

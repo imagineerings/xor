@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeSet;
 use thiserror::Error;
 
-pub const GRAPH_CLIPBOARD_MEDIA_TYPE: &str = "application/x-sim-comfy-graph+json;version=1";
+pub const GRAPH_CLIPBOARD_MEDIA_TYPE: &str = "application/x-zed-comfy-graph+json;version=1";
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum GraphActionInput {
@@ -914,7 +914,7 @@ pub enum GraphActionError {
     Graph(#[from] comfy_runtime::GraphError),
     #[error("graph action {0:?} requires typed input")]
     InputRequired(CatalogGraphAction),
-    #[error("graph action {0:?} is owned by the Sim settings store")]
+    #[error("graph action {0:?} is owned by the Zed settings store")]
     RequiresSettingsStore(CatalogGraphAction),
     #[error("graph action {0:?} requires the canonical native asset service")]
     RequiresAssetService(CatalogGraphAction),

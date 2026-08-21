@@ -10,8 +10,8 @@ ROOT = Path(__file__).parent
 CATALOG = ROOT / "catalogs" / "master-coverage.csv"
 
 CLASSIFICATIONS = {
-    1: "Already implemented in Sim and reusable without changes",
-    2: "Partially implemented in Sim and should be extended",
+    1: "Already implemented in Zed and reusable without changes",
+    2: "Partially implemented in Zed and should be extended",
     3: "Fully covered by an existing Godot migration spec",
     4: "Partially covered by an existing migration spec",
     5: "Missing from the migration specs",
@@ -28,7 +28,7 @@ class Domain:
     modes: str
     lifecycle: str
     godot_evidence: str
-    sim_evidence: str
+    zed_evidence: str
     baseline_spec: str
     owner: str
     writes: str
@@ -50,7 +50,7 @@ DOMAINS = (
         "project + workspace + recent_projects",
         "crates/project/src/project.rs, crates/workspace/src/workspace.rs, crates/recent_projects/src/recent_projects.rs",
         "cargo test -p project -p workspace -p recent_projects godot",
-        "Which create, upgrade, import, and launch behaviors are mandatory native Sim capabilities, and which are intentionally excluded?",
+        "Which create, upgrade, import, and launch behaviors are mandatory native Zed capabilities, and which are intentionally excluded?",
         (
             ("create a project with name, path, renderer, version-control metadata, and default files", 5),
             ("import an existing project.godot and reject invalid or duplicate roots without losing user data", 4),
@@ -77,7 +77,7 @@ DOMAINS = (
         "project + worktree + language",
         "crates/project/src/project.rs, crates/worktree/src/worktree.rs, crates/language/src/language_registry.rs",
         "cargo test -p project -p worktree -p language godot_scene",
-        "Does the product require Sim-owned executable scene trees, or only lossless native import/editing with runtime execution explicitly unresolved or excluded?",
+        "Does the product require Zed-owned executable scene trees, or only lossless native import/editing with runtime execution explicitly unresolved or excluded?",
         (
             ("create, parent, reorder, name, own, group, and free nodes while preserving scene-tree invariants", 6),
             ("deliver enter-tree, ready, process, physics-process, pause, exit-tree, and deletion lifecycle notifications", 6),
@@ -105,7 +105,7 @@ DOMAINS = (
         "workspace + project_panel + inspector_ui + editor + command_palette",
         "crates/workspace/src/workspace.rs, crates/project_panel/src/project_panel.rs, crates/inspector_ui/src/inspector_ui.rs",
         "cargo test -p workspace -p project_panel -p inspector_ui godot",
-        "Which Godot editor surfaces are mandatory native Sim authoring experiences, and which are intentionally excluded rather than delegated?",
+        "Which Godot editor surfaces are mandatory native Zed authoring experiences, and which are intentionally excluded rather than delegated?",
         (
             ("restore open scenes, selected objects, bottom panels, docks, and workspace layout per project", 2),
             ("browse and manipulate the scene tree with create, rename, reparent, group, visibility, and ownership operations", 4),
@@ -130,12 +130,12 @@ DOMAINS = (
         "Editor viewport and exported runtime; Vulkan/Metal/D3D12 rendering-device paths and GLES3 compatibility path; low-end and mobile constraints vary.",
         "Canvas state is frame-driven and viewport-scoped; resource loss and unsupported shaders have explicit fallbacks or errors; visual output, culling, batching, and ordering remain deterministic for the same inputs.",
         "projects/godot/scene/main/canvas_item.cpp::CanvasItem; projects/godot/servers/rendering/rendering_server_default.cpp::RenderingServerDefault; projects/godot/servers/rendering/renderer_canvas_cull.cpp::RendererCanvasCull; projects/godot/scene/2d/tile_map_layer.cpp::TileMapLayer",
-        "crates/gpui/src/element.rs::Element and crates/gpui_wgpu/src/wgpu_renderer.rs::WgpuRenderer render Sim UI, not Godot CanvasItem scenes",
+        "crates/gpui/src/element.rs::Element and crates/gpui_wgpu/src/wgpu_renderer.rs::WgpuRenderer render Zed UI, not Godot CanvasItem scenes",
         "rendering-media R1.1-R2.2 / Property 1 / Task 1 documents a blanket render-backend exclusion but no behavioral replacement",
         "gpui + gpui_wgpu + image_viewer",
         "crates/gpui/src/element.rs, crates/gpui_wgpu/src/wgpu_renderer.rs, crates/image_viewer/src/image_viewer.rs",
         "cargo test -p gpui -p gpui_wgpu -p image_viewer godot_canvas",
-        "Must Sim own exported-runtime CanvasItem behavior, or is the capability intentionally excluded or narrowed to native asset preview?",
+        "Must Zed own exported-runtime CanvasItem behavior, or is the capability intentionally excluded or narrowed to native asset preview?",
         (
             ("compose CanvasItem and Node2D transforms, visibility, modulation, clipping, z-order, y-sort, and draw commands", 6),
             ("render sprites, regions, nine-patches, polygons, lines, text, and texture rectangles with filtering and repeat modes", 6),
@@ -155,12 +155,12 @@ DOMAINS = (
         "Forward+, Mobile, and Compatibility renderers; Vulkan/Metal/D3D12/GLES3 drivers vary by platform; editor previews and exported runtimes share resources but not tooling.",
         "Frame and resource lifecycles cover device creation/loss, shader compile failure, streaming, visibility, and viewport resize; unsupported driver/features fail visibly or choose a documented fallback.",
         "projects/godot/scene/3d/node_3d.cpp::Node3D; projects/godot/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp::RendererSceneRenderRD; projects/godot/servers/rendering/renderer_scene_cull.cpp::RendererSceneCull; projects/godot/scene/resources/environment.cpp::Environment",
-        "crates/gpui_wgpu/src/wgpu_renderer.rs::WgpuRenderer and crates/component_preview/src/component_preview.rs preview Sim UI; no Godot 3D scene renderer or camera pipeline was found",
+        "crates/gpui_wgpu/src/wgpu_renderer.rs::WgpuRenderer and crates/component_preview/src/component_preview.rs preview Zed UI; no Godot 3D scene renderer or camera pipeline was found",
         "rendering-media R1.1 / Property 1 / Task 1 excludes renderer migration; mesh-generation-pipeline covers generated mesh artifact metadata only",
         "gpui_wgpu + component_preview + image_viewer",
         "crates/gpui_wgpu/src/wgpu_renderer.rs, crates/component_preview/src/component_preview.rs, crates/image_viewer/src/image_viewer.rs",
         "cargo test -p gpui_wgpu -p component_preview godot_3d",
-        "Which visual parity tier will a Sim-native renderer own, and which unsupported behaviors are intentionally excluded or limited to asset preview?",
+        "Which visual parity tier will a Zed-native renderer own, and which unsupported behaviors are intentionally excluded or limited to asset preview?",
         (
             ("compose Node3D transforms, visibility, layers, top-level state, and camera projections", 6),
             ("render meshes, surfaces, blend shapes, skeleton skinning, MultiMesh instances, and material overrides", 6),
@@ -182,7 +182,7 @@ DOMAINS = (
         "Editor and exported runtime; desktop, mobile, web, RTL, accessibility, pointer, touch, keyboard, and controller navigation variants.",
         "Layout and theme changes invalidate predictably; focus/event ownership follows tree lifecycle; invalid theme resources or inaccessible actions degrade visibly without trapping input.",
         "projects/godot/scene/gui/control.cpp::Control; projects/godot/scene/gui/container.cpp::Container; projects/godot/scene/resources/theme.cpp::Theme; projects/godot/scene/gui/text_edit.cpp::TextEdit; projects/godot/scene/gui/rich_text_label.cpp::RichTextLabel",
-        "crates/gpui/src/elements/div.rs::Div; crates/ui/src/ui.rs::init; crates/theme/src/theme.rs::Theme; crates/ui_input/src/ui_input.rs; Sim editor UI is not Godot exported-runtime Control semantics",
+        "crates/gpui/src/elements/div.rs::Div; crates/ui/src/ui.rs::init; crates/theme/src/theme.rs::Theme; crates/ui_input/src/ui_input.rs; Zed editor UI is not Godot exported-runtime Control semantics",
         "editor-experience and unified-authoring-app partially cover authoring UI; rendering-media excludes Godot UI/text runtime stacks",
         "gpui + ui + theme + ui_input",
         "crates/ui/src/ui.rs, crates/theme/src/theme.rs, crates/ui_input/src/ui_input.rs",
@@ -211,7 +211,7 @@ DOMAINS = (
         "gpui + gpui_platform + keymap_editor + settings",
         "crates/gpui/src/platform.rs, crates/gpui_platform/src/gpui_platform.rs, crates/settings/src/settings.rs",
         "cargo test -p gpui -p gpui_platform -p keymap_editor godot_input",
-        "Which runtime input/display contracts must Sim reproduce beyond its editor-window platform layer?",
+        "Which runtime input/display contracts must Zed reproduce beyond its editor-window platform layer?",
         (
             ("define InputMap actions, deadzones, physical/logical keys, device filters, and multiple event bindings", 5),
             ("report pressed, just-pressed, just-released, strength, vector, mouse velocity, and accumulated input deterministically", 5),
@@ -225,7 +225,7 @@ DOMAINS = (
         ),
     ),
     Domain(
-        "SIM",
+        "ZED",
         "Physics, navigation, animation, audio, and particles",
         "simulation services",
         "Editor tools and exported runtime; 2D and 3D servers can be disabled independently; Godot Physics and Jolt are selectable; audio/device backends and GPU features vary.",
@@ -236,7 +236,7 @@ DOMAINS = (
         "task + project metadata; architecture decision required for runtime owner",
         "crates/project/src/project.rs, crates/task/src/task.rs, crates/audio/src/audio.rs, crates/media/src/media.rs",
         "cargo test -p project -p task -p audio godot_simulation",
-        "Which physics, navigation, animation, audio, and particle behaviors are native Sim runtime requirements, and which are intentionally excluded?",
+        "Which physics, navigation, animation, audio, and particle behaviors are native Zed runtime requirements, and which are intentionally excluded?",
         (
             ("simulate 2D rigid, static, character, animatable, and soft bodies with areas, shapes, joints, layers, masks, sleeping, and callbacks", 6),
             ("simulate 3D rigid, static, character, animatable, and soft bodies with areas, shapes, joints, layers, masks, sleeping, and callbacks", 6),
@@ -281,12 +281,12 @@ DOMAINS = (
         "Editor and exported runtime; platform-specific shared libraries and feature tags; initialization levels core, servers, scene, editor; tools and release builds differ.",
         "Libraries resolve, initialize, register, reload where supported, and terminate in order; ABI/version/library failures are isolated and diagnosed; plugins persist enabled state and unregister cleanly.",
         "projects/godot/core/extension/gdextension.cpp::GDExtension; projects/godot/core/extension/gdextension_manager.cpp::GDExtensionManager; projects/godot/core/extension/gdextension_interface.cpp::gdextension_setup_interface; projects/godot/editor/plugins/editor_plugin.cpp::EditorPlugin; projects/godot/editor/editor_data.cpp::EditorData::add_editor_plugin",
-        "crates/extension/src/extension.rs::ExtensionStore; crates/extension_host/src/extension_host.rs::ExtensionHost; crates/extension_api/src/extension_api.rs; extensions/ supports Sim WASM extensions, not GDExtension ABI or Godot EditorPlugin contracts",
+        "crates/extension/src/extension.rs::ExtensionStore; crates/extension_host/src/extension_host.rs::ExtensionHost; crates/extension_api/src/extension_api.rs; extensions/ supports Zed WASM extensions, not GDExtension ABI or Godot EditorPlugin contracts",
         "No dedicated Godot extension/plugin spec; language-scripting mentions legacy .gd and C# only; build-test-docs has dependency review",
         "extension + extension_host + extension_api + extensions_ui",
         "crates/extension_host/src/extension_host.rs, crates/extension_api/src/extension_api.rs, crates/extensions_ui/src/extensions_ui.rs",
         "cargo test -p extension -p extension_host -p extensions_ui godot",
-        "Should Sim refuse GDExtension binaries, translate a supported subset, or provide a separately reviewed Sim-owned compatibility host without Godot libraries?",
+        "Should Zed refuse GDExtension binaries, translate a supported subset, or provide a separately reviewed Zed-owned compatibility host without Godot libraries?",
         (
             ("parse .gdextension manifests and select libraries by OS, architecture, build, and feature tags", 5),
             ("validate GDExtension minimum version, entry symbol, ABI, interface functions, and initialization levels", 5),
@@ -295,7 +295,7 @@ DOMAINS = (
             ("generate and preserve extension_api.json and gdextension_interface.h compatibility contracts", 5),
             ("discover plugin.cfg addons and enable, disable, persist, reload, and diagnose EditorPlugin instances", 5),
             ("allow editor plugins to add docks, inspectors, importers, exporters, gizmos, debuggers, settings, shortcuts, and autoloads with cleanup", 5),
-            ("reuse Sim extension trust, capability, installation, and UI boundaries instead of creating a second plugin manager", 2),
+            ("reuse Zed extension trust, capability, installation, and UI boundaries instead of creating a second plugin manager", 2),
         ),
     ),
     Domain(
@@ -310,7 +310,7 @@ DOMAINS = (
         "worktree + fs + project + image_viewer + svg_preview",
         "crates/worktree/src/worktree.rs, crates/project/src/project.rs, crates/image_viewer/src/image_viewer.rs",
         "cargo test -p worktree -p project -p image_viewer godot_import",
-        "Which Godot import artifacts must Sim reproduce as Sim-native resources, and which importers are intentionally excluded?",
+        "Which Godot import artifacts must Zed reproduce as Zed-native resources, and which importers are intentionally excluded?",
         (
             ("scan the project filesystem incrementally with ignore rules, UIDs, type detection, moves, removals, and watcher reconciliation", 4),
             ("select importers by extension and priority and persist importer, options, source, destination, remap, generator, and validity metadata", 4),
@@ -331,12 +331,12 @@ DOMAINS = (
         "Editor UI and headless CLI; debug/release/dedicated-server templates; Android, iOS, macOS, visionOS, Linux, Windows, and Web exporters have distinct signing/toolchain/options.",
         "Presets persist filters, features, credentials references, templates, patches, encryption, and platform settings; validation blocks missing templates/toolchains/signing; cancellation and partial packages are cleaned up.",
         "projects/godot/editor/export/editor_export.cpp::EditorExport; projects/godot/editor/export/editor_export_platform.cpp::EditorExportPlatform; projects/godot/editor/export/editor_export_preset.cpp::EditorExportPreset; projects/godot/editor/export/editor_export_plugin.cpp::EditorExportPlugin; projects/godot/main/main.cpp::Main::start",
-        "crates/task/src/task_template.rs::TaskTemplate and crates/terminal/src/terminal.rs can run external commands; script/bundle-* packages Sim itself; no export_presets.cfg parser was found",
+        "crates/task/src/task_template.rs::TaskTemplate and crates/terminal/src/terminal.rs can run external commands; script/bundle-* packages Zed itself; no export_presets.cfg parser was found",
         "platform-export R1.1-R2.2 / Property 1 / Task 1 covers parsing presets into external tasks but omits packaging semantics and per-platform outcomes",
         "task + terminal + project + settings",
         "crates/task/src/task.rs, crates/project/src/project.rs, crates/settings/src/settings.rs",
         "cargo test -p task -p project -p settings godot_export",
-        "Which platform packager and exporter behaviors must Sim reproduce natively, and which targets are intentionally excluded?",
+        "Which platform packager and exporter behaviors must Zed reproduce natively, and which targets are intentionally excluded?",
         (
             ("parse, edit, duplicate, reorder, persist, and validate export presets, filters, features, patches, and custom options", 4),
             ("discover, install, uninstall, mirror, and validate matching debug/release export templates without silent downloads", 5),
@@ -347,7 +347,7 @@ DOMAINS = (
             ("export Linux/BSD and Windows executables with architectures, icons, metadata, signing, console mode, and embedded data", 5),
             ("export Web builds with WASM, threads, service worker/PWA, extensions, HTML shell, compression, and browser feature validation", 5),
             ("encrypt packs or scripts and protect credentials/signing material without persisting secrets in project files", 5),
-            ("launch, stop, remote-deploy, and collect logs from an exported or editor-run project through existing Sim tasks", 4),
+            ("launch, stop, remote-deploy, and collect logs from an exported or editor-run project through existing Zed tasks", 4),
         ),
     ),
     Domain(
@@ -357,12 +357,12 @@ DOMAINS = (
         "Editor and exported runtime; desktop/mobile/web/headless; TLS, browser sandbox, IPv4/IPv6, platform permissions, dedicated server, and peer topology variants.",
         "Connections, requests, peers, channels, replication, RPCs, downloads, and files have explicit open/close/cancel/error/timeout lifecycles; limits and path/network failures are observable.",
         "projects/godot/core/io/file_access.cpp::FileAccess; projects/godot/core/io/dir_access.cpp::DirAccess; projects/godot/core/io/http_client.cpp::HTTPClient; projects/godot/scene/main/http_request.cpp::HTTPRequest; projects/godot/modules/multiplayer/scene_multiplayer.cpp::SceneMultiplayer; projects/godot/modules/websocket/websocket_peer.cpp::WebSocketPeer",
-        "crates/fs/src/fs.rs::Fs, crates/net/src/net.rs, crates/http_client/src/http_client.rs::HttpClient, crates/rpc/src/rpc.rs, and crates/collab/src/collab.rs exist for Sim application services, not Godot runtime API compatibility",
+        "crates/fs/src/fs.rs::Fs, crates/net/src/net.rs, crates/http_client/src/http_client.rs::HttpClient, crates/rpc/src/rpc.rs, and crates/collab/src/collab.rs exist for Zed application services, not Godot runtime API compatibility",
         "networking-collaboration R1.1-R2.1 / Properties 1-2 / Task 1 excludes multiplayer runtime broadly and preserves only debug metadata",
         "fs + net + http_client + rpc + collab + task",
         "crates/fs/src/fs.rs, crates/net/src/net.rs, crates/http_client/src/http_client.rs, crates/rpc/src/rpc.rs, crates/collab/src/lib.rs",
         "cargo test -p fs -p net -p http_client -p rpc godot",
-        "Which Godot runtime networking APIs are native product requirements versus intentional exclusions, and may Sim collaboration ever back gameplay networking?",
+        "Which Godot runtime networking APIs are native product requirements versus intentional exclusions, and may Zed collaboration ever back gameplay networking?",
         (
             ("read, write, seek, resize, flush, compress, encrypt, hash, map, and atomically replace files through res:// and user://", 5),
             ("list, create, rename, copy, remove, and watch directories while confining paths and preserving platform semantics", 5),
@@ -389,7 +389,7 @@ DOMAINS = (
         "dap + debugger_ui + diagnostics + zlog + crashes + miniprofiler_ui",
         "crates/dap/src/dap.rs, crates/debugger_ui/src/debugger_ui.rs, crates/diagnostics/src/diagnostics.rs, crates/crashes/src/crashes.rs",
         "cargo test -p dap -p debugger_ui -p diagnostics -p crashes godot",
-        "Which debugger protocol semantics must Sim own directly, and which unsupported operations should remain explicit exclusions?",
+        "Which debugger protocol semantics must Zed own directly, and which unsupported operations should remain explicit exclusions?",
         (
             ("format, route, filter, timestamp, persist, and flush stdout/stderr, print, warning, error, and structured engine log messages", 2),
             ("connect and authenticate editor/runtime debugger sessions with protocol negotiation, timeouts, reconnect, and multiple instances", 4),
@@ -408,12 +408,12 @@ DOMAINS = (
         "Editor, project manager, game, headless, dedicated server, import, export, script, benchmark, doctool, and platform-specific command options.",
         "Argument parsing selects one mode, validates conflicts and prerequisites, propagates exit codes, signals cancellation, and shuts down initialized services in reverse order; automation remains deterministic and noninteractive.",
         "projects/godot/main/main.cpp::Main::setup,Main::start,Main::cleanup and command-line option table; projects/godot/main/main_timer_sync.cpp::MainTimerSync; projects/godot/platform/linuxbsd/godot_linuxbsd.cpp::main",
-        "crates/cli/src/cli.rs::CliRequest; crates/task/src/task.rs::Task; crates/terminal/src/terminal.rs; crates/remote_server/src/remote_server.rs; Sim workflows have no Godot option compatibility",
+        "crates/cli/src/cli.rs::CliRequest; crates/task/src/task.rs::Task; crates/terminal/src/terminal.rs; crates/remote_server/src/remote_server.rs; Zed workflows have no Godot option compatibility",
         "platform-export partially covers CLI export; editor-experience covers run/debug; build-test-docs excludes duplicate build infrastructure; no complete CLI/headless criteria",
         "cli + task + terminal + remote_server",
         "crates/cli/src/cli.rs, crates/task/src/task.rs, crates/remote_server/src/main.rs",
         "cargo test -p cli -p task -p remote_server godot",
-        "Which Godot-compatible CLI flags must map to Sim-owned execution, and which are explicitly unsupported?",
+        "Which Godot-compatible CLI flags must map to Zed-owned execution, and which are explicitly unsupported?",
         (
             ("resolve project path, main pack, scene, editor, project-manager, and runtime mode with conflict diagnostics", 4),
             ("run headless or with dummy display/audio/text/input drivers and report unsupported visual operations", 5),
@@ -438,12 +438,12 @@ DOMAINS = (
         "sandbox + credentials_provider + http_client_tls + extension_host + settings",
         "crates/sandbox/src/sandbox.rs, crates/credentials_provider/src/credentials_provider.rs, crates/extension_host/src/extension_host.rs",
         "cargo test -p sandbox -p credentials_provider -p extension_host godot_security",
-        "What is the trust policy for imported @tool scripts, native extensions, editor plugins, and post-import scripts executed or translated by Sim?",
+        "What is the trust policy for imported @tool scripts, native extensions, editor plugins, and post-import scripts executed or translated by Zed?",
         (
             ("confine res://, user://, temp, pack, import, extension, and export paths against traversal, symlink, and archive attacks", 5),
             ("establish TLS trust from system/bundled/custom certificates and expose hostname, chain, expiry, and protocol failures", 2),
             ("request, explain, persist, revoke, and diagnose mobile camera, microphone, storage, network, notification, and XR permissions", 5),
-            ("store export signing keys, passwords, tokens, and remote credentials through Sim secret facilities with redaction", 2),
+            ("store export signing keys, passwords, tokens, and remote credentials through Zed secret facilities with redaction", 2),
             ("gate @tool scripts, post-import scripts, GDExtension libraries, and EditorPlugins by explicit project trust and isolation policy", 5),
             ("enforce browser sandbox, secure-context, cross-origin, CSP-like embedding, storage, clipboard, fullscreen, and thread prerequisites", 5),
             ("bound resource parsing, decompression, image dimensions, archive entries, recursion, network bodies, queues, and worker memory/time", 5),
@@ -487,7 +487,7 @@ DOMAINS = (
         "gpui_windows + gpui_macos + gpui_linux + gpui_web + task",
         "crates/gpui_platform/src/gpui_platform.rs, crates/task/src/task.rs",
         "cargo test -p gpui_platform -p task godot_platform",
-        "Which target platforms must Sim support for authoring and native exported runtime, and which are intentionally excluded?",
+        "Which target platforms must Zed support for authoring and native exported runtime, and which are intentionally excluded?",
         (
             ("run and export on Windows with native windows, input, IME, accessibility, gamepads, audio/MIDI, filesystem, registry, crash handling, signing, and D3D12/Vulkan/GLES", 4),
             ("run and export on macOS with Cocoa windows, input/IME, accessibility, Metal/Vulkan/GLES, audio/MIDI, filesystem, menus, bundles, sandbox, signing, and notarization", 4),
@@ -538,7 +538,7 @@ DOMAINS = (
         "Cargo feature owners + task diagnostics + system_specs",
         "crates/system_specs/src/system_specs.rs, crates/task/src/task.rs, Cargo.toml",
         "cargo test -p system_specs -p task godot_features",
-        "Which Godot modules are mandatory native capabilities, optional native capabilities, or intentionally excluded for each Sim product profile?",
+        "Which Godot modules are mandatory native capabilities, optional native capabilities, or intentionally excluded for each Zed product profile?",
         (
             ("resolve all 55 built-in modules and custom modules by default, explicit module flags, dependencies, can_build, platform, architecture, and build profile", 5),
             ("enable GDScript and common codec/text/network/import modules by default only when their dependencies and product profile permit", 5),
@@ -568,8 +568,8 @@ DOMAINS = (
             ("generate bindings, extension APIs, docs, shaders, fonts, icons, translations, platform templates, and registration sources reproducibly", 7),
             ("maintain SCons helpers, compiler/linker probes, caches, SCU/Ninja/compile-db support, and platform toolchain integration", 7),
             ("maintain upstream CI, packaging, signing, release, update-check, and artifact-publishing workflows separately from product parity", 7),
-            ("treat imported documentation, examples, test fixtures, and generated files as evidence until a connected Sim behavior consumes them", 7),
-            ("reuse Sim license, dependency, compliance, CI, documentation, and release infrastructure instead of porting Godot's equivalents", 1),
+            ("treat imported documentation, examples, test fixtures, and generated files as evidence until a connected Zed behavior consumes them", 7),
+            ("reuse Zed license, dependency, compliance, CI, documentation, and release infrastructure instead of porting Godot's equivalents", 1),
         ),
     ),
 )
@@ -578,24 +578,24 @@ DOMAINS = (
 GODOT_COMPATIBLE_BOUNDARIES = {
     "PROJ": "Godot project.godot, override.cfg, feature tags, project identifiers, and project-directory conventions at import/export boundaries only.",
     "SCENE": "Godot .tscn, .tres, .scn, .res, UID, Variant, node/resource type, path, and signal representations at serialization boundaries only.",
-    "EDITOR": "Godot-compatible command names, shortcuts, workspace concepts, inspector metadata, and project files at the Sim UI boundary only.",
-    "R2D": "Godot CanvasItem, Node2D, texture, shader, material, and scene data accepted as input or emitted for interoperability; rendering executes in Sim.",
-    "R3D": "Godot Node3D, mesh, material, camera, lighting, environment, shader, and scene data accepted as input or emitted for interoperability; rendering executes in Sim.",
-    "UI": "Godot Control, theme, focus, layout, accessibility, and input data accepted as a compatibility model; UI layout and events execute in GPUI/Sim.",
+    "EDITOR": "Godot-compatible command names, shortcuts, workspace concepts, inspector metadata, and project files at the Zed UI boundary only.",
+    "R2D": "Godot CanvasItem, Node2D, texture, shader, material, and scene data accepted as input or emitted for interoperability; rendering executes in Zed.",
+    "R3D": "Godot Node3D, mesh, material, camera, lighting, environment, shader, and scene data accepted as input or emitted for interoperability; rendering executes in Zed.",
+    "UI": "Godot Control, theme, focus, layout, accessibility, and input data accepted as a compatibility model; UI layout and events execute in GPUI/Zed.",
     "INPUT": "Godot InputMap names, event encodings, display settings, locale, and platform metadata at project/file/API boundaries only.",
-    "SIM": "Godot physics, navigation, animation, audio, and particle resource/property encodings at import/export boundaries only; supported simulation executes in Sim.",
+    "ZED": "Godot physics, navigation, animation, audio, and particle resource/property encodings at import/export boundaries only; supported simulation executes in Zed.",
     "SCRIPT": "Godot .gd/.cs sources, annotations, project metadata, diagnostics, language/debug protocol shapes, and serialized script properties at migration/tooling boundaries only.",
     "EXT": "Godot .gdextension, extension_api.json, gdextension_interface.h, plugin.cfg, and declared ABI metadata may be parsed; no Godot library or process owns execution.",
-    "IMPORT": "Godot source assets, .import metadata, UID/remap data, and importer option names may be read; imported outputs are Sim-native resources and caches.",
-    "EXPORT": "Godot export_presets.cfg, compatible package/resource formats, option names, and platform metadata may be read or emitted; packaging and execution are Sim-owned.",
+    "IMPORT": "Godot source assets, .import metadata, UID/remap data, and importer option names may be read; imported outputs are Zed-native resources and caches.",
+    "EXPORT": "Godot export_presets.cfg, compatible package/resource formats, option names, and platform metadata may be read or emitted; packaging and execution are Zed-owned.",
     "NET": "Godot-compatible res:// and user:// paths, HTTP/network API shapes, RPC metadata, and serialized protocol values at explicit compatibility boundaries only.",
-    "DEBUG": "Godot-compatible debug messages, source locations, breakpoints, profiler samples, and protocol payloads may be translated into Sim diagnostics/DAP models.",
-    "CLI": "Approved Godot-compatible flags, exit meanings, project paths, and automation inputs may map to Sim CLI operations; commands execute inside Sim.",
-    "SEC": "Godot project permission, signing, encryption, certificate, plugin, and script metadata may be imported; trust enforcement and secrets remain Sim-owned.",
-    "PERSIST": "Godot project/resource/editor/import/save formats may be read or written for interoperability; authoritative state and migrations are Sim-owned.",
-    "PLAT": "Godot-compatible platform option names, manifests, entitlements, permissions, package metadata, and resource formats at native Sim packaging boundaries only.",
+    "DEBUG": "Godot-compatible debug messages, source locations, breakpoints, profiler samples, and protocol payloads may be translated into Zed diagnostics/DAP models.",
+    "CLI": "Approved Godot-compatible flags, exit meanings, project paths, and automation inputs may map to Zed CLI operations; commands execute inside Zed.",
+    "SEC": "Godot project permission, signing, encryption, certificate, plugin, and script metadata may be imported; trust enforcement and secrets remain Zed-owned.",
+    "PERSIST": "Godot project/resource/editor/import/save formats may be read or written for interoperability; authoritative state and migrations are Zed-owned.",
+    "PLAT": "Godot-compatible platform option names, manifests, entitlements, permissions, package metadata, and resource formats at native Zed packaging boundaries only.",
     "QA": "Godot behavior fixtures, schemas, documentation, examples, and expected outputs are test evidence only unless licensing review approves copied material.",
-    "MOD": "Godot module names, feature flags, build profiles, and availability metadata may be represented as compatibility inputs to Sim-owned capability resolution.",
+    "MOD": "Godot module names, feature flags, build profiles, and availability metadata may be represented as compatibility inputs to Zed-owned capability resolution.",
     "UPSTREAM": "Godot source, generated files, third-party manifests, docs, examples, fixtures, and CI are evidence/provenance only and are not shipped or executed by default.",
 }
 
@@ -611,34 +611,34 @@ def no_godot_validation(domain: Domain, behavior: str) -> str:
 
 def native_storage_path(domain: Domain, classification: int) -> str:
     if classification == 7:
-        return f"No product storage is introduced; provenance remains in Sim audit/compliance owners. Relevant existing or proposed owner paths: {domain.writes}."
+        return f"No product storage is introduced; provenance remains in Zed audit/compliance owners. Relevant existing or proposed owner paths: {domain.writes}."
     if classification == 6:
-        return f"No runtime state until a native architecture is approved; imported metadata, exclusions, and diagnostics remain Sim-owned at {domain.writes}."
-    return f"Sim-owned records, resources, caches, settings, or artifacts persist through the existing owner at {domain.writes}; Godot files are boundary inputs or outputs, never authoritative runtime state."
+        return f"No runtime state until a native architecture is approved; imported metadata, exclusions, and diagnostics remain Zed-owned at {domain.writes}."
+    return f"Zed-owned records, resources, caches, settings, or artifacts persist through the existing owner at {domain.writes}; Godot files are boundary inputs or outputs, never authoritative runtime state."
 
 
 def native_execution_path(domain: Domain, classification: int) -> str:
     if classification == 7:
-        return f"No direct product execution path; existing Sim build, compliance, test, and release owners process evidence without executing Godot. Owner: {domain.owner}."
+        return f"No direct product execution path; existing Zed build, compliance, test, and release owners process evidence without executing Godot. Owner: {domain.owner}."
     if classification == 6:
         return f"No execution path is claimed. The capability stays excluded or decision-blocked until `{domain.owner}` can own native execution without Godot."
-    return f"`{domain.owner}` owns execution through existing Sim services and registries; no Godot process, API wrapper, engine server, or shared library may execute the behavior."
+    return f"`{domain.owner}` owns execution through existing Zed services and registries; no Godot process, API wrapper, engine server, or shared library may execute the behavior."
 
 
 def native_ui_path(domain: Domain, classification: int) -> str:
     if classification == 7:
-        return "No direct user-facing UI; supported downstream behavior and provenance use existing Sim diagnostics, documentation, settings, and compliance surfaces."
+        return "No direct user-facing UI; supported downstream behavior and provenance use existing Zed diagnostics, documentation, settings, and compliance surfaces."
     if classification == 6:
-        return f"Existing Sim diagnostics owned by `{domain.owner}` expose the explicit exclusion or unresolved decision; no launch-Godot affordance counts as support."
-    return f"Existing Sim UI, command, task, preview, settings, or diagnostic surfaces owned by `{domain.owner}` present the behavior and failures; no hidden Godot UI is used."
+        return f"Existing Zed diagnostics owned by `{domain.owner}` expose the explicit exclusion or unresolved decision; no launch-Godot affordance counts as support."
+    return f"Existing Zed UI, command, task, preview, settings, or diagnostic surfaces owned by `{domain.owner}` present the behavior and failures; no hidden Godot UI is used."
 
 
 def native_lifecycle_path(domain: Domain, classification: int) -> str:
     if classification == 7:
-        return "Sim build/test/compliance jobs own evidence ingestion, validation, cancellation, failure reporting, retention, and cleanup."
+        return "Zed build/test/compliance jobs own evidence ingestion, validation, cancellation, failure reporting, retention, and cleanup."
     if classification == 6:
-        return "The Sim specification and diagnostic lifecycle owns unresolved/excluded state; no Godot instance is started and no external lifecycle is delegated."
-    return f"`{domain.owner}` owns create/open/start/update/cancel/recover/persist/close behavior and cleanup using Sim entity, task, session, resource, or platform lifecycles."
+        return "The Zed specification and diagnostic lifecycle owns unresolved/excluded state; no Godot instance is started and no external lifecycle is delegated."
+    return f"`{domain.owner}` owns create/open/start/update/cancel/recover/persist/close behavior and cleanup using Zed entity, task, session, resource, or platform lifecycles."
 
 
 def strategy(classification: int, owner: str) -> str:
@@ -654,12 +654,12 @@ def strategy(classification: int, owner: str) -> str:
         return f"Add capability-specific requirements and implement through {owner}; no new crate unless an architecture decision proves these owners insufficient."
     if classification == 6:
         return "Preserve the documented exclusion as unresolved or intentionally excluded; external Godot execution is prohibited and a native owner requires product/architecture review."
-    return "Do not port this infrastructure directly; reuse Sim tooling and trace only the externally observable behavior it enables."
+    return "Do not port this infrastructure directly; reuse Zed tooling and trace only the externally observable behavior it enables."
 
 
 def gap(classification: int, behavior: str) -> str:
     if classification == 1:
-        return f"Godot-specific verification that existing Sim behavior satisfies: {behavior}."
+        return f"Godot-specific verification that existing Zed behavior satisfies: {behavior}."
     if classification == 2:
         return f"Godot semantics, format mapping, and platform/error coverage for: {behavior}."
     if classification == 3:
@@ -669,7 +669,7 @@ def gap(classification: int, behavior: str) -> str:
     if classification == 5:
         return f"No baseline requirement/design/leaf task completely owns: {behavior}."
     if classification == 6:
-        return f"No Sim-native behavior replaces the excluded capability: {behavior}; native scope or intentional exclusion remains an unresolved product/architecture decision."
+        return f"No Zed-native behavior replaces the excluded capability: {behavior}; native scope or intentional exclusion remains an unresolved product/architecture decision."
     return f"Only provenance and supported-behavior linkage are needed for: {behavior}."
 
 
@@ -686,22 +686,22 @@ def rows():
                 "supported_modes_and_platform_differences": domain.modes,
                 "success_failure_persistence_lifecycle": domain.lifecycle,
                 "godot_evidence": domain.godot_evidence,
-                "existing_sim_evidence": domain.sim_evidence,
+                "existing_zed_evidence": domain.zed_evidence,
                 "spec_coverage": f"Baseline: {domain.baseline_spec}. Audit closure: R{requirement_id}.1-R{requirement_id}.4; D-{domain.code}; T{task_id}. Native gate: R23.1-R23.10; D-NATIVE; T200.",
                 "classification": CLASSIFICATIONS[classification],
                 "proposed_owner_in_sim": domain.owner,
-                "existing_or_proposed_native_sim_owner": domain.owner,
+                "existing_or_proposed_native_zed_owner": domain.owner,
                 "build_time_dependency_on_godot": "No. Godot source, generators, libraries, executables, servers, and command-line tools are prohibited build dependencies unless separately approved compatibility tooling is isolated from shipped artifacts.",
-                "runtime_dependency_on_godot": "No. The shipped Sim editor and exported runtime must not embed, bundle, invoke, link, wrap, or communicate with any Godot runtime component.",
-                "sim_native_storage_path": native_storage_path(domain, classification),
-                "sim_native_execution_path": native_execution_path(domain, classification),
-                "sim_native_ui_path": native_ui_path(domain, classification),
-                "sim_native_lifecycle_path": native_lifecycle_path(domain, classification),
+                "runtime_dependency_on_godot": "No. The shipped Zed editor and exported runtime must not embed, bundle, invoke, link, wrap, or communicate with any Godot runtime component.",
+                "zed_native_storage_path": native_storage_path(domain, classification),
+                "zed_native_execution_path": native_execution_path(domain, classification),
+                "zed_native_ui_path": native_ui_path(domain, classification),
+                "zed_native_lifecycle_path": native_lifecycle_path(domain, classification),
                 "godot_compatible_file_or_api_boundary": GODOT_COMPATIBLE_BOUNDARIES[domain.code],
-                "existing_sim_reuse_evidence": domain.sim_evidence,
+                "existing_zed_reuse_evidence": domain.zed_evidence,
                 "reuse_or_extension_strategy": strategy(classification, domain.owner),
                 "remaining_gap": gap(classification, behavior),
-                "verification_needed": f"{domain.validation}; scenario must prove {behavior}, including the domain failure/lifecycle contract and native Sim ownership.",
+                "verification_needed": f"{domain.validation}; scenario must prove {behavior}, including the domain failure/lifecycle contract and native Zed ownership.",
                 "no_godot_installation_validation": no_godot_validation(domain, behavior),
                 "confidence": "High" if classification in {1, 6, 7} else "Medium",
                 "open_questions": domain.question,
@@ -727,15 +727,15 @@ def write_requirements():
         "",
         "## Problem",
         "",
-        "The existing Godot migration pack groups broad areas but does not prove source-complete capability coverage, connected native Sim implementation, or leaf-level traceability. This audit freezes the source baseline and makes every independently observable capability reviewable without treating checked tasks, placeholders, external Godot delegation, dependencies, or blanket exclusions as parity.",
+        "The existing Godot migration pack groups broad areas but does not prove source-complete capability coverage, connected native Zed implementation, or leaf-level traceability. This audit freezes the source baseline and makes every independently observable capability reviewable without treating checked tasks, placeholders, external Godot delegation, dependencies, or blanket exclusions as parity.",
         "",
         "## Scope",
         "",
         "### In scope",
         "",
         "- Godot 4.7-stable editor, runtime, format, build, platform, optional-module, test, documentation, and infrastructure behavior present in the frozen source snapshot.",
-        "- Existing Sim implementation and every specification under `.agents/specs/godot-migration/`.",
-        "- Source-backed classification, native Sim ownership, anti-duplication, no-Godot dependency validation, platform/failure/lifecycle coverage, and implementation planning.",
+        "- Existing Zed implementation and every specification under `.agents/specs/godot-migration/`.",
+        "- Source-backed classification, native Zed ownership, anti-duplication, no-Godot dependency validation, platform/failure/lifecycle coverage, and implementation planning.",
         "",
         "### Out of scope",
         "",
@@ -750,9 +750,9 @@ def write_requirements():
         "",
         "#### Acceptance criteria",
         "",
-        "1. **1.1** THE audit SHALL record the Sim commit, Godot commit, content-manifest fingerprint, source-file count, source version, working-tree state, submodule state, build targets, feature options, modules, platform roots, and CI roots.",
+        "1. **1.1** THE audit SHALL record the Zed commit, Godot commit, content-manifest fingerprint, source-file count, source version, working-tree state, submodule state, build targets, feature options, modules, platform roots, and CI roots.",
         "2. **1.2** THE catalog SHALL assign every independently observable capability one stable `GODOT-<DOMAIN>-<NUMBER>` ID and exactly one of the seven requested classifications.",
-        "3. **1.3** THE catalog SHALL record every field requested by the audit, including exact source, Sim, requirement, design, task, validation, confidence, decision, native owner, Godot build/runtime dependency, Sim storage/execution/UI/lifecycle path, Godot-compatible boundary, reuse evidence, and no-Godot-installation evidence.",
+        "3. **1.3** THE catalog SHALL record every field requested by the audit, including exact source, Zed, requirement, design, task, validation, confidence, decision, native owner, Godot build/runtime dependency, Zed storage/execution/UI/lifecycle path, Godot-compatible boundary, reuse evidence, and no-Godot-installation evidence.",
         "4. **1.4** THE summary SHALL reconcile every catalog row by domain and classification and state the coverage denominator and formula.",
         "5. **1.5** IF evidence is absent or a product, compatibility, licensing, or architecture choice is unresolved, THEN THE audit SHALL record uncertainty and SHALL NOT assume parity or choose a direction.",
         "",
@@ -762,35 +762,35 @@ def write_requirements():
             [
                 f"### Requirement {requirement_id}: {domain.name}",
                 "",
-                f"**User story:** As a Godot project owner, I want migration coverage for {domain.subdomain} so that observable behavior is implemented natively in Sim, intentionally excluded, identified as upstream-only, or blocked on an explicit decision without duplicate Sim infrastructure.",
+                f"**User story:** As a Godot project owner, I want migration coverage for {domain.subdomain} so that observable behavior is implemented natively in Zed, intentionally excluded, identified as upstream-only, or blocked on an explicit decision without duplicate Zed infrastructure.",
                 "",
                 "#### Acceptance criteria",
                 "",
-                f"1. **{requirement_id}.1** WHEN a cataloged {domain.name.lower()} capability succeeds, THEN THE selected Sim owner SHALL provide the cataloged observable result in every declared supported mode.",
-                f"2. **{requirement_id}.2** IF an input, dependency, permission, resource, platform, configuration, cancellation, persistence, or lifecycle transition fails, THEN THE selected Sim owner SHALL provide the cataloged failure, recovery, and state-preservation behavior.",
-                f"3. **{requirement_id}.3** IF existing Sim functionality owns any part of the capability, THEN THE migration SHALL extend or reuse `{domain.owner}` and SHALL NOT add a parallel implementation.",
-                f"4. **{requirement_id}.4** WHEN parity is claimed, THEN verification SHALL exercise every `{domain.code}` catalog row against the frozen Godot evidence and connected Sim behavior; documentation, stubs, types, disabled code, and unchecked tasks alone SHALL NOT count.",
+                f"1. **{requirement_id}.1** WHEN a cataloged {domain.name.lower()} capability succeeds, THEN THE selected Zed owner SHALL provide the cataloged observable result in every declared supported mode.",
+                f"2. **{requirement_id}.2** IF an input, dependency, permission, resource, platform, configuration, cancellation, persistence, or lifecycle transition fails, THEN THE selected Zed owner SHALL provide the cataloged failure, recovery, and state-preservation behavior.",
+                f"3. **{requirement_id}.3** IF existing Zed functionality owns any part of the capability, THEN THE migration SHALL extend or reuse `{domain.owner}` and SHALL NOT add a parallel implementation.",
+                f"4. **{requirement_id}.4** WHEN parity is claimed, THEN verification SHALL exercise every `{domain.code}` catalog row against the frozen Godot evidence and connected Zed behavior; documentation, stubs, types, disabled code, and unchecked tasks alone SHALL NOT count.",
                 "",
             ]
         )
     lines.extend(
         [
-            "### Requirement 23: Native Sim implementation gate",
+            "### Requirement 23: Native Zed implementation gate",
             "",
-            "**User story:** As a product and distribution owner, I want every supported Godot-origin capability to be owned and executed by Sim so that shipped products remain independent of a Godot installation or runtime dependency.",
+            "**User story:** As a product and distribution owner, I want every supported Godot-origin capability to be owned and executed by Zed so that shipped products remain independent of a Godot installation or runtime dependency.",
             "",
             "#### Acceptance criteria",
             "",
-            "1. **23.1** WHEN a Godot-origin capability is implemented or classified as fully specified, THEN its storage, execution, UI, persistence, cancellation, recovery, and lifecycle paths SHALL be owned by named existing or proposed Sim components.",
+            "1. **23.1** WHEN a Godot-origin capability is implemented or classified as fully specified, THEN its storage, execution, UI, persistence, cancellation, recovery, and lifecycle paths SHALL be owned by named existing or proposed Zed components.",
             "2. **23.2** THE migration SHALL NOT embed, bundle, invoke, launch, link against, wrap, proxy, communicate with, or depend at build time or runtime on the Godot editor, engine, executable, shared library, server, command-line tool, or hidden Godot instance.",
-            "3. **23.3** WHEN Godot-compatible projects, scenes, resources, scripts, APIs, imports, or export settings cross a compatibility boundary, THEN Sim SHALL parse or emit the boundary representation while storing and executing supported behavior as Sim-native data, resources, scenes, artifacts, and runtime state.",
-            "4. **23.4** WHEN an existing Sim component owns an adjacent responsibility, THEN the migration SHALL extend that owner and SHALL NOT create a parallel Godot-specific crate, registry, manager, runtime, task source, UI subsystem, persistence layer, network stack, plugin host, renderer, or platform service.",
+            "3. **23.3** WHEN Godot-compatible projects, scenes, resources, scripts, APIs, imports, or export settings cross a compatibility boundary, THEN Zed SHALL parse or emit the boundary representation while storing and executing supported behavior as Zed-native data, resources, scenes, artifacts, and runtime state.",
+            "4. **23.4** WHEN an existing Zed component owns an adjacent responsibility, THEN the migration SHALL extend that owner and SHALL NOT create a parallel Godot-specific crate, registry, manager, runtime, task source, UI subsystem, persistence layer, network stack, plugin host, renderer, or platform service.",
             "5. **23.5** IF source code, generated code, vendor patches, libraries, bindings, fixtures, assets, or documentation would be copied from Godot, THEN work SHALL remain blocked until a separate licensing and architecture review approves the exact material, license obligations, provenance, maintenance, linkage, and distribution effects.",
-            "6. **23.6** WHEN an importer or migration tool reads Godot formats, THEN every successful output SHALL be a Sim-native record, resource, scene, artifact, cache entry, or runtime state, and failure/cancellation SHALL not require Godot to recover.",
+            "6. **23.6** WHEN an importer or migration tool reads Godot formats, THEN every successful output SHALL be a Zed-native record, resource, scene, artifact, cache entry, or runtime state, and failure/cancellation SHALL not require Godot to recover.",
             "7. **23.7** WHEN an exported project is validated, THEN it SHALL execute on a machine without Godot installed and its package, process tree, loader resolution, network connections, and runtime dependency manifest SHALL contain no Godot editor, engine, executable, shared library, server, or command-line tool.",
-            "8. **23.8** IF a capability cannot currently be implemented through a native Sim owner, THEN it SHALL be classified as unresolved, intentionally excluded with rationale, or requiring a material product/architecture decision and SHALL NOT be treated as covered by a wrapper, interface, placeholder, format declaration, task template, or external delegation.",
-            "9. **23.9** WHEN a capability is classified as already implemented or fully specified, THEN its acceptance criteria, leaf task validation, and implementation evidence SHALL prove Sim-owned execution with Godot absent; otherwise the classification SHALL be partial, missing, excluded, upstream-only, or decision-blocked as applicable.",
-            "10. **23.10** WHEN this audit is validated, THEN it SHALL report every plan that embeds, wraps, invokes, vendors, links, or delegates to Godot; every Godot-specific abstraction duplicating a Sim owner; every placeholder-only support claim; every license/linkage dependency; and every material native architecture decision without silently selecting a direction.",
+            "8. **23.8** IF a capability cannot currently be implemented through a native Zed owner, THEN it SHALL be classified as unresolved, intentionally excluded with rationale, or requiring a material product/architecture decision and SHALL NOT be treated as covered by a wrapper, interface, placeholder, format declaration, task template, or external delegation.",
+            "9. **23.9** WHEN a capability is classified as already implemented or fully specified, THEN its acceptance criteria, leaf task validation, and implementation evidence SHALL prove Zed-owned execution with Godot absent; otherwise the classification SHALL be partial, missing, excluded, upstream-only, or decision-blocked as applicable.",
+            "10. **23.10** WHEN this audit is validated, THEN it SHALL report every plan that embeds, wraps, invokes, vendors, links, or delegates to Godot; every Godot-specific abstraction duplicating a Zed owner; every placeholder-only support claim; every license/linkage dependency; and every material native architecture decision without silently selecting a direction.",
             "",
             "## Constraints",
             "",
@@ -813,27 +813,27 @@ def write_design():
         "",
         "## Overview",
         "",
-        "The audit uses a frozen source manifest, one master capability catalog, and domain owners that point into existing Sim crates. The catalog is the granularity authority; requirements define cross-cutting success/failure/reuse/evidence and native-ownership contracts, design elements bind each domain to its smallest existing owners, and one leaf task per capability prevents broad labels, wrappers, or Godot delegation from hiding materially different behavior.",
+        "The audit uses a frozen source manifest, one master capability catalog, and domain owners that point into existing Zed crates. The catalog is the granularity authority; requirements define cross-cutting success/failure/reuse/evidence and native-ownership contracts, design elements bind each domain to its smallest existing owners, and one leaf task per capability prevents broad labels, wrappers, or Godot delegation from hiding materially different behavior.",
         "",
         "## Existing context",
         "",
-        "The inspected Sim revision has mature project, worktree, editor, GPUI, language/LSP/DAP, task, filesystem, HTTP/RPC, collaboration, diagnostics, settings, persistence, sandbox, extension, media, and platform crates. It has no `sim_game` or `world_model` workspace members and no connected `project.godot`, `.tscn`, `.tres`, GDScript, GDExtension, Godot import, or Godot export implementation. Existing checked migration tasks are therefore planning history, not implementation evidence.",
+        "The inspected Zed revision has mature project, worktree, editor, GPUI, language/LSP/DAP, task, filesystem, HTTP/RPC, collaboration, diagnostics, settings, persistence, sandbox, extension, media, and platform crates. It has no `zed_game` or `world_model` workspace members and no connected `project.godot`, `.tscn`, `.tres`, GDScript, GDExtension, Godot import, or Godot export implementation. Existing checked migration tasks are therefore planning history, not implementation evidence.",
         "",
         "## Design decisions",
         "",
         "### D-BASELINE: Frozen evidence and historical classification",
         "",
-        "- Responsibility: Reproduce the exact Godot and Sim sources, preserve baseline classification, and generate reconciled counts.",
+        "- Responsibility: Reproduce the exact Godot and Zed sources, preserve baseline classification, and generate reconciled counts.",
         "- Integration: `baseline.md`, `catalogs/master-coverage.csv`, `coverage-summary.md`, and `verify_snapshot.py`.",
         "- Rationale: A source snapshot without nested Git metadata must be verified against the official tag rather than assigned an inferred SHA.",
         "",
-        "### D-NATIVE: Native Sim ownership and no-Godot dependency gate",
+        "### D-NATIVE: Native Zed ownership and no-Godot dependency gate",
         "",
-        "- Responsibility: Require every supported Godot-origin capability to name the existing or proposed Sim owner, Sim-native storage/execution/UI/lifecycle path, compatibility boundary, reuse evidence, build/runtime dependency status, and a validation that runs with Godot absent.",
-        "- Integration: Existing Sim owners named by each domain, `catalogs/master-coverage.csv`, `findings.md`, `decisions.md`, `validate_audit.py`, owner-spec acceptance criteria, and leaf-task validation metadata.",
-        "- Runtime boundary: Godot is a behavioral and format reference only. Sim must not embed, bundle, invoke, launch, link, wrap, proxy, or communicate with Godot. Imported formats terminate at Sim-native records/resources; exports package Sim-owned execution.",
+        "- Responsibility: Require every supported Godot-origin capability to name the existing or proposed Zed owner, Zed-native storage/execution/UI/lifecycle path, compatibility boundary, reuse evidence, build/runtime dependency status, and a validation that runs with Godot absent.",
+        "- Integration: Existing Zed owners named by each domain, `catalogs/master-coverage.csv`, `findings.md`, `decisions.md`, `validate_audit.py`, owner-spec acceptance criteria, and leaf-task validation metadata.",
+        "- Runtime boundary: Godot is a behavioral and format reference only. Zed must not embed, bundle, invoke, launch, link, wrap, proxy, or communicate with Godot. Imported formats terminate at Zed-native records/resources; exports package Zed-owned execution.",
         "- Source boundary: Godot source, generated code, vendor patches, fixtures, assets, and docs remain evidence unless exact copying is separately approved after licensing and architecture review.",
-        "- Classification gate: Classifications 1 and 3 require acceptance criteria and connected evidence proving Sim-owned execution in a hermetic no-Godot environment. A wrapper, task template, file declaration, type, interface, stub, placeholder, disabled path, or external delegation cannot satisfy the gate.",
+        "- Classification gate: Classifications 1 and 3 require acceptance criteria and connected evidence proving Zed-owned execution in a hermetic no-Godot environment. A wrapper, task template, file declaration, type, interface, stub, placeholder, disabled path, or external delegation cannot satisfy the gate.",
         "- Decision handling: Capabilities without a viable native owner remain unresolved, intentionally excluded, upstream-only, or decision-blocked; the audit never selects between materially different native product/architecture directions.",
         "",
     ]
@@ -872,14 +872,14 @@ def write_design():
             "",
             "## Error handling and recovery",
             "",
-            "A missing path, symbol, criterion, design element, task, classification, native owner, Godot dependency declaration, Sim-native path, compatibility boundary, reuse evidence, no-Godot validation, confidence, or question is a catalog error. A source or architecture uncertainty is not converted into an implementation claim: it remains an open decision with dependent capability tasks blocked by review. Any proposed Godot process, library, server, command, wrapper, proxy, hidden instance, or shipped vendor/linkage dependency is a blocking native-ownership violation.",
+            "A missing path, symbol, criterion, design element, task, classification, native owner, Godot dependency declaration, Zed-native path, compatibility boundary, reuse evidence, no-Godot validation, confidence, or question is a catalog error. A source or architecture uncertainty is not converted into an implementation claim: it remains an open decision with dependent capability tasks blocked by review. Any proposed Godot process, library, server, command, wrapper, proxy, hidden instance, or shipped vendor/linkage dependency is a blocking native-ownership violation.",
             "",
             "## Testing strategy",
             "",
             "- Recompute the local Godot Git blob manifest and compare it with the official tag tree.",
             "- Validate CSV schema, IDs, enum values, nonempty fields, unique capabilities, counts, and requirement/design/task references.",
-            "- Validate that every catalog row declares no Godot build/runtime dependency and records Sim-native storage, execution, UI, lifecycle, compatibility boundary, reuse evidence, and a hermetic no-Godot scenario.",
-            "- Scan all migration specs for plans that invoke, embed, wrap, link, vendor, or delegate execution to Godot and for Godot-specific abstractions that duplicate existing Sim owners.",
+            "- Validate that every catalog row declares no Godot build/runtime dependency and records Zed-native storage, execution, UI, lifecycle, compatibility boundary, reuse evidence, and a hermetic no-Godot scenario.",
+            "- Scan all migration specs for plans that invoke, embed, wrap, link, vendor, or delegate execution to Godot and for Godot-specific abstractions that duplicate existing Zed owners.",
             "- Run the feature-spec validator for this pack and every modified migration pack.",
             "- During implementation, execute each catalog row's focused command plus scenario tests for success, failure, persistence, lifecycle, permissions, limits, cancellation, relevant platforms, package contents, linked dependencies, process trees, and operation with Godot absent.",
         ]
@@ -893,7 +893,7 @@ def write_tasks(all_rows):
         "",
         "## Approach",
         "",
-        "Keep the audit baseline reproducible, enforce native Sim ownership, resolve blocking product decisions, then execute one independently reviewable capability task at the existing Sim owner. Task order is catalog order only; implementation may be regrouped into dependency waves after the decisions in `decisions.md` are approved and write conflicts are reviewed. Every task is intentionally unchecked.",
+        "Keep the audit baseline reproducible, enforce native Zed ownership, resolve blocking product decisions, then execute one independently reviewable capability task at the existing Zed owner. Task order is catalog order only; implementation may be regrouped into dependency waves after the decisions in `decisions.md` are approved and write conflicts are reviewed. Every task is intentionally unchecked.",
         "",
         "## Tasks",
         "",
@@ -910,7 +910,7 @@ def write_tasks(all_rows):
     previous_task_by_domain = {}
     for row in all_rows:
         domain = domain_by_code[row["_domain_code"]]
-        reads = f"{domain.godot_evidence.split(';')[0].split('::')[0]}, {domain.sim_evidence.split(';')[0].split('::')[0]}"
+        reads = f"{domain.godot_evidence.split(';')[0].split('::')[0]}, {domain.zed_evidence.split(';')[0].split('::')[0]}"
         previous_dependency = previous_task_by_domain.get(row["_domain_code"])
         dependency = f"{previous_dependency}, 200" if previous_dependency is not None else "1, 200"
         writes = ", ".join(
@@ -920,7 +920,7 @@ def write_tasks(all_rows):
         lines.extend(
             [
                 f"- [ ] {row['_task_id']}. Close or verify {row['capability_id']}: {row['observable_behavior']}",
-                f"  - Apply the cataloged native Sim owner, reuse strategy, modes, failure/recovery, storage, execution, UI, persistence, lifecycle, security, limit, compatibility boundary, and platform contract. Classification remains historical; implementation may claim completion only with connected Sim behavior and hermetic no-Godot evidence.",
+                f"  - Apply the cataloged native Zed owner, reuse strategy, modes, failure/recovery, storage, execution, UI, persistence, lifecycle, security, limit, compatibility boundary, and platform contract. Classification remains historical; implementation may claim completion only with connected Zed behavior and hermetic no-Godot evidence.",
                 f"  - _Requirements: {row['_requirement_id']}.1, {row['_requirement_id']}.2, {row['_requirement_id']}.3, {row['_requirement_id']}.4, 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10_",
                 f"  - _Depends on: {dependency}_",
                 f"  - _Reads: {reads}, .agents/specs/godot-migration/godot-full-port-coverage/catalogs/master-coverage.csv_",
@@ -932,7 +932,7 @@ def write_tasks(all_rows):
         previous_task_by_domain[row["_domain_code"]] = row["_task_id"]
     lines.extend(
         [
-            "- [ ] 200. Enforce the native Sim implementation gate across the Godot migration",
+            "- [ ] 200. Enforce the native Zed implementation gate across the Godot migration",
             "  - Audit every migration requirement, design, task, dependency proposal, and catalog row for embedding, bundling, invocation, linkage, wrappers, hidden instances, external delegation, source copying, duplicate Godot-specific owners, placeholder-only support, and missing no-Godot validation. Keep material product, compatibility, licensing, and architecture choices in `decisions.md`.",
             "  - _Requirements: 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10_",
             "  - _Depends on: 1_",
@@ -963,7 +963,7 @@ def write_summary(all_rows):
         "",
         "## Denominator and estimate",
         "",
-        f"The denominator is **{denominator} independently observable capability families** in `catalogs/master-coverage.csv`. Baseline estimated disposition coverage is **{covered}/{denominator} ({estimated:.1f}%)**, counting classifications 1, 3, 6, and 7 as fully dispositioned only because the updated acceptance criteria make native Sim ownership and hermetic no-Godot validation mandatory gates. Classifications 2, 4, and 5 remain partial or missing. This is specification/disposition coverage, not implemented runtime parity; any class 1 or 3 row must be downgraded if its connected implementation or leaf validation cannot pass without Godot installed.",
+        f"The denominator is **{denominator} independently observable capability families** in `catalogs/master-coverage.csv`. Baseline estimated disposition coverage is **{covered}/{denominator} ({estimated:.1f}%)**, counting classifications 1, 3, 6, and 7 as fully dispositioned only because the updated acceptance criteria make native Zed ownership and hermetic no-Godot validation mandatory gates. Classifications 2, 4, and 5 remain partial or missing. This is specification/disposition coverage, not implemented runtime parity; any class 1 or 3 row must be downgraded if its connected implementation or leaf validation cannot pass without Godot installed.",
         "",
         "## Counts by domain and classification",
         "",
@@ -978,11 +978,11 @@ def write_summary(all_rows):
     lines.extend(
         [
             "",
-            "Classification legend: 1 implemented/reusable; 2 partial Sim implementation; 3 fully covered existing spec; 4 partially covered existing spec; 5 missing baseline spec; 6 intentionally excluded; 7 upstream-only infrastructure.",
+            "Classification legend: 1 implemented/reusable; 2 partial Zed implementation; 3 fully covered existing spec; 4 partially covered existing spec; 5 missing baseline spec; 6 intentionally excluded; 7 upstream-only infrastructure.",
             "",
-            "## Native Sim implementation gate",
+            "## Native Zed implementation gate",
             "",
-            "Every row records a native Sim owner, zero permitted Godot build/runtime dependency, Sim-native storage/execution/UI/lifecycle path, Godot-compatible boundary, existing Sim reuse evidence, and a hermetic no-Godot-installation validation. External Godot execution, API wrapping, hidden instances, runtime linkage, and unreviewed source copying are not coverage strategies. Capabilities without an approved native owner remain partial, missing, intentionally excluded, upstream-only, or decision-blocked.",
+            "Every row records a native Zed owner, zero permitted Godot build/runtime dependency, Zed-native storage/execution/UI/lifecycle path, Godot-compatible boundary, existing Zed reuse evidence, and a hermetic no-Godot-installation validation. External Godot execution, API wrapping, hidden instances, runtime linkage, and unreviewed source copying are not coverage strategies. Capabilities without an approved native owner remain partial, missing, intentionally excluded, upstream-only, or decision-blocked.",
             "",
             "## Missing and partially covered capabilities",
             "",

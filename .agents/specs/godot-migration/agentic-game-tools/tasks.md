@@ -20,9 +20,9 @@ Register agent tools over existing graph, world-model, and mesh primitives after
 
 - [ ] 1. Add graph, world generation, and mesh generation agent tools
   - Register validated tools for graph edits and typed generation requests.
-  - Represent the tools as native Sim `SimGame*`, `SimWorld*`, and `SimMesh*` records that convert into `world_model` graph, generation, mesh, and provenance types.
+  - Represent the tools as native Zed `SimGame*`, `SimWorld*`, and `SimMesh*` records that convert into `world_model` graph, generation, mesh, and provenance types.
   - _Requirements: 1.1, 2.1, 2.2_
   - _Writes: crates/agent/src/tools/game_graph_tool.rs, crates/agent/src/tools/world_generation_tool.rs, crates/agent/src/tools/mesh_generation_tool.rs_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/agentic-game-tools/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/agentic-game-tools/design.md, Cargo.toml, projects/godot_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/agentic-game-tools/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/agentic-game-tools/design.md, Cargo.toml, projects/godot_
   - _Validation: cargo test -p agent_

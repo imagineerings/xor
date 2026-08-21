@@ -211,7 +211,7 @@ impl NativeNoisePayload {
 
     fn checked(resource: NativeNoiseResource) -> Result<Self, NativeSamplerPayloadError> {
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-noise-payload.v1");
+        hasher.update(b"zed.comfy.native-noise-payload.v1");
         hasher.update([0]);
         let mut resident_bytes = usize_to_u64(mem::size_of::<Self>())?;
         match &resource {
@@ -418,7 +418,7 @@ impl NativeGuiderPayload {
         }
         model.validate()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-guider-payload.v1");
+        hasher.update(b"zed.comfy.native-guider-payload.v1");
         hash_field(&mut hasher, model.identity().digest_sha256().as_bytes())?;
         let mut resident_bytes = usize_to_u64(mem::size_of::<Self>())?;
         resident_bytes = checked_add(resident_bytes, model.resident_bytes())?;
@@ -529,7 +529,7 @@ impl NativeSamplerPayload {
         registry.resolve(&identity)?;
         validate_sha256("sampler implementation", implementation_digest_sha256)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-sampler-payload.v1");
+        hasher.update(b"zed.comfy.native-sampler-payload.v1");
         hash_field(&mut hasher, identity.as_str().as_bytes())?;
         hash_field(&mut hasher, implementation_digest_sha256.as_bytes())?;
         let semantic_digest_sha256 = format!("{:x}", hasher.finalize());
@@ -793,7 +793,7 @@ fn tensor_element_count(tensor: &Tensor) -> Result<usize, NativeSamplerPayloadEr
 
 fn hash_tensor(hasher: &mut Sha256, tensor: &Tensor) -> Result<(), NativeSamplerPayloadError> {
     let descriptor = tensor.descriptor();
-    hasher.update(b"sim.comfy.native-noise-tensor.v1");
+    hasher.update(b"zed.comfy.native-noise-tensor.v1");
     hash_field(hasher, descriptor.dtype().catalog_name().as_bytes())?;
     hasher.update(usize_to_u64(descriptor.rank())?.to_le_bytes());
     for dimension in descriptor.shape() {

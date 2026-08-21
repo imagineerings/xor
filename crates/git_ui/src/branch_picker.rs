@@ -41,25 +41,25 @@ actions!(
 
 pub fn checkout_branch(
     workspace: &mut Workspace,
-    _: &sim_actions::git::CheckoutBranch,
+    _: &zed_actions::git::CheckoutBranch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
-    open(workspace, &sim_actions::git::Branch, window, cx);
+    open(workspace, &zed_actions::git::Branch, window, cx);
 }
 
 pub fn switch(
     workspace: &mut Workspace,
-    _: &sim_actions::git::Switch,
+    _: &zed_actions::git::Switch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
-    open(workspace, &sim_actions::git::Branch, window, cx);
+    open(workspace, &zed_actions::git::Branch, window, cx);
 }
 
 pub fn open(
     workspace: &mut Workspace,
-    _: &sim_actions::git::Branch,
+    _: &zed_actions::git::Branch,
     window: &mut Window,
     cx: &mut Context<Workspace>,
 ) {
@@ -1406,13 +1406,13 @@ impl PickerDelegate for BranchListDelegate {
                         .unwrap_or_else(|_| OffsetDateTime::now_utc());
                     let local_offset =
                         time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
-                    let formatted_time = time_format::format_localisim_timestamp(
+                    let formatted_time = time_format::format_localized_timestamp(
                         commit_time,
                         OffsetDateTime::now_utc(),
                         local_offset,
                         time_format::TimestampFormat::Relative,
                     );
-                    let absolute_time = time_format::format_localisim_timestamp(
+                    let absolute_time = time_format::format_localized_timestamp(
                         commit_time,
                         OffsetDateTime::now_utc(),
                         local_offset,

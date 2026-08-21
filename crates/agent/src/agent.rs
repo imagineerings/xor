@@ -3595,15 +3595,15 @@ fn model_id_to_selection(model_id: &AgentModelId, cx: &App) -> LanguageModelSele
     agent_settings::language_model_to_selection(&resolved, current_user_selection.as_ref())
 }
 
-pub static SIM_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new("Sim Agent"));
+pub static ZED_AGENT_ID: LazyLock<AgentId> = LazyLock::new(|| AgentId::new("Zed Agent"));
 
 impl acp_thread::AgentConnection for NativeAgentConnection {
     fn agent_id(&self) -> AgentId {
-        SIM_AGENT_ID.clone()
+        ZED_AGENT_ID.clone()
     }
 
     fn telemetry_id(&self) -> SharedString {
-        "sim".into()
+        "zed".into()
     }
 
     fn new_session(
@@ -4230,7 +4230,7 @@ impl ThreadEnvironment for NativeThreadEnvironment {
         // Linux, and via WSL on Windows) already mounts a fresh, writable
         // `tmpfs` over `/tmp`, so the environment looks like a normal
         // filesystem with no special `$TMPDIR` (which would only make the
-        // sandbox more obviously Sim-specific). On Windows a per-thread
+        // sandbox more obviously Zed-specific). On Windows a per-thread
         // `$TMPDIR` would also be a Windows path that's meaningless inside
         // WSL, and adding it to the writable scope would bind a stray
         // `/mnt/<drive>/...` path.
@@ -7047,17 +7047,17 @@ mod internal_tests {
         // Hand-typed `/global:<name>` is not aliased to the global
         // source; it looks for a worktree literally named `global`.
         assert!(!global.matches_scope("global"));
-        assert!(!global.matches_scope("sim"));
+        assert!(!global.matches_scope("zed"));
 
         let project = SkillSource::ProjectLocal {
             worktree_id: SkillScopeId(1),
-            worktree_root_name: "sim".into(),
+            worktree_root_name: "zed".into(),
         };
         // Project-local skills are scoped by their worktree root name
         // so multiple open worktrees with same-named skills can each
         // be addressed unambiguously.
-        assert_eq!(project.scope_prefix(), "sim");
-        assert!(project.matches_scope("sim"));
+        assert_eq!(project.scope_prefix(), "zed");
+        assert!(project.matches_scope("zed"));
         // The empty scope is reserved for globals.
         assert!(!project.matches_scope(""));
         // An unrelated worktree name (or MCP server name) must not
@@ -8726,7 +8726,7 @@ mod internal_tests {
     /// rejected with a size-limit error and excluded from the loaded
     /// skills, exercising the size guard in `load_project_skills`.
     #[gpui::test]
-    async fn test_oversisim_project_skill_reports_error(cx: &mut TestAppContext) {
+    async fn test_oversized_project_skill_reports_error(cx: &mut TestAppContext) {
         init_test(cx);
         let fs = FakeFs::new(cx.executor());
         let oversized = format!(

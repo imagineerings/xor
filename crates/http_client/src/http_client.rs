@@ -262,12 +262,12 @@ impl HttpClientWithUrl {
         format!("{}{}", self.base_url(), path)
     }
 
-    /// Builds a Sim API URL using the given path.
-    pub fn build_sim_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
+    /// Builds a Zed API URL using the given path.
+    pub fn build_zed_api_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://sim.dev" => "https://api.sim.dev",
-            "https://staging.sim.dev" => "https://api-staging.sim.dev",
+            "https://zed.dev" => "https://api.zed.dev",
+            "https://staging.zed.dev" => "https://api-staging.zed.dev",
             "http://localhost:3000" => "http://localhost:8080",
             other => other,
         };
@@ -278,12 +278,12 @@ impl HttpClientWithUrl {
         )?)
     }
 
-    /// Builds a Sim Cloud URL using the given path.
-    pub fn build_sim_cloud_url(&self, path: &str) -> Result<Url> {
+    /// Builds a Zed Cloud URL using the given path.
+    pub fn build_zed_cloud_url(&self, path: &str) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://sim.dev" => "https://cloud.sim.dev",
-            "https://staging.sim.dev" => "https://cloud.sim.dev",
+            "https://zed.dev" => "https://cloud.zed.dev",
+            "https://staging.zed.dev" => "https://cloud.zed.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };
@@ -291,12 +291,12 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}", base_api_url, path))?)
     }
 
-    /// Builds a Sim Cloud URL using the given path and query params.
-    pub fn build_sim_cloud_url_with_query(&self, path: &str, query: impl Serialize) -> Result<Url> {
+    /// Builds a Zed Cloud URL using the given path and query params.
+    pub fn build_zed_cloud_url_with_query(&self, path: &str, query: impl Serialize) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://sim.dev" => "https://cloud.sim.dev",
-            "https://staging.sim.dev" => "https://cloud.sim.dev",
+            "https://zed.dev" => "https://cloud.zed.dev",
+            "https://staging.zed.dev" => "https://cloud.zed.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };
@@ -304,12 +304,12 @@ impl HttpClientWithUrl {
         Ok(Url::parse(&format!("{}{}?{}", base_api_url, path, query))?)
     }
 
-    /// Builds a Sim LLM URL using the given path.
-    pub fn build_sim_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
+    /// Builds a Zed LLM URL using the given path.
+    pub fn build_zed_llm_url(&self, path: &str, query: &[(&str, &str)]) -> Result<Url> {
         let base_url = self.base_url();
         let base_api_url = match base_url.as_ref() {
-            "https://sim.dev" => "https://cloud.sim.dev",
-            "https://staging.sim.dev" => "https://llm-staging.sim.dev",
+            "https://zed.dev" => "https://cloud.zed.dev",
+            "https://staging.zed.dev" => "https://llm-staging.zed.dev",
             "http://localhost:3000" => "http://localhost:8787",
             other => other,
         };

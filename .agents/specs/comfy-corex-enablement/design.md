@@ -2,7 +2,7 @@
 
 ## Overview
 
-This future pack extends the already compiled fail-closed CoreX structural boundary only after proprietary inputs are lawfully supplied. It does not replace any canonical Sim service. The adapter remains a focused vendor boundary under existing trust, binding, tensor, memory, worker, persistence, queue, cancellation, recovery, and GPUI owners.
+This future pack extends the already compiled fail-closed CoreX structural boundary only after proprietary inputs are lawfully supplied. It does not replace any canonical Zed service. The adapter remains a focused vendor boundary under existing trust, binding, tensor, memory, worker, persistence, queue, cancellation, recovery, and GPUI owners.
 
 ## Decisions
 

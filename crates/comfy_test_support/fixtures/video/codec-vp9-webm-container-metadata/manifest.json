@@ -34,7 +34,7 @@
     "attachment_phase": "after format and custom AVIO setup and before stream and header creation",
     "native_ownership": "avformat_free_context owns partial and complete attached dictionaries exactly once",
     "actor_transport": "one owned safe metadata value crosses the sole capacity-one retained codec actor",
-    "codec_thread_identity_version": "sim.comfy.video-codec-thread.v5"
+    "codec_thread_identity_version": "zed.comfy.video-codec-thread.v5"
   },
   "vectors": [
     { "key": "prompt", "value": "first", "ordinal": 0 },

@@ -498,7 +498,7 @@ mod tests {
     }
 
     fn principal(id: PrincipalId, scope: &AuthorizationScope) -> AuthenticatedPrincipal {
-        AuthenticatedPrincipal::sim_account(
+        AuthenticatedPrincipal::zed_account(
             id,
             community_id(),
             ServiceAccountId::new(id.as_uuid().as_u128() as u64),

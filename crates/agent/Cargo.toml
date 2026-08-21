@@ -76,11 +76,11 @@ util.workspace = true
 uuid.workspace = true
 watch.workspace = true
 web_search.workspace = true
-sim_env_vars.workspace = true
+zed_env_vars.workspace = true
 zstd.workspace = true
 
 # Used only on Windows to resolve the running release channel/version so the WSL
-# sandbox helper can fetch a matching Linux `sim`.
+# sandbox helper can fetch a matching Linux `zed`.
 [target.'cfg(target_os = "windows")'.dependencies]
 release_channel.workspace = true
 

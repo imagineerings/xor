@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Migrate ~17 foundational agent infrastructure features from goose into sim's existing agent and supporting crates. These are varied subsystems that augment the core agent loop, configuration, and system management.
+Migrate ~17 foundational agent infrastructure features from goose into zed's existing agent and supporting crates. These are varied subsystems that augment the core agent loop, configuration, and system management.
 
 ### Key Architectural Decisions
 
@@ -15,7 +15,7 @@ Migrate ~17 foundational agent infrastructure features from goose into sim's exi
   - Doctor → extend existing diagnostics and provider-registry health paths
   - Download behavior → reuse `http_client` and the selected provider/cache owner; extract a shared manager only if multiple existing consumers require it
   - Config migrations → `crates/settings/`
-  - Sim mode → `crates/agent_settings/`
+  - Zed mode → `crates/agent_settings/`
   - Misc (instance_id, subprocess, prompt_template, etc.) → `crates/util/` or small modules
 
 ## 2. Architecture
@@ -207,7 +207,7 @@ pub trait Migration: Send + Sync {
 }
 ```
 
-### Component: Sim Mode
+### Component: Zed Mode
 
 ```rust
 pub enum SimMode {
@@ -303,7 +303,7 @@ _For any_ doctor run, ALL registered checks SHALL execute and produce a result.
 - Goose's hook behavior is plugin-owned command execution from `hooks/hooks.json`, with regex matching, JSON stdin, timeouts, plugin-root substitution, and pre-tool denial. A generic in-process trait-only hook design is insufficient.
 - Large-response handling applies to oversized text tool results and preserves full content in a temporary file; it is not model-response truncation.
 - Structured final output is recipe-scoped JSON Schema validation with corrective retry behavior.
-- Plugins, Doctor, downloads, and container execution must first extend existing Sim agent-server, diagnostics, HTTP/cache, dev-container, and process-lifecycle integration points. The earlier diagrams' proposed crates are illustrative, not approved ownership.
+- Plugins, Doctor, downloads, and container execution must first extend existing Zed agent-server, diagnostics, HTTP/cache, dev-container, and process-lifecycle integration points. The earlier diagrams' proposed crates are illustrative, not approved ownership.
 
 ### D-HOOKS
 
@@ -319,12 +319,12 @@ Use prompt regression fixtures only as tests. Do not add runtime state capture/r
 
 ### D-CONTAINER-EXTENSIONS
 
-Reuse Sim's development-container and agent-server process abstractions. The container option changes extension process placement, not the agent/session authority or permission model.
+Reuse Zed's development-container and agent-server process abstractions. The container option changes extension process placement, not the agent/session authority or permission model.
 
 ## References
 
 - Source: All `projects/goose/crates/goose/src/` files listed in requirements
-- Sim: `crates/agent/`, `crates/settings/`, `crates/agent_settings/`, `crates/util/`
+- Zed: `crates/agent/`, `crates/settings/`, `crates/agent_settings/`, `crates/util/`
 
 ## Requirements traceability
 

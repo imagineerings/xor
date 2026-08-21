@@ -2,7 +2,7 @@
 
 ## Overview
 
-Extend Sim's existing tool-permission, ACP confirmation, sandbox, HTTP, settings, and agent UI boundaries. Add a separate component only if implementation review proves the existing owner cannot maintain the security boundary.
+Extend Zed's existing tool-permission, ACP confirmation, sandbox, HTTP, settings, and agent UI boundaries. Add a separate component only if implementation review proves the existing owner cannot maintain the security boundary.
 
 ## Tasks
 

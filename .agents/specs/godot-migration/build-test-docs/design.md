@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Extend existing Sim documentation, test, license, compliance, dependency, and CI tooling for source metadata, fixture attribution, and dependency review. Godot material remains evidence by default; copying exact material requires a separately approved licensing and architecture record. Comfy-era generated outputs are modeled as native Sim generated assets rather than compatibility pass-through records.
+Extend existing Zed documentation, test, license, compliance, dependency, and CI tooling for source metadata, fixture attribution, and dependency review. Godot material remains evidence by default; copying exact material requires a separately approved licensing and architecture record. Comfy-era generated outputs are modeled as native Zed generated assets rather than compatibility pass-through records.
 
 ## Components
 
@@ -10,10 +10,10 @@ Extend existing Sim documentation, test, license, compliance, dependency, and CI
 - Existing license/compliance tooling and fixture test owners.
 - Existing dependency review and CI gates.
 
-## Native Sim Naming
+## Native Zed Naming
 
-- Sim-owned documentation, artifact, and dependency records remain at existing owners rather than a parallel migration registry.
-- Comfy-origin fixture semantics are recreated as native Sim generated asset attribution, so new APIs do not expose compatibility-only names.
+- Zed-owned documentation, artifact, and dependency records remain at existing owners rather than a parallel migration registry.
+- Comfy-origin fixture semantics are recreated as native Zed generated asset attribution, so new APIs do not expose compatibility-only names.
 
 ## Correctness Properties
 
@@ -23,9 +23,9 @@ _For any_ copied or converted fixture, validation SHALL require source attributi
 
 **Validates: Requirement 2.2**
 
-### Property 2: Native Sim Generated Attribution
+### Property 2: Native Zed Generated Attribution
 
-_For any_ generated-output fixture, attribution SHALL use a native Sim generated asset source record rather than a Comfy compatibility label.
+_For any_ generated-output fixture, attribution SHALL use a native Zed generated asset source record rather than a Comfy compatibility label.
 
 **Validates: Requirement 2.3**
 
@@ -37,7 +37,7 @@ _For any_ heavy or native dependency proposal, validation SHALL require a depend
 
 ### D-NATIVE: Native tooling and licensed-evidence path
 
-Existing Sim build/test/docs/compliance owners consume behavior descriptions and approved fixtures. Godot binaries, generators, libraries, and commands never enter Sim build or runtime dependency graphs. Exact copied material remains blocked until licensing and architecture review records its provenance and distribution effect.
+Existing Zed build/test/docs/compliance owners consume behavior descriptions and approved fixtures. Godot binaries, generators, libraries, and commands never enter Zed build or runtime dependency graphs. Exact copied material remains blocked until licensing and architecture review records its provenance and distribution effect.
 
 **Validates: Requirement 9.1, 9.2, 9.3, 9.4, 9.5**
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the 18+ provider integrations from goose that don't yet exist in sim, following the patterns established in `crates/language_models/src/provider/`. Work is grouped: first the shared infrastructure (registry, declarative providers, ACP adapter), then individual providers by category.
+Implement the 18+ provider integrations from goose that don't yet exist in zed, following the patterns established in `crates/language_models/src/provider/`. Work is grouped: first the shared infrastructure (registry, declarative providers, ACP adapter), then individual providers by category.
 
 ## Tasks
 
@@ -23,7 +23,7 @@ Implement the 18+ provider integrations from goose that don't yet exist in sim, 
   - Extend the existing provider registry rather than centralizing registration in a second registry
   - Define declarative configuration only for source-confirmed catalog fields and validate unknown or conflicting fields
   - Reuse `language_model_core` request, response, error, usage, tool, image, and thinking contracts
-  - Add canonical metadata only where an approved provider needs fields Sim cannot currently express
+  - Add canonical metadata only where an approved provider needs fields Zed cannot currently express
 
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 7.2, 7.3, 8.1, 8.2, 8.3_
   - _Depends on: none_

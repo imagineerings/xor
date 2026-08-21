@@ -83,7 +83,7 @@ impl NativeProviderPayload {
 
     pub fn identity_digest_sha256(&self) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.provider-payload-identity.v1");
+        hasher.update(b"zed.comfy.provider-payload-identity.v1");
         hasher.update([0]);
         hasher.update([native_handle_kind_tag(self.handle_type.kind)]);
         hasher.update([0]);
@@ -135,7 +135,7 @@ fn provider_semantic_digest_sha256(
     abi_bytes: &[u8],
 ) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.provider-payload-semantic.v1");
+    hasher.update(b"zed.comfy.provider-payload-semantic.v1");
     hasher.update([0]);
     hasher.update([native_handle_kind_tag(handle_type.kind)]);
     hasher.update([0]);

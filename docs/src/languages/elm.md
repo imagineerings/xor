@@ -1,18 +1,18 @@
 ---
 title: Elm
-description: "Configure Elm language support in Sim, including language servers, formatting, and debugging."
+description: "Configure Elm language support in Zed, including language servers, formatting, and debugging."
 ---
 
 # Elm
 
-Elm support is available through the [Elm extension](https://github.com/sim-extensions/elm).
+Elm support is available through the [Elm extension](https://github.com/zed-extensions/elm).
 
 - Tree-sitter: [elm-tooling/tree-sitter-elm](https://github.com/elm-tooling/tree-sitter-elm)
 - Language Server: [elm-tooling/elm-language-server](https://github.com/elm-tooling/elm-language-server)
 
 ## Setup
 
-Sim support for Elm requires installation of `elm`, `elm-format`, and `elm-review`.
+Zed support for Elm requires installation of `elm`, `elm-format`, and `elm-review`.
 
 1. [Install Elm](https://guide.elm-lang.org/install/elm.html) (or run `brew install elm` on macOS).
 2. Install `elm-review` to support code linting:

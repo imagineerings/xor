@@ -255,7 +255,7 @@ impl CanonicalConditioningCacheIdentities {
             return Err(NativeCacheError::InvalidDependencyIdentity);
         }
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.conditioning-execution.v1\0");
+        hasher.update(b"zed.comfy.conditioning-execution.v1\0");
         for digest in [
             conditioning.as_str(),
             guidance.as_str(),
@@ -840,7 +840,7 @@ pub(crate) mod tests {
 
     fn native(value: Value) -> NativeValue {
         NativeValue::PreservedUnknown {
-            type_name: "sim.json@1".to_owned(),
+            type_name: "zed.json@1".to_owned(),
             value,
         }
     }

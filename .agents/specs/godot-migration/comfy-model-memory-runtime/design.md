@@ -2,7 +2,7 @@
 
 ## Overview
 
-The model runtime is a core harness policy layer around Sim model and worker services. It preserves Comfy folder names and model-family concepts while reusing Sim asset indexing, worker diagnostics, and artifact provenance. The model runtime does not own Python environment creation, remote worker launch, sampler/scheduler behavior, or model-family execution semantics; it supplies the model policy and diagnostics consumed by `model-serving-packaging/` and `comfy-diffusion-world-model-runtime/`.
+The model runtime is a core harness policy layer around Zed model and worker services. It preserves Comfy folder names and model-family concepts while reusing Zed asset indexing, worker diagnostics, and artifact provenance. The model runtime does not own Python environment creation, remote worker launch, sampler/scheduler behavior, or model-family execution semantics; it supplies the model policy and diagnostics consumed by `model-serving-packaging/` and `comfy-diffusion-world-model-runtime/`.
 
 ## Architecture
 
@@ -138,7 +138,7 @@ _For any_ missing model weight or heavy dependency, the system SHALL require exp
 - Unsupported model families block execution with missing capability details.
 - Incompatible device or precision policies block worker start.
 - Quantization metadata parse failures disable quantized execution and report the invalid layer metadata.
-- Resource release failures surface native Sim worker diagnostics instead of pretending memory was freed.
+- Resource release failures surface native Zed worker diagnostics instead of pretending memory was freed.
 
 ## Testing Strategy
 

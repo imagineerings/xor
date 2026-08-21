@@ -2115,7 +2115,7 @@ impl NativeDecoderTextEncoder {
     ) -> Result<String, DecoderTextError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.native-decoder-text.v1");
+        hasher.update(b"zed.comfy.native-decoder-text.v1");
         hasher.update(format!("{:?}", self.configuration).as_bytes());
         for (name, module) in self.named_modules() {
             cancellation.check()?;

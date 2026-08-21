@@ -1277,7 +1277,7 @@ pub struct CatalogNodeDescriptor {
     pub test_evidence: String,
     pub registration_evidence: String,
     pub inactive_reason: Option<String>,
-    pub sim_status: Option<String>,
+    pub zed_status: Option<String>,
     pub parity_gap: Option<String>,
     pub feature_id: String,
     pub catalog_status: CatalogNodeStatus,

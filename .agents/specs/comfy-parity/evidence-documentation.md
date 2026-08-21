@@ -152,7 +152,7 @@ matches.
 
 The tooling catalog has 108 rows: 28 package scripts, 41 distinct static tool
 flag literals, 30 tooling environment variables, and nine CI workflows. These
-are developer/infrastructure behavior, not production Sim flags. The
+are developer/infrastructure behavior, not production Zed flags. The
 configuration/format catalog has 20 source configuration/schema/lock/registry
 files and 15 documented format contracts.
 

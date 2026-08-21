@@ -1055,10 +1055,10 @@ fn run_ownership_validation(
         fs::read_to_string(root.join("crates/extension_host/src/extension_host.rs"))?;
     let extension_component_runtime =
         fs::read_to_string(root.join("crates/extension_host/src/wasm_host.rs"))?;
-    let sim_bootstrap = fs::read_to_string(root.join("crates/sim/src/sim.rs"))?;
-    let sim_plugin_services =
-        fs::read_to_string(root.join("crates/sim/src/comfy_plugin_services.rs"))?;
-    let sim_cli = fs::read_to_string(root.join("crates/sim/src/comfy_cli.rs"))?;
+    let zed_bootstrap = fs::read_to_string(root.join("crates/zed/src/zed.rs"))?;
+    let zed_plugin_services =
+        fs::read_to_string(root.join("crates/zed/src/comfy_plugin_services.rs"))?;
+    let zed_cli = fs::read_to_string(root.join("crates/zed/src/comfy_cli.rs"))?;
     let ownership_policy_source =
         fs::read_to_string(root.join(".agents/specs/comfy-parity/ownership-policy.json"))?;
     let ownership_policy: serde_json::Value = serde_json::from_str(&ownership_policy_source)?;
@@ -2130,7 +2130,7 @@ fn run_ownership_validation(
         && model_clip_tokenizer.contains("text.nfc().collect()")
         && model_clip_tokenizer.contains("fn apply_merges(")
         && model_clip_tokenizer.contains("String::from_utf8_lossy(bytes)")
-        && model_clip_tokenizer.contains("sim.comfy.qwen2-byte-bpe.v1")
+        && model_clip_tokenizer.contains("zed.comfy.qwen2-byte-bpe.v1")
         && model_clip_tokenizer.contains("NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) =>")
         && !model_clip_tokenizer.contains("RngStreamAddress")
         && !model_clip_tokenizer.contains("NativeCache")
@@ -2205,7 +2205,7 @@ fn run_ownership_validation(
         && model_clip_tokenizer.contains("GEMMA4_AUDIO_TOKEN")
         && model_clip_tokenizer.contains("GEMMA4_VIDEO_TOKEN")
         && model_clip_tokenizer.contains("pub fn decode_generated(")
-        && model_clip_tokenizer.contains("sim.comfy.gemma3-sentencepiece-tokenizer.v1")
+        && model_clip_tokenizer.contains("zed.comfy.gemma3-sentencepiece-tokenizer.v1")
         && !model_clip_tokenizer.contains("RngStreamAddress")
         && !model_clip_tokenizer.contains("NativeCache")
         && !model_clip_tokenizer.contains("OutputTransaction");
@@ -3189,7 +3189,7 @@ fn run_ownership_validation(
         model_clip_text_encoder_multimodal.contains("QWEN25_TOKENIZER_ARTIFACT_DIGEST")
             && model_clip_text_encoder_multimodal.contains("QWEN35_TOKENIZER_ARTIFACT_DIGEST")
             && model_clip_text_encoder_multimodal.contains("qwen_multimodal_decoder_configuration")
-            && model_clip_text_encoder_multimodal.contains("sim.comfy.qwen-multimodal-resource.v2")
+            && model_clip_text_encoder_multimodal.contains("zed.comfy.qwen-multimodal-resource.v2")
             && model_clip_text_encoder_multimodal
                 .contains("shared Qwen tensor storage changed resident size")
             && nodes_stored_payload.contains("resource.qwen_multimodal_resource().is_some()")
@@ -3269,7 +3269,7 @@ fn run_ownership_validation(
         model_clip_text_encoder_multimodal.contains("GemmaMultimodalFamily")
             && model_clip_text_encoder_multimodal.contains("pub const fn supports_audio")
             && model_clip_text_encoder_multimodal
-                .contains("sim.comfy.gemma-multimodal-resource.v1")
+                .contains("zed.comfy.gemma-multimodal-resource.v1")
             && model_clip_text_encoder_multimodal
                 .contains("Gemma4 aliased tensor storage has inconsistent residency")
             && nodes_stored_payload.contains("resource.gemma_multimodal_resource().is_some()")
@@ -4993,7 +4993,7 @@ fn run_ownership_validation(
         && !tensor_random_number_generation_part_two.contains("struct RngStream")
         && !tensor_random_number_generation_part_two.contains("struct RngTransaction")
         && tensor_random_number_generation_part_two_resolution
-            .contains("sim.native.rng.randn.cpu-floating-strided.v1")
+            .contains("zed.native.rng.randn.cpu-floating-strided.v1")
         && tensor_random_number_generation_part_two_tests
             .contains("randn_replays_advances_and_reuses_the_canonical_normal_transform")
         && tensor_random_number_generation_part_two_tests
@@ -6558,7 +6558,7 @@ fn run_ownership_validation(
             && backend_xpu_packager.contains("execution_verifier_sha256")
             && backend_xpu_packager.contains("package-coverage.sha256")
             && backend_xpu_reviewed_execution
-                .contains("schema=sim-comfy-xpu-reviewed-execution-bindings-v1")
+                .contains("schema=zed-comfy-xpu-reviewed-execution-bindings-v1")
             && backend_xpu_reviewed_execution.contains("symbol=dnnl_primitive_execute")
             && backend_xpu_execution_verifier.contains("CHECK_FUNCTION(dnnl_primitive_execute")
             && backend_xpu_execution_verifier.contains("CHECK_LAYOUT(ze_device_properties_t")
@@ -6848,7 +6848,7 @@ fn run_ownership_validation(
             && backend_metal_execution.contains("name: bounded_device_name(probed.name)?")
             && backend_metal_execution
                 .contains("fn device_names_and_public_diagnostics_are_bounded()")
-            && backend_metal_execution_abi.contains("sim-comfy-metal-execution-v1")
+            && backend_metal_execution_abi.contains("zed-comfy-metal-execution-v1")
             && backend_metal_execution_abi
                 .contains(
                     "const RESOURCE_SELECTORS: [(&str, &str, &str, ReturnNullability); 29]",
@@ -7998,12 +7998,12 @@ fn run_ownership_validation(
         .roots()
         .identity_from_reference(&asset_reference)?;
     let asset_reference_semantics = reference_identity == mapped_identity
-        && asset_reference == "sim-asset://input/nested/example.png"
+        && asset_reference == "zed-asset://input/nested/example.png"
         && shared_assets
             .lock()
             .map_err(|error| format!("asset service is unavailable: {error}"))?
             .roots()
-            .identity_from_reference("sim-asset://input/../outside.png")
+            .identity_from_reference("zed-asset://input/../outside.png")
             .is_err();
 
     let external_navigation_policy = ExternalNavigationPolicy::https_user_gesture();
@@ -8020,10 +8020,10 @@ fn run_ownership_validation(
         .into_iter()
         .filter(|location| location.contains("/crates/comfy_"))
         .collect::<Vec<_>>();
-    let sim_asset_reference_parsers =
-        source_occurrences(&sources, "strip_prefix(\"sim-asset://\")");
-    let sim_asset_reference_formatters =
-        source_occurrences(&sources, "\"sim-asset://{}/{relative_path}\"");
+    let zed_asset_reference_parsers =
+        source_occurrences(&sources, "strip_prefix(\"zed-asset://\")");
+    let zed_asset_reference_formatters =
+        source_occurrences(&sources, "\"zed-asset://{}/{relative_path}\"");
 
     let output_committer = authorize_native_output_committer("ownership-profile")?;
     let output_ui = authorize_native_output_ui("ownership-profile")?;
@@ -8621,19 +8621,19 @@ fn run_ownership_validation(
         (
             "asset_references_have_one_checked_mapping_owner",
             asset_reference_semantics
-                && sim_asset_reference_parsers.len() == 1
-                && sim_asset_reference_parsers.first().is_some_and(|location| {
+                && zed_asset_reference_parsers.len() == 1
+                && zed_asset_reference_parsers.first().is_some_and(|location| {
                     location.contains("crates/comfy_runtime/src/assets.rs")
                 })
-                && sim_asset_reference_formatters.len() == 1
-                && sim_asset_reference_formatters
+                && zed_asset_reference_formatters.len() == 1
+                && zed_asset_reference_formatters
                     .first()
                     .is_some_and(|location| {
                         location.contains("crates/comfy_runtime/src/assets.rs")
                     })
                 && runtime_controller_production.contains(".to_reference()")
-                && !runtime_controller_production.contains("format!(\"sim-asset://")
-                && !execution_ui_production.contains("strip_prefix(\"sim-asset://\")"),
+                && !runtime_controller_production.contains("format!(\"zed-asset://")
+                && !execution_ui_production.contains("strip_prefix(\"zed-asset://\")"),
         ),
         (
             "backend_matrix_is_single_owner",
@@ -8720,8 +8720,8 @@ fn run_ownership_validation(
                 && execution_ui_production.contains("service: SharedExecutionPresentationService")
                 && api_services.contains("presentation: SharedExecutionPresentationService")
                 && api_headless.contains("presentation: SharedExecutionPresentationService")
-                && sim_bootstrap.contains("shared_service()")
-                && sim_cli.contains("native_presentation(")
+                && zed_bootstrap.contains("shared_service()")
+                && zed_cli.contains("native_presentation(")
                 && execution_ui_production.contains("contains_canonical_event(&event)")
                 && !api_host_production.contains(".apply_event(event.clone())"),
         ),
@@ -8747,9 +8747,9 @@ fn run_ownership_validation(
                 && execution_ui_production.contains(".reconcile_durable(")
                 && execution_ui_production.contains(".restore_profile(")
                 && !execution_ui_production.contains("load_execution_attempts_for_profile")
-                && sim_cli.contains("presentation.restore_profile(profile_id)")
-                && sim_cli.contains(".set_snapshot_status_durable(")
-                && !sim_cli.contains("load_execution_attempts_for_profile"),
+                && zed_cli.contains("presentation.restore_profile(profile_id)")
+                && zed_cli.contains(".set_snapshot_status_durable(")
+                && !zed_cli.contains("load_execution_attempts_for_profile"),
         ),
         (
             "execution_owner_has_no_mutable_bypass",
@@ -8842,10 +8842,10 @@ fn run_ownership_validation(
                 && runtime_controller.contains("pub assets: SharedAssetService")
                 && runtime_controller.contains(".read_verified(")
                 && !runtime_controller.contains("pub roots: AssetRoots")
-                && sim_bootstrap.contains("open_native_profile_asset_service(")
-                && sim_cli.contains("open_native_profile_asset_service(")
-                && sim_bootstrap.contains("NativeExecutionControllerConfig::new(")
-                && sim_cli.contains("NativeExecutionControllerConfig::new("),
+                && zed_bootstrap.contains("open_native_profile_asset_service(")
+                && zed_cli.contains("open_native_profile_asset_service(")
+                && zed_bootstrap.contains("NativeExecutionControllerConfig::new(")
+                && zed_cli.contains("NativeExecutionControllerConfig::new("),
         ),
         (
             "no_raw_signature_authority_boolean",
@@ -9109,7 +9109,7 @@ fn run_ownership_validation(
                 && !api_http.contains("struct ReplayableResponse")
                 && !api_http.contains("struct IdempotencyLedger")
                 && api_services.contains(".command_receipt_state(")
-                && sim_cli.contains("ArtifactIdempotencySnapshotStore::from_directory("),
+                && zed_cli.contains("ArtifactIdempotencySnapshotStore::from_directory("),
         ),
         (
             "native_api_uses_injected_canonical_permissions",
@@ -9246,10 +9246,10 @@ fn run_ownership_validation(
                 && !plugin_host_production_capabilities.contains("provider_policy: ProviderPolicy")
                 && !plugin_component_host.contains("ProviderPolicy")
                 && !plugin_private_worker.contains("ProviderPolicy")
-                && sim_plugin_services.contains(".uri(request.endpoint())")
-                && !sim_plugin_services.contains("validated_provider_url")
-                && !sim_plugin_services.contains("Url::parse")
-                && !sim_plugin_services.contains("url::Host"),
+                && zed_plugin_services.contains(".uri(request.endpoint())")
+                && !zed_plugin_services.contains("validated_provider_url")
+                && !zed_plugin_services.contains("Url::parse")
+                && !zed_plugin_services.contains("url::Host"),
         ),
         (
             "canonical_provider_and_secret_security_precedes_actuators",
@@ -9297,13 +9297,13 @@ fn run_ownership_validation(
                 && !plugin_component_host
                     .contains("impl ComponentLifecycleAdapter for ComponentHost {")
                 && extension_host.contains("pub trait ComponentLifecycleAdapter: Send + Sync")
-                && sim_bootstrap.contains("ComponentHostRouter::with_initial_generation(")
-                && sim_bootstrap
+                && zed_bootstrap.contains("ComponentHostRouter::with_initial_generation(")
+                && zed_bootstrap
                     .contains("extension_host::register_component_lifecycle_adapter(Arc::new(")
-                && sim_bootstrap.contains("comfy_plugin_services::private_worker_services(")
-                && sim_plugin_services
+                && zed_bootstrap.contains("comfy_plugin_services::private_worker_services(")
+                && zed_plugin_services
                     .contains("PluginCapabilityBroker::new_with_provider_cost_acceptance(")
-                && sim_plugin_services.contains("ComponentExecutionBoundary::private_worker(")
+                && zed_plugin_services.contains("ComponentExecutionBoundary::private_worker(")
                 && plugin_private_worker.contains("RuntimeSupervisor::start(")
                 && plugin_private_worker.contains(".execute_plugin_retaining_capabilities(")
                 && worker_plugin_runtime.contains("pub(crate) struct WorkerCapabilityBridge"),
@@ -9383,18 +9383,18 @@ fn run_ownership_validation(
         ),
         (
             "secret_id_delegates_to_the_existing_credentials_provider",
-            sim_plugin_services.contains("sim_credentials_provider::global(cx)")
-                && sim_plugin_services.contains(".read_credentials(&command.secret_id, cx)")
-                && sim_plugin_services.contains(".read(request.secret_id().as_str())?")
-                && sim_plugin_services
+            zed_plugin_services.contains("zed_credentials_provider::global(cx)")
+                && zed_plugin_services.contains(".read_credentials(&command.secret_id, cx)")
+                && zed_plugin_services.contains(".read(request.secret_id().as_str())?")
+                && zed_plugin_services
                     .contains("impl CredentialPresenceActuator for SimCredentialActuator")
-                && !sim_plugin_services.contains("fs::write")
-                && !sim_plugin_services.contains("std::fs"),
+                && !zed_plugin_services.contains("fs::write")
+                && !zed_plugin_services.contains("std::fs"),
         ),
         (
             "desktop_api_headless_and_worker_consume_component_registry",
-            sim_bootstrap.contains("component_host.router.active_execution_registry_bundle()?")
-                && sim_bootstrap.contains("worker.with_registry_deployment(")
+            zed_bootstrap.contains("component_host.router.active_execution_registry_bundle()?")
+                && zed_bootstrap.contains("worker.with_registry_deployment(")
                 && api_host_production.contains("pub fn with_registry_bundle(")
                 && api_host_production.contains("NativeRuntimeHttpServices::from_registry_bundle(")
                 && api_services
@@ -9411,9 +9411,9 @@ fn run_ownership_validation(
                 && execution_ui_production.contains("compile_generated_native_prompt(")
                 && execution_ui_production.contains("graph_to_prompt(")
                 && !execution_ui_production.contains("compile_native_image_workflow(")
-                && sim_bootstrap
+                && zed_bootstrap
                     .contains("generated_native_node_registry_projection(None)?")
-                && !sim_bootstrap.contains("comfy_runtime::native_image_registry_projection()?")
+                && !zed_bootstrap.contains("comfy_runtime::native_image_registry_projection()?")
                 && api_host_production.contains("pub fn with_registry(")
                 && api_services
                     .contains("for (class_type, runtime) in self.registry.descriptors()")
@@ -10254,8 +10254,8 @@ fn run_ownership_validation(
         "crates/comfy_test_support/tests/native_image_recovery.rs",
         "crates/comfy_api/src/security.rs",
         "crates/comfy_api/src/transport.rs",
-        "crates/sim/src/sim.rs",
-        "crates/sim/src/comfy_plugin_services.rs",
+        "crates/zed/src/zed.rs",
+        "crates/zed/src/comfy_plugin_services.rs",
         ".agents/specs/comfy-parity/ownership-policy.json",
         ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ".agents/specs/comfy-parity/generate_ownership_catalog.py",
@@ -11778,7 +11778,7 @@ fn native_module_backend_admission_preserves_canonical_capability_ownership()
     );
     assert!(
         native_ops
-            .contains("capabilities.require(\"sim.comfy_model.native_module.execute\", support)?")
+            .contains("capabilities.require(\"zed.comfy_model.native_module.execute\", support)?")
     );
     assert!(!native_ops.contains("pub struct NativeBackendCapability"));
     assert!(!native_ops.contains("pub struct NativeExecutionContext"));
@@ -12849,7 +12849,7 @@ fn validate_native_structured_input_boundary(
     Ok(descriptor.contains("pub fn structured_options(")
         && descriptor.contains("DynamicCombo.Option")
         && descriptor.contains("MultiType.Input")
-        && execution.contains("sim.native-structured-value@1")
+        && execution.contains("zed.native-structured-value@1")
         && execution.contains("NativeStructuredValue::from_native_value(value)")
         && compiler.contains("resolve_active_structured_input(")
         && compiler.contains("decode_link(value)")
@@ -13510,7 +13510,7 @@ fn val_ownership_video_component_foundation_001() -> Result<(), Box<dyn std::err
         "pub enum NativeVideoBitDepth",
         "frame_rate_numerator: u64",
         "frame_rate_denominator: u64",
-        "sim.comfy.media.video.v2",
+        "zed.comfy.media.video.v2",
         "greatest_common_divisor(frame_rate_numerator, frame_rate_denominator)",
     ] {
         assert!(
@@ -14279,7 +14279,7 @@ fn val_ownership_native_video_codec_retained_loader_001() -> Result<(), Box<dyn 
         "globally_side_effect_free_rollback",
         "explicit_dlsym_or_callable_address_projection",
         "encoder_availability_probed",
-        "sim_invoked_codec_api",
+        "zed_invoked_codec_api",
     ] {
         assert!(
             fixture.contains(required),
@@ -14906,7 +14906,7 @@ fn val_ownership_native_video_codec_suite_admission_001() -> Result<(), Box<dyn 
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         ".admit_ltxv_h264(&startup_cancellation)",
         ".admit_video_suite(&startup_cancellation)",
         "codec: &NativeVideoCodecSuite",
@@ -15211,7 +15211,7 @@ fn val_ownership_native_video_codec_av1_webm_thread_bridge_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "pub(crate) struct NativeOwnedAv1Webm",
         "EncodeAv1Webm",
         "Av1Webm(NativeOwnedAv1Webm)",
@@ -15306,7 +15306,7 @@ fn val_ownership_native_video_codec_h264_mp4_thread_bridge_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "pub(crate) struct NativeOwnedH264Mp4",
         "EncodeH264Mp4",
         "H264Mp4(NativeOwnedH264Mp4)",
@@ -15420,7 +15420,7 @@ fn val_ownership_native_video_codec_webm_node_service_001() -> Result<(), Box<dy
     let runtime =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.webm-node-service.v1",
+        "zed.comfy.webm-node-service.v1",
         "pub(crate) struct NativeWebmCodecRequestService",
         "batch_limits_configuration_u64",
         "metadata_limits_configuration_u64",
@@ -15525,7 +15525,7 @@ fn val_ownership_native_video_component_h264_mp4_backing_service_001()
     let runtime =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.component-h264-mp4-backing-service.v2",
+        "zed.comfy.component-h264-mp4-backing-service.v2",
         "pub(crate) struct NativeComponentH264Mp4CodecRequestService",
         "plan_native_video_encode",
         "NativeVideoEncodeOptions::ComponentMp4",
@@ -15628,7 +15628,7 @@ fn val_ownership_native_video_backing_representation_001() -> Result<(), Box<dyn
         "pub struct NativeVideoComponentsPayload",
         "pub struct NativeEncodedVideoPayload",
         "checked_h264_mp4_from_component",
-        "sim.comfy.media.video.encoded-h264-mp4.v1",
+        "zed.comfy.media.video.encoded-h264-mp4.v1",
         "actual_content_sha256",
         "encoded_h264_mp4_video_binds_component_identity_and_portable_storage",
     ] {
@@ -15857,7 +15857,7 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
         "NativeVideoCrf",
         "crf.bits() != 31.5_f64.to_bits()",
         "NativeVideoCrf::checked(31.5)",
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
     ] {
         assert!(service.contains(required), "VP9 CRF actor lacks {required}");
     }
@@ -15958,7 +15958,7 @@ fn val_ownership_native_video_codec_vp9_webm_container_metadata_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "metadata: NativeVideoContainerMetadata",
         "encode_vp9_webm_batch_with_metadata",
         "metadata.entries()",
@@ -16070,7 +16070,7 @@ fn val_ownership_native_video_codec_vp9_webm_alpha_001() -> Result<(), Box<dyn s
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "has_alpha: bool",
         "pub(crate) fn has_alpha",
         "encoded.has_alpha()",
@@ -16410,7 +16410,7 @@ fn val_ownership_native_video_codec_h264_mp4_10bit_thread_bridge_001()
     let service =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "bit_depth: NativeVideoBitDepth",
         "pub(crate) fn encode_h264_mp4_10bit_batch",
         "encode_h264_mp4_batch_with_bit_depth",
@@ -16447,7 +16447,7 @@ fn val_ownership_native_video_codec_h264_mp4_10bit_thread_bridge_001()
     ))?;
     for required in [
         "synthetic-retained-h264-mp4-10bit-owned-tensor-thread-bridge",
-        "sim.comfy.video-codec-thread.v9",
+        "zed.comfy.video-codec-thread.v9",
         "one_deliberate_post_encode_copy_observed",
         "native_or_workspace_owner_crosses_thread_response",
         "public_node_backing_video_slice_save_effect_path_or_output_committer_reachable",
@@ -16498,7 +16498,7 @@ fn val_ownership_native_video_component_h264_mp4_10bit_backing_001()
         "bit_depth: NativeVideoBitDepth",
         "let bit_depth = components.bit_depth()",
         "NativeVideoBitDepth::Ten => crate::NativeVideoPixelFormat::Yuv420p10le",
-        "sim.comfy.media.video.encoded-h264-mp4.v1",
+        "zed.comfy.media.video.encoded-h264-mp4.v1",
         "184, 236, 128, 232",
     ] {
         assert!(
@@ -16521,7 +16521,7 @@ fn val_ownership_native_video_component_h264_mp4_10bit_backing_001()
     let runtime =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_video_codec_service.rs"))?;
     for required in [
-        "sim.comfy.component-h264-mp4-backing-service.v2",
+        "zed.comfy.component-h264-mp4-backing-service.v2",
         "let supported_depth = matches!",
         "NativeVideoBitDepth::Ten",
         "NativeVideoPixelFormat::Yuv420p10le",
@@ -16542,7 +16542,7 @@ fn val_ownership_native_video_component_h264_mp4_10bit_backing_001()
         "source_depth_is_authoritative",
         "actor_owned_tensor_moved_without_second_copy",
         "eight_bit_semantic_identity_byte_stable",
-        "sim.comfy.component-h264-mp4-backing-service.v2",
+        "zed.comfy.component-h264-mp4-backing-service.v2",
         "trim_window_video_slice_or_save_video_effect",
     ] {
         assert!(
@@ -17397,7 +17397,7 @@ fn val_ownership_video_output_media_foundation_001() -> Result<(), Box<dyn std::
     for required in [
         "pub enum NativeOutputMediaKind",
         "pub fn checked_media(",
-        "sim.comfy.native-output-effect.v2",
+        "zed.comfy.native-output-effect.v2",
         "NativeOutputMediaKind::Video, \"video/webm\"",
         "media_kind.accepts(&extension, &media_type)",
     ] {

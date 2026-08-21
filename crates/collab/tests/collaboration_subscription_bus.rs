@@ -38,7 +38,7 @@ fn envelope(tenant: &TenantContext, sequence: u64) -> FanoutEnvelope {
         sequence,
         "conversation.activity",
         Provenance::new(
-            SourceSystem::Sim,
+            SourceSystem::Zed,
             SourceRecordId::new(format!("activity:{sequence}")).expect("source ID"),
             1_900_000_000_000 + sequence,
         )

@@ -1,7 +1,7 @@
 use std::fs;
 
 use zed_extension_api::{
-    self as sim, Architecture, DownloadedFileType, GithubReleaseOptions, Os, Result,
+    self as zed, Architecture, DownloadedFileType, GithubReleaseOptions, Os, Result,
     settings::LspSettings,
 };
 
@@ -22,8 +22,8 @@ impl BufLsp {
 
     pub(crate) fn language_server_binary(
         &mut self,
-        worktree: &sim::Worktree,
-    ) -> Result<sim::Command> {
+        worktree: &zed::Worktree,
+    ) -> Result<zed::Command> {
         let binary_settings = LspSettings::for_worktree(Self::SERVER_NAME, worktree)
             .ok()
             .and_then(|lsp_settings| lsp_settings.binary);
@@ -34,27 +34,27 @@ impl BufLsp {
             .unwrap_or_else(|| ["lsp", "serve"].map(ToOwned::to_owned).into());
 
         if let Some(path) = binary_settings.and_then(|binary_settings| binary_settings.path) {
-            return Ok(sim::Command {
+            return Ok(zed::Command {
                 command: path,
                 args,
                 env: Default::default(),
             });
         } else if let Some(path) = self.cached_binary_path.clone() {
-            return Ok(sim::Command {
+            return Ok(zed::Command {
                 command: path,
                 args,
                 env: Default::default(),
             });
         } else if let Some(path) = worktree.which(Self::SERVER_NAME) {
             self.cached_binary_path = Some(path.clone());
-            return Ok(sim::Command {
+            return Ok(zed::Command {
                 command: path,
                 args,
                 env: Default::default(),
             });
         }
 
-        let latest_release = sim::latest_github_release(
+        let latest_release = zed::latest_github_release(
             "bufbuild/buf",
             GithubReleaseOptions {
                 require_assets: true,
@@ -62,7 +62,7 @@ impl BufLsp {
             },
         )?;
 
-        let (os, arch) = sim::current_platform();
+        let (os, arch) = zed::current_platform();
 
         let release_suffix = match (os, arch) {
             (Os::Mac, Architecture::Aarch64) => "Darwin-arm64",
@@ -94,18 +94,18 @@ impl BufLsp {
                 )
             })?;
 
-        sim::download_file(
+        zed::download_file(
             &download_target.download_url,
             &binary_path,
             DownloadedFileType::Uncompressed,
         )?;
-        sim::make_file_executable(&binary_path)?;
+        zed::make_file_executable(&binary_path)?;
 
         util::remove_outdated_versions(Self::SERVER_NAME, &version_dir)?;
 
         self.cached_binary_path = Some(binary_path.clone());
 
-        Ok(sim::Command {
+        Ok(zed::Command {
             command: binary_path,
             args,
             env: Default::default(),

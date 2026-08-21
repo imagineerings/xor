@@ -230,7 +230,7 @@ fn provider_plan_digest(
     let canonical =
         canonical_json(&value).map_err(|_| PromptCompileError::ProviderPlanSerializationFailed)?;
     let mut digest = Sha256::new();
-    digest.update(b"sim-native-provider-plan-v1\0");
+    digest.update(b"zed-native-provider-plan-v1\0");
     digest.update(registry.identity_sha256().as_bytes());
     digest.update([0]);
     digest.update(canonical.as_bytes());
@@ -1186,7 +1186,7 @@ fn native_scalar_literal(value: &Value, accepted_types: &NativeTypeUnion) -> Opt
                 NativeValueType::NamedPreservedUnknown(type_name) => Some(type_name.clone()),
                 _ => None,
             })
-            .unwrap_or_else(|| "sim.json@1".to_owned());
+            .unwrap_or_else(|| "zed.json@1".to_owned());
         Some(NativeValue::PreservedUnknown {
             type_name,
             value: value.clone(),

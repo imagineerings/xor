@@ -11,7 +11,7 @@ permissions:
 jobs:
   update-duplicate-magnets:
     runs-on: ubuntu-latest
-    if: github.repository == 'simtropolis/sim'
+    if: github.repository == 'simtropolis/zed'
     permissions:
       contents: read
       issues: write

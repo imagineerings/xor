@@ -1,4 +1,4 @@
-//! Baseline interface of Tasks in Sim: all tasks in Sim are intended to use those for implementing their own logic.
+//! Baseline interface of Tasks in Zed: all tasks in Zed are intended to use those for implementing their own logic.
 
 mod adapter_schema;
 mod debug_format;
@@ -23,7 +23,7 @@ pub use debug_format::{
     AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
     Request, SimDebugConfig, TcpArgumentsTemplate,
 };
-pub use sim_actions::RevealTarget;
+pub use zed_actions::RevealTarget;
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
     TaskTemplates, substitute_variables_in_map, substitute_variables_in_str,
@@ -298,7 +298,7 @@ impl StructuredTaskHandle {
     }
 }
 
-/// Contains all information needed by Sim to spawn a new terminal tab for the given task.
+/// Contains all information needed by Zed to spawn a new terminal tab for the given task.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct SpawnInTerminal {
     /// Id of the task to use when determining task tab affinity.
@@ -407,7 +407,7 @@ impl ResolvedTask {
     }
 }
 
-/// Variables, available for use in [`TaskContext`] when a Sim's [`TaskTemplate`] gets resolved into a [`ResolvedTask`].
+/// Variables, available for use in [`TaskContext`] when a Zed's [`TaskTemplate`] gets resolved into a [`ResolvedTask`].
 /// Name of the variable must be a valid shell variable identifier, which generally means that it is
 /// a word  consisting only  of alphanumeric characters and underscores,
 /// and beginning with an alphabetic character or an  underscore.
@@ -476,7 +476,7 @@ impl FromStr for VariableName {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let without_prefix = s.strip_prefix(SIM_VARIABLE_NAME_PREFIX).ok_or(())?;
+        let without_prefix = s.strip_prefix(ZED_VARIABLE_NAME_PREFIX).ok_or(())?;
         let value = match without_prefix {
             "FILE" => Self::File,
             "FILENAME" => Self::Filename,
@@ -499,7 +499,7 @@ impl FromStr for VariableName {
             "GIT_REF" => Self::GitRef,
             _ => {
                 if let Some(custom_name) =
-                    without_prefix.strip_prefix(SIM_CUSTOM_VARIABLE_NAME_PREFIX)
+                    without_prefix.strip_prefix(ZED_CUSTOM_VARIABLE_NAME_PREFIX)
                 {
                     Self::Custom(Cow::Owned(custom_name.to_owned()))
                 } else {
@@ -512,41 +512,41 @@ impl FromStr for VariableName {
 }
 
 /// A prefix that all [`VariableName`] variants are prefixed with when used in environment variables and similar template contexts.
-pub const SIM_VARIABLE_NAME_PREFIX: &str = "SIM_";
-const SIM_CUSTOM_VARIABLE_NAME_PREFIX: &str = "CUSTOM_";
+pub const ZED_VARIABLE_NAME_PREFIX: &str = "ZED_";
+const ZED_CUSTOM_VARIABLE_NAME_PREFIX: &str = "CUSTOM_";
 
 impl std::fmt::Display for VariableName {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::File => write!(f, "{SIM_VARIABLE_NAME_PREFIX}FILE"),
-            Self::Filename => write!(f, "{SIM_VARIABLE_NAME_PREFIX}FILENAME"),
-            Self::RelativeFile => write!(f, "{SIM_VARIABLE_NAME_PREFIX}RELATIVE_FILE"),
-            Self::RelativeDir => write!(f, "{SIM_VARIABLE_NAME_PREFIX}RELATIVE_DIR"),
-            Self::Dirname => write!(f, "{SIM_VARIABLE_NAME_PREFIX}DIRNAME"),
-            Self::Stem => write!(f, "{SIM_VARIABLE_NAME_PREFIX}STEM"),
-            Self::WorktreeRoot => write!(f, "{SIM_VARIABLE_NAME_PREFIX}WORKTREE_ROOT"),
-            Self::Symbol => write!(f, "{SIM_VARIABLE_NAME_PREFIX}SYMBOL"),
-            Self::Row => write!(f, "{SIM_VARIABLE_NAME_PREFIX}ROW"),
-            Self::Column => write!(f, "{SIM_VARIABLE_NAME_PREFIX}COLUMN"),
-            Self::SelectedText => write!(f, "{SIM_VARIABLE_NAME_PREFIX}SELECTED_TEXT"),
-            Self::Language => write!(f, "{SIM_VARIABLE_NAME_PREFIX}LANGUAGE"),
-            Self::RunnableSymbol => write!(f, "{SIM_VARIABLE_NAME_PREFIX}RUNNABLE_SYMBOL"),
-            Self::PickProcessId => write!(f, "{SIM_VARIABLE_NAME_PREFIX}PICK_PID"),
-            Self::MainGitWorktree => write!(f, "{SIM_VARIABLE_NAME_PREFIX}MAIN_GIT_WORKTREE"),
-            Self::GitSha => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_SHA"),
-            Self::GitShaShort => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_SHA_SHORT"),
-            Self::GitRepositoryName => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME"),
-            Self::GitRepositoryPath => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH"),
-            Self::GitRef => write!(f, "{SIM_VARIABLE_NAME_PREFIX}GIT_REF"),
+            Self::File => write!(f, "{ZED_VARIABLE_NAME_PREFIX}FILE"),
+            Self::Filename => write!(f, "{ZED_VARIABLE_NAME_PREFIX}FILENAME"),
+            Self::RelativeFile => write!(f, "{ZED_VARIABLE_NAME_PREFIX}RELATIVE_FILE"),
+            Self::RelativeDir => write!(f, "{ZED_VARIABLE_NAME_PREFIX}RELATIVE_DIR"),
+            Self::Dirname => write!(f, "{ZED_VARIABLE_NAME_PREFIX}DIRNAME"),
+            Self::Stem => write!(f, "{ZED_VARIABLE_NAME_PREFIX}STEM"),
+            Self::WorktreeRoot => write!(f, "{ZED_VARIABLE_NAME_PREFIX}WORKTREE_ROOT"),
+            Self::Symbol => write!(f, "{ZED_VARIABLE_NAME_PREFIX}SYMBOL"),
+            Self::Row => write!(f, "{ZED_VARIABLE_NAME_PREFIX}ROW"),
+            Self::Column => write!(f, "{ZED_VARIABLE_NAME_PREFIX}COLUMN"),
+            Self::SelectedText => write!(f, "{ZED_VARIABLE_NAME_PREFIX}SELECTED_TEXT"),
+            Self::Language => write!(f, "{ZED_VARIABLE_NAME_PREFIX}LANGUAGE"),
+            Self::RunnableSymbol => write!(f, "{ZED_VARIABLE_NAME_PREFIX}RUNNABLE_SYMBOL"),
+            Self::PickProcessId => write!(f, "{ZED_VARIABLE_NAME_PREFIX}PICK_PID"),
+            Self::MainGitWorktree => write!(f, "{ZED_VARIABLE_NAME_PREFIX}MAIN_GIT_WORKTREE"),
+            Self::GitSha => write!(f, "{ZED_VARIABLE_NAME_PREFIX}GIT_SHA"),
+            Self::GitShaShort => write!(f, "{ZED_VARIABLE_NAME_PREFIX}GIT_SHA_SHORT"),
+            Self::GitRepositoryName => write!(f, "{ZED_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_NAME"),
+            Self::GitRepositoryPath => write!(f, "{ZED_VARIABLE_NAME_PREFIX}GIT_REPOSITORY_PATH"),
+            Self::GitRef => write!(f, "{ZED_VARIABLE_NAME_PREFIX}GIT_REF"),
             Self::Custom(s) => write!(
                 f,
-                "{SIM_VARIABLE_NAME_PREFIX}{SIM_CUSTOM_VARIABLE_NAME_PREFIX}{s}"
+                "{ZED_VARIABLE_NAME_PREFIX}{ZED_CUSTOM_VARIABLE_NAME_PREFIX}{s}"
             ),
         }
     }
 }
 
-/// Container for predefined environment variables that describe state of Sim at the time the task was spawned.
+/// Container for predefined environment variables that describe state of Zed at the time the task was spawned.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct TaskVariables(HashMap<VariableName, String>);
 
@@ -597,14 +597,14 @@ impl IntoIterator for TaskVariables {
 }
 
 /// Keeps track of the file associated with a task and context of tasks execution (i.e. current file or current function).
-/// Keeps all Sim-related state inside, used to produce a resolved task out of its template.
+/// Keeps all Zed-related state inside, used to produce a resolved task out of its template.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TaskContext {
     /// A path to a directory in which the task should be executed.
     pub cwd: Option<PathBuf>,
     /// Additional environment variables associated with a given task.
     pub task_variables: TaskVariables,
-    /// Environment variables obtained when loading the project into Sim.
+    /// Environment variables obtained when loading the project into Zed.
     /// This is the environment one would get when `cd`ing in a terminal
     /// into the project's root directory.
     pub project_env: HashMap<String, String>,
@@ -700,7 +700,7 @@ impl EnvVariableReplacer {
             _ => input,
         }
     }
-    // Replaces occurrences of VsCode-specific environment variables with Sim equivalents.
+    // Replaces occurrences of VsCode-specific environment variables with Zed equivalents.
     fn replace(&self, input: &str) -> String {
         shellexpand::env_with_context_no_errors(&input, |var: &str| {
             // Colons denote a default value in case the variable is not set. We want to preserve that default, as otherwise shellexpand will substitute it for us.
@@ -723,7 +723,7 @@ impl EnvVariableReplacer {
                 }
             };
             if let Some(substitution) = self.variables.get(variable_name) {
-                // Got a VSCode->Sim hit, perform a substitution
+                // Got a VSCode->Zed hit, perform a substitution
                 let mut name = format!("${{{substitution}");
                 append_previous_default(&mut name);
                 name.push('}');

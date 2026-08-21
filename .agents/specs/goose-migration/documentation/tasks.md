@@ -1,16 +1,16 @@
-# Tasks: Goose Documentation Coverage in Sim
+# Tasks: Goose Documentation Coverage in Zed
 
 - [ ] 1. Build a documentation claim matrix from approved migration capabilities
   - Map each user-facing capability to setup, configuration, use, failures, security/privacy, platform gates, compatibility, examples, implementation evidence, and verification
   - Reject or label planned behavior that has no implementation evidence
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 5.3_
   - _Depends on: implementation and verification of the referenced migration capability_
-  - _Reads: requirements.md, design.md, ../coverage-catalog.md, every approved migration requirements/design/tasks pack, affected Sim implementation/tests_
+  - _Reads: requirements.md, design.md, ../coverage-catalog.md, every approved migration requirements/design/tasks pack, affected Zed implementation/tests_
   - _Writes: documentation claim matrix and selected `docs/src/` pages_
   - _Validation: Review every published behavior claim against an implementation symbol and passing verification result_
 
 - [ ] 2. Add approved migration content to the existing mdBook hierarchy
-  - Extend `docs/src` and `docs/SUMMARY.md`; preserve Sim terminology, voice, navigation, and release-channel conventions
+  - Extend `docs/src` and `docs/SUMMARY.md`; preserve Zed terminology, voice, navigation, and release-channel conventions
   - Cover providers, extensions, recipes, authentication, scheduling, gateways, local models, and embedded apps only when approved and implemented
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.4_
   - _Depends on: 1_
@@ -28,11 +28,11 @@
   - _Validation: Run every documented command/example against a fixture or integration test and review explicit content exclusions_
 
 - [ ] 4. Decide and, if approved, generate machine-consumable documentation artifacts
-  - Identify whether docs maps, `llms.txt`, server catalogs, or skills manifests provide required Sim behavior
+  - Identify whether docs maps, `llms.txt`, server catalogs, or skills manifests provide required Zed behavior
   - Generate approved artifacts from canonical metadata with determinism, validation, atomic replacement, and private-data checks
   - _Requirements: 3.1, 3.2, 3.3_
   - _Depends on: 1_
-  - _Reads: requirements.md, design.md, projects/goose/documentation/scripts/, projects/goose/documentation/static/, Sim canonical command/provider/skill/server metadata_
+  - _Reads: requirements.md, design.md, projects/goose/documentation/scripts/, projects/goose/documentation/static/, Zed canonical command/provider/skill/server metadata_
   - _Writes: approved generator and public artifact locations_
   - _Validation: Run deterministic regeneration, invalid-source, stale-output, secret/private-endpoint, unpublished-feature, and local-path tests_
 

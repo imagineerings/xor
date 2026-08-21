@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/directml/ffi-contracts-v1.schema.json",
-  "title": "Sim DirectML native FFI contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/directml/ffi-contracts-v1.schema.json",
+  "title": "Zed DirectML native FFI contracts v1",
   "$comment": "The package validator additionally requires canonical JSON, the exact three reviewed library identities, target-specific DirectML digest, ABI and policy digests, sorted unique symbols, and deterministic row ordering. System image digests are supplied only by a separately reviewed catalog and are never synthesized from an installed Windows runtime.",
   "type": "object",
   "additionalProperties": false,

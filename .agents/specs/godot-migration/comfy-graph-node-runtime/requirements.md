@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Sim artifacts. These graph and node semantics are core world-model harness functionality, so Sim graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`. Comfy compatibility defines the expected graph and node semantics and fixtures, but every supported graph/runtime feature must be recreated as native Sim functionality backed by Sim graph, validation, execution-plan, cache, artifact, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
+Zed needs Comfy graph and node runtime compatibility so Comfy workflows can be validated, introspected, partially executed, cached, and connected to Zed artifacts. These graph and node semantics are core world-model harness functionality, so Zed graph implementation decisions must account for this spec before adding alternate execution behavior. This spec owns runtime graph scheduling, validation, and node schema adaptation. It delegates canvas UI to `diffusion-graph-editor/`, HTTP submission to `comfy-runtime-control-plane/`, model loading to `comfy-model-memory-runtime/`, and sampler/model-family execution semantics to `comfy-diffusion-world-model-runtime/`. Comfy compatibility defines the expected graph and node semantics and fixtures, but every supported graph/runtime feature must be recreated as native Zed functionality backed by Zed graph, validation, execution-plan, cache, artifact, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 
@@ -10,13 +10,13 @@ Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be v
 - **Node Schema**: The introspection data returned to clients through object info.
 - **Prompt Graph**: A Comfy execution graph keyed by node id where linked inputs reference upstream node outputs.
 - **Execution Plan**: A validated topological order and output target set for running a prompt graph.
-- **Node Cache**: Reusable node output state keyed by node identity, input signature, or Sim cache policy.
+- **Node Cache**: Reusable node output state keyed by node identity, input signature, or Zed cache policy.
 
 ## Requirements
 
 ### Requirement 1: Node Registry and Schema Introspection
 
-**User Story:** As a workflow author, I want Sim to expose Comfy node definitions so workflows can be edited and validated.
+**User Story:** As a workflow author, I want Zed to expose Comfy node definitions so workflows can be edited and validated.
 
 #### Acceptance Criteria
 
@@ -36,7 +36,7 @@ Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be v
 
 ### Requirement 3: Execution Planning and Caching
 
-**User Story:** As a workflow author, I want Sim to execute only the graph parts that need to run.
+**User Story:** As a workflow author, I want Zed to execute only the graph parts that need to run.
 
 #### Acceptance Criteria
 
@@ -47,7 +47,7 @@ Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be v
 
 ### Requirement 4: Async and Batched Node Execution
 
-**User Story:** As a node author, I want Sim to support Comfy nodes that operate over lists or asynchronous work.
+**User Story:** As a node author, I want Zed to support Comfy nodes that operate over lists or asynchronous work.
 
 #### Acceptance Criteria
 
@@ -55,7 +55,7 @@ Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be v
 2. **4.2** WHEN a node returns an execution blocker THEN THE system SHALL stop dependent execution and report a structured block reason.
 3. **4.3** WHEN a node performs async work THEN THE system SHALL keep cancellation, progress, and error propagation connected to the parent job.
 
-### Requirement 5: Sim Integration Boundary
+### Requirement 5: Zed Integration Boundary
 
 **User Story:** As a maintainer, I want runtime compatibility without duplicating the visual editor.
 
@@ -70,7 +70,7 @@ Sim needs Comfy graph and node runtime compatibility so Comfy workflows can be v
 
 #### Acceptance criteria
 
-1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Sim behavior and source-backed compatibility record.
+1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Zed behavior and source-backed compatibility record.
 2. **9.2** THE system SHALL NOT count labels, placeholders, metadata-only fixtures, or hidden upstream pass-throughs as implementation evidence.
 3. **9.3** WHEN backlog behavior is materialized THEN focused validation SHALL cover success, failure, cancellation, persistence, security, and relevant platform outcomes.
 4. **9.4** WHEN coverage status changes THEN THE owner SHALL preserve stable capability identity, owner traceability, and evidence for the new classification.

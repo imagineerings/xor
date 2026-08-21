@@ -98,7 +98,7 @@ impl RuntimeAdapter {
             Self::Native(runtime) => {
                 let properties = runtime
                     .device_properties(device.ordinal())
-                    .map_err(|error| map_execution_error("sim.rocm.device-properties", error))?;
+                    .map_err(|error| map_execution_error("zed.rocm.device-properties", error))?;
                 NativeDeviceProperties::new(
                     device,
                     properties.name(),
@@ -112,7 +112,7 @@ impl RuntimeAdapter {
             #[cfg(test)]
             Self::Test(runtime) => {
                 runtime.select_device(device.ordinal()).map_err(|error| {
-                    map_execution_error("sim.rocm.device-properties", error)
+                    map_execution_error("zed.rocm.device-properties", error)
                 })?;
                 NativeDeviceProperties::new(
                     device,
@@ -402,7 +402,7 @@ impl RocmTensorBackend {
         cancellation.check()?;
         runtime
             .select_device(device_ordinal)
-            .map_err(|error| map_execution_error("sim.rocm.select-device", error))?;
+            .map_err(|error| map_execution_error("zed.rocm.select-device", error))?;
         cancellation.check()?;
         let device = DeviceId::new(DeviceKind::Rocm, device_ordinal);
         let properties = runtime.device_properties(device)?;
@@ -462,7 +462,7 @@ impl RocmTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.rocm.transfer.host-to-device",
+            "zed.rocm.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -483,10 +483,10 @@ impl RocmTensorBackend {
             let offset = tensor_byte_offset(tensor.descriptor())?;
             self.runtime
                 .copy_host_to_device(&stream, allocation, offset, bytes)
-                .map_err(|error| map_execution_error("sim.rocm.transfer.host-to-device", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.transfer.host-to-device", error))?;
             self.runtime
                 .synchronize_stream(&stream)
-                .map_err(|error| map_execution_error("sim.rocm.transfer.host-to-device", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.transfer.host-to-device", error))?;
         }
         self.check_context(context)?;
         let event = self.record_event(context)?;
@@ -498,7 +498,7 @@ impl RocmTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.rocm.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.rocm.transfer.device-to-host", tensor, context)?;
         let byte_length = usize::try_from(tensor.descriptor().byte_len()?)
             .map_err(|_| TensorError::ShapeOverflow)?;
         let staging_bytes =
@@ -525,10 +525,10 @@ impl RocmTensorBackend {
                     allocation,
                     tensor_byte_offset(tensor.descriptor())?,
                 )
-                .map_err(|error| map_execution_error("sim.rocm.transfer.device-to-host", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.transfer.device-to-host", error))?;
             self.runtime
                 .synchronize_stream(&stream)
-                .map_err(|error| map_execution_error("sim.rocm.transfer.device-to-host", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.transfer.device-to-host", error))?;
         }
         self.check_context(context)?;
         drop(staging);
@@ -539,7 +539,7 @@ impl RocmTensorBackend {
         self.streams.get_or_try_insert_with(stream_id, || {
             self.runtime
                 .create_stream(self.device.ordinal())
-                .map_err(|error| map_execution_error("sim.rocm.stream.create", error))
+                .map_err(|error| map_execution_error("zed.rocm.stream.create", error))
         })
     }
 
@@ -564,10 +564,10 @@ impl RocmTensorBackend {
             let allocation = self
                 .runtime
                 .allocate(self.device.ordinal(), byte_length_usize)
-                .map_err(|error| map_execution_error("sim.rocm.allocate", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.allocate", error))?;
             self.runtime
                 .memset(stream, &allocation, 0, 0, byte_length_usize)
-                .map_err(|error| map_execution_error("sim.rocm.allocate.zero", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.allocate.zero", error))?;
             Some(allocation)
         };
         self.check_context(context)?;
@@ -593,7 +593,7 @@ impl RocmTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.rocm.storage.lookup".to_owned(),
+                operation: "zed.rocm.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified ROCm backend instance"
                     .to_owned(),
@@ -683,7 +683,7 @@ impl CachedAllocationOwner for RocmTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-rocm-hip-v1"
+        "zed-native-rocm-hip-v1"
     }
 
     fn release_cached_allocations(
@@ -719,7 +719,7 @@ impl TensorBackend for RocmTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.rocm.allocate",
+            "zed.rocm.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -739,7 +739,7 @@ impl TensorBackend for RocmTensorBackend {
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.check_context(context)?;
         self.require_descriptor(
-            "sim.rocm.copy",
+            "zed.rocm.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -760,7 +760,7 @@ impl TensorBackend for RocmTensorBackend {
         if source.descriptor().layout() != Layout::Contiguous
             || !source.descriptor().is_contiguous()?
         {
-            return Err(self.unsupported("sim.rocm.copy", "source tensor must be contiguous"));
+            return Err(self.unsupported("zed.rocm.copy", "source tensor must be contiguous"));
         }
         let stream = self.stream(context.stream)?;
         let tensor = self.allocate_tensor(destination, &stream, context)?;
@@ -782,7 +782,7 @@ impl TensorBackend for RocmTensorBackend {
                     });
                 }
                 self.capabilities.require(
-                    "sim.rocm.copy",
+                    "zed.rocm.copy",
                     OperationSupport::copy_input(DType::F32, Layout::Contiguous),
                 )?;
                 let source_storage = self.storage(source)?;
@@ -800,7 +800,7 @@ impl TensorBackend for RocmTensorBackend {
                         tensor_byte_offset(source.descriptor())?,
                         byte_length,
                     )
-                    .map_err(|error| map_execution_error("sim.rocm.copy", error))?;
+                    .map_err(|error| map_execution_error("zed.rocm.copy", error))?;
             } else if source.descriptor().device().kind() == DeviceKind::Cpu {
                 let source_bytes = source.contiguous_bytes()?;
                 self.runtime
@@ -810,13 +810,13 @@ impl TensorBackend for RocmTensorBackend {
                         destination_offset,
                         source_bytes,
                     )
-                    .map_err(|error| map_execution_error("sim.rocm.copy", error))?;
+                    .map_err(|error| map_execution_error("zed.rocm.copy", error))?;
                 self.runtime
                     .synchronize_stream(&stream)
-                    .map_err(|error| map_execution_error("sim.rocm.copy", error))?;
+                    .map_err(|error| map_execution_error("zed.rocm.copy", error))?;
             } else {
                 return Err(self.unsupported(
-                    "sim.rocm.copy",
+                    "zed.rocm.copy",
                     "source must be host-addressable CPU storage or this ROCm backend instance",
                 ));
             }
@@ -829,12 +829,12 @@ impl TensorBackend for RocmTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.rocm.event.record", OperationSupport::record_event())?;
+            .require("zed.rocm.event.record", OperationSupport::record_event())?;
         let stream = self.stream(context.stream)?;
         let sequence = self.events.record_with(context.stream, || {
             self.runtime
                 .record_event(&stream)
-                .map_err(|error| map_execution_error("sim.rocm.event.record", error))
+                .map_err(|error| map_execution_error("zed.rocm.event.record", error))
         })?;
         if let Err(error) = self.check_context(context) {
             let removed = self.events.cancel(context.stream, sequence)?;
@@ -856,7 +856,7 @@ impl TensorBackend for RocmTensorBackend {
     ) -> Result<(), TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.rocm.event.wait", OperationSupport::wait_event())?;
+            .require("zed.rocm.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "ROCm event belongs to a different backend instance".to_owned(),
@@ -882,7 +882,7 @@ impl TensorBackend for RocmTensorBackend {
         };
         self.runtime
             .synchronize_event(&native_event)
-            .map_err(|error| map_execution_error("sim.rocm.event.wait", error))?;
+            .map_err(|error| map_execution_error("zed.rocm.event.wait", error))?;
         let retired = self.events.complete(event.stream, event.sequence)?;
         drop(retired);
         self.check_context(context)
@@ -894,7 +894,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.fill", context)
+        self.unsupported_result("zed.rocm.fill", context)
     }
 
     fn unary(
@@ -904,7 +904,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.unary", context)
+        self.unsupported_result("zed.rocm.unary", context)
     }
 
     fn binary(
@@ -915,7 +915,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.binary", context)
+        self.unsupported_result("zed.rocm.binary", context)
     }
 
     fn binary_scalar(
@@ -927,7 +927,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.binary-scalar", context)
+        self.unsupported_result("zed.rocm.binary-scalar", context)
     }
 
     fn reduction(
@@ -937,7 +937,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.reduction", context)
+        self.unsupported_result("zed.rocm.reduction", context)
     }
 
     fn indexing(
@@ -947,7 +947,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.indexing", context)
+        self.unsupported_result("zed.rocm.indexing", context)
     }
 
     fn resize(
@@ -957,7 +957,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.resize", context)
+        self.unsupported_result("zed.rocm.resize", context)
     }
 
     fn convolution(
@@ -967,7 +967,7 @@ impl TensorBackend for RocmTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.convolution", context)
+        self.unsupported_result("zed.rocm.convolution", context)
     }
 
     fn linear_algebra(
@@ -980,7 +980,7 @@ impl TensorBackend for RocmTensorBackend {
         self.check_context(context)?;
         if operation != LinearAlgebraOperation::MatrixMultiply {
             return Err(self.unsupported(
-                "sim.rocm.linear-algebra",
+                "zed.rocm.linear-algebra",
                 "the certified ROCm baseline implements rank-two matrix multiplication only",
             ));
         }
@@ -991,7 +991,7 @@ impl TensorBackend for RocmTensorBackend {
         };
         for input in [left, right] {
             self.require_descriptor(
-                "sim.rocm.linear-algebra.matmul",
+                "zed.rocm.linear-algebra.matmul",
                 PrimitiveOperation::LinearAlgebra(LinearAlgebraOperation::MatrixMultiply),
                 TensorRole::Input,
                 input.descriptor(),
@@ -1000,7 +1000,7 @@ impl TensorBackend for RocmTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.rocm.linear-algebra.matmul",
+            "zed.rocm.linear-algebra.matmul",
             PrimitiveOperation::LinearAlgebra(LinearAlgebraOperation::MatrixMultiply),
             TensorRole::Output,
             &output,
@@ -1052,7 +1052,7 @@ impl TensorBackend for RocmTensorBackend {
                 || tensor.descriptor().offset_elements() != 0
             {
                 return Err(self.unsupported(
-                    "sim.rocm.linear-algebra.matmul",
+                    "zed.rocm.linear-algebra.matmul",
                     "rocBLAS baseline matrices must begin at storage offset zero",
                 ));
             }
@@ -1064,7 +1064,7 @@ impl TensorBackend for RocmTensorBackend {
                     right_allocation,
                     output_allocation,
                 )
-                .map_err(|error| map_execution_error("sim.rocm.linear-algebra.matmul", error))?;
+                .map_err(|error| map_execution_error("zed.rocm.linear-algebra.matmul", error))?;
         }
         self.check_context(context)?;
         let event = self.record_event(context)?;
@@ -1078,7 +1078,7 @@ impl TensorBackend for RocmTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.rocm.custom-kernel", context)
+        self.unsupported_result("zed.rocm.custom-kernel", context)
     }
 }
 

@@ -40,11 +40,11 @@ impl State {
     }
 }
 
-pub const SIM_WEB_SEARCH_PROVIDER_ID: &str = "sim.dev";
+pub const ZED_WEB_SEARCH_PROVIDER_ID: &str = "zed.dev";
 
 impl WebSearchProvider for CloudWebSearchProvider {
     fn id(&self) -> WebSearchProviderId {
-        WebSearchProviderId(SIM_WEB_SEARCH_PROVIDER_ID.into())
+        WebSearchProviderId(ZED_WEB_SEARCH_PROVIDER_ID.into())
     }
 
     fn search(&self, query: String, cx: &mut App) -> Task<Result<WebSearchResponse>> {
@@ -71,7 +71,7 @@ async fn perform_web_search(
 ) -> Result<WebSearchResponse> {
     let organization_id = organization_id.ok_or_else(|| anyhow!("No organization selected."))?;
 
-    let url = client.http_client().build_sim_llm_url("/web_search", &[])?;
+    let url = client.http_client().build_zed_llm_url("/web_search", &[])?;
     let body = serde_json::to_string(&body)?;
     let mut response = client
         .authenticated_llm_request(&llm_api_token, organization_id, |token| {

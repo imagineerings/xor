@@ -2,7 +2,7 @@
 
 ## Overview
 
-The control plane is a Sim harness layer for Comfy-compatible HTTP and WebSocket semantics. It defines the world-model harness prompt/job lifecycle while delegating execution, assets, and model work to existing Sim subsystems and the adjacent Comfy migration specs. The key decision is to model Comfy endpoints as protocol adapters rather than porting `aiohttp` server code.
+The control plane is a Zed harness layer for Comfy-compatible HTTP and WebSocket semantics. It defines the world-model harness prompt/job lifecycle while delegating execution, assets, and model work to existing Zed subsystems and the adjacent Comfy migration specs. The key decision is to model Comfy endpoints as protocol adapters rather than porting `aiohttp` server code.
 
 ## Architecture
 
@@ -15,20 +15,20 @@ flowchart LR
     Jobs --> Graph[comfy-graph-node-runtime]
     Routes --> Assets[comfy-asset-library]
     Routes --> Models[comfy-model-memory-runtime]
-    Events --> Media[Sim Media / Artifacts]
+    Events --> Media[Zed Media / Artifacts]
 ```
 
-The adapter exposes legacy Comfy paths and `/api` aliases. Internally it converts requests into Sim task/job operations and converts Sim events back into Comfy-compatible payloads.
+The adapter exposes legacy Comfy paths and `/api` aliases. Internally it converts requests into Zed task/job operations and converts Zed events back into Comfy-compatible payloads.
 
 ## Components and Interfaces
 
 ### SimRouteAdapter
 
-- **Purpose**: Register Comfy-compatible HTTP routes against Sim HTTP infrastructure.
+- **Purpose**: Register Comfy-compatible HTTP routes against Zed HTTP infrastructure.
 - **Responsibilities**: Parse requests, validate prompt ids, map `/api` aliases, return Comfy-compatible JSON, and enforce route-level safety.
 - **Does not own**: Job execution, asset persistence, model loading, or frontend rendering.
-- **Native route catalog**: Route aliases are method-aware native Sim records in
-  `world_model`. Legacy and `/api` paths resolve to the same owning Sim handler
+- **Native route catalog**: Route aliases are method-aware native Zed records in
+  `world_model`. Legacy and `/api` paths resolve to the same owning Zed handler
   domain, while shared paths such as `GET /prompt` and `POST /prompt` remain
   distinct operations. The catalog covers prompt submission/status, queue,
   history, jobs, features, model catalog, object info, upload, view,
@@ -46,17 +46,17 @@ pub trait SimRouteAdapter {
 
 ### SimJobBridge
 
-- **Purpose**: Map Comfy prompt lifecycle operations onto Sim tasks/jobs.
+- **Purpose**: Map Comfy prompt lifecycle operations onto Zed tasks/jobs.
 - **Responsibilities**: Create jobs, expose queue snapshots, normalize job history, cancel pending or running jobs, and remove sensitive extra data from public responses.
-- **Dependencies**: Sim task system, Comfy graph validator, generated artifact store.
-- **Native job bridge**: Prompt submissions become Sim-owned job records with
+- **Dependencies**: Zed task system, Comfy graph validator, generated artifact store.
+- **Native job bridge**: Prompt submissions become Zed-owned job records with
   canonical prompt ids, queue numbers, status, client metadata, prompt payloads,
   outputs, and explicit public extra-data views. Queue snapshots, terminal
   history, job listings, sorting, filtering, and queue/history removal actions
-  operate on those Sim job records and never expose sensitive prompt extra data
+  operate on those Zed job records and never expose sensitive prompt extra data
   or forward lifecycle state to a ComfyUI server.
 - **Native cancellation controller**: Cancellation and interrupt requests are
-  classified against Sim job state. Pending jobs are dequeued into cancelled
+  classified against Zed job state. Pending jobs are dequeued into cancelled
   terminal history, running jobs are interrupted into cancelled terminal
   history, terminal and unknown jobs are explicit non-failing no-ops, and
   targeted interrupts never cancel unrelated pending jobs.
@@ -65,10 +65,10 @@ pub trait SimRouteAdapter {
 
 - **Purpose**: Maintain Comfy-compatible realtime sessions.
 - **Responsibilities**: Assign client ids, persist per-client feature flags, send initial queue status, and serialize execution events.
-- **Native session registry**: Sessions are Sim-owned records keyed by client
+- **Native session registry**: Sessions are Zed-owned records keyed by client
   session id. Connect creates or reuses a session, stores the requested client
   id, emits initial queue status from `SimJobBridge`, and negotiates feature
-  flags against Sim-supported realtime capabilities.
+  flags against Zed-supported realtime capabilities.
 - **Interface contract**:
 
 ```rust
@@ -81,43 +81,43 @@ pub trait SimWebSocketAdapter {
 
 ### ExecutionEventTranslator
 
-- **Purpose**: Convert Sim execution events into Comfy event names and binary preview event ids.
+- **Purpose**: Convert Zed execution events into Comfy event names and binary preview event ids.
 - **Responsibilities**: Emit `status`, `executing`, `progress`, `feature_flags`, legacy preview image events, and metadata preview events.
-- **Preview selection**: Sim runtime events are translated into typed WebSocket
+- **Preview selection**: Zed runtime events are translated into typed WebSocket
   frames. Clients that negotiated preview metadata receive JSON metadata
   previews; clients without that support receive legacy binary preview frames.
   Translation does not proxy a ComfyUI WebSocket server.
 
 ### Compatibility Fixtures
 
-- **Purpose**: Keep Comfy script-example compatibility executable as native Sim
+- **Purpose**: Keep Comfy script-example compatibility executable as native Zed
   regression tests.
 - **Responsibilities**: Cover basic HTTP prompt submission, queue/history reads,
   WebSocket connection, feature negotiation, executing/progress events, and
   metadata-vs-legacy preview selection using checked-in fixtures.
-- **Native fixture contract**: Fixtures declare `native_sim_records: true` and
+- **Native fixture contract**: Fixtures declare `native_zed_records: true` and
   `comfyui_passthrough: false`; tests fail if compatibility is represented only
   by route labels or hidden ComfyUI proxy behavior.
 
 ### SimHttpSafetyLayer
 
-- **Purpose**: Preserve Comfy's local-server safety behavior while using Sim middleware.
+- **Purpose**: Preserve Comfy's local-server safety behavior while using Zed middleware.
 - **Responsibilities**: origin checks, CORS policy, CSP when API nodes are disabled, path confinement, safe content disposition, and cache-control classification.
 
-Task 2 implements the safety layer as native Sim primitives. Loopback browser
+Task 2 implements the safety layer as native Zed primitives. Loopback browser
 requests validate host/origin before route handling, API-node mode selects an
 explicit content-security policy, executable view content is forced to a safe
 download type, cache-control is classified by response purpose, and file
 resolution rejects absolute paths or parent-directory escapes before joining
-against registered Sim roots.
+against registered Zed roots.
 
 ## Data Models
 
-Task 1 defines these as native Sim protocol records in `crates/world_model`.
+Task 1 defines these as native Zed protocol records in `crates/world_model`.
 Prompt ids are validated as canonical lowercase hyphenated UUID strings before
 enqueueing, prompt payloads stay as protocol JSON until graph validation owns
 them, extra data exposes an explicit redacted public view, queue/history actions
-carry typed prompt ids, job summaries model Sim queue state, and runtime events
+carry typed prompt ids, job summaries model Zed queue state, and runtime events
 carry feature negotiation, execution progress, and preview metadata without
 wrapping or forwarding a ComfyUI server object.
 
@@ -192,9 +192,9 @@ _For any_ upload, view, or download request, the resolved filesystem path SHALL 
 
 ## Testing Strategy
 
-- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Sim job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, WebSocket session/feature negotiation and preview frame selection, and path confinement.
+- Unit tests for prompt id validation, native protocol records, HTTP safety primitives, method-aware `/api` alias routing, Zed job bridge submission/listing/history redaction, idempotent cancellation and targeted interrupt classification, WebSocket session/feature negotiation and preview frame selection, and path confinement.
 - Integration tests for prompt submission through queue, job status transitions, WebSocket feature negotiation, progress events, and preview metadata negotiation.
-- Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval, backed by native Sim route, job, session, and event records.
+- Compatibility fixtures from `projects/comfy/script_examples` for basic HTTP prompt execution and WebSocket image retrieval, backed by native Zed route, job, session, and event records.
 - Property tests for route alias equivalence and path traversal rejection.
 
 

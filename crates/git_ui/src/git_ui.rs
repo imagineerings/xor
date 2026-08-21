@@ -18,7 +18,7 @@ use gpui::{
 use menu::{Cancel, Confirm};
 use project::git_store::Repository;
 use project_diff::ProjectDiff;
-use sim_actions;
+use zed_actions;
 use time::OffsetDateTime;
 use ui::{ButtonLike, ContextMenu, ElevationIndex, PopoverMenuHandle, TintColor, prelude::*};
 use workspace::{
@@ -102,17 +102,17 @@ pub fn init(cx: &mut App) {
         git_picker::register(workspace);
 
         workspace.register_action(
-            |workspace, action: &sim_actions::CreateWorktree, window, cx| {
+            |workspace, action: &zed_actions::CreateWorktree, window, cx| {
                 worktree_service::handle_create_worktree(workspace, action, window, None, cx);
             },
         );
         workspace.register_action(
-            |workspace, action: &sim_actions::SwitchWorktree, window, cx| {
+            |workspace, action: &zed_actions::SwitchWorktree, window, cx| {
                 worktree_service::handle_switch_worktree(workspace, action, window, None, cx);
             },
         );
 
-        workspace.register_action(|workspace, _: &sim_actions::git::Worktree, window, cx| {
+        workspace.register_action(|workspace, _: &zed_actions::git::Worktree, window, cx| {
             let focused_dock = workspace.focused_dock_position(window, cx);
             let project = workspace.project().clone();
             let workspace_handle = workspace.weak_handle();
@@ -128,7 +128,7 @@ pub fn init(cx: &mut App) {
         });
 
         workspace.register_action(
-            |workspace, action: &sim_actions::OpenWorktreeInNewWindow, window, cx| {
+            |workspace, action: &zed_actions::OpenWorktreeInNewWindow, window, cx| {
                 let path = action.path.clone();
                 let is_remote = !workspace.project().read(cx).is_local();
 
@@ -165,7 +165,7 @@ pub fn init(cx: &mut App) {
         }
         if !project.is_via_collab() {
             workspace.register_action(
-                |workspace, _: &sim_actions::git::CreatePullRequest, window, cx| {
+                |workspace, _: &zed_actions::git::CreatePullRequest, window, cx| {
                     if let Some(panel) = workspace.panel::<git_panel::GitPanel>(cx) {
                         panel.update(cx, |panel, cx| {
                             panel.create_pull_request(window, cx);
@@ -695,7 +695,7 @@ impl Render for RefPickerModal {
                 .unwrap_or_else(|_| OffsetDateTime::now_utc());
             let local_offset =
                 time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
-            let formatted_time = time_format::format_localisim_timestamp(
+            let formatted_time = time_format::format_localized_timestamp(
                 commit_time,
                 OffsetDateTime::now_utc(),
                 local_offset,

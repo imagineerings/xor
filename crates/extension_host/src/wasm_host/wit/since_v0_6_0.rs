@@ -23,16 +23,16 @@ wasmtime::component::bindgen!({
         "worktree": ExtensionWorktree,
         "project": ExtensionProject,
         "key-value-store": ExtensionKeyValueStore,
-        "sim:extension/common": latest::sim::extension::common,
-        "sim:extension/http-client": latest::sim::extension::http_client,
-        "sim:extension/nodejs": latest::sim::extension::nodejs,
-        "sim:extension/process": latest::sim::extension::process,
-        "sim:extension/slash-command": latest::sim::extension::slash_command,
-        "sim:extension/context-server": latest::sim::extension::context_server,
+        "zed:extension/common": latest::zed::extension::common,
+        "zed:extension/http-client": latest::zed::extension::http_client,
+        "zed:extension/nodejs": latest::zed::extension::nodejs,
+        "zed:extension/process": latest::zed::extension::process,
+        "zed:extension/slash-command": latest::zed::extension::slash_command,
+        "zed:extension/context-server": latest::zed::extension::context_server,
     },
 });
 
-pub use self::sim::extension::*;
+pub use self::zed::extension::*;
 
 mod settings {
     #![allow(dead_code)]
@@ -138,7 +138,7 @@ impl From<github::GithubReleaseOptions> for latest::github::GithubReleaseOptions
     }
 }
 
-impl sim::extension::github::Host for WasmState {
+impl zed::extension::github::Host for WasmState {
     async fn github_release_by_tag_name(
         &mut self,
         repo: String,
@@ -722,7 +722,7 @@ impl TryFrom<latest::DebugAdapterBinary> for DebugAdapterBinary {
     }
 }
 
-impl sim::extension::dap::Host for WasmState {
+impl zed::extension::dap::Host for WasmState {
     async fn resolve_tcp_template(
         &mut self,
         template: dap::TcpArgumentsTemplate,

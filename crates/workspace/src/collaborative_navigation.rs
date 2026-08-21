@@ -669,11 +669,11 @@ mod tests {
         let owner = "A".repeat(64);
         let event_id = "B".repeat(64);
         assert_eq!(
-            target_from_entity_link(&format!("buzz://pr?id={event_id}&owner={owner}&d=sim-main")),
+            target_from_entity_link(&format!("buzz://pr?id={event_id}&owner={owner}&d=zed-main")),
             Ok(CollaborativeNavigationTarget::PullRequest {
                 event_id: event_id.to_ascii_lowercase(),
                 owner: owner.to_ascii_lowercase(),
-                repository_d_tag: "sim-main".to_owned(),
+                repository_d_tag: "zed-main".to_owned(),
             })
         );
         assert_eq!(
@@ -693,13 +693,13 @@ mod tests {
         let owner = "a".repeat(64);
         let event_id = "b".repeat(64);
         for link in [
-            format!("https://repo?owner={owner}&d=sim"),
-            format!("buzz://repo/extra?owner={owner}&d=sim"),
-            format!("buzz://repo?owner={owner}&d=sim#fragment"),
-            format!("buzz://repo?owner={owner}&owner={owner}&d=sim"),
-            format!("buzz://repo?owner={owner}&d=../sim"),
-            format!("buzz://pr?id=short&owner={owner}&d=sim"),
-            format!("buzz://pr?id={event_id}&owner={owner}&d=sim&relay=wss://relay"),
+            format!("https://repo?owner={owner}&d=zed"),
+            format!("buzz://repo/extra?owner={owner}&d=zed"),
+            format!("buzz://repo?owner={owner}&d=zed#fragment"),
+            format!("buzz://repo?owner={owner}&owner={owner}&d=zed"),
+            format!("buzz://repo?owner={owner}&d=../zed"),
+            format!("buzz://pr?id=short&owner={owner}&d=zed"),
+            format!("buzz://pr?id={event_id}&owner={owner}&d=zed&relay=wss://relay"),
         ] {
             assert!(
                 target_from_entity_link(&link).is_err(),

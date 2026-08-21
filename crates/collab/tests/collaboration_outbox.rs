@@ -135,7 +135,7 @@ impl TransactionalCommandMutation<Vec<u8>> for TestMutation {
         let outbox_operation = OutboxOperation::new(
             "test.mutated",
             Provenance::new(
-                SourceSystem::Sim,
+                SourceSystem::Zed,
                 SourceRecordId::new(command.operation_id().to_string()).expect("source ID"),
                 1_900_000_000_000,
             )

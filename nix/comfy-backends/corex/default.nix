@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-corex-metadata";
+  pname = "zed-comfy-backend-corex-metadata";
   version = "ixrt-0.8-abi1-provenance-blocked";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/corex"
+    destination="$out/lib/zed/comfy-backends/corex"
     mkdir -p "$destination/abi"
     cp ${../../../crates/comfy_backend_corex/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_corex/LICENSES} "$destination/"
@@ -26,7 +26,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Fail-closed Sim CoreX IXRT 0.8 ABI metadata without vendor redistribution";
+    description = "Fail-closed Zed CoreX IXRT 0.8 ABI metadata without vendor redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "x86_64-linux" ];
   };

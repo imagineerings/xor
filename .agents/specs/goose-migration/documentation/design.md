@@ -1,10 +1,10 @@
-# Design: Goose Documentation Coverage in Sim
+# Design: Goose Documentation Coverage in Zed
 
 ## Ownership and reuse
 
 - **D-DOCS-ARCH:** mdBook under `docs/` remains the sole documentation site. Extend `SUMMARY.md`, content, preprocessors, and current deployment.
 - **D-DOCS-CAPABILITY:** Documentation is written per approved capability and uses the coverage catalog as the claim inventory. Pages name configuration, platform gates, permissions, security, failures, compatibility, and verification.
-- **D-DOCS-GENERATED:** Any required docs map, server catalog, skills manifest, or model-readable index is generated deterministically from canonical Sim metadata and checked for private data.
+- **D-DOCS-GENERATED:** Any required docs map, server catalog, skills manifest, or model-readable index is generated deterministically from canonical Zed metadata and checked for private data.
 - **D-DOCS-CONTENT-BOUNDARY:** Docusaurus themes/plugins, blog/community marketing, Goose brand/legal assets, and deployment choices are not portable behavior. Tutorials are added only for approved public workflows.
 - **D-DOCS-VALIDATION:** Existing formatter, mdBook/preprocessor build, link checks, and generated workflow own validation and release channels.
 
@@ -24,6 +24,6 @@ Broken internal/action links, invalid front matter/metadata, failed preprocessin
 
 ## Open decisions
 
-1. Which Goose tutorials merit Sim-native equivalents after the corresponding product capabilities are approved.
-2. Whether Sim needs public machine-consumable docs artifacts beyond its current site/search outputs.
+1. Which Goose tutorials merit Zed-native equivalents after the corresponding product capabilities are approved.
+2. Whether Zed needs public machine-consumable docs artifacts beyond its current site/search outputs.
 3. Whether blog/community marketing content is owned in this repository; this migration does not assume it is.

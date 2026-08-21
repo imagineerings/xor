@@ -11,7 +11,7 @@ fn repeated_function_lines(line_count: usize) -> String {
     text
 }
 
-fn localisim_rename_inputs(line_count: usize) -> (String, String, String) {
+fn localized_rename_inputs(line_count: usize) -> (String, String, String) {
     let base = repeated_function_lines(line_count);
     let mut predicted = base.clone();
     let mut final_text = base.clone();
@@ -63,10 +63,10 @@ fn kept_rate_benchmark(c: &mut Criterion) {
     }
     no_change_group.finish();
 
-    let mut localisim_group = c.benchmark_group("kept_rate/localisim_rename");
+    let mut localized_group = c.benchmark_group("kept_rate/localized_rename");
     for line_count in [128usize, 512, 2048] {
-        let inputs = localisim_rename_inputs(line_count);
-        localisim_group.bench_with_input(
+        let inputs = localized_rename_inputs(line_count);
+        localized_group.bench_with_input(
             BenchmarkId::new("lines", line_count),
             &inputs,
             |bench, inputs| {
@@ -81,7 +81,7 @@ fn kept_rate_benchmark(c: &mut Criterion) {
             },
         );
     }
-    localisim_group.finish();
+    localized_group.finish();
 
     let mut addition_group = c.benchmark_group("kept_rate/identical_addition");
     for line_count in [128usize, 512, 2048] {

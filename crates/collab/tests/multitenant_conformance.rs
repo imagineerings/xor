@@ -169,7 +169,7 @@ impl AdmissionFixture {
         let scopes = PrincipalScopes::new([required_scope.clone()]).expect("scopes");
         Self {
             tenant,
-            principal: AuthenticatedPrincipal::sim_account(
+            principal: AuthenticatedPrincipal::zed_account(
                 principal_id,
                 community_id,
                 ServiceAccountId::new(20),

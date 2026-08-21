@@ -20,14 +20,14 @@ pub fn after_release() -> Workflow {
     let prerelease = WorkflowInput::bool("prerelease", None);
     let body = WorkflowInput::string("body", Some(String::new()));
 
-    let refresh_sim_dev = rebuild_releases_page();
+    let refresh_zed_dev = rebuild_releases_page();
     let deploy_docs = deploy_docs_workflow_call(DOCS_CHANNEL, TAG_NAME_ENV);
-    let post_to_discord = post_to_discord(&[&refresh_sim_dev]);
+    let post_to_discord = post_to_discord(&[&refresh_zed_dev]);
     let publish_winget = publish_winget();
     let create_sentry_release = create_sentry_release();
     let notify_on_failure = {
         let notify_on_failure = notify_on_failure(&[
-            &refresh_sim_dev,
+            &refresh_zed_dev,
             &post_to_discord,
             &publish_winget,
             &create_sentry_release,
@@ -49,7 +49,7 @@ pub fn after_release() -> Workflow {
                     .add_input(prerelease.name, prerelease.input())
                     .add_input(body.name, body.input()),
             ))
-        .add_job(refresh_sim_dev.name, refresh_sim_dev.job)
+        .add_job(refresh_zed_dev.name, refresh_zed_dev.job)
         .add_job(deploy_docs.name, deploy_docs.job)
         .add_job(post_to_discord.name, post_to_discord.job)
         .add_job(publish_winget.name, publish_winget.job)
@@ -59,14 +59,14 @@ pub fn after_release() -> Workflow {
 
 fn rebuild_releases_page() -> NamedJob {
     fn refresh_cloud_releases() -> Step<Run> {
-        named::bash("curl -fX POST \"https://cloud.sim.dev/releases/refresh?expect_tag=$TAG_NAME\"")
+        named::bash("curl -fX POST \"https://cloud.zed.dev/releases/refresh?expect_tag=$TAG_NAME\"")
     }
 
-    fn revalidate_sim_dev() -> Step<Run> {
+    fn revalidate_zed_dev() -> Step<Run> {
         named::bash(
-            "curl -fX GET \"https://sim.dev/api/revalidate?tag=releases\" -H \"Authorization: Bearer $SIM_DEV_REVALIDATE_TOKEN\"",
+            "curl -fX GET \"https://zed.dev/api/revalidate?tag=releases\" -H \"Authorization: Bearer $ZED_DEV_REVALIDATE_TOKEN\"",
         )
-        .add_env(("SIM_DEV_REVALIDATE_TOKEN", vars::SIM_DEV_REVALIDATE_TOKEN))
+        .add_env(("ZED_DEV_REVALIDATE_TOKEN", vars::ZED_DEV_REVALIDATE_TOKEN))
     }
 
     named::job(
@@ -74,7 +74,7 @@ fn rebuild_releases_page() -> NamedJob {
             .runs_on(runners::LINUX_SMALL)
             .with_repository_owner_guard()
             .add_step(refresh_cloud_releases())
-            .add_step(revalidate_sim_dev()),
+            .add_step(revalidate_zed_dev()),
     )
 }
 
@@ -82,9 +82,9 @@ fn post_to_discord(deps: &[&NamedJob]) -> NamedJob {
     fn get_release_url() -> Step<Run> {
         named::bash(
             r#"if [ "$IS_PRERELEASE" == "true" ]; then
-    URL="https://sim.dev/releases/preview"
+    URL="https://zed.dev/releases/preview"
 else
-    URL="https://sim.dev/releases/stable"
+    URL="https://zed.dev/releases/stable"
 fi
 
 echo "URL=$URL" >> "$GITHUB_OUTPUT"
@@ -103,7 +103,7 @@ echo "URL=$URL" >> "$GITHUB_OUTPUT"
         .add_with((
             "stringToTruncate",
             format!(
-                "📣 Sim [{TAG_NAME}](<${{{{ steps.get-release-url.outputs.URL }}}}>)  was just released!\n\n{RELEASE_BODY}\n"
+                "📣 Zed [{TAG_NAME}](<${{{{ steps.get-release-url.outputs.URL }}}}>)  was just released!\n\n{RELEASE_BODY}\n"
             ),
         ))
         .add_with(("maxLength", 2000))
@@ -151,9 +151,9 @@ fn publish_winget() -> NamedJob {
 
     fn set_package_name() -> (Step<Run>, StepOutput) {
         let script = r#"if ($env:IS_PRERELEASE -eq "true") {
-    $PACKAGE_NAME = "Simtropolis.Sim.Preview"
+    $PACKAGE_NAME = "Simtropolis.Zed.Preview"
 } else {
-    $PACKAGE_NAME = "Simtropolis.Sim"
+    $PACKAGE_NAME = "Simtropolis.Zed"
 }
 
 echo "PACKAGE_NAME=$PACKAGE_NAME" >> $env:GITHUB_OUTPUT

@@ -197,7 +197,7 @@ async fn nostr_http_nip11_binds_host_and_redacts_unmapped_metadata() {
     assert_eq!(unmapped.status(), StatusCode::OK);
     let unmapped = response_json(unmapped).await;
     assert!(unmapped.get("icon").is_none());
-    assert_eq!(unmapped["name"], "Sim Collaborative Relay");
+    assert_eq!(unmapped["name"], "Zed Collaborative Relay");
 
     let not_negotiated = app
         .oneshot(

@@ -22,7 +22,7 @@ use language::{Buffer, Capability, OffsetRangeExt, Point};
 use multi_buffer::PathKey;
 use project::{Project, ProjectItem, ProjectPath};
 use settings::{Settings, SettingsStore};
-use sim_actions::assistant::ToggleFocus;
+use zed_actions::assistant::ToggleFocus;
 use std::{
     any::{Any, TypeId},
     collections::hash_map::Entry,

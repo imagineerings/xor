@@ -5,7 +5,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: '1'
   CARGO_INCREMENTAL: '0'
-  SIM_EXTENSION_CLI_SHA: 9ee3c503a4bbbc6b4a0f8a789acca4871d773223
+  ZED_EXTENSION_CLI_SHA: 9ee3c503a4bbbc6b4a0f8a789acca4871d773223
 on:
   workflow_call:
     inputs:
@@ -31,7 +31,7 @@ on:
 permissions: {}
 jobs:
   check_version_changed:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::checkout_repo
@@ -70,7 +70,7 @@ jobs:
     needs:
     - check_version_changed
     if: |-
-      (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') &&
+      (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions') &&
       (inputs.force-bump == true || needs.check_version_changed.outputs.version_changed == 'false')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
@@ -117,7 +117,7 @@ jobs:
             {
                 echo "title=Bump version to ${NEW_VERSION}";
                 echo "body=This PR bumps the version of this extension to v${NEW_VERSION}";
-                echo "branch_name=sim-zippy-autobump";
+                echo "branch_name=zed-zippy-autobump";
             } >> "$GITHUB_OUTPUT"
         else
             {
@@ -129,7 +129,7 @@ jobs:
                 echo "";
                 echo "- N/A";
                 echo "EOF";
-                echo "branch_name=sim-zippy-${EXTENSION_ID}-autobump";
+                echo "branch_name=zed-zippy-${EXTENSION_ID}-autobump";
             } >> "$GITHUB_OUTPUT"
         fi
 
@@ -145,8 +145,8 @@ jobs:
         body: ${{ steps.bump-version.outputs.body }}
         commit-message: ${{ steps.bump-version.outputs.title }}
         branch: ${{ steps.bump-version.outputs.branch_name }}
-        committer: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
-        author: sim-zippy[bot] <234243425+sim-zippy[bot]@users.noreply.github.com>
+        committer: zed-zippy[bot] <234243425+zed-zippy[bot]@users.noreply.github.com>
+        author: zed-zippy[bot] <234243425+zed-zippy[bot]@users.noreply.github.com>
         base: main
         delete-branch: true
         token: ${{ steps.generate-token.outputs.token }}
@@ -160,7 +160,7 @@ jobs:
   create_version_label:
     needs:
     - check_version_changed
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions') && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check_version_changed.outputs.version_changed == 'true'
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions') && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check_version_changed.outputs.version_changed == 'true'
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - id: generate-token
@@ -210,7 +210,7 @@ jobs:
     needs:
     - check_version_changed
     - create_version_label
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - id: generate-token
@@ -233,7 +233,7 @@ jobs:
         echo "extension_id=${EXTENSION_ID}" >> "$GITHUB_OUTPUT"
     - id: extension-update
       name: extension_bump::release_action
-      uses: huacnlee/sim-extension-action@82920ff0876879f65ffbcfa3403589114a8919c6
+      uses: huacnlee/zed-extension-action@82920ff0876879f65ffbcfa3403589114a8919c6
       with:
         extension-name: ${{ steps.get-extension-id.outputs.extension_id }}
         push-to: simtropolis/extensions

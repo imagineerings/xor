@@ -554,7 +554,7 @@ fn device_adapters_project_only_canonical_owner_state() -> Result<(), Box<dyn st
     let allocator = CudaAllocatorOwner { device: cuda };
     assert_eq!(
         cuda_get_allocator_backend_exact_native(&allocator, &cancellation)?,
-        "sim-native-cuda-caching-v1"
+        "zed-native-cuda-caching-v1"
     );
 
     let xpu = DeviceId::new(DeviceKind::Xpu, 1);

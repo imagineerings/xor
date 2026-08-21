@@ -1883,7 +1883,7 @@ impl NativeGemma3VisionProjector {
     ) -> Result<String, MultimodalTextError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.gemma3-vision-projector.v1");
+        hasher.update(b"zed.comfy.gemma3-vision-projector.v1");
         hasher.update(LLAMA_SOURCE_SHA256.as_bytes());
         hasher.update(GEMMA3_MULTIMODAL_SOURCE_SHA256.as_bytes());
         hasher.update(format!("{:?}", self.configuration).as_bytes());
@@ -3382,7 +3382,7 @@ impl NativeGemma4VisionEncoder {
     ) -> Result<String, MultimodalTextError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.gemma4-vision.v1");
+        hasher.update(b"zed.comfy.gemma4-vision.v1");
         hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
         hasher.update(format!("{:?}", self.configuration).as_bytes());
         hasher.update(self.position_embedding.contiguous_bytes()?);
@@ -3743,7 +3743,7 @@ impl NativeGemma4AudioEncoder {
     ) -> Result<String, MultimodalTextError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.gemma4-audio.v1");
+        hasher.update(b"zed.comfy.gemma4-audio.v1");
         hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
         hasher.update(format!("{:?}", self.configuration).as_bytes());
         for (name, module) in self.named_modules() {
@@ -4023,7 +4023,7 @@ impl NativeQwenVisionEncoder {
     ) -> Result<String, MultimodalTextError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.qwen-vision.v1");
+        hasher.update(b"zed.comfy.qwen-vision.v1");
         hasher.update(format!("{:?}", self.configuration).as_bytes());
         hasher.update(self.position_embedding.contiguous_bytes()?);
         for (name, module) in self.named_modules() {
@@ -4529,7 +4529,7 @@ impl NativeQwenMultimodal {
     ) -> Result<String, MultimodalTextError> {
         self.validate(cancellation)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.qwen-multimodal-resource.v2");
+        hasher.update(b"zed.comfy.qwen-multimodal-resource.v2");
         hasher.update(b"standard-comfy-text-generation-adapter");
         hasher.update(format!("{:?}", self.family()).as_bytes());
         hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());
@@ -5155,7 +5155,7 @@ impl NativeGemmaMultimodal {
     ) -> Result<String, MultimodalTextError> {
         self.validate(cancellation)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.gemma-multimodal-resource.v1");
+        hasher.update(b"zed.comfy.gemma-multimodal-resource.v1");
         hasher.update(b"standard-comfy-text-generation-adapter");
         hasher.update(format!("{:?}", self.family).as_bytes());
         hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());

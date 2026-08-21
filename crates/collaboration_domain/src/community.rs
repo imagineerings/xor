@@ -448,7 +448,7 @@ mod tests {
     fn principal() -> AuthenticatedPrincipal {
         let scope = AuthorizationScope::new(COMMUNITY_MANAGE_SCOPE).expect("scope");
         let scopes = PrincipalScopes::new([scope]).expect("scopes");
-        AuthenticatedPrincipal::sim_account(
+        AuthenticatedPrincipal::zed_account(
             principal_id(),
             community_id(),
             ServiceAccountId::new(1),

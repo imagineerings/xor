@@ -65,14 +65,14 @@
       "labels": ["area:controls/ime", "area:controls/mouse", "area:gpui"]
     },
     {
-      "name": "Auth & Sim.dev",
+      "name": "Auth & Zed.dev",
       "labels": [
         "area:auth",
         "area:billing",
         "area:permissions",
-        "area:sim account",
-        "area:sim.dev",
-        "area:sim.dev/theme builder"
+        "area:zed account",
+        "area:zed.dev",
+        "area:zed.dev/theme builder"
       ]
     },
     {

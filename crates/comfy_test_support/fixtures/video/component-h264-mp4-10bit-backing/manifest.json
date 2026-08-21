@@ -19,7 +19,7 @@
     "canonical_media_owner": "comfy_media::NativeVideoPayload",
     "canonical_service_owner": "comfy_nodes::execution::NativeComponentH264Mp4BackingService",
     "runtime_adapter": "comfy_runtime::native_video_codec_service::NativeComponentH264Mp4CodecRequestService",
-    "service_identity_version": "sim.comfy.component-h264-mp4-backing-service.v2",
+    "service_identity_version": "zed.comfy.component-h264-mp4-backing-service.v2",
     "accepted_profiles": [
       "Eight/Yuv420p",
       "Ten/Yuv420p10le"

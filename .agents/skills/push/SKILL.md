@@ -1,6 +1,6 @@
 ---
 name: push
-description: Push the current Sim branch to origin and create or update a GitHub PR using gh, with repo-appropriate validation and PR hygiene.
+description: Push the current Zed branch to origin and create or update a GitHub PR using gh, with repo-appropriate validation and PR hygiene.
 ---
 
 # push skill
@@ -106,7 +106,7 @@ fill in every item. Specifically:
 - Check off each self-review checklist item that applies (`[x]`) after
   verifying it. Leave unchecked (`[ ]`) only items that genuinely do not
   apply, with a comment explaining why.
-- Replace `#ISSUE` with the Linear issue identifier (e.g., `SIM-5`) or the
+- Replace `#ISSUE` with the Linear issue identifier (e.g., `ZED-5`) or the
   GitHub issue number when this PR closes a tracked issue.
 - Fill in the `Release Notes:` section with exactly one bullet.
 

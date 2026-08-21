@@ -5,7 +5,7 @@ use editor::SearchSettings;
 use gpui::{Action, App, ClickEvent, Entity, FocusHandle, IntoElement, actions};
 use project::search::SearchQuery;
 pub use project_search::ProjectSearchView;
-pub use sim_actions::search::ToggleIncludeIgnored;
+pub use zed_actions::search::ToggleIncludeIgnored;
 use ui::{ButtonStyle, IconButton, IconButtonShape};
 use ui::{Tooltip, prelude::*};
 use util::paths::PathMatcher;

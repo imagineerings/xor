@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`. Comfy compatibility defines the expected extension semantics and fixtures, but every supported extension feature must be recreated as native Sim functionality backed by Sim extension policy, asset, web-service, node-schema, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
+Zed needs a controlled harness extension path for Comfy custom nodes, extension web assets, translations, example workflows, prestartup scripts, and ComfyUI-Manager-like package metadata. Custom node discovery is part of the world-model harness feature surface, but execution remains policy-gated. This spec owns extension discovery and policy. It delegates executable node runtime to `comfy-graph-node-runtime/`, provider calls to `comfy-api-provider-nodes/`, and packaging/dependency installation to `comfy-packaging-quality/`. Comfy compatibility defines the expected extension semantics and fixtures, but every supported extension feature must be recreated as native Zed functionality backed by Zed extension policy, asset, web-service, node-schema, and diagnostic services rather than passed through to ComfyUI or represented by a compatibility label alone.
 
 ## Glossary
 
@@ -16,7 +16,7 @@ Sim needs a controlled harness extension path for Comfy custom nodes, extension 
 
 ### Requirement 1: Extension Discovery
 
-**User Story:** As a user, I want Sim to discover installed Comfy custom node packs while keeping them isolated and diagnosable.
+**User Story:** As a user, I want Zed to discover installed Comfy custom node packs while keeping them isolated and diagnosable.
 
 #### Acceptance Criteria
 
@@ -33,7 +33,7 @@ Sim needs a controlled harness extension path for Comfy custom nodes, extension 
 
 1. **2.1** WHEN a node pack exposes `NODE_CLASS_MAPPINGS` THEN THE system SHALL register supported node classes and display names.
 2. **2.2** WHEN a node pack exposes a modern extension entrypoint THEN THE system SHALL call it through the approved runtime boundary and register returned node schemas.
-3. **2.3** WHEN a node pack declares a web directory THEN THE system SHALL serve static assets through Sim's extension asset service with safe path confinement.
+3. **2.3** WHEN a node pack declares a web directory THEN THE system SHALL serve static assets through Zed's extension asset service with safe path confinement.
 4. **2.4** IF a node pack lacks a supported registration mechanism THEN THE system SHALL skip it with a diagnostic.
 
 ### Requirement 3: Startup Scripts and Dependency Policy
@@ -43,12 +43,12 @@ Sim needs a controlled harness extension path for Comfy custom nodes, extension 
 #### Acceptance Criteria
 
 1. **3.1** WHEN a prestartup script exists THEN THE system SHALL execute it only if extension policy allows scripts for that pack.
-2. **3.2** WHEN a prestartup or import script changes global hooks or runtime state THEN THE system SHALL restore protected Sim hooks after loading.
+2. **3.2** WHEN a prestartup or import script changes global hooks or runtime state THEN THE system SHALL restore protected Zed hooks after loading.
 3. **3.3** IF an extension requires missing dependencies THEN THE system SHALL report installation instructions without silently installing packages.
 
 ### Requirement 4: Translations, Templates, and Subgraphs
 
-**User Story:** As a frontend user, I want custom node translations, templates, and subgraphs available in Sim.
+**User Story:** As a frontend user, I want custom node translations, templates, and subgraphs available in Zed.
 
 #### Acceptance Criteria
 
@@ -62,7 +62,7 @@ Sim needs a controlled harness extension path for Comfy custom nodes, extension 
 
 #### Acceptance Criteria
 
-1. **5.1** WHEN manager integration is enabled THEN THE system SHALL expose manager status and policy metadata through Sim-approved routes or tools.
+1. **5.1** WHEN manager integration is enabled THEN THE system SHALL expose manager status and policy metadata through Zed-approved routes or tools.
 2. **5.2** IF manager UI or endpoints are disabled THEN THE system SHALL still honor scheduled background operations only when policy permits them.
 3. **5.3** WHEN install, update, or disable actions require network or filesystem writes THEN THE system SHALL require explicit user approval and dependency review.
 
@@ -70,7 +70,7 @@ Sim needs a controlled harness extension path for Comfy custom nodes, extension 
 
 #### Acceptance criteria
 
-1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Sim behavior and source-backed compatibility record.
+1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Zed behavior and source-backed compatibility record.
 2. **9.2** THE system SHALL NOT count labels, placeholders, metadata-only fixtures, or hidden upstream pass-throughs as implementation evidence.
 3. **9.3** WHEN backlog behavior is materialized THEN focused validation SHALL cover success, failure, cancellation, persistence, security, and relevant platform outcomes.
 4. **9.4** WHEN coverage status changes THEN THE owner SHALL preserve stable capability identity, owner traceability, and evidence for the new classification.

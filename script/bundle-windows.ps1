@@ -13,10 +13,10 @@ if ($DryRun) {
     $rustToolFeatures = if ($RustTools) { "rust-tools" } else { "none" }
     if ($Comfy) {
         $simFeatures = if ($RustTools) { "comfy,rocm,directml,rust-tools" } else { "comfy,rocm,directml" }
-        Write-Output "mode=comfy packages=sim,cli,comfy_worker,auto_update_helper sim_features=$simFeatures remote_features=$rustToolFeatures worker_features=rocm,directml include_comfy_worker=true rust_tools=$($RustTools.ToString().ToLower())"
+        Write-Output "mode=comfy packages=zed,cli,comfy_worker,auto_update_helper zed_features=$simFeatures remote_features=$rustToolFeatures worker_features=rocm,directml include_comfy_worker=true rust_tools=$($RustTools.ToString().ToLower())"
     }
     else {
-        Write-Output "mode=default packages=sim,cli,auto_update_helper sim_features=$rustToolFeatures remote_features=$rustToolFeatures include_comfy_worker=false rust_tools=$($RustTools.ToString().ToLower())"
+        Write-Output "mode=default packages=zed,cli,auto_update_helper zed_features=$rustToolFeatures remote_features=$rustToolFeatures include_comfy_worker=false rust_tools=$($RustTools.ToString().ToLower())"
     }
     exit 0
 }
@@ -73,9 +73,9 @@ if ($Help) {
     exit 0
 }
 
-Push-Location -Path crates/sim
+Push-Location -Path crates/zed
 $channel = Get-Content "RELEASE_CHANNEL"
-$env:SIM_RELEASE_CHANNEL = $channel
+$env:ZED_RELEASE_CHANNEL = $channel
 $env:RELEASE_CHANNEL = $channel
 Pop-Location
 
@@ -85,7 +85,7 @@ function CheckEnvironmentVariables {
     }
 
     $requiredVars = @(
-        'SIM_WORKSPACE', 'RELEASE_VERSION', 'SIM_RELEASE_CHANNEL',
+        'ZED_WORKSPACE', 'RELEASE_VERSION', 'ZED_RELEASE_CHANNEL',
         'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
         'ACCOUNT_NAME', 'CERT_PROFILE_NAME', 'ENDPOINT',
         'FILE_DIGEST', 'TIMESTAMP_DIGEST', 'TIMESTAMP_SERVER'
@@ -104,7 +104,7 @@ function PrepareForBundle {
         Remove-Item -Path "$innoDir" -Recurse -Force
     }
     New-Item -Path "$innoDir" -ItemType Directory -Force
-    Copy-Item -Path "$env:SIM_WORKSPACE\crates\sim\resources\windows\*" -Destination "$innoDir" -Recurse -Force
+    Copy-Item -Path "$env:ZED_WORKSPACE\crates\zed\resources\windows\*" -Destination "$innoDir" -Recurse -Force
     New-Item -Path "$innoDir\make_appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\appx" -ItemType Directory -Force
     New-Item -Path "$innoDir\bin" -ItemType Directory -Force
@@ -118,21 +118,21 @@ function GenerateLicenses {
 }
 
 function BuildSimAndItsFriends {
-    Write-Output "Building Sim and its friends, for channel: $channel"
+    Write-Output "Building Zed and its friends, for channel: $channel"
     if ($Comfy) {
-        $features = "sim/comfy,sim/rocm,comfy_worker/rocm,sim/directml,comfy_worker/directml"
+        $features = "zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml"
         if ($RustTools) {
-            $features = "$features,sim/rust-tools"
+            $features = "$features,zed/rust-tools"
         }
-        cargo build --release --package sim --package cli --package comfy_worker --package auto_update_helper --features $features --target $target
+        cargo build --release --package zed --package cli --package comfy_worker --package auto_update_helper --features $features --target $target
     }
     elseif ($RustTools) {
-        cargo build --release --package sim --package cli --package auto_update_helper --features sim/rust-tools --target $target
+        cargo build --release --package zed --package cli --package auto_update_helper --features zed/rust-tools --target $target
     }
     else {
-        cargo build --release --package sim --package cli --package auto_update_helper --target $target
+        cargo build --release --package zed --package cli --package auto_update_helper --target $target
     }
-    Copy-Item -Path ".\$CargoOutDir\sim.exe" -Destination "$innoDir\Sim.exe" -Force
+    Copy-Item -Path ".\$CargoOutDir\zed.exe" -Destination "$innoDir\Zed.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
     if ($Comfy) {
         Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
@@ -150,7 +150,7 @@ function BuildSimAndItsFriends {
             cargo build --release --package explorer_command_injector --target $target
         }
     }
-    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\sim_explorer_command_injector.dll" -Force
+    Copy-Item -Path ".\$CargoOutDir\explorer_command_injector.dll" -Destination "$innoDir\zed_explorer_command_injector.dll" -Force
 }
 
 function BuildRemoteServer {
@@ -170,7 +170,7 @@ function BuildRemoteServer {
         & "$innoDir\sign.ps1" $remoteServerSrc
     }
 
-    $remoteServerDst = "$env:SIM_WORKSPACE\target\sim-remote-server-windows-$Architecture.zip"
+    $remoteServerDst = "$env:ZED_WORKSPACE\target\zed-remote-server-windows-$Architecture.zip"
     Write-Output "Compressing remote_server to $remoteServerDst"
     Compress-Archive -Path $remoteServerSrc -DestinationPath $remoteServerDst -Force
 
@@ -179,7 +179,7 @@ function BuildRemoteServer {
 
 function ZipSimAndItsFriendsDebug {
     $items = @(
-        ".\$CargoOutDir\sim.pdb",
+        ".\$CargoOutDir\zed.pdb",
         ".\$CargoOutDir\cli.pdb",
         ".\$CargoOutDir\auto_update_helper.pdb",
         ".\$CargoOutDir\explorer_command_injector.pdb",
@@ -189,7 +189,7 @@ function ZipSimAndItsFriendsDebug {
         $items += ".\$CargoOutDir\comfy-worker.pdb"
     }
 
-    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip" -Force
+    Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip" -Force
 }
 
 
@@ -203,10 +203,10 @@ function UploadToSentry {
         Write-Output "missing SENTRY_AUTH_TOKEN. skipping sentry upload."
         return
     }
-    Write-Output "Uploading sim debug symbols to sentry..."
+    Write-Output "Uploading zed debug symbols to sentry..."
     for ($i = 1; $i -le 3; $i++) {
         try {
-            sentry-cli debug-files upload --include-sources --wait -p sim -o sim-dev $CargoOutDir
+            sentry-cli debug-files upload --include-sources --wait -p zed -o zed-dev $CargoOutDir
             break
         }
         catch {
@@ -223,20 +223,20 @@ function UploadToSentry {
 function MakeAppx {
     switch ($channel) {
         "stable" {
-            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest.xml"
         }
         "preview" {
-            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Preview.xml"
         }
         default {
-            $manifestFile = "$env:SIM_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
+            $manifestFile = "$env:ZED_WORKSPACE\crates\explorer_command_injector\AppxManifest-Nightly.xml"
         }
     }
     Copy-Item -Path "$manifestFile" -Destination "$innoDir\make_appx\AppxManifest.xml"
     # Add makeAppx.exe to Path
     $sdk = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64"
     $env:Path += ';' + $sdk
-    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\sim_explorer_command_injector.appx" /nv
+    makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\zed_explorer_command_injector.appx" /nv
 }
 
 function SignSimAndItsFriends {
@@ -244,7 +244,7 @@ function SignSimAndItsFriends {
         return
     }
 
-    $files = "$innoDir\Sim.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\sim_explorer_command_injector.dll,$innoDir\sim_explorer_command_injector.appx"
+    $files = "$innoDir\Zed.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\zed_explorer_command_injector.dll,$innoDir\zed_explorer_command_injector.appx"
     if ($Comfy) {
         $files += ",$innoDir\comfy-worker.exe"
     }
@@ -269,10 +269,10 @@ function DownloadConpty {
 }
 
 function CollectFiles {
-    Move-Item -Path "$innoDir\sim_explorer_command_injector.appx" -Destination "$innoDir\appx\sim_explorer_command_injector.appx" -Force
-    Move-Item -Path "$innoDir\sim_explorer_command_injector.dll" -Destination "$innoDir\appx\sim_explorer_command_injector.dll" -Force
-    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\sim.exe" -Force
-    Move-Item -Path "$innoDir\sim.sh" -Destination "$innoDir\bin\sim" -Force
+    Move-Item -Path "$innoDir\zed_explorer_command_injector.appx" -Destination "$innoDir\appx\zed_explorer_command_injector.appx" -Force
+    Move-Item -Path "$innoDir\zed_explorer_command_injector.dll" -Destination "$innoDir\appx\zed_explorer_command_injector.dll" -Force
+    Move-Item -Path "$innoDir\cli.exe" -Destination "$innoDir\bin\zed.exe" -Force
+    Move-Item -Path "$innoDir\zed.sh" -Destination "$innoDir\bin\zed" -Force
     Move-Item -Path "$innoDir\auto_update_helper.exe" -Destination "$innoDir\tools\auto_update_helper.exe" -Force
     if($Architecture -eq "aarch64") {
         New-Item -Type Directory -Path "$innoDir\arm64" -Force
@@ -290,63 +290,63 @@ function CollectFiles {
 }
 
 function BuildInstaller {
-    $issFilePath = "$innoDir\sim.iss"
+    $issFilePath = "$innoDir\zed.iss"
     switch ($channel) {
         "stable" {
             $appId = "{{2DB0DA96-CA55-49BB-AF4F-64AF36A86712}"
             $appIconName = "app-icon"
-            $appName = "Sim"
-            $appDisplayName = "Sim"
-            $appSetupName = "Sim-$Architecture"
-            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
-            $appMutex = "Sim-Stable-Instance-Mutex"
-            $appExeName = "Sim"
-            $regValueName = "Sim"
-            $appUserId = "Simtropolis.Sim"
+            $appName = "Zed"
+            $appDisplayName = "Zed"
+            $appSetupName = "Zed-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Zed-Stable-Instance-Mutex"
+            $appExeName = "Zed"
+            $regValueName = "Zed"
+            $appUserId = "Simtropolis.Zed"
             $appShellNameShort = "Z&ed"
             $appAppxFullName = "Simtropolis.Sim_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "preview" {
             $appId = "{{F70E4811-D0E2-4D88-AC99-D63752799F95}"
             $appIconName = "app-icon-preview"
-            $appName = "Sim Preview"
-            $appDisplayName = "Sim Preview"
-            $appSetupName = "Sim-$Architecture"
-            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
-            $appMutex = "Sim-Preview-Instance-Mutex"
-            $appExeName = "Sim"
+            $appName = "Zed Preview"
+            $appDisplayName = "Zed Preview"
+            $appSetupName = "Zed-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Zed-Preview-Instance-Mutex"
+            $appExeName = "Zed"
             $regValueName = "SimPreview"
-            $appUserId = "Simtropolis.Sim.Preview"
+            $appUserId = "Simtropolis.Zed.Preview"
             $appShellNameShort = "Z&ed Preview"
-            $appAppxFullName = "Simtropolis.Sim.Preview_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Preview_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "nightly" {
             $appId = "{{1BDB21D3-14E7-433C-843C-9C97382B2FE0}"
             $appIconName = "app-icon-nightly"
-            $appName = "Sim Nightly"
-            $appDisplayName = "Sim Nightly"
-            $appSetupName = "Sim-$Architecture"
-            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
-            $appMutex = "Sim-Nightly-Instance-Mutex"
-            $appExeName = "Sim"
+            $appName = "Zed Nightly"
+            $appDisplayName = "Zed Nightly"
+            $appSetupName = "Zed-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Zed-Nightly-Instance-Mutex"
+            $appExeName = "Zed"
             $regValueName = "SimNightly"
-            $appUserId = "Simtropolis.Sim.Nightly"
+            $appUserId = "Simtropolis.Zed.Nightly"
             $appShellNameShort = "Z&ed Editor Nightly"
-            $appAppxFullName = "Simtropolis.Sim.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "dev" {
             $appId = "{{8357632E-24A4-4F32-BA97-E575B4D1FE5D}"
             $appIconName = "app-icon-dev"
-            $appName = "Sim Dev"
-            $appDisplayName = "Sim Dev"
-            $appSetupName = "Sim-$Architecture"
-            # The mutex name here should match the mutex name in crates\sim\src\sim\windows_only_instance.rs
-            $appMutex = "Sim-Dev-Instance-Mutex"
-            $appExeName = "Sim"
+            $appName = "Zed Dev"
+            $appDisplayName = "Zed Dev"
+            $appSetupName = "Zed-$Architecture"
+            # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
+            $appMutex = "Zed-Dev-Instance-Mutex"
+            $appExeName = "Zed"
             $regValueName = "SimDev"
-            $appUserId = "Simtropolis.Sim.Dev"
+            $appUserId = "Simtropolis.Zed.Dev"
             $appShellNameShort = "Z&ed Dev"
-            $appAppxFullName = "Simtropolis.Sim.Dev_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Dev_1.0.0.0_neutral__japxn1gcva8rg"
         }
         default {
             Write-Error "can't bundle installer for $channel."
@@ -362,7 +362,7 @@ function BuildInstaller {
     $definitions = @{
         "AppId"          = $appId
         "AppIconName"    = $appIconName
-        "OutputDir"      = "$env:SIM_WORKSPACE\target"
+        "OutputDir"      = "$env:ZED_WORKSPACE\target"
         "AppSetupName"   = $appSetupName
         "AppName"        = $appName
         "AppDisplayName" = $appDisplayName
@@ -373,7 +373,7 @@ function BuildInstaller {
         "ShellNameShort" = $appShellNameShort
         "AppUserId"      = $appUserId
         "Version"        = "$env:RELEASE_VERSION"
-        "SourceDir"      = "$env:SIM_WORKSPACE"
+        "SourceDir"      = "$env:ZED_WORKSPACE"
         "AppxFullName"   = $appAppxFullName
     }
     if ($Comfy) {
@@ -407,9 +407,9 @@ function BuildInstaller {
 }
 
 ParseSimWorkspace
-$innoDir = "$env:SIM_WORKSPACE\inno\$Architecture"
-$debugArchive = "$CargoOutDir\sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip"
-$debugStoreKey = "$env:SIM_RELEASE_CHANNEL/sim-$env:RELEASE_VERSION-$env:SIM_RELEASE_CHANNEL.dbg.zip"
+$innoDir = "$env:ZED_WORKSPACE\inno\$Architecture"
+$debugArchive = "$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
+$debugStoreKey = "$env:ZED_RELEASE_CHANNEL/zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
 
 CheckEnvironmentVariables
 PrepareForBundle
@@ -431,8 +431,8 @@ if($env:CI) {
 if ($buildSuccess) {
     Write-Output "Build successful"
     if ($Install) {
-        Write-Output "Installing Sim..."
-        Start-Process -FilePath "$env:SIM_WORKSPACE/target/SimEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
+        Write-Output "Installing Zed..."
+        Start-Process -FilePath "$env:ZED_WORKSPACE/target/SimEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
     }
     exit 0
 }

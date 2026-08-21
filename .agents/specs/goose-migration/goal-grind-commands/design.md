@@ -2,7 +2,7 @@
 
 ## Overview
 
-This feature extends Sim's current native-agent command and turn paths. `Thread` gains one persisted optional goal and one transient grind-turn control context. `NativeAgent::Session` gains one transient active-grind record. `/goal` mutations are persisted atomically before their local acknowledgement; `/grind` runs a foreground bounded loop that calls the same `Thread::resume` and event-forwarding machinery used by normal native turns.
+This feature extends Zed's current native-agent command and turn paths. `Thread` gains one persisted optional goal and one transient grind-turn control context. `NativeAgent::Session` gains one transient active-grind record. `/goal` mutations are persisted atomically before their local acknowledgement; `/grind` runs a foreground bounded loop that calls the same `Thread::resume` and event-forwarding machinery used by normal native turns.
 
 The design intentionally separates durable intent from temporary spending consent:
 
@@ -13,9 +13,9 @@ The design intentionally separates durable intent from temporary spending consen
 
 ## Audit findings
 
-Goose exposes `/goal` and `/grind` from its built-in command catalog and supports `off`, `clear`, and `none`. Its legacy and state-machine implementations store goal/grind values on the agent, hide command acknowledgements from model context, inject model-only continuation messages, and rely on the agent's maximum-turn loop. The audited grind nudge repeats whenever the model ends without tools; it does not provide Sim's required persisted per-thread goal, per-invocation consent record, hard limit of twenty, reload non-resumption, or immediate stop-on-permission/tool-failure contract.
+Goose exposes `/goal` and `/grind` from its built-in command catalog and supports `off`, `clear`, and `none`. Its legacy and state-machine implementations store goal/grind values on the agent, hide command acknowledgements from model context, inject model-only continuation messages, and rely on the agent's maximum-turn loop. The audited grind nudge repeats whenever the model ends without tools; it does not provide Zed's required persisted per-thread goal, per-invocation consent record, hard limit of twenty, reload non-resumption, or immediate stop-on-permission/tool-failure contract.
 
-Sim already owns every necessary boundary: catalog and dispatch in `NativeAgent`, persisted messages and tool results in `Thread`, transient presentation in `AcpThread`, cancellation in `Thread::cancel`, tool authorization in `handle_thread_events`, queued input in `ThreadView`, and final storage in `ThreadStore`. No Goose state-machine or execution-manager type is needed.
+Zed already owns every necessary boundary: catalog and dispatch in `NativeAgent`, persisted messages and tool results in `Thread`, transient presentation in `AcpThread`, cancellation in `Thread::cancel`, tool authorization in `handle_thread_events`, queued input in `ThreadView`, and final storage in `ThreadStore`. No Goose state-machine or execution-manager type is needed.
 
 ## Design elements
 

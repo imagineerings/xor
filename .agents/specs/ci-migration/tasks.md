@@ -14,7 +14,7 @@
     - _Reads: `.github/workflows/*.yml`, `tooling/xtask/src/tasks/workflows.rs`_
     - _Writes: `.agents/specs/ci-migration/requirements.md`, `.agents/specs/ci-migration/design.md`, `.agents/specs/ci-migration/tasks.md`_
     - _Validation: Count top-level `.yml` files, retained core files, generated files, and non-core files from the checkout._
-    - _Evidence: The measured baseline was 41 top-level `.yml` files: 2 retained core workflows and 39 non-core workflows. The generator inventory contained 20 Sim workflows, split into 2 active core and 18 archived generated workflows; the remaining 21 archived workflows are hand-written._
+    - _Evidence: The measured baseline was 41 top-level `.yml` files: 2 retained core workflows and 39 non-core workflows. The generator inventory contained 20 Zed workflows, split into 2 active core and 18 archived generated workflows; the remaining 21 archived workflows are hand-written._
   - [x] 1.2. Move every non-core top-level workflow into the archive with `git mv` and make the README inventory exact.
     - _Requirements: 1.2, 1.3, 1.4, 1.5_
     - _Depends on: 1.1_
@@ -22,13 +22,13 @@
     - _Writes: `.github/workflows/*.yml`, `.github/workflows/archive/*.yml`, `.github/workflows/archive/README.md`_
     - _Validation: Confirm the active set is exactly `release.yml` and `run_tests.yml`; confirm 39 archived `.yml` files; compare the README inventory to the directory; inspect staged 100% renames._
     - _Evidence: `git mv` produced 39 staged 100% renames with zero content changes. The active inventory contains exactly 2 files, the archive contains 39 `.yml` files, and a sorted README-to-directory comparison has no differences._
-  - [x] 1.3. Exclude every generated archived Sim workflow and test the complete active/archive partition.
+  - [x] 1.3. Exclude every generated archived Zed workflow and test the complete active/archive partition.
     - _Requirements: 2.1, 2.3, 2.4_
     - _Depends on: 1.2_
     - _Reads: `tooling/xtask/src/tasks/workflows.rs`, `.github/workflows/archive/*.yml`_
     - _Writes: `tooling/xtask/src/tasks/workflows.rs`_
-    - _Validation: `cargo test -p xtask sim_workflow_generation_matches_archive_policy -- --nocapture`_
-    - _Evidence: `ARCHIVED_SIM_WORKFLOWS` contains all 18 generated archived Sim workflows, including `run_bundling`; the focused policy test passed with 1 test and asserts the active two-file allowlist, complete partition, and archived-file existence._
+    - _Validation: `cargo test -p xtask zed_workflow_generation_matches_archive_policy -- --nocapture`_
+    - _Evidence: `ARCHIVED_ZED_WORKFLOWS` contains all 18 generated archived Zed workflows, including `run_bundling`; the focused policy test passed with 1 test and asserts the active two-file allowlist, complete partition, and archived-file existence._
   - [x] 1.4. Validate deterministic generation, archive immutability, formatting, and the completed spec pack.
     - _Requirements: 1.2, 1.3, 2.1, 2.2, 2.4_
     - _Depends on: 1.3_
@@ -156,11 +156,11 @@ The optional post-generation CI fallback is not needed because Task 1 enforces t
 
 ## Phase 14: Restore automated version bumping (P2)
 
-- [ ] 15. Restore and validate `bump_sim_version.yml`, `bump_patch_version.yml`, and `bump_collab_staging.yml`.
+- [ ] 15. Restore and validate `bump_zed_version.yml`, `bump_patch_version.yml`, and `bump_collab_staging.yml`.
   - _Requirements: 15.1_
   - _Depends on: 1.4_
-  - _Reads: `.github/workflows/archive/bump_sim_version.yml`, `.github/workflows/archive/bump_patch_version.yml`, `.github/workflows/archive/bump_collab_staging.yml`, `tooling/xtask/src/tasks/workflows.rs`_
-  - _Writes: `.github/workflows/bump_sim_version.yml`, `.github/workflows/bump_patch_version.yml`, `.github/workflows/bump_collab_staging.yml`, `tooling/xtask/src/tasks/workflows.rs`, `.github/workflows/archive/README.md`_
+  - _Reads: `.github/workflows/archive/bump_zed_version.yml`, `.github/workflows/archive/bump_patch_version.yml`, `.github/workflows/archive/bump_collab_staging.yml`, `tooling/xtask/src/tasks/workflows.rs`_
+  - _Writes: `.github/workflows/bump_zed_version.yml`, `.github/workflows/bump_patch_version.yml`, `.github/workflows/bump_collab_staging.yml`, `tooling/xtask/src/tasks/workflows.rs`, `.github/workflows/archive/README.md`_
   - _Validation: Run generator validation; inspect dispatch inputs, version calculation, branches/tags, permissions, and app tokens._
 
 ## Phase 15: Restore community management (P3)
@@ -221,6 +221,6 @@ The optional post-generation CI fallback is not needed because Task 1 enforces t
 ## Execution rules
 
 - Every restoration move uses `git mv`.
-- A generated workflow is removed from `ARCHIVED_SIM_WORKFLOWS` in the same task that restores it.
+- A generated workflow is removed from `ARCHIVED_ZED_WORKFLOWS` in the same task that restores it.
 - Every later phase validates dependencies, permissions, and secrets before activation.
 - Phase 1 stops before Task 3; no archived workflow is restored or activated.

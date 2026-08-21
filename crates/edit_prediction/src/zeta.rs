@@ -655,7 +655,7 @@ fn handle_api_response<T>(
                             ErrorSeverity::Critical
                         }
                         fn primary_action(&self) -> ErrorAction {
-                            ErrorAction::link("Update Sim", "https://sim.dev/releases")
+                            ErrorAction::link("Update Zed", "https://zed.dev/releases")
                         }
                     }
 
@@ -851,7 +851,7 @@ pub(crate) fn edit_prediction_accepted(
 
         let url = client
             .http_client()
-            .build_sim_llm_url("/predict_edits/accept", &[])?;
+            .build_zed_llm_url("/predict_edits/accept", &[])?;
         EditPredictionStore::send_api_request::<()>(
             move |builder| Ok(builder.uri(url.as_ref()).body(body.clone().into())?),
             client,

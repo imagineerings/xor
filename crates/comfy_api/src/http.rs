@@ -1599,11 +1599,11 @@ pub(crate) fn validate_request_headers(
         "x-forwarded-host",
         "x-forwarded-proto",
         "x-real-ip",
-        "x-sim-plugin-capabilities",
-        "x-sim-plugin-digest",
-        "x-sim-plugin-id",
-        "x-sim-plugin-profile",
-        "x-sim-plugin-version",
+        "x-zed-plugin-capabilities",
+        "x-zed-plugin-digest",
+        "x-zed-plugin-id",
+        "x-zed-plugin-profile",
+        "x-zed-plugin-version",
     ];
     let mut counts = BTreeMap::<String, usize>::new();
     for (name, values) in &request.headers {

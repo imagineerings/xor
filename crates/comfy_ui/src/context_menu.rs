@@ -1107,7 +1107,7 @@ fn settings_context_action_availability(
     cx: &App,
 ) -> ContextActionAvailability {
     if !cx.has_global::<SettingsStore>() {
-        return ContextActionAvailability::disabled("Sim settings store is unavailable");
+        return ContextActionAvailability::disabled("Zed settings store is unavailable");
     }
     if item.context_settings_task.is_some() {
         return ContextActionAvailability::disabled("settings update is already in progress");
@@ -2587,7 +2587,7 @@ impl GraphWorkspaceItem {
             GeneratedGraphContextAction::ToggleDefaultRerouteType => {
                 let visible = !self.context_default_reroute_type_visible(cx);
                 if !cx.has_global::<SettingsStore>() {
-                    return self.reject_context_action("Sim settings store is unavailable", cx);
+                    return self.reject_context_action("Zed settings store is unavailable", cx);
                 }
                 let completion = settings::update_settings_file_with_completion(
                     <dyn Fs>::global(cx),

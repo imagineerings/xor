@@ -1864,7 +1864,7 @@ mod tests {
     }
 
     fn vorbis_comments() -> Vec<u8> {
-        let vendor = b"sim";
+        let vendor = b"zed";
         let comment = b"workflow={\"version\":0.4,\"nodes\":[],\"links\":[]}";
         let mut payload = Vec::new();
         payload.extend_from_slice(&(vendor.len() as u32).to_le_bytes());

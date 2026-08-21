@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/mlu/ffi-contracts-v1.schema.json",
-  "title": "Sim Cambricon MLU native FFI contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/mlu/ffi-contracts-v1.schema.json",
+  "title": "Zed Cambricon MLU native FFI contracts v1",
   "$comment": "The native runtime additionally requires exact reviewed identities, filenames, ABI, symbol rows, owner, manifest digest, policy digest, target, deterministic ordering, and signed package coverage.",
   "type": "object",
   "additionalProperties": false,

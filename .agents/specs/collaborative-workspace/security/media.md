@@ -67,7 +67,7 @@ Canonical metadata records the tenant, hash, observed type, size, variants, prov
 
 ### INV-MED-05 — credentials never cross to clients
 
-Object credentials are service-side, least-privilege and late-bound from deployment secret owners. Public URLs terminate at an authenticated Sim/compatibility endpoint. Storage errors are redacted; logs never contain credentials, signed capability headers, private object paths or collected IP values.
+Object credentials are service-side, least-privilege and late-bound from deployment secret owners. Public URLs terminate at an authenticated Zed/compatibility endpoint. Storage errors are redacted; logs never contain credentials, signed capability headers, private object paths or collected IP values.
 
 ### INV-MED-06 — every parser and renderer is bounded and fallible
 

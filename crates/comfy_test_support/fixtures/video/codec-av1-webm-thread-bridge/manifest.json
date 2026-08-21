@@ -26,7 +26,7 @@
     "successful_response_retains_scratch_lease": false,
     "successful_response_backend_accounts_actual_encoded_length": true,
     "mixed_ltxv_vp9_and_av1_requests_share_one_actor": true,
-    "actor_identity_version": "sim.comfy.video-codec-thread.v7"
+    "actor_identity_version": "zed.comfy.video-codec-thread.v7"
   },
   "synthetic_fixture": {
     "encoded_bytes": "HA1T",

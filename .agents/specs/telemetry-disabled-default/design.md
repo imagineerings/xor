@@ -2,7 +2,7 @@
 
 ## Overview
 
-Use Sim's existing telemetry settings as the only policy owner. Change the embedded and typed defaults to `false`, retain the existing UI and settings write paths as explicit opt-in, and harden the existing client telemetry state so disabling metrics clears pending outbound work before the uploader can construct or send a request.
+Use Zed's existing telemetry settings as the only policy owner. Change the embedded and typed defaults to `false`, retain the existing UI and settings write paths as explicit opt-in, and harden the existing client telemetry state so disabling metrics clears pending outbound work before the uploader can construct or send a request.
 
 ## Decisions
 
@@ -28,9 +28,9 @@ Use Sim's existing telemetry settings as the only policy owner. Change the embed
 
 ### D3: Preserve diagnostic and application lifecycle owners
 
-<!-- impl: crates/sim/src/reliability.rs#init -->
+<!-- impl: crates/zed/src/reliability.rs#init -->
 
-- Choice: Keep `sim::reliability` and all normal startup initialization unchanged; rely on its existing `diagnostics_enabled` checks with the new default.
+- Choice: Keep `zed::reliability` and all normal startup initialization unchanged; rely on its existing `diagnostics_enabled` checks with the new default.
 - Rationale: Crash uploads are already conditionally started through the canonical setting. Removing reliability initialization would also remove local hang detection and logging, which are not outbound telemetry and must remain available.
 - Consequences: Explicitly enabled diagnostics keep their existing behavior. Other networked product features are unaffected.
 

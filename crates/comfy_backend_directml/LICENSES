@@ -1,6 +1,6 @@
-Sim DirectML adapter package
+Zed DirectML adapter package
 
-The Sim adapter source and metadata are licensed GPL-3.0-or-later.
+The Zed adapter source and metadata are licensed GPL-3.0-or-later.
 
 The optional Microsoft.AI.DirectML 1.13.1 redistributable remains governed by
 the Microsoft DirectML license shipped as LICENSE.txt in that package. Release

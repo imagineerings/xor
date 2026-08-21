@@ -9,12 +9,12 @@
     }:
     let
       mkSim = import ../toolchain.nix { inherit inputs; };
-      sim-editor = mkSim pkgs;
+      zed-editor = mkSim pkgs;
     in
     {
       packages = {
-        default = sim-editor;
-        debug = sim-editor.override { profile = "dev"; };
+        default = zed-editor;
+        debug = zed-editor.override { profile = "dev"; };
       };
     }
     // lib.optionalAttrs (lib.hasSuffix "linux" system) {

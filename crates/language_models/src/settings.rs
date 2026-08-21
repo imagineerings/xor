@@ -30,7 +30,7 @@ pub struct AllLanguageModelSettings {
     pub openai_compatible: HashMap<Arc<str>, OpenAiCompatibleSettings>,
     pub vercel_ai_gateway: VercelAiGatewaySettings,
     pub x_ai: XAiSettings,
-    pub sim_dot_dev: SimDotDevSettings,
+    pub zed_dot_dev: SimDotDevSettings,
 }
 
 fn custom_headers_from(
@@ -64,7 +64,7 @@ impl settings::Settings for AllLanguageModelSettings {
         let openai_compatible = language_models.openai_compatible.unwrap();
         let vercel_ai_gateway = language_models.vercel_ai_gateway.unwrap();
         let x_ai = language_models.x_ai.unwrap();
-        let sim_dot_dev = language_models.sim_dot_dev.unwrap();
+        let zed_dot_dev = language_models.zed_dot_dev.unwrap();
         Self {
             anthropic: AnthropicSettings {
                 api_url: anthropic.api_url.unwrap(),
@@ -206,8 +206,8 @@ impl settings::Settings for AllLanguageModelSettings {
                 available_models: x_ai.available_models.unwrap_or_default(),
                 custom_headers: custom_headers_from("xAI", x_ai.custom_headers, &[]),
             },
-            sim_dot_dev: SimDotDevSettings {
-                available_models: sim_dot_dev.available_models.unwrap_or_default(),
+            zed_dot_dev: SimDotDevSettings {
+                available_models: zed_dot_dev.available_models.unwrap_or_default(),
             },
         }
     }

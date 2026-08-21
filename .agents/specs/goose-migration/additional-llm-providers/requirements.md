@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Migrate the LLM provider integrations from goose that do not yet have equivalents in sim. Goose includes 20+ provider implementations that extend sim's current provider ecosystem (which already covers Anthropic, OpenAI, Google, Bedrock, Ollama, OpenRouter, DeepSeek, Mistral, xAI, LM Studio, Copilot Chat, and OpenAI-compatible).
+Migrate the LLM provider integrations from goose that do not yet have equivalents in zed. Goose includes 20+ provider implementations that extend zed's current provider ecosystem (which already covers Anthropic, OpenAI, Google, Bedrock, Ollama, OpenRouter, DeepSeek, Mistral, xAI, LM Studio, Copilot Chat, and OpenAI-compatible).
 
 ## Glossary
 
-- **Provider**: An LLM API service implementation that conforms to sim's `language_model` trait
+- **Provider**: An LLM API service implementation that conforms to zed's `language_model` trait
 - **ACP Provider**: A provider that communicates via the Agent-Client Protocol
 - **Declarative Provider**: A provider defined via configuration rather than code
 - **Embedding Provider**: A provider that generates embeddings rather than chat completions
@@ -17,7 +17,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 1: Cloud API Providers
 
-**User Story:** As a sim user, I want to use Azure OpenAI, GCP Vertex AI, HuggingFace, LiteLLM, Snowflake, and Sagemaker TGI as LLM providers, so that I can leverage enterprise cloud AI services.
+**User Story:** As a zed user, I want to use Azure OpenAI, GCP Vertex AI, HuggingFace, LiteLLM, Snowflake, and Sagemaker TGI as LLM providers, so that I can leverage enterprise cloud AI services.
 
 #### Acceptance Criteria
 
@@ -31,7 +31,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 2: Consumer API Providers
 
-**User Story:** As a sim user, I want to use NanoGPT, Tetrate, Avian, and KimiCode as LLM providers, so that I can access additional LLM API services.
+**User Story:** As a zed user, I want to use NanoGPT, Tetrate, Avian, and KimiCode as LLM providers, so that I can access additional LLM API services.
 
 #### Acceptance Criteria
 
@@ -43,7 +43,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 3: ACP-Based Providers
 
-**User Story:** As a sim user, I want to use Claude ACP, Claude Code, ChatGPT/Codex (Codex CLI), Cursor Agent, and Gemini CLI as providers, so that I can leverage my existing subscriptions.
+**User Story:** As a zed user, I want to use Claude ACP, Claude Code, ChatGPT/Codex (Codex CLI), Cursor Agent, and Gemini CLI as providers, so that I can leverage my existing subscriptions.
 
 #### Acceptance Criteria
 
@@ -56,7 +56,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 4: Databricks Provider
 
-**User Story:** As a sim user, I want to use Databricks as an LLM provider with both v1 and v2 API support, so that I can use Databricks-hosted models.
+**User Story:** As a zed user, I want to use Databricks as an LLM provider with both v1 and v2 API support, so that I can use Databricks-hosted models.
 
 #### Acceptance Criteria
 
@@ -66,20 +66,20 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 5: Local Inference
 
-**User Story:** As a sim user, I want to run LLM inference locally without a cloud provider, so that I can work offline and keep data private.
+**User Story:** As a zed user, I want to run LLM inference locally without a cloud provider, so that I can work offline and keep data private.
 
 #### Acceptance Criteria
 
 1. **5.1** WHEN a user enables local inference via an OpenAI-compatible local server THEN the system SHALL allow configuring the provider with a local `/v1` endpoint such as `http://localhost:11434/v1`
 2. **5.2** WHEN a local Ollama or llama.cpp server does not require authentication THEN the system SHALL allow saving the provider without a user-entered API key
 3. **5.3** IF a local inference provider is selected while its local server is not running THEN the system SHALL display a clear error that instructs the user to start Ollama or llama.cpp and configure the OpenAI-compatible endpoint
-4. **5.4** WHERE Sim-owned in-process inference is approved, THE system SHALL extend the existing `llama_cpp` integration and explicitly decide whether audited Goose MLX behavior is supported; it SHALL NOT introduce Candle solely from the obsolete plan.
+4. **5.4** WHERE Zed-owned in-process inference is approved, THE system SHALL extend the existing `llama_cpp` integration and explicitly decide whether audited Goose MLX behavior is supported; it SHALL NOT introduce Candle solely from the obsolete plan.
 5. **5.5** IF local inference hardware is insufficient THEN the system SHALL display a clear error
 6. **5.6** WHILE local inference is running THE system SHALL handle resource constraints gracefully
 
 ### Requirement 6: Declarative Providers
 
-**User Story:** As a sim user, I want to define custom providers via configuration files or UI, so that I can use any OpenAI-compatible API without writing code.
+**User Story:** As a zed user, I want to define custom providers via configuration files or UI, so that I can use any OpenAI-compatible API without writing code.
 
 #### Acceptance Criteria
 
@@ -91,7 +91,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 7: Provider Registry
 
-**User Story:** As a sim developer, I want a centralized provider registry, so that providers can be discovered and instantiated by name.
+**User Story:** As a zed developer, I want a centralized provider registry, so that providers can be discovered and instantiated by name.
 
 #### Acceptance Criteria
 
@@ -101,11 +101,11 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 
 ### Requirement 8: Provider Contract and Canonical Metadata
 
-**User Story:** As a sim user, I want provider behavior and model metadata normalized consistently, so that switching providers does not produce silent compatibility or usage errors.
+**User Story:** As a zed user, I want provider behavior and model metadata normalized consistently, so that switching providers does not produce silent compatibility or usage errors.
 
 #### Acceptance Criteria
 
-1. **8.1** THE provider integration SHALL normalize streaming messages, tool requests/results, images, thinking content, token usage, and retryable errors into Sim's existing language-model core types.
+1. **8.1** THE provider integration SHALL normalize streaming messages, tool requests/results, images, thinking content, token usage, and retryable errors into Zed's existing language-model core types.
 2. **8.2** THE provider registry SHALL expose canonical model identity and capability metadata where the upstream catalog supplies it.
 3. **8.3** WHEN a provider omits usage, THE system SHALL label any fallback estimate and SHALL NOT present estimated cost or tokens as exact.
 
@@ -118,7 +118,7 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 1. **9.1** WHERE in-process local inference is approved, THE system SHALL search supported Hugging Face GGUF/MLX model variants and report compatibility metadata.
 2. **9.2** THE system SHALL download one or more model files with authenticated access, progress, cancellation, resume, integrity/size checks, and disk/permission errors.
 3. **9.3** THE system SHALL list downloaded and loaded models and SHALL support explicit eviction and deletion with destructive confirmation.
-4. **9.4** THE system SHALL store Hugging Face tokens through Sim's credentials provider and SHALL redact them from settings, logs, errors, and telemetry.
+4. **9.4** THE system SHALL store Hugging Face tokens through Zed's credentials provider and SHALL redact them from settings, logs, errors, and telemetry.
 5. **9.5** IF a model or platform is unsupported or memory is insufficient, THEN THE system SHALL explain the incompatibility without leaving a falsely usable provider entry.
 
 ### Requirement 10: ACP and CLI Provider Preset Inventory
@@ -128,17 +128,17 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 #### Acceptance Criteria
 
 1. **10.1** THE migration SHALL assess Amp ACP, Claude ACP, Claude Code, ChatGPT/Codex, Codex ACP, Cursor Agent, Gemini CLI, Pi ACP, and Copilot ACP separately.
-2. **10.2** WHERE a preset speaks ACP, THE implementation SHALL register it in Sim's existing agent-server registry unless a review proves language-model-provider ownership is required.
+2. **10.2** WHERE a preset speaks ACP, THE implementation SHALL register it in Zed's existing agent-server registry unless a review proves language-model-provider ownership is required.
 3. **10.3** EACH approved preset SHALL define binary discovery, authentication, capability negotiation, working-directory behavior, cancellation, upgrade compatibility, and actionable missing-binary errors.
 4. **10.4** THE UI and CLI SHALL distinguish an external ACP agent from an in-process language-model provider.
 
 ### Requirement 11: Curated Declarative Provider Catalog
 
-**User Story:** As a user of an OpenAI/Ollama-compatible service, I want an accurate preset when protocol compatibility is known, so that Sim does not maintain unnecessary provider code.
+**User Story:** As a user of an OpenAI/Ollama-compatible service, I want an accurate preset when protocol compatibility is known, so that Zed does not maintain unnecessary provider code.
 
 #### Acceptance Criteria
 
-1. **11.1** THE migration SHALL inventory every audited definition in `goose-providers/src/declarative/definitions` and classify it as reusable Sim support, approved preset, unsupported deviation, or intentionally excluded.
+1. **11.1** THE migration SHALL inventory every audited definition in `goose-providers/src/declarative/definitions` and classify it as reusable Zed support, approved preset, unsupported deviation, or intentionally excluded.
 2. **11.2** AN approved preset SHALL declare endpoint, authentication, model source, headers, streaming/tool/image/thinking capabilities, and canonical filtering behavior.
 3. **11.3** INVALID or conflicting custom/declarative definitions SHALL be isolated and reported without preventing built-in providers from loading.
 4. **11.4** THE provider catalog SHALL support safe refresh without exposing secrets or replacing an active provider with an invalid definition.
@@ -146,4 +146,4 @@ Migrate the LLM provider integrations from goose that do not yet have equivalent
 ## References
 
 - Source: `projects/goose/crates/goose/src/providers/`, `projects/goose/crates/goose-providers/src/`, and `projects/goose/crates/goose-local-inference/src/`
-- Existing sim providers: `crates/language_models/src/provider/`
+- Existing zed providers: `crates/language_models/src/provider/`

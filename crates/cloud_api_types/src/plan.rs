@@ -53,16 +53,16 @@ mod tests {
 
     #[test]
     fn test_plan_deserialize_snake_case() {
-        let plan = serde_json::from_value::<Plan>(json!("sim_free")).unwrap();
+        let plan = serde_json::from_value::<Plan>(json!("zed_free")).unwrap();
         assert_eq!(plan, Plan::SimFree);
 
-        let plan = serde_json::from_value::<Plan>(json!("sim_pro")).unwrap();
+        let plan = serde_json::from_value::<Plan>(json!("zed_pro")).unwrap();
         assert_eq!(plan, Plan::SimPro);
 
-        let plan = serde_json::from_value::<Plan>(json!("sim_pro_trial")).unwrap();
+        let plan = serde_json::from_value::<Plan>(json!("zed_pro_trial")).unwrap();
         assert_eq!(plan, Plan::SimProTrial);
 
-        let plan = serde_json::from_value::<Plan>(json!("sim_student")).unwrap();
+        let plan = serde_json::from_value::<Plan>(json!("zed_student")).unwrap();
         assert_eq!(plan, Plan::SimStudent);
     }
 }

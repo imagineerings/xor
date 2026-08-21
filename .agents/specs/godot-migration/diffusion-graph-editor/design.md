@@ -3,7 +3,7 @@
 ## Architecture
 
 Use GPUI/app infrastructure for the editor surface and `crates/world_model` graph primitives for validation and execution planning.
-The editor state is a native Sim feature: `DiffusionGraphEditorState` owns the
+The editor state is a native Zed feature: `DiffusionGraphEditorState` owns the
 graph, validation state, artifact outputs, and execution plan metadata directly
 instead of presenting Comfy graph compatibility labels or pass-through state.
 

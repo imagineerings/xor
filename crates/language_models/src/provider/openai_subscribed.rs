@@ -32,7 +32,7 @@ const PROVIDER_NAME: LanguageModelProviderName =
     LanguageModelProviderName::new("ChatGPT Subscription");
 
 const SUBSCRIPTION_DESCRIPTION: &str =
-    "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Sim's agent.";
+    "Sign in with your ChatGPT Plus or Pro subscription to use OpenAI models in Zed's agent.";
 
 const CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 const OPENAI_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
@@ -569,7 +569,7 @@ impl LanguageModel for OpenAiSubscribedLanguageModel {
             let mut header_pairs: Vec<(HeaderName, HeaderValue)> = vec![
                 (
                     HeaderName::from_static("originator"),
-                    HeaderValue::from_static("sim"),
+                    HeaderValue::from_static("zed"),
                 ),
                 (
                     HeaderName::from_static("openai-beta"),
@@ -806,7 +806,7 @@ async fn do_oauth_flow(
         .append_pair("id_token_add_organizations", "true")
         .append_pair("state", &oauth_state)
         .append_pair("codex_cli_simplified_flow", "true")
-        .append_pair("originator", "sim");
+        .append_pair("originator", "zed");
 
     // Open browser AFTER the listener is ready
     cx.update(|cx| cx.open_url(auth_url.as_str()));

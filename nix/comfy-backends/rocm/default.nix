@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-rocm-metadata";
+  pname = "zed-comfy-backend-rocm-metadata";
   version = "6.1.0-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/rocm"
+    destination="$out/lib/zed/comfy-backends/rocm"
     mkdir -p "$destination/abi"
     cp ${../../../crates/comfy_backend_rocm/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_rocm/LICENSES} "$destination/"
@@ -22,7 +22,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim ROCm ABI metadata without AMD runtime redistribution";
+    description = "Reviewed Zed ROCm ABI metadata without AMD runtime redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "x86_64-linux" ];
   };

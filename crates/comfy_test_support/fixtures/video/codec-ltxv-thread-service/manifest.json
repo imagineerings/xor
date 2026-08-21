@@ -1,5 +1,5 @@
 {
-  "fixture_schema": "sim.comfy.video-codec-ltxv-thread-service.v1",
+  "fixture_schema": "zed.comfy.video-codec-ltxv-thread-service.v1",
   "truth_mode": "synthetic-retained-ltxv-codec-thread-service",
   "source": {
     "comfyui_version": "0.27.1",

@@ -950,7 +950,7 @@ pub(crate) fn compile_generated_native_workflow(
         .map(|(class_type, contract)| (class_type, contract.graph))
         .collect();
     let submission =
-        graph_to_prompt(&workflow, &descriptors, "sim-native-generated-v1").map_err(|error| {
+        graph_to_prompt(&workflow, &descriptors, "zed-native-generated-v1").map_err(|error| {
             ExecutionFailure::new("native_plan_compilation_failed", error.to_string())
                 .with_origin(ExecutionFailureOrigin::Validation)
         })?;

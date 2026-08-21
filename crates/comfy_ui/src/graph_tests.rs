@@ -1523,7 +1523,7 @@ async fn val_gpui_004(cx: &mut TestAppContext) {
     cx.run_until_parked();
     fs.remove_file(local_path, RemoveOptions::default())
         .await
-        .expect("delete workflow outside Sim");
+        .expect("delete workflow outside Zed");
     cx.background_executor
         .timer(Duration::from_millis(250))
         .await;

@@ -4061,7 +4061,7 @@ mod tests {
             &artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             definition,
-            "sim.vae.block_average_nearest.v1",
+            "zed.vae.block_average_nearest.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             pixel_channels,
             clamp,
@@ -4692,7 +4692,7 @@ mod tests {
             &second_artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.block_average_nearest.v1",
+            "zed.vae.block_average_nearest.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             3,
             [-1.0, 1.0],
@@ -4713,7 +4713,7 @@ mod tests {
         for (field, replacement) in [
             (
                 "architecture",
-                serde_json::Value::String("sim.vae.changed.v1".to_owned()),
+                serde_json::Value::String("zed.vae.changed.v1".to_owned()),
             ),
             ("dtype", serde_json::to_value(DType::Bf16)?),
             (
@@ -4730,7 +4730,7 @@ mod tests {
         tampered_patch["patch"]["base_artifact_digest"] = serde_json::Value::String("f".repeat(64));
         assert!(serde_json::from_value::<VaeIdentity>(tampered_patch).is_err());
         assert!(VaeArchitectureIdentity::checked("free form architecture").is_err());
-        assert!(VaeArchitectureIdentity::checked("sim.vae.unregistered.v1").is_err());
+        assert!(VaeArchitectureIdentity::checked("zed.vae.unregistered.v1").is_err());
         assert!(first.descriptor().is_conformance_only());
         Ok(())
     }
@@ -4783,7 +4783,7 @@ mod tests {
     -> Result<(), Box<dyn Error>> {
         let artifact = artifact('a')?;
         let family = ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?;
-        let architecture = VaeArchitectureIdentity::checked("sim.vae.boundary.v1")?;
+        let architecture = VaeArchitectureIdentity::checked("zed.vae.boundary.v1")?;
         let mut wrong_patch = patch_identity(&artifact)?;
         wrong_patch.base_artifact_digest = "b".repeat(64);
         assert!(matches!(
@@ -4842,7 +4842,7 @@ mod tests {
                 &artifact,
                 ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
                 &AFFINE_2D,
-                "sim.vae.boundary.v1",
+                "zed.vae.boundary.v1",
                 VaeKernelProfile::BlockAverageNearestV1,
                 3,
                 [0.0, 1.0],
@@ -4857,7 +4857,7 @@ mod tests {
                 &artifact,
                 ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
                 &AFFINE_2D,
-                VaeArchitectureIdentity::checked("sim.vae.boundary.v1")?,
+                VaeArchitectureIdentity::checked("zed.vae.boundary.v1")?,
                 patch_identity(&artifact)?,
                 DType::F32,
                 DeviceId::CPU,
@@ -5125,7 +5125,7 @@ mod tests {
             &second_artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.block_average_nearest.v1",
+            "zed.vae.block_average_nearest.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             1,
             [-1.0, 1.0],
@@ -5172,7 +5172,7 @@ mod tests {
             &record,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.boundary.v1",
+            "zed.vae.boundary.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             3,
             [0.0, 1.0],
@@ -5253,7 +5253,7 @@ mod tests {
             &wrong_path_artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.boundary.v1",
+            "zed.vae.boundary.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             3,
             [0.0, 1.0],
@@ -5277,7 +5277,7 @@ mod tests {
             &wrong_sha_artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.boundary.v1",
+            "zed.vae.boundary.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             3,
             [0.0, 1.0],
@@ -5468,7 +5468,7 @@ mod tests {
             &record,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            "sim.vae.boundary.v1",
+            "zed.vae.boundary.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             2,
             [0.0, 1.0],
@@ -5570,7 +5570,7 @@ mod tests {
             &record,
             ModelFamilyIdentity::new("COMFY-MODEL-0999", "vae_test_family", "v1")?,
             &AFFINE_2D,
-            VaeArchitectureIdentity::checked("sim.vae.boundary.v1")?,
+            VaeArchitectureIdentity::checked("zed.vae.boundary.v1")?,
             patch_identity(&record)?,
             DType::F16,
             DeviceId::CPU,
@@ -5638,7 +5638,7 @@ mod tests {
             &block_artifact,
             ModelFamilyIdentity::new("COMFY-MODEL-0117", "SD15", "sd15-v1")?,
             &SD15_REDUCED,
-            "sim.vae.block_average_nearest.v1",
+            "zed.vae.block_average_nearest.v1",
             VaeKernelProfile::BlockAverageNearestV1,
             3,
             [0.0, 1.0],

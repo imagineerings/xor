@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "0b4481f131bfa8b311ee6e1f7a926eb3fdcfffc0e0165fb64ed4fd8e4036cb81",
         "91d8bd8a346bda371c8175066ac5155fb27ccfe4ba63091730ec29dcd96dd091",
         "comfy_backend_npu::loader",
-        "sim-comfy-npu-package-v1",
+        "zed-comfy-npu-package-v1",
     ] {
         if !manifest.contains(required) {
             return Err(format!("reviewed NPU ABI manifest omits {required}").into());

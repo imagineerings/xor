@@ -12,7 +12,7 @@ use project::agent_server_store::{AgentId, AgentServerStore, ExternalAgentSource
 use settings::{
     AgentConfigOptionValue, CustomAgentServerSettings, SettingsStore, update_settings_file,
 };
-use sim_actions::OpenBrowser;
+use zed_actions::OpenBrowser;
 use ui::{
     AiSettingItem, AiSettingItemSource, AiSettingItemStatus, ContextMenu, ContextMenuEntry,
     Divider, PopoverMenu, Tooltip, prelude::*,
@@ -291,7 +291,7 @@ pub(crate) fn render_add_agent_popover(
                         original_window
                             .update(cx, |_, window, cx| {
                                 window.activate_window();
-                                window.dispatch_action(Box::new(sim_actions::AcpRegistry), cx);
+                                window.dispatch_action(Box::new(zed_actions::AcpRegistry), cx);
                             })
                             .log_err();
                     }

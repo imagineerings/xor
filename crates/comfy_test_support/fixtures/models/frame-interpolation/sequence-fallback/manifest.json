@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-frame-interpolation-sequence-fallback-v1",
+  "artifact": "zed-native-frame-interpolation-sequence-fallback-v1",
   "evidence_kind": "source-fingerprinted attempt-local FILM and RIFE sequence fallback execution",
   "source": {
     "repository": "ComfyUI",

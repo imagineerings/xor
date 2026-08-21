@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-0BDEE629B8C6",
   "baseline_overload_id": "COMFY-TENSOR-OP-0BDEE629B8C6:blocked",
   "baseline_fixture_sha256": "19e7415cbf046d79a9619ecedead983ad9e3f1c1e61654ebecbf76ddb658486a",
-  "overload_id": "sim.native.tensor.sub-in-place.cpu-f32.v1",
+  "overload_id": "zed.native.tensor.sub-in-place.cpu-f32.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "input", "type": "mutable Tensor<f32>"},

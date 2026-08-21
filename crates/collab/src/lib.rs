@@ -144,30 +144,30 @@ pub struct Config {
     pub kinesis_stream: Option<String>,
     pub kinesis_access_key: Option<String>,
     pub kinesis_secret_key: Option<String>,
-    pub sim_environment: Arc<str>,
-    pub sim_cloud_internal_api_key: String,
-    pub sim_client_checksum_seed: Option<String>,
+    pub zed_environment: Arc<str>,
+    pub zed_cloud_internal_api_key: String,
+    pub zed_client_checksum_seed: Option<String>,
 }
 
 impl Config {
     pub fn is_development(&self) -> bool {
-        self.sim_environment == "development".into()
+        self.zed_environment == "development".into()
     }
 
-    /// Returns the base `sim.dev` URL.
-    pub fn sim_dot_dev_url(&self) -> &str {
-        match self.sim_environment.as_ref() {
+    /// Returns the base `zed.dev` URL.
+    pub fn zed_dot_dev_url(&self) -> &str {
+        match self.zed_environment.as_ref() {
             "development" => "http://localhost:3000",
-            "staging" => "https://staging.sim.dev",
-            _ => "https://sim.dev",
+            "staging" => "https://staging.zed.dev",
+            _ => "https://zed.dev",
         }
     }
 
-    /// Returns the base Sim Cloud URL.
-    pub fn sim_cloud_url(&self) -> &str {
-        match self.sim_environment.as_ref() {
+    /// Returns the base Zed Cloud URL.
+    pub fn zed_cloud_url(&self) -> &str {
+        match self.zed_environment.as_ref() {
             "development" => "http://localhost:8787",
-            _ => "https://cloud.sim.dev",
+            _ => "https://cloud.zed.dev",
         }
     }
 
@@ -182,14 +182,14 @@ impl Config {
             livekit_secret: None,
             rust_log: None,
             log_json: None,
-            sim_environment: "test".into(),
-            sim_cloud_internal_api_key: "test-internal-api-key".into(),
+            zed_environment: "test".into(),
+            zed_cloud_internal_api_key: "test-internal-api-key".into(),
             blob_store_url: None,
             blob_store_region: None,
             blob_store_access_key: None,
             blob_store_secret_key: None,
             blob_store_bucket: None,
-            sim_client_checksum_seed: None,
+            zed_client_checksum_seed: None,
             kinesis_region: None,
             kinesis_access_key: None,
             kinesis_secret_key: None,
@@ -270,8 +270,8 @@ impl AppState {
             },
             user_service: Arc::new(CloudUserService::new(
                 http_client,
-                config.sim_cloud_url().to_string(),
-                config.sim_cloud_internal_api_key.clone(),
+                config.zed_cloud_url().to_string(),
+                config.zed_cloud_internal_api_key.clone(),
             )),
             config,
         };

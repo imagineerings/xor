@@ -86,13 +86,13 @@ fn publish(deps: &[&NamedJob]) -> NamedJob {
         named::bash(indoc! {r#"
             docker build -f Dockerfile-collab \
               --build-arg "GITHUB_SHA=$GITHUB_SHA" \
-              --tag "registry.digitalocean.com/sim/collab:$GITHUB_SHA" \
+              --tag "registry.digitalocean.com/zed/collab:$GITHUB_SHA" \
               .
         "#})
     }
 
     fn publish_docker_image() -> Step<Run> {
-        named::bash(r#"docker push "registry.digitalocean.com/sim/collab:${GITHUB_SHA}""#)
+        named::bash(r#"docker push "registry.digitalocean.com/zed/collab:${GITHUB_SHA}""#)
     }
 
     fn prune_docker_system() -> Step<Run> {
@@ -133,40 +133,40 @@ fn deploy(deps: &[&NamedJob]) -> NamedJob {
         named::bash(indoc! {r#"
             set -eu
             if [[ $GITHUB_REF_NAME = "collab-production" ]]; then
-              export SIM_KUBE_NAMESPACE=production
-              export SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT=10
-              export SIM_API_LOAD_BALANCER_SIZE_UNIT=2
+              export ZED_KUBE_NAMESPACE=production
+              export ZED_COLLAB_LOAD_BALANCER_SIZE_UNIT=10
+              export ZED_API_LOAD_BALANCER_SIZE_UNIT=2
             elif [[ $GITHUB_REF_NAME = "collab-staging" ]]; then
-              export SIM_KUBE_NAMESPACE=staging
-              export SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT=1
-              export SIM_API_LOAD_BALANCER_SIZE_UNIT=1
+              export ZED_KUBE_NAMESPACE=staging
+              export ZED_COLLAB_LOAD_BALANCER_SIZE_UNIT=1
+              export ZED_API_LOAD_BALANCER_SIZE_UNIT=1
             else
               echo "cowardly refusing to deploy from an unknown branch"
               exit 1
             fi
 
-            echo "Deploying collab:$GITHUB_SHA to $SIM_KUBE_NAMESPACE"
+            echo "Deploying collab:$GITHUB_SHA to $ZED_KUBE_NAMESPACE"
 
             source script/lib/deploy-helpers.sh
-            export_vars_for_environment "$SIM_KUBE_NAMESPACE"
+            export_vars_for_environment "$ZED_KUBE_NAMESPACE"
 
-            SIM_DO_CERTIFICATE_ID="$(doctl compute certificate list --format ID --no-header)"
-            export SIM_DO_CERTIFICATE_ID
-            export SIM_IMAGE_ID="registry.digitalocean.com/sim/collab:${GITHUB_SHA}"
+            ZED_DO_CERTIFICATE_ID="$(doctl compute certificate list --format ID --no-header)"
+            export ZED_DO_CERTIFICATE_ID
+            export ZED_IMAGE_ID="registry.digitalocean.com/zed/collab:${GITHUB_SHA}"
 
-            export SIM_SERVICE_NAME=collab
-            export SIM_LOAD_BALANCER_SIZE_UNIT=$SIM_COLLAB_LOAD_BALANCER_SIZE_UNIT
+            export ZED_SERVICE_NAME=collab
+            export ZED_LOAD_BALANCER_SIZE_UNIT=$ZED_COLLAB_LOAD_BALANCER_SIZE_UNIT
             export DATABASE_MAX_CONNECTIONS=850
             envsubst < crates/collab/k8s/collab.template.yml | kubectl apply -f -
-            kubectl -n "$SIM_KUBE_NAMESPACE" rollout status "deployment/$SIM_SERVICE_NAME" --watch
-            echo "deployed ${SIM_SERVICE_NAME} to ${SIM_KUBE_NAMESPACE}"
+            kubectl -n "$ZED_KUBE_NAMESPACE" rollout status "deployment/$ZED_SERVICE_NAME" --watch
+            echo "deployed ${ZED_SERVICE_NAME} to ${ZED_KUBE_NAMESPACE}"
 
-            export SIM_SERVICE_NAME=api
-            export SIM_LOAD_BALANCER_SIZE_UNIT=$SIM_API_LOAD_BALANCER_SIZE_UNIT
+            export ZED_SERVICE_NAME=api
+            export ZED_LOAD_BALANCER_SIZE_UNIT=$ZED_API_LOAD_BALANCER_SIZE_UNIT
             export DATABASE_MAX_CONNECTIONS=60
             envsubst < crates/collab/k8s/collab.template.yml | kubectl apply -f -
-            kubectl -n "$SIM_KUBE_NAMESPACE" rollout status "deployment/$SIM_SERVICE_NAME" --watch
-            echo "deployed ${SIM_SERVICE_NAME} to ${SIM_KUBE_NAMESPACE}"
+            kubectl -n "$ZED_KUBE_NAMESPACE" rollout status "deployment/$ZED_SERVICE_NAME" --watch
+            echo "deployed ${ZED_SERVICE_NAME} to ${ZED_KUBE_NAMESPACE}"
         "#})
     }
 

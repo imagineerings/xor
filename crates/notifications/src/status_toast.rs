@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use gpui::{DismissEvent, Entity, EventEmitter, FocusHandle, Focusable, IntoElement};
-use sim_actions::toast;
+use zed_actions::toast;
 use ui::{Tooltip, prelude::*};
 use workspace::{ToastAction, ToastView};
 
@@ -178,7 +178,7 @@ impl Component for StatusToast {
             },
         );
 
-        let success_example = StatusToast::new("Pushed 4 changes to `sim/main`", cx, |this, _| {
+        let success_example = StatusToast::new("Pushed 4 changes to `zed/main`", cx, |this, _| {
             this.icon(
                 Icon::new(IconName::Check)
                     .size(IconSize::Small)
@@ -187,7 +187,7 @@ impl Component for StatusToast {
         });
 
         let error_example = StatusToast::new(
-            "git push: Couldn't find remote origin `iamnbutler/sim`",
+            "git push: Couldn't find remote origin `iamnbutler/zed`",
             cx,
             |this, _cx| {
                 this.icon(
@@ -209,7 +209,7 @@ impl Component for StatusToast {
         });
 
         let pr_example =
-            StatusToast::new("`sim/new-notification-system` created!", cx, |this, _cx| {
+            StatusToast::new("`zed/new-notification-system` created!", cx, |this, _cx| {
                 this.icon(
                     Icon::new(IconName::GitBranch)
                         .size(IconSize::Small)

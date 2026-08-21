@@ -163,9 +163,9 @@ impl NostrHttpConfiguration {
         public_tls: bool,
     ) -> Result<Self, NostrHttpConfigurationError> {
         Self::new(
-            "Sim Collaborative Relay",
-            "Sim collaborative workspace relay",
-            "https://github.com/simtropolis/sim",
+            "Zed Collaborative Relay",
+            "Zed collaborative workspace relay",
+            "https://github.com/simtropolis/zed",
             version,
             relay_self,
             vec![1, 2, 10, 11, 16, 17, 23, 25, 29, 33, 38, 42, 50, 56],

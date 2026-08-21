@@ -22,7 +22,7 @@ use serde::Deserialize;
 use settings::{
     SeedQuerySetting, Settings, SettingsStore, TerminalBell, TerminalBlink, WorkingDirectory,
 };
-use sim_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
+use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 use std::{
     any::Any,
     cmp,
@@ -1099,8 +1099,8 @@ impl TerminalView {
     }
 }
 
-fn terminal_rerun_override(task: &TaskId) -> sim_actions::Rerun {
-    sim_actions::Rerun {
+fn terminal_rerun_override(task: &TaskId) -> zed_actions::Rerun {
+    zed_actions::Rerun {
         task_id: Some(task.0.clone()),
         allow_concurrent_runs: Some(true),
         use_new_terminal: Some(false),
@@ -1840,7 +1840,7 @@ impl Item for TerminalView {
 }
 
 impl SerializableItem for TerminalView {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "Terminal"
     }
 

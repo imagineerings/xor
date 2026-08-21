@@ -3403,7 +3403,7 @@ mod tests {
     #[test]
     fn asset_and_model_operations_delegate_to_canonical_index_without_path_exposure()
     -> Result<(), Box<dyn Error>> {
-        let model_id = "sim-asset://model/fixture.json";
+        let model_id = "zed-asset://model/fixture.json";
         let authorization = authorization(vec![
             capability(CapabilityKind::Filesystem, "input"),
             capability(CapabilityKind::Filesystem, "model"),
@@ -3419,7 +3419,7 @@ mod tests {
         )?)?;
 
         assert_eq!(
-            invocation.read_asset(AssetNamespace::Input, "sim-asset://input/fixture.bin")?,
+            invocation.read_asset(AssetNamespace::Input, "zed-asset://input/fixture.bin")?,
             b"canonical asset bytes"
         );
         let model = invocation.load_model(model_id)?;
@@ -3431,7 +3431,7 @@ mod tests {
         let error = invocation
             .read_asset(
                 AssetNamespace::Input,
-                "sim-asset://input/../../outside-secret",
+                "zed-asset://input/../../outside-secret",
             )
             .expect_err("canonical root must reject traversal");
         let error_text = error.to_string();
@@ -3519,7 +3519,7 @@ mod tests {
         assert!(matches!(
             invocation.read_asset(
                 AssetNamespace::Model,
-                "sim-asset://model/fixture.json"
+                "zed-asset://model/fixture.json"
             ),
             Err(PluginServiceError::CapabilityDenied(Capability::Asset {
                 namespace,
@@ -3532,7 +3532,7 @@ mod tests {
     #[test]
     fn model_loading_requires_both_opaque_handle_and_canonical_asset_grants()
     -> Result<(), Box<dyn Error>> {
-        let model_id = "sim-asset://model/fixture.json";
+        let model_id = "zed-asset://model/fixture.json";
         let authorization = authorization(vec![capability(CapabilityKind::Model, model_id)])?;
         let clock = Arc::new(TestClock::new(Instant::now()));
         let (_directory, broker, _provider, _credential) = broker(&authorization, clock.clone())?;
@@ -3600,7 +3600,7 @@ mod tests {
 
     #[test]
     fn plugin_model_handle_does_not_expose_mutable_store_or_paths() -> Result<(), Box<dyn Error>> {
-        let model_id = "sim-asset://model/fixture.json";
+        let model_id = "zed-asset://model/fixture.json";
         let authorization = authorization(vec![
             capability(CapabilityKind::Filesystem, "model"),
             capability(CapabilityKind::Model, model_id),
@@ -3650,7 +3650,7 @@ mod tests {
         let mut failed = broker.begin_invocation(invocation_context.clone())?;
         let expected = failed.random_bytes("noise", 8)?;
         assert!(matches!(
-            failed.read_asset(AssetNamespace::Input, "sim-asset://input/fixture.bin"),
+            failed.read_asset(AssetNamespace::Input, "zed-asset://input/fixture.bin"),
             Err(PluginServiceError::CapabilityDenied(
                 Capability::Asset { .. }
             ))

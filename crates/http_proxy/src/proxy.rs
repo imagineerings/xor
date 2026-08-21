@@ -336,7 +336,7 @@ fn unique_temp_socket_directory() -> PathBuf {
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
     std::env::temp_dir().join(format!(
-        "sim-proxy-{}-{nanos}-{counter}",
+        "zed-proxy-{}-{nanos}-{counter}",
         std::process::id()
     ))
 }

@@ -37,7 +37,7 @@ fn source() -> ProjectionSource {
     ProjectionSource::new(
         "conversation_activity",
         Provenance::new(
-            SourceSystem::Sim,
+            SourceSystem::Zed,
             SourceRecordId::new("conversation:42").expect("source ID"),
             1_900_000_000_000,
         )

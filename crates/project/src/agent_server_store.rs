@@ -1024,7 +1024,7 @@ fn versioned_archive_cache_dir(
     archive_url: &str,
 ) -> PathBuf {
     let version = version.unwrap_or_default();
-    let sanitisim_version = sanitize_path_component(version);
+    let sanitized_version = sanitize_path_component(version);
 
     let mut version_hasher = Sha256::new();
     version_hasher.update(version.as_bytes());
@@ -1035,7 +1035,7 @@ fn versioned_archive_cache_dir(
     let url_hash = format!("{:x}", url_hasher.finalize());
 
     base_dir.join(format!(
-        "v_{sanitisim_version}_{}_{}",
+        "v_{sanitized_version}_{}_{}",
         &version_hash[..16],
         &url_hash[..16],
     ))
@@ -1438,7 +1438,7 @@ impl ExternalAgentServer for LocalRegistryNpxAgent {
 /// cmd.exe), and the quotes our shell builder emits are PowerShell string-literal syntax that PS
 /// strips during parsing. PS only re-adds CRT-style transport quotes around native command args
 /// containing whitespace, so `package@<=0.25.3` reaches cmd.exe bare and the unquoted `<` is
-/// interpreted as input redirection. See simtropolis/sim#55921.
+/// interpreted as input redirection. See simtropolis/zed#55921.
 fn bounded_npm_package_spec(package_spec: &str) -> String {
     let Some((package_name, version)) = package_spec.rsplit_once('@') else {
         return package_spec.to_string();

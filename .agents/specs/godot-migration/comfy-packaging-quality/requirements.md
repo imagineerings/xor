@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs. Comfy compatibility defines the expected packaging, schema, and fixture semantics, but every supported quality-control feature must validate native Sim functionality rather than certify a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
+Zed needs Comfy migration support for launch configuration, feature flags, frontend/template/doc packages, OpenAPI/schema compatibility, examples, tests, CI, dependency review, and platform packaging. These controls protect core Comfy-derived world-model harness behavior from drift across implementation tasks. This spec owns migration quality controls and compatibility fixtures. It delegates runtime behavior to the other Comfy specs. Comfy compatibility defines the expected packaging, schema, and fixture semantics, but every supported quality-control feature must validate native Zed functionality rather than certify a thin compatibility label, hidden ComfyUI pass-through, or unsupported placeholder.
 
 ## Glossary
 
@@ -16,14 +16,14 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 
 ### Requirement 1: Launch Configuration
 
-**User Story:** As a developer, I want Comfy-compatible launch options mapped to Sim configuration so runtime behavior is predictable.
+**User Story:** As a developer, I want Comfy-compatible launch options mapped to Zed configuration so runtime behavior is predictable.
 
 #### Acceptance Criteria
 
 1. **1.1** WHEN a launch profile is parsed THEN THE system SHALL capture listen address, port, TLS, CORS, upload size, base/input/output/temp/user directories, auto-launch, logging, assets, database URL, API nodes, custom nodes, manager mode, feature flags, and compression settings.
 2. **1.2** WHEN device, precision, memory, attention, cache, or performance options are present THEN THE system SHALL pass validated settings to the model runtime policy resolver.
-3. **1.3** IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Sim equivalent.
-4. **1.4** WHEN Comfy-compatible launch options are represented in Sim THEN THE system SHALL use native `SimLaunch*` implementation types and SHALL NOT expose Sim-owned launch profiles as `SimLaunch*` pass-through records.
+3. **1.3** IF a launch option is unsupported THEN THE system SHALL report the option, reason, and nearest Zed equivalent.
+4. **1.4** WHEN Comfy-compatible launch options are represented in Zed THEN THE system SHALL use native `SimLaunch*` implementation types and SHALL NOT expose Zed-owned launch profiles as `SimLaunch*` pass-through records.
 
 ### Requirement 2: Feature Flags and Frontend Packages
 
@@ -34,7 +34,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 1. **2.1** WHEN server features are requested THEN THE system SHALL return core flags for preview metadata, upload size, manager support, node replacements, assets, and CLI-provided flags that do not overwrite core flags.
 2. **2.2** WHEN client feature flags are negotiated THEN THE system SHALL store connection-specific flags for event behavior.
 3. **2.3** WHEN frontend, workflow template, or embedded docs packages are missing or outdated THEN THE system SHALL show actionable diagnostics.
-4. **2.4** WHEN Comfy-compatible feature flags are represented in Sim THEN THE system SHALL use native `SimFeatureFlag*` implementation types and SHALL NOT expose Sim-owned flag registries as `SimFeatureFlag*` pass-through records.
+4. **2.4** WHEN Comfy-compatible feature flags are represented in Zed THEN THE system SHALL use native `SimFeatureFlag*` implementation types and SHALL NOT expose Zed-owned flag registries as `SimFeatureFlag*` pass-through records.
 
 ### Requirement 3: API Schemas and Examples
 
@@ -45,7 +45,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 1. **3.1** WHEN Comfy-compatible APIs are exposed THEN THE system SHALL include OpenAPI or equivalent schema coverage for supported routes.
 2. **3.2** WHEN example scripts are migrated THEN THE system SHALL provide automated fixtures for basic HTTP prompt submission and WebSocket completion/output retrieval.
 3. **3.3** IF a documented OpenAPI route is not implemented locally THEN THE system SHALL mark it as cloud-only, external, unsupported, or planned.
-4. **3.4** WHEN Comfy-compatible API schema status is represented in Sim THEN THE system SHALL use native `SimApiSchema*` implementation types and SHALL NOT expose Sim-owned schema catalogs as `SimApiSchema*` pass-through records.
+4. **3.4** WHEN Comfy-compatible API schema status is represented in Zed THEN THE system SHALL use native `SimApiSchema*` implementation types and SHALL NOT expose Zed-owned schema catalogs as `SimApiSchema*` pass-through records.
 
 ### Requirement 4: Automated Test Coverage
 
@@ -59,12 +59,12 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 
 ### Requirement 5: Packaging and Dependency Governance
 
-**User Story:** As a maintainer, I want packaging and dependency changes controlled before they affect Sim distributions.
+**User Story:** As a maintainer, I want packaging and dependency changes controlled before they affect Zed distributions.
 
 #### Acceptance Criteria
 
 1. **5.1** IF a task adds a native library, codec, Python package, provider SDK, model dependency, frontend package, or vendored code THEN THE system SHALL require dependency review before implementation.
-2. **5.2** WHEN platform packaging is configured THEN THE system SHALL describe CPU-only and GPU-specific launch profiles without duplicating Sim platform packaging.
+2. **5.2** WHEN platform packaging is configured THEN THE system SHALL describe CPU-only and GPU-specific launch profiles without duplicating Zed platform packaging.
 3. **5.3** WHEN a task requires network access or large downloads THEN THE system SHALL require explicit user approval and preserve an audit record.
 
 ### Requirement 6: Logs and Internal Diagnostics
@@ -73,7 +73,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 
 #### Acceptance Criteria
 
-1. **6.1** WHEN logs are requested THEN THE system SHALL expose raw and formatted logs through Sim diagnostics with terminal size metadata where available.
+1. **6.1** WHEN logs are requested THEN THE system SHALL expose raw and formatted logs through Zed diagnostics with terminal size metadata where available.
 2. **6.2** WHEN folder paths or recent files are requested for diagnostics THEN THE system SHALL expose only approved input, output, temp, model, and user roots.
 3. **6.3** IF a diagnostic endpoint is internal-only THEN THE system SHALL mark it unstable and avoid depending on it for public API compatibility.
 
@@ -81,7 +81,7 @@ Sim needs Comfy migration support for launch configuration, feature flags, front
 
 #### Acceptance criteria
 
-1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Sim behavior and source-backed compatibility record.
+1. **9.1** WHEN a backlog capability is claimed implemented THEN THE system SHALL identify the connected native Zed behavior and source-backed compatibility record.
 2. **9.2** THE system SHALL NOT count labels, placeholders, metadata-only fixtures, or hidden upstream pass-throughs as implementation evidence.
 3. **9.3** WHEN backlog behavior is materialized THEN focused validation SHALL cover success, failure, cancellation, persistence, security, and relevant platform outcomes.
 4. **9.4** WHEN coverage status changes THEN THE owner SHALL preserve stable capability identity, owner traceability, and evidence for the new classification.

@@ -826,7 +826,7 @@ impl LspAdapter for TypeScriptLspAdapter {
         let tsdk_path = self.tsdk_path(adapter).await;
         Ok(Some(json!({
             "provideFormatter": true,
-            "hostInfo": "sim",
+            "hostInfo": "zed",
             "tsserver": {
                 "path": tsdk_path,
             },
@@ -1114,7 +1114,7 @@ mod tests {
             crate::language("javascript", tree_sitter_typescript::LANGUAGE_TSX.into()),
         ] {
             let text = r#"
-            // Reproduction from https://github.com/simtropolis/sim/issues/48711
+            // Reproduction from https://github.com/simtropolis/zed/issues/48711
             const a = {
               p01: '01',
               fn01: () => {},
@@ -1716,19 +1716,19 @@ mod tests {
             [
                 (
                     "vitest file test".into(),
-                    Some("$SIM_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
+                    Some("$ZED_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
                 ),
                 (
-                    "vitest test $SIM_SYMBOL".into(),
-                    Some("$SIM_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
+                    "vitest test $ZED_SYMBOL".into(),
+                    Some("$ZED_CUSTOM_TYPESCRIPT_VITEST_PACKAGE_PATH".into()),
                 ),
                 (
                     "mocha file test".into(),
-                    Some("$SIM_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
+                    Some("$ZED_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
                 ),
                 (
-                    "mocha test $SIM_SYMBOL".into(),
-                    Some("$SIM_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
+                    "mocha test $ZED_SYMBOL".into(),
+                    Some("$ZED_CUSTOM_TYPESCRIPT_MOCHA_PACKAGE_PATH".into()),
                 ),
                 (
                     "root/package.json > test".into(),

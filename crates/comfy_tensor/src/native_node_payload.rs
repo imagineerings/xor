@@ -304,7 +304,7 @@ pub fn native_tensor_digest(
         return Err(NativeTensorPayloadError::ContentByteLength { expected, actual });
     }
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.native-tensor.semantic.v1");
+    hasher.update(b"zed.comfy.native-tensor.semantic.v1");
     hasher.update([role.digest_tag()]);
     hasher.update(serde_json::to_vec(&descriptor.dtype())?);
     hasher.update(

@@ -1,6 +1,6 @@
-Sim native Metal execution package notices
+Zed native Metal execution package notices
 
-Sim source and the checked Metal tensor kernel source are covered by the
+Zed source and the checked Metal tensor kernel source are covered by the
 repository license. The packaged tensor_ops.metallib is generated from
 crates/comfy_backend_metal/kernels/tensor_ops.metal with the locally installed,
 reviewed Xcode toolchain during development-time packaging.

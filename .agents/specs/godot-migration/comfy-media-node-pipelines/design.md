@@ -2,7 +2,7 @@
 
 ## Overview
 
-Media node support is organized as harness capability groups rather than one-off ports of every Python file. Each group maps Comfy node IDs to Sim media, artifact, model, and graph interfaces. This avoids duplicating preview, mesh, codec, and graph-editor infrastructure while preserving node-level workflow compatibility.
+Media node support is organized as harness capability groups rather than one-off ports of every Python file. Each group maps Comfy node IDs to Zed media, artifact, model, and graph interfaces. This avoids duplicating preview, mesh, codec, and graph-editor infrastructure while preserving node-level workflow compatibility.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ flowchart TD
     Registry --> ThreeD[ThreeDGeometryOps]
     Registry --> Analysis[AnalysisControlOps]
     Registry --> Utilities[UtilityOps]
-    Images --> Media[Sim Media Services]
+    Images --> Media[Zed Media Services]
     Video --> Media
     Audio --> Media
     ThreeD --> Mesh[mesh-generation-pipeline]
@@ -25,11 +25,11 @@ flowchart TD
 
 ### SimMediaNodeCapabilityRegistry
 
-- **Purpose**: Map Comfy media nodes to Sim capability groups and backend requirements.
+- **Purpose**: Map Comfy media nodes to Zed capability groups and backend requirements.
 - **Responsibilities**: Capability metadata, unsupported diagnostics, dependency review flags, developer-only flags, and node schema linkage.
 - **Native behavior**: Stores Comfy node IDs as compatibility input
   identifiers, but maps them to native `SimMedia*` capability records,
-  typed ports, backend diagnostics, and `sim.*` handler ownership. The
+  typed ports, backend diagnostics, and `zed.*` handler ownership. The
   registry must not mark support by forwarding execution to ComfyUI.
 
 ### ImageMaskOps
@@ -40,7 +40,7 @@ flowchart TD
   image/mask shapes, batches, metadata, save formats, GLSL dependency metadata,
   and validation diagnostics. Comfy node IDs are accepted as compatibility
   inputs through the capability registry, but transforms are represented as
-  native Sim media operations.
+  native Zed media operations.
 
 ### VideoOps
 
@@ -48,7 +48,7 @@ flowchart TD
 - **Responsibilities**: Frame extraction, frame ranges, MIME metadata, audio association, and codec diagnostics.
 - **Native behavior**: Uses `SimVideo*` adapters to preserve frame count,
   frame rate, MIME type, audio references, frame ranges, and output references.
-  Advanced processing surfaces native Sim backend diagnostics for dependency
+  Advanced processing surfaces native Zed backend diagnostics for dependency
   review or unsupported backend state before execution.
 
 ### AudioOps
@@ -58,13 +58,13 @@ flowchart TD
 - **Native behavior**: Uses `SimAudio*` adapters to preserve sample rate,
   channel count, duration, MIME type, sample ranges, output references, volume
   and equalization metadata, and audio latent capability diagnostics. Codec
-  support is represented as native Sim backend status, including dependency
+  support is represented as native Zed backend status, including dependency
   review and unsupported diagnostics, rather than forwarding audio work to
   ComfyUI.
 
 ### ThreeDGeometryOps
 
-- **Purpose**: Bridge 3D, geometry, point cloud, and Gaussian splat nodes to Sim 3D artifacts.
+- **Purpose**: Bridge 3D, geometry, point cloud, and Gaussian splat nodes to Zed 3D artifacts.
 - **Responsibilities**: Artifact registration, preview metadata, mesh delegation, and format diagnostics.
 - **Native behavior**: Uses `SimThreeD*` adapters to register mesh, point
   cloud, Gaussian splat, depth, normal, camera, and point-map artifacts with
@@ -81,7 +81,7 @@ flowchart TD
   outputs for canny, pose, keypoints, bounding boxes, face landmarks,
   segmentation, detection, depth, geometry, optical flow, camera trajectory,
   and tracking. Downstream graph checks validate `SimControlTargetKind`
-  compatibility before execution, and backend gaps surface native Sim
+  compatibility before execution, and backend gaps surface native Zed
   diagnostics for unsupported or dependency-review-required analysis engines.
 
 ### UtilityOps
@@ -91,7 +91,7 @@ flowchart TD
   switch, dataset shuffle, dedupe, bucket, and training-data preparation.
 - **Native behavior**: Uses `SimUtility*` and `SimDataset*` adapters for
   deterministic primitive, regex, JSON, math, logic, seed, and switch behavior.
-  Dataset entries are normalized through Sim user-data path confinement,
+  Dataset entries are normalized through Zed user-data path confinement,
   preserve source attribution, and use deterministic ordering for seeded
   shuffles rather than forwarding dataset work to ComfyUI.
 
@@ -113,7 +113,7 @@ pub struct SimMediaNodeCapability {
     pub inputs: Vec<SimMediaPortType>,
     pub outputs: Vec<SimMediaPortType>,
     pub backend: SimMediaBackendRequirement,
-    pub native_sim_handler: String,
+    pub native_zed_handler: String,
     pub developer_only: bool,
 }
 

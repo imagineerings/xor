@@ -30,7 +30,7 @@ use project::{
 use rope::TextSummary;
 use rpc::proto::{self, update_view};
 use settings::Settings;
-use sim_actions::preview::{
+use zed_actions::preview::{
     markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 use std::{
@@ -1231,7 +1231,7 @@ impl Item for Editor {
 }
 
 impl SerializableItem for Editor {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "Editor"
     }
 
@@ -1258,19 +1258,19 @@ impl SerializableItem for Editor {
         window: &mut Window,
         cx: &mut App,
     ) -> Task<Result<Entity<Self>>> {
-        let serialisim_editor = match EditorDb::global(cx)
-            .get_serialisim_editor(item_id, workspace_id)
+        let serialized_editor = match EditorDb::global(cx)
+            .get_serialized_editor(item_id, workspace_id)
             .context("Failed to query editor state")
         {
-            Ok(Some(serialisim_editor)) => {
+            Ok(Some(serialized_editor)) => {
                 if ProjectSettings::get_global(cx)
                     .session
                     .restore_unsaved_buffers
                 {
-                    serialisim_editor
+                    serialized_editor
                 } else {
                     SerializedEditor {
-                        abs_path: serialisim_editor.abs_path,
+                        abs_path: serialized_editor.abs_path,
                         contents: None,
                         language: None,
                         mtime: None,
@@ -1287,10 +1287,10 @@ impl SerializableItem for Editor {
             }
         };
         log::debug!(
-            "Deserialized editor {item_id:?} in workspace {workspace_id:?}, {serialisim_editor:?}"
+            "Deserialized editor {item_id:?} in workspace {workspace_id:?}, {serialized_editor:?}"
         );
 
-        match serialisim_editor {
+        match serialized_editor {
             SerializedEditor {
                 abs_path: None,
                 contents: Some(contents),
@@ -1361,7 +1361,7 @@ impl SerializableItem for Editor {
 
                         if let Some(contents) = contents {
                             buffer.update(cx, |buffer, cx| {
-                                restore_serialisim_buffer_contents(buffer, contents, mtime, cx);
+                                restore_serialized_buffer_contents(buffer, contents, mtime, cx);
                             });
                         }
 
@@ -1391,7 +1391,7 @@ impl SerializableItem for Editor {
 
                             if let Some(contents) = contents {
                                 buffer.update(cx, |buffer, cx| {
-                                    restore_serialisim_buffer_contents(buffer, contents, mtime, cx);
+                                    restore_serialized_buffer_contents(buffer, contents, mtime, cx);
                                 });
                             }
 
@@ -1491,7 +1491,7 @@ impl SerializableItem for Editor {
                     mtime,
                 };
                 log::debug!("Serializing editor {item_id:?} in workspace {workspace_id:?}");
-                db.save_serialisim_editor(item_id, workspace_id, editor)
+                db.save_serialized_editor(item_id, workspace_id, editor)
                     .await
                     .context("failed to save serialized editor")
             })
@@ -2194,7 +2194,7 @@ fn path_for_file<'a>(
 /// This is somewhat wasteful since we load the whole buffer from disk then overwrite it,
 /// but keeps implementation simple as we don't need to persist all metadata from loading
 /// (git diff base, etc.).
-fn restore_serialisim_buffer_contents(
+fn restore_serialized_buffer_contents(
     buffer: &mut Buffer,
     contents: String,
     mtime: Option<MTime>,
@@ -2540,7 +2540,7 @@ mod tests {
                 .unwrap()
                 .mtime;
 
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2548,7 +2548,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor.clone())
+                .save_serialized_editor(item_id, workspace_id, serialized_editor.clone())
                 .await
                 .unwrap();
 
@@ -2577,7 +2577,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 5678 as ItemId;
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: None,
                 language: None,
@@ -2585,7 +2585,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+                .save_serialized_editor(item_id, workspace_id, serialized_editor)
                 .await
                 .unwrap();
 
@@ -2620,7 +2620,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 9012 as ItemId;
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: None,
                 contents: Some("hello".to_string()),
                 language: Some("Rust".to_string()),
@@ -2628,7 +2628,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+                .save_serialized_editor(item_id, workspace_id, serialized_editor)
                 .await
                 .unwrap();
 
@@ -2662,7 +2662,7 @@ mod tests {
 
             let item_id = 9345 as ItemId;
             let old_mtime = MTime::from_seconds_and_nanos(0, 50);
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/file.rs"))),
                 contents: Some("fn main() {}".to_string()),
                 language: Some("Rust".to_string()),
@@ -2670,7 +2670,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+                .save_serialized_editor(item_id, workspace_id, serialized_editor)
                 .await
                 .unwrap();
 
@@ -2696,7 +2696,7 @@ mod tests {
             let workspace_id = db.next_id().await.unwrap();
 
             let item_id = 10000 as ItemId;
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: None,
                 contents: None,
                 language: None,
@@ -2704,7 +2704,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+                .save_serialized_editor(item_id, workspace_id, serialized_editor)
                 .await
                 .unwrap();
 
@@ -2749,7 +2749,7 @@ mod tests {
                 .mtime;
 
             // Simulate serialized state: file with unsaved changes
-            let serialisim_editor = SerializedEditor {
+            let serialized_editor = SerializedEditor {
                 abs_path: Some(PathBuf::from(path!("/standalone.rs"))),
                 contents: Some("modified content".to_string()),
                 language: Some("Rust".to_string()),
@@ -2757,7 +2757,7 @@ mod tests {
             };
 
             editor_db
-                .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+                .save_serialized_editor(item_id, workspace_id, serialized_editor)
                 .await
                 .unwrap();
 
@@ -2851,7 +2851,7 @@ mod tests {
         });
     }
 
-    // Regression test for https://github.com/simtropolis/sim/issues/35947
+    // Regression test for https://github.com/simtropolis/zed/issues/35947
     // Verifies that deserializing a non-worktree editor does not add the item
     // to any pane as a side effect.
     #[gpui::test]
@@ -2875,7 +2875,7 @@ mod tests {
         let workspace_id = db.next_id().await.unwrap();
         let item_id = 99999 as ItemId;
 
-        let serialisim_editor = SerializedEditor {
+        let serialized_editor = SerializedEditor {
             abs_path: Some(PathBuf::from(path!("/outside/settings.json"))),
             contents: None,
             language: None,
@@ -2883,7 +2883,7 @@ mod tests {
         };
 
         editor_db
-            .save_serialisim_editor(item_id, workspace_id, serialisim_editor)
+            .save_serialized_editor(item_id, workspace_id, serialized_editor)
             .await
             .unwrap();
 

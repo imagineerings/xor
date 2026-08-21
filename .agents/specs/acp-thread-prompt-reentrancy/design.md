@@ -2,7 +2,7 @@
 
 ## Overview
 
-The crash is an ownership cycle in `AcpThread::send_inner`: its turn task updates the `AcpThread` and, from inside that update closure, invokes the selected connection prompt. Sim's native connection handles local commands synchronously and appends their transient output by updating the session's same `AcpThread`. GPUI correctly rejects that second lease.
+The crash is an ownership cycle in `AcpThread::send_inner`: its turn task updates the `AcpThread` and, from inside that update closure, invokes the selected connection prompt. Zed's native connection handles local commands synchronously and appends their transient output by updating the session's same `AcpThread`. GPUI correctly rejects that second lease.
 
 The fix captures the connection and optional client-user-message-ID dispatcher while the turn is constructed, then starts the selected prompt task through `AsyncApp::update` without leasing `AcpThread`. The returned task is awaited by the unchanged `run_turn` future. All response, stop, error, cancellation, and persistence handling therefore remains owned by the existing flow.
 

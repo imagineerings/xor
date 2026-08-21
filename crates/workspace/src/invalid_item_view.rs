@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use gpui::{EventEmitter, FocusHandle, Focusable};
-use sim_actions::workspace::OpenWithSystem;
+use zed_actions::workspace::OpenWithSystem;
 use ui::{
     App, Button, ButtonCommon, ButtonStyle, Clickable, Context, FluentBuilder, InteractiveElement,
     KeyBinding, Label, LabelCommon, LabelSize, ParentElement, Render, SharedString, Styled as _,

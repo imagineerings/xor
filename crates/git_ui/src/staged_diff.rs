@@ -484,7 +484,7 @@ impl Item for StagedDiff {
 }
 
 impl SerializableItem for StagedDiff {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "StagedDiff"
     }
 
@@ -850,7 +850,7 @@ mod tests {
                 active_item
                     .to_serializable_item_handle(cx)
                     .unwrap()
-                    .serialisim_item_kind(),
+                    .serialized_item_kind(),
                 "StagedDiff"
             );
             assert_eq!(active_item.tab_content_text(0, cx), "Staged Changes");
@@ -1073,7 +1073,7 @@ mod tests {
                 active_item
                     .to_serializable_item_handle(cx)
                     .unwrap()
-                    .serialisim_item_kind(),
+                    .serialized_item_kind(),
                 "StagedDiff"
             );
             assert_eq!(active_item.tab_content_text(0, cx), "Staged Changes");

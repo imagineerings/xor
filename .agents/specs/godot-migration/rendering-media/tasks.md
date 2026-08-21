@@ -2,7 +2,7 @@
 
 ## Overview
 
-Route generated outputs through existing Sim preview/media systems first; Godot media classification is deferred W7 compatibility unless it unlocks the target product. Generated media diagnostics start in W2, while generated asset previews finish in W4.
+Route generated outputs through existing Zed preview/media systems first; Godot media classification is deferred W7 compatibility unless it unlocks the target product. Generated media diagnostics start in W2, while generated asset previews finish in W4.
 
 ## Gates
 
@@ -21,12 +21,12 @@ Route generated outputs through existing Sim preview/media systems first; Godot 
 
 - [ ] 1. Add Godot media and generated-output preview routing
   - Classify media files, preserve unsupported reasons, and route generated media with provenance.
-  - Represent media classification, decoded resources, provenance, and preview routing through existing Sim media/image/component preview records and render surfaces.
+  - Represent media classification, decoded resources, provenance, and preview routing through existing Zed media/image/component preview records and render surfaces.
   - _Requirements: 1.1, 2.1, 2.2, 3.1, 9.1, 9.2, 9.3, 9.4, 9.5_
   - _Writes: crates/media/src/media.rs, crates/image_viewer/src/image_viewer.rs, crates/component_preview/src/component_preview.rs, crates/gpui_wgpu/src/wgpu_renderer.rs_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/rendering-media/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/rendering-media/design.md, Cargo.toml, projects/godot_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/rendering-media; run supported preview/media scenarios without Godot and inspect processes, loaders, packages, GPU/media execution, and dependencies_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/rendering-media/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/rendering-media/design.md, Cargo.toml, projects/godot_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/rendering-media; run supported preview/media scenarios without Godot and inspect processes, loaders, packages, GPU/media execution, and dependencies_
 
 - [ ] 2. Prove native rendering and media ownership without Godot
   - Add hermetic preview, unsupported-runtime, device-loss, decode-failure, cancellation, cleanup, process, loader, package, and dependency checks.

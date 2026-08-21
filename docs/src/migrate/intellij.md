@@ -1,37 +1,37 @@
 ---
-title: How to Migrate from IntelliJ IDEA to Sim
-description: "Guide for migrating from IntelliJ IDEA to Sim, including settings and keybindings."
+title: How to Migrate from IntelliJ IDEA to Zed
+description: "Guide for migrating from IntelliJ IDEA to Zed, including settings and keybindings."
 ---
 
-# How to Migrate from IntelliJ IDEA to Sim
+# How to Migrate from IntelliJ IDEA to Zed
 
-This guide covers how to set up Sim if you're coming from IntelliJ IDEA, including keybindings, settings, and the differences you should expect.
+This guide covers how to set up Zed if you're coming from IntelliJ IDEA, including keybindings, settings, and the differences you should expect.
 
-## Install Sim
+## Install Zed
 
-Sim is available on macOS, Windows, and Linux.
+Zed is available on macOS, Windows, and Linux.
 
-For macOS, you can download it from sim.dev/download, or install via Homebrew:
-
-```sh
-brew install --cask sim
-```
-
-For Windows, download the installer from sim.dev/download, or install via winget:
+For macOS, you can download it from zed.dev/download, or install via Homebrew:
 
 ```sh
-winget install Sim.Sim
+brew install --cask zed
 ```
 
-For most Linux users, the easiest way to install Sim is through our installation script:
+For Windows, download the installer from zed.dev/download, or install via winget:
 
 ```sh
-curl -f https://sim.dev/install.sh | sh
+winget install Zed.Zed
 ```
 
-After installation, you can launch Sim from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
-`sim .`
-This opens the current directory in Sim.
+For most Linux users, the easiest way to install Zed is through our installation script:
+
+```sh
+curl -f https://zed.dev/install.sh | sh
+```
+
+After installation, you can launch Zed from your Applications folder (macOS), Start menu (Windows), or directly from the terminal using:
+`zed .`
+This opens the current directory in Zed.
 
 ## Set Up the JetBrains Keymap
 
@@ -45,11 +45,11 @@ This maps familiar shortcuts like `Shift Shift` for Search Everywhere, `Cmd+O` f
 
 ## Set Up Editor Preferences
 
-You can configure most settings in the Settings Editor ({#kb sim::OpenSettings}). For advanced settings, run {#action sim::OpenSettingsFile} from the Command Palette to edit your settings file directly.
+You can configure most settings in the Settings Editor ({#kb zed::OpenSettings}). For advanced settings, run {#action zed::OpenSettingsFile} from the Command Palette to edit your settings file directly.
 
 Settings IntelliJ users typically configure first:
 
-| Sim Setting             | What it does                                                                    |
+| Zed Setting             | What it does                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | `format_on_save`        | Auto-format when saving. Set to `"on"` to enable.                               |
 | `soft_wrap`             | Wrap long lines. Options: `"none"`, `"editor_width"`, `"preferred_line_length"` |
@@ -57,18 +57,18 @@ Settings IntelliJ users typically configure first:
 | `inlay_hints`           | Show parameter names and type hints inline, like IntelliJ's hints.              |
 | `relative_line_numbers` | Useful if you're coming from IdeaVim.                                           |
 
-Sim also supports per-project settings. Create a `.sim/settings.json` file in your project root to override global settings for that project, similar to how you might use `.idea` folders in IntelliJ.
+Zed also supports per-project settings. Create a `.zed/settings.json` file in your project root to override global settings for that project, similar to how you might use `.idea` folders in IntelliJ.
 
 > **Tip:** If you're joining an existing project, check `format_on_save` before making your first commit. Otherwise you might accidentally reformat an entire file when you only meant to change one line.
 
 ## Open or Create a Project
 
-After setup, press `Cmd+Shift+O` (with JetBrains keymap) to open a folder. This becomes your workspace in Sim. Unlike IntelliJ, there's no project configuration wizard, no `.iml` files, and no SDK setup required.
+After setup, press `Cmd+Shift+O` (with JetBrains keymap) to open a folder. This becomes your workspace in Zed. Unlike IntelliJ, there's no project configuration wizard, no `.iml` files, and no SDK setup required.
 
-To start a new project, create a directory using your terminal or file manager, then open it in Sim. The editor will treat that folder as the root of your project.
+To start a new project, create a directory using your terminal or file manager, then open it in Zed. The editor will treat that folder as the root of your project.
 
-You can also launch Sim from the terminal inside any folder with:
-`sim .`
+You can also launch Zed from the terminal inside any folder with:
+`zed .`
 
 Once inside a project:
 
@@ -80,9 +80,9 @@ Open buffers appear as tabs across the top. The Project Panel shows your file tr
 
 ## Differences in Keybindings
 
-If you chose the JetBrains keymap during onboarding, most of your shortcuts should already feel familiar. Here's a quick reference for how Sim compares to IntelliJ.
+If you chose the JetBrains keymap during onboarding, most of your shortcuts should already feel familiar. Here's a quick reference for how Zed compares to IntelliJ.
 
-### Common Shared Keybindings (Sim with JetBrains keymap ↔ IntelliJ)
+### Common Shared Keybindings (Zed with JetBrains keymap ↔ IntelliJ)
 
 | Action                        | Shortcut                |
 | ----------------------------- | ----------------------- |
@@ -105,9 +105,9 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 | Go Back / Forward             | `Cmd + [` / `Cmd + ]`   |
 | Toggle Breakpoint             | `Ctrl + F8`             |
 
-### Different Keybindings (IntelliJ → Sim)
+### Different Keybindings (IntelliJ → Zed)
 
-| Action                 | IntelliJ    | Sim (JetBrains keymap)   |
+| Action                 | IntelliJ    | Zed (JetBrains keymap)   |
 | ---------------------- | ----------- | ------------------------ |
 | File Structure         | `Cmd + F12` | `Cmd + F12` (outline)    |
 | Navigate to Next Error | `F2`        | `F2`                     |
@@ -115,7 +115,7 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 | Debug                  | `Ctrl + D`  | `Alt + Shift + F9`       |
 | Stop                   | `Cmd + F2`  | `Ctrl + F2`              |
 
-### Unique to Sim
+### Unique to Zed
 
 | Action            | Shortcut                   | Notes                          |
 | ----------------- | -------------------------- | ------------------------------ |
@@ -125,11 +125,11 @@ If you chose the JetBrains keymap during onboarding, most of your shortcuts shou
 ### How to Customize Keybindings
 
 - Open the Command Palette (`Cmd+Shift+A` or `Shift Shift`)
-- Run {#action sim::OpenKeymap}
+- Run {#action zed::OpenKeymap}
 
 This opens a list of all available bindings. You can override individual shortcuts or remove conflicts.
 
-Sim also supports key sequences (multi-key shortcuts).
+Zed also supports key sequences (multi-key shortcuts).
 
 ## Differences in User Interfaces
 
@@ -137,9 +137,9 @@ Sim also supports key sequences (multi-key shortcuts).
 
 If you've used IntelliJ on large projects, you know the wait: "Indexing..." can take anywhere from 30 seconds to 15 minutes depending on project size. IntelliJ builds a comprehensive index of your entire codebase to power its code intelligence, and it re-indexes when dependencies change or after builds.
 
-Sim doesn't index. You open a folder and start working immediately. File search and navigation work instantly regardless of project size.
+Zed doesn't index. You open a folder and start working immediately. File search and navigation work instantly regardless of project size.
 
-IntelliJ's index powers features like finding all usages across your entire codebase, understanding class hierarchies, and detecting dead code. Sim delegates this work to language servers, which may not analyze at the same depth.
+IntelliJ's index powers features like finding all usages across your entire codebase, understanding class hierarchies, and detecting dead code. Zed delegates this work to language servers, which may not analyze at the same depth.
 
 **How to adapt:**
 
@@ -152,7 +152,7 @@ IntelliJ's index powers features like finding all usages across your entire code
 
 IntelliJ has its own language analysis engine built from scratch for each supported language. For Java, Kotlin, and other JVM languages, this engine understands your code thoroughly: it resolves types, tracks data flow, knows about framework annotations, and offers dozens of specialized refactorings.
 
-Sim uses the Language Server Protocol (LSP) for code intelligence. Each language has its own server: `jdtls` for Java, `rust-analyzer` for Rust, and so on.
+Zed uses the Language Server Protocol (LSP) for code intelligence. Each language has its own server: `jdtls` for Java, `rust-analyzer` for Rust, and so on.
 
 For some languages, the LSP experience is excellent. TypeScript, Rust, and Go have mature language servers that provide fast, accurate completions, diagnostics, and refactorings. For JVM languages, the gap might be more noticeable. The Eclipse-based Java language server is capable, but it won't match IntelliJ's depth for things like:
 
@@ -170,19 +170,19 @@ For some languages, the LSP experience is excellent. TypeScript, Rust, and Go ha
 
 IntelliJ manages projects through `.idea` folders containing XML configuration files, `.iml` module definitions, SDK assignments, and run configurations. This model enables IntelliJ to understand multi-module projects, manage dependencies automatically, and persist complex run/debug setups.
 
-Sim has no project model. A project is a folder. There's no wizard, no SDK selection screen, no module configuration.
+Zed has no project model. A project is a folder. There's no wizard, no SDK selection screen, no module configuration.
 
 This means:
 
-- Build commands are manual. Sim doesn't detect Maven or Gradle projects.
+- Build commands are manual. Zed doesn't detect Maven or Gradle projects.
 - Run configurations don't exist. You define tasks or use the terminal.
 - SDK management is external. Your language server uses whatever JDK is on your PATH.
-- There are no module boundaries. Sim sees folders, not project structure.
+- There are no module boundaries. Zed sees folders, not project structure.
 
 **How to adapt:**
 
-- Create a `.sim/settings.json` in your project root for project-specific settings
-- Define common commands in `tasks.json` (open via Command Palette: {#action sim::OpenTasks}):
+- Create a `.zed/settings.json` in your project root for project-specific settings
+- Define common commands in `tasks.json` (open via Command Palette: {#action zed::OpenTasks}):
 
 ```json
 [
@@ -196,20 +196,20 @@ This means:
   },
   {
     "label": "test current file",
-    "command": "./gradlew test --tests $SIM_STEM"
+    "command": "./gradlew test --tests $ZED_STEM"
   }
 ]
 ```
 
 - Use `Ctrl+Alt+R` to run tasks quickly
 - Lean on your terminal (`Alt+F12`) for anything tasks don't cover
-- For multi-module projects, you can open each module as a separate Sim window, or open the root and navigate via file finder
+- For multi-module projects, you can open each module as a separate Zed window, or open the root and navigate via file finder
 
 ### No Framework Integration
 
 IntelliJ's value for enterprise Java development comes largely from its framework integration. Spring beans are understood and navigable. JPA entities get special treatment. Endpoints are indexed and searchable. Jakarta EE annotations modify how the IDE analyzes your code.
 
-Sim has none of this. The language server sees Java code as Java code, so it doesn't understand that `@Autowired` means something special or that this class is a REST controller.
+Zed has none of this. The language server sees Java code as Java code, so it doesn't understand that `@Autowired` means something special or that this class is a REST controller.
 
 Similarly for other stacks: no Rails integration, no Django awareness, no Angular/React-specific tooling beyond what the TypeScript language server provides.
 
@@ -218,17 +218,17 @@ Similarly for other stacks: no Rails integration, no Django awareness, no Angula
 - Use grep and file search liberally. `Cmd+Shift+F` with a regex can find endpoint definitions, bean names, or annotation usages.
 - Rely on your language server's "find references" (`Alt+F7`) for navigation—it works, just without framework context
 - For Spring Boot, keep the Actuator endpoints or a separate tool for understanding bean wiring
-- Consider using framework-specific CLI tools (Spring CLI, Rails generators) from Sim's terminal
+- Consider using framework-specific CLI tools (Spring CLI, Rails generators) from Zed's terminal
 
-> **Tip:** For database work, pick up a dedicated tool like DataGrip, DBeaver, or TablePlus. Many developers who switch to Sim keep DataGrip around specifically for SQL—it integrates well with your existing JetBrains license.
+> **Tip:** For database work, pick up a dedicated tool like DataGrip, DBeaver, or TablePlus. Many developers who switch to Zed keep DataGrip around specifically for SQL—it integrates well with your existing JetBrains license.
 
-If your daily work depends heavily on framework-aware navigation and refactoring, you'll feel the gap. Sim works best when you're comfortable navigating code through search rather than specialized tooling, or when your language has strong LSP support that covers most of what you need.
+If your daily work depends heavily on framework-aware navigation and refactoring, you'll feel the gap. Zed works best when you're comfortable navigating code through search rather than specialized tooling, or when your language has strong LSP support that covers most of what you need.
 
 ### Tool Windows vs. Docks
 
-IntelliJ organizes auxiliary views into numbered tool windows (Project = 1, Git = 9, Terminal = Alt+F12, etc.). Sim uses a similar concept called "docks":
+IntelliJ organizes auxiliary views into numbered tool windows (Project = 1, Git = 9, Terminal = Alt+F12, etc.). Zed uses a similar concept called "docks":
 
-| IntelliJ Tool Window | Sim Equivalent | Shortcut (JetBrains keymap) |
+| IntelliJ Tool Window | Zed Equivalent | Shortcut (JetBrains keymap) |
 | -------------------- | -------------- | --------------------------- |
 | Project (1)          | Project Panel  | `Cmd + 1`                   |
 | Git (9 or Cmd+0)     | Git Panel      | `Cmd + 0`                   |
@@ -237,15 +237,15 @@ IntelliJ organizes auxiliary views into numbered tool windows (Project = 1, Git 
 | Problems (6)         | Diagnostics    | `Cmd + 6`                   |
 | Debug (5)            | Debug Panel    | `Cmd + 5`                   |
 
-Sim has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
+Zed has three dock positions: left, bottom, and right. Panels can be moved between docks by dragging or through settings.
 
-> **Tip:** IntelliJ has an "Override IDE shortcuts" setting that lets terminal shortcuts like `Ctrl+Left/Right` work normally. In Sim, terminal keybindings are separate—check your keymap if familiar shortcuts aren't working in the terminal panel.
+> **Tip:** IntelliJ has an "Override IDE shortcuts" setting that lets terminal shortcuts like `Ctrl+Left/Right` work normally. In Zed, terminal keybindings are separate—check your keymap if familiar shortcuts aren't working in the terminal panel.
 
 ### Debugging
 
-Both IntelliJ and Sim offer integrated debugging, but the experience differs:
+Both IntelliJ and Zed offer integrated debugging, but the experience differs:
 
-- Sim's debugger uses the Debug Adapter Protocol (DAP), supporting multiple languages
+- Zed's debugger uses the Debug Adapter Protocol (DAP), supporting multiple languages
 - Set breakpoints with `Ctrl+F8`
 - Start debugging with `Alt+Shift+F9`
 - Step through code with `F7` (step into), `F8` (step over), `Shift+F8` (step out)
@@ -257,13 +257,13 @@ The Debug Panel (`Cmd+5`) shows variables, call stack, and breakpoints—similar
 
 IntelliJ has a large plugin catalog covering everything from language support to database tools to deployment integrations.
 
-Sim's extension catalog is smaller and more focused:
+Zed's extension catalog is smaller and more focused:
 
 - Language support and syntax highlighting
 - Themes
 - Context servers
 
-Several features that require plugins in other editors are built into Sim:
+Several features that require plugins in other editors are built into Zed:
 
 - Real-time collaboration with voice chat
 - AI coding assistance
@@ -271,21 +271,21 @@ Several features that require plugins in other editors are built into Sim:
 - Task runner
 - LSP-based code intelligence
 
-You won't find one-to-one replacements for every IntelliJ plugin, especially for framework-specific tools, database clients, or application server integrations. For those workflows, you may need to use external tools alongside Sim.
+You won't find one-to-one replacements for every IntelliJ plugin, especially for framework-specific tools, database clients, or application server integrations. For those workflows, you may need to use external tools alongside Zed.
 
-## Collaboration in Sim vs. IntelliJ
+## Collaboration in Zed vs. IntelliJ
 
-IntelliJ offers Code With Me as a separate plugin for collaboration. Sim has collaboration built into the core experience.
+IntelliJ offers Code With Me as a separate plugin for collaboration. Zed has collaboration built into the core experience.
 
 - Open the Collab Panel in the left dock
-- Create a channel and [invite your collaborators](https://sim.dev/docs/collaboration#inviting-a-collaborator) to join
-- [Share your screen or your codebase](https://sim.dev/docs/collaboration#share-a-project) directly
+- Create a channel and [invite your collaborators](https://zed.dev/docs/collaboration#inviting-a-collaborator) to join
+- [Share your screen or your codebase](https://zed.dev/docs/collaboration#share-a-project) directly
 
 Once connected, you'll see each other's cursors, selections, and edits in real time. Voice chat is included. There's no need for separate tools or third-party logins.
 
-## Using AI in Sim
+## Using AI in Zed
 
-If you're used to AI assistants in IntelliJ (like GitHub Copilot or JetBrains AI), Sim offers similar capabilities with more flexibility.
+If you're used to AI assistants in IntelliJ (like GitHub Copilot or JetBrains AI), Zed offers similar capabilities with more flexibility.
 
 ### Configuring GitHub Copilot
 
@@ -294,19 +294,19 @@ If you're used to AI assistants in IntelliJ (like GitHub Copilot or JetBrains AI
 3. Click **Configure** next to "Configure Providers"
 4. Under **GitHub Copilot**, click **Sign in to GitHub**
 
-Once signed in, just start typing. Sim will offer suggestions inline for you to accept.
+Once signed in, just start typing. Zed will offer suggestions inline for you to accept.
 
 ### Additional AI Options
 
-To use other AI models in Sim, you have several options:
+To use other AI models in Zed, you have several options:
 
-- Use Sim's hosted models, with higher rate limits. Requires [authentication](https://sim.dev/docs/authentication) and access through [Sim Pro](https://sim.dev/docs/account/sim-hosted-models.html).
-- Bring your own [API keys](https://sim.dev/docs/ai/use-api-access.html), no authentication needed
-- Use [External Agents like Claude Agent](https://sim.dev/docs/ai/external-agents.html)
+- Use Zed's hosted models, with higher rate limits. Requires [authentication](https://zed.dev/docs/authentication) and access through [Zed Pro](https://zed.dev/docs/account/zed-hosted-models.html).
+- Bring your own [API keys](https://zed.dev/docs/ai/use-api-access.html), no authentication needed
+- Use [External Agents like Claude Agent](https://zed.dev/docs/ai/external-agents.html)
 
 ## Advanced Config and Productivity Tweaks
 
-Sim exposes advanced settings for power users who want to fine-tune their environment.
+Zed exposes advanced settings for power users who want to fine-tune their environment.
 
 Here are a few useful tweaks:
 
@@ -338,11 +338,11 @@ Here are a few useful tweaks:
 
 ## Next Steps
 
-Now that you're set up, here are some resources to help you get the most out of Sim:
+Now that you're set up, here are some resources to help you get the most out of Zed:
 
 - [All Settings](../reference/all-settings.md) — Customize settings, themes, and editor behavior
 - [Key Bindings](../key-bindings.md) — Learn how to customize and extend your keymap
 - [Tasks](../tasks.md) — Set up build and run commands for your projects
-- [AI Features](../ai/overview.md) — Explore Sim's AI capabilities beyond code completion
+- [AI Features](../ai/overview.md) — Explore Zed's AI capabilities beyond code completion
 - [Collaboration](../collaboration/overview.md) — Share your projects and code together in real time
 - [Languages](../languages.md) — Language-specific setup guides, including Java and Kotlin

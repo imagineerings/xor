@@ -284,7 +284,7 @@ fn val_model_format_001() -> Result<(), Box<dyn Error>> {
     let yaml = directory.path().join("extra_model_paths.yaml");
     fs::write(
         &yaml,
-        "sim:\n  base_path: /models\n  is_default: true\n  checkpoints: |\n    checkpoints\n    imported\n",
+        "zed:\n  base_path: /models\n  is_default: true\n  checkpoints: |\n    checkpoints\n    imported\n",
     )?;
     let parsed = parse_model_file(&yaml, &limits, &cancellation)?;
     assert_eq!(parsed.format, ModelFormat::YamlConfig);

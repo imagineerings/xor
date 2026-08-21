@@ -21,7 +21,7 @@ use itertools::Itertools;
 use project::{AgentId, ProjectItem};
 use serde::{Deserialize, Serialize};
 
-use sim_actions::{
+use zed_actions::{
     DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize,
     agent::{
         AddSelectionToThread, ConflictContent, LogoutAgent, OpenSettings, ReauthenticateAgent,
@@ -295,7 +295,7 @@ async fn write_global_last_created_entry_kind(kvp: KeyValueStore, entry_kind: Ag
     }
 }
 
-fn read_serialisim_panel(
+fn read_serialized_panel(
     workspace_id: workspace::WorkspaceId,
     kvp: &KeyValueStore,
 ) -> Option<SerializedAgentPanel> {
@@ -308,7 +308,7 @@ fn read_serialisim_panel(
         .and_then(|json| serde_json::from_str::<SerializedAgentPanel>(&json).log_err())
 }
 
-async fn save_serialisim_panel(
+async fn save_serialized_panel(
     workspace_id: workspace::WorkspaceId,
     panel: SerializedAgentPanel,
     kvp: KeyValueStore,
@@ -321,7 +321,7 @@ async fn save_serialisim_panel(
 
 /// Migration: reads the original single-panel format stored under the
 /// `"agent_panel"` KVP key before per-workspace keying was introduced.
-fn read_legacy_serialisim_panel(kvp: &KeyValueStore) -> Option<SerializedAgentPanel> {
+fn read_legacy_serialized_panel(kvp: &KeyValueStore) -> Option<SerializedAgentPanel> {
     kvp.read_kvp(AGENT_PANEL_KEY)
         .log_err()
         .flatten()
@@ -977,7 +977,7 @@ pub struct CreateThreadOptions {
     /// Agent to use. Defaults to the panel's selected agent.
     pub agent: Option<Agent>,
     /// Model override, as `provider/model-id`. Only applied when the thread
-    /// uses the native Sim agent.
+    /// uses the native Zed agent.
     pub model: Option<String>,
     /// Working directories to attach to the new thread (e.g., the path of a
     /// freshly-created sibling worktree). When `None`, the thread inherits
@@ -1256,7 +1256,7 @@ impl AgentPanel {
 
         let kvp = KeyValueStore::global(cx);
         self.pending_serialization = Some(cx.background_spawn(async move {
-            save_serialisim_panel(
+            save_serialized_panel(
                 workspace_id,
                 SerializedAgentPanel {
                     selected_agent: Some(selected_agent),
@@ -1283,13 +1283,13 @@ impl AgentPanel {
                 .ok()
                 .flatten();
 
-            let (serialisim_panel, global_last_used_agent, global_last_created_entry_kind) = cx
+            let (serialized_panel, global_last_used_agent, global_last_created_entry_kind) = cx
                 .background_spawn(async move {
                     match kvp {
                         Some(kvp) => {
                             let panel = workspace_id
-                                .and_then(|id| read_serialisim_panel(id, &kvp))
-                                .or_else(|| read_legacy_serialisim_panel(&kvp));
+                                .and_then(|id| read_serialized_panel(id, &kvp))
+                                .or_else(|| read_legacy_serialized_panel(&kvp));
                             let global_agent = read_global_last_used_agent(&kvp);
                             let global_entry_kind = read_global_last_created_entry_kind(&kvp);
                             (panel, global_agent, global_entry_kind)
@@ -1303,7 +1303,7 @@ impl AgentPanel {
                 .read_with(cx, |workspace, cx| !workspace.root_paths(cx).is_empty())
                 .unwrap_or(false);
             let terminal_id_to_restore = if has_open_project {
-                serialisim_panel
+                serialized_panel
                     .as_ref()
                     .and_then(|panel| panel.last_active_terminal_id.as_deref())
                     .and_then(|terminal_id| {
@@ -1353,7 +1353,7 @@ impl AgentPanel {
             };
 
             let thread_to_restore = if has_open_project && terminal_to_restore.is_none() {
-                if let Some(info) = serialisim_panel
+                if let Some(info) = serialized_panel
                     .as_ref()
                     .and_then(|panel| panel.last_active_thread.as_ref())
                 {
@@ -1419,8 +1419,8 @@ impl AgentPanel {
                     let global_fallback =
                         global_last_used_agent.filter(|agent| !is_via_collab || agent.is_native());
 
-                    if let Some(serialisim_panel) = &serialisim_panel {
-                        panel.last_created_entry_kind = serialisim_panel.last_created_entry_kind;
+                    if let Some(serialized_panel) = &serialized_panel {
+                        panel.last_created_entry_kind = serialized_panel.last_created_entry_kind;
                     } else if let Some(entry_kind) = global_last_created_entry_kind {
                         panel.last_created_entry_kind = entry_kind;
                     }
@@ -1434,7 +1434,7 @@ impl AgentPanel {
                     // selection, then the global last-used agent.
                     let initial_agent = match &thread_to_restore {
                         Some((info, _)) => Some(clamp(info.agent_type.clone())),
-                        None => serialisim_panel
+                        None => serialized_panel
                             .as_ref()
                             .and_then(|p| p.selected_agent.clone())
                             .map(clamp)
@@ -1466,7 +1466,7 @@ impl AgentPanel {
                             cx,
                         );
                     }
-                    if let Some(new_draft_thread_id) = serialisim_panel
+                    if let Some(new_draft_thread_id) = serialized_panel
                         .as_ref()
                         .and_then(|p| p.new_draft_thread_id)
                     {
@@ -3500,8 +3500,8 @@ impl AgentPanel {
         cx: &mut Context<Self>,
     ) {
         window.dispatch_action(
-            Box::new(sim_actions::OpenSettingsAt {
-                path: sim_actions::AGENT_SKILLS_SETTINGS_PATH.to_string(),
+            Box::new(zed_actions::OpenSettingsAt {
+                path: zed_actions::AGENT_SKILLS_SETTINGS_PATH.to_string(),
                 target: None,
             }),
             cx,
@@ -3669,7 +3669,7 @@ impl AgentPanel {
 
     pub(crate) fn open_configuration(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         window.dispatch_action(
-            Box::new(sim_actions::OpenSettingsPage {
+            Box::new(zed_actions::OpenSettingsPage {
                 page: "AI".to_string(),
                 target: None,
             }),
@@ -4721,7 +4721,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
         cx.spawn(async move |cx| {
             let agent_choice = match request.agent_id.as_deref() {
                 None => None,
-                Some(id) if id == agent::SIM_AGENT_ID.as_ref() => Some(Agent::NativeAgent),
+                Some(id) if id == agent::ZED_AGENT_ID.as_ref() => Some(Agent::NativeAgent),
                 Some(id) => {
                     // Reject unknown agent ids up front so the model gets a
                     // structured error pointing at `list_agents_and_models`,
@@ -4783,12 +4783,12 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
                 // detached HEAD state — the agent can attach to a branch via
                 // git afterwards.
                 let branch_target = match request.base_ref.as_ref() {
-                    Some(ref_name) => sim_actions::NewWorktreeBranchTarget::ExistingBranch {
+                    Some(ref_name) => zed_actions::NewWorktreeBranchTarget::ExistingBranch {
                         name: ref_name.clone(),
                     },
-                    None => sim_actions::NewWorktreeBranchTarget::CurrentBranch,
+                    None => zed_actions::NewWorktreeBranchTarget::CurrentBranch,
                 };
-                let action = sim_actions::CreateWorktree {
+                let action = zed_actions::CreateWorktree {
                     worktree_name: request.worktree_name.clone(),
                     branch_target,
                 };
@@ -4870,7 +4870,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
 
         let mut agents = Vec::new();
 
-        // Native Sim agent — always available, and we can enumerate models
+        // Native Zed agent — always available, and we can enumerate models
         // directly from the language model registry.
         let native_models = {
             let registry = LanguageModelRegistry::read_global(cx);
@@ -4897,7 +4897,7 @@ impl agent::SiblingThreadHost for AgentPanelSiblingHost {
             models
         };
         agents.push(agent::AvailableAgent {
-            id: agent::SIM_AGENT_ID.to_string(),
+            id: agent::ZED_AGENT_ID.to_string(),
             name: Agent::NativeAgent.label(),
             is_native: true,
             models: native_models,
@@ -5643,16 +5643,16 @@ impl AgentPanel {
                                 .header("MCP Servers")
                                 .action(
                                     "Add Server…",
-                                    Box::new(sim_actions::OpenSettingsAt {
+                                    Box::new(zed_actions::OpenSettingsAt {
                                         path: "context_servers".to_string(),
                                         target: None,
                                     }),
                                 )
                                 .action(
                                     "Install New Servers…",
-                                    Box::new(sim_actions::Extensions {
+                                    Box::new(zed_actions::Extensions {
                                         category_filter: Some(
-                                            sim_actions::ExtensionCategoryFilter::ContextServers,
+                                            zed_actions::ExtensionCategoryFilter::ContextServers,
                                         ),
                                         id: None,
                                     }),
@@ -5719,16 +5719,16 @@ impl AgentPanel {
                                 .header("MCP Servers")
                                 .action(
                                     "Add Server…",
-                                    Box::new(sim_actions::OpenSettingsAt {
+                                    Box::new(zed_actions::OpenSettingsAt {
                                         path: "context_servers".to_string(),
                                         target: None,
                                     }),
                                 )
                                 .action(
                                     "Install New Servers…",
-                                    Box::new(sim_actions::Extensions {
+                                    Box::new(zed_actions::Extensions {
                                         category_filter: Some(
-                                            sim_actions::ExtensionCategoryFilter::ContextServers,
+                                            zed_actions::ExtensionCategoryFilter::ContextServers,
                                         ),
                                         id: None,
                                     }),
@@ -5819,7 +5819,7 @@ impl AgentPanel {
                 Some(ContextMenu::build(window, cx, |menu, _window, cx| {
                     menu.context(focus_handle.clone())
                         .item(
-                            ContextMenuEntry::new("Sim Agent")
+                            ContextMenuEntry::new("Zed Agent")
                                 .when(
                                     !showing_terminal && is_agent_selected(Agent::NativeAgent),
                                     |this| this.action(Box::new(NewThread)),
@@ -5978,7 +5978,7 @@ impl AgentPanel {
                                 .handler({
                                     move |window, cx| {
                                         window
-                                            .dispatch_action(Box::new(sim_actions::AcpRegistry), cx)
+                                            .dispatch_action(Box::new(zed_actions::AcpRegistry), cx)
                                     }
                                 }),
                         )
@@ -6169,7 +6169,7 @@ impl AgentPanel {
                     .read(cx)
                     .default_model()
                     .is_some_and(|model| {
-                        model.provider.id() != language_model::SIM_CLOUD_PROVIDER_ID
+                        model.provider.id() != language_model::ZED_CLOUD_PROVIDER_ID
                     })
                 {
                     return false;
@@ -6218,12 +6218,12 @@ impl AgentPanel {
             return false;
         }
 
-        let has_configured_non_sim_providers = LanguageModelRegistry::read_global(cx)
+        let has_configured_non_zed_providers = LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
             .any(|provider| {
                 provider.is_authenticated(cx)
-                    && provider.id() != language_model::SIM_CLOUD_PROVIDER_ID
+                    && provider.id() != language_model::ZED_CLOUD_PROVIDER_ID
             });
 
         match &self.base_view {
@@ -6231,7 +6231,7 @@ impl AgentPanel {
             BaseView::AgentThread { conversation_view } => {
                 if conversation_view.read(cx).as_native_thread(cx).is_some() {
                     let history_is_empty = ThreadStore::global(cx).read(cx).is_empty();
-                    history_is_empty || !has_configured_non_sim_providers
+                    history_is_empty || !has_configured_non_zed_providers
                 } else {
                     false
                 }
@@ -6932,7 +6932,7 @@ mod tests {
 
     impl AgentConnection for SessionTrackingConnection {
         fn agent_id(&self) -> AgentId {
-            agent::SIM_AGENT_ID.clone()
+            agent::ZED_AGENT_ID.clone()
         }
 
         fn telemetry_id(&self) -> SharedString {
@@ -7117,16 +7117,16 @@ mod tests {
             .read_with(cx, |workspace, _cx| workspace.database_id())
             .expect("workspace A should have a database id");
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
-        let serialisim_a: SerializedAgentPanel = cx
-            .background_spawn(async move { read_serialisim_panel(workspace_a_id, &kvp) })
+        let serialized_a: SerializedAgentPanel = cx
+            .background_spawn(async move { read_serialized_panel(workspace_a_id, &kvp) })
             .await
             .expect("workspace A should serialize panel state");
         assert!(
-            serialisim_a.last_active_thread.is_some(),
+            serialized_a.last_active_thread.is_some(),
             "active thread should be the thread restore target"
         );
         assert!(
-            serialisim_a.last_active_terminal_id.is_none(),
+            serialized_a.last_active_terminal_id.is_none(),
             "active thread serialization should not also include a terminal restore target"
         );
 
@@ -7221,7 +7221,7 @@ mod tests {
             .expect("workspace should have a database id");
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
         let serialized: SerializedAgentPanel = cx
-            .background_spawn(async move { read_serialisim_panel(workspace_id, &kvp) })
+            .background_spawn(async move { read_serialized_panel(workspace_id, &kvp) })
             .await
             .expect("workspace should serialize panel state");
         assert_eq!(
@@ -7839,14 +7839,14 @@ mod tests {
 
         let kvp = cx.update(|_window, cx| KeyValueStore::global(cx));
         let serialized: Option<SerializedAgentPanel> = cx
-            .background_spawn(async move { read_serialisim_panel(workspace_id, &kvp) })
+            .background_spawn(async move { read_serialized_panel(workspace_id, &kvp) })
             .await;
-        let serialisim_session_id = serialized
+        let serialized_session_id = serialized
             .as_ref()
             .and_then(|p| p.last_active_thread.as_ref())
             .and_then(|t| t.session_id.clone());
         assert_eq!(
-            serialisim_session_id,
+            serialized_session_id,
             Some(resume_session_id.0.to_string()),
             "serialize() must preserve the restored session id even while the \
              ConversationView is in LoadError; otherwise the bug survives a \
@@ -8306,8 +8306,8 @@ mod tests {
             "resource text should be the raw conflict"
         );
         assert!(
-            uri.starts_with("sim:///agent/merge-conflict"),
-            "URI should use the sim merge-conflict scheme, got: {uri}"
+            uri.starts_with("zed:///agent/merge-conflict"),
+            "URI should use the zed merge-conflict scheme, got: {uri}"
         );
         assert!(uri.contains("utils.rs"), "URI should encode the file path");
     }
@@ -12652,7 +12652,7 @@ mod tests {
 
     impl AgentConnection for DisassociationTrackingConnection {
         fn agent_id(&self) -> AgentId {
-            agent::SIM_AGENT_ID.clone()
+            agent::ZED_AGENT_ID.clone()
         }
 
         fn telemetry_id(&self) -> SharedString {

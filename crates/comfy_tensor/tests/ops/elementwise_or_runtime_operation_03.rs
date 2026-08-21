@@ -786,7 +786,7 @@ fn torch_save_builds_deterministic_archive_content_without_owning_publication()
     assert!(contains_bytes(&first, b"archive/data.pkl"));
     assert!(contains_bytes(&first, b"archive/data/0"));
     assert!(!contains_bytes(&first, b"archive/data/1"));
-    assert!(contains_bytes(&first, b"sim-native-comfy-tensor-v1"));
+    assert!(contains_bytes(&first, b"zed-native-comfy-tensor-v1"));
 
     let cancelled = CancellationToken::default();
     cancelled.cancel();

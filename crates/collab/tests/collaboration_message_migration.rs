@@ -68,7 +68,7 @@ fn collaboration_message_schema_preserves_order_tombstones_and_provenance() {
         "'schedule_cancel'",
         "'schedule_publish'",
         "octet_length(emoji) BETWEEN 1 AND 4096",
-        "source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')",
+        "source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')",
         "source_record_id",
         "source_version",
         "source_observed_at",

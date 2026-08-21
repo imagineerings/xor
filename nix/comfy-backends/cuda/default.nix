@@ -1,14 +1,14 @@
 { lib, stdenvNoCC }:
 
 stdenvNoCC.mkDerivation {
-  pname = "sim-comfy-backend-cuda-metadata";
+  pname = "zed-comfy-backend-cuda-metadata";
   version = "cuda12.2-cudnn9-abi1";
 
   dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-    destination="$out/lib/sim/comfy-backends/cuda"
+    destination="$out/lib/zed/comfy-backends/cuda"
     mkdir -p "$destination/abi" "$destination/kernels"
     cp ${../../../crates/comfy_backend_cuda/abi/symbols-v1.json} "$destination/abi/"
     cp ${../../../crates/comfy_backend_cuda/kernels/core-v1.ptx} "$destination/kernels/"
@@ -28,7 +28,7 @@ stdenvNoCC.mkDerivation {
   };
 
   meta = {
-    description = "Reviewed Sim NVIDIA CUDA ABI and PTX metadata without vendor runtime redistribution";
+    description = "Reviewed Zed NVIDIA CUDA ABI and PTX metadata without vendor runtime redistribution";
     license = lib.licenses.gpl3Plus;
     platforms = [ "x86_64-linux" "aarch64-linux" "x86_64-windows" ];
   };

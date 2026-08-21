@@ -158,7 +158,7 @@ impl Component for Vector {
                 example_group_with_title(
                     "Different Vectors",
                     vec![single_example(
-                        "Sim X Copilot",
+                        "Zed X Copilot",
                         Vector::square(VectorName::SimXCopilot, rems_from_px(100.))
                             .into_any_element(),
                     )],
@@ -174,6 +174,6 @@ mod tests {
 
     #[test]
     fn vector_path() {
-        assert_eq!(VectorName::SimLogo.path().as_ref(), "images/sim_logo.svg");
+        assert_eq!(VectorName::SimLogo.path().as_ref(), "images/zed_logo.svg");
     }
 }

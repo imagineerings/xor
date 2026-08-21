@@ -29,7 +29,7 @@ use std::{
 };
 use thiserror::Error;
 
-pub const COMFY_COMPONENT_ADAPTER_ID: &str = "sim.comfy.component-host.v1";
+pub const COMFY_COMPONENT_ADAPTER_ID: &str = "zed.comfy.component-host.v1";
 pub const MAX_WORKER_PLUGIN_TIMEOUT_MILLISECONDS: u64 = 60_000;
 
 #[derive(Debug, Error)]

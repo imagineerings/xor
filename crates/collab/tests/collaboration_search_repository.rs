@@ -51,7 +51,7 @@ fn principal(community_id: CommunityId, search_scope: bool) -> AuthenticatedPrin
     } else {
         PrincipalScopes::default()
     };
-    AuthenticatedPrincipal::sim_account(
+    AuthenticatedPrincipal::zed_account(
         PrincipalId::from_uuid(Uuid::from_u128(2)),
         community_id,
         ServiceAccountId::new(3),
@@ -91,7 +91,7 @@ fn event_row(rank: f32) -> BTreeMap<String, SeaValue> {
 fn document_row(rank: f32) -> BTreeMap<String, SeaValue> {
     BTreeMap::from([
         ("record_type".into(), "canonical_document".to_owned().into()),
-        ("source_system".into(), "sim".to_owned().into()),
+        ("source_system".into(), "zed".to_owned().into()),
         ("source_record_id".into(), "project:7".to_owned().into()),
         ("source_version".into(), "4".to_owned().into()),
         ("document_type".into(), "project".to_owned().into()),
@@ -287,9 +287,9 @@ INSERT INTO public.collaboration_search_documents (
     source_observed_at, projection_version, document_type, visibility_scope,
     title, body
 ) VALUES
-    ($1, 'sim', 'project:public', '1', clock_timestamp(), 1, 'project',
+    ($1, 'zed', 'project:public', '1', clock_timestamp(), 1, 'project',
      'community', 'alpha public project', 'alpha'),
-    ($1, 'sim', 'task:restricted', '1', clock_timestamp(), 1, 'task',
+    ($1, 'zed', 'task:restricted', '1', clock_timestamp(), 1, 'task',
      'authorized_restricted', 'alpha restricted task', 'alpha alpha alpha alpha')
 "#,
     )
@@ -303,7 +303,7 @@ INSERT INTO public.collaboration_projection_checkpoints (
     community_id, projection_name, source_system, source_record_id,
     source_version, source_observed_at, projection_version, reset_generation,
     drift_state, authoritative_hash, projection_hash, projected_at, last_error
-) VALUES ($1, 'collaboration_search', 'sim', 'project:public', '1',
+) VALUES ($1, 'collaboration_search', 'zed', 'project:public', '1',
           clock_timestamp(), 1, 1, 'diverged', $2, $3,
           clock_timestamp(), 'seeded drift')
 "#,

@@ -2,16 +2,16 @@
 
 ## Problem
 
-Sim's native agent can run and cancel one persisted conversation turn, but it has no native way to retain a user-defined objective or to grant bounded consent for automatic continuation. Goose demonstrates useful `/goal` and `/grind` concepts, but its process-global goal fields and effectively unconditional grind nudges do not provide the persistence, restart, spending, permission, and lifecycle guarantees required by Sim.
+Zed's native agent can run and cancel one persisted conversation turn, but it has no native way to retain a user-defined objective or to grant bounded consent for automatic continuation. Goose demonstrates useful `/goal` and `/grind` concepts, but its process-global goal fields and effectively unconditional grind nudges do not provide the persistence, restart, spending, permission, and lifecycle guarantees required by Zed.
 
-Users need a Sim-native session goal and an explicitly bounded grind loop that reuse the current command, thread, tool, cancellation, and persistence owners. Command acknowledgements must remain local UI state, while every real model turn and tool/action record remains part of the ordinary persisted thread.
+Users need a Zed-native session goal and an explicitly bounded grind loop that reuse the current command, thread, tool, cancellation, and persistence owners. Command acknowledgements must remain local UI state, while every real model turn and tool/action record remains part of the ordinary persisted thread.
 
 ## Scope
 
 ### In scope
 
-- Sim-native `/goal` set, show, replace, and clear forms.
-- Sim-native `/grind` with a default five-turn limit and an explicit `max_turns=<n>` override capped at twenty.
+- Zed-native `/goal` set, show, replace, and clear forms.
+- Zed-native `/grind` with a default five-turn limit and an explicit `max_turns=<n>` override capped at twenty.
 - Goal persistence with `Thread` and `ThreadStore`; transient grind progress with the open `NativeAgent` session.
 - Goal-satisfaction reporting through a grind-only native tool attached to the existing `Thread` turn path.
 - Existing cancellation, tool/action persistence, permission, provider, session close/reload, autocomplete, and queued-input owners.
@@ -24,7 +24,7 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 - Background, scheduled, unbounded, or automatically restarted provider work.
 - Recipe runtime or recipe-backed commands.
 - `/doctor`, terminal-only commands, MCP Apps, `/help`, or unrelated Goose command parity.
-- Changes to Sim instruction, skill, project-root, trust, sandbox, or path-security behavior.
+- Changes to Zed instruction, skill, project-root, trust, sandbox, or path-security behavior.
 
 ## Glossary
 
@@ -39,11 +39,11 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 
 ### Requirement 1: Native goal command
 
-**User story:** As a Sim user, I want a persistent goal for one native-agent session, so that I can inspect and reuse the objective without placing command text in model context.
+**User story:** As a Zed user, I want a persistent goal for one native-agent session, so that I can inspect and reuse the objective without placing command text in model context.
 
 #### Acceptance criteria
 
-1. **1.1** WHEN `/goal <text>` is submitted to Sim's `NativeAgent`, THEN THE system SHALL trim the argument, set or replace the session goal with the remaining non-empty text, persist it through the existing thread persistence path, and show a transient confirmation without invoking the model.
+1. **1.1** WHEN `/goal <text>` is submitted to Zed's `NativeAgent`, THEN THE system SHALL trim the argument, set or replace the session goal with the remaining non-empty text, persist it through the existing thread persistence path, and show a transient confirmation without invoking the model.
 2. **1.2** WHEN `/goal` is submitted without an argument, THEN THE system SHALL show the current goal or explicitly report that no goal is set, without invoking the model.
 3. **1.3** WHEN `/goal clear`, `/goal off`, or `/goal none` is submitted as the complete argument, THEN THE system SHALL clear and persist the goal and show a transient confirmation without invoking the model.
 4. **1.4** IF `/goal` receives only whitespace after the command token, THEN THE system SHALL treat it as the show form; IF a clear keyword has additional text, THEN THE system SHALL treat the complete non-empty argument as a replacement goal rather than partially interpreting it.
@@ -52,7 +52,7 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 
 ### Requirement 2: Bounded grind execution
 
-**User story:** As a Sim user, I want to authorize bounded automatic continuation toward my current goal, so that the agent can keep working without creating unbounded or background provider spending.
+**User story:** As a Zed user, I want to authorize bounded automatic continuation toward my current goal, so that the agent can keep working without creating unbounded or background provider spending.
 
 #### Acceptance criteria
 
@@ -68,7 +68,7 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 
 ### Requirement 3: Failure, cancellation, and attention boundaries
 
-**User story:** As a Sim user, I want a grind to stop safely at every failure or authorization boundary, so that automatic continuation never runs while control belongs to me.
+**User story:** As a Zed user, I want a grind to stop safely at every failure or authorization boundary, so that automatic continuation never runs while control belongs to me.
 
 #### Acceptance criteria
 
@@ -82,7 +82,7 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 
 ### Requirement 4: Persistence, visibility, and reload
 
-**User story:** As a Sim user reopening a session, I want my goal retained but interrupted automatic work stopped, so that persistence never becomes implicit spending authority.
+**User story:** As a Zed user reopening a session, I want my goal retained but interrupted automatic work stopped, so that persistence never becomes implicit spending authority.
 
 #### Acceptance criteria
 
@@ -97,7 +97,7 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 
 ### Requirement 5: Catalog, autocomplete, and submission regressions
 
-**User story:** As a Sim user, I want the new commands to behave like first-class native commands without breaking existing slash-command input behavior.
+**User story:** As a Zed user, I want the new commands to behave like first-class native commands without breaking existing slash-command input behavior.
 
 #### Acceptance criteria
 
@@ -121,10 +121,10 @@ Users need a Sim-native session goal and an explicitly bounded grind loop that r
 ## Evidence and ownership
 
 - Goose audit: `projects/goose/crates/goose/src/agents/execute_commands.rs` (`COMMANDS`, `command_starts_turn`, goal/grind handlers), `projects/goose/crates/goose/src/agents/state_machine/ops_retry.rs`, `ops_maxturns.rs`, and `projects/goose/crates/goose/src/agents/agent.rs` turn-limit/cancellation paths.
-- Sim catalog/dispatch/session owner: `crates/agent/src/agent.rs` (`NATIVE_COMMANDS`, `Command::parse`, `NativeAgentConnection::prompt`, `Session`, `pending_sessions`, `close_session`).
-- Sim persistence/turn owner: `crates/agent/src/thread.rs`, `crates/agent/src/db.rs`, and `crates/agent/src/thread_store.rs`.
-- Sim visible/transient thread owner: `crates/acp_thread/src/acp_thread.rs`.
-- Sim UI owner: `crates/agent_ui/src/conversation_view/thread_view.rs`, `crates/agent_ui/src/conversation_view.rs`, and the existing message-editor completion/unknown-command path.
+- Zed catalog/dispatch/session owner: `crates/agent/src/agent.rs` (`NATIVE_COMMANDS`, `Command::parse`, `NativeAgentConnection::prompt`, `Session`, `pending_sessions`, `close_session`).
+- Zed persistence/turn owner: `crates/agent/src/thread.rs`, `crates/agent/src/db.rs`, and `crates/agent/src/thread_store.rs`.
+- Zed visible/transient thread owner: `crates/acp_thread/src/acp_thread.rs`.
+- Zed UI owner: `crates/agent_ui/src/conversation_view/thread_view.rs`, `crates/agent_ui/src/conversation_view.rs`, and the existing message-editor completion/unknown-command path.
 - Migration coverage owner record: `../developer-experience/coverage-audit.md` capability `DCC-CMD-012`.
 
 ## Approved product decisions

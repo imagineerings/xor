@@ -138,7 +138,7 @@ pub(crate) fn build_static_bwrap(arch: Arch, deps: &[&NamedJob]) -> NamedJob {
                     "cachix-action",
                     "0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad", // v16
                 )
-                .add_with(("name", "sim"))
+                .add_with(("name", "zed"))
                 .add_with(("authToken", vars::CACHIX_AUTH_TOKEN))
                 .add_with(("cachixArgs", "-v")),
             )
@@ -199,7 +199,7 @@ pub(crate) fn bundle_windows(
                 named::pwsh("script/bundle-windows.ps1 -RustTools -Architecture aarch64")
             }
         };
-        step.working_directory("${{ env.SIM_WORKSPACE }}")
+        step.working_directory("${{ env.ZED_WORKSPACE }}")
     }
     let artifact_name = match arch {
         Arch::X86_64 => assets::WINDOWS_X86_64,
@@ -240,14 +240,14 @@ fn set_release_channel_to_nightly(platform: Platform) -> Step<Run> {
             set -eu
             version=$(git rev-parse --short HEAD)
             echo "Publishing version: ${version} on release channel nightly"
-            echo "nightly" > crates/sim/RELEASE_CHANNEL
+            echo "nightly" > crates/zed/RELEASE_CHANNEL
         "#}),
         Platform::Windows => named::pwsh(indoc::indoc! {r#"
             $ErrorActionPreference = "Stop"
             $version = git rev-parse --short HEAD
             Write-Host "Publishing version: $version on release channel nightly"
-            "nightly" | Set-Content -Path "crates/sim/RELEASE_CHANNEL"
+            "nightly" | Set-Content -Path "crates/zed/RELEASE_CHANNEL"
         "#})
-        .working_directory("${{ env.SIM_WORKSPACE }}"),
+        .working_directory("${{ env.ZED_WORKSPACE }}"),
     }
 }

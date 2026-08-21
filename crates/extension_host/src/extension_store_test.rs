@@ -826,10 +826,10 @@ async fn test_extension_store(cx: &mut TestAppContext) {
         "/the-extension-dir",
         json!({
             "installed": {
-                "sim-monokai": {
+                "zed-monokai": {
                     "extension.json": r#"{
-                        "id": "sim-monokai",
-                        "name": "Sim Monokai",
+                        "id": "zed-monokai",
+                        "name": "Zed Monokai",
                         "version": "2.0.0",
                         "themes": {
                             "Monokai Dark": "themes/monokai.json",
@@ -873,10 +873,10 @@ async fn test_extension_store(cx: &mut TestAppContext) {
                         }"#,
                     }
                 },
-                "sim-ruby": {
+                "zed-ruby": {
                     "extension.json": r#"{
-                        "id": "sim-ruby",
-                        "name": "Sim Ruby",
+                        "id": "zed-ruby",
+                        "name": "Zed Ruby",
                         "version": "1.0.0",
                         "grammars": {
                             "ruby": "grammars/ruby.wasm",
@@ -918,11 +918,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     let mut expected_index = ExtensionIndex {
         extensions: [
             (
-                "sim-ruby".into(),
+                "zed-ruby".into(),
                 ExtensionIndexEntry {
                     manifest: Arc::new(ExtensionManifest {
-                        id: "sim-ruby".into(),
-                        name: "Sim Ruby".into(),
+                        id: "zed-ruby".into(),
+                        name: "Zed Ruby".into(),
                         version: "1.0.0".into(),
                         schema_version: SchemaVersion::ZERO,
                         description: None,
@@ -954,11 +954,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
                 },
             ),
             (
-                "sim-monokai".into(),
+                "zed-monokai".into(),
                 ExtensionIndexEntry {
                     manifest: Arc::new(ExtensionManifest {
-                        id: "sim-monokai".into(),
-                        name: "Sim Monokai".into(),
+                        id: "zed-monokai".into(),
+                        name: "Zed Monokai".into(),
                         version: "2.0.0".into(),
                         schema_version: SchemaVersion::ZERO,
                         description: None,
@@ -991,7 +991,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "ERB".into(),
                 ExtensionIndexLanguageEntry {
-                    extension: "sim-ruby".into(),
+                    extension: "zed-ruby".into(),
                     path: "languages/erb".into(),
                     grammar: Some("embedded_template".into()),
                     hidden: false,
@@ -1005,7 +1005,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "Ruby".into(),
                 ExtensionIndexLanguageEntry {
-                    extension: "sim-ruby".into(),
+                    extension: "zed-ruby".into(),
                     path: "languages/ruby".into(),
                     grammar: Some("ruby".into()),
                     hidden: false,
@@ -1023,28 +1023,28 @@ async fn test_extension_store(cx: &mut TestAppContext) {
             (
                 "Monokai Dark".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "sim-monokai".into(),
+                    extension: "zed-monokai".into(),
                     path: "themes/monokai.json".into(),
                 },
             ),
             (
                 "Monokai Light".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "sim-monokai".into(),
+                    extension: "zed-monokai".into(),
                     path: "themes/monokai.json".into(),
                 },
             ),
             (
                 "Monokai Pro Dark".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "sim-monokai".into(),
+                    extension: "zed-monokai".into(),
                     path: "themes/monokai-pro.json".into(),
                 },
             ),
             (
                 "Monokai Pro Light".into(),
                 ExtensionIndexThemeEntry {
-                    extension: "sim-monokai".into(),
+                    extension: "zed-monokai".into(),
                     path: "themes/monokai-pro.json".into(),
                 },
             ),
@@ -1111,11 +1111,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     });
 
     fs.insert_tree(
-        "/the-extension-dir/installed/sim-gruvbox",
+        "/the-extension-dir/installed/zed-gruvbox",
         json!({
             "extension.json": r#"{
-                "id": "sim-gruvbox",
-                "name": "Sim Gruvbox",
+                "id": "zed-gruvbox",
+                "name": "Zed Gruvbox",
                 "version": "1.0.0",
                 "themes": {
                     "Gruvbox": "themes/gruvbox.json"
@@ -1139,11 +1139,11 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     .await;
 
     expected_index.extensions.insert(
-        "sim-gruvbox".into(),
+        "zed-gruvbox".into(),
         ExtensionIndexEntry {
             manifest: Arc::new(ExtensionManifest {
-                id: "sim-gruvbox".into(),
-                name: "Sim Gruvbox".into(),
+                id: "zed-gruvbox".into(),
+                name: "Zed Gruvbox".into(),
                 version: "1.0.0".into(),
                 schema_version: SchemaVersion::ZERO,
                 description: None,
@@ -1169,7 +1169,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     expected_index.themes.insert(
         "Gruvbox".into(),
         ExtensionIndexThemeEntry {
-            extension: "sim-gruvbox".into(),
+            extension: "zed-gruvbox".into(),
             path: "themes/gruvbox.json".into(),
         },
     );
@@ -1209,7 +1209,7 @@ async fn test_extension_store(cx: &mut TestAppContext) {
     let prev_fs_metadata_call_count = fs.metadata_call_count();
     let prev_fs_read_dir_call_count = fs.read_dir_call_count();
 
-    // Create new extension store, as if Sim were restarting.
+    // Create new extension store, as if Zed were restarting.
     drop(store);
     let store = cx.new(|cx| {
         ExtensionStore::new(
@@ -1278,12 +1278,12 @@ async fn test_extension_store(cx: &mut TestAppContext) {
 
     store.update(cx, |store, cx| {
         store
-            .uninstall_extension("sim-ruby".into(), cx)
+            .uninstall_extension("zed-ruby".into(), cx)
             .detach_and_log_err(cx);
     });
 
     cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
-    expected_index.extensions.remove("sim-ruby");
+    expected_index.extensions.remove("zed-ruby");
     expected_index.languages.remove("Ruby");
     expected_index.languages.remove("ERB");
 
@@ -1463,7 +1463,7 @@ async fn test_extension_store_with_test_extension(cx: &mut TestAppContext) {
     });
     let user_agent = cx.update(|cx| {
         format!(
-            "Sim/{} ({}; {})",
+            "Zed/{} ({}; {})",
             AppVersion::global(cx),
             std::env::consts::OS,
             std::env::consts::ARCH

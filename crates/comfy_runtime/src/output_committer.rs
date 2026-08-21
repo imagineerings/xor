@@ -24,8 +24,8 @@ pub const DEFAULT_MAX_OUTPUT_JOURNAL_BYTES: usize = 4 * 1024 * 1024;
 const MAX_FILENAME_PREFIX_BYTES: usize = 4_096;
 const MAX_EXTENSION_BYTES: usize = 32;
 const MAX_PROJECTION_METADATA_BYTES: usize = 16 * 1024;
-const STAGING_SUBFOLDER: &str = ".sim-output-staging";
-const JOURNAL_FILENAME: &str = ".sim-output-transactions.json";
+const STAGING_SUBFOLDER: &str = ".zed-output-staging";
+const JOURNAL_FILENAME: &str = ".zed-output-transactions.json";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2358,7 +2358,7 @@ mod tests {
         )?;
         let state_path = roots
             .test_root_path(AssetNamespace::Temporary)?
-            .join(".sim-asset-index.json");
+            .join(".zed-asset-index.json");
         fs::remove_file(&state_path)?;
         fs::create_dir(&state_path)?;
 

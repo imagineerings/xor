@@ -35,7 +35,7 @@
     "redistributes_vendor_runtime": false,
     "license_approval_required_for_vendor_runtime": true,
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-mlu-package-v1",
+    "signature_domain": "zed-comfy-mlu-package-v1",
     "runtime_compilation_forbidden": true
   },
   "provenance": {

@@ -69,37 +69,37 @@ done
 shift $((OPTIND-1))
 
 if [[ "$dry_run" = true ]]; then
-    sim_features="none"
+    zed_features="none"
     remote_features="none"
     if [[ "$rust_tools" = true ]]; then
-        sim_features="rust-tools"
+        zed_features="rust-tools"
         remote_features="rust-tools"
     fi
     if [[ "$comfy" = true ]]; then
         if [[ "$rust_tools" = true ]]; then
-            sim_features="comfy,metal,rust-tools"
+            zed_features="comfy,metal,rust-tools"
         else
-            sim_features="comfy,metal"
+            zed_features="comfy,metal"
         fi
-        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=${sim_features} remote_features=${remote_features} worker_features=metal include_comfy_worker=true rust_tools=${rust_tools}"
+        echo "mode=comfy packages=zed,cli,comfy_worker zed_features=${zed_features} remote_features=${remote_features} worker_features=metal include_comfy_worker=true rust_tools=${rust_tools}"
     else
-        echo "mode=default packages=sim,cli sim_features=${sim_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
+        echo "mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
     fi
     exit 0
 fi
 
 
 # Get release channel
-pushd crates/sim
+pushd crates/zed
 channel=$(<RELEASE_CHANNEL)
-export SIM_RELEASE_CHANNEL="${channel}"
+export ZED_RELEASE_CHANNEL="${channel}"
 popd
 
-export SIM_BUNDLE=true
+export ZED_BUNDLE=true
 
 cargo_bundle_version=$(cargo -q bundle --help 2>&1 | head -n 1 || echo "")
-if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-sim" ]; then
-    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch sim-deploy
+if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-zed" ]; then
+    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch zed-deploy
 fi
 
 # Deal with versions of macOS that don't include libstdc++ headers
@@ -127,17 +127,17 @@ script/generate-licenses
 
 rustup target add $target_triple
 
-echo "Compiling sim binaries"
+echo "Compiling zed binaries"
 if [[ "$comfy" = true ]]; then
-    sim_build_features="sim/comfy,sim/metal,comfy_worker/metal"
+    zed_build_features="zed/comfy,zed/metal,comfy_worker/metal"
     if [[ "$rust_tools" = true ]]; then
-        sim_build_features="${sim_build_features},sim/rust-tools"
+        zed_build_features="${zed_build_features},zed/rust-tools"
     fi
-    cargo build ${build_flag} --package sim --package cli --package comfy_worker --features "${sim_build_features}" --target $target_triple
+    cargo build ${build_flag} --package zed --package cli --package comfy_worker --features "${zed_build_features}" --target $target_triple
 elif [[ "$rust_tools" = true ]]; then
-    cargo build ${build_flag} --package sim --package cli --features sim/rust-tools --target $target_triple
+    cargo build ${build_flag} --package zed --package cli --features zed/rust-tools --target $target_triple
 else
-    cargo build ${build_flag} --package sim --package cli --target $target_triple
+    cargo build ${build_flag} --package zed --package cli --target $target_triple
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
@@ -148,7 +148,7 @@ else
 fi
 
 echo "Creating application bundle"
-pushd crates/sim
+pushd crates/zed
 cp Cargo.toml Cargo.toml.backup
 sed \
     -i.backup \
@@ -167,7 +167,7 @@ echo "Bundled ${app_path}"
 
 # DocumentTypes.plist references CFBundleTypeIconFile "Document", so the bundle must contain Document.icns.
 # We use the app icon as a placeholder document icon for now.
-document_icon_source="crates/sim/resources/Document.icns"
+document_icon_source="crates/zed/resources/Document.icns"
 document_icon_target="${app_path}/Contents/Resources/Document.icns"
 if [[ -f "${document_icon_source}" ]]; then
     mkdir -p "$(dirname "${document_icon_target}")"
@@ -180,20 +180,20 @@ if [[ -n "${MACOS_CERTIFICATE:-}" && -n "${MACOS_CERTIFICATE_PASSWORD:-}" && -n 
     can_code_sign=true
 
     echo "Setting up keychain for code signing..."
-    security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" sim.keychain || echo ""
-    security default-keychain -s sim.keychain
-    security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" sim.keychain
+    security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" zed.keychain || echo ""
+    security default-keychain -s zed.keychain
+    security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" zed.keychain
     # Calling set-keychain-settings without `-t` disables the auto-lock timeout
-    security set-keychain-settings sim.keychain
-    echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/sim-certificate.p12
-    security import /tmp/sim-certificate.p12 -k sim.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-    rm /tmp/sim-certificate.p12
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" sim.keychain
+    security set-keychain-settings zed.keychain
+    echo "$MACOS_CERTIFICATE" | base64 --decode > /tmp/zed-certificate.p12
+    security import /tmp/zed-certificate.p12 -k zed.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+    rm /tmp/zed-certificate.p12
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_CERTIFICATE_PASSWORD" zed.keychain
 
     function cleanup() {
         echo "Cleaning up keychain"
         security default-keychain -s login.keychain
-        security delete-keychain sim.keychain
+        security delete-keychain zed.keychain
     }
 
     trap cleanup EXIT
@@ -255,7 +255,7 @@ function sign_app_binaries() {
     download_git "${target_triple}" "${app_path}/Contents/MacOS/git"
 
     # Note: The app identifier for our development builds is the same as the app identifier for nightly.
-    cp crates/sim/contents/$channel/embedded.provisionprofile "${app_path}/Contents/"
+    cp crates/zed/contents/$channel/embedded.provisionprofile "${app_path}/Contents/"
 
     if [[ $can_code_sign = true ]]; then
         echo "Code signing binaries"
@@ -265,8 +265,8 @@ function sign_app_binaries() {
             /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/comfy-worker" -v
         fi
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/git" -v
-        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/sim" -v
-        /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${app_path}" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/zed" -v
+        /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}" -v
     else
         echo "One or more of the following variables are missing: MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD, APPLE_NOTARIZATION_KEY, APPLE_NOTARIZATION_KEY_ID, APPLE_NOTARIZATION_ISSUER_ID"
 
@@ -279,9 +279,9 @@ function sign_app_binaries() {
         # - get a signing key for the MQ55VZLNZQ team from Nathan.
         # - create your own signing key, and update references to MQ55VZLNZQ to your own team ID
         # then comment out this line.
-        cat crates/sim/resources/sim.entitlements | sed '/com.apple.developer.associated-domains/,+1d' > "${app_path}/Contents/Resources/sim.entitlements"
+        cat crates/zed/resources/zed.entitlements | sed '/com.apple.developer.associated-domains/,+1d' > "${app_path}/Contents/Resources/zed.entitlements"
 
-        codesign --force --deep --entitlements "${app_path}/Contents/Resources/sim.entitlements" --sign ${MACOS_SIGNING_KEY:- -} "${app_path}" -v
+        codesign --force --deep --entitlements "${app_path}/Contents/Resources/zed.entitlements" --sign ${MACOS_SIGNING_KEY:- -} "${app_path}" -v
     fi
 
     bundle_name=$(basename "$app_path")
@@ -307,7 +307,7 @@ function sign_app_binaries() {
     else
         dmg_target_directory="target/${target_triple}/${target_dir}"
         dmg_source_directory="${dmg_target_directory}/dmg"
-        dmg_file_path="${dmg_target_directory}/Sim-${arch_suffix}.dmg"
+        dmg_file_path="${dmg_target_directory}/Zed-${arch_suffix}.dmg"
         xcode_bin_dir_path="$(xcode-select -p)/usr/bin"
 
         rm -rf ${dmg_source_directory}
@@ -319,10 +319,10 @@ function sign_app_binaries() {
         ln -s /Applications ${dmg_source_directory}
 
         echo "Creating final DMG at ${dmg_file_path} using ${dmg_source_directory}"
-        hdiutil create -volname Sim -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
+        hdiutil create -volname Zed -srcfolder "${dmg_source_directory}" -ov -format UDZO "${dmg_file_path}"
 
         # If someone runs this bundle script locally, a symlink will be placed in `dmg_source_directory`.
-        # This symlink causes CPU issues with Sim if the Sim codebase is the project being worked on, so we simply remove it for now.
+        # This symlink causes CPU issues with Zed if the Zed codebase is the project being worked on, so we simply remove it for now.
         echo "Removing symlink to /Applications from ${dmg_source_directory}"
         rm ${dmg_source_directory}/Applications
 
@@ -350,7 +350,7 @@ function sign_binary() {
 
     if [[ $can_code_sign = true ]]; then
         echo "Code signing executable $binary_path"
-        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/sim/resources/sim.entitlements --sign "$IDENTITY" "${binary_path}" -v
+        /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${binary_path}" -v
     fi
 }
 
@@ -358,9 +358,9 @@ function upload_debug_symbols() {
     if [ "$local_install" = true ]; then
         echo "local install; skipping sentry upload."
     elif [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
-        echo "Uploading sim debug symbols to sentry..."
-        exe_path="target/${target_triple}/release/Sim"
-        if ! dsymutil --flat "target/${target_triple}/${target_dir}/sim" 2> target/dsymutil.log; then
+        echo "Uploading zed debug symbols to sentry..."
+        exe_path="target/${target_triple}/release/Zed"
+        if ! dsymutil --flat "target/${target_triple}/${target_dir}/zed" 2> target/dsymutil.log; then
             echo "dsymutil failed"
             cat target/dsymutil.log
             exit 1
@@ -375,8 +375,8 @@ function upload_debug_symbols() {
         # Try uploading up to 3 times
         for attempt in 1 2 3; do
             echo "Sentry upload attempt $attempt..."
-            if sentry-cli debug-files upload --include-sources --wait -p sim -o sim-dev \
-                "target/${target_triple}/${target_dir}/sim.dwarf" \
+            if sentry-cli debug-files upload --include-sources --wait -p zed -o zed-dev \
+                "target/${target_triple}/${target_dir}/zed.dwarf" \
                 "target/${target_triple}/${target_dir}/remote_server.dwarf"; then
                 break
             else
@@ -394,7 +394,7 @@ function upload_debug_symbols() {
 
 upload_debug_symbols
 
-cp target/${target_triple}/${target_dir}/sim "${app_path}/Contents/MacOS/sim"
+cp target/${target_triple}/${target_dir}/zed "${app_path}/Contents/MacOS/zed"
 cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
 if [[ "$comfy" = true ]]; then
     cp target/${target_triple}/${target_dir}/comfy-worker "${app_path}/Contents/MacOS/comfy-worker"
@@ -402,4 +402,4 @@ fi
 sign_app_binaries
 
 sign_binary "target/$target_triple/release/remote_server"
-gzip -f --stdout --best target/$target_triple/release/remote_server > target/sim-remote-server-macos-$arch_suffix.gz
+gzip -f --stdout --best target/$target_triple/release/remote_server > target/zed-remote-server-macos-$arch_suffix.gz

@@ -484,7 +484,7 @@ fn validate_manifest(
         || !manifest.runtime_compilation_forbidden
         || manifest.signature_algorithm != "ed25519"
         || manifest.signature_coverage != "package-coverage-v1"
-        || manifest.signature_domain != "sim-comfy-directml-package-v1"
+        || manifest.signature_domain != "zed-comfy-directml-package-v1"
         || manifest.certificate_owner != "comfy_runtime::NativeFfiRegistry"
         || manifest.unsafe_owner != UNSAFE_OWNER
         || manifest.source_package != "Microsoft.AI.DirectML/1.13.1"
@@ -1067,8 +1067,8 @@ mod tests {
             schema_version: 2,
             signature_algorithm: "ed25519".to_owned(),
             signature_coverage: "package-coverage-v1".to_owned(),
-            signature_domain: "sim-comfy-directml-package-v1".to_owned(),
-            signer: "sim.release.directml-v1".to_owned(),
+            signature_domain: "zed-comfy-directml-package-v1".to_owned(),
+            signer: "zed.release.directml-v1".to_owned(),
             source_package: "Microsoft.AI.DirectML/1.13.1".to_owned(),
             source_package_sha256: AbiManifest::embedded()?.reviewed_package.nupkg_sha256,
             target: TARGET.to_owned(),

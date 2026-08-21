@@ -544,7 +544,7 @@ mod tests {
         Example {
             spec: ExampleSpec {
                 name: "example".to_string(),
-                repository_url: "https://github.com/simtropolis/sim.git".to_string(),
+                repository_url: "https://github.com/simtropolis/zed.git".to_string(),
                 revision: "HEAD".to_string(),
                 tags: Vec::new(),
                 reasoning: None,
@@ -583,7 +583,7 @@ mod tests {
             }],
             score: Vec::new(),
             qa: Vec::new(),
-            sim_version: None,
+            zed_version: None,
             state: None,
         }
     }

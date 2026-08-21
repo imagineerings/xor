@@ -315,7 +315,7 @@ dependencies = [
  "uuid",
  "watch",
  "web_search",
- "sim_env_vars",
+ "zed_env_vars",
  "zlog",
  "zstd",
 ]
@@ -408,7 +408,7 @@ dependencies = [
  "util",
  "uuid",
  "watch",
- "sim_credentials_provider",
+ "zed_credentials_provider",
 ]
 
 [[package]]
@@ -556,7 +556,7 @@ dependencies = [
  "vim",
  "watch",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -607,7 +607,7 @@ dependencies = [
  "smallvec",
  "telemetry",
  "ui",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -1459,7 +1459,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -2168,7 +2168,7 @@ dependencies = [
  "theme_settings",
  "ui",
  "util",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -3229,7 +3229,7 @@ dependencies = [
  "util",
  "windows 0.61.3",
  "worktree",
- "sim_credentials_provider",
+ "zed_credentials_provider",
 ]
 
 [[package]]
@@ -3392,7 +3392,7 @@ dependencies = [
  "serde",
  "serde_json",
  "text",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "zeta_prompt",
 ]
 
@@ -3491,7 +3491,7 @@ dependencies = [
  "uuid",
  "workspace",
  "worktree",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -3528,7 +3528,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -3600,7 +3600,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -4926,7 +4926,7 @@ dependencies = [
  "tempfile",
  "util",
  "uuid",
- "sim_env_vars",
+ "zed_env_vars",
 ]
 
 [[package]]
@@ -5026,7 +5026,7 @@ dependencies = [
  "unindent",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -5228,7 +5228,7 @@ dependencies = [
  "unindent",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -5563,8 +5563,8 @@ dependencies = [
  "uuid",
  "workspace",
  "worktree",
- "sim_actions",
- "sim_credentials_provider",
+ "zed_actions",
+ "zed_credentials_provider",
  "zeta_prompt",
  "zlog",
  "zstd",
@@ -5725,7 +5725,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zeta_prompt",
 ]
 
@@ -5812,7 +5812,7 @@ dependencies = [
  "uuid",
  "vim_mode_setting",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
  "ztracing",
 ]
@@ -6434,7 +6434,7 @@ dependencies = [
  "util",
  "vim_mode_setting",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -6566,7 +6566,7 @@ dependencies = [
  "urlencoding",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -6611,7 +6611,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -7422,7 +7422,7 @@ dependencies = [
  "watch",
  "windows 0.61.3",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zeroize",
  "zlog",
  "ztracing",
@@ -7825,8 +7825,8 @@ dependencies = [
  "wasm-bindgen",
  "web-time",
  "windows 0.61.3",
- "sim-font-kit",
- "sim-scap",
+ "zed-font-kit",
+ "zed-scap",
 ]
 
 [[package]]
@@ -7875,8 +7875,8 @@ dependencies = [
  "x11-clipboard",
  "x11rb",
  "xkbcommon",
- "sim-scap",
- "sim-xim",
+ "zed-scap",
+ "zed-xim",
 ]
 
 [[package]]
@@ -7922,7 +7922,7 @@ dependencies = [
  "smallvec",
  "strum 0.27.2",
  "uuid",
- "sim-font-kit",
+ "zed-font-kit",
 ]
 
 [[package]]
@@ -8025,7 +8025,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",
- "sim-font-kit",
+ "zed-font-kit",
 ]
 
 [[package]]
@@ -8053,7 +8053,7 @@ dependencies = [
  "windows-core 0.61.2",
  "windows-numerics 0.2.0",
  "windows-registry 0.5.3",
- "sim-scap",
+ "zed-scap",
 ]
 
 [[package]]
@@ -9094,7 +9094,7 @@ dependencies = [
  "util",
  "util_macros",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -9535,7 +9535,7 @@ dependencies = [
  "ui_input",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -9937,7 +9937,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -10313,7 +10313,7 @@ dependencies = [
  "prost-build 0.9.0",
  "prost-types 0.9.0",
  "serde",
- "sim-reqwest",
+ "zed-reqwest",
 ]
 
 [[package]]
@@ -10354,7 +10354,7 @@ dependencies = [
  "ui",
  "util",
  "webrtc-sys",
- "sim-scap",
+ "zed-scap",
 ]
 
 [[package]]
@@ -10705,7 +10705,7 @@ dependencies = [
  "urlencoding",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -11131,7 +11131,7 @@ dependencies = [
  "theme_settings",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -11530,7 +11530,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -12210,7 +12210,7 @@ dependencies = [
  "util",
  "vim_mode_setting",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -12503,7 +12503,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -12538,7 +12538,7 @@ dependencies = [
  "util",
  "workspace",
  "worktree",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -13469,7 +13469,7 @@ dependencies = [
  "ui_input",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -13594,7 +13594,7 @@ dependencies = [
  "ui",
  "windows 0.61.3",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -14040,7 +14040,7 @@ dependencies = [
  "wax",
  "which 6.0.3",
  "worktree",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "zeroize",
  "zlog",
  "ztracing",
@@ -14109,7 +14109,7 @@ dependencies = [
  "util",
  "workspace",
  "worktree",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -14932,7 +14932,7 @@ dependencies = [
  "windows-registry 0.6.1",
  "workspace",
  "worktree",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -15276,7 +15276,7 @@ dependencies = [
  "util",
  "uuid",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -15373,7 +15373,7 @@ dependencies = [
  "regex",
  "serde",
  "tokio",
- "sim-reqwest",
+ "zed-reqwest",
 ]
 
 [[package]]
@@ -16274,7 +16274,7 @@ dependencies = [
  "util",
  "util_macros",
  "workspace",
- "sim_actions",
+ "zed_actions",
  "ztracing",
 ]
 
@@ -16692,7 +16692,7 @@ dependencies = [
  "theme_settings",
  "ui",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -16755,8 +16755,8 @@ dependencies = [
  "url",
  "util",
  "workspace",
- "sim_actions",
- "sim_credentials_provider",
+ "zed_actions",
+ "zed_credentials_provider",
 ]
 
 [[package]]
@@ -16902,7 +16902,7 @@ dependencies = [
  "unicode-segmentation",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -17792,7 +17792,7 @@ dependencies = [
  "multi_buffer",
  "ui",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -18253,7 +18253,7 @@ dependencies = [
  "sha2",
  "shellexpand",
  "util",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -18279,7 +18279,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -18426,7 +18426,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -18523,7 +18523,7 @@ dependencies = [
  "ui",
  "util",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -18774,7 +18774,7 @@ dependencies = [
  "util",
  "windows 0.61.3",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -20079,7 +20079,7 @@ dependencies = [
  "util_macros",
  "vim_mode_setting",
  "workspace",
- "sim_actions",
+ "zed_actions",
 ]
 
 [[package]]
@@ -22524,7 +22524,7 @@ dependencies = [
  "util",
  "uuid",
  "windows 0.61.3",
- "sim_actions",
+ "zed_actions",
  "zlog",
 ]
 
@@ -22964,7 +22964,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim"
+name = "zed"
 version = "1.11.3"
 dependencies = [
  "acp_thread",
@@ -23129,17 +23129,17 @@ dependencies = [
  "windows 0.61.3",
  "windows_resources",
  "workspace",
- "sim-reqwest",
- "sim_actions",
- "sim_env_vars",
+ "zed-reqwest",
+ "zed_actions",
+ "zed_env_vars",
  "zlog",
  "zlog_settings",
  "ztracing",
 ]
 
 [[package]]
-name = "sim-font-kit"
-version = "0.14.1-sim"
+name = "zed-font-kit"
+version = "0.14.1-zed"
 source = "git+https://github.com/simtropolis/font-kit?rev=94b0f28166665e8fd2f53ff6d268a14955c82269#94b0f28166665e8fd2f53ff6d268a14955c82269"
 dependencies = [
  "bitflags 2.10.0",
@@ -23162,8 +23162,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-reqwest"
-version = "0.12.15-sim"
+name = "zed-reqwest"
+version = "0.12.15-zed"
 source = "git+https://github.com/simtropolis/reqwest.git?rev=c15662463bda39148ba154100dd44d3fba5873a4#c15662463bda39148ba154100dd44d3fba5873a4"
 dependencies = [
  "base64 0.22.1",
@@ -23211,8 +23211,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-scap"
-version = "0.0.8-sim"
+name = "zed-scap"
+version = "0.0.8-zed"
 source = "git+https://github.com/simtropolis/scap?rev=4afea48c3b002197176fb19cd0f9b180dd36eaac#4afea48c3b002197176fb19cd0f9b180dd36eaac"
 dependencies = [
  "anyhow",
@@ -23232,8 +23232,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-xim"
-version = "0.4.0-sim"
+name = "zed-xim"
+version = "0.4.0-zed"
 source = "git+https://github.com/simtropolis/xim-rs.git?rev=16f35a2c881b815a2b6cdfd6687988e84f8447d8#16f35a2c881b815a2b6cdfd6687988e84f8447d8"
 dependencies = [
  "ahash 0.8.12",
@@ -23245,7 +23245,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_actions"
+name = "zed_actions"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -23255,7 +23255,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_credentials_provider"
+name = "zed_credentials_provider"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -23269,7 +23269,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_env_vars"
+name = "zed_env_vars"
 version = "0.1.0"
 dependencies = [
  "env_var",
@@ -23307,28 +23307,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_glsl"
+name = "zed_glsl"
 version = "0.2.4"
 dependencies = [
  "zed_extension_api 0.1.0",
 ]
 
 [[package]]
-name = "sim_html"
+name = "zed_html"
 version = "0.3.1"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "sim_proto"
+name = "zed_proto"
 version = "0.3.2"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "sim_test_extension"
+name = "zed_test_extension"
 version = "0.1.0"
 dependencies = [
  "zed_extension_api 0.8.0",

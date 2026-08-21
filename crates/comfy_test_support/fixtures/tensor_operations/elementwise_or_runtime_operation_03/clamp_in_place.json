@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-26EF6B18C684",
   "baseline_overload_id": "COMFY-TENSOR-OP-26EF6B18C684:blocked",
   "baseline_fixture_sha256": "c3c8230dba45ed0e82188feb52a13cbd2fadfaec72708630b2876ef1df033b6e",
-  "overload_id": "sim.native.tensor.clamp-in-place.cpu.v1",
+  "overload_id": "zed.native.tensor.clamp-in-place.cpu.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
   "ordered_parameters": [
     {

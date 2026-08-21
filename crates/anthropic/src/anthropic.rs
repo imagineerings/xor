@@ -366,11 +366,11 @@ async fn send_request(
         request_builder = request_builder.header("Anthropic-Beta", beta_headers);
     }
 
-    let serialisim_request =
+    let serialized_request =
         serde_json::to_string(&request).map_err(AnthropicError::SerializeRequest)?;
     let request = request_builder
         .extra_headers(extra_headers)
-        .body(AsyncBody::from(serialisim_request))
+        .body(AsyncBody::from(serialized_request))
         .map_err(AnthropicError::BuildRequestBody)?;
 
     let response = client

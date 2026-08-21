@@ -2723,8 +2723,8 @@ fn validate_nonzero_shape(
 pub(crate) fn is_registered_vae_architecture(value: &str) -> bool {
     matches!(
         value,
-        "sim.vae.block_average_nearest.v1"
-            | "sim.vae.boundary.v1"
+        "zed.vae.block_average_nearest.v1"
+            | "zed.vae.boundary.v1"
             | "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1"
             | "comfy.ldm.models.autoencoder.AutoencodingEngine.temporal.v1"
             | "comfy.taesd.TAESD.v1"
@@ -2760,7 +2760,7 @@ pub(crate) fn validate_architecture_profile_pair(
     profile: &VaeKernelProfile,
 ) -> Result<(), VaeArchitectureError> {
     let matches = match architecture.as_str() {
-        "sim.vae.block_average_nearest.v1" | "sim.vae.boundary.v1" => {
+        "zed.vae.block_average_nearest.v1" | "zed.vae.boundary.v1" => {
             matches!(profile, VaeKernelProfile::BlockAverageNearestV1)
         }
         "comfy.ldm.models.autoencoder.AutoencoderKL.reduced.v1" => {
@@ -3097,7 +3097,7 @@ mod tests {
             VaeKernelProfile::PixelSpaceV1 => {
                 "comfy.pixel_space_convert.PixelspaceConversionVAE.v1"
             }
-            _ => "sim.vae.boundary.v1",
+            _ => "zed.vae.boundary.v1",
         };
         let contract = profile.contract();
         let boundary = match contract.boundary {

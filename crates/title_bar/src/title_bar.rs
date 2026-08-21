@@ -23,7 +23,7 @@ use crate::application_menu::{
 
 use auto_update::AutoUpdateStatus;
 use call::ActiveCall;
-use client::{Client, UserStore, sim_urls};
+use client::{Client, UserStore, zed_urls};
 use command_palette_hooks::CommandPaletteFilter;
 
 use gpui::{
@@ -56,7 +56,7 @@ use workspace::{
     notifications::{NotifyResultExt, NotifyTaskExt as _},
 };
 
-use sim_actions::OpenRemote;
+use zed_actions::OpenRemote;
 
 pub use onboarding_banner::restore_banner;
 
@@ -450,7 +450,7 @@ impl TitleBar {
         let platform_style = PlatformStyle::platform();
         let application_menu = match platform_style {
             PlatformStyle::Mac => {
-                if option_env!("SIM_USE_CROSS_PLATFORM_MENU").is_some() {
+                if option_env!("ZED_USE_CROSS_PLATFORM_MENU").is_some() {
                     Some(cx.new(|cx| ApplicationMenu::new(window, cx)))
                 } else {
                     None
@@ -853,7 +853,7 @@ impl TitleBar {
                     .selected_style(ButtonStyle::Tinted(TintColor::Accent))
                     .when(!is_project_selected, |s| s.color(Color::Muted)),
                 move |_window, cx| {
-                    Tooltip::for_action("Recent Projects", &sim_actions::OpenRecent::default(), cx)
+                    Tooltip::for_action("Recent Projects", &zed_actions::OpenRecent::default(), cx)
                 },
             )
             .anchor(gpui::Anchor::TopLeft)
@@ -904,7 +904,7 @@ impl TitleBar {
                     .selected_style(ButtonStyle::Tinted(TintColor::Accent))
                     .when(!is_project_selected, |s| s.color(Color::Muted)),
                 move |_window, cx| {
-                    Tooltip::for_action("Recent Projects", &sim_actions::OpenRecent::default(), cx)
+                    Tooltip::for_action("Recent Projects", &zed_actions::OpenRecent::default(), cx)
                 },
             )
             .anchor(gpui::Anchor::TopLeft)
@@ -1006,7 +1006,7 @@ impl TitleBar {
                     move |_window, cx| {
                         Tooltip::with_meta(
                             "Worktree",
-                            Some(&sim_actions::git::Worktree),
+                            Some(&zed_actions::git::Worktree),
                             format!("Currently In Use: {}", worktree_label),
                             cx,
                         )
@@ -1064,7 +1064,7 @@ impl TitleBar {
                         };
                         Tooltip::with_meta(
                             "Branch & Stash",
-                            Some(&sim_actions::git::Branch),
+                            Some(&zed_actions::git::Branch),
                             meta,
                             cx,
                         )
@@ -1161,13 +1161,13 @@ impl TitleBar {
             client::Status::UpgradeRequired => {
                 let auto_updater = auto_update::AutoUpdater::get(cx);
                 let label = match auto_updater.map(|auto_update| auto_update.read(cx).status()) {
-                    Some(AutoUpdateStatus::Updated { .. }) => "Please restart Sim to Collaborate",
+                    Some(AutoUpdateStatus::Updated { .. }) => "Please restart Zed to Collaborate",
                     Some(AutoUpdateStatus::Installing { .. })
                     | Some(AutoUpdateStatus::Downloading { .. })
                     | Some(AutoUpdateStatus::Checking) => "Updating...",
                     Some(AutoUpdateStatus::Idle)
                     | Some(AutoUpdateStatus::Errored { .. })
-                    | None => "Please update Sim to Collaborate",
+                    | None => "Please update Zed to Collaborate",
                 };
 
                 Some(
@@ -1294,7 +1294,7 @@ impl TitleBar {
                                     .into_any_element()
                             },
                             move |_, cx| {
-                                cx.open_url(&sim_urls::account_url(cx));
+                                cx.open_url(&zed_urls::account_url(cx));
                             },
                         )
                         .separator()
@@ -1306,7 +1306,7 @@ impl TitleBar {
                                     .w_full()
                                     .gap_1()
                                     .justify_between()
-                                    .child(Label::new("Restart to update Sim").color(Color::Accent))
+                                    .child(Label::new("Restart to update Zed").color(Color::Accent))
                                     .child(
                                         Icon::new(IconName::Download)
                                             .size(IconSize::Small)
@@ -1374,19 +1374,19 @@ impl TitleBar {
 
                         this.separator()
                     })
-                    .action("Settings", sim_actions::OpenSettings.boxed_clone())
-                    .action("Keymap", Box::new(sim_actions::OpenKeymap))
+                    .action("Settings", zed_actions::OpenSettings.boxed_clone())
+                    .action("Keymap", Box::new(zed_actions::OpenKeymap))
                     .action(
                         "Themes…",
-                        sim_actions::theme_selector::Toggle::default().boxed_clone(),
+                        zed_actions::theme_selector::Toggle::default().boxed_clone(),
                     )
                     .action(
                         "Icon Themes…",
-                        sim_actions::icon_theme_selector::Toggle::default().boxed_clone(),
+                        zed_actions::icon_theme_selector::Toggle::default().boxed_clone(),
                     )
                     .action(
                         "Extensions",
-                        sim_actions::Extensions::default().boxed_clone(),
+                        zed_actions::Extensions::default().boxed_clone(),
                     )
                     .when(ai_enabled, |menu| {
                         menu.separator()

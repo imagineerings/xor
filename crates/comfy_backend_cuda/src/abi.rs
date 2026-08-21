@@ -205,7 +205,7 @@ impl AbiManifest {
             || !self.package_policy.approved_redistributables.is_empty()
             || !self.package_policy.license_approval_required
             || self.package_policy.signature_algorithm != "ed25519"
-            || self.package_policy.signature_domain != "sim-comfy-cuda-package-v1"
+            || self.package_policy.signature_domain != "zed-comfy-cuda-package-v1"
             || self.package_policy.runtime_compilation_for_core_kernels
         {
             return Err(contract(

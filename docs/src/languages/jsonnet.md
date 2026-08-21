@@ -1,11 +1,11 @@
 ---
 title: Jsonnet
-description: "Configure Jsonnet language support in Sim, including language servers, formatting, and debugging."
+description: "Configure Jsonnet language support in Zed, including language servers, formatting, and debugging."
 ---
 
 # Jsonnet
 
-Jsonnet language support in Sim is provided by the community-maintained [Jsonnet extension](https://github.com/narqo/sim-jsonnet).
+Jsonnet language support in Zed is provided by the community-maintained [Jsonnet extension](https://github.com/narqo/zed-jsonnet).
 
 - Tree-sitter: [sourcegraph/tree-sitter-jsonnet](https://github.com/sourcegraph/tree-sitter-jsonnet)
 - Language Server: [grafana/jsonnet-language-server](https://github.com/grafana/jsonnet-language-server)

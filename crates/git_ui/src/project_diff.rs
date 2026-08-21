@@ -26,7 +26,7 @@ use project::{
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
-use sim_actions::git as git_actions;
+use zed_actions::git as git_actions;
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 use ui::{DiffStat, Divider, Tooltip, prelude::*};
@@ -563,7 +563,7 @@ impl Render for ProjectDiff {
 }
 
 impl SerializableItem for ProjectDiff {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "ProjectDiff"
     }
 
@@ -1008,7 +1008,7 @@ mod tests {
         });
     }
 
-    use sim_actions::git as git_actions;
+    use zed_actions::git as git_actions;
 
     use crate::project_diff::{self, ProjectDiff};
 

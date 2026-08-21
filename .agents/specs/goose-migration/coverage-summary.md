@@ -1,4 +1,4 @@
-# Goose-to-Sim Migration Coverage Summary
+# Goose-to-Zed Migration Coverage Summary
 
 ## Overall coverage
 
@@ -10,8 +10,8 @@
 
 | Classification | Count | Meaning |
 | --- | ---: | --- |
-| C1 | 22 | Reusable in Sim without changes |
-| C2 | 35 | Existing Sim behavior should be extended |
+| C1 | 22 | Reusable in Zed without changes |
+| C2 | 35 | Existing Zed behavior should be extended |
 | C3 | 51 | Fully covered by a migration specification, not evidenced as implemented |
 | C4 | 35 | Partially covered by a migration specification |
 | C5 | 1 | Missing from migration specifications |
@@ -46,7 +46,7 @@
 
 ## Missing capability
 
-- **ACP-013 — multi-language SDK:** Goose publishes Rust/UniFFI-backed Python and Kotlin artifacts, Maven packages, and Python wheels. No Sim public-binding commitment or migration requirement exists. A product decision is required before specifying API/ABI stability, generated-code ownership, distribution, and support.
+- **ACP-013 — multi-language SDK:** Goose publishes Rust/UniFFI-backed Python and Kotlin artifacts, Maven packages, and Python wheels. No Zed public-binding commitment or migration requirement exists. A product decision is required before specifying API/ABI stability, generated-code ownership, distribution, and support.
 
 ## Partially covered or ambiguous capabilities
 
@@ -59,13 +59,13 @@
 - **Sessions:** SES-007 explicit legacy import/backup/idempotency/rollback; SES-008 extension/profile restore precedence and partial failure.
 - **Dictation:** DCT-001 device/permission/interruption/sample/platform capture behavior; DCT-003 exact cloud-provider contracts, limits, privacy, and retention.
 - **CLI:** CLI-001 headless session option precedence/lifecycle; CLI-003 session management selection and deletion safety; CLI-004 provider/config/Doctor TTY and mutation semantics; CLI-008 final command inclusion/exclusion matrix.
-- **Desktop:** DUI-010 prompt-management scope and live-session semantics (the existing Sim skills settings surface is reusable); DUI-012 display modes and remaining native-Goose-app versus MCP-App product scope.
+- **Desktop:** DUI-010 prompt-management scope and live-session semantics (the existing Zed skills settings surface is reusable); DUI-012 display modes and remaining native-Goose-app versus MCP-App product scope.
 - **Developer Context and Commands:** the 33-capability source-backed subcatalog in `developer-experience/coverage-audit.md` found seven confirmed native extensions (local commands, MCP prompt arguments, and project-rule diagnostics), six decision-gated behaviors, five cross-spec behaviors, two intentional exclusions, and two Goose internals with no direct port. The new `goal-grind-commands` pack owns the previously gated persistent-goal/bounded-grind capability.
 - **Observability/evaluation/developer workflows:** OBS-006 tool inspection/repetition retention/privacy; EVL-003 datasets/metrics/hardware variance/result schema; DX-001 exact runnable examples; DX-002 script-by-script reuse/exclusion and CI matrix.
 
 ## Reuse opportunities and duplicate prevention
 
-| Behavior | Canonical Sim owner to reuse |
+| Behavior | Canonical Zed owner to reuse |
 | --- | --- |
 | Agent turns, compaction, tools, subagents | `crates/agent` thread/session/tool paths |
 | ACP agents and extension processes | `crates/agent_servers`, `crates/context_server`, `crates/acp_thread` |
@@ -80,37 +80,37 @@
 | Downloads/local models | `crates/http_client` plus the selected existing model/cache owner |
 | Telemetry/Langfuse/OTLP/analytics | existing tracing/telemetry pipeline with conditional exporters |
 | Documentation | existing mdBook, preprocessors, link checks, and deploy workflows |
-| Release/build/community workflows | Sim-native CI/release/governance; no direct Goose workflow copy |
+| Release/build/community workflows | Zed-native CI/release/governance; no direct Goose workflow copy |
 
 ## Suspected specification overclaims found and corrected
 
 1. Runtime agent snapshots were actually Insta prompt golden files; runtime capture/restore was removed.
 2. The supposed Goose REST/OpenAPI server and routes do not exist; the pack now covers ACP stdio and authenticated HTTP/WebSocket and excludes REST parity.
-3. Local inference was incorrectly described as Candle; the plan now reuses Sim llama.cpp and decision-gates MLX.
+3. Local inference was incorrectly described as Candle; the plan now reuses Zed llama.cpp and decision-gates MLX.
 4. Peekaboo was incorrectly treated as cross-platform; the current source is macOS-gated.
 5. A nonexistent generic embedding provider source was cited; the work was replaced by source-backed canonical metadata and usage normalization.
 6. OIDC proxy behavior was incorrectly described as an end-user/Anthropic login service; it is a GitHub Actions JWT-verifying upstream-key proxy.
 7. Multiple designs assumed new Doctor, download, PostHog, security, permission, i18n, app, runner, and other crates from directory names; affected packs now choose existing integration points first.
 8. Tasks used past-tense “implemented/created/tests passing” language without code evidence; those claims were converted to unchecked implementation instructions.
-9. Documentation proposed a second Docusaurus site although Sim already has mdBook, preprocessors, search/deployment, link checks, and release channels; the pack now extends existing docs.
+9. Documentation proposed a second Docusaurus site although Zed already has mdBook, preprocessors, search/deployment, link checks, and release channels; the pack now extends existing docs.
 10. Ask AI requirements had no task or operational boundary; the pack now decision-gates the external Discord service and records auth/privacy/abuse/freshness/ownership needs.
-11. Developer experience assumed `/help` and literal `/recipe` were Goose agent built-ins, proposed direct-agent unknown-command rejection, described `sources.rs` as a root registry, erased action history on clear, and overlooked Sim's existing shared session initialization and skills settings UI. The repaired pack corrects those claims and adds the confirmed multi-argument MCP prompt gap.
+11. Developer experience assumed `/help` and literal `/recipe` were Goose agent built-ins, proposed direct-agent unknown-command rejection, described `sources.rs` as a root registry, erased action history on clear, and overlooked Zed's existing shared session initialization and skills settings UI. The repaired pack corrects those claims and adds the confirmed multi-argument MCP prompt gap.
 
 ## Decisions requiring review
 
-1. Expose Sim as a standalone ACP server: stdio, authenticated HTTP/WebSocket, both, or neither.
+1. Expose Zed as a standalone ACP server: stdio, authenticated HTTP/WebSocket, both, or neither.
 2. Keep REST/OpenAPI excluded, or commission a separate non-parity product specification.
 3. Approve a terminal-native UI/headless agent CLI and choose the exact command matrix.
-4. Select subscription-backed ACP agents, declarative provider presets, and consumer providers Sim will support.
+4. Select subscription-backed ACP agents, declarative provider presets, and consumer providers Zed will support.
 5. Select local-inference scope: existing llama.cpp only, MLX too, supported model families, hardware, and platforms.
 6. Approve or exclude persistent memory, Nostr sharing, Telegram gateway, arbitrary container execution, and embedded MCP Apps after privacy/security review.
 7. Approve or reject model-based read-only permission judgment and automatic Doctor provider/model changes.
 8. Decide public SDK commitments: TypeScript and/or Rust/Python/Kotlin, including support/versioning ownership.
 9. Decide whether localization is a repository-wide initiative and whether Goose locale content informs it.
-10. Decide whether Sim will operate the GitHub Actions OIDC proxy and Ask AI Discord service, with named operations/security owners.
+10. Decide whether Zed will operate the GitHub Actions OIDC proxy and Ask AI Discord service, with named operations/security owners.
 11. Decide whether Nostr/session links, recipe deeplinks, and shared sessions require signing, encryption, retention, or service infrastructure beyond local import/export.
 12. Decide whether blog/community content and additional machine-consumable documentation artifacts belong in this repository.
-13. Decide whether nested access-triggered instructions, instruction imports, structured source CRUD APIs, agent/check catalogs, or embedded MCP Apps are Sim products; persistent `/goal` and bounded `/grind` are now approved and owned by `goal-grind-commands`.
+13. Decide whether nested access-triggered instructions, instruction imports, structured source CRUD APIs, agent/check catalogs, or embedded MCP Apps are Zed products; persistent `/goal` and bounded `/grind` are now approved and owned by `goal-grind-commands`.
 
 ## Files and validation
 

@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-A9FBD2C51ABA",
   "baseline_overload_id": "COMFY-TENSOR-OP-A9FBD2C51ABA:blocked",
   "baseline_fixture_sha256": "0a536069b715e9f5db21bb59fa43cb2f2b6efda24b8cec071c56f6447db3bc91",
-  "overload_id": "sim.native.reduction.torch-norm.vector-norm-adapter.v1",
+  "overload_id": "zed.native.reduction.torch-norm.vector-norm-adapter.v1",
   "owner_task_id": "comfy-parity-tensor-ops-reduction-comfy-tensor-op-9f681b3616f6",
   "ordered_parameters": [
     {

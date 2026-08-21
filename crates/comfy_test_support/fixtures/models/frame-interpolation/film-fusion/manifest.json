@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-film-fusion-v1",
+  "artifact": "zed-native-film-fusion-v1",
   "evidence_kind": "source-fingerprinted reduced exact-weight fusion graph plus production retained-weight schedule",
   "source": {
     "repository": "ComfyUI",

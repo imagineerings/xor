@@ -1,6 +1,6 @@
 #![allow(rustdoc::private_intra_doc_links)]
 //! This is the place where everything editor-related is stored (data-wise) and displayed (ui-wise).
-//! The main point of interest in this crate is [`Editor`] type, which is used in every other Sim part as a user input element.
+//! The main point of interest in this crate is [`Editor`] type, which is used in every other Zed part as a user input element.
 //! It comes in different flavors: single line, multiline and a fixed height one.
 //!
 //! Editor contains of multiple large submodules:
@@ -479,7 +479,7 @@ pub enum EditorMode {
         /// When set to `true`, the editor will render a background for the active line.
         show_active_line_background: bool,
         /// When set to `true`, the editor's height will be determined by its content.
-        sisim_by_content: bool,
+        sized_by_content: bool,
     },
 }
 
@@ -488,7 +488,7 @@ impl EditorMode {
         Self::Full {
             scale_ui_elements_with_buffer_font_size: true,
             show_active_line_background: true,
-            sisim_by_content: false,
+            sized_by_content: false,
         }
     }
 
@@ -825,7 +825,7 @@ struct PhantomBreakpointIndicator {
     is_active: bool,
     collides_with_existing_breakpoint: bool,
 }
-/// Sim's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
+/// Zed's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
 ///
 /// See the [module level documentation](self) for more information.
 pub struct Editor {
@@ -2094,7 +2094,7 @@ impl Editor {
             cx,
             |e, _, _| match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
+                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -2165,7 +2165,7 @@ impl Editor {
         .detach_and_prompt_err("Failed to create buffer", window, cx, |e, _, _| {
             match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
+                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -4554,7 +4554,7 @@ impl Editor {
             return None;
         }
 
-        // OnTypeFormatting returns a list of edits, no need to pass them between Sim instances,
+        // OnTypeFormatting returns a list of edits, no need to pass them between Zed instances,
         // hence we do LSP request & edit on host side only — add formats to host's history.
         let push_to_lsp_host_history = true;
         // If this is not the host, append its history with new edits.
@@ -7966,7 +7966,7 @@ impl Editor {
                         cx.stop_propagation();
                         this.report_editor_event("Edit Prediction Provider ToS Clicked", None, cx);
                         window.dispatch_action(
-                            sim_actions::OpenSimPredictOnboarding.boxed_clone(),
+                            zed_actions::OpenSimPredictOnboarding.boxed_clone(),
                             cx,
                         );
                     }))
@@ -10727,7 +10727,7 @@ impl Editor {
                     "No entry in selection_history found for undo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/simtropolis/sim/issues/22692"
+                     https://github.com/simtropolis/zed/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);
@@ -10757,7 +10757,7 @@ impl Editor {
                     "No entry in selection_history found for redo. \
                      This may correspond to a bug where undo does not update the selection. \
                      If this is occurring, please add details to \
-                     https://github.com/simtropolis/sim/issues/22692"
+                     https://github.com/simtropolis/zed/issues/22692"
                 );
             }
             self.request_autoscroll(Autoscroll::fit(), cx);
@@ -16600,7 +16600,7 @@ impl Editor {
 
     pub fn copy_path(
         &mut self,
-        _: &sim_actions::workspace::CopyPath,
+        _: &zed_actions::workspace::CopyPath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -16613,7 +16613,7 @@ impl Editor {
 
     pub fn copy_relative_path(
         &mut self,
-        _: &sim_actions::workspace::CopyRelativePath,
+        _: &zed_actions::workspace::CopyRelativePath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -21139,10 +21139,10 @@ impl Render for MissingEditPredictionKeybindingTooltip {
                         .items_end()
                         .w_full()
                         .child(Button::new("open-keymap", "Assign Keybinding").size(ButtonSize::Compact).on_click(|_ev, window, cx| {
-                            window.dispatch_action(sim_actions::OpenKeymap.boxed_clone(), cx)
+                            window.dispatch_action(zed_actions::OpenKeymap.boxed_clone(), cx)
                         }))
                         .child(Button::new("see-docs", "See Docs").size(ButtonSize::Compact).on_click(|_ev, _window, cx| {
-                            cx.open_url("https://sim.dev/docs/completions#edit-predictions-missing-keybinding");
+                            cx.open_url("https://zed.dev/docs/completions#edit-predictions-missing-keybinding");
                         })),
                 )
         })

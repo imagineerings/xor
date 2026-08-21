@@ -2,11 +2,11 @@
 
 ## 1. Overview
 
-Migrate goose's security and permission systems into sim's existing security infrastructure (`crates/sandbox/`). The security system provides adversarial input inspection, egress data inspection, content classification, and pattern-based threat detection. The permission system provides user-in-the-loop confirmation, intelligent judging, and persistent permission storage.
+Migrate goose's security and permission systems into zed's existing security infrastructure (`crates/sandbox/`). The security system provides adversarial input inspection, egress data inspection, content classification, and pattern-based threat detection. The permission system provides user-in-the-loop confirmation, intelligent judging, and persistent permission storage.
 
 ### Key Architectural Decisions
 
-- **Layer on top of `crates/sandbox/`**: Sim already has sandbox primitives. The goose security system adds content-level inspection (not just OS-level sandboxing).
+- **Layer on top of `crates/sandbox/`**: Zed already has sandbox primitives. The goose security system adds content-level inspection (not just OS-level sandboxing).
 - **Integration-point-first security ownership**: Content inspection composes with the existing agent, sandbox/network, settings, HTTP, and redaction boundaries. Extract a component only if the existing owner cannot preserve isolation.
 - **Existing permission owner**: Extend `crates/agent/src/tool_permissions.rs`, ACP permission requests, and agent UI confirmation rather than creating a second permission system.
 - **Pluggable inspectors**: The security scanner supports registering multiple inspectors, making it extensible.
@@ -30,7 +30,7 @@ graph TD
         Store[PermissionStore]
     end
 
-    subgraph "Existing sim"
+    subgraph "Existing zed"
         Sandbox[crates/sandbox/]
         AgentTools[crates/agent/src/tool_permissions.rs]
         Agent[crates/agent/]
@@ -205,8 +205,8 @@ _For any_ blocked action [by security or permission systems], THE system SHALL i
 
 - Source: `projects/goose/crates/goose/src/security/`
 - Source: `projects/goose/crates/goose/src/permission/`
-- Sim: `crates/sandbox/`
-- Sim: `crates/agent/src/tool_permissions.rs`
+- Zed: `crates/sandbox/`
+- Zed: `crates/agent/src/tool_permissions.rs`
 
 ## Requirements traceability
 

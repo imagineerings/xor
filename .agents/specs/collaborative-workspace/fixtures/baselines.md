@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document freezes the reproducible evidence available in the Buzz source tree before consolidation into Sim. It is a preservation baseline, not an approval of the target architecture and not evidence that an unmeasured subsystem is fast enough for production. A missing measurement is a failing readiness condition until the owning scale-gate leaf records an approved budget and a passing result.
+This document freezes the reproducible evidence available in the Buzz source tree before consolidation into Zed. It is a preservation baseline, not an approval of the target architecture and not evidence that an unmeasured subsystem is fast enough for production. A missing measurement is a failing readiness condition until the owning scale-gate leaf records an approved budget and a passing result.
 
 The baseline covers the seven subsystems required by Task 3.4: relay, Redis fan-out, search, push, workflow, relay mesh and Harbor orchestration. Each record names its command, environment, observed result, preservation budget and known defect. The downstream task references are the canonical owners of missing measurements or behavior.
 
@@ -11,7 +11,7 @@ The baseline covers the seven subsystems required by Task 3.4: relay, Redis fan-
 | Field | Captured value |
 |---|---|
 | Date | 2026-08-14 |
-| Source revision | `4dbf73b1d36cb2e328a9a1a02aaa47b8dd59b19f` on `sim-dev-editors` |
+| Source revision | `4dbf73b1d36cb2e328a9a1a02aaa47b8dd59b19f` on `zed-dev-editors` |
 | Host | Apple Silicon arm64, 10 logical cores, 32 GiB memory |
 | Operating system | Darwin |
 | Python | CPython 3.14.5 |

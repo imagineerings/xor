@@ -43,7 +43,7 @@ fn admission() -> AuthorizedRpcRequest {
     )
     .expect("tenant");
     let required_scope = AuthorizationScope::new("events:write").expect("scope");
-    let authenticated = AuthenticatedPrincipal::sim_account(
+    let authenticated = AuthenticatedPrincipal::zed_account(
         principal_id,
         community_id,
         ServiceAccountId::new(3),

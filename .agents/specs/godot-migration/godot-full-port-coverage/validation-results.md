@@ -5,7 +5,7 @@
 No validation errors remain.
 
 - The feature-spec validator passed the root pack, all 27 pre-existing child packs, and `godot-full-port-coverage`: **29/29 packs**, **0 errors**.
-- `validate_audit.py` passed: **198 capabilities**, **21 domains**, **7 classifications**, **13,979 Godot source paths**, unique IDs, the expanded native-owner/dependency/path/boundary schema, exact evidence paths, exact domain and native-gate trace links, reconciled counts, frozen Sim/Godot source fingerprints, prohibited-delegation scans, and no checked tasks.
+- `validate_audit.py` passed: **198 capabilities**, **21 domains**, **7 classifications**, **13,979 Godot source paths**, unique IDs, the expanded native-owner/dependency/path/boundary schema, exact evidence paths, exact domain and native-gate trace links, reconciled counts, frozen Zed/Godot source fingerprints, prohibited-delegation scans, and no checked tasks.
 - The migration tree contains **344 unchecked tasks** and **0 checked tasks**.
 
 ## Warnings

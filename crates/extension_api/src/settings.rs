@@ -1,4 +1,4 @@
-//! Provides access to Sim settings.
+//! Provides access to Zed settings.
 
 #[path = "../wit/since_v0.8.0/settings.rs"]
 mod types;

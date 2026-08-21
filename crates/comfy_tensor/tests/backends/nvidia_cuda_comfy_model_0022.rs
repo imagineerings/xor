@@ -29,7 +29,7 @@ fn test_backend_with_limits(
         total_memory_bytes,
         maximum_allocation_bytes,
     )
-    .map_err(|error| map_execution_error("sim.cuda.test-harness", error))?;
+    .map_err(|error| map_execution_error("zed.cuda.test-harness", error))?;
     let cancellation = CancellationToken::default();
     let (backend, authority) = CudaTensorBackend::from_certified_session(
         session,

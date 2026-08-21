@@ -669,7 +669,7 @@ impl OutlinePanel {
         workspace: WeakEntity<Workspace>,
         mut cx: AsyncWindowContext,
     ) -> anyhow::Result<Entity<Self>> {
-        let serialisim_panel = match workspace
+        let serialized_panel = match workspace
             .read_with(&cx, |workspace, _| {
                 OutlinePanel::serialization_key(workspace)
             })
@@ -692,7 +692,7 @@ impl OutlinePanel {
         };
 
         workspace.update_in(&mut cx, |workspace, window, cx| {
-            let panel = Self::new(workspace, serialisim_panel.as_ref(), window, cx);
+            let panel = Self::new(workspace, serialized_panel.as_ref(), window, cx);
             panel.update(cx, |_, cx| cx.notify());
             panel
         })
@@ -1463,10 +1463,10 @@ impl OutlinePanel {
                     menu.action("Fold Directory", Box::new(FoldDirectory))
                 })
                 .separator()
-                .action("Copy Path", Box::new(sim_actions::workspace::CopyPath))
+                .action("Copy Path", Box::new(zed_actions::workspace::CopyPath))
                 .action(
                     "Copy Relative Path",
-                    Box::new(sim_actions::workspace::CopyRelativePath),
+                    Box::new(zed_actions::workspace::CopyRelativePath),
                 )
         });
         window.focus(&context_menu.focus_handle(cx), cx);
@@ -1959,7 +1959,7 @@ impl OutlinePanel {
 
     fn copy_path(
         &mut self,
-        _: &sim_actions::workspace::CopyPath,
+        _: &zed_actions::workspace::CopyPath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -1974,7 +1974,7 @@ impl OutlinePanel {
 
     fn copy_relative_path(
         &mut self,
-        _: &sim_actions::workspace::CopyRelativePath,
+        _: &zed_actions::workspace::CopyRelativePath,
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {

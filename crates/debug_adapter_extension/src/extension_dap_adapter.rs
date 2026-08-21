@@ -106,8 +106,8 @@ impl DebugAdapter for ExtensionDapAdapter {
             .await
     }
 
-    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
-        self.extension.dap_config_to_scenario(sim_scenario).await
+    async fn config_from_zed_format(&self, zed_scenario: SimDebugConfig) -> Result<DebugScenario> {
+        self.extension.dap_config_to_scenario(zed_scenario).await
     }
 
     async fn request_kind(

@@ -1,29 +1,29 @@
 use client::telemetry;
 use extension_host::ExtensionStore;
 use gpui::{App, ClipboardItem, PromptLevel, actions};
-use sim_actions::feedback::{EmailSim, FileBugReport, RequestFeature};
+use zed_actions::feedback::{EmailSim, FileBugReport, RequestFeature};
 use system_specs::{CopySystemSpecsIntoClipboard, SystemSpecs};
 use util::ResultExt;
 use workspace::Workspace;
 
 actions!(
-    sim,
+    zed,
     [
-        /// Opens the Sim repository on GitHub.
+        /// Opens the Zed repository on GitHub.
         OpenSimRepo,
         /// Copies installed extensions to the clipboard for bug reports.
         CopyInstalledExtensionsIntoClipboard
     ]
 );
 
-const SIM_REPO_URL: &str = "https://github.com/simtropolis/sim";
+const ZED_REPO_URL: &str = "https://github.com/simtropolis/zed";
 
-const REQUEST_FEATURE_URL: &str = "https://github.com/simtropolis/sim/discussions/new/choose";
+const REQUEST_FEATURE_URL: &str = "https://github.com/simtropolis/zed/discussions/new/choose";
 
 fn file_bug_report_url(specs: &SystemSpecs) -> String {
     format!(
         concat!(
-            "https://github.com/simtropolis/sim/issues/new",
+            "https://github.com/simtropolis/zed/issues/new",
             "?",
             "template=10_bug_report.yml",
             "&",
@@ -33,9 +33,9 @@ fn file_bug_report_url(specs: &SystemSpecs) -> String {
     )
 }
 
-fn email_sim_url(specs: &SystemSpecs) -> String {
+fn email_zed_url(specs: &SystemSpecs) -> String {
     format!(
-        concat!("mailto:hi@sim.dev", "?", "body={}"),
+        concat!("mailto:hi@zed.dev", "?", "body={}"),
         email_body(specs)
     )
 }
@@ -102,14 +102,14 @@ pub fn init(cx: &mut App) {
                 cx.spawn_in(window, async move |_, cx| {
                     let specs = specs.await;
                     cx.update(|_, cx| {
-                        cx.open_url(&email_sim_url(&specs));
+                        cx.open_url(&email_zed_url(&specs));
                     })
                     .log_err();
                 })
                 .detach();
             })
             .register_action(move |_, _: &OpenSimRepo, _, cx| {
-                cx.open_url(SIM_REPO_URL);
+                cx.open_url(ZED_REPO_URL);
             });
     })
     .detach();

@@ -36,7 +36,7 @@ use project::{
 };
 use rope::Point;
 use settings::Settings;
-use sim_actions::agent::{Chat, PasteRaw};
+use zed_actions::agent::{Chat, PasteRaw};
 use std::{cmp::min, fmt::Write, ops::Range, rc::Rc, sync::Arc};
 use text::LineEnding;
 use theme_settings::ThemeSettings;
@@ -2336,7 +2336,7 @@ mod tests {
 
     #[test]
     fn test_validate_slash_commands_accepts_scope_qualified_skill() {
-        let agent_id = AgentId::from("Sim");
+        let agent_id = AgentId::from("Zed");
         let make_skill = |name: &str, source: &str| AvailableSkill {
             name: name.into(),
             description: "desc".into(),
@@ -2350,14 +2350,14 @@ mod tests {
         // name. The empty-scope encoding means a worktree literally
         // named `global` no longer collides with the global source.
         let commands = vec![acp::AvailableCommand::new("help", "Get help")];
-        let skills = vec![make_skill("deploy", ""), make_skill("deploy", "sim")];
+        let skills = vec![make_skill("deploy", ""), make_skill("deploy", "zed")];
         let no_skills = Vec::new();
 
         // Bare name still works (current behavior — the resolver
         // applies project-overrides-global for unqualified commands).
         MessageEditor::validate_slash_commands("/deploy", &commands, &skills, &agent_id)
             .expect("bare /deploy should validate when a skill named `deploy` exists");
-        MessageEditor::validate_slash_commands("/sim:deploy", &commands, &no_skills, &agent_id)
+        MessageEditor::validate_slash_commands("/zed:deploy", &commands, &no_skills, &agent_id)
             .expect_err("scope-qualified skills should require a first-class available skill");
 
         // Scope-qualified forms both validate, each pointing at the
@@ -2366,8 +2366,8 @@ mod tests {
         // for a project-local skill.
         MessageEditor::validate_slash_commands("/:deploy", &commands, &skills, &agent_id)
             .expect("/:deploy should validate when a global skill named `deploy` exists");
-        MessageEditor::validate_slash_commands("/sim:deploy", &commands, &skills, &agent_id).expect(
-            "/sim:deploy should validate when a project skill named `deploy` exists in the `sim` worktree",
+        MessageEditor::validate_slash_commands("/zed:deploy", &commands, &skills, &agent_id).expect(
+            "/zed:deploy should validate when a project skill named `deploy` exists in the `zed` worktree",
         );
 
         // Hand-typed `/global:<name>` is NOT an alias for `/:<name>`.
@@ -2379,23 +2379,23 @@ mod tests {
             );
 
         // The `:` separator is what distinguishes a skill scope from
-        // an MCP server prefix — the dotted form `/sim.deploy` is an
+        // an MCP server prefix — the dotted form `/zed.deploy` is an
         // MCP-style lookup, which doesn't match here.
-        MessageEditor::validate_slash_commands("/sim.deploy", &commands, &skills, &agent_id)
-            .expect_err("/sim.deploy (dotted) should be treated as an MCP-style prefix and fail");
+        MessageEditor::validate_slash_commands("/zed.deploy", &commands, &skills, &agent_id)
+            .expect_err("/zed.deploy (dotted) should be treated as an MCP-style prefix and fail");
 
         // Wrong scope is rejected so the resolver doesn't silently
-        // fall through when the user meant a skill. `sim:help` looks
+        // fall through when the user meant a skill. `zed:help` looks
         // like a skill scope qualifier but no skill named `help`
-        // exists in the `sim` worktree (it's an MCP command).
+        // exists in the `zed` worktree (it's an MCP command).
         let err =
-            MessageEditor::validate_slash_commands("/sim:help", &commands, &skills, &agent_id)
+            MessageEditor::validate_slash_commands("/zed:help", &commands, &skills, &agent_id)
                 .expect_err(
-                    "/sim:help should fail — `help` is an MCP command, not a worktree skill",
+                    "/zed:help should fail — `help` is an MCP command, not a worktree skill",
                 );
         let err_message = err.to_string();
         assert!(
-            err_message.contains("/sim:help"),
+            err_message.contains("/zed:help"),
             "error should mention the typed command: {err_message}"
         );
         // Error listing shows qualified forms for skills so users see
@@ -2406,7 +2406,7 @@ mod tests {
             "error listing should show qualified global form: {err_message}"
         );
         assert!(
-            err_message.contains("/sim:deploy"),
+            err_message.contains("/zed:deploy"),
             "error listing should show qualified worktree form: {err_message}"
         );
         assert!(
@@ -2436,7 +2436,7 @@ mod tests {
     #[test]
     fn test_parse_mention_links() {
         // Single file mention
-        let text = "[@bundle-mac](file:///Users/test/sim/script/bundle-mac)";
+        let text = "[@bundle-mac](file:///Users/test/zed/script/bundle-mac)";
         let mentions = parse_mention_links(text, PathStyle::local());
         assert_eq!(mentions.len(), 1);
         assert_eq!(mentions[0].0, 0..text.len());
@@ -2618,7 +2618,7 @@ mod tests {
         fs.insert_tree(
             "/test",
             json!({
-                ".sim": {
+                ".zed": {
                     "tasks.json": r#"[{"label": "test", "command": "echo"}]"#
                 },
                 "src": {
@@ -4810,7 +4810,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialisim_copy_text_selection_covers_only_mention(cx: &mut TestAppContext) {
+    async fn test_serialized_copy_text_selection_covers_only_mention(cx: &mut TestAppContext) {
         init_test(cx);
 
         let (fixture, mut cx) = setup_selection_mention_fixture(cx).await;
@@ -4840,7 +4840,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialisim_copy_text_returns_none_when_mentions_outside_selection(
+    async fn test_serialized_copy_text_returns_none_when_mentions_outside_selection(
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
@@ -5001,7 +5001,7 @@ mod tests {
     }
 
     #[gpui::test]
-    async fn test_serialisim_cut_text_returns_none_when_mentions_outside_selection(
+    async fn test_serialized_cut_text_returns_none_when_mentions_outside_selection(
         cx: &mut TestAppContext,
     ) {
         init_test(cx);
@@ -5502,8 +5502,8 @@ mod tests {
             .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
             .expect("decode png");
         let file_name = match extension {
-            Some(extension) => format!("sim-agent-ui-test-{}.{}", uuid::Uuid::new_v4(), extension),
-            None => format!("sim-agent-ui-test-{}", uuid::Uuid::new_v4()),
+            Some(extension) => format!("zed-agent-ui-test-{}.{}", uuid::Uuid::new_v4(), extension),
+            None => format!("zed-agent-ui-test-{}", uuid::Uuid::new_v4()),
         };
         let path = std::env::temp_dir().join(file_name);
         std::fs::write(&path, bytes).expect("write temp png");

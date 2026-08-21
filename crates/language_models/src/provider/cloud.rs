@@ -1,7 +1,7 @@
 use ai_onboarding::YoungAccountBanner;
 use anyhow::{Result, anyhow};
 use client::{
-    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, global_llm_token, sim_urls,
+    Client, RefreshLlmTokenListener, TelemetrySettings, UserStore, global_llm_token, zed_urls,
 };
 use cloud_api_client::LlmApiToken;
 use cloud_api_types::OrganizationId;
@@ -13,8 +13,8 @@ use gpui::{AnyElement, AnyView, App, AppContext, Context, Entity, Subscription, 
 use language_model::{
     AuthenticateError, FastModeConfirmation, IconOrSvg, InlineDescription, LanguageModel,
     LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
-    LanguageModelProviderState, ProviderConfigurationView, SIM_CLOUD_PROVIDER_ID,
-    SIM_CLOUD_PROVIDER_NAME,
+    LanguageModelProviderState, ProviderConfigurationView, ZED_CLOUD_PROVIDER_ID,
+    ZED_CLOUD_PROVIDER_NAME,
 };
 use language_models_cloud::{CloudLlmTokenProvider, CloudModelProvider};
 use rand::{Rng as _, SeedableRng as _, rngs::StdRng};
@@ -27,8 +27,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use ui::{TintColor, prelude::*};
 
-const PROVIDER_ID: LanguageModelProviderId = SIM_CLOUD_PROVIDER_ID;
-const PROVIDER_NAME: LanguageModelProviderName = SIM_CLOUD_PROVIDER_NAME;
+const PROVIDER_ID: LanguageModelProviderId = ZED_CLOUD_PROVIDER_ID;
+const PROVIDER_NAME: LanguageModelProviderName = ZED_CLOUD_PROVIDER_NAME;
 const MODELS_REFRESH_DEBOUNCE: Duration = Duration::from_secs(5 * 60);
 
 struct ClientTokenProvider {
@@ -386,15 +386,15 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
     fn inline_description(&self, cx: &App) -> Option<InlineDescription> {
         let state = self.state.read(cx);
         let user_store = state.user_store.read(cx);
-        let is_sim_model_provider_enabled = user_store
+        let is_zed_model_provider_enabled = user_store
             .current_organization_configuration()
-            .map_or(true, |config| config.is_sim_model_provider_enabled);
+            .map_or(true, |config| config.is_zed_model_provider_enabled);
 
         Some(InlineDescription::Text(
-            sim_ai_description(
+            zed_ai_description(
                 !state.is_signed_out(cx),
                 user_store.plan(),
-                is_sim_model_provider_enabled,
+                is_zed_model_provider_enabled,
                 user_store.trial_started_at().is_none(),
             )
             .into(),
@@ -422,21 +422,21 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
     }
 
     fn authentication_error_message(&self) -> SharedString {
-        "Failed to sign in with your Sim account (401).".into()
+        "Failed to sign in with your Zed account (401).".into()
     }
 
     fn missing_credentials_error_message(&self) -> SharedString {
-        "You are not signed in to your Sim account. \
+        "You are not signed in to your Zed account. \
         Sign in to continue."
             .into()
     }
 
     fn fast_mode_confirmation(&self, _cx: &App) -> Option<FastModeConfirmation> {
         Some(FastModeConfirmation {
-            title: "Enable Fast Mode for Sim?".into(),
+            title: "Enable Fast Mode for Zed?".into(),
             message: "Fast mode routes requests through the upstream provider's fast mode or priority tier. The \
                 upstream provider's premium per-token pricing applies and is passed through to \
-                your Sim billing."
+                your Zed billing."
                 .into(),
         })
     }
@@ -446,46 +446,46 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
 struct SimAiConfiguration {
     is_connected: bool,
     plan: Option<Plan>,
-    is_sim_model_provider_enabled: bool,
+    is_zed_model_provider_enabled: bool,
     eligible_for_trial: bool,
     account_too_young: bool,
     compact: bool,
     sign_in_callback: Arc<dyn Fn(&mut Window, &mut App) + Send + Sync>,
 }
 
-fn sim_ai_description(
+fn zed_ai_description(
     is_connected: bool,
     plan: Option<Plan>,
-    is_sim_model_provider_enabled: bool,
+    is_zed_model_provider_enabled: bool,
     eligible_for_trial: bool,
 ) -> &'static str {
     if !is_connected {
-        return "Sign in to have access to Sim's complete agentic experience with hosted models.";
+        return "Sign in to have access to Zed's complete agentic experience with hosted models.";
     }
 
     match plan {
         Some(Plan::SimPro) => {
-            "You have access to Sim's hosted models through your Pro subscription."
+            "You have access to Zed's hosted models through your Pro subscription."
         }
-        Some(Plan::SimProTrial) => "You have access to Sim's hosted models through your Pro trial.",
+        Some(Plan::SimProTrial) => "You have access to Zed's hosted models through your Pro trial.",
         Some(Plan::SimStudent) => {
-            "You have access to Sim's hosted models through your Student subscription."
+            "You have access to Zed's hosted models through your Student subscription."
         }
         Some(Plan::SimBusiness) => {
-            if is_sim_model_provider_enabled {
-                "You have access to Sim's hosted models through your organization."
+            if is_zed_model_provider_enabled {
+                "You have access to Zed's hosted models through your organization."
             } else {
-                "Sim's hosted models are disabled by your organization's configuration."
+                "Zed's hosted models are disabled by your organization's configuration."
             }
         }
         Some(Plan::SimVip) => {
-            "You have access to Sim's hosted models through your VIP subscription."
+            "You have access to Zed's hosted models through your VIP subscription."
         }
         Some(Plan::SimFree) | None => {
             if eligible_for_trial {
-                "Subscribe for access to Sim's hosted models. Start with a 14 day free trial."
+                "Subscribe for access to Zed's hosted models. Start with a 14 day free trial."
             } else {
-                "Subscribe for access to Sim's hosted models."
+                "Subscribe for access to Zed's hosted models."
             }
         }
     }
@@ -498,10 +498,10 @@ impl RenderOnce for SimAiConfiguration {
             Some(Plan::SimPro | Plan::SimStudent | Plan::SimBusiness | Plan::SimVip)
         );
 
-        let description = sim_ai_description(
+        let description = zed_ai_description(
             self.is_connected,
             self.plan,
-            self.is_sim_model_provider_enabled,
+            self.is_zed_model_provider_enabled,
             self.eligible_for_trial,
         );
 
@@ -512,7 +512,7 @@ impl RenderOnce for SimAiConfiguration {
                 })
                 .when(self.compact, |this| this.size(ButtonSize::Medium))
                 .style(ButtonStyle::Tinted(TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&sim_urls::account_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&zed_urls::account_url(cx)))
                 .into_any_element()
         } else if self.plan.is_none() || self.eligible_for_trial {
             Button::new("start_trial", "Start 14-day Free Pro Trial")
@@ -521,7 +521,7 @@ impl RenderOnce for SimAiConfiguration {
                 })
                 .when(self.compact, |this| this.size(ButtonSize::Medium))
                 .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&sim_urls::start_trial_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&zed_urls::start_trial_url(cx)))
                 .into_any_element()
         } else {
             Button::new("upgrade", "Upgrade to Pro")
@@ -530,7 +530,7 @@ impl RenderOnce for SimAiConfiguration {
                 })
                 .when(self.compact, |this| this.size(ButtonSize::Medium))
                 .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
-                .on_click(|_, _, cx| cx.open_url(&sim_urls::upgrade_to_sim_pro_url(cx)))
+                .on_click(|_, _, cx| cx.open_url(&zed_urls::upgrade_to_zed_pro_url(cx)))
                 .into_any_element()
         };
 
@@ -539,7 +539,7 @@ impl RenderOnce for SimAiConfiguration {
                 .gap_2()
                 .when(!self.compact, |this| this.child(Label::new(description)))
                 .child(
-                    Button::new("sign_in", "Sign In to use Sim AI")
+                    Button::new("sign_in", "Sign In to use Zed AI")
                         .start_icon(
                             Icon::new(IconName::Github)
                                 .size(IconSize::Small)
@@ -563,7 +563,7 @@ impl RenderOnce for SimAiConfiguration {
                             .style(ui::ButtonStyle::Tinted(ui::TintColor::Accent))
                             .when(!self.compact, |this| this.full_width())
                             .on_click(|_, _, cx| {
-                                cx.open_url(&sim_urls::upgrade_to_sim_pro_url(cx))
+                                cx.open_url(&zed_urls::upgrade_to_zed_pro_url(cx))
                             }),
                     )
                 } else {
@@ -604,14 +604,14 @@ impl Render for ConfigurationView {
         let state = self.state.read(cx);
         let user_store = state.user_store.read(cx);
 
-        let is_sim_model_provider_enabled = user_store
+        let is_zed_model_provider_enabled = user_store
             .current_organization_configuration()
-            .map_or(true, |config| config.is_sim_model_provider_enabled);
+            .map_or(true, |config| config.is_zed_model_provider_enabled);
 
         SimAiConfiguration {
             is_connected: !state.is_signed_out(cx),
             plan: user_store.plan(),
-            is_sim_model_provider_enabled,
+            is_zed_model_provider_enabled,
             eligible_for_trial: user_store.trial_started_at().is_none(),
             account_too_young: user_store.account_too_young(),
             compact: self.compact,
@@ -954,16 +954,16 @@ impl Component for SimAiConfiguration {
     }
 
     fn description() -> &'static str {
-        "The configuration surface for Sim's hosted AI models, \
+        "The configuration surface for Zed's hosted AI models, \
         showing the user's connection status, current plan, trial eligibility, \
-        and entry points for enabling the Sim model provider."
+        and entry points for enabling the Zed model provider."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {
         struct PreviewConfiguration {
             plan: Option<Plan>,
             is_connected: bool,
-            is_sim_model_provider_enabled: bool,
+            is_zed_model_provider_enabled: bool,
             eligible_for_trial: bool,
         }
 
@@ -971,7 +971,7 @@ impl Component for SimAiConfiguration {
             SimAiConfiguration {
                 is_connected: config.is_connected,
                 plan: config.plan,
-                is_sim_model_provider_enabled: config.is_sim_model_provider_enabled,
+                is_zed_model_provider_enabled: config.is_zed_model_provider_enabled,
                 eligible_for_trial: config.eligible_for_trial,
                 account_too_young: false,
                 compact: false,
@@ -989,7 +989,7 @@ impl Component for SimAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: false,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
@@ -998,7 +998,7 @@ impl Component for SimAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
@@ -1007,7 +1007,7 @@ impl Component for SimAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
@@ -1016,7 +1016,7 @@ impl Component for SimAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: None,
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
@@ -1025,43 +1025,43 @@ impl Component for SimAiConfiguration {
                     configuration(PreviewConfiguration {
                         plan: Some(Plan::SimFree),
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Sim Pro Trial Plan",
+                    "Zed Pro Trial Plan",
                     configuration(PreviewConfiguration {
                         plan: Some(Plan::SimProTrial),
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Sim Pro Plan",
+                    "Zed Pro Plan",
                     configuration(PreviewConfiguration {
                         plan: Some(Plan::SimPro),
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
                     }),
                 ),
                 single_example(
-                    "Business Plan - Sim models enabled",
+                    "Business Plan - Zed models enabled",
                     configuration(PreviewConfiguration {
                         plan: Some(Plan::SimBusiness),
                         is_connected: true,
-                        is_sim_model_provider_enabled: true,
+                        is_zed_model_provider_enabled: true,
                         eligible_for_trial: false,
                     }),
                 ),
                 single_example(
-                    "Business Plan - Sim models disabled",
+                    "Business Plan - Zed models disabled",
                     configuration(PreviewConfiguration {
                         plan: Some(Plan::SimBusiness),
                         is_connected: true,
-                        is_sim_model_provider_enabled: false,
+                        is_zed_model_provider_enabled: false,
                         eligible_for_trial: false,
                     }),
                 ),

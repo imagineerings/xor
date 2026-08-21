@@ -184,7 +184,7 @@ impl AbiManifest {
         if self.package.redistributes_vendor_runtime
             || !self.package.license_approval_required_for_redistribution
             || self.package.signature_algorithm != "ed25519"
-            || self.package.signature_domain != "sim-comfy-corex-package-v1"
+            || self.package.signature_domain != "zed-comfy-corex-package-v1"
             || !self.package.final_application_signing_required
             || self.package.runtime_loading_enabled
         {

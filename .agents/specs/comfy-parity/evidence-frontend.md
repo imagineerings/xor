@@ -131,7 +131,7 @@ The route catalog contains 82 rows:
 - 12 desktop-ui child routes covering the empty-child `/` WelcomeView, its `/welcome` alias, installation, Git download, desktop/server start and update, manual configuration, metrics consent, maintenance, unsupported hardware, and dialog popouts.
 - 59 Astro website routes, including `/zh-CN` variants, Cloud pricing/enterprise/supported nodes, payment results, models, demos, downloads, privacy, terms, affiliates, customers, and marketing pages.
 
-The website and payment rows are not silently excluded. Their native Sim
+The website and payment rows are not silently excluded. Their native Zed
 surface, approved provider mapping, documentation/navigation treatment, or
 deliberate deferral remains a required decision; browser handoff does not
 execute Comfy extensions.
@@ -210,7 +210,7 @@ Workflow persistence uses a two-layer V2 design:
 
 The V1-to-V2 migration preserves LRU ordering, skips failed payload writes, migrates tab pointers when a client ID exists, leaves V1 data in place for rollback until 2026-07-15, and creates an empty V2 index when no V1 data exists. Autosave supports `off` or `after delay`, coalesces changes during an active save, saves only modified persisted workflows, and logs failures without losing the scheduled follow-up state.
 
-The browser-state ledger now contains 66 rows. The 24 closure rows cover reroute/type and floating-actionbar preferences, mask-brush settings, the raw `comfy_api_key`, website banner dismissals, current workspace/token/expiry, credit and subscription checkout markers, attribution identifiers, survey/feature-usage state, Manager conflict/UI state, OAuth correlation, one-shot pricing resumption, namespaced preserved queries, and all builder/sidebar/bottom-panel splitter keys. `comfy_api_key` and `Comfy.Workspace.Token` are explicitly secret-bearing source behaviors: parity does not justify reproducing raw browser-secret persistence in Sim. The native design must import them only through an explicit compatibility flow into the platform secret provider, persist opaque references, redact diagnostics, and preserve source clear/expiry/error behavior.
+The browser-state ledger now contains 66 rows. The 24 closure rows cover reroute/type and floating-actionbar preferences, mask-brush settings, the raw `comfy_api_key`, website banner dismissals, current workspace/token/expiry, credit and subscription checkout markers, attribution identifiers, survey/feature-usage state, Manager conflict/UI state, OAuth correlation, one-shot pricing resumption, namespaced preserved queries, and all builder/sidebar/bottom-panel splitter keys. `comfy_api_key` and `Comfy.Workspace.Token` are explicitly secret-bearing source behaviors: parity does not justify reproducing raw browser-secret persistence in Zed. The native design must import them only through an explicit compatibility flow into the platform secret provider, persist opaque references, redact diagnostics, and preserve source clear/expiry/error behavior.
 
 ## Queue, execution, progress, errors, and recovery
 
@@ -312,7 +312,7 @@ The compatibility surface remains open-world:
 - Node execution outputs permit arbitrary passthrough keys.
 - LiteGraph node callbacks, widget arrays, node serialization, graph versioning, and legacy context menus are ecosystem contracts.
 
-Production Sim uses an explicit compatibility boundary: versioned Rust/WASM contributions with explicit ports, deterministic legacy identifier mappings, preserved unknown payloads, and visible unsupported placeholders. Native GPUI cannot execute unchanged JavaScript, DOM, or LiteGraph hooks, so no real or managed browser/frontend execution path is permitted; the source contracts remain development-oracle evidence and migration inputs.
+Production Zed uses an explicit compatibility boundary: versioned Rust/WASM contributions with explicit ports, deterministic legacy identifier mappings, preserved unknown payloads, and visible unsupported placeholders. Native GPUI cannot execute unchanged JavaScript, DOM, or LiteGraph hooks, so no real or managed browser/frontend execution path is permitted; the source contracts remain development-oracle evidence and migration inputs.
 
 ## Cloud, paid, telemetry, surveys, and workspace surfaces
 
@@ -320,7 +320,7 @@ Cloud/paid rows are retained for authentication, OAuth, session-cookie minting, 
 
 Telemetry is compiled/gated by distribution and dispatched through an error-isolated registry. The catalog contains 56 event contracts and 32 distinct literal UI-button identifiers, for 88 unique stable IDs. Duplicate emission sites for `queue_run_multiple_batches_submitted` and `error_dialog_closed` are consolidated into their respective identifier rows instead of reusing the umbrella `COMFY-CLOUD-059`. In addition to the typed application events, the catalog retains Desktop UI `install_stepper_change`, Desktop-hosted graph `execution`, website `$pageview`, and website `website:download_button_clicked`. The event set covers auth, subscription, checkout, credits, workspace invitations, surveys, email verification, templates, workflow import/open/save/create/share, App Mode, visibility/tab/shell layout, node search/add, settings, help, execution, install progress, downloads, generic UI clicks, and page views. Product behavior must not depend on telemetry success.
 
-No cloud/paid row was dynamically exercised. Sim must explicitly choose retained, native-provider-mapped, documentation/navigation-only, or deferred behavior for each row.
+No cloud/paid row was dynamically exercised. Zed must explicitly choose retained, native-provider-mapped, documentation/navigation-only, or deferred behavior for each row.
 
 ## HTTP and protocol client usage
 
@@ -402,9 +402,9 @@ The machine-readable reconciliation is `catalogs/frontend-reconciliation.csv`. A
 | Playwright literal cases | 1,677 | 1,677 | 0 |
 | Source files | 4,697 | 4,697 | 0 |
 
-The three schema-only settings, three indirect Playwright files, open-world extension keys, dynamic custom routes, absent runtime install, and all Sim-status values are preserved as uncertainties. Extension interface members 037–063 cite `extensionAPI.spec.ts` only for the six members it directly exercises; the other 21 members are code-inferred and no longer cite the stale nonexistent extension-service test path. They are not silently counted as verified parity.
+The three schema-only settings, three indirect Playwright files, open-world extension keys, dynamic custom routes, absent runtime install, and all Zed-status values are preserved as uncertainties. Extension interface members 037–063 cite `extensionAPI.spec.ts` only for the six members it directly exercises; the other 21 members are code-inferred and no longer cite the stale nonexistent extension-service test path. They are not silently counted as verified parity.
 
-## Sim migration implications for the lead design
+## Zed migration implications for the lead design
 
 The frontend evidence maps to a fully native production strategy:
 
@@ -420,7 +420,7 @@ The frontend evidence maps to a fully native production strategy:
   or explicit defer. Python, JavaScript, DOM, LiteGraph imperative hooks,
   arbitrary web directories, embedded WebViews, and external-browser handoff
   do not execute compatibility code.
-- Implement tensor/model/device/sampler/node behavior in the Sim-owned Rust
+- Implement tensor/model/device/sampler/node behavior in the Zed-owned Rust
   worker and validate source protocols/object-info only as conformance outputs.
 - Treat Desktop lifecycle and public website/cloud surfaces as separately
   mapped native/platform/provider capabilities, not assumptions about graph
@@ -437,7 +437,7 @@ slice adds the shape-reduced native diffusion workflow.
 
 | Artifact | Purpose |
 |---|---|
-| `catalogs/frontend-features.csv` | Canonical per-feature ledger with evidence, behavior, failure/recovery, Sim status/gap, acceptance, and validation fields |
+| `catalogs/frontend-features.csv` | Canonical per-feature ledger with evidence, behavior, failure/recovery, Zed status/gap, acceptance, and validation fields |
 | `catalogs/frontend-component-surfaces.csv` | Source-specific Vue component contracts or explicit presentation/infrastructure dispositions |
 | `catalogs/frontend-functional-modules.csv` | Source-specific service/store/composable state and side-effect contracts or infrastructure dispositions |
 | `catalogs/frontend-test-cases.csv` | One row per literal Playwright test declaration |

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This spec makes Comfy's model-execution semantics explicit inside the world-model harness. The implementation should not treat Comfy as only an API or graph format: Comfy also defines how samplers, schedulers, conditioning, latent formats, VAEs, model patches, and model families are assembled into executable diffusion and world-model runs. Sim keeps worker processes, storage, UI, media previews, and dependency review in existing systems.
+This spec makes Comfy's model-execution semantics explicit inside the world-model harness. The implementation should not treat Comfy as only an API or graph format: Comfy also defines how samplers, schedulers, conditioning, latent formats, VAEs, model patches, and model families are assembled into executable diffusion and world-model runs. Zed keeps worker processes, storage, UI, media previews, and dependency review in existing systems.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ flowchart LR
     Worker --> Artifacts[Artifacts and Provenance]
 ```
 
-The graph runtime decides which nodes execute and in what order. This runtime turns executable sampling/model nodes into typed execution requests and sends those requests through Sim worker boundaries.
+The graph runtime decides which nodes execute and in what order. This runtime turns executable sampling/model nodes into typed execution requests and sends those requests through Zed worker boundaries.
 
 ## Components and Interfaces
 
@@ -67,7 +67,7 @@ pub trait SimExecutionRegistry {
 
 ### WorkerExecutionAdapter
 
-- **Purpose**: Send validated execution requests through Sim worker infrastructure.
+- **Purpose**: Send validated execution requests through Zed worker infrastructure.
 - **Responsibilities**: Worker capability checks, progress events, preview events, cancellation, terminal state mapping, output collection, and diagnostics.
 
 ## Data Models
@@ -162,7 +162,7 @@ pub struct SimRunnerProfile {
     pub media: MediaDomain,
     pub latent_format: LatentFormat,
     pub execution_profile: ModelFamilyExecutionProfile,
-    pub native_sim_runner: String,
+    pub native_zed_runner: String,
 }
 
 pub struct WorldModelRunnerProfile {
@@ -211,43 +211,43 @@ pub struct DivergenceRecord {
     pub behavior: ExecutionBehaviorKey,
     pub comfy_source: SourceReference,
     pub reason: DivergenceReason,
-    pub sim_behavior: String,
+    pub zed_behavior: String,
 }
 ```
 
-Conditioning records are native Sim data structures. They preserve
+Conditioning records are native Zed data structures. They preserve
 Comfy-compatible conditioning semantics for interoperability, but validation and
-worker handoff use typed Sim bundle, tensor, prompt, region, transform, and
+worker handoff use typed Zed bundle, tensor, prompt, region, transform, and
 control-attachment records instead of passing opaque Comfy payloads through the
 runtime.
 
-Latent and VAE records are also native Sim runtime records. VAE encode, decode,
+Latent and VAE records are also native Zed runtime records. VAE encode, decode,
 tiled, temporal, and inpaint operations preserve Comfy-compatible metadata, but
-Sim validates latent format, dimensions, frame counts, masks, compression, VAE
+Zed validates latent format, dimensions, frame counts, masks, compression, VAE
 model references, and tiling metadata before worker execution rather than
 delegating those checks to Comfy.
 
-Model loader outputs and model patches are native Sim component and patch plans.
+Model loader outputs and model patches are native Zed component and patch plans.
 The runtime validates component category, model family, latent format, patch
 category, compatibility, strengths, duplicate ids, and patch support before
 worker execution. Patch application order is deterministic across LoRA,
 hypernetwork, ControlNet, GLIGEN, model patch, model merge, and edit-model
 records, with provenance preserved on every applied patch.
 
-Runner profiles are native Sim execution records. They bind Comfy-compatible
-model-family semantics to Sim runner identifiers for image diffusion,
+Runner profiles are native Zed execution records. They bind Comfy-compatible
+model-family semantics to Zed runner identifiers for image diffusion,
 video/world-model, audio, 3D, depth, segmentation, and detection families.
 Unsupported families produce explicit diagnostics; video/world-model profiles
 also preserve reference frame, camera, and action-control constraints.
 
-Worker execution is a native Sim boundary. The adapter validates worker
+Worker execution is a native Zed boundary. The adapter validates worker
 capabilities for model family, previews, cancellation, and deterministic
 execution before dispatch, then maps worker progress, previews, terminal state,
-outputs, diagnostics, and provenance back into Sim job records.
+outputs, diagnostics, and provenance back into Zed job records.
 
 Compatibility fixtures use mock runner manifests when production weights are not
 available. The fixture manifest records required workflow categories,
-native-Sim validation surfaces, and dependency-review divergences so tests can
+native-Zed validation surfaces, and dependency-review divergences so tests can
 assert coverage without downloading weights or passing execution through Comfy.
 
 ## Correctness Properties
@@ -290,13 +290,13 @@ _For any_ video or world-model execution profile, the worker request SHALL prese
 
 ### Property 7: Worker Boundary
 
-_For any_ local model execution that requires Python, PyTorch, GPU APIs, custom kernels, native packages, model weights, or large downloads, the system SHALL use Sim worker and dependency-review boundaries before execution.
+_For any_ local model execution that requires Python, PyTorch, GPU APIs, custom kernels, native packages, model weights, or large downloads, the system SHALL use Zed worker and dependency-review boundaries before execution.
 
 **Validates: Requirement 5.1, 5.2, 5.3**
 
 ### Property 8: Divergence Accountability
 
-_For any_ intentional Sim divergence from Comfy execution behavior, a machine-readable divergence record SHALL identify the Comfy source behavior, reason, and Sim behavior.
+_For any_ intentional Zed divergence from Comfy execution behavior, a machine-readable divergence record SHALL identify the Comfy source behavior, reason, and Zed behavior.
 
 **Validates: Requirement 6.3**
 

@@ -18359,7 +18359,7 @@ async fn test_completion_can_run_commands(cx: &mut TestAppContext) {
     assert_eq!(
         command_calls.load(atomic::Ordering::Acquire),
         1,
-        "For completion with a registered command, Sim should send a command execution request",
+        "For completion with a registered command, Zed should send a command execution request",
     );
 
     editor.update_in(cx, |editor, window, cx| {
@@ -18398,7 +18398,7 @@ async fn test_completion_can_run_commands(cx: &mut TestAppContext) {
     assert_eq!(
         command_calls.load(atomic::Ordering::Acquire),
         1,
-        "For completion with an unregistered command, Sim should not send a command execution request",
+        "For completion with an unregistered command, Zed should not send a command execution request",
     );
 }
 
@@ -20097,7 +20097,7 @@ async fn test_toggle_block_comment(cx: &mut TestAppContext) {
     cx.update_editor(|editor, window, cx| {
         editor.toggle_comments(&ToggleComments::default(), window, cx)
     });
-    // TODO this is how it actually worked in Sim Stable, which is not very ergonomic.
+    // TODO this is how it actually worked in Zed Stable, which is not very ergonomic.
     // Uncommenting and commenting from this position brings in even more wrong artifacts.
     cx.assert_editor_state(
         &r#"
@@ -24018,7 +24018,7 @@ struct Row10;"#};
         &mut cx,
     );
 
-    // Deletion hunks are ephemeral, so it's impossible to place the caret into them — Sim triggers reverts for lines, adjacent to carets and selections.
+    // Deletion hunks are ephemeral, so it's impossible to place the caret into them — Zed triggers reverts for lines, adjacent to carets and selections.
     assert_hunk_revert(
         indoc! {r#"struct Row;
                    ˇstruct Row2;
@@ -29498,7 +29498,7 @@ impl BookmarkTestContext {
             project
                 .bookmark_store()
                 .read(cx)
-                .all_serialisim_bookmarks(cx)
+                .all_serialized_bookmarks(cx)
         })
     }
 
@@ -33926,7 +33926,7 @@ async fn test_paste_url_from_other_app_creates_markdown_link_over_selected_text(
 ) {
     init_test(cx, |_| {});
 
-    let url = "https://sim.dev";
+    let url = "https://zed.dev";
 
     let markdown_language = Arc::new(Language::new(
         LanguageConfig {
@@ -34079,12 +34079,12 @@ async fn test_markdown_indents(cx: &mut gpui::TestAppContext) {
 }
 
 #[gpui::test]
-async fn test_paste_url_from_sim_copy_creates_markdown_link_over_selected_text(
+async fn test_paste_url_from_zed_copy_creates_markdown_link_over_selected_text(
     cx: &mut gpui::TestAppContext,
 ) {
     init_test(cx, |_| {});
 
-    let url = "https://sim.dev";
+    let url = "https://zed.dev";
 
     let markdown_language = Arc::new(Language::new(
         LanguageConfig {
@@ -34123,7 +34123,7 @@ async fn test_paste_url_from_other_app_replaces_existing_url_without_creating_ma
 ) {
     init_test(cx, |_| {});
 
-    let url = "https://sim.dev";
+    let url = "https://zed.dev";
 
     let markdown_language = Arc::new(Language::new(
         LanguageConfig {
@@ -34135,14 +34135,14 @@ async fn test_paste_url_from_other_app_replaces_existing_url_without_creating_ma
 
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
-    cx.set_state("Please visit sim's homepage: «https://www.apple.comˇ»");
+    cx.set_state("Please visit zed's homepage: «https://www.apple.comˇ»");
 
     cx.update_editor(|editor, window, cx| {
         cx.write_to_clipboard(ClipboardItem::new_string(url.to_string()));
         editor.paste(&Paste, window, cx);
     });
 
-    cx.assert_editor_state(&format!("Please visit sim's homepage: {url}ˇ"));
+    cx.assert_editor_state(&format!("Please visit zed's homepage: {url}ˇ"));
 }
 
 #[gpui::test]
@@ -34209,7 +34209,7 @@ async fn test_paste_url_from_other_app_without_creating_markdown_link_in_non_mar
 ) {
     init_test(cx, |_| {});
 
-    let url = "https://sim.dev";
+    let url = "https://zed.dev";
 
     let markdown_language = Arc::new(Language::new(
         LanguageConfig {
@@ -34221,7 +34221,7 @@ async fn test_paste_url_from_other_app_without_creating_markdown_link_in_non_mar
 
     let mut cx = EditorTestContext::new(cx).await;
     cx.update_buffer(|buffer, cx| buffer.set_language(Some(markdown_language), cx));
-    cx.set_state("// Hello, «editorˇ».\n// Sim is «ˇgreat» (see this link: ˇ)");
+    cx.set_state("// Hello, «editorˇ».\n// Zed is «ˇgreat» (see this link: ˇ)");
 
     cx.update_editor(|editor, window, cx| {
         cx.write_to_clipboard(ClipboardItem::new_string(url.to_string()));
@@ -34229,7 +34229,7 @@ async fn test_paste_url_from_other_app_without_creating_markdown_link_in_non_mar
     });
 
     cx.assert_editor_state(&format!(
-        "// Hello, {url}ˇ.\n// Sim is {url}ˇ (see this link: {url}ˇ)"
+        "// Hello, {url}ˇ.\n// Zed is {url}ˇ (see this link: {url}ˇ)"
     ));
 }
 
@@ -34239,7 +34239,7 @@ async fn test_paste_url_from_other_app_creates_markdown_link_selectively_in_mult
 ) {
     init_test(cx, |_| {});
 
-    let url = "https://sim.dev";
+    let url = "https://zed.dev";
 
     let markdown_language = Arc::new(Language::new(
         LanguageConfig {
@@ -36448,7 +36448,7 @@ async fn test_local_worktree_trust(cx: &mut TestAppContext) {
     fs.insert_tree(
         path!("/project"),
         json!({
-            ".sim": {
+            ".zed": {
                 "settings.json": r#"{"languages":{"Rust":{"language_servers":["override-rust-analyzer"]}}}"#
             },
             "main.rs": "fn main() {}"
@@ -36545,7 +36545,7 @@ async fn test_local_worktree_trust(cx: &mut TestAppContext) {
             )
             .language_servers,
             ["...".to_string()],
-            "local .sim/settings.json must not apply before trust approval"
+            "local .zed/settings.json must not apply before trust approval"
         )
     });
 
@@ -36578,7 +36578,7 @@ async fn test_local_worktree_trust(cx: &mut TestAppContext) {
             )
             .language_servers,
             ["override-rust-analyzer".to_string()],
-            "local .sim/settings.json should apply after trust approval"
+            "local .zed/settings.json should apply after trust approval"
         )
     });
     let _fake_language_server = fake_language_server.await.unwrap();

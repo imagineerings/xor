@@ -12,7 +12,7 @@ use util::ResultExt;
 use workspace::{ModalView, Workspace, ui::HighlightedLabel};
 
 actions!(
-    sim,
+    zed,
     [
         /// Toggles the base keymap selector modal.
         ToggleBaseKeymapSelector

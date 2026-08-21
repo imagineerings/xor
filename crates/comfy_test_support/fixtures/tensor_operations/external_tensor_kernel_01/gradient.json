@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-165C20AC8DD8",
   "baseline_overload_id": "COMFY-TENSOR-OP-165C20AC8DD8:blocked",
   "baseline_fixture_sha256": "8829d9e802a0c01a7e0f69669e9a2d7d46d2fca9129c04680382c427b35ecab6",
-  "overload_id": "sim.native.morphology.gradient-flat-geodesic.v1",
+  "overload_id": "zed.native.morphology.gradient-flat-geodesic.v1",
   "owner_task_id": "comfy-parity-tensor-ops-external-tensor-kernel-comfy-tensor-op-0607daa06439",
   "ordered_parameters": [
     {"name":"input","kind":"positional_or_keyword","type":"Tensor<F32,BCHW>","default":null,"keyword_only":false},

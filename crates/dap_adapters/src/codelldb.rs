@@ -89,9 +89,9 @@ impl DebugAdapter for CodeLldbDebugAdapter {
         DebugAdapterName(Self::ADAPTER_NAME.into())
     }
 
-    async fn config_from_sim_format(&self, sim_scenario: SimDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_zed_format(&self, zed_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let mut configuration = json!({
-            "request": match sim_scenario.request {
+            "request": match zed_scenario.request {
                 DebugRequest::Launch(_) => "launch",
                 DebugRequest::Attach(_) => "attach",
             },
@@ -100,9 +100,9 @@ impl DebugAdapter for CodeLldbDebugAdapter {
         // CodeLLDB uses `name` for a terminal label.
         map.insert(
             "name".into(),
-            Value::String(String::from(sim_scenario.label.as_ref())),
+            Value::String(String::from(zed_scenario.label.as_ref())),
         );
-        match &sim_scenario.request {
+        match &zed_scenario.request {
             DebugRequest::Attach(attach) => {
                 map.insert("pid".into(), attach.process_id.into());
             }
@@ -115,7 +115,7 @@ impl DebugAdapter for CodeLldbDebugAdapter {
                 if !launch.env.is_empty() {
                     map.insert("env".into(), launch.env_json());
                 }
-                if let Some(stop_on_entry) = sim_scenario.stop_on_entry {
+                if let Some(stop_on_entry) = zed_scenario.stop_on_entry {
                     map.insert("stopOnEntry".into(), stop_on_entry.into());
                 }
                 if let Some(cwd) = launch.cwd.as_ref() {
@@ -125,8 +125,8 @@ impl DebugAdapter for CodeLldbDebugAdapter {
         }
 
         Ok(DebugScenario {
-            adapter: sim_scenario.adapter,
-            label: sim_scenario.label,
+            adapter: zed_scenario.adapter,
+            label: zed_scenario.label,
             config: configuration,
             build: None,
             tcp_connection: None,

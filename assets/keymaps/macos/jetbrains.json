@@ -19,8 +19,8 @@
   {
     "context": "Editor",
     "bindings": {
-      "ctrl->": ["sim::IncreaseBufferFontSize", { "persist": true }],
-      "ctrl-<": ["sim::DecreaseBufferFontSize", { "persist": true }],
+      "ctrl->": ["zed::IncreaseBufferFontSize", { "persist": true }],
+      "ctrl-<": ["zed::DecreaseBufferFontSize", { "persist": true }],
       "ctrl-shift-j": "editor::JoinLines",
       "cmd-d": "editor::DuplicateSelection",
       "cmd-backspace": "editor::DeleteLine",

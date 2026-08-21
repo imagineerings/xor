@@ -109,12 +109,12 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
             let release_channel = *RELEASE_CHANNEL;
             match release_channel {
                 ReleaseChannel::Stable | ReleaseChannel::Preview => {
-                    println!("{}", env!("SIM_PKG_VERSION"))
+                    println!("{}", env!("ZED_PKG_VERSION"))
                 }
                 ReleaseChannel::Nightly | ReleaseChannel::Dev => {
                     let commit_sha =
-                        option_env!("SIM_COMMIT_SHA").unwrap_or(release_channel.dev_name());
-                    let build_id = option_env!("SIM_BUILD_ID");
+                        option_env!("ZED_COMMIT_SHA").unwrap_or(release_channel.dev_name());
+                    let build_id = option_env!("ZED_BUILD_ID");
                     if let Some(build_id) = build_id {
                         println!("{}+{}", build_id, commit_sha)
                     } else {
@@ -128,10 +128,10 @@ pub fn run(command: Commands) -> anyhow::Result<()> {
 }
 
 pub static VERSION: LazyLock<String> = LazyLock::new(|| match *RELEASE_CHANNEL {
-    ReleaseChannel::Stable | ReleaseChannel::Preview => env!("SIM_PKG_VERSION").to_owned(),
+    ReleaseChannel::Stable | ReleaseChannel::Preview => env!("ZED_PKG_VERSION").to_owned(),
     ReleaseChannel::Nightly | ReleaseChannel::Dev => {
-        let commit_sha = option_env!("SIM_COMMIT_SHA").unwrap_or("missing-sim-commit-sha");
-        let build_identifier = option_env!("SIM_BUILD_ID");
+        let commit_sha = option_env!("ZED_COMMIT_SHA").unwrap_or("missing-zed-commit-sha");
+        let build_identifier = option_env!("ZED_BUILD_ID");
         if let Some(build_id) = build_identifier {
             format!("{build_id}+{commit_sha}")
         } else {
@@ -351,7 +351,7 @@ fn handle_crash_files_requests(project: &Entity<HeadlessProject>, client: &AnyPr
                         continue;
                     };
 
-                    if !filename.starts_with("sim") {
+                    if !filename.starts_with("zed") {
                         continue;
                     }
 
@@ -572,7 +572,7 @@ pub fn execute_run(
     let pid = std::process::id();
     let id = pid.to_string();
     let should_install_crash_handler = matches!(
-        env::var("SIM_GENERATE_MINIDUMPS").as_deref(),
+        env::var("ZED_GENERATE_MINIDUMPS").as_deref(),
         Ok("true" | "1")
     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
 
@@ -580,10 +580,10 @@ pub fn execute_run(
         Some(app.background_executor().spawn(crashes::init(
             crashes::InitCrashHandler {
                 session_id: id,
-                sim_version: VERSION.to_owned(),
-                binary: "sim-remote-server".to_string(),
+                zed_version: VERSION.to_owned(),
+                binary: "zed-remote-server".to_string(),
                 release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                commit_sha: option_env!("SIM_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
+                commit_sha: option_env!("ZED_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
             },
             {
                 let background_executor = app.background_executor();
@@ -591,7 +591,7 @@ pub fn execute_run(
                     background_executor.spawn(task).detach();
                 }
             },
-            |pid| paths::temp_dir().join(format!("sim-remote-server-crash-handler-{pid}")),
+            |pid| paths::temp_dir().join(format!("zed-remote-server-crash-handler-{pid}")),
             // we are running outside gpui
             #[allow(clippy::disallowed_methods)]
             |duration| FutureExt::map(Timer::after(duration), |_| ()),
@@ -647,10 +647,10 @@ pub fn execute_run(
             .detach();
         }
         settings::init(cx);
-        let app_commit_sha = option_env!("SIM_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
+        let app_commit_sha = option_env!("ZED_COMMIT_SHA").map(|s| AppCommitSha::new(s.to_owned()));
         let app_version = AppVersion::load(
-            env!("SIM_PKG_VERSION"),
-            option_env!("SIM_BUILD_ID"),
+            env!("ZED_PKG_VERSION"),
+            option_env!("ZED_BUILD_ID"),
             app_commit_sha,
         );
         release_channel::init(app_version, cx);
@@ -691,7 +691,7 @@ pub fn execute_run(
                     ReqwestClient::proxy_and_user_agent(
                         proxy_url,
                         &format!(
-                            "Sim-Server/{} ({}; {})",
+                            "Zed-Server/{} ({}; {})",
                             env!("CARGO_PKG_VERSION"),
                             std::env::consts::OS,
                             std::env::consts::ARCH
@@ -852,7 +852,7 @@ pub(crate) fn execute_proxy(
 
     let id = std::process::id().to_string();
     let should_install_crash_handler = matches!(
-        env::var("SIM_GENERATE_MINIDUMPS").as_deref(),
+        env::var("ZED_GENERATE_MINIDUMPS").as_deref(),
         Ok("true" | "1")
     ) || *RELEASE_CHANNEL != ReleaseChannel::Dev;
 
@@ -860,15 +860,15 @@ pub(crate) fn execute_proxy(
         smol::spawn(crashes::init(
             crashes::InitCrashHandler {
                 session_id: id,
-                sim_version: VERSION.to_owned(),
-                binary: "sim-remote-proxy".to_string(),
+                zed_version: VERSION.to_owned(),
+                binary: "zed-remote-proxy".to_string(),
                 release_channel: release_channel::RELEASE_CHANNEL_NAME.clone(),
-                commit_sha: option_env!("SIM_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
+                commit_sha: option_env!("ZED_COMMIT_SHA").unwrap_or("no_sha").to_owned(),
             },
             |task| {
                 smol::spawn(task).detach();
             },
-            |pid| paths::temp_dir().join(format!("sim-remote-server-proxy-crash-handler-{pid}")),
+            |pid| paths::temp_dir().join(format!("zed-remote-server-proxy-crash-handler-{pid}")),
             // we are running outside gpui
             #[allow(clippy::disallowed_methods)]
             |duration| FutureExt::map(Timer::after(duration), |_| ()),
@@ -1324,7 +1324,7 @@ fn read_proxy_settings(cx: &mut Context<HeadlessProject>) -> Option<Url> {
 fn cleanup_old_binaries() -> Result<()> {
     let server_dir = paths::remote_server_dir_relative();
     let release_channel = release_channel::RELEASE_CHANNEL.dev_name();
-    let prefix = format!("sim-remote-server-{}-", release_channel);
+    let prefix = format!("zed-remote-server-{}-", release_channel);
 
     for entry in std::fs::read_dir(server_dir.as_std_path())? {
         let path = entry?.path();
@@ -1354,7 +1354,7 @@ fn cleanup_old_binaries_wsl() {
 fn is_new_version(version: &str) -> bool {
     semver::Version::from_str(version)
         .ok()
-        .zip(semver::Version::from_str(env!("SIM_PKG_VERSION")).ok())
+        .zip(semver::Version::from_str(env!("ZED_PKG_VERSION")).ok())
         .is_some_and(|(version, current_version)| version >= current_version)
 }
 
@@ -1388,7 +1388,7 @@ mod tests {
     }
 
     #[test]
-    fn opening_remote_log_rotates_existing_oversisim_log() {
+    fn opening_remote_log_rotates_existing_oversized_log() {
         let temp_dir = tempfile::tempdir().expect("create temp dir");
         let log_path = temp_dir.path().join("server-workspace-12.log");
         let rotated_path = temp_dir.path().join("server-workspace-12.1.log");

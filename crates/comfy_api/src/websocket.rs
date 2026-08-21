@@ -389,7 +389,7 @@ pub struct NormativeWebSocketContract {
     pub ordering_concurrency: String,
     pub source_evidence: String,
     pub test_evidence: String,
-    pub sim_status: String,
+    pub zed_status: String,
     pub parity_gap: String,
     pub acceptance_criteria: String,
 }
@@ -419,7 +419,7 @@ fn parse_normative_websocket_catalog() -> Result<Vec<NormativeWebSocketContract>
         "ordering_concurrency",
         "source_evidence",
         "test_evidence",
-        "sim_status",
+        "zed_status",
         "parity_gap",
         "acceptance_criteria",
     ];
@@ -493,7 +493,7 @@ fn parse_normative_websocket_catalog() -> Result<Vec<NormativeWebSocketContract>
                 ordering_concurrency: value(12),
                 source_evidence: value(13),
                 test_evidence: value(14),
-                sim_status: value(15),
+                zed_status: value(15),
                 parity_gap: value(16),
                 acceptance_criteria: value(17),
             })

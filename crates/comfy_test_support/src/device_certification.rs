@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-const SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-device-certification-v2\0";
+const SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-device-certification-v2\0";
 const MAX_ARTIFACT_BYTES: usize = 1024 * 1024;
 const MAX_MATRIX_ROWS: usize = 4096;
 const MAX_PROVENANCE_ROWS: usize = 4096;
@@ -21,7 +21,7 @@ const MAX_IMPLEMENTATION_FILE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_IMPLEMENTATION_PATH_BYTES: usize = 4096;
 const MAX_IMPLEMENTATION_COMPONENT_BYTES: usize = 255;
 const MAX_SIGNING_KEY_BYTES: u64 = 16 * 1024;
-const IMPLEMENTATION_MANIFEST_DOMAIN: &[u8] = b"sim-comfy-device-certification-implementation-v1\0";
+const IMPLEMENTATION_MANIFEST_DOMAIN: &[u8] = b"zed-comfy-device-certification-implementation-v1\0";
 
 const CPU_IMPLEMENTATION_FILES: &[&str] = &[
     ".cargo/config.toml",
@@ -359,7 +359,7 @@ impl CertificationArtifact {
             payload,
             attestation: CertificationSignature {
                 algorithm: "ed25519".to_owned(),
-                domain: "sim-comfy-device-certification-v2".to_owned(),
+                domain: "zed-comfy-device-certification-v2".to_owned(),
                 signer: trust_anchor.signer.clone(),
                 public_key,
                 signature,
@@ -934,7 +934,7 @@ fn validate_artifact(
 ) -> Result<(), CertificationArtifactError> {
     if artifact.schema_version != 2
         || artifact.attestation.algorithm != "ed25519"
-        || artifact.attestation.domain != "sim-comfy-device-certification-v2"
+        || artifact.attestation.domain != "zed-comfy-device-certification-v2"
     {
         return Err(CertificationArtifactError::InvalidContract(
             "unsupported schema, algorithm, or signature domain".to_owned(),
@@ -1288,7 +1288,7 @@ mod tests {
             target: "aarch64-apple-darwin".to_owned(),
             observed_at_utc: "2026-07-26T00:00:00Z".to_owned(),
             environment: CertificationEnvironment {
-                lab_id: "sim-test-lab".to_owned(),
+                lab_id: "zed-test-lab".to_owned(),
                 hostname: "test-host".to_owned(),
                 os_name: "test-os".to_owned(),
                 os_version: "1.0".to_owned(),

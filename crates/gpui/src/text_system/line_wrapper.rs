@@ -476,7 +476,7 @@ impl LineWrapper {
         // `2^3`, `a~b`, `a=1`, `Self::new`, etc. Trailing punctuation like `,`, `.`, `:`, `;`
         // is included so it stays attached to the preceding word when wrapping.
         matches!(c, '-' | '_' | '.' | '\'' | '’' | '‘' | '$' | '%' | '@' | '#' | '^' | '~' | ',' | '=' | ':' | ';') ||
-        // `⋯` character is special used in Sim, to keep this at the end of the line.
+        // `⋯` character is special used in Zed, to keep this at the end of the line.
         matches!(c, '⋯') ||
 
         // Non-breaking glue characters
@@ -1158,8 +1158,8 @@ mod tests {
 
         // URL case
         assert_word("github.com");
-        assert_not_word("simtropolis/sim");
-        assert_not_word("simtropolis\\sim");
+        assert_not_word("simtropolis/zed");
+        assert_not_word("simtropolis\\zed");
         assert_not_word("a=1&b=2");
         assert_not_word("foo?b=2");
 
@@ -1171,7 +1171,7 @@ mod tests {
         assert_word("ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƏ");
         // Cyrillic
         assert_word("АБВГДЕЖЗИЙКЛМНОП");
-        // Vietnamese (https://github.com/simtropolis/sim/issues/23245)
+        // Vietnamese (https://github.com/simtropolis/zed/issues/23245)
         assert_word("ThậmchíđếnkhithuachạychúngcònnhẫntâmgiếtnốtsốđôngtùchínhtrịởYênBáivàCaoBằng");
         // Bengali
         assert_word("গিয়েছিলেন");
@@ -1186,7 +1186,7 @@ mod tests {
         assert_not_word("()[]{}<>");
 
         // Non-breaking ("Glue") characters, see https://www.unicode.org/reports/tr14/
-        // (https://github.com/simtropolis/sim/issues/59664)
+        // (https://github.com/simtropolis/zed/issues/59664)
         assert_word("\u{202F}"); // NNBSP " "
         assert_word("\u{00A0}"); // NBSP " "
         assert_word("\u{2011}"); // NBH "‑"

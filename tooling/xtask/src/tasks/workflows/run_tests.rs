@@ -135,7 +135,7 @@ pub(crate) fn run_tests() -> Workflow {
 /// Controls which features `orchestrate_impl` includes in the generated script.
 #[derive(PartialEq, Eq)]
 enum OrchestrateTarget {
-    /// For the main Sim repo: includes the cargo package filter and extension
+    /// For the main Zed repo: includes the cargo package filter and extension
     /// change detection, but no working-directory scoping.
     SimRepo,
     /// For individual extension repos: scopes changed-file detection to the
@@ -418,7 +418,7 @@ pub(crate) fn run_ts_query_ls(context: RunContext) -> Step<Run> {
         "$GITHUB_WORKSPACE/ts_query_ls" format --check {directory} || {{
             echo "Found unformatted queries, please format them with ts_query_ls."
             echo "For easy use, install the Tree-sitter query extension:"
-            echo "sim://extension/tree-sitter-query"
+            echo "zed://extension/tree-sitter-query"
             false
         }}"#,
         directory = match context {
@@ -502,8 +502,8 @@ fn check_rust_tools_feature_boundary() -> NamedJob {
             .map(steps::install_linux_dependencies)
             .add_step(steps::setup_sccache(Platform::Linux))
             .add_step(steps::script("./script/check-rust-tools-feature-boundary"))
-            .add_step(steps::script("cargo check -p sim --features rust-tools"))
-            .add_step(steps::script("cargo check -p sim --no-default-features"))
+            .add_step(steps::script("cargo check -p zed --features rust-tools"))
+            .add_step(steps::script("cargo check -p zed --no-default-features"))
             .add_step(steps::script(
                 "cargo check -p remote_server --features rust-tools",
             ))
@@ -511,10 +511,10 @@ fn check_rust_tools_feature_boundary() -> NamedJob {
                 "cargo check -p remote_server --no-default-features",
             ))
             .add_step(steps::script(
-                "cargo test -p sim --features test-support,rust-tools cargo_panel",
+                "cargo test -p zed --features test-support,rust-tools cargo_panel",
             ))
             .add_step(steps::script(
-                "cargo test -p sim --no-default-features cargo_panel_disabled",
+                "cargo test -p zed --no-default-features cargo_panel_disabled",
             ))
             .add_step(steps::script(
                 "cargo test -p tasks_ui --features rust-test-actions rust_test_actions",
@@ -692,7 +692,7 @@ fn run_platform_tests_impl(platform: Platform, filter_packages: bool, harden: bo
 
 fn build_visual_tests_binary() -> NamedJob {
     pub fn cargo_build_visual_tests() -> Step<Run> {
-        named::bash("cargo build -p sim --bin sim_visual_test_runner --features visual-tests")
+        named::bash("cargo build -p zed --bin zed_visual_test_runner --features visual-tests")
     }
 
     named::job(
@@ -752,9 +752,9 @@ pub(crate) fn check_postgres_and_protobuf_migrations() -> NamedJob {
         release_job(&[])
             .runs_on(runners::LINUX_DEFAULT)
             .add_env(("GIT_AUTHOR_NAME", "Protobuf Action"))
-            .add_env(("GIT_AUTHOR_EMAIL", "ci@sim.dev"))
+            .add_env(("GIT_AUTHOR_EMAIL", "ci@zed.dev"))
             .add_env(("GIT_COMMITTER_NAME", "Protobuf Action"))
-            .add_env(("GIT_COMMITTER_EMAIL", "ci@sim.dev"))
+            .add_env(("GIT_COMMITTER_EMAIL", "ci@zed.dev"))
             .add_step(steps::harden_runner())
             .add_step(steps::checkout_repo().with_full_history())
             .add_step(ensure_fresh_merge())

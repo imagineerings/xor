@@ -3,7 +3,7 @@
   "owner_task": "comfy-parity-metal-execution-resource-ownership-consolidation",
   "feature_id": "COMFY-MODEL-0015",
   "backend": "metal",
-  "contract": "sim-comfy-metal-execution-v1",
+  "contract": "zed-comfy-metal-execution-v1",
   "abi_floor": "macos-13-metal-3",
   "targets": [
     "aarch64-apple-darwin",

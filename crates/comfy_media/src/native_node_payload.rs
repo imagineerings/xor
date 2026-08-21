@@ -779,7 +779,7 @@ impl NativeArtifactPayload {
         check_byte_count("artifact bytes", bytes.len())?;
         let bytes = bytes.into_boxed_slice();
         let (semantic_digest_sha256, resident_bytes) = project_byte_asset::<Self>(
-            b"sim.comfy.media.artifact.v1",
+            b"zed.comfy.media.artifact.v1",
             &[kind_tag(kind)],
             &media_type,
             &bytes,
@@ -821,7 +821,7 @@ impl NativeArtifactPayload {
         checked_media_type(self.media_type.to_string())?;
         check_byte_count("artifact bytes", self.bytes.len())?;
         let (digest, resident_bytes) = project_byte_asset::<Self>(
-            b"sim.comfy.media.artifact.v1",
+            b"zed.comfy.media.artifact.v1",
             &[kind_tag(self.kind)],
             &self.media_type,
             &self.bytes,
@@ -953,7 +953,7 @@ impl NativeFile3DPayload {
         let bytes = bytes.into_boxed_slice();
         let tags = [file_role_tag(role), file_format_tag(format)];
         let (semantic_digest_sha256, resident_bytes) = project_byte_asset::<Self>(
-            b"sim.comfy.media.file-3d.v1",
+            b"zed.comfy.media.file-3d.v1",
             &tags,
             format.extension(),
             &bytes,
@@ -1002,7 +1002,7 @@ impl NativeFile3DPayload {
         validate_file_3d_contents(self.format, &self.bytes)?;
         let tags = [file_role_tag(self.role), file_format_tag(self.format)];
         let (digest, resident_bytes) = project_byte_asset::<Self>(
-            b"sim.comfy.media.file-3d.v1",
+            b"zed.comfy.media.file-3d.v1",
             &tags,
             self.format.extension(),
             &self.bytes,
@@ -2318,7 +2318,7 @@ fn project_bounding_boxes(
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     check_count("bounding box frames", frames.len(), MAX_FRAMES)?;
     let mut projection =
-        Projection::new::<NativeBoundingBoxPayload>(b"sim.comfy.media.bounding-box.v1")?;
+        Projection::new::<NativeBoundingBoxPayload>(b"zed.comfy.media.bounding-box.v1")?;
     projection.hash_len(frames.len())?;
     projection.add_allocation::<Box<[NativeBoundingBox]>>(frames.len())?;
     for frame in frames {
@@ -2348,7 +2348,7 @@ fn project_face_landmarks(
     check_count("face landmark frames", frames.len(), MAX_FRAMES)?;
     check_count("face connection sets", connection_sets.len(), MAX_ITEMS)?;
     let mut projection =
-        Projection::new::<NativeFaceLandmarksPayload>(b"sim.comfy.media.face-landmarks.v1")?;
+        Projection::new::<NativeFaceLandmarksPayload>(b"zed.comfy.media.face-landmarks.v1")?;
     projection.hasher.update(image_height.to_le_bytes());
     projection.hasher.update(image_width.to_le_bytes());
     projection.hash_len(frames.len())?;
@@ -2422,7 +2422,7 @@ fn project_pose_keypoints(
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     check_count("pose frames", frames.len(), MAX_FRAMES)?;
     let mut projection =
-        Projection::new::<NativePoseKeypointPayload>(b"sim.comfy.media.pose-keypoint.v1")?;
+        Projection::new::<NativePoseKeypointPayload>(b"zed.comfy.media.pose-keypoint.v1")?;
     projection.hash_len(frames.len())?;
     projection.add_allocation::<NativePoseFrame>(frames.len())?;
     for frame in frames {
@@ -2484,7 +2484,7 @@ fn project_tracks(
     track_path: &Tensor,
     track_visibility: &Tensor,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<NativeTracksPayload>(b"sim.comfy.media.tracks.v1")?;
+    let mut projection = Projection::new::<NativeTracksPayload>(b"zed.comfy.media.tracks.v1")?;
     projection.hash_tensor(b"track-path", track_path)?;
     projection.hash_tensor(b"track-visibility", track_visibility)?;
     projection.add_tensor_storages([track_path, track_visibility])?;
@@ -2563,7 +2563,7 @@ fn project_sam3_track_data(
     original_width: u32,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     let mut projection =
-        Projection::new::<NativeSam3TrackDataPayload>(b"sim.comfy.media.sam3-track-data.v1")?;
+        Projection::new::<NativeSam3TrackDataPayload>(b"zed.comfy.media.sam3-track-data.v1")?;
     projection.hasher.update(frame_count.to_le_bytes());
     projection.hasher.update(original_height.to_le_bytes());
     projection.hasher.update(original_width.to_le_bytes());
@@ -2749,7 +2749,7 @@ fn project_audio(
     waveform: &Tensor,
     sample_rate: u32,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<NativeAudioPayload>(b"sim.comfy.media.audio.v1")?;
+    let mut projection = Projection::new::<NativeAudioPayload>(b"zed.comfy.media.audio.v1")?;
     projection.hasher.update(sample_rate.to_le_bytes());
     projection.hash_tensor(b"waveform", waveform)?;
     projection.add_tensor_storages([waveform])?;
@@ -2826,7 +2826,7 @@ fn project_video(
     alpha: Option<&Tensor>,
     metadata: &BTreeMap<String, String>,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.v2")?;
+    let mut projection = Projection::new::<NativeVideoPayload>(b"zed.comfy.media.video.v2")?;
     projection.hasher.update(frame_rate_numerator.to_le_bytes());
     projection
         .hasher
@@ -2906,7 +2906,7 @@ fn project_encoded_h264_mp4(
     bit_depth: NativeVideoBitDepth,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
     let mut projection =
-        Projection::new::<NativeVideoPayload>(b"sim.comfy.media.video.encoded-h264-mp4.v1")?;
+        Projection::new::<NativeVideoPayload>(b"zed.comfy.media.video.encoded-h264-mp4.v1")?;
     projection.hasher.update(b"mp4\0h264\0");
     match bit_depth {
         NativeVideoBitDepth::Eight => projection.hasher.update(b"yuv420p\0"),
@@ -3003,7 +3003,7 @@ fn project_camera<Payload>(
     width: u32,
     height: u32,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.camera.v1")?;
+    let mut projection = Projection::new::<Payload>(b"zed.comfy.media.camera.v1")?;
     projection.hasher.update([camera_role_tag(role)]);
     for value in position.iter().chain(target).chain(std::iter::once(&zoom)) {
         projection.hasher.update(value.to_bits().to_le_bytes());
@@ -3203,7 +3203,7 @@ fn project_splat<Payload>(
     spherical_harmonics: &Tensor,
     counts: Option<&[u64]>,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.splat.v1")?;
+    let mut projection = Projection::new::<Payload>(b"zed.comfy.media.splat.v1")?;
     for (role, tensor) in [
         (&b"positions"[..], positions),
         (&b"scales"[..], scales),
@@ -3324,7 +3324,7 @@ fn project_mesh<Payload>(
     batches: &[NativeMeshBatch],
     unlit: bool,
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.mesh.v1")?;
+    let mut projection = Projection::new::<Payload>(b"zed.comfy.media.mesh.v1")?;
     projection.hash_len(batches.len())?;
     projection.hasher.update([u8::from(unlit)]);
     projection.add_allocation::<NativeMeshBatch>(batches.len())?;
@@ -3412,7 +3412,7 @@ fn project_voxel<Payload>(
     colors: Option<&Tensor>,
     world_from_grid: &[f32; 16],
 ) -> Result<([u8; 32], u64), NativeMediaPayloadError> {
-    let mut projection = Projection::new::<Payload>(b"sim.comfy.media.voxel.v1")?;
+    let mut projection = Projection::new::<Payload>(b"zed.comfy.media.voxel.v1")?;
     for value in world_from_grid {
         projection.hasher.update(value.to_bits().to_le_bytes());
     }

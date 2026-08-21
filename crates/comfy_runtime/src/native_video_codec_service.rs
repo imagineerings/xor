@@ -36,15 +36,15 @@ use std::{
 use thiserror::Error;
 
 const VIDEO_CODEC_THREAD_NAME: &str = "comfy-video-codec";
-const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "sim.comfy.video-codec-thread.v9";
+const VIDEO_CODEC_THREAD_IDENTITY_VERSION: &str = "zed.comfy.video-codec-thread.v9";
 #[allow(dead_code, reason = "consumed by the following SaveWEBM node adapter")]
-const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "sim.comfy.webm-node-service.v1";
+const WEBM_NODE_SERVICE_IDENTITY_VERSION: &str = "zed.comfy.webm-node-service.v1";
 #[allow(
     dead_code,
     reason = "constructed by the following encoded VIDEO backing adapter"
 )]
 const COMPONENT_H264_MP4_BACKING_SERVICE_IDENTITY_VERSION: &str =
-    "sim.comfy.component-h264-mp4-backing-service.v2";
+    "zed.comfy.component-h264-mp4-backing-service.v2";
 
 #[allow(
     dead_code,

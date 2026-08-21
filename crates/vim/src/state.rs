@@ -295,7 +295,7 @@ pub struct MarksState {
     buffer_marks: HashMap<BufferId, HashMap<String, Vec<text::Anchor>>>,
     watched_buffers: HashMap<BufferId, (MarkLocation, Subscription, Subscription)>,
 
-    serialisim_marks: HashMap<Arc<Path>, HashMap<String, Vec<Point>>>,
+    serialized_marks: HashMap<Arc<Path>, HashMap<String, Vec<Point>>>,
     global_marks: HashMap<String, MarkLocation>,
 
     _subscription: Subscription,
@@ -328,7 +328,7 @@ impl MarksState {
                 multibuffer_marks: HashMap::default(),
                 buffer_marks: HashMap::default(),
                 watched_buffers: HashMap::default(),
-                serialisim_marks: HashMap::default(),
+                serialized_marks: HashMap::default(),
                 global_marks: HashMap::default(),
                 _subscription: subscription,
             };
@@ -382,7 +382,7 @@ impl MarksState {
         };
 
         for mark in marks {
-            self.serialisim_marks
+            self.serialized_marks
                 .entry(mark.path)
                 .or_default()
                 .insert(mark.name, mark.points);
@@ -424,13 +424,13 @@ impl MarksState {
         };
         let abs_path: Arc<Path> = abs_path.into();
 
-        let Some(serialisim_marks) = self.serialisim_marks.get(&abs_path) else {
+        let Some(serialized_marks) = self.serialized_marks.get(&abs_path) else {
             return;
         };
 
         let mut loaded_marks = HashMap::default();
         let buffer = buffer_handle.read(cx);
-        for (name, points) in serialisim_marks.iter() {
+        for (name, points) in serialized_marks.iter() {
             loaded_marks.insert(
                 name.clone(),
                 points
@@ -466,7 +466,7 @@ impl MarksState {
             } else {
                 HashMap::default()
             };
-        let old_points = self.serialisim_marks.get(&path);
+        let old_points = self.serialized_marks.get(&path);
         if old_points == Some(&new_points) {
             return;
         }
@@ -494,7 +494,7 @@ impl MarksState {
             }
         }
 
-        self.serialisim_marks.insert(path.clone(), new_points);
+        self.serialized_marks.insert(path.clone(), new_points);
 
         if let Some(workspace_id) = self.workspace_id(cx) {
             let db = VimDb::global(cx);
@@ -687,7 +687,7 @@ impl MarksState {
                 Some(Mark::Buffer(*entity_id, anchors.get(name)?.clone()))
             }
             MarkLocation::Path(path) => {
-                let points = self.serialisim_marks.get(path)?;
+                let points = self.serialized_marks.get(path)?;
                 Some(Mark::Path(path.clone(), points.get(name)?.clone()))
             }
         }
@@ -739,7 +739,7 @@ impl MarksState {
             }
         };
         self.global_marks.remove(&mark_name);
-        self.serialisim_marks
+        self.serialized_marks
             .get_mut(&path)
             .map(|m| m.remove(&mark_name.clone()));
         if let Some(workspace_id) = self.workspace_id(cx) {
@@ -1632,7 +1632,7 @@ impl PickerDelegate for MarksViewDelegate {
                         }
                         MarkLocation::Path(path) => {
                             if let Some(&position) = marks_state
-                                .serialisim_marks
+                                .serialized_marks
                                 .get(path.as_ref())
                                 .and_then(|map| map.get(name))
                                 .and_then(|points| points.first())

@@ -2,19 +2,19 @@
 
 ## Overview
 
-This feature is an incremental extension of Sim's native agent. The command catalog remains the single source for autocomplete and dispatch; developer context remains the combination of Sim's personal instructions, per-worktree project instructions, trusted skills, and visible worktrees; session loading remains owned by `NativeAgent` and `ThreadStore`.
+This feature is an incremental extension of Zed's native agent. The command catalog remains the single source for autocomplete and dispatch; developer context remains the combination of Zed's personal instructions, per-worktree project instructions, trusted skills, and visible worktrees; session loading remains owned by `NativeAgent` and `ThreadStore`.
 
-The implementation adds three source-backed, Sim-owned commands (`/clear`, `/skills`, and `/status`), completes the existing dynamically named MCP prompt path for declared arguments, makes project-instruction failures visible, and adds missing integration and lifecycle regression coverage. It deliberately does not port Goose's types, config paths, hints subsystem, source registries, MCP Apps, or execution manager.
+The implementation adds three source-backed, Zed-owned commands (`/clear`, `/skills`, and `/status`), completes the existing dynamically named MCP prompt path for declared arguments, makes project-instruction failures visible, and adds missing integration and lifecycle regression coverage. It deliberately does not port Goose's types, config paths, hints subsystem, source registries, MCP Apps, or execution manager.
 
 ## Existing context
 
-| Area | Existing Sim owner and behavior | Confirmed change |
+| Area | Existing Zed owner and behavior | Confirmed change |
 | --- | --- | --- |
 | Native command catalog | `crates/agent/src/agent.rs` — `build_available_commands_for_project` advertises `/compact` and MCP prompts; skill commands are published from the existing skill catalog. | Reserve and advertise `/clear`, `/skills`, and `/status` alongside `/compact`. |
 | Dispatch | `crates/agent/src/agent.rs` — `Command::parse` and `NativeAgentConnection::prompt` route `/compact`, qualified/unqualified skills, and MCP prompts before model input. | Add handlers to this dispatch; no second parser or registry. |
 | MCP prompt commands | `build_available_commands_for_project` advertises zero- and one-argument context-server prompts; `NativeAgentConnection::prompt` maps the entire remainder to only the first prompt argument and `send_mcp_prompt` owns execution/persistence. | Advertise every declared prompt shape and validate named multi-argument input before reusing `send_mcp_prompt`. |
 | Autocomplete and submission | `crates/agent_ui/src/message_editor.rs` — `validate_slash_commands`; `crates/agent_ui/src/conversation_view/thread_view.rs` — `leading_native_command` and `send_command_queueing_remainder`. | Reuse the advertised catalog for completions, preserve unknown input, and cover the full submission behavior with regressions. |
-| Personal instructions | `crates/agent_settings/src/user_agents_md.rs` — `UserAgentsMd` watches the platform-specific Sim `AGENTS.md` and exposes load errors. | Reuse unchanged; report its state in `/status`. |
+| Personal instructions | `crates/agent_settings/src/user_agents_md.rs` — `UserAgentsMd` watches the platform-specific Zed `AGENTS.md` and exposes load errors. | Reuse unchanged; report its state in `/status`. |
 | Project instructions | `crates/prompt_store/src/prompts.rs` — `RULES_FILE_NAMES`, `ProjectContext`, `WorktreeContext`, `RulesFileContext`; `crates/agent/src/agent.rs` — `build_project_context` and `load_worktree_rules_file`. | Surface `RulesLoadingError`, which is currently discarded after loading. |
 | Skills | `crates/agent/src/agent.rs` and `crates/agent/src/tools/skill_tool.rs` discover, trust-filter, advertise, and invoke global/project `.agents/skills`. | Reuse the same catalog for `/skills` and `/status`; do not add hint-like auto-loading. |
 | Prompt order | `crates/agent/src/thread.rs` builds `SystemPromptTemplate`; `crates/agent/src/templates/system_prompt.hbs` renders personal `AGENTS.md` before project rules and renders skill metadata separately. | Preserve order and add cross-source regressions only. |
@@ -37,7 +37,7 @@ flowchart LR
     Dispatch --> SkillsDispatch["Existing skill paths"]
     Local --> Conversation["Existing AcpThread conversation UI"]
 
-    Personal["Sim personal AGENTS.md"] --> Context["Existing ProjectContext / system prompt"]
+    Personal["Zed personal AGENTS.md"] --> Context["Existing ProjectContext / system prompt"]
     Rules["Per-worktree AGENTS.md or .rules"] --> Context
     Skills["Trusted .agents/skills"] --> Context
     Worktrees["Project visible worktrees / ProjectPath"] --> Rules
@@ -71,7 +71,7 @@ Native command precedence remains:
 - **Responsibility:** `ContextServerRegistry` remains the prompt source and lookup owner; `NativeAgent::build_available_commands_for_project` remains discovery; `NativeAgentConnection::prompt` remains dispatch; `send_mcp_prompt` remains invocation, persistence, and returned-content ownership.
 - **Integration:** Stop omitting prompts with more than one declared argument. Encode each prompt's declared argument names, descriptions, and required state in the existing available-command input metadata where ACP supports it. A shared helper used by catalog tests and dispatch parses multi-argument input as shell-style quoted `name=value` tokens, validates the complete declared argument set, and returns the argument map expected by `send_mcp_prompt`. Zero-argument prompts reject unexpected input. The existing single-argument remainder form remains accepted when unambiguous; explicit `name=value` is also accepted.
 - **Failure boundary:** Duplicate names, unknown names, malformed assignments, and missing required values fail locally before `ContextServerRegistry::find_prompt` execution or a model turn. Context-server lookup, transport, protocol, and returned-content failures continue through the existing `send_mcp_prompt` error path.
-- **Rationale:** Goose's `/prompt` command proves that declared arguments and visible validation are observable behavior. Sim already exposes the stronger, directly named command experience, so literal `/prompt` and `/prompts` wrappers would duplicate discovery and dispatch.
+- **Rationale:** Goose's `/prompt` command proves that declared arguments and visible validation are observable behavior. Zed already exposes the stronger, directly named command experience, so literal `/prompt` and `/prompts` wrappers would duplicate discovery and dispatch.
 
 ### D-LOCAL-OUTPUT — Render local command results without model context
 
@@ -99,7 +99,7 @@ Missing model, usage, or instruction values are rendered as unavailable or not l
 - **Integration:** `/clear` is dispatched only through the native command path. The existing conversation queue waits until an active turn stops before running it. A fallible persistence step stores an empty conversation for the same session before emitting success; the live `Thread` and `AcpThread` are then cleared together, usage is refreshed, and a transient local confirmation is appended.
 - **Rationale:** The normal save helper skips empty threads, so relying only on its current observer path would leave stale persisted messages. The clear path must explicitly persist an empty conversation without changing the general new-empty-thread policy.
 
-Conversation-specific state to reset includes model-visible messages, detailed summary and pending summary state, compaction state, request/current token accounting, and any in-flight conversation-only bookkeeping. The command preserves session ID, title, project, selected model or unresolved selection, profile, tool configuration, sandbox/settings, worktree bindings, and records of edits or other real-world actions. Goose's conversation reset is not evidence that Sim's `ActionLog` should be erased.
+Conversation-specific state to reset includes model-visible messages, detailed summary and pending summary state, compaction state, request/current token accounting, and any in-flight conversation-only bookkeeping. The command preserves session ID, title, project, selected model or unresolved selection, profile, tool configuration, sandbox/settings, worktree bindings, and records of edits or other real-world actions. Goose's conversation reset is not evidence that Zed's `ActionLog` should be erased.
 
 If persistence fails, the live conversation is not cleared and no success result is shown. If the session disappears after persistence but before the infallible foreground mutation, the command returns a diagnostic; reopening observes the persisted empty conversation. This is the only unavoidable cross-entity boundary and requires a targeted regression.
 
@@ -109,9 +109,9 @@ If persistence fails, the live conversation is not cleared and no success result
 - **Integration:** The validator compares the typed command against existing available-command and available-skill data. On failure, the existing conversation error path displays the recognized command list while the editor retains its content. Native commands are submitted bare; trailing text and resolved content blocks are queued unchanged for the next ordinary turn.
 - **Rationale:** This behavior already exists at the right UI boundary. The feature needs end-to-end regression coverage, not a second unknown-command handler.
 
-This feature does not change direct ACP caller behavior after no command resolves. Goose itself deliberately falls through to inference in both legacy and state-machine paths, while Sim's user-facing editor already validates against the advertised catalog. Changing protocol-level fallthrough would be a separate compatibility decision, not an unknown-command UI fix.
+This feature does not change direct ACP caller behavior after no command resolves. Goose itself deliberately falls through to inference in both legacy and state-machine paths, while Zed's user-facing editor already validates against the advertised catalog. Changing protocol-level fallthrough would be a separate compatibility decision, not an unknown-command UI fix.
 
-### D-CONTEXT — Reuse Sim developer context and generalize its diagnostics
+### D-CONTEXT — Reuse Zed developer context and generalize its diagnostics
 
 - **Responsibility:** `UserAgentsMd` owns personal instructions; `NativeAgent::build_project_context` owns per-project refresh; `prompt_store::ProjectContext` owns prompt data; the existing skill integration owns `.agents/skills`.
 - **Integration:** Keep `RULES_FILE_NAMES` and its first-match precedence. Retain the existing prompt order of personal instructions, then root-labelled project instructions, with skill metadata in the existing catalog. Generalize the current skill-loading issue event and conversation callout just enough to carry a project-instruction load failure as a source-labelled developer-context issue. The existing global settings/error notification continues to own personal `AGENTS.md` failures.
@@ -119,9 +119,9 @@ This feature does not change direct ACP caller behavior after no command resolve
 
 The issue snapshot remains replacement-based and dismissible. A corrected or removed source clears its issue; if the same source fails again after being healthy, it may be shown again. `/status` reports issue counts but not full error text or instruction content.
 
-Referenced-file imports are not part of this design. Adding a new directive would require a Sim syntax decision, boundary semantics for global versus worktree files, and new recursive loading behavior. Skill documents continue to instruct the agent to read their supporting files through existing project/file tools, whose `ProjectPath`, trust, and permission checks already apply.
+Referenced-file imports are not part of this design. Adding a new directive would require a Zed syntax decision, boundary semantics for global versus worktree files, and new recursive loading behavior. Skill documents continue to instruct the agent to read their supporting files through existing project/file tools, whose `ProjectPath`, trust, and permission checks already apply.
 
-Goose also discovers nested hints after tool arguments reference a subdirectory. Sim currently selects one root instruction file per visible worktree. Loading nested instructions based on path access would change prompt precedence over time and requires a separate product/security decision; it is not silently treated as parity in this feature.
+Goose also discovers nested hints after tool arguments reference a subdirectory. Zed currently selects one root instruction file per visible worktree. Loading nested instructions based on path access would change prompt precedence over time and requires a separate product/security decision; it is not silently treated as parity in this feature.
 
 ### D-PATHS — Use Project and worktrees as the only root model
 
@@ -135,21 +135,21 @@ No arbitrary path is accepted by the new commands. `/status` reports only metada
 
 - **Responsibility:** `NativeAgent::open_thread` and `pending_sessions` coalesce loads; `register_session` and reference counts own the live entity; `close_session` and `ThreadStore` own final persistence.
 - **Integration:** Preserve the existing success path and test. Add coverage that two waiters see the same load failure, that the pending map is cleared, and that a later load can retry. Retain existing final-close persistence coverage.
-- **Rationale:** The audited Sim code already has the behavior for which the old pack proposed an execution manager. The remaining work is regression confidence, not a new abstraction or provider/extension restoration protocol.
+- **Rationale:** The audited Zed code already has the behavior for which the old pack proposed an execution manager. The remaining work is regression confidence, not a new abstraction or provider/extension restoration protocol.
 
 ### D-SCOPE — Re-home non-feature behavior
 
 - Dynamically named recipe commands and CLI recipe generation remain in `recipe-system`; `/doctor` remains in `agent-infrastructure`; terminal-only session and presentation commands remain in `text-ui` if approved.
 - Persistent `/goal` and bounded `/grind` are approved but remain outside this feature; `.agents/specs/goose-migration/goal-grind-commands` owns their catalog, persistence, consent, cancellation, and reload behavior while reusing this pack's native command integration.
-- Goose `sources.rs` is filesystem-backed ACP CRUD/import/export for skills, saved project profiles, agents, and checks. It is not a root registry. Existing Sim `Project`, recent-project/session state, skill settings, and worktrees already own the reusable behavior; a public structured source-management API requires a separate product/security decision.
-- Goose `SourceRoot` and the execution manager's LRU/creation-lock implementation are upstream implementation details. Sim reuses its own project and session owners.
+- Goose `sources.rs` is filesystem-backed ACP CRUD/import/export for skills, saved project profiles, agents, and checks. It is not a root registry. Existing Zed `Project`, recent-project/session state, skill settings, and worktrees already own the reusable behavior; a public structured source-management API requires a separate product/security decision.
+- Goose `SourceRoot` and the execution manager's LRU/creation-lock implementation are upstream implementation details. Zed reuses its own project and session owners.
 - MCP Apps stay decision-gated. The desktop renderer, resource/tool bridge, loopback proxy secret, CSP, cache, navigation, and app-management behavior cannot be smuggled into a context or command task; existing cross-spec references are conditional until an owner and threat model are approved.
 
 ## Error handling and recovery
 
 | Scenario | Required handling |
 | --- | --- |
-| Unknown slash command in the Sim UI | Keep editor content, skip agent/model dispatch, and use the existing error callout with available commands or a suggestion. |
+| Unknown slash command in the Zed UI | Keep editor content, skip agent/model dispatch, and use the existing error callout with available commands or a suggestion. |
 | Unknown slash command from a direct native-agent caller | Preserve current protocol behavior; no new direct-caller rejection is part of this feature. |
 | Invalid MCP prompt arguments | Keep the conversation usable, show the parser/validation error, and call neither the MCP server nor the model. |
 | MCP prompt execution failure | Preserve the original command according to the existing prompt owner and surface the server/protocol/content error through the existing conversation failure UI. |
@@ -179,7 +179,7 @@ No arbitrary path is accepted by the new commands. `/status` reports only metada
 | 1.14 | D-MCP-PROMPTS | Zero-, one-, and multi-argument prompts are all advertised with declared input metadata and collision qualification. |
 | 1.15 | D-MCP-PROMPTS | Quoted named arguments succeed; duplicate, unknown, malformed, missing-required, and unexpected arguments produce zero MCP/model calls. |
 | 1.16 | D-MCP-PROMPTS | Valid prompt results follow `send_mcp_prompt`; server and returned-content failures remain visible; no wrapper commands appear. |
-| 2.1 | D-CONTEXT | Context integration test loads only Sim personal/project instructions and trusted skills. |
+| 2.1 | D-CONTEXT | Context integration test loads only Zed personal/project instructions and trusted skills. |
 | 2.2 | D-CONTEXT, D-PATHS | Multi-worktree context preserves visible-worktree order and root labels. |
 | 2.3 | D-CONTEXT | Rendered-prompt ordering and skill-body exclusion tests. |
 | 2.5 | D-CONTEXT | One broken rule source yields one dismissible issue while other sources remain in context. |

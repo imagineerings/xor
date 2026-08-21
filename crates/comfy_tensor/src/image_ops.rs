@@ -60,7 +60,7 @@ impl Rgb8ImageTensor {
         }
         if !matches!(descriptor.dtype(), DType::F32 | DType::U8) {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.cpu.rgb8-image-from-logical-chw".to_owned(),
+                operation: "zed.cpu.rgb8-image-from-logical-chw".to_owned(),
                 device: descriptor.device(),
                 reason: format!(
                     "logical CHW image conversion supports F32 and U8, got {:?}",

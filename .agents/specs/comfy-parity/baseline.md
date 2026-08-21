@@ -3,7 +3,7 @@
 ## Purpose
 
 This baseline fixes the source snapshots, evidence vocabulary, and discovery
-limits used by the Comfy-to-Sim parity specification. The source directories
+limits used by the Comfy-to-Zed parity specification. The source directories
 contain no Git metadata, so no commit SHA is asserted. Package versions and
 content-sensitive tree fingerprints are used instead.
 
@@ -17,7 +17,7 @@ content-sensitive tree fingerprints are used instead.
 | comfy-cli | `projects/comfy/comfy-cli` | `0.0.0` in `pyproject.toml`, explicitly a CI placeholder and not a release identity | unavailable | 312 | `09d0b5f262bce3105f83777a310f1e391c4624f95142da5e3230626b68a276e6` |
 | Comfy documentation | `projects/comfy/docs` | no project version declared; locked tooling versions are recorded below | unavailable | 5,800 | `1f4c9c460b8f5b35e30eb4d2d64bc201a958f247ab21af6c68743cce28c33931` |
 | Comfy embedded docs | `projects/comfy/embedded-docs` | `0.5.7` in `pyproject.toml`; ComfyUI pins `comfyui-embedded-docs==0.5.6` | unavailable | 10,298 | `5aebf925cf36fe7b8df3c89466ad96ffa42110542a392ec6156b88fc807ec956` |
-| Sim target | repository root | `1.10.2` in `crates/sim/Cargo.toml` | unavailable | 3,310 fingerprint inputs, including 2,839 files under `crates/` | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
+| Zed target | repository root | `1.10.2` in `crates/zed/Cargo.toml` | unavailable | 3,310 fingerprint inputs, including 2,839 files under `crates/` | `99ceb40a1cc3359cde6e0865fe1b6138a06317d5fbd892f1595de10a96b07e9a` |
 
 The source-file coverage catalogs contain the reconciled production, test,
 generated, documentation, asset, and infrastructure counts. The counts above
@@ -50,7 +50,7 @@ report. No checked-in source is excluded: hidden, generated, translated, test,
 documentation, fixture, and build-support files are part of the source
 fingerprint and source-file ledger.
 
-The Sim fingerprint is reproducible from the repository root with the exact
+The Zed fingerprint is reproducible from the repository root with the exact
 manifest and path spelling below. Specification files are outside the manifest;
 `target/` build output is excluded:
 
@@ -77,7 +77,7 @@ not change the target baseline.
 | comfy-cli declares Python 3.10+ and the package version is only a `0.0.0` CI placeholder | `projects/comfy/comfy-cli/pyproject.toml`; [evidence-comfy-cli.md](evidence-comfy-cli.md) |
 | docs declares no project release version; locked tooling includes Mint 4.2.585, Sharp 0.33.5, and Playwright MCP 1.0.12 | `projects/comfy/docs/package.json`; `projects/comfy/docs/pnpm-lock.yaml`; [evidence-documentation.md](evidence-documentation.md) |
 | embedded-docs declares 0.5.7 while this ComfyUI snapshot pins 0.5.6 | `projects/comfy/embedded-docs/pyproject.toml`; ComfyUI dependency declaration; `catalogs/docs-reconciliation.json` |
-| Sim package version is 1.10.2 | `crates/sim/Cargo.toml:5` |
+| Zed package version is 1.10.2 | `crates/zed/Cargo.toml:5` |
 | No Comfy-specific target implementation exists | repository-wide search and direct architecture inspection outside `projects/comfy/**` and this pack found no Comfy workflow, node, tensor, model, sampler, worker, API-host, plugin, or GPUI implementation |
 
 ## Platform and distribution baseline
@@ -85,12 +85,12 @@ not change the target baseline.
 | Product | Availability represented in the snapshot | Notes |
 | --- | --- | --- |
 | ComfyUI | Windows, macOS, Linux; local and remotely reachable server modes; NVIDIA CUDA, CPU, DirectML, Intel oneAPI, Apple MPS, and conditional accelerator backends | Hardware and dtype support is capability- and dependency-dependent. Exact modes are cataloged rather than generalized from platform names. |
-| Frontend | Browser/local server, desktop distribution, remote server, cloud distribution, App Mode, and developer/test distributions | Cloud, paid, experimental, disabled, and developer surfaces remain inventoried even when Sim parity is deferred. |
+| Frontend | Browser/local server, desktop distribution, remote server, cloud distribution, App Mode, and developer/test distributions | Cloud, paid, experimental, disabled, and developer surfaces remain inventoried even when Zed parity is deferred. |
 | Desktop | Windows, macOS, and Linux packages with platform branches and platform-specific installation/update behavior | Native behavior is cataloged per IPC, menu, window event, setting, and platform branch. |
-| comfy-cli | Python 3.10+ terminal client; local/project/registry/cloud/partner lifecycle, event, schema, configuration, and extension surfaces | Source Python lifecycle and custom-node/frontend override execution are architecture conflicts; observable automation maps to native `sim comfy` or an explicit migration/defer response. |
+| comfy-cli | Python 3.10+ terminal client; local/project/registry/cloud/partner lifecycle, event, schema, configuration, and extension surfaces | Source Python lifecycle and custom-node/frontend override execution are architecture conflicts; observable automation maps to native `zed comfy` or an explicit migration/defer response. |
 | docs | Documentation site, English source content, localized mirrors, Cloud OpenAPI, redirects, tooling, generated node pages, staging, and developer workflows | Documentation is not executable evidence without code/test corroboration. English is the source of truth under the nested repository instructions. |
 | embedded-docs | Python package of 855 node records across 12 locales with bundled assets and source fingerprints | Documentation availability and version skew are inventoried separately from node execution support. |
-| Sim | Windows, macOS, Linux, and FreeBSD branches are present in the target; GPUI accessibility is currently opt-in through `SIM_EXPERIMENTAL_A11Y=1` | A Comfy capability receives an `equivalent` status only when its observable contract is already present, not merely because a generic Sim primitive exists. |
+| Zed | Windows, macOS, Linux, and FreeBSD branches are present in the target; GPUI accessibility is currently opt-in through `ZED_EXPERIMENTAL_A11Y=1` | A Comfy capability receives an `equivalent` status only when its observable contract is already present, not merely because a generic Zed primitive exists. |
 
 ## Repository instructions applied
 
@@ -131,7 +131,7 @@ README or visible screen as authoritative:
 
 Checked-in extractors exist for Desktop, comfy-cli, docs/embedded-docs,
 tensor/autograd/RNG, Frontend component supplements, Desktop renderer
-supplements, Sim evidence, native planning, and the master/trace artifacts.
+supplements, Zed evidence, native planning, and the master/trace artifacts.
 The base ComfyUI and Frontend catalogs do not have checked-in extractors in
 this pack. They are therefore classified as checksum-locked source snapshot
 inputs, not falsely described as generated outputs. Their source-only fields
@@ -228,14 +228,14 @@ production target may not use those commands, source trees, Python packages,
 or a Comfy endpoint. Native release validation runs with the network disabled,
 no Python executable on `PATH`, and source directories absent.
 
-## Sim status vocabulary
+## Zed status vocabulary
 
 | Status | Rule |
 | --- | --- |
-| `equivalent` | The current Sim behavior matches the externally observable Comfy contract and has target evidence. |
+| `equivalent` | The current Zed behavior matches the externally observable Comfy contract and has target evidence. |
 | `partial` | Some observable behavior matches, but at least one required state, format, interaction, side effect, error, recovery, or compatibility contract is absent. |
-| `missing` | No Comfy-specific observable capability exists in Sim. Generic GPUI/workspace infrastructure alone does not change this status. |
-| `conflicting` | Current Sim behavior or format is incompatible with the Comfy contract and requires a compatibility boundary or migration. |
+| `missing` | No Comfy-specific observable capability exists in Zed. Generic GPUI/workspace infrastructure alone does not change this status. |
+| `conflicting` | Current Zed behavior or format is incompatible with the Comfy contract and requires a compatibility boundary or migration. |
 | `deferred` | The parity decision deliberately schedules the capability after prerequisite work or a product/legal decision; the source feature remains traced. |
 | `uncertain` | Target support or source behavior cannot be established with the available evidence. |
 

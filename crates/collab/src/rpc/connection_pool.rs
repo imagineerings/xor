@@ -44,7 +44,7 @@ impl SimVersion {
 pub struct Connection {
     pub user_id: UserId,
     pub admin: bool,
-    pub sim_version: SimVersion,
+    pub zed_version: SimVersion,
 }
 
 impl ConnectionPool {
@@ -64,14 +64,14 @@ impl ConnectionPool {
         connection_id: ConnectionId,
         user_id: UserId,
         admin: bool,
-        sim_version: SimVersion,
+        zed_version: SimVersion,
     ) {
         self.connections.insert(
             connection_id,
             Connection {
                 user_id,
                 admin,
-                sim_version,
+                zed_version,
             },
         );
         let connected_user = self.connected_users.entry(user_id).or_default();

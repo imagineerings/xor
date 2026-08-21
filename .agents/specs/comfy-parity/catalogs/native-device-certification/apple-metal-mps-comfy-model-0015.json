@@ -8,7 +8,7 @@
     "target": "aarch64-apple-darwin",
     "observed_at_utc": "2026-07-26T08:31:35Z",
     "environment": {
-      "lab_id": "sim-metal-lab-mt-mbp-l2kh69c7rg",
+      "lab_id": "zed-metal-lab-mt-mbp-l2kh69c7rg",
       "hostname": "MT-MBP-L2KH69C7RG",
       "os_name": "macOS",
       "os_version": "26.5.2",
@@ -65,13 +65,13 @@
       "symbols": [
         "MPSSupportsMTLDevice",
         "MTLCreateSystemDefaultDevice",
-        "sim_comfy_metal_add_f16_v1",
-        "sim_comfy_metal_add_f32_v1",
-        "sim_comfy_metal_readiness_v1"
+        "zed_comfy_metal_add_f16_v1",
+        "zed_comfy_metal_add_f32_v1",
+        "zed_comfy_metal_readiness_v1"
       ],
       "package": {
         "kind": "signed",
-        "format": "sim-comfy-metal-package-v1",
+        "format": "zed-comfy-metal-package-v1",
         "signer": "metal.lab.mt-mbp-l2kh69c7rg",
         "signer_public_key": "ea96df9b4a930cb4a9a55425119a0cdba327e084a7859b5fda6025e2f36b3846",
         "signature": "70d1a14b47c571708785da5627c2128ef48c41b234be1d5f2a3ec6eeadaec371121d326587323c9d2453cae65fffc9b9d92a81fed7cddf425f31a2050b439a07",
@@ -370,8 +370,8 @@
   },
   "attestation": {
     "algorithm": "ed25519",
-    "domain": "sim-comfy-device-certification-v2",
-    "signer": "sim.hardware.lab.mt-mbp-l2kh69c7rg",
+    "domain": "zed-comfy-device-certification-v2",
+    "signer": "zed.hardware.lab.mt-mbp-l2kh69c7rg",
     "public_key": "0f17d6edad8968968b48bb4a00a332ba1759342aeb750cebaca3f3413f7951cf",
     "signature": "15be005ce7b1a4fa12553150f9d7f3757e0eb5d3c984cb015384d850f3efff4fc54ac9f5c0f9ec4eb76dda043397454b577506ba1be6c463efefe755f46a9d07",
     "payload_sha256": "78a71a374aabd60bd878009946444cd6a19742ad3f372c3f755d9c469acb6f4b"

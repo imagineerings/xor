@@ -2,7 +2,7 @@
 
 ## Outcome and oracle boundary
 
-Validation compares identical deterministic fixtures against source behavior and native Sim, but source applications are development-only oracles. Recorded fixtures, normalization code, fingerprints, environments, and numeric tolerances are checked in; release tests do not require source trees, Python, JavaScript extension execution, external Comfy connectivity, accounts, paid services, credentials, or network access.
+Validation compares identical deterministic fixtures against source behavior and native Zed, but source applications are development-only oracles. Recorded fixtures, normalization code, fingerprints, environments, and numeric tolerances are checked in; release tests do not require source trees, Python, JavaScript extension execution, external Comfy connectivity, accounts, paid services, credentials, or network access.
 
 A result is `observed` only when a recorded runtime probe actually ran. Existing tests may support `test-backed`; executable code may support `code-inferred`; documentation without corroboration remains `documented-only`; unavailable hardware/accounts/dependencies remain explicit uncertainty.
 
@@ -22,7 +22,7 @@ A result is `observed` only when a recorded runtime probe actually ran. Existing
 | Production boundary | Packaged release with no source trees, no Python on PATH, no Node extension host/browser, network disabled | Must pass native readiness and first slice; static inspection alone is insufficient |
 | Devices | Certified baseline: deterministic CPU and signed Apple Metal; optional CUDA, ROCm, DirectML, XPU, NPU, MLU, CoreX, and multi-device boundaries | Optional live-hardware rows stay external release gates; CoreX must remain compiled, zero-symbol, typed Unbound until its future specification is delivered |
 | Platforms | macOS, Windows, Linux package/data/permission/window/backend/codec behavior | Native branch plus platform test/lab; macOS observation cannot promote Windows/Linux |
-| Modes | GPUI local, headless native host, remote client of Sim host, offline, provider/cloud gated | GPUI and API share one native runtime; no external Comfy mode |
+| Modes | GPUI local, headless native host, remote client of Zed host, offline, provider/cloud gated | GPUI and API share one native runtime; no external Comfy mode |
 | Accessibility | Keyboard-only, semantic tree, screen reader, focus, contrast, zoom, reduced motion | Production application must not default to inaccessible |
 | Failure injection | Invalid, empty, loading, partial, cancellation, timeout, OOM, device loss, plugin trap/hang, worker crash, app crash, conflict, permission denial, restart | Terminal state, durable record, resource convergence, and visible recovery are mandatory |
 
@@ -147,9 +147,9 @@ Implementation completion requires deterministic CPU conformance, strict verific
 ### VAL-RUNTIME-SETTINGS-001: Native runtime profile settings foundation
 
 - Type: domain/settings.
-- Fixture: Registered Sim defaults plus merged native runtime profile settings.
+- Fixture: Registered Zed defaults plus merged native runtime profile settings.
 - Command/runner: `cargo test -p comfy_runtime val_runtime_settings_001`.
-- Procedure and expected signal: Verify canonical profile identity, typed device/memory/API/plugin/provider policy, Sim precedence reuse, partial-parse error retention, inactive future values, exact unknown-field round trips, duplicate/version/bind rejection, and fail-closed mapping into production initialization.
+- Procedure and expected signal: Verify canonical profile identity, typed device/memory/API/plugin/provider policy, Zed precedence reuse, partial-parse error retention, inactive future values, exact unknown-field round trips, duplicate/version/bind rejection, and fail-closed mapping into production initialization.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-runtime-settings-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
 ### VAL-RUNTIME-TRUST-001: Native runtime trust foundation
@@ -171,7 +171,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 ### VAL-E2E-001: Superseded external path release guard
 
 - Type: release E2E.
-- Fixture: Packaged Sim with legacy connection state.
+- Fixture: Packaged Zed with legacy connection state.
 - Command/runner: `cargo test -p comfy_test_support val_e2e_001`.
 - Procedure and expected signal: Prove the former external-server slice is absent: no Comfy connection UI/request occurs, data is preserved, and native migration is offered.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-e2e-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
@@ -179,7 +179,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 ### VAL-E2E-002: Native worker lifecycle
 
 - Type: E2E.
-- Fixture: Packaged Sim with deterministic CPU backend plus every compiled signed accelerator selection.
+- Fixture: Packaged Zed with deterministic CPU backend plus every compiled signed accelerator selection.
 - Command/runner: `cargo test -p comfy_test_support val_e2e_002`.
 - Procedure and expected signal: Start, ready, stop, restart, crash, recover, and quit without Python, source trees, network, or a public protocol loopback; for each accelerator require the exact signed-package-to-certified-session-to-semantic-backend chain, typed unavailable before Ready when host evidence is absent, and no CPU retry or relabeling.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-e2e-002.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
@@ -323,8 +323,8 @@ Implementation completion requires deterministic CPU conformance, strict verific
 ### VAL-GPUI-013: Production accessibility bootstrap
 
 - Type: GPUI/accessibility.
-- Fixture: Production Sim application construction, Comfy initialization, keymap ordering, and static menu registration.
-- Command/runner: `cargo test -p sim --features test-support val_gpui_013`.
+- Fixture: Production Zed application construction, Comfy initialization, keymap ordering, and static menu registration.
+- Command/runner: `cargo test -p zed --features test-support val_gpui_013`.
 - Procedure and expected signal: Prove production application construction never disables or environment-gates GPUI accessibility; construct that path on a test/headless platform where platform thread rules permit, otherwise verify the compiled helper and exact production source boundary; verify idempotent Comfy initialization, the scoped built-in keymap load order before user overrides, and registered non-placeholder menu actions. Native graph semantics remain exercised by VAL-GPUI-012 and the later whole-application VAL-GPUI-011 audit.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-gpui-013.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
@@ -341,7 +341,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Type: GPUI interaction/plugin/catalog.
 - Fixture: All 59 frontend extension rows, every installed signed UI declaration, and the 17-case compatibility fixture matrix.
 - Command/runner: `cargo test -p comfy_ui --features test-support val_gpui_015`.
-- Procedure and expected signal: Reconcile exact generated classifications and typed read-only surfaces; project only live signature-verified ComponentHost inventory; preserve exact bounded payloads and identities in accessible placeholders for unknown, malformed, or duplicate contributions; surface inventory failure without stale state; prove SDK, host, Sim adapter, and GPUI owners remain disjoint; and reject JavaScript, DOM, LiteGraph, browser, Python, source-runtime, capability-grant, action-dispatch, settings-persistence, or parallel lifecycle paths. Require a byte-stable zero-failure/zero-skip artifact twice.
+- Procedure and expected signal: Reconcile exact generated classifications and typed read-only surfaces; project only live signature-verified ComponentHost inventory; preserve exact bounded payloads and identities in accessible placeholders for unknown, malformed, or duplicate contributions; surface inventory failure without stale state; prove SDK, host, Zed adapter, and GPUI owners remain disjoint; and reject JavaScript, DOM, LiteGraph, browser, Python, source-runtime, capability-grant, action-dispatch, settings-persistence, or parallel lifecycle paths. Require a byte-stable zero-failure/zero-skip artifact twice.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-gpui-015.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
 ### VAL-HTTP-001: Native HTTP route contracts
@@ -445,7 +445,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Type: failure injection/platform.
 - Fixture: Crash parent before/during worker shutdown.
 - Command/runner: `cargo test -p comfy_test_support val_recovery_009`.
-- Procedure and expected signal: On restart identify only Sim-owned workers, refuse foreign processes, terminate or recover safely, and prevent restart loops.
+- Procedure and expected signal: On restart identify only Zed-owned workers, refuse foreign processes, terminate or recover safely, and prevent restart loops.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-recovery-009.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
 ### VAL-NATIVE-BOUNDARY-001: Native-only release boundary
@@ -685,7 +685,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 - Type: architecture/security/protocol.
 - Fixture: Every cancellation, runtime permission, asset/API/plugin/provider authorization, signed-manifest, asset-reference, execution-output-operation, external-navigation, backend capability, binding-status, and worker-negotiation definition and production call site.
 - Command/runner: `cargo test -p comfy_test_support val_ownership_domain_001`.
-- Procedure and expected signal: Require the canonical cancellation token, PermissionPolicy, PluginTrustPolicy, ProviderPolicy, ExternalNavigationPolicy, AssetIdentity/AssetRoots reference mapping, ExecutionPresentationOwner output-operation projection, and BackendCapabilityMatrix to be the only decision or mutation owners in scope; prove checked ABI/wire/asset/API/GPUI/backend adapters preserve exact semantics; reject self-grants, untyped capability decisions, duplicate host trust, repeated `sim-asset` parsing, UI-owned output persistence, direct Comfy external opens, and caller-supplied verification booleans before quota, allocation, navigation, deletion, or effects; and require a byte-stable zero-failure/zero-skip artifact twice.
+- Procedure and expected signal: Require the canonical cancellation token, PermissionPolicy, PluginTrustPolicy, ProviderPolicy, ExternalNavigationPolicy, AssetIdentity/AssetRoots reference mapping, ExecutionPresentationOwner output-operation projection, and BackendCapabilityMatrix to be the only decision or mutation owners in scope; prove checked ABI/wire/asset/API/GPUI/backend adapters preserve exact semantics; reject self-grants, untyped capability decisions, duplicate host trust, repeated `zed-asset` parsing, UI-owned output persistence, direct Comfy external opens, and caller-supplied verification booleans before quota, allocation, navigation, deletion, or effects; and require a byte-stable zero-failure/zero-skip artifact twice.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-ownership-domain-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
 ### VAL-OWNERSHIP-001: Foundational ownership and adapter semantics
@@ -740,7 +740,7 @@ Implementation completion requires deterministic CPU conformance, strict verific
 
 - Type: CLI.
 - Fixture: Every command, flag, schema, event, error, config, format, lifecycle, test, and source row.
-- Command/runner: `cargo test -p sim --features test-support comfy_cli_contract`.
+- Command/runner: `cargo test -p zed --features test-support comfy_cli_contract`.
 - Procedure and expected signal: Compare native/migration/defer mapping, help/schema output, invalid input, offline, cancellation, interrupted operation, and source-file closure without running Python in production.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-cli-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
@@ -755,9 +755,9 @@ Implementation completion requires deterministic CPU conformance, strict verific
 ### VAL-COMFY-BUILD-001: Opt-in Comfy product boundary
 
 - Type: build/package.
-- Fixture: The default and Comfy-enabled Sim feature, dependency, runtime-surface, asset, and macOS/Linux/Windows package graphs.
+- Fixture: The default and Comfy-enabled Zed feature, dependency, runtime-surface, asset, and macOS/Linux/Windows package graphs.
 - Command/runner: `cargo test -p comfy_test_support val_comfy_build_001`.
-- Procedure and expected signal: Build and test default Sim without Comfy, build CPU and selected accelerator Comfy modes, prove the default normal dependency tree contains no comfy_* package, verify Comfy CLI/UI/runtime/settings surfaces are cfg-absent, and compare default versus explicit-Comfy package plans with deterministic zero-failure evidence.
+- Procedure and expected signal: Build and test default Zed without Comfy, build CPU and selected accelerator Comfy modes, prove the default normal dependency tree contains no comfy_* package, verify Comfy CLI/UI/runtime/settings surfaces are cfg-absent, and compare default versus explicit-Comfy package plans with deterministic zero-failure evidence.
 - Pass artifact: exit status 0 plus `target/comfy-parity/val-comfy-build-001.json` containing fixture digests, environment/backend identity, per-case results, and no unexplained skipped row.
 
 ## Validation execution and gates

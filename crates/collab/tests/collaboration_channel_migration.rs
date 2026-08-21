@@ -38,7 +38,7 @@ fn collaboration_channel_schema_is_tenant_fenced_and_provenance_indexed() {
         "PRIMARY KEY (community_id, channel_id, principal_id)",
         "FOREIGN KEY (community_id, creator_principal_id)",
         "FOREIGN KEY (community_id, principal_id)",
-        "source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')",
+        "source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')",
         "source_record_id",
         "source_version",
         "source_observed_at",

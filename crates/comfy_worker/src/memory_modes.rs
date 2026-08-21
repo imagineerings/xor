@@ -605,7 +605,7 @@ pub fn cuda_memory_summary_exact_native(
     )?;
     cancellation.check()?;
     Ok(format!(
-        "Sim native {:?} memory summary, device {}\nactive_bytes.all.current: {active}\nreserved_bytes.all.current: {reserved}\n",
+        "Zed native {:?} memory summary, device {}\nactive_bytes.all.current: {active}\nreserved_bytes.all.current: {reserved}\n",
         device.kind(),
         device.ordinal()
     ))

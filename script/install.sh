@@ -1,20 +1,20 @@
 #!/usr/bin/env sh
 set -eu
 
-# Downloads a tarball from https://sim.dev/releases and unpacks it
+# Downloads a tarball from https://zed.dev/releases and unpacks it
 # into ~/.local/. If you'd prefer to do this manually, instructions are at
-# https://sim.dev/docs/linux.
+# https://zed.dev/docs/linux.
 
 main() {
     platform="$(uname -s)"
     arch="$(uname -m)"
-    channel="${SIM_CHANNEL:-stable}"
-    SIM_VERSION="${SIM_VERSION:-latest}"
+    channel="${ZED_CHANNEL:-stable}"
+    ZED_VERSION="${ZED_VERSION:-latest}"
     # Use TMPDIR if available (for environments with non-standard temp directories)
     if [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}" ]; then
-        temp="$(mktemp -d "$TMPDIR/sim-XXXXXX")"
+        temp="$(mktemp -d "$TMPDIR/zed-XXXXXX")"
     else
-        temp="$(mktemp -d "/tmp/sim-XXXXXX")"
+        temp="$(mktemp -d "/tmp/zed-XXXXXX")"
     fi
 
     if [ "$platform" = "Darwin" ]; then
@@ -54,10 +54,10 @@ main() {
 
     "$platform" "$@"
 
-    if [ "$(command -v sim)" = "$HOME/.local/bin/sim" ]; then
-        echo "Sim has been installed. Run with 'sim'"
+    if [ "$(command -v zed)" = "$HOME/.local/bin/zed" ]; then
+        echo "Zed has been installed. Run with 'zed'"
     else
-        echo "To run Sim from your terminal, you must add ~/.local/bin to your PATH"
+        echo "To run Zed from your terminal, you must add ~/.local/bin to your PATH"
         echo "Run:"
 
         case "$SHELL" in
@@ -74,16 +74,16 @@ main() {
                 ;;
         esac
 
-        echo "To run Sim now, '~/.local/bin/sim'"
+        echo "To run Zed now, '~/.local/bin/zed'"
     fi
 }
 
 linux() {
-    if [ -n "${SIM_BUNDLE_PATH:-}" ]; then
-        cp "$SIM_BUNDLE_PATH" "$temp/sim-linux-$arch.tar.gz"
+    if [ -n "${ZED_BUNDLE_PATH:-}" ]; then
+        cp "$ZED_BUNDLE_PATH" "$temp/zed-linux-$arch.tar.gz"
     else
-        echo "Downloading Sim version: $SIM_VERSION"
-        curl "https://cloud.sim.dev/releases/$channel/$SIM_VERSION/download?asset=sim&arch=$arch&os=linux&source=install.sh" > "$temp/sim-linux-$arch.tar.gz"
+        echo "Downloading Zed version: $ZED_VERSION"
+        curl "https://cloud.zed.dev/releases/$channel/$ZED_VERSION/download?asset=zed&arch=$arch&os=linux&source=install.sh" > "$temp/zed-linux-$arch.tar.gz"
     fi
 
     suffix=""
@@ -94,56 +94,56 @@ linux() {
     appid=""
     case "$channel" in
       stable)
-        appid="dev.sim.Sim"
+        appid="dev.zed.Zed"
         ;;
       nightly)
-        appid="dev.sim.Sim-Nightly"
+        appid="dev.zed.Zed-Nightly"
         ;;
       preview)
-        appid="dev.sim.Sim-Preview"
+        appid="dev.zed.Zed-Preview"
         ;;
       dev)
-        appid="dev.sim.Sim-Dev"
+        appid="dev.zed.Zed-Dev"
         ;;
       *)
         echo "Unknown release channel: ${channel}. Using stable app ID."
-        appid="dev.sim.Sim"
+        appid="dev.zed.Zed"
         ;;
     esac
 
     # Unpack
-    rm -rf "$HOME/.local/sim$suffix.app"
-    mkdir -p "$HOME/.local/sim$suffix.app"
-    tar -xzf "$temp/sim-linux-$arch.tar.gz" -C "$HOME/.local/"
+    rm -rf "$HOME/.local/zed$suffix.app"
+    mkdir -p "$HOME/.local/zed$suffix.app"
+    tar -xzf "$temp/zed-linux-$arch.tar.gz" -C "$HOME/.local/"
 
     # Setup ~/.local directories
     mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
 
     # Link the binary
-    if [ -f "$HOME/.local/sim$suffix.app/bin/sim" ]; then
-        ln -sf "$HOME/.local/sim$suffix.app/bin/sim" "$HOME/.local/bin/sim"
+    if [ -f "$HOME/.local/zed$suffix.app/bin/zed" ]; then
+        ln -sf "$HOME/.local/zed$suffix.app/bin/zed" "$HOME/.local/bin/zed"
     else
         # support for versions before 0.139.x.
-        ln -sf "$HOME/.local/sim$suffix.app/bin/cli" "$HOME/.local/bin/sim"
+        ln -sf "$HOME/.local/zed$suffix.app/bin/cli" "$HOME/.local/bin/zed"
     fi
 
     # Copy .desktop file
     desktop_file_path="$HOME/.local/share/applications/${appid}.desktop"
-    src_dir="$HOME/.local/sim$suffix.app/share/applications"
+    src_dir="$HOME/.local/zed$suffix.app/share/applications"
     if [ -f "$src_dir/${appid}.desktop" ]; then
         cp "$src_dir/${appid}.desktop" "${desktop_file_path}"
     else
         # Fallback for older tarballs
-        cp "$src_dir/sim$suffix.desktop" "${desktop_file_path}"
+        cp "$src_dir/zed$suffix.desktop" "${desktop_file_path}"
     fi
-    sed -i "s|Icon=sim|Icon=$HOME/.local/sim$suffix.app/share/icons/hicolor/512x512/apps/sim.png|g" "${desktop_file_path}"
-    sed -i "s|Exec=sim|Exec=$HOME/.local/sim$suffix.app/bin/sim|g" "${desktop_file_path}"
+    sed -i "s|Icon=zed|Icon=$HOME/.local/zed$suffix.app/share/icons/hicolor/512x512/apps/zed.png|g" "${desktop_file_path}"
+    sed -i "s|Exec=zed|Exec=$HOME/.local/zed$suffix.app/bin/zed|g" "${desktop_file_path}"
 }
 
 macos() {
-    echo "Downloading Sim version: $SIM_VERSION"
-    curl "https://cloud.sim.dev/releases/$channel/$SIM_VERSION/download?asset=sim&os=macos&arch=$arch&source=install.sh" > "$temp/Sim-$arch.dmg"
-    hdiutil attach -quiet "$temp/Sim-$arch.dmg" -mountpoint "$temp/mount"
+    echo "Downloading Zed version: $ZED_VERSION"
+    curl "https://cloud.zed.dev/releases/$channel/$ZED_VERSION/download?asset=zed&os=macos&arch=$arch&source=install.sh" > "$temp/Zed-$arch.dmg"
+    hdiutil attach -quiet "$temp/Zed-$arch.dmg" -mountpoint "$temp/mount"
     app="$(cd "$temp/mount/"; echo *.app)"
     echo "Installing $app"
     if [ -d "/Applications/$app" ]; then
@@ -155,7 +155,7 @@ macos() {
 
     mkdir -p "$HOME/.local/bin"
     # Link the binary
-    ln -sf "/Applications/$app/Contents/MacOS/cli" "$HOME/.local/bin/sim"
+    ln -sf "/Applications/$app/Contents/MacOS/cli" "$HOME/.local/bin/zed"
 }
 
 main "$@"

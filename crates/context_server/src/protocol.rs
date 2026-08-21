@@ -67,14 +67,14 @@ impl ModelContextProtocol {
         self.inner
             .set_protocol_version(&response.protocol_version.0);
 
-        let initialisim_protocol = InitializedContextServerProtocol {
+        let initialized_protocol = InitializedContextServerProtocol {
             inner: self.inner,
             initialize: response,
         };
 
-        initialisim_protocol.notify::<types::notifications::Initialized>(())?;
+        initialized_protocol.notify::<types::notifications::Initialized>(())?;
 
-        Ok(initialisim_protocol)
+        Ok(initialized_protocol)
     }
 }
 

@@ -3509,7 +3509,7 @@ fn semantic_digest(
     cancellation: &CancellationToken,
 ) -> Result<String, FrameInterpolationError> {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.frame-interpolation-model.v1");
+    hasher.update(b"zed.comfy.frame-interpolation-model.v1");
     hasher.update(FRAME_INTERPOLATION_SOURCE_SHA256.as_bytes());
     match profile {
         FrameInterpolationProfile::Film => hasher.update(FILM_SOURCE_SHA256.as_bytes()),
@@ -5482,7 +5482,7 @@ mod tests {
         );
         assert_eq!(
             payload.identity().format(),
-            "sim-native-frame-interpolation-v1"
+            "zed-native-frame-interpolation-v1"
         );
         assert!(payload.frame_interpolation_resource().is_some());
         assert!(payload.model().is_none());

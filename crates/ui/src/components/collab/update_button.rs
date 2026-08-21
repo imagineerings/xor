@@ -85,13 +85,13 @@ impl UpdateButton {
     }
 
     pub fn checking() -> Self {
-        Self::new(IconName::LoadCircle, "Checking for Sim Updates…")
+        Self::new(IconName::LoadCircle, "Checking for Zed Updates…")
             .icon_animate(true)
             .disabled(true)
     }
 
     pub fn downloading(version: impl Into<SharedString>, progress: Option<f32>) -> Self {
-        let mut this = Self::new(IconName::Download, "Downloading Sim Update…")
+        let mut this = Self::new(IconName::Download, "Downloading Zed Update…")
             .tooltip(version)
             .disabled(true);
         this.progress = progress;
@@ -99,7 +99,7 @@ impl UpdateButton {
     }
 
     pub fn installing(version: impl Into<SharedString>) -> Self {
-        Self::new(IconName::LoadCircle, "Installing Sim Update…")
+        Self::new(IconName::LoadCircle, "Installing Zed Update…")
             .icon_animate(true)
             .tooltip(version)
             .disabled(true)
@@ -196,7 +196,7 @@ impl Component for UpdateButton {
 
     fn description() -> &'static str {
         "A button component displayed in the title bar to \
-        show auto-update status and allow users to restart Sim."
+        show auto-update status and allow users to restart Zed."
     }
 
     fn preview(_window: &mut Window, _cx: &mut App) -> AnyElement {

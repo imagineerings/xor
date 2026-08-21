@@ -28,7 +28,7 @@ pub const RAFT_LARGE_SOURCE_TYPE_ID: &str = "OPTICAL_FLOW";
 pub const RAFT_LARGE_RESOURCE_ROLE: &str = "optical_flow";
 const EFFICIENTNET_V2_S_FEATURE_MODULE: &str = "efficientnet_v2_s.features";
 const RAFT_LARGE_ARCHITECTURE_ID: &str = "torchvision.models.optical_flow.raft_large";
-const RAFT_LARGE_RESOURCE_FORMAT: &str = "sim-native-torchvision-raft-large-v1";
+const RAFT_LARGE_RESOURCE_FORMAT: &str = "zed-native-torchvision-raft-large-v1";
 
 #[derive(Clone, Debug, Error)]
 pub enum NativeVisionModelError {
@@ -907,7 +907,7 @@ impl RaftSemanticHasher {
 fn raft_architecture_digest(
     schema: &[NativeVisionStateSpec],
 ) -> Result<String, NativeVisionModelError> {
-    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-architecture.v1")?;
+    let mut digest = RaftSemanticHasher::new(b"zed.comfy.model.raft-large-architecture.v1")?;
     digest.field(RAFT_LARGE_ARCHITECTURE_ID.as_bytes())?;
     digest.field(RAFT_LARGE_OPERATION_ID.as_bytes())?;
     digest.field(RAFT_LARGE_SOURCE_TYPE_ID.as_bytes())?;
@@ -936,7 +936,7 @@ fn raft_state_digest(
     cancellation: &CancellationToken,
 ) -> Result<String, NativeVisionModelError> {
     cancellation.check()?;
-    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-state.v1")?;
+    let mut digest = RaftSemanticHasher::new(b"zed.comfy.model.raft-large-state.v1")?;
     digest.u64(u64::try_from(state.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?);
     for (name, tensor) in state {
         cancellation.check()?;
@@ -966,7 +966,7 @@ fn raft_module_state_digest(
     cancellation: &CancellationToken,
 ) -> Result<String, NativeVisionModelError> {
     cancellation.check()?;
-    let mut digest = RaftSemanticHasher::new(b"sim.comfy.model.raft-large-modules.v1")?;
+    let mut digest = RaftSemanticHasher::new(b"zed.comfy.model.raft-large-modules.v1")?;
     digest.u64(u64::try_from(modules.len()).map_err(|_| NativeVisionModelError::ShapeOverflow)?);
     for slot in modules {
         cancellation.check()?;

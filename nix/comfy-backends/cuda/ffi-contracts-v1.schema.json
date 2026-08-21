@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sim.dev/schemas/comfy/cuda/ffi-contracts-v1.schema.json",
-  "title": "Sim NVIDIA CUDA native library contracts v1",
+  "$id": "https://zed.dev/schemas/comfy/cuda/ffi-contracts-v1.schema.json",
+  "title": "Zed NVIDIA CUDA native library contracts v1",
   "$comment": "The runtime additionally enforces exact target filenames, reviewed ABI symbols, sorted unique identities and symbols, compiled policy and kernel digests, and signed package coverage before constructing NativeFfiRegistry.",
   "type": "object",
   "additionalProperties": false,

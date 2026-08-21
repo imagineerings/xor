@@ -3,29 +3,29 @@ title: Subprocessor List
 slug: subprocessors
 ---
 
-Sim uses select third-party subprocessors to deliver core product functionality. Each subprocessor processes customer personal data only as necessary to provide its service, and all are subject to appropriate data protection agreements.
+Zed uses select third-party subprocessors to deliver core product functionality. Each subprocessor processes customer personal data only as necessary to provide its service, and all are subject to appropriate data protection agreements.
 
-### How Sim Uses Subprocessors
+### How Zed Uses Subprocessors
 
-To provide fast, reliable, and secure functionality, Sim relies on a small number of carefully vetted third-party subprocessors. These vendors help us deliver essential capabilities such as hosting, billing, analytics, real-time collaboration, and hosted AI features.
+To provide fast, reliable, and secure functionality, Zed relies on a small number of carefully vetted third-party subprocessors. These vendors help us deliver essential capabilities such as hosting, billing, analytics, real-time collaboration, and hosted AI features.
 
 Each subprocessor only processes customer personal data as needed to provide its service.
 
-Sim maintains contracts and data protection agreements with all subprocessors, including GDPR-compliant terms where applicable. We do not sell customer data, and we do not share customer personal data with vendors for advertising or marketing purposes.
+Zed maintains contracts and data protection agreements with all subprocessors, including GDPR-compliant terms where applicable. We do not sell customer data, and we do not share customer personal data with vendors for advertising or marketing purposes.
 
 ### AI Subprocessors
 
-Sim offers three modes for AI:
+Zed offers three modes for AI:
 
-1. **Bring your own API key** — data goes directly from the customer to the model provider; Sim does not process or store it.
-2. [**External Agents**](https://sim.dev/docs/ai/external-agents) — Sim uses ACP to provide an enhanced experience with terminal-based AI code agents like Claude Code or OpenAI Codex. Data is not processed or stored by Sim when using external agents.
-3. **Sim-hosted models** — Sim sends customer prompts to one of its AI providers (listed below). These vendors act as subprocessors only for customers who choose this mode.
+1. **Bring your own API key** — data goes directly from the customer to the model provider; Zed does not process or store it.
+2. [**External Agents**](https://zed.dev/docs/ai/external-agents) — Zed uses ACP to provide an enhanced experience with terminal-based AI code agents like Claude Code or OpenAI Codex. Data is not processed or stored by Zed when using external agents.
+3. **Zed-hosted models** — Zed sends customer prompts to one of its AI providers (listed below). These vendors act as subprocessors only for customers who choose this mode.
 
 ### Ongoing Updates
 
 **Last Updated**: March 2, 2026
 
-This subprocessor list is reviewed regularly. Sim will notify customers of material changes in accordance with our [Terms](https://sim.dev/terms) and [Privacy Policy](https://sim.dev/privacy-policy).
+This subprocessor list is reviewed regularly. Zed will notify customers of material changes in accordance with our [Terms](https://zed.dev/terms) and [Privacy Policy](https://zed.dev/privacy-policy).
 
 ---
 
@@ -74,7 +74,7 @@ This subprocessor list is reviewed regularly. Sim will notify customers of mater
 | -------------------- | ---------------------------------------------------------------------------------------- | ------------- |
 | **Amplitude**        | Product analytics                                                                        | United States |
 | **Axiom**            | Application telemetry, observability, and logs                                           | United States |
-| **Fivetran**         | Automates data pipeline integration (extract, transformation, and load services) for Sim | United States |
+| **Fivetran**         | Automates data pipeline integration (extract, transformation, and load services) for Zed | United States |
 | **Hex Technologies** | Analytics and debugging                                                                  | United States |
 | **Snowflake**        | Data warehouse                                                                           | United States |
 
@@ -88,9 +88,9 @@ This subprocessor list is reviewed regularly. Sim will notify customers of mater
 
 ---
 
-## AI Services (Sim-Hosted Models)
+## AI Services (Zed-Hosted Models)
 
-_These subprocessors apply only when customers opt to use Sim's hosted AI models. When users supply their own API keys, or use external agents, data is sent directly to the provider and does not pass through Sim's infrastructure._
+_These subprocessors apply only when customers opt to use Zed's hosted AI models. When users supply their own API keys, or use external agents, data is sent directly to the provider and does not pass through Zed's infrastructure._
 
 | Subprocessor        | Purpose                                                                                                                                                                                                          | Data Location |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |

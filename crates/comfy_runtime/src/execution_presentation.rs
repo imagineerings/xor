@@ -5215,10 +5215,10 @@ mod tests {
                     subfolder: None,
                     storage_type: Some("output".to_owned()),
                     metadata: BTreeMap::new(),
-                    view_reference: Some("sim-asset://output/native-image.png".to_owned()),
-                    download_reference: Some("sim-asset://output/native-image.png".to_owned()),
+                    view_reference: Some("zed-asset://output/native-image.png".to_owned()),
+                    download_reference: Some("zed-asset://output/native-image.png".to_owned()),
                     availability: crate::ExecutionOutputAvailability::Missing {
-                        reference: Some("sim-asset://output/native-image.png".to_owned()),
+                        reference: Some("zed-asset://output/native-image.png".to_owned()),
                         reason: "fixture missing".to_owned(),
                     },
                     created_at: DateTime::<Utc>::UNIX_EPOCH,
@@ -5239,7 +5239,7 @@ mod tests {
             output_id,
             crate::ExecutionOutputOperationAction::Recover,
             crate::ExecutionOutputAvailability::Ready {
-                reference: "sim-asset://output/native-image.png".to_owned(),
+                reference: "zed-asset://output/native-image.png".to_owned(),
                 byte_length: 128,
             },
         )?;
@@ -5364,10 +5364,10 @@ mod tests {
                     subfolder: None,
                     storage_type: Some("output".to_owned()),
                     metadata: BTreeMap::new(),
-                    view_reference: Some("sim-asset://output/native-image.png".to_owned()),
-                    download_reference: Some("sim-asset://output/native-image.png".to_owned()),
+                    view_reference: Some("zed-asset://output/native-image.png".to_owned()),
+                    download_reference: Some("zed-asset://output/native-image.png".to_owned()),
                     availability: crate::ExecutionOutputAvailability::Ready {
-                        reference: "sim-asset://output/native-image.png".to_owned(),
+                        reference: "zed-asset://output/native-image.png".to_owned(),
                         byte_length: 128,
                     },
                     created_at: DateTime::<Utc>::UNIX_EPOCH,

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Migrate several foundational agent infrastructure features from goose: context management, plugins, hooks, subagent execution, platform extensions, large response handling, final output tool, agent snapshots, extension malware checking, action required manager, doctor, download manager, instance ID, prompt templates, subprocess management, built-in extensions, config migrations, and Sim mode.
+Migrate several foundational agent infrastructure features from goose: context management, plugins, hooks, subagent execution, platform extensions, large response handling, final output tool, agent snapshots, extension malware checking, action required manager, doctor, download manager, instance ID, prompt templates, subprocess management, built-in extensions, config migrations, and Zed mode.
 
 ## Glossary
 
@@ -24,7 +24,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 1: Context Management
 
-**User Story:** As a sim user, I want the agent to manage its context window efficiently, so that it can handle long conversations without running out of context.
+**User Story:** As a zed user, I want the agent to manage its context window efficiently, so that it can handle long conversations without running out of context.
 
 #### Acceptance Criteria
 
@@ -35,7 +35,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 2: Plugin System
 
-**User Story:** As a sim developer, I want to create plugins that extend the agent's capabilities, so that third-party functionality can be added without modifying core code.
+**User Story:** As a zed developer, I want to create plugins that extend the agent's capabilities, so that third-party functionality can be added without modifying core code.
 
 #### Acceptance Criteria
 
@@ -46,7 +46,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 3: Hook System
 
-**User Story:** As a sim developer, I want lifecycle hooks in the agent, so that I can inject custom behavior at key points (before tool execution, after response, etc.).
+**User Story:** As a zed developer, I want lifecycle hooks in the agent, so that I can inject custom behavior at key points (before tool execution, after response, etc.).
 
 #### Acceptance Criteria
 
@@ -61,7 +61,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 4: Subagent Execution
 
-**User Story:** As a sim user, I want the agent to spawn sub-agents for complex tasks, so that work can be parallelized and delegated.
+**User Story:** As a zed user, I want the agent to spawn sub-agents for complex tasks, so that work can be parallelized and delegated.
 
 #### Acceptance Criteria
 
@@ -73,7 +73,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 5: Platform Extensions
 
-**User Story:** As a sim user, I want the agent to have built-in platform capabilities (code execution, app management, orchestration, summarization, etc.), so that it can perform a wide range of tasks without external extensions.
+**User Story:** As a zed user, I want the agent to have built-in platform capabilities (code execution, app management, orchestration, summarization, etc.), so that it can perform a wide range of tasks without external extensions.
 
 #### Acceptance Criteria
 
@@ -91,7 +91,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 6: Large Response Handler
 
-**User Story:** As a sim user, I want the agent to handle large text tool results gracefully, so that a tool cannot overwhelm the model context.
+**User Story:** As a zed user, I want the agent to handle large text tool results gracefully, so that a tool cannot overwhelm the model context.
 
 #### Acceptance Criteria
 
@@ -102,7 +102,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 7: Final Output Tool
 
-**User Story:** As a sim user, I want the agent to produce structured final output, so that results are clearly communicated.
+**User Story:** As a zed user, I want the agent to produce structured final output, so that results are clearly communicated.
 
 #### Acceptance Criteria
 
@@ -117,11 +117,11 @@ Migrate several foundational agent infrastructure features from goose: context m
 #### Acceptance Criteria
 
 1. **8.1** THE migration SHALL classify `agents/snapshots/*.snap` as prompt regression fixtures and SHALL NOT plan runtime state capture/restore from them.
-2. **8.2** WHERE prompt golden coverage is useful, THE implementation SHALL use Sim's repository-appropriate test pattern without adding a runtime snapshot manager.
+2. **8.2** WHERE prompt golden coverage is useful, THE implementation SHALL use Zed's repository-appropriate test pattern without adding a runtime snapshot manager.
 
 ### Requirement 9: Extension Malware Check
 
-**User Story:** As a sim user, I want extensions to be checked for malicious content before loading, so that my system is protected from harmful extensions.
+**User Story:** As a zed user, I want extensions to be checked for malicious content before loading, so that my system is protected from harmful extensions.
 
 #### Acceptance Criteria
 
@@ -131,7 +131,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 10: Action Required Manager
 
-**User Story:** As a sim user, I want the agent to track actions that need my attention, so that I don't miss important pending tasks.
+**User Story:** As a zed user, I want the agent to track actions that need my attention, so that I don't miss important pending tasks.
 
 #### Acceptance Criteria
 
@@ -141,7 +141,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 11: Doctor / Troubleshooting
 
-**User Story:** As a sim user, I want a diagnostic tool that checks system health, so that I can troubleshoot configuration, connectivity, and dependency issues.
+**User Story:** As a zed user, I want a diagnostic tool that checks system health, so that I can troubleshoot configuration, connectivity, and dependency issues.
 
 #### Acceptance Criteria
 
@@ -155,7 +155,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 12: Download Manager
 
-**User Story:** As a sim system, I want a download manager for fetching assets, models, and updates, so that downloads are reliable and resumable.
+**User Story:** As a zed system, I want a download manager for fetching assets, models, and updates, so that downloads are reliable and resumable.
 
 #### Acceptance Criteria
 
@@ -168,7 +168,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 13: Instance ID
 
-**User Story:** As a sim developer, I want a unique instance identifier, so that I can correlate telemetry and diagnostics from individual installations.
+**User Story:** As a zed developer, I want a unique instance identifier, so that I can correlate telemetry and diagnostics from individual installations.
 
 #### Acceptance Criteria
 
@@ -178,7 +178,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 14: Prompt Templates
 
-**User Story:** As a sim developer, I want a prompt template system, so that prompts can be parameterized and rendered consistently.
+**User Story:** As a zed developer, I want a prompt template system, so that prompts can be parameterized and rendered consistently.
 
 #### Acceptance Criteria
 
@@ -188,7 +188,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 15: Subprocess Management
 
-**User Story:** As a sim system, I want to manage subprocesses reliably, so that spawned processes are tracked and cleaned up properly.
+**User Story:** As a zed system, I want to manage subprocesses reliably, so that spawned processes are tracked and cleaned up properly.
 
 #### Acceptance Criteria
 
@@ -198,7 +198,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 16: Configuration Migration
 
-**User Story:** As a sim user, I want configuration files to be automatically migrated between versions, so that I don't lose settings after an update.
+**User Story:** As a zed user, I want configuration files to be automatically migrated between versions, so that I don't lose settings after an update.
 
 #### Acceptance Criteria
 
@@ -208,7 +208,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 
 ### Requirement 17: Goose Mode
 
-**User Story:** As a sim user, I want different agent modes (focus, creative, balanced), so that the agent's behavior can match my current task.
+**User Story:** As a zed user, I want different agent modes (focus, creative, balanced), so that the agent's behavior can match my current task.
 
 #### Acceptance Criteria
 
@@ -225,7 +225,7 @@ Migrate several foundational agent infrastructure features from goose: context m
 1. **18.1** WHERE container execution is approved, THE session SHALL route selected stdio and built-in extension processes through the configured container without changing unrelated extensions.
 2. **18.2** THE system SHALL validate the container, working-directory mapping, binary availability, environment, and mount policy before starting the extension.
 3. **18.3** IF the container exits, is unavailable, or lacks the extension, THEN THE agent SHALL surface an actionable extension failure and clean up owned processes.
-4. **18.4** CONTAINER execution SHALL remain subject to Sim's tool permission, secret, filesystem, network, and process-cleanup policies.
+4. **18.4** CONTAINER execution SHALL remain subject to Zed's tool permission, secret, filesystem, network, and process-cleanup policies.
 
 ## References
 
@@ -244,4 +244,4 @@ Migrate several foundational agent infrastructure features from goose: context m
 - Source: `projects/goose/crates/goose/src/instance_id.rs`
 - Source: `projects/goose/crates/goose/src/prompt_template.rs`
 - Source: `projects/goose/crates/goose/src/subprocess.rs`
-- Source: `projects/goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs` (renamed to Sim mode in Sim)
+- Source: `projects/goose/crates/goose/src/config/migrations.rs`, `config/goose_mode.rs` (renamed to Zed mode in Zed)

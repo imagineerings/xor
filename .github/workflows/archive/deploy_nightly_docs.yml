@@ -8,10 +8,10 @@ on:
 permissions: {}
 jobs:
   deploy_docs:
-    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'sim-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     permissions:
       contents: read
-    uses: simtropolis/sim/.github/workflows/deploy_docs.yml@3f16f7b9082f8828e4d6ae207d2349b1ef932517
+    uses: simtropolis/zed/.github/workflows/deploy_docs.yml@3f16f7b9082f8828e4d6ae207d2349b1ef932517
     secrets:
       DOCS_AMPLITUDE_API_KEY: ${{ secrets.DOCS_AMPLITUDE_API_KEY }}
       DOCS_CONSENT_IO_INSTANCE: ${{ secrets.DOCS_CONSENT_IO_INSTANCE }}

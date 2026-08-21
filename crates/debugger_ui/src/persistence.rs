@@ -127,27 +127,27 @@ pub(crate) async fn serialize_pane_layout(
     pane_group: SerializedLayout,
     kvp: KeyValueStore,
 ) -> anyhow::Result<()> {
-    let serialisim_pane_group = serde_json::to_string(&pane_group)
+    let serialized_pane_group = serde_json::to_string(&pane_group)
         .context("Serializing pane group with serde_json as a string")?;
     kvp.write_kvp(
         format!("{DEBUGGER_PANEL_PREFIX}-{adapter_name}"),
-        serialisim_pane_group,
+        serialized_pane_group,
     )
     .await
 }
 
-pub(crate) fn build_serialisim_layout(
+pub(crate) fn build_serialized_layout(
     pane_group: &Member,
     dock_axis: Axis,
     cx: &App,
 ) -> SerializedLayout {
     SerializedLayout {
         dock_axis,
-        panes: build_serialisim_pane_layout(pane_group, cx),
+        panes: build_serialized_pane_layout(pane_group, cx),
     }
 }
 
-pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> SerializedPaneLayout {
+pub(crate) fn build_serialized_pane_layout(pane_group: &Member, cx: &App) -> SerializedPaneLayout {
     match pane_group {
         Member::Axis(PaneAxis {
             axis,
@@ -158,7 +158,7 @@ pub(crate) fn build_serialisim_pane_layout(pane_group: &Member, cx: &App) -> Ser
             axis: *axis,
             children: members
                 .iter()
-                .map(|member| build_serialisim_pane_layout(member, cx))
+                .map(|member| build_serialized_pane_layout(member, cx))
                 .collect::<Vec<_>>(),
             flexes: Some(flexes.lock().clone()),
         },
@@ -187,7 +187,7 @@ fn serialize_pane(pane: &Entity<Pane>, cx: &App) -> SerializedPane {
     }
 }
 
-pub(crate) fn get_serialisim_layout(
+pub(crate) fn get_serialized_layout(
     adapter_name: impl AsRef<str>,
     kvp: &KeyValueStore,
 ) -> Option<SerializedLayout> {
@@ -259,7 +259,7 @@ pub(crate) fn deserialize_pane_layout(
                 flexes,
             )))
         }
-        SerializedPaneLayout::Pane(serialisim_pane) => {
+        SerializedPaneLayout::Pane(serialized_pane) => {
             let pane = running::new_debugger_pane(workspace.clone(), project.clone(), window, cx);
             subscriptions.insert(
                 pane.entity_id(),
@@ -268,7 +268,7 @@ pub(crate) fn deserialize_pane_layout(
             let running_state = cx.weak_entity();
             let pane_handle = pane.downgrade();
 
-            let sub_views: Vec<_> = serialisim_pane
+            let sub_views: Vec<_> = serialized_pane
                 .children
                 .iter()
                 .map(|child| match child {
@@ -339,7 +339,7 @@ pub(crate) fn deserialize_pane_layout(
             pane.update(cx, |pane, cx| {
                 let mut active_idx = 0;
                 for (idx, sub_view) in sub_views.into_iter().enumerate() {
-                    if serialisim_pane
+                    if serialized_pane
                         .active_item
                         .is_some_and(|active| active == sub_view.read(cx).view_kind())
                     {

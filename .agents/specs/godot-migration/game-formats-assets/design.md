@@ -2,9 +2,9 @@
 
 ## Architecture
 
-Use parsers at existing project, worktree, filesystem, preview, media, and artifact owners for text project, scene, resource, and import metadata. Heavyweight formats require an approved Sim-native importer or an explicit unsupported/decision-required outcome; Godot is never used as an external tool.
+Use parsers at existing project, worktree, filesystem, preview, media, and artifact owners for text project, scene, resource, and import metadata. Heavyweight formats require an approved Zed-native importer or an explicit unsupported/decision-required outcome; Godot is never used as an external tool.
 
-Game format and generated asset handling is implemented as native Sim functionality. Godot-origin text resources are parsed into records at existing project/worktree owners without executing scripts, `.import` metadata is linked by Sim-owned import records, and generated mesh assets register through existing artifact/media provenance owners rather than compatibility labels or pass-through import hooks.
+Game format and generated asset handling is implemented as native Zed functionality. Godot-origin text resources are parsed into records at existing project/worktree owners without executing scripts, `.import` metadata is linked by Zed-owned import records, and generated mesh assets register through existing artifact/media provenance owners rather than compatibility labels or pass-through import hooks.
 
 ## Components
 
@@ -28,7 +28,7 @@ _For any_ generated mesh asset, registration SHALL require provenance metadata.
 
 ### D-NATIVE: Native format and import path
 
-Godot-compatible bytes and metadata terminate at Sim-owned parsers/importers. Their outputs, caches, dependency graph, diagnostics, cancellation, recovery, and cleanup remain in existing Sim owners. Unsupported heavyweight formats do not fall back to Godot.
+Godot-compatible bytes and metadata terminate at Zed-owned parsers/importers. Their outputs, caches, dependency graph, diagnostics, cancellation, recovery, and cleanup remain in existing Zed owners. Unsupported heavyweight formats do not fall back to Godot.
 
 **Validates: Requirement 9.1, 9.2, 9.3, 9.4, 9.5**
 

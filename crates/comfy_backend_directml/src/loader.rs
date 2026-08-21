@@ -1846,7 +1846,7 @@ mod tests {
     fn discovery_order_is_application_package_then_system_component() {
         let plan = DirectMlDiscoveryPlan::for_target(
             "x86_64-pc-windows-msvc",
-            "C:/Sim",
+            "C:/Zed",
             "C:/Windows/System32",
         )
         .expect("supported target");
@@ -1860,7 +1860,7 @@ mod tests {
         );
         assert_eq!(
             plan.candidates()[0].path(),
-            Path::new("C:/Sim/DirectML.dll")
+            Path::new("C:/Zed/DirectML.dll")
         );
     }
 
@@ -2034,14 +2034,14 @@ mod tests {
         let handles = retained_handles();
         let plan = DirectMlDiscoveryPlan::for_target(
             "x86_64-pc-windows-msvc",
-            "C:/Sim",
+            "C:/Zed",
             "C:/Windows/System32",
         )
         .expect("plan");
         let mut observation = DirectMlCandidateObservation {
             target: "x86_64-pc-windows-msvc".to_owned(),
             source: DiscoverySource::SignedApplicationPackage,
-            path: PathBuf::from("C:/Sim/DirectML.dll"),
+            path: PathBuf::from("C:/Zed/DirectML.dll"),
             windows_build: MINIMUM_WINDOWS_BUILD,
             file_version: FILE_VERSION,
             digest_sha256: "5ab77cc5db8e1544d386fd28586598317da8dcbef098fb86d8d8a60e739e0e5d"
@@ -2069,7 +2069,7 @@ mod tests {
         assert!(matches!(
             DirectMlDiscoveryPlan::for_target(
                 "aarch64-apple-darwin",
-                "/Applications/Sim.app",
+                "/Applications/Zed.app",
                 "/System32"
             ),
             Err(DirectMlLoadError::UnsupportedTarget { .. })
@@ -2084,7 +2084,7 @@ mod tests {
     fn production_observation_has_no_synthetic_non_windows_success() {
         let plan = DirectMlDiscoveryPlan::for_target(
             "x86_64-pc-windows-msvc",
-            "C:/Sim",
+            "C:/Zed",
             "C:/Windows/System32",
         )
         .expect("supported catalog target");

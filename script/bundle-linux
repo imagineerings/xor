@@ -14,7 +14,7 @@ Build a release .tar.gz for Linux.
 
 Options:
   -h, --help     Display this help and exit.
-  --flatpak      Set SIM_BUNDLE_TYPE=flatpak so that this can be included in system info
+  --flatpak      Set ZED_BUNDLE_TYPE=flatpak so that this can be included in system info
   --comfy        Include the Comfy integration, accelerator backends, worker, and assets.
   --rust-tools   Include the Cargo tool window and matching remote-server support.
   --dry-run      Print the selected package plan without building it.
@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         --flatpak)
-            export SIM_BUNDLE_TYPE=flatpak
+            export ZED_BUNDLE_TYPE=flatpak
             shift
             ;;
         --comfy)
@@ -62,31 +62,31 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$dry_run" = true ]]; then
-    sim_features="none"
+    zed_features="none"
     remote_features="none"
     if [[ "$rust_tools" = true ]]; then
-        sim_features="rust-tools"
+        zed_features="rust-tools"
         remote_features="rust-tools"
     fi
     if [[ "$comfy" = true ]]; then
         if [[ "$rust_tools" = true ]]; then
-            sim_features="comfy,cuda,rocm,mlu,npu,xpu,rust-tools"
+            zed_features="comfy,cuda,rocm,mlu,npu,xpu,rust-tools"
         else
-            sim_features="comfy,cuda,rocm,mlu,npu,xpu"
+            zed_features="comfy,cuda,rocm,mlu,npu,xpu"
         fi
-        echo "mode=comfy packages=sim,cli,comfy_worker sim_features=${sim_features} remote_features=${remote_features} worker_features=cuda,rocm,mlu,npu,xpu include_comfy_worker=true rust_tools=${rust_tools}"
+        echo "mode=comfy packages=zed,cli,comfy_worker zed_features=${zed_features} remote_features=${remote_features} worker_features=cuda,rocm,mlu,npu,xpu include_comfy_worker=true rust_tools=${rust_tools}"
     else
-        echo "mode=default packages=sim,cli sim_features=${sim_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
+        echo "mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
     fi
     exit 0
 fi
 
-export SIM_BUNDLE=true
+export ZED_BUNDLE=true
 
-channel=$(<crates/sim/RELEASE_CHANNEL)
+channel=$(<crates/zed/RELEASE_CHANNEL)
 target_dir="${CARGO_TARGET_DIR:-target}"
 
-version="$(script/get-crate-version sim)"
+version="$(script/get-crate-version zed)"
 # Set RELEASE_VERSION so it's compiled into GPUI and it knows about the version.
 export RELEASE_VERSION="${version}"
 
@@ -122,15 +122,15 @@ else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
 if [[ "$comfy" = true ]]; then
-    sim_build_features="sim/comfy,sim/cuda,sim/rocm,sim/mlu,sim/npu,sim/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
+    zed_build_features="zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
     if [[ "$rust_tools" = true ]]; then
-        sim_build_features="${sim_build_features},sim/rust-tools"
+        zed_build_features="${zed_build_features},zed/rust-tools"
     fi
-    cargo build --release --target "${target_triple}" --package sim --package cli --package comfy_worker --features "${sim_build_features}"
+    cargo build --release --target "${target_triple}" --package zed --package cli --package comfy_worker --features "${zed_build_features}"
 elif [[ "$rust_tools" = true ]]; then
-    cargo build --release --target "${target_triple}" --package sim --package cli --features sim/rust-tools
+    cargo build --release --target "${target_triple}" --package zed --package cli --features zed/rust-tools
 else
-    cargo build --release --target "${target_triple}" --package sim --package cli
+    cargo build --release --target "${target_triple}" --package zed --package cli
 fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
@@ -149,13 +149,13 @@ if ! command -v sentry-cli >/dev/null 2>&1; then
     echo "install with: 'curl -sL https://sentry.io/get-cli | bash'"
 else
     if [[ -n "${SENTRY_AUTH_TOKEN:-}" ]]; then
-        echo "Uploading sim debug symbols to sentry..."
+        echo "Uploading zed debug symbols to sentry..."
         # note: this uploads the unstripped binary which is needed because it contains
         # .eh_frame data for stack unwinding. see https://github.com/getsentry/symbolic/issues/783
         for attempt in 1 2 3; do
             echo "Attempting sentry upload (attempt $attempt/3)..."
-            if sentry-cli debug-files upload --include-sources --wait -p sim -o sim-dev \
-                "${target_dir}/${target_triple}"/release/sim \
+            if sentry-cli debug-files upload --include-sources --wait -p zed -o zed-dev \
+                "${target_dir}/${target_triple}"/release/zed \
                 "${target_dir}/${remote_server_triple}"/release/remote_server; then
                 echo "Sentry upload successful on attempt $attempt"
                 break
@@ -174,7 +174,7 @@ fi
 # Strip debug symbols and save them for upload to DigitalOcean.
 # We use llvm-objcopy because GNU objcopy on older distros (e.g. Ubuntu 20.04)
 # doesn't understand CREL sections produced by newer LLVM.
-llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/sim"
+llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/zed"
 llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/cli"
 if [[ "$comfy" = true ]]; then
     llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/comfy-worker"
@@ -198,68 +198,68 @@ fi
 # Move everything that should end up in the final package
 # into a temp directory.
 temp_dir=$(mktemp -d)
-sim_dir="${temp_dir}/sim$suffix.app"
+zed_dir="${temp_dir}/zed$suffix.app"
 
 # Binary
-mkdir -p "${sim_dir}/bin" "${sim_dir}/libexec"
-cp "${target_dir}/${target_triple}/release/sim" "${sim_dir}/libexec/sim-editor"
+mkdir -p "${zed_dir}/bin" "${zed_dir}/libexec"
+cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"
 if [[ "$comfy" = true ]]; then
-    cp "${target_dir}/${target_triple}/release/comfy-worker" "${sim_dir}/libexec/comfy-worker"
+    cp "${target_dir}/${target_triple}/release/comfy-worker" "${zed_dir}/libexec/comfy-worker"
 fi
-cp "${target_dir}/${target_triple}/release/cli" "${sim_dir}/bin/sim"
+cp "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"
 
 # Libs
 # Bundle libstdc++ so older supported systems can run binaries built with our
 # toolchain even when their system libstdc++.so.6 lacks required GLIBCXX symbols.
 find_libs() {
-    ldd ${target_dir}/${target_triple}/release/sim |\
+    ldd ${target_dir}/${target_triple}/release/zed |\
         cut -d' ' -f3 |\
         grep -v '\<\(libc.so\|libgcc_s.so\|libm.so\|libpthread.so\|libdl.so\|libasound.so\)'
 }
 
-mkdir -p "${sim_dir}/lib"
-rm -rf "${sim_dir}/lib/*"
-cp $(find_libs) "${sim_dir}/lib"
+mkdir -p "${zed_dir}/lib"
+rm -rf "${zed_dir}/lib/*"
+cp $(find_libs) "${zed_dir}/lib"
 
 # Icons
-mkdir -p "${sim_dir}/share/icons/hicolor/512x512/apps"
-cp "crates/sim/resources/app-icon$suffix.png" "${sim_dir}/share/icons/hicolor/512x512/apps/sim.png"
-mkdir -p "${sim_dir}/share/icons/hicolor/1024x1024/apps"
-cp "crates/sim/resources/app-icon$suffix@2x.png" "${sim_dir}/share/icons/hicolor/1024x1024/apps/sim.png"
+mkdir -p "${zed_dir}/share/icons/hicolor/512x512/apps"
+cp "crates/zed/resources/app-icon$suffix.png" "${zed_dir}/share/icons/hicolor/512x512/apps/zed.png"
+mkdir -p "${zed_dir}/share/icons/hicolor/1024x1024/apps"
+cp "crates/zed/resources/app-icon$suffix@2x.png" "${zed_dir}/share/icons/hicolor/1024x1024/apps/zed.png"
 
 # .desktop
 export DO_STARTUP_NOTIFY="true"
-export APP_CLI="sim"
-export APP_ICON="sim"
+export APP_CLI="zed"
+export APP_ICON="zed"
 export APP_ARGS="%U"
 if [[ "$channel" == "preview" ]]; then
-  export APP_NAME="Sim Preview"
-  APP_ID="dev.sim.Sim-Preview"
+  export APP_NAME="Zed Preview"
+  APP_ID="dev.zed.Zed-Preview"
 elif [[ "$channel" == "nightly" ]]; then
-  export APP_NAME="Sim Nightly"
-  APP_ID="dev.sim.Sim-Nightly"
+  export APP_NAME="Zed Nightly"
+  APP_ID="dev.zed.Zed-Nightly"
 elif [[ "$channel" == "dev" ]]; then
-  export APP_NAME="Sim Devel"
-  APP_ID="dev.sim.Sim-Dev"
+  export APP_NAME="Zed Devel"
+  APP_ID="dev.zed.Zed-Dev"
 else
-  export APP_NAME="Sim"
-  APP_ID="dev.sim.Sim"
+  export APP_NAME="Zed"
+  APP_ID="dev.zed.Zed"
 fi
 
-mkdir -p "${sim_dir}/share/applications"
-envsubst < "crates/sim/resources/sim.desktop.in" > "${sim_dir}/share/applications/$APP_ID.desktop"
-chmod +x "${sim_dir}/share/applications/$APP_ID.desktop"
+mkdir -p "${zed_dir}/share/applications"
+envsubst < "crates/zed/resources/zed.desktop.in" > "${zed_dir}/share/applications/$APP_ID.desktop"
+chmod +x "${zed_dir}/share/applications/$APP_ID.desktop"
 
 # Copy generated licenses so they'll end up in archive too
-cp "assets/licenses.md" "${sim_dir}/licenses.md"
+cp "assets/licenses.md" "${zed_dir}/licenses.md"
 
 # Create archive out of everything that's in the temp directory
 arch=$(uname -m)
-archive="sim-linux-${arch}.tar.gz"
+archive="zed-linux-${arch}.tar.gz"
 
 rm -rf "${archive}"
-remove_match="sim(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
+remove_match="zed(-[a-zA-Z0-9]+)?-linux-$(uname -m)\.tar\.gz"
 ls "${target_dir}/release" | grep -E ${remove_match} | xargs -d "\n" -I {} rm -f "${target_dir}/release/{}" || true
-tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "sim$suffix.app"
+tar -czvf "${target_dir}/release/$archive" -C ${temp_dir} "zed$suffix.app"
 
-gzip -f --stdout --best "${target_dir}/${remote_server_triple}/release/remote_server" > "${target_dir}/sim-remote-server-linux-${arch}.gz"
+gzip -f --stdout --best "${target_dir}/${remote_server_triple}/release/remote_server" > "${target_dir}/zed-remote-server-linux-${arch}.gz"

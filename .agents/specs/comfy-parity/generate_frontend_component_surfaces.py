@@ -60,7 +60,7 @@ FIELDS = (
     "platform_localization_variants",
     "feature_flags_permissions",
     "infrastructure_disposition_reason",
-    "observable_sim_acceptance",
+    "observable_zed_acceptance",
     "automated_validation",
     "manual_validation",
     "open_questions",
@@ -82,7 +82,7 @@ MANUAL_CONTRACTS = {
         "observable": "Choosing a platform-filtered Apple Metal, NVIDIA, AMD, CPU, or Manual Install option updates the required device model; Metal/NVIDIA/AMD selections show the recommended badge and the selected option's localized description.",
         "state": "Each HardwareOption click calls pickGpu with one TorchDeviceType and replaces device exactly once; the Darwin branch offers Metal while other platforms offer NVIDIA and AMD, and CPU/manual remain available in both branches.",
         "failure": "No asynchronous failure path exists in this component; an unknown/null selection shows neither recommended state nor a device description, while platform acquisition is delegated to the Desktop preload bridge.",
-        "accessibility": "Selection is delegated to HardwareOption click semantics; Sim must expose the alternatives as a single keyboard-operable choice group with selected state, labels, recommendation, and description programmatically associated.",
+        "accessibility": "Selection is delegated to HardwareOption click semantics; Zed must expose the alternatives as a single keyboard-operable choice group with selected state, labels, recommendation, and description programmatically associated.",
         "interfaces": "Reads electronAPI().getPlatform() and writes the parent-owned device model; it performs no install or filesystem mutation.",
     },
     "apps/desktop-ui/src/components/install/InstallLocationPicker.vue": {
@@ -109,14 +109,14 @@ MANUAL_CONTRACTS = {
     "apps/desktop-ui/src/components/maintenance/TerminalOutputDrawer.vue": {
         "observable": "Opening the bottom drawer creates a read-only terminal, writes the default message and buffered log history, auto-sizes it, then streams subsequent Desktop log messages live; unmounting clears only the visible terminal reference while retaining the hidden buffer.",
         "state": "created copies buffer-to-terminal and disables stdin; every onLogMessage writes to the buffer and the terminal when mounted; unmounted sets the terminal reference to null so later logs remain buffered for the next open.",
-        "failure": "Closing or unmounting does not cancel maintenance and does not lose buffered logs; bridge or terminal write failures have no component-local visible recovery and must be surfaced by the owning maintenance view in Sim.",
+        "failure": "Closing or unmounting does not cancel maintenance and does not lose buffered logs; bridge or terminal write failures have no component-local visible recovery and must be surfaced by the owning maintenance view in Zed.",
         "accessibility": "The drawer header and close control must be keyboard operable; terminal output is read-only and requires an accessible log transcript/status alternative rather than relying on the canvas terminal alone.",
         "interfaces": "Subscribes to electron.onLogMessage and writes xterm/terminal-buffer state; it sends no terminal input and starts no subprocess.",
     },
     "src/components/sidebar/tabs/AppsSidebarTab.vue": {
         "observable": "The Apps sidebar lists only workflows whose suffix is app.json; when none exist it shows mode-sensitive localized guidance and, outside App Mode, an action that switches the application mode to app.",
         "state": "isAppWorkflow is the list filter; the empty-state action calls setMode('app') exactly once, while the empty-state button is omitted when App Mode is already active.",
-        "failure": "There is no component-local asynchronous failure path; workflow-load failures remain with BaseWorkflowsSidebarTab and mode-switch failure must preserve the prior mode with visible feedback in Sim.",
+        "failure": "There is no component-local asynchronous failure path; workflow-load failures remain with BaseWorkflowsSidebarTab and mode-switch failure must preserve the prior mode with visible feedback in Zed.",
         "accessibility": "The filtered tree/search and empty action require keyboard operation, focus retention, localized accessible names, and a textual beta state; the omitted button must not leave a dead focus target.",
         "interfaces": "Reads workflow suffixes and useAppMode state; writes only the frontend application mode.",
     },
@@ -132,7 +132,7 @@ MANUAL_CONTRACTS = {
         "observable": "The About panel renders store-provided version/resource badges as labelled external links and conditionally renders current system statistics when the system-stats store has data.",
         "state": "Badge rows track aboutPanelStore.badges and the SystemStatsPanel appears only while systemStatsStore.systemStats is present.",
         "failure": "Absent system statistics omits the stats panel without inventing values; external-link failure remains in the browser/host and must not mutate About state.",
-        "accessibility": "Each badge is a native external link with title and visible label; Sim must preserve external-destination indication, keyboard focus, and semantic system-stat labels.",
+        "accessibility": "Each badge is a native external link with title and visible label; Zed must preserve external-destination indication, keyboard focus, and semantic system-stat labels.",
         "interfaces": "Reads About and system-stat stores and opens badge URLs in a new noopener/noreferrer browsing context.",
     },
     "src/components/dialog/content/setting/UsageLogsTable.vue": {
@@ -145,7 +145,7 @@ MANUAL_CONTRACTS = {
     "src/components/dialog/content/setting/UserPanel.vue": {
         "observable": "The User panel switches between signed-in identity/provider details and a sign-in action; email-auth users can open password update, signed-in users can sign out, and non-API-key users see the support address for account deletion.",
         "state": "isLoggedIn selects account versus login content, loading replaces sign-out controls with a spinner and drives sign-in loading, and provider/API-key state gates password and deletion guidance.",
-        "failure": "Authentication and dialog failures are delegated to useCurrentUser/dialogService; Sim must retain the current session state, stop loading, and expose a recoverable localized error.",
+        "failure": "Authentication and dialog failures are delegated to useCurrentUser/dialogService; Zed must retain the current session state, stop loading, and expose a recoverable localized error.",
         "accessibility": "Identity fields remain labelled text; sign-in, sign-out, password update, and mail link are keyboard reachable with visible focus and loading/disabled state, and the icon-only password button requires its localized tooltip/name.",
         "interfaces": "Calls useCurrentUser authentication handlers and dialogService.showUpdatePasswordDialog; the support link uses mailto:support@comfy.org.",
     },
@@ -664,7 +664,7 @@ def build_row(source_row, selection_basis):
             accessibility_parts.append("static source contains a non-native click target without a colocated keyboard/role binding; this is an explicit source accessibility risk, not behavior to copy")
         if not accessibility_parts:
             accessibility_parts.append("Has no direct native focus target; the owning surface must expose its dynamic state as labelled text/status")
-        accessibility = "; ".join(accessibility_parts) + ". Sim acceptance requires keyboard, focus, name, role, state, disabled/loading, and error equivalence without preserving source defects."
+        accessibility = "; ".join(accessibility_parts) + ". Zed acceptance requires keyboard, focus, name, role, state, disabled/loading, and error equivalence without preserving source defects."
         interfaces = clean(
             "; ".join(
                 part for part in (
@@ -735,7 +735,7 @@ def build_row(source_row, selection_basis):
     )
 
     acceptance = (
-        f"With the same props/models/store state and {source_availability} distribution, Sim shall reproduce {component}'s "
+        f"With the same props/models/store state and {source_availability} distribution, Zed shall reproduce {component}'s "
         + ("actions, emitted/model transitions, visible state variants, failure/recovery, and accessible focus semantics." if functional else "source-specific rendered information and semantic layout through the owning surface, without inventing a standalone action.")
     )
     automated = (
@@ -744,9 +744,9 @@ def build_row(source_row, selection_basis):
         else f"Create a deterministic {'interaction/state' if functional else 'render/semantic'} contract fixture for {feature_id(source_file)} from the exact bindings and states in this row."
     )
     manual = (
-        f"Open {component} in its owning source surface and Sim with identical data; exercise pointer and keyboard paths, state branches, failure/recovery, localization, and applicable platform/cloud gates."
+        f"Open {component} in its owning source surface and Zed with identical data; exercise pointer and keyboard paths, state branches, failure/recovery, localization, and applicable platform/cloud gates."
         if functional
-        else f"Inspect {component} in its owning source surface and Sim for semantic reading order, localized content, responsive layout, contrast, and absence of unintended actions."
+        else f"Inspect {component} in its owning source surface and Zed for semantic reading order, localized content, responsive layout, contrast, and absence of unintended actions."
     )
 
     return {
@@ -782,7 +782,7 @@ def build_row(source_row, selection_basis):
         ),
         "feature_flags_permissions": f"Availability={source_availability}; source gates/permission-like state={', '.join(flags) if flags else 'none resolved locally; parent route/store gates apply'}.",
         "infrastructure_disposition_reason": infrastructure_reason,
-        "observable_sim_acceptance": acceptance,
+        "observable_zed_acceptance": acceptance,
         "automated_validation": automated,
         "manual_validation": manual,
         "open_questions": "Runtime-only child-component semantics, cloud service outcomes, and platform bridge results remain explicit until side-by-side execution; no behavior beyond the cited source is inferred.",

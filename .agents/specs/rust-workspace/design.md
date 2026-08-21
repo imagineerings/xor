@@ -35,13 +35,13 @@ The following implementation facts determine the design:
 - `TerminalProvider::spawn` currently returns eventual exit status but no generic cancellation/output-observer handle. Terminal output is rendered by the terminal subsystem and is not a suitable structured protocol.
 - `Project::active_toolchain` and `ToolchainStore` are generic and remote-capable, but the audited Rust language does not register a Rust `ToolchainLister`; Cargo configuration therefore cannot assume an active Rust toolchain is available there.
 - There is no generic structured test/result store or Tests panel. Existing editor runnables and rust-analyzer extensions are useful inputs, not a workspace-wide result model.
-- `sim/rust-tools`, `project/cargo-workspace`, `remote_server/rust-tools`, settings feature forwarding, release scripts, CI, and `script/check-rust-tools-feature-boundary` already form the optional Cargo boundary. Existing Rust language initialization remains unconditional.
+- `zed/rust-tools`, `project/cargo-workspace`, `remote_server/rust-tools`, settings feature forwarding, release scripts, CI, and `script/check-rust-tools-feature-boundary` already form the optional Cargo boundary. Existing Rust language initialization remains unconditional.
 
 ## Recommended architecture
 
 ```mermaid
 flowchart LR
-    subgraph Client["Sim client"]
+    subgraph Client["Zed client"]
         CP["cargo_ui / Cargo panel"]
         TP["tasks_ui / Tests panel"]
         LT["language_tools tree host"]
@@ -114,7 +114,7 @@ Extend `CargoWorkspaceSnapshot` with a configuration section keyed by existing w
 
 Manifest reads go through the visible worktree/project APIs. The parser records names and supported toolchain declaration fields only; it does not evaluate all Cargo profile inheritance or rustup state. The probe is metadata/model discovery, so `CargoWorkspaceStore` may own its lifecycle, but its runner interface remains separate from `CargoMetadataRunner`. It cannot run builds, tests, benches, or user presets.
 
-The effective target label is deliberately three-valued: explicit active preset target, probed host triple, or unresolved Cargo default. Sim does not attempt to reproduce Cargo's layered `.cargo/config.toml`, environment, alias, or target-selection algorithm. Relevant visible config files trigger invalidation because Cargo may use them, but unresolved influence is labeled rather than guessed.
+The effective target label is deliberately three-valued: explicit active preset target, probed host triple, or unresolved Cargo default. Zed does not attempt to reproduce Cargo's layered `.cargo/config.toml`, environment, alias, or target-selection algorithm. Relevant visible config files trigger invalidation because Cargo may use them, but unresolved influence is labeled rather than guessed.
 
 ### D4: Model active configuration and presets outside the metadata store
 
@@ -123,7 +123,7 @@ The effective target label is deliberately three-valued: explicit active preset 
 Persistence follows the recommended OQ1 default:
 
 - user presets: `cargo.presets` in user `settings.json`;
-- project presets: `cargo.presets` in trusted `.sim/settings.json`, merged by stable ID over user presets;
+- project presets: `cargo.presets` in trusted `.zed/settings.json`, merged by stable ID over user presets;
 - ephemeral presets: panel memory only;
 - active preset: stable ID plus non-secret selection overrides in the existing workspace database/panel serialization; missing IDs fall back to the default ephemeral configuration with a migration notice.
 
@@ -176,7 +176,7 @@ Remote execution remains the existing remote terminal/task path. The client-side
 
 The dockable panel title is **Tests**. It owns focus, selected provider/run, text/status filters, summaries, run/cancel/rerun-failed toolbar actions, result navigation, and terminal links. The generic panel has no Rust labels or Cargo argument logic. Registration occurs only when its compile-time feature is selected; the first provider registration in Now is internal and Rust-specific.
 
-Panel persistence stores placement, size, filter, selected provider, and safe IDs, not result payloads or secrets. Result history is in-memory for Now; reopening Sim starts with discovery/no-results rather than migrating unbounded test history.
+Panel persistence stores placement, size, filter, selected provider, and safe IDs, not result payloads or secrets. Result history is in-memory for Now; reopening Zed starts with discovery/no-results rather than migrating unbounded test history.
 
 ### D9: Use a separate Rust test provider with a protocol gate
 
@@ -196,7 +196,7 @@ The provider maps a case to an exact Rust/Cargo `TaskTemplate`; a single-case ru
 
 Local stores use the existing `WorktreeStore`, `ProjectEnvironment`, `TrustedWorktrees`, and process runner. Remote client stores are proxies. `remote_server` constructs the local Cargo and Rust-test stores, registers typed handlers, and subscribes entities only under `rust-tools` feature forwarding.
 
-SSH, WSL, and dev-container support is capability-based: when Sim represents the environment as a project host with Tasks/DAP and project environment support, the same provider works. There is no `std::fs`/local `cargo` fallback on the client. Unsupported project modes return typed states.
+SSH, WSL, and dev-container support is capability-based: when Zed represents the environment as a project host with Tasks/DAP and project environment support, the same provider works. There is no `std::fs`/local `cargo` fallback on the client. Unsupported project modes return typed states.
 
 Every request carries project/peer ID, capability/protocol version, request or run ID, generation, and a bounded visible-worktree scope. Multiplayer responses and action resolution are filtered through visible worktrees before serialization. Remote action plans are resolved on the host, executed through the existing remote Task/DAP policy, and report lifecycle back to the host; they never invoke client-local Cargo. Guests may view allowed model/results but execute only if existing task/debug policy permits. Disconnect or host generation changes cancel request ownership, expire pending run authorization, and stale prior snapshots.
 
@@ -225,7 +225,7 @@ Large parsing and fixture conversion runs on the background executor. Foreground
 Feature shape:
 
 ```text
-sim/rust-tools
+zed/rust-tools
   -> dep:cargo_ui
   -> project/cargo-workspace
   -> project/structured-execution

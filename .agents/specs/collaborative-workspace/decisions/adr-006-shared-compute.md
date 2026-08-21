@@ -20,7 +20,7 @@ Shared compute is disabled by default at the deployment, community, user and dev
 
 The initial supported deployment policy is self-hosted only:
 
-- compute nodes are controlled by the same Sim deployment/operator or by active members of the requesting community who explicitly share their own device;
+- compute nodes are controlled by the same Zed deployment/operator or by active members of the requesting community who explicitly share their own device;
 - scheduling is restricted to the same host-derived community and approved deployment federation boundary;
 - no public marketplace, anonymous provider, cross-community pool, paid third-party broker or provider discovered from an arbitrary client URL is eligible; and
 - external Iroh relays may transport end-to-end encrypted traffic only when locally allowlisted; they do not become compute providers or trust authorities.
@@ -31,7 +31,7 @@ Relay mesh is a separate operator feature. A single-instance deployment does not
 
 ### Canonical ownership
 
-Sim's native agent/ACP job state remains the canonical execution owner. The remote/shared-compute scheduler selects an execution lease for that job; it does not create a second job or transcript. Agent permissions, cancellation, activity, result delivery and audit use the same canonical owners as local execution.
+Zed's native agent/ACP job state remains the canonical execution owner. The remote/shared-compute scheduler selects an execution lease for that job; it does not create a second job or transcript. Agent permissions, cancellation, activity, result delivery and audit use the same canonical owners as local execution.
 
 The collaboration domain owns provider-neutral job identity, requested model/capabilities, execution-location policy and authorization inputs. `remote` owns mesh protocol, advertisements, eligibility, scheduling and expiring execution leases. The shared-compute runtime owns bounded inference execution on an admitted serving device. Mesh gossip, local caches and presence are derived hints, never job or membership authority.
 
@@ -83,7 +83,7 @@ Admission either acquires one fenced resource/executor lease or returns a visibl
 
 ### No-silent-fallback rule
 
-If the user or job selects shared compute, Sim never silently executes that request through a local model, commercial API, different trust class, unapproved community, or generic remote-agent provider. No eligible capacity, policy denial, stale mesh, partition, model loss and execution failure are distinct visible outcomes.
+If the user or job selects shared compute, Zed never silently executes that request through a local model, commercial API, different trust class, unapproved community, or generic remote-agent provider. No eligible capacity, policy denial, stale mesh, partition, model loss and execution failure are distinct visible outcomes.
 
 Automatic retry may use the same node only while the canonical job's idempotency and delivery state prove that duplicate inference is safe. Moving a prompt to a different owner/node after bytes may have been delivered requires a policy that explicitly permits multi-node disclosure and an observable retry decision; the default is to ask the user. An unknown execution outcome is not converted into success or replayed invisibly.
 
@@ -109,7 +109,7 @@ Operators receive health/readiness, peer/version counts, fence/replay rejects, s
 
 Shared-compute binaries, model runtimes and mesh listeners ship disabled with explicit kill switches, allowlists, resource ceilings and readiness checks. Configuration validation rejects wildcard community/provider trust, unbounded resources, unknown relay URLs, mutable/unverified model identities and missing identity material. Enabling is a reversible configuration action; this ADR authorizes specification and implementation, not production activation.
 
-Rollback stops new admissions, drains or cancels active leases under policy, records terminal/unknown job state, disables advertisements/listeners and returns affected jobs to visible user action. It never reroutes them to another provider. Redis/gossip/advertisement state can expire; canonical job and audit state is retained. Source Buzz mesh remains available for compatibility only until Sim mesh conformance and client cutover pass, and never runs the same canonical job concurrently.
+Rollback stops new admissions, drains or cancels active leases under policy, records terminal/unknown job state, disables advertisements/listeners and returns affected jobs to visible user action. It never reroutes them to another provider. Redis/gossip/advertisement state can expire; canonical job and audit state is retained. Source Buzz mesh remains available for compatibility only until Zed mesh conformance and client cutover pass, and never runs the same canonical job concurrently.
 
 ## Future third-party approval gate
 

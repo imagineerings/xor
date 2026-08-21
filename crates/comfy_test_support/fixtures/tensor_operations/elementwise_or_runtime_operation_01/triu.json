@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-0678D863EEBA",
   "baseline_overload_id": "COMFY-TENSOR-OP-0678D863EEBA:blocked",
   "baseline_fixture_sha256": "eee990e56e08de5bb25c40732cb173e0d194f3a84618126e4fc2554a9be439c1",
-  "overload_id": "sim.native.tensor.triu.cpu.v1",
+  "overload_id": "zed.native.tensor.triu.cpu.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "input", "type": "Tensor"},

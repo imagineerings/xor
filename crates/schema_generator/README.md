@@ -1,6 +1,6 @@
-# Sim Schema Generator
+# Zed Schema Generator
 
-Prints various Sim schemas to stdout.
+Prints various Zed schemas to stdout.
 
 ## Usage
 

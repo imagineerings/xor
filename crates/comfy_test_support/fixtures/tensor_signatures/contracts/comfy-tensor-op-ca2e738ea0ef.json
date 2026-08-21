@@ -397,7 +397,7 @@
         {
           "expanded_mapping": false,
           "name": "device",
-          "syntax": "sim.device",
+          "syntax": "zed.device",
           "syntax_kind": "Attribute"
         }
       ],
@@ -428,7 +428,7 @@
         {
           "expanded_mapping": false,
           "name": "device",
-          "syntax": "sim.device",
+          "syntax": "zed.device",
           "syntax_kind": "Attribute"
         }
       ],

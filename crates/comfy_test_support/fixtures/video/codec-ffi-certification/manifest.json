@@ -38,7 +38,7 @@
   "contract": {
     "catalog_encoding": "canonical-json-with-trailing-newline",
     "signature_algorithm": "ed25519",
-    "signature_domain": "sim-comfy-video-codec-package-v1",
+    "signature_domain": "zed-comfy-video-codec-package-v1",
     "certificate_owner": "comfy_runtime::NativeFfiRegistry",
     "unsafe_owner": "comfy_runtime::native_video_codec_ffi",
     "runtime_compilation_forbidden": true,

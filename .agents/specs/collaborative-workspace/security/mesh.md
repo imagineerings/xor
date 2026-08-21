@@ -19,11 +19,11 @@ Shared compute is disabled independently at deployment, community, user and devi
 
 - `projects/buzz/crates/buzz-relay-mesh/src/wire.rs` freezes ALPN `buzz/mesh/1`, a one-byte wire version, a 16 MiB stream-frame ceiling, first-frame `Hello`, authenticated boot-scoped runtime IDs and a `{session_id, generation, owner_runtime_id}` fence on every session-bearing frame.
 - Relay ready records expire after three refresh intervals and bind a boot runtime key to the expected relay signing identity. Unanchored or foreign relay records are rejected. Gossip uses monotonic record versions and phi suspicion only as dial/liveness hints.
-- The relay runtime authenticates Iroh endpoint identity, rejects unknown inbound peers, deterministically resolves simultaneous dials, separates reliable/control streams from lossy media datagrams, and exposes bounded counters. The current Buzz mesh protocol does not itself carry a trusted community field, so Sim must bind every connection and frame to deployment and tenant context before compatibility decoding can route it.
+- The relay runtime authenticates Iroh endpoint identity, rejects unknown inbound peers, deterministically resolves simultaneous dials, separates reliable/control streams from lossy media datagrams, and exposes bounded counters. The current Buzz mesh protocol does not itself carry a trusted community field, so Zed must bind every connection and frame to deployment and tenant context before compatibility decoding can route it.
 - Buzz desktop shared compute intersects current relay membership with fresh signed member-status events, verifies owner/member/endpoint bindings, rejects missing membership snapshots, removes revoked members despite fresh status, and excludes stale status from routing.
 - Desktop transport policy bounds invite tokens and transport candidates, restricts relay URLs, rejects unsafe direct targets and verifies signed bootstrap tokens. Local owner keys and endpoint identities are separate trust artifacts.
-- Buzz's local mesh runtime supports serve and consume modes, model discovery, progress, health, stop/recovery and usage reporting. It does not provide the canonical resource lease, weighted fairness, job fencing or no-silent-fallback guarantees required by ADR-006; these are Sim strengthening obligations, not optional parity.
-- Buzz's Kubernetes backend deliberately refuses shared-compute agents because the in-image mesh client is absent. Sim deployment must retain that fail-closed behavior until a declared execution substrate passes readiness and conformance.
+- Buzz's local mesh runtime supports serve and consume modes, model discovery, progress, health, stop/recovery and usage reporting. It does not provide the canonical resource lease, weighted fairness, job fencing or no-silent-fallback guarantees required by ADR-006; these are Zed strengthening obligations, not optional parity.
+- Buzz's Kubernetes backend deliberately refuses shared-compute agents because the in-image mesh client is absent. Zed deployment must retain that fail-closed behavior until a declared execution substrate passes readiness and conformance.
 - `VISION_MESH.md` accurately identifies prompt disclosure to another member's hardware and opt-in capacity, but its statement that membership is the only gate is superseded by ADR-006: membership is necessary and never sufficient consent or execution authority.
 
 ## Security invariants
@@ -33,11 +33,11 @@ Shared compute is disabled independently at deployment, community, user and devi
 3. **MS-03 — hints cannot own.** Gossip, reachability, load, phi suspicion and advertisements can remove candidates but cannot grant membership, session ownership, capacity or execution.
 4. **MS-04 — monotonic replay fences.** Versions, expiries, nonces and canonical session/executor generations reject stale, replayed, duplicated and wrong-owner traffic at every send, receive and completion seam.
 5. **MS-05 — explicit bilateral consent.** Deployment/community policy, requester authorization and device-owner sharing consent are current at selection and execution admission; relay-mesh enablement never enables shared compute.
-6. **MS-06 — one canonical job.** Local, remote and mesh attempts share one Sim job/session authority. Exactly one current executor lease may mutate it, and stale or duplicate output cannot complete it.
+6. **MS-06 — one canonical job.** Local, remote and mesh attempts share one Zed job/session authority. Exactly one current executor lease may mutate it, and stale or duplicate output cannot complete it.
 7. **MS-07 — local bounds are authoritative.** Signed resource claims are capped by configured policy and verified locally before and during execution; exceeding a bound cancels and cleans up rather than overcommitting.
 8. **MS-08 — inference is not code execution.** Shared compute receives only explicitly classified model context and has no implicit filesystem, credential, keyring, shell, tool, environment or unrestricted network authority.
 9. **MS-09 — community-local fairness.** Eligibility and weighted fair queuing operate inside one community with bounded requester/device queues, concurrency, aging and owner-reserved capacity; other tenants neither influence nor observe them.
-10. **MS-10 — no silent fallback or replay.** Mesh unavailability, denial, partition and uncertain execution remain visible. Sim never changes provider, trust class, owner or attempt without an explicit authorized decision.
+10. **MS-10 — no silent fallback or replay.** Mesh unavailability, denial, partition and uncertain execution remain visible. Zed never changes provider, trust class, owner or attempt without an explicit authorized decision.
 11. **MS-11 — content-minimized control plane.** Prompts, outputs, secrets and private memory never enter gossip, discovery, status, logs, traces or metric labels; serving-node retention is disabled beyond active bounded buffers by default.
 12. **MS-12 — reversible, fail-closed operation.** Missing authority, store, identity, version, readiness, kill switch or cleanup evidence blocks admission. Disablement stops new leases and visibly drains/cancels existing work without rerouting it.
 
@@ -86,7 +86,7 @@ Shared compute is disabled independently at deployment, community, user and devi
 
 ### MESH-B01 — deployment, tenant and peer admission
 
-- **Owner:** Sim configuration/identity plus `remote::mesh` handshake.
+- **Owner:** Zed configuration/identity plus `remote::mesh` handshake.
 - **Order:** enabled profile → typed deployment/federation and community → bounded ALPN/version → endpoint proof → trust-root attestation → current revocation/readiness → peer state.
 - **Failure:** absent or ambiguous identity, wildcard trust, foreign peer or unsupported version closes the connection without resource-existence detail.
 - **Tests:** Tasks 41.1, 44.3, 45.2 and 48.2.
@@ -121,7 +121,7 @@ Shared compute is disabled independently at deployment, community, user and devi
 
 ### MESH-B06 — executor and resource lease
 
-- **Owner:** canonical Sim job repository plus remote scheduler and serving runtime.
+- **Owner:** canonical Zed job repository plus remote scheduler and serving runtime.
 - **Fields:** community, job/attempt, executor generation, node/owner, model digest, resource ceilings, expiry, nonce and cancellation grace.
 - **Rule:** only one current fenced lease can start or complete; serving enforcement may narrow but never widen it.
 - **Tests:** Tasks 33.5, 41.3, 41.5 and 46.3.
@@ -149,7 +149,7 @@ Shared compute is disabled independently at deployment, community, user and devi
 
 ### MESH-B10 — visibility, observability and deployment compatibility
 
-- **Owner:** `collab_ui` for user state and Sim deployment/operations for readiness/metrics.
+- **Owner:** `collab_ui` for user state and Zed deployment/operations for readiness/metrics.
 - **Rule:** UI names execution location/trust, disclosure and sharing state; operators see bounded version, rejection, capacity, fairness, queue, cancellation, partition and cleanup signals with tenant access controls. Content is excluded.
 - **Deployment:** listeners and serving ship disabled; unsupported clients/substrates remain unavailable. Rollback never reroutes a job, and Buzz compatibility cannot execute the same canonical attempt concurrently.
 - **Tests:** Tasks 41.4, 44.3–44.5, 45.5, 47.1 and 48.4.
@@ -157,13 +157,13 @@ Shared compute is disabled independently at deployment, community, user and devi
 ## Known gaps and strengthening obligations
 
 1. Buzz relay mesh authenticates peers to one relay signing identity but its frozen frame does not carry a community. Task 41.1 must bind the compatibility connection/frame to trusted deployment and tenant context before routing; adding an untrusted tenant field alone is insufficient.
-2. Buzz desktop status events offer useful membership/endpoint checks but do not provide an atomic canonical executor/resource lease. Tasks 41.2 and 41.3 must preserve status compatibility as discovery while moving execution authority into Sim.
+2. Buzz desktop status events offer useful membership/endpoint checks but do not provide an atomic canonical executor/resource lease. Tasks 41.2 and 41.3 must preserve status compatibility as discovery while moving execution authority into Zed.
 3. Buzz capacity fields and usage status are self-reported. ADR-006 requires local admission enforcement, immutable model digests and bounded resource leases; Task 41.5 must demonstrate that false and stale claims cannot overcommit.
 4. Buzz's community-member-only vision is weaker than approved bilateral consent. The migration must not infer sharing consent from existing membership or start a listener during import.
 5. Buzz's local mesh SDK can restart/rearm runtimes and currently allows long management waits. Task 4.4 must assign bounded startup, stop, heartbeat, status, lease, cancellation and recovery budgets with owners and alerts.
 6. Shared compute is not deployable through the current Buzz Kubernetes backend. This is a preserved fail-closed compatibility fact, not permission for a generic remote-provider fallback; Tasks 44.3 and 48.4 own explicit substrate readiness.
 7. Distributed/sharded model execution described by `VISION_MESH.md` has no accepted implementation authority. It may be supported only if one canonical lease identifies every node and aggregate limits before prompt release; otherwise it remains unavailable rather than partially emulated.
-8. Existing status events, identities, endpoint tokens and local model state require versioned import/shadow comparison. Imported state grants no consent or active lease, and Buzz/Sim may not execute one job concurrently during Tasks 46.1–46.6.
+8. Existing status events, identities, endpoint tokens and local model state require versioned import/shadow comparison. Imported state grants no consent or active lease, and Buzz/Zed may not execute one job concurrently during Tasks 46.1–46.6.
 
 ## Cross-cutting verification checklist
 

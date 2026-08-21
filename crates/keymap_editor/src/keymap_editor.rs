@@ -43,7 +43,7 @@ use workspace::{
     register_serializable_item, with_active_or_new_workspace,
 };
 
-use sim_actions::{ChangeKeybinding, OpenKeymap};
+use zed_actions::{ChangeKeybinding, OpenKeymap};
 pub use ui_components::*;
 
 use crate::{
@@ -232,7 +232,7 @@ impl FilterState {
 #[derive(Default, PartialEq, Eq, Copy, Clone)]
 struct SourceFilters {
     user: bool,
-    sim_defaults: bool,
+    zed_defaults: bool,
     vim_defaults: bool,
 }
 
@@ -242,7 +242,7 @@ impl SourceFilters {
             Some(KeybindSource::User) => self.user,
             Some(KeybindSource::Vim) => self.vim_defaults,
             Some(KeybindSource::Base | KeybindSource::Default | KeybindSource::Unknown) | None => {
-                self.sim_defaults
+                self.zed_defaults
             }
         }
     }
@@ -449,7 +449,7 @@ struct KeymapEditor {
     selected_index: Option<usize>,
     context_menu: Option<(Entity<ContextMenu>, Point<Pixels>, Subscription)>,
     previous_edit: Option<PreviousEdit>,
-    humanisim_action_names: HumanizedActionNameCache,
+    humanized_action_names: HumanizedActionNameCache,
     current_widths: Entity<RedistributableColumnsState>,
     show_hover_menus: bool,
     actions_with_schemas: HashSet<&'static str>,
@@ -602,7 +602,7 @@ impl KeymapEditor {
             filter_state: FilterState::default(),
             source_filters: SourceFilters {
                 user: true,
-                sim_defaults: true,
+                zed_defaults: true,
                 vim_defaults: true,
             },
             show_no_action_bindings: true,
@@ -618,7 +618,7 @@ impl KeymapEditor {
             context_menu: None,
             previous_edit: None,
             search_query_debounce: None,
-            humanisim_action_names: HumanizedActionNameCache::new(cx),
+            humanized_action_names: HumanizedActionNameCache::new(cx),
             show_hover_menus: true,
             actions_with_schemas: HashSet::default(),
             action_args_temp_dir: None,
@@ -815,8 +815,8 @@ impl KeymapEditor {
 
     fn process_bindings(
         json_language: Arc<Language>,
-        sim_keybind_context_language: Arc<Language>,
-        humanisim_action_names: &HumanizedActionNameCache,
+        zed_keybind_context_language: Arc<Language>,
+        humanized_action_names: &HumanizedActionNameCache,
         cx: &mut App,
     ) -> (
         Vec<ProcessedBinding>,
@@ -859,7 +859,7 @@ impl KeymapEditor {
                 .map(|predicate| {
                     KeybindContextString::Local(
                         predicate.to_string().into(),
-                        sim_keybind_context_language.clone(),
+                        zed_keybind_context_language.clone(),
                     )
                 })
                 .unwrap_or(KeybindContextString::Global);
@@ -875,12 +875,12 @@ impl KeymapEditor {
                 action_arguments,
                 &actions_with_schemas,
                 action_documentation,
-                humanisim_action_names,
+                humanized_action_names,
             );
 
             let index = processed_bindings.len();
             let string_match_candidate =
-                StringMatchCandidate::new(index, &action_information.humanisim_name);
+                StringMatchCandidate::new(index, &action_information.humanized_name);
             processed_bindings.push(ProcessedBinding::new_mapped(
                 keystroke_text,
                 binding,
@@ -900,10 +900,10 @@ impl KeymapEditor {
                 None,
                 &actions_with_schemas,
                 action_documentation,
-                humanisim_action_names,
+                humanized_action_names,
             );
             let string_match_candidate =
-                StringMatchCandidate::new(index, &action_information.humanisim_name);
+                StringMatchCandidate::new(index, &action_information.humanized_name);
 
             processed_bindings.push(ProcessedBinding::Unmapped(action_information));
             string_match_candidates.push(string_match_candidate);
@@ -919,15 +919,15 @@ impl KeymapEditor {
         let workspace = self.workspace.clone();
         cx.spawn_in(window, async move |this, cx| {
             let json_language = load_json_language(workspace.clone(), cx).await;
-            let sim_keybind_context_language =
+            let zed_keybind_context_language =
                 load_keybind_context_language(workspace.clone(), cx).await;
 
             let (action_query, keystroke_query) = this.update(cx, |this, cx| {
                 let (key_bindings, string_match_candidates, actions_with_schemas) =
                     Self::process_bindings(
                         json_language,
-                        sim_keybind_context_language,
-                        &this.humanisim_action_names,
+                        zed_keybind_context_language,
+                        &this.humanized_action_names,
                         cx,
                     );
 
@@ -1386,7 +1386,7 @@ impl KeymapEditor {
             None,
             &HashSet::default(),
             cx.action_documentation(),
-            &self.humanisim_action_names,
+            &self.humanized_action_names,
         );
 
         let dummy_binding = ProcessedBinding::Unmapped(action_information);
@@ -1509,8 +1509,8 @@ impl KeymapEditor {
         self.on_query_changed(cx);
     }
 
-    fn toggle_sim_defaults_filter(&mut self, cx: &mut Context<Self>) {
-        self.source_filters.sim_defaults = !self.source_filters.sim_defaults;
+    fn toggle_zed_defaults_filter(&mut self, cx: &mut Context<Self>) {
+        self.source_filters.zed_defaults = !self.source_filters.zed_defaults;
         self.on_query_changed(cx);
     }
 
@@ -1650,12 +1650,12 @@ impl KeymapEditor {
                             ))
                             .map(add_filter(
                                 "Default",
-                                source_filters.sim_defaults,
+                                source_filters.zed_defaults,
                                 None,
                                 &focus_handle,
                                 &keymap_editor,
                                 Some(|editor, cx| {
-                                    editor.toggle_sim_defaults_filter(cx);
+                                    editor.toggle_zed_defaults_filter(cx);
                                 }),
                             ))
                             .map(add_filter(
@@ -1777,7 +1777,7 @@ impl KeybindInformation {
 #[derive(Clone)]
 struct ActionInformation {
     name: &'static str,
-    humanisim_name: SharedString,
+    humanized_name: SharedString,
     arguments: Option<SyntaxHighlightedText>,
     documentation: Option<&'static str>,
     has_schema: bool,
@@ -1792,7 +1792,7 @@ impl ActionInformation {
         action_name_cache: &HumanizedActionNameCache,
     ) -> Self {
         Self {
-            humanisim_name: action_name_cache.get(action_name),
+            humanized_name: action_name_cache.get(action_name),
             has_schema: actions_with_schemas.contains(action_name),
             arguments: action_arguments,
             documentation: action_documentation.get(action_name).copied(),
@@ -1888,14 +1888,14 @@ impl ProcessedBinding {
         match (self, other) {
             (Self::Mapped(keybind1, action1), Self::Mapped(keybind2, action2)) => {
                 match keybind1.source.cmp(&keybind2.source) {
-                    cmp::Ordering::Equal => action1.humanisim_name.cmp(&action2.humanisim_name),
+                    cmp::Ordering::Equal => action1.humanized_name.cmp(&action2.humanized_name),
                     ordering => ordering,
                 }
             }
             (Self::Mapped(_, _), Self::Unmapped(_)) => cmp::Ordering::Less,
             (Self::Unmapped(_), Self::Mapped(_, _)) => cmp::Ordering::Greater,
             (Self::Unmapped(action1), Self::Unmapped(action2)) => {
-                action1.humanisim_name.cmp(&action2.humanisim_name)
+                action1.humanized_name.cmp(&action2.humanized_name)
             }
         }
     }
@@ -2077,12 +2077,12 @@ impl Render for KeymapEditor {
                                         Button::new("edit-in-json", "Edit in JSON")
                                             .style(ButtonStyle::Subtle)
                                             .key_binding(
-                                                ui::KeyBinding::for_action_in(&sim_actions::OpenKeymapFile, &focus_handle, cx)
+                                                ui::KeyBinding::for_action_in(&zed_actions::OpenKeymapFile, &focus_handle, cx)
                                                     .map(|kb| kb.size(rems_from_px(10.))),
                                             )
                                             .on_click(|_, window, cx| {
                                                 window.dispatch_action(
-                                                    sim_actions::OpenKeymapFile.boxed_clone(),
+                                                    zed_actions::OpenKeymapFile.boxed_clone(),
                                                     cx,
                                                 );
                                             })
@@ -2157,7 +2157,7 @@ impl Render for KeymapEditor {
                                             if action_name != gpui::NoAction.name() {
                                                 binding
                                                     .action()
-                                                    .humanisim_name
+                                                    .humanized_name
                                                     .clone()
                                                     .into_any_element()
                                             } else {
@@ -2329,7 +2329,7 @@ impl Render for KeymapEditor {
                                                             log::error!("Unexpected override from the {} keymap", conflict.override_source.name());
                                                             None
                                                         }
-                                                    }.map(|source| format!("This keybinding is overridden by the '{}' binding from {}.", binding.action().humanisim_name, source))
+                                                    }.map(|source| format!("This keybinding is overridden by the '{}' binding from {}.", binding.action().humanized_name, source))
                                                 }).unwrap_or_else(|| "This binding is overridden.".to_string());
 
                                                 row.tooltip(Tooltip::text(context))
@@ -2549,7 +2549,7 @@ impl KeybindingEditorModal {
         let (action_editor, action_name_to_static) = if has_action_editor {
             let actions: Vec<&'static str> = cx.all_action_names().to_vec();
 
-            let humanisim_names: HashMap<&'static str, SharedString> = actions
+            let humanized_names: HashMap<&'static str, SharedString> = actions
                 .iter()
                 .map(|&name| (name, command_palette::humanize_action_name(name).into()))
                 .collect();
@@ -2571,7 +2571,7 @@ impl KeybindingEditorModal {
                     .unwrap();
                 editor_entity.update(cx, |editor, _cx| {
                     editor.set_completion_provider(Some(std::rc::Rc::new(
-                        ActionCompletionProvider::new(actions, humanisim_names),
+                        ActionCompletionProvider::new(actions, humanized_names),
                     )));
                 });
 
@@ -2852,7 +2852,7 @@ impl KeybindingEditorModal {
             .get_selected_action_name(cx)
             .map_err(InputError::error)?;
 
-        let humanisim_action_name: SharedString =
+        let humanized_action_name: SharedString =
             command_palette::humanize_action_name(action_name).into();
 
         let action_information = ActionInformation::new(
@@ -2860,7 +2860,7 @@ impl KeybindingEditorModal {
             None,
             &HashSet::default(),
             cx.action_documentation(),
-            &self.keymap_editor.read(cx).humanisim_action_names,
+            &self.keymap_editor.read(cx).humanized_action_names,
         );
 
         let keybind_for_save = if create {
@@ -2890,7 +2890,7 @@ impl KeybindingEditorModal {
                                 fallback: keymap.table_interaction_state.read(cx).scroll_offset(),
                             });
                             let status_toast = StatusToast::new(
-                                format!("Saved edits to the {} action.", humanisim_action_name),
+                                format!("Saved edits to the {} action.", humanized_action_name),
                                 cx,
                                 move |this, _cx| {
                                     this.icon(
@@ -3086,7 +3086,7 @@ impl Render for KeybindingEditorModal {
                                 .border_color(theme.border_variant)
                                 .when(!self.creating, |this| {
                                     this.child(Label::new(
-                                        self.editing_keybind.action().humanisim_name.clone(),
+                                        self.editing_keybind.action().humanized_name.clone(),
                                     ))
                                     .when_some(
                                         self.editing_keybind.action().documentation,
@@ -3587,21 +3587,21 @@ async fn load_keybind_context_language(
                 .project()
                 .read(cx)
                 .languages()
-                .language_for_name("Sim Keybind Context")
+                .language_for_name("Zed Keybind Context")
         })
-        .context("Failed to load Sim Keybind Context language")
+        .context("Failed to load Zed Keybind Context language")
         .log_err();
     let language = match language_task {
         Some(task) => task
             .await
-            .context("Failed to load Sim Keybind Context language")
+            .context("Failed to load Zed Keybind Context language")
             .log_err(),
         None => None,
     };
     language.unwrap_or_else(|| {
         Arc::new(Language::new(
             LanguageConfig {
-                name: "Sim Keybind Context".into(),
+                name: "Zed Keybind Context".into(),
                 ..Default::default()
             },
             Some(tree_sitter_rust::LANGUAGE.into()),
@@ -3926,7 +3926,7 @@ fn normalized_ctx_eq(
 }
 
 impl SerializableItem for KeymapEditor {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "KeymapEditor"
     }
 
@@ -4106,12 +4106,12 @@ mod tests {
         let keymap_content = r#"[
     {
         "bindings": {
-            "alt-cmd-shift-c": "sim::OpenKeymap"
+            "alt-cmd-shift-c": "zed::OpenKeymap"
         }
     },
     {
         "bindings": {
-            "alt-cmd-shift-c": "sim::OpenKeymap"
+            "alt-cmd-shift-c": "zed::OpenKeymap"
         }
     }
 ]"#;
@@ -4119,7 +4119,7 @@ mod tests {
         let cx = &mut cx;
 
         let rows = keymap_editor.read_with(cx, |editor, _| {
-            visible_rows_for_action(editor, "sim::OpenKeymap")
+            visible_rows_for_action(editor, "zed::OpenKeymap")
         });
         assert_eq!(
             rows.len(),
@@ -4145,7 +4145,7 @@ mod tests {
         cx.run_until_parked();
 
         let rows = keymap_editor.read_with(cx, |editor, _| {
-            visible_rows_for_action(editor, "sim::OpenKeymap")
+            visible_rows_for_action(editor, "zed::OpenKeymap")
         });
         assert_eq!(rows.len(), 1, "expected one row remaining after deletion");
     }
@@ -4373,7 +4373,7 @@ mod tests {
 
     #[test]
     fn binding_is_unbound_by_unbind_respects_precedence() {
-        let binding = gpui::KeyBinding::new("tab", sim_actions::OpenKeymap, None);
+        let binding = gpui::KeyBinding::new("tab", zed_actions::OpenKeymap, None);
         let unbind =
             gpui::KeyBinding::new("tab", gpui::Unbind(binding.action().name().into()), None);
 

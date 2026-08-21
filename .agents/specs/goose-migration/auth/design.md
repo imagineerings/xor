@@ -20,7 +20,7 @@ The CI proxy verifies claims and signature before quota admission or forwarding.
 ## Security and compatibility
 
 - Treat callback state, device codes, access tokens, refresh tokens, upstream keys, and JWTs as sensitive.
-- Use Sim's HTTP/TLS/proxy configuration for application auth flows.
+- Use Zed's HTTP/TLS/proxy configuration for application auth flows.
 - Do not migrate Goose credential files verbatim; import only through an explicit, redacted migration with rollback.
 - Return typed errors to desktop/CLI surfaces and keep logs useful without secret material.
 
@@ -35,6 +35,6 @@ The CI proxy verifies claims and signature before quota admission or forwarding.
 
 ## Open decisions
 
-1. Whether Sim will operate the CI OIDC proxy at all, and which team owns deployment, abuse response, monitoring, and credential rotation.
+1. Whether Zed will operate the CI OIDC proxy at all, and which team owns deployment, abuse response, monitoring, and credential rotation.
 2. Which provider device flows are in the initial supported set.
 3. Whether a legacy Goose credential import is desirable; this requires a separate migration threat model.

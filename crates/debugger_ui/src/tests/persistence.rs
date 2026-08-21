@@ -72,7 +72,7 @@ async fn test_invert_axis_on_panel_position_change(
         "Default dock position should be bottom for debug panel"
     );
 
-    let pre_serialisim_layout = debug_panel
+    let pre_serialized_layout = debug_panel
         .read_with(cx, |panel, cx| {
             panel
                 .active_session()
@@ -80,11 +80,11 @@ async fn test_invert_axis_on_panel_position_change(
                 .read(cx)
                 .running_state()
                 .read(cx)
-                .serialisim_layout(cx)
+                .serialized_layout(cx)
         })
         .panes;
 
-    let post_serialisim_layout = debug_panel
+    let post_serialized_layout = debug_panel
         .update_in(cx, |panel, window, cx| {
             panel.set_position(DockPosition::Right, window, cx);
 
@@ -94,12 +94,12 @@ async fn test_invert_axis_on_panel_position_change(
                 .read(cx)
                 .running_state()
                 .read(cx)
-                .serialisim_layout(cx)
+                .serialized_layout(cx)
         })
         .panes;
 
-    let pre_panes = pre_serialisim_layout.in_order();
-    let post_panes = post_serialisim_layout.in_order();
+    let pre_panes = pre_serialized_layout.in_order();
+    let post_panes = post_serialized_layout.in_order();
 
     assert_eq!(pre_panes.len(), post_panes.len());
 

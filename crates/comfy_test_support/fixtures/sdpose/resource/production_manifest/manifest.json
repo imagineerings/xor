@@ -21,7 +21,7 @@
   },
   "resource_contract": {
     "role": "MODEL",
-    "format": "sim-native-sdpose-model-v1",
+    "format": "zed-native-sdpose-model-v1",
     "denoiser_tensor_count": 690,
     "head_tensor_count": 5,
     "combined_tensor_count": 695,

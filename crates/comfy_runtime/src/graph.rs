@@ -17,9 +17,9 @@ pub const BLUEPRINT_SEARCH_ALIASES_FIELD: &str = "BlueprintSearchAliases";
 const MIN_VIEWPORT_SCALE: f32 = 0.1;
 const MAX_VIEWPORT_SCALE: f32 = 8.0;
 const MAX_GRAPH_DEPTH: usize = 64;
-pub(crate) const NATIVE_WIDGETS_FIELD: &str = "sim:native-widgets";
+pub(crate) const NATIVE_WIDGETS_FIELD: &str = "zed:native-widgets";
 const NATIVE_WIDGETS_VERSION: u16 = 1;
-const EXPOSED_WIDGETS_FIELD: &str = "sim:exposed-widgets";
+const EXPOSED_WIDGETS_FIELD: &str = "zed:exposed-widgets";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct NativeWidgetsEnvelope {
@@ -882,7 +882,7 @@ impl GraphDocument {
         let submission = prompt.to_submission()?;
         let mut root = GraphLevel::default();
         root.source_fields
-            .insert("sim_api_prompt".to_owned(), prompt.value().clone());
+            .insert("zed_api_prompt".to_owned(), prompt.value().clone());
         let known_node_identifiers = submission
             .prompt
             .0
@@ -910,7 +910,7 @@ impl GraphDocument {
             );
             if let Some(source) = prompt.value().get(&node_identifier.0) {
                 node.source_fields
-                    .insert("sim_api_prompt_node".to_owned(), source.clone());
+                    .insert("zed_api_prompt_node".to_owned(), source.clone());
             }
             for (name, value) in &prompt_node.inputs {
                 let linked = value.as_array().and_then(|values| {
@@ -949,7 +949,7 @@ impl GraphDocument {
         }
         let canonical_source = serde_json::to_vec(prompt.value())
             .map_err(|error| GraphError::Serialization(error.to_string()))?;
-        let api_prompt_namespace = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"sim-comfy-api-prompt");
+        let api_prompt_namespace = Uuid::new_v5(&Uuid::NAMESPACE_OID, b"zed-comfy-api-prompt");
         let mut graph = Self {
             schema_version: GRAPH_DOCUMENT_SCHEMA_VERSION,
             document_identity: Uuid::new_v5(&api_prompt_namespace, &canonical_source),
@@ -1031,7 +1031,7 @@ impl GraphDocument {
     pub fn next_available_identifier(&self) -> GraphIdentifier {
         let mut next_identifier = self.next_identifier;
         loop {
-            let identifier = GraphIdentifier::String(format!("sim-{next_identifier}"));
+            let identifier = GraphIdentifier::String(format!("zed-{next_identifier}"));
             if !contains_identifier(&self.root, &identifier) {
                 return identifier;
             }
@@ -1046,7 +1046,7 @@ impl GraphDocument {
             let identifier = GraphIdentifier::String(
                 Uuid::new_v5(
                     &self.document_identity,
-                    format!("sim-subgraph-{counter}").as_bytes(),
+                    format!("zed-subgraph-{counter}").as_bytes(),
                 )
                 .to_string(),
             );
@@ -1081,7 +1081,7 @@ impl GraphDocument {
                     }
                     GraphIdentifier::String(value) => {
                         if let Some(value) = value
-                            .strip_prefix("sim-")
+                            .strip_prefix("zed-")
                             .and_then(|value| value.parse::<u64>().ok())
                         {
                             *maximum = (*maximum).max(value);
@@ -1160,7 +1160,7 @@ fn advance_identifier_counter(document: &mut GraphDocument, identifier: &GraphId
     let numeric_identifier = match identifier {
         GraphIdentifier::Integer(value) if *value >= 0 => Some(*value as u64),
         GraphIdentifier::String(value) => value
-            .strip_prefix("sim-")
+            .strip_prefix("zed-")
             .and_then(|value| value.parse::<u64>().ok()),
         GraphIdentifier::Integer(_) => None,
     };
@@ -7054,7 +7054,7 @@ fn serialize_node(
     }
     if !node.quarantine.is_empty() {
         object.insert(
-            "sim_unmapped".to_owned(),
+            "zed_unmapped".to_owned(),
             serde_json::to_value(&node.quarantine)
                 .map_err(|error| GraphError::Serialization(error.to_string()))?,
         );
@@ -8006,7 +8006,7 @@ mod tests {
         assert_eq!(document.root.nodes.len(), 2);
         assert_eq!(document.root.links.len(), 1);
         assert_eq!(
-            document.root.source_fields.get("sim_api_prompt"),
+            document.root.source_fields.get("zed_api_prompt"),
             Some(&serde_json::from_slice::<Value>(prompt)?)
         );
         let serialized = document.to_workflow_value()?;
@@ -8363,7 +8363,7 @@ mod tests {
     fn exercise_clipboard_remapping() -> Result<Vec<u8>, Box<dyn Error>> {
         let mut engine = fixture_engine()?;
         engine.document.next_identifier = 1;
-        let mut occupied = node("sim-1", None, None);
+        let mut occupied = node("zed-1", None, None);
         occupied.position.y = 500.0;
         engine
             .document
@@ -8462,7 +8462,7 @@ mod tests {
                 .root
                 .selection
                 .nodes
-                .contains(&GraphIdentifier::from("sim-1"))
+                .contains(&GraphIdentifier::from("zed-1"))
         );
         engine.document.validate()?;
         assert!(engine.undo());
@@ -9796,7 +9796,7 @@ mod tests {
         native.insert("version".to_owned(), json!(2));
         assert!(matches!(
             GraphDocument::from_workflow_bytes(&serde_json::to_vec(&unsupported)?),
-            Err(GraphError::InvalidWorkflow { path, .. }) if path.ends_with("sim:native-widgets.version")
+            Err(GraphError::InvalidWorkflow { path, .. }) if path.ends_with("zed:native-widgets.version")
         ));
         Ok(())
     }

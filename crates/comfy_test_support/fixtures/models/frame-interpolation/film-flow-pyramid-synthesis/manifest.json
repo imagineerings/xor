@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-film-flow-pyramid-synthesis-v1",
+  "artifact": "zed-native-film-flow-pyramid-synthesis-v1",
   "evidence_kind": "source-fingerprinted analytic exact arithmetic oracle",
   "source": {
     "repository": "ComfyUI",

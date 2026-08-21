@@ -91,7 +91,7 @@ impl RuntimeAdapter {
             Self::Native(runtime) => runtime
                 .allocate(byte_length, cancellation)
                 .map(AllocationAdapter::Native)
-                .map_err(|error| map_execution_error("sim.npu.allocate", device, error)),
+                .map_err(|error| map_execution_error("zed.npu.allocate", device, error)),
             #[cfg(test)]
             Self::Test(runtime) => runtime
                 .validate_allocation(
@@ -114,7 +114,7 @@ impl RuntimeAdapter {
             Self::Native(runtime) => runtime
                 .create_stream(cancellation)
                 .map(StreamAdapter::Native)
-                .map_err(|error| map_execution_error("sim.npu.stream.create", device, error)),
+                .map_err(|error| map_execution_error("zed.npu.stream.create", device, error)),
             #[cfg(test)]
             Self::Test(runtime) => {
                 runtime.synchronize(device)?;
@@ -135,7 +135,7 @@ impl RuntimeAdapter {
                 .copy_from_host(destination, destination_offset, bytes, cancellation)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.npu.transfer.host-to-device",
+                        "zed.npu.transfer.host-to-device",
                         runtime.properties().device_id(),
                         error,
                     )
@@ -204,7 +204,7 @@ impl RuntimeAdapter {
                 .copy_to_host(source, source_offset, bytes, cancellation)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.npu.transfer.device-to-host",
+                        "zed.npu.transfer.device-to-host",
                         runtime.properties().device_id(),
                         error,
                     )
@@ -258,7 +258,7 @@ impl RuntimeAdapter {
                     cancellation,
                 )
                 .map_err(|error| {
-                    map_execution_error("sim.npu.copy", runtime.properties().device_id(), error)
+                    map_execution_error("zed.npu.copy", runtime.properties().device_id(), error)
                 }),
             #[cfg(test)]
             (
@@ -337,7 +337,7 @@ impl RuntimeAdapter {
                 .map(EventAdapter::Native)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.npu.binary.add",
+                        "zed.npu.binary.add",
                         runtime.properties().device_id(),
                         error,
                     )
@@ -393,7 +393,7 @@ impl RuntimeAdapter {
                 .map(EventAdapter::Native)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.npu.event.record",
+                        "zed.npu.event.record",
                         runtime.properties().device_id(),
                         error,
                     )
@@ -417,7 +417,7 @@ impl RuntimeAdapter {
                 .wait_event(event, cancellation)
                 .map_err(|error| {
                     map_execution_error(
-                        "sim.npu.event.wait",
+                        "zed.npu.event.wait",
                         runtime.properties().device_id(),
                         error,
                     )
@@ -504,7 +504,7 @@ impl NpuTensorBackend {
         let device_count = certified.device_count();
         if device_ordinal >= device_count || device_ordinal != certified.device_id() {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.npu.select-device".to_owned(),
+                operation: "zed.npu.select-device".to_owned(),
                 device: DeviceId::new(DeviceKind::Npu, device_ordinal),
                 reason: format!(
                     "device ordinal must match certified device {} within count {device_count}",
@@ -516,7 +516,7 @@ impl NpuTensorBackend {
             .map_err(|_| TensorError::ShapeOverflow)?;
         if memory_limit_bytes == 0 || memory_limit_bytes > allocation_capacity {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.npu.memory-limit".to_owned(),
+                operation: "zed.npu.memory-limit".to_owned(),
                 device: DeviceId::new(DeviceKind::Npu, device_ordinal),
                 reason: format!(
                     "configured memory limit {memory_limit_bytes} must be within certified allocation capacity {allocation_capacity}"
@@ -557,7 +557,7 @@ impl NpuTensorBackend {
         cancellation.check()?;
         if device.kind() != DeviceKind::Npu || device.ordinal() >= device_count {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.npu.select-device".to_owned(),
+                operation: "zed.npu.select-device".to_owned(),
                 device,
                 reason: format!("device ordinal is outside certified count {device_count}"),
             });
@@ -608,7 +608,7 @@ impl NpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.npu.transfer.host-to-device",
+            "zed.npu.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -655,7 +655,7 @@ impl NpuTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.npu.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.npu.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -748,7 +748,7 @@ impl NpuTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.npu.storage.lookup".to_owned(),
+                operation: "zed.npu.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified NPU backend instance"
                     .to_owned(),
@@ -855,7 +855,7 @@ impl CachedAllocationOwner for NpuTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-npu-cnrt-v1"
+        "zed-native-npu-cnrt-v1"
     }
 
     fn release_cached_allocations(
@@ -890,7 +890,7 @@ impl TensorBackend for NpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.npu.allocate",
+            "zed.npu.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -923,7 +923,7 @@ impl TensorBackend for NpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.npu.copy",
+            "zed.npu.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -932,7 +932,7 @@ impl TensorBackend for NpuTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.npu.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.npu.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -960,7 +960,7 @@ impl TensorBackend for NpuTensorBackend {
         }
 
         let source = if source.descriptor().device() == self.device {
-            self.require_input("sim.npu.copy", source, context)?;
+            self.require_input("zed.npu.copy", source, context)?;
             let source_offset = tensor_byte_offset(source.descriptor())?;
             let source_storage = self.storage(source)?;
             let allocation = source_storage.allocation.clone();
@@ -990,7 +990,7 @@ impl TensorBackend for NpuTensorBackend {
                 || !source.descriptor().is_contiguous()?
             {
                 return Err(self.unsupported(
-                    "sim.npu.copy",
+                    "zed.npu.copy",
                     "CPU source tensor must have canonical contiguous layout and strides",
                 ));
             }
@@ -1004,7 +1004,7 @@ impl TensorBackend for NpuTensorBackend {
             PreflightSource::Cpu(bytes)
         } else {
             return Err(self.unsupported(
-                "sim.npu.copy",
+                "zed.npu.copy",
                 "source must be host-addressable CPU storage or this NPU backend instance",
             ));
         };
@@ -1074,7 +1074,7 @@ impl TensorBackend for NpuTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.npu.event.record", OperationSupport::record_event())?;
+            .require("zed.npu.event.record", OperationSupport::record_event())?;
         let stream = self.stream(context.stream, context.cancellation)?;
         let event = self.runtime.record_event(&stream, context.cancellation)?;
         self.track_event(event, context)
@@ -1087,7 +1087,7 @@ impl TensorBackend for NpuTensorBackend {
     ) -> Result<(), TensorError> {
         self.check_context(context)?;
         self.capabilities
-            .require("sim.npu.event.wait", OperationSupport::wait_event())?;
+            .require("zed.npu.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "NPU event belongs to a different backend instance".to_owned(),
@@ -1132,7 +1132,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.fill", context)
+        self.unsupported_result("zed.npu.fill", context)
     }
 
     fn unary(
@@ -1142,7 +1142,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.unary", context)
+        self.unsupported_result("zed.npu.unary", context)
     }
 
     fn binary(
@@ -1154,11 +1154,11 @@ impl TensorBackend for NpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.npu.binary", context);
+            return self.unsupported_result("zed.npu.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.npu.binary.add",
+                "zed.npu.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -1167,7 +1167,7 @@ impl TensorBackend for NpuTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.npu.binary.add",
+            "zed.npu.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -1208,7 +1208,7 @@ impl TensorBackend for NpuTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.npu.binary.add",
+                "zed.npu.binary.add",
                 "the certified AscendCL Add wrapper does not accept offset tensor views",
             ));
         }
@@ -1224,7 +1224,7 @@ impl TensorBackend for NpuTensorBackend {
         };
         if dimensions.len() > 8 {
             return Err(self.unsupported(
-                "sim.npu.binary.add",
+                "zed.npu.binary.add",
                 "AscendCL array descriptors require rank 1 through 8 with positive dimensions",
             ));
         }
@@ -1258,7 +1258,7 @@ impl TensorBackend for NpuTensorBackend {
             DType::F32 => NpuElementType::F32,
             _ => {
                 return Err(self.unsupported(
-                    "sim.npu.binary.add",
+                    "zed.npu.binary.add",
                     "only reviewed f16/f32 AscendCL Add kernels are available",
                 ));
             }
@@ -1288,7 +1288,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.binary-scalar", context)
+        self.unsupported_result("zed.npu.binary-scalar", context)
     }
 
     fn reduction(
@@ -1298,7 +1298,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.reduction", context)
+        self.unsupported_result("zed.npu.reduction", context)
     }
 
     fn indexing(
@@ -1308,7 +1308,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.indexing", context)
+        self.unsupported_result("zed.npu.indexing", context)
     }
 
     fn resize(
@@ -1318,7 +1318,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.resize", context)
+        self.unsupported_result("zed.npu.resize", context)
     }
 
     fn convolution(
@@ -1328,7 +1328,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.convolution", context)
+        self.unsupported_result("zed.npu.convolution", context)
     }
 
     fn linear_algebra(
@@ -1338,7 +1338,7 @@ impl TensorBackend for NpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.linear-algebra", context)
+        self.unsupported_result("zed.npu.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -1348,7 +1348,7 @@ impl TensorBackend for NpuTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.npu.custom-kernel", context)
+        self.unsupported_result("zed.npu.custom-kernel", context)
     }
 }
 
@@ -1529,7 +1529,7 @@ impl TestRuntime {
     fn check(&self, device: u32, requested: usize) -> Result<(), TensorError> {
         if device >= self.device_count {
             return Err(TensorError::UnsupportedCapability {
-                operation: "sim.npu.test.select-device".to_owned(),
+                operation: "zed.npu.test.select-device".to_owned(),
                 device: DeviceId::new(DeviceKind::Npu, device),
                 reason: format!("device ordinal is outside test count {}", self.device_count),
             });

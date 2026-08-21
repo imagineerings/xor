@@ -841,7 +841,7 @@ impl WorkerLaunchConfig {
 fn packaged_worker_binary() -> Result<PathBuf, RuntimeSupervisorError> {
     let executable = std::env::current_exe().map_err(|error| {
         RuntimeSupervisorError::InvalidConfiguration(format!(
-            "Sim executable path is unavailable: {error}"
+            "Zed executable path is unavailable: {error}"
         ))
     })?;
     packaged_worker_binary_for_executable(&executable)
@@ -857,7 +857,7 @@ fn packaged_worker_binary_for_executable(
     };
     let directory = executable.parent().ok_or_else(|| {
         RuntimeSupervisorError::InvalidConfiguration(
-            "Sim executable has no containing directory".to_owned(),
+            "Zed executable has no containing directory".to_owned(),
         )
     })?;
     Ok(directory.join(binary_name))
@@ -3238,7 +3238,7 @@ mod tests {
 
     #[test]
     fn packaged_worker_path_is_owned_once_and_strictly_sibling_relative() {
-        let executable = Path::new("/Applications/Sim.app/Contents/MacOS/sim");
+        let executable = Path::new("/Applications/Zed.app/Contents/MacOS/zed");
         let expected_name = if cfg!(windows) {
             "comfy-worker.exe"
         } else {

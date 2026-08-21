@@ -30,7 +30,7 @@ impl RuntimeAdapter {
     ) -> Result<DirectMlAllocation, TensorError> {
         self.0
             .allocate(byte_length, &|| cancellation.is_cancelled())
-            .map_err(|error| map_execution_error("sim.directml.allocate", error))
+            .map_err(|error| map_execution_error("zed.directml.allocate", error))
     }
 
     fn create_stream(
@@ -39,7 +39,7 @@ impl RuntimeAdapter {
     ) -> Result<DirectMlStream, TensorError> {
         self.0
             .create_stream(&|| cancellation.is_cancelled())
-            .map_err(|error| map_execution_error("sim.directml.stream.create", error))
+            .map_err(|error| map_execution_error("zed.directml.stream.create", error))
     }
 
     fn copy_from_host(
@@ -54,7 +54,7 @@ impl RuntimeAdapter {
             .copy_host_to_device(stream, destination, destination_offset, bytes, &|| {
                 cancellation.is_cancelled()
             })
-            .map_err(|error| map_execution_error("sim.directml.transfer.host-to-device", error))
+            .map_err(|error| map_execution_error("zed.directml.transfer.host-to-device", error))
     }
 
     fn copy_to_host(
@@ -69,7 +69,7 @@ impl RuntimeAdapter {
             .copy_device_to_host(stream, source, source_offset, bytes, &|| {
                 cancellation.is_cancelled()
             })
-            .map_err(|error| map_execution_error("sim.directml.transfer.device-to-host", error))
+            .map_err(|error| map_execution_error("zed.directml.transfer.device-to-host", error))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -87,7 +87,7 @@ impl RuntimeAdapter {
             .dispatch_add(stream, element_type, left, right, output, elements, &|| {
                 cancellation.is_cancelled()
             })
-            .map_err(|error| map_execution_error("sim.directml.binary.add", error))
+            .map_err(|error| map_execution_error("zed.directml.binary.add", error))
     }
 
     fn record_event(
@@ -97,7 +97,7 @@ impl RuntimeAdapter {
     ) -> Result<DirectMlEvent, TensorError> {
         self.0
             .record_event(stream, &|| cancellation.is_cancelled())
-            .map_err(|error| map_execution_error("sim.directml.event.record", error))
+            .map_err(|error| map_execution_error("zed.directml.event.record", error))
     }
 
     fn wait_event(
@@ -107,7 +107,7 @@ impl RuntimeAdapter {
     ) -> Result<(), TensorError> {
         self.0
             .wait_event(event, &|| cancellation.is_cancelled())
-            .map_err(|error| map_execution_error("sim.directml.event.wait", error))
+            .map_err(|error| map_execution_error("zed.directml.event.wait", error))
     }
 
     fn physical_memory_snapshot(&self, capacity: u64) -> BackendMemorySnapshot {
@@ -300,7 +300,7 @@ impl DirectMlTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.directml.transfer.host-to-device",
+            "zed.directml.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -353,7 +353,7 @@ impl DirectMlTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.directml.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.directml.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -380,7 +380,7 @@ impl DirectMlTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.directml.test.download-storage", tensor, context)?;
+        self.require_input("zed.directml.test.download-storage", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = usize::try_from(storage.byte_length)
             .map_err(|_| TensorError::ShapeOverflow)?;
@@ -452,7 +452,7 @@ impl DirectMlTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.directml.storage.lookup".to_owned(),
+                operation: "zed.directml.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified DirectML backend instance"
                     .to_owned(),
@@ -529,7 +529,7 @@ impl DirectMlTensorBackend {
             });
         }
         if source.descriptor().device() == self.device {
-            self.require_input("sim.directml.copy", source, context)?;
+            self.require_input("zed.directml.copy", source, context)?;
             return Ok(PreparedCopySource::DirectMl {
                 storage: self.storage(source)?,
                 byte_offset: tensor_byte_offset(source.descriptor())?,
@@ -540,7 +540,7 @@ impl DirectMlTensorBackend {
             return try_copy_bytes(bytes, "DirectML CPU copy staging").map(PreparedCopySource::Cpu);
         }
         Err(self.unsupported(
-            "sim.directml.copy",
+            "zed.directml.copy",
             "source must be host-addressable contiguous CPU storage or this DirectML backend instance",
         ))
     }
@@ -587,7 +587,7 @@ impl CachedAllocationOwner for DirectMlTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-directml-v1"
+        "zed-native-directml-v1"
     }
 
     fn release_cached_allocations(
@@ -622,7 +622,7 @@ impl TensorBackend for DirectMlTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.directml.allocate",
+            "zed.directml.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -655,7 +655,7 @@ impl TensorBackend for DirectMlTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.directml.copy",
+            "zed.directml.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -664,7 +664,7 @@ impl TensorBackend for DirectMlTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.directml.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.directml.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -742,7 +742,7 @@ impl TensorBackend for DirectMlTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities.require(
-            "sim.directml.event.record",
+            "zed.directml.event.record",
             OperationSupport::record_event(),
         )?;
         let stream = self.stream(context.stream, context.cancellation)?;
@@ -758,7 +758,7 @@ impl TensorBackend for DirectMlTensorBackend {
     ) -> Result<(), TensorError> {
         check_backend_context_identity(self.backend_id, context)?;
         self.capabilities
-            .require("sim.directml.event.wait", OperationSupport::wait_event())?;
+            .require("zed.directml.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "DirectML event belongs to a different backend instance".to_owned(),
@@ -791,7 +791,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.fill", context)
+        self.unsupported_result("zed.directml.fill", context)
     }
 
     fn unary(
@@ -801,7 +801,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.unary", context)
+        self.unsupported_result("zed.directml.unary", context)
     }
 
     fn binary(
@@ -813,11 +813,11 @@ impl TensorBackend for DirectMlTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.directml.binary", context);
+            return self.unsupported_result("zed.directml.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.directml.binary.add",
+                "zed.directml.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -826,7 +826,7 @@ impl TensorBackend for DirectMlTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.directml.binary.add",
+            "zed.directml.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -856,7 +856,7 @@ impl TensorBackend for DirectMlTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.directml.binary.add",
+                "zed.directml.binary.add",
                 "the reviewed DirectML Add binding requires zero-offset whole buffers",
             ));
         }
@@ -888,7 +888,7 @@ impl TensorBackend for DirectMlTensorBackend {
             DType::F32 => DirectMlElementType::F32,
             _ => {
                 return Err(self.unsupported(
-                    "sim.directml.binary.add",
+                    "zed.directml.binary.add",
                     "only reviewed f16/f32 DirectML Add kernels are available",
                 ));
             }
@@ -918,7 +918,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.binary-scalar", context)
+        self.unsupported_result("zed.directml.binary-scalar", context)
     }
 
     fn reduction(
@@ -928,7 +928,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.reduction", context)
+        self.unsupported_result("zed.directml.reduction", context)
     }
 
     fn indexing(
@@ -938,7 +938,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.indexing", context)
+        self.unsupported_result("zed.directml.indexing", context)
     }
 
     fn resize(
@@ -948,7 +948,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.resize", context)
+        self.unsupported_result("zed.directml.resize", context)
     }
 
     fn convolution(
@@ -958,7 +958,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.convolution", context)
+        self.unsupported_result("zed.directml.convolution", context)
     }
 
     fn linear_algebra(
@@ -968,7 +968,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.linear-algebra", context)
+        self.unsupported_result("zed.directml.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -978,7 +978,7 @@ impl TensorBackend for DirectMlTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.directml.custom-kernel", context)
+        self.unsupported_result("zed.directml.custom-kernel", context)
     }
 }
 

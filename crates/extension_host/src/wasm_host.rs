@@ -79,7 +79,7 @@ impl ComponentRuntime {
             let engine = Engine::new(&config).map_err(|error| error.to_string())?;
             let epoch_engine = engine.clone();
             let epoch_driver = std::thread::Builder::new()
-                .name("sim-component-epoch".to_owned())
+                .name("zed-component-epoch".to_owned())
                 .spawn(move || {
                     loop {
                         std::thread::sleep(COMPONENT_EPOCH_INTERVAL);
@@ -119,7 +119,7 @@ pub struct WasmExtension {
     pub manifest: Arc<ExtensionManifest>,
     pub work_dir: Arc<Path>,
     #[allow(unused)]
-    pub sim_api_version: Version,
+    pub zed_api_version: Version,
     _task: Arc<Task<Result<(), gpui_tokio::JoinError>>>,
 }
 
@@ -706,15 +706,15 @@ impl WasmHost {
             let engine = this.engine.clone();
 
             executor.spawn(async move {
-                let sim_api_version = parse_wasm_extension_version(&manifest_id, &wasm_bytes)?;
+                let zed_api_version = parse_wasm_extension_version(&manifest_id, &wasm_bytes)?;
                 let component = Component::from_binary(&engine, &wasm_bytes)
                     .context("failed to compile wasm component")?;
 
-                anyhow::Ok((sim_api_version, component))
+                anyhow::Ok((zed_api_version, component))
             })
         };
 
-        let load_extension = |sim_api_version: Version, component| async move {
+        let load_extension = |zed_api_version: Version, component| async move {
             let wasi_ctx = this.build_wasi_ctx(&manifest).await?;
             let mut store = wasmtime::Store::new(
                 &this.engine,
@@ -737,7 +737,7 @@ impl WasmHost {
                 &executor,
                 &mut store,
                 this.release_channel,
-                sim_api_version.clone(),
+                zed_api_version.clone(),
                 &component,
             )
             .await?;
@@ -759,17 +759,17 @@ impl WasmHost {
                 manifest.clone(),
                 this.work_dir.join(manifest.id.as_ref()).into(),
                 tx,
-                sim_api_version,
+                zed_api_version,
             ))
         };
 
         cx.spawn(async move |cx| {
-            let (sim_api_version, component) = compile_task.await?;
+            let (zed_api_version, component) = compile_task.await?;
 
             // Run wasi-dependent operations on tokio.
             // wasmtime_wasi internally uses tokio for I/O operations.
-            let (extension_task, manifest, work_dir, tx, sim_api_version) =
-                gpui_tokio::Tokio::spawn(cx, load_extension(sim_api_version, component)).await??;
+            let (extension_task, manifest, work_dir, tx, zed_api_version) =
+                gpui_tokio::Tokio::spawn(cx, load_extension(zed_api_version, component)).await??;
 
             // Run the extension message loop on tokio since extension
             // calls may invoke wasi functions that require a tokio runtime.
@@ -779,7 +779,7 @@ impl WasmHost {
                 manifest,
                 work_dir,
                 tx,
-                sim_api_version,
+                zed_api_version,
                 _task: task,
             })
         })
@@ -869,12 +869,12 @@ pub fn parse_wasm_extension_version(extension_id: &str, wasm_bytes: &[u8]) -> Re
     for part in wasmparser::Parser::new(0).parse_all(wasm_bytes) {
         if let wasmparser::Payload::CustomSection(s) =
             part.context("error parsing wasm extension")?
-            && s.name() == "sim:api-version"
+            && s.name() == "zed:api-version"
         {
             version = parse_wasm_extension_version_custom_section(s.data());
             if version.is_none() {
                 bail!(
-                    "extension {} has invalid sim:api-version section: {:?}",
+                    "extension {} has invalid zed:api-version section: {:?}",
                     extension_id,
                     s.data()
                 );
@@ -887,7 +887,7 @@ pub fn parse_wasm_extension_version(extension_id: &str, wasm_bytes: &[u8]) -> Re
     //
     // By parsing the entirety of the Wasm bytes before we return, we're able to detect this problem
     // earlier as an `Err` rather than as a panic.
-    version.with_context(|| format!("extension {extension_id} has no sim:api-version section"))
+    version.with_context(|| format!("extension {extension_id} has no zed:api-version section"))
 }
 
 fn parse_wasm_extension_version_custom_section(data: &[u8]) -> Option<Version> {

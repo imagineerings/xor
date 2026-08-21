@@ -385,7 +385,7 @@ SURFACES = {
         "diff is required; collapsible is optional and false when absent.",
         "Only changed sections render; collapsed node/package groups start closed and noncollapsible groups are always shown.",
         "Added, removed, changed, version, commit-shortening, enabled-state, ComfyUI-version, and update-channel transitions render with exact before/after semantics.",
-        "The source collapsible headings are click-only divs with no button role, aria-expanded, or key handler; this is an explicit accessibility gap for the Sim acceptance test.",
+        "The source collapsible headings are click-only divs with no button role, aria-expanded, or key handler; this is an explicit accessibility gap for the Zed acceptance test.",
         "Node and package expansion are independent local booleans; input diff changes do not explicitly reset them.",
         "Empty change classes render nothing; absent version falls back to a seven-character commit or question mark.",
         "No persistence; disclosure state is local/transient.",
@@ -760,10 +760,10 @@ FIELDS = [
     "persistence_serialization",
     "interfaces_side_effects",
     "disposition_reason",
-    "sim_status",
-    "sim_evidence",
+    "zed_status",
+    "zed_evidence",
     "parity_gap",
-    "observable_sim_acceptance",
+    "observable_zed_acceptance",
     "automated_validation",
     "manual_validation",
     "open_questions",
@@ -912,28 +912,28 @@ def write_catalog(paths: list[str]) -> list[dict[str, str]]:
                     if direct_test
                     else "No focused existing test directly mounts this component; source contract is code-inferred."
                 ),
-                "sim_status": "deferred" if infrastructure else "missing",
-                "sim_evidence": (
-                    "No standalone Sim component is required; this presentational/infrastructure contract is validated through each consuming Comfy-specific GPUI surface."
+                "zed_status": "deferred" if infrastructure else "missing",
+                "zed_evidence": (
+                    "No standalone Zed component is required; this presentational/infrastructure contract is validated through each consuming Comfy-specific GPUI surface."
                     if infrastructure
-                    else "No Comfy-specific Desktop renderer surface exists in the inspected Sim target."
+                    else "No Comfy-specific Desktop renderer surface exists in the inspected Zed target."
                 ),
                 "parity_gap": (
-                    f"This source-specific presentational contract is not separately mapped in Sim; inventory and validate its semantic/decorative effect through every consuming Comfy GPUI surface: {metadata['disposition_reason']}"
+                    f"This source-specific presentational contract is not separately mapped in Zed; inventory and validate its semantic/decorative effect through every consuming Comfy GPUI surface: {metadata['disposition_reason']}"
                     if infrastructure
-                    else f"Sim has no GPUI surface that reproduces the {metadata['component_surface']} contract, including its state, error, focus, and service-boundary behavior."
+                    else f"Zed has no GPUI surface that reproduces the {metadata['component_surface']} contract, including its state, error, focus, and service-boundary behavior."
                 ),
-                "observable_sim_acceptance": (
-                    f"Every consuming Sim Comfy surface shall preserve this noninteractive render contract without creating a standalone workflow requirement: {metadata['observable_success']}"
+                "observable_zed_acceptance": (
+                    f"Every consuming Zed Comfy surface shall preserve this noninteractive render contract without creating a standalone workflow requirement: {metadata['observable_success']}"
                     if infrastructure
-                    else f"With deterministic props/service fixtures, the Sim GPUI surface shall reproduce this observable contract: {metadata['observable_success']} It shall also preserve the documented failure/recovery and provide a keyboard-accessible path for every action."
+                    else f"With deterministic props/service fixtures, the Zed GPUI surface shall reproduce this observable contract: {metadata['observable_success']} It shall also preserve the documented failure/recovery and provide a keyboard-accessible path for every action."
                 ),
                 "automated_validation": (
                     f"Parameterize consuming GPUI visual/accessibility tests with {feature_id}; verify the semantic grouping or decorative-hidden effect without a standalone action surface."
                     if infrastructure
                     else f"Add a deterministic GPUI interaction test parameterized by {feature_id}; assert success, empty/loading/error/cancel/retry states that apply, focus/keyboard behavior, emitted service requests, and no forbidden side effects."
                 ),
-                "manual_validation": f"Exercise {metadata['component_surface']} side by side in Comfy-Desktop and Sim; compare localized text/state, pointer and keyboard actions, focus, cancellation, retry, destructive confirmation, and visible errors.",
+                "manual_validation": f"Exercise {metadata['component_surface']} side by side in Comfy-Desktop and Zed; compare localized text/state, pointer and keyboard actions, focus, cancellation, retry, destructive confirmation, and visible errors.",
                 "open_questions": "Electron renderer was not launched because dependencies are absent; native focus, screen-reader announcement, packaged bridge timing, and platform window-manager behavior remain runtime-unverified.",
             }
         )

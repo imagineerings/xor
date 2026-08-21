@@ -14,7 +14,7 @@ use ordered_float::OrderedFloat;
 use picker::popover_menu::PickerPopoverMenu;
 use picker::{Picker, PickerDelegate};
 use settings::{AgentConfigOptionValue, SettingsStore};
-use sim_actions::agent::ToggleModelSelector;
+use zed_actions::agent::ToggleModelSelector;
 use ui::{
     ElevationIndex, IconButton, KeyBinding, ListItem, ListItemSpacing, PopoverMenuHandle, Switch,
     SwitchLabelPosition, ToggleState, Tooltip, prelude::*,

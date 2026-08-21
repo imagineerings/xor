@@ -23,7 +23,7 @@
     "actor_transport": "the sole retained codec actor carries the checked value without conversion",
     "ffi_option": "the VP9 session writes a bounded NUL-terminated source-compatible floating string before avcodec_open2",
     "ltxv_h264_integer_crf_unchanged": true,
-    "codec_thread_identity_version": "sim.comfy.video-codec-thread.v4"
+    "codec_thread_identity_version": "zed.comfy.video-codec-thread.v4"
   },
   "vectors": [
     { "value": 0.0, "rendered": "0.0" },

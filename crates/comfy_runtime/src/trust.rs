@@ -48,22 +48,22 @@ use crate::{
 pub const SEALED_PLUGIN_AUTHORIZATION_VERSION: u16 = 2;
 pub const MAX_SEALED_PLUGIN_AUTHORIZATION_BYTES: usize = 2 * 1024 * 1024;
 pub const CUDART_LIBRARY_ID: &str = "nvidia-cudart";
-const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-plugin-authorization-v2\0";
-const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-cost-acceptance-v2\0";
-const PROVIDER_RESULT_RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-provider-result-receipt-v1\0";
+const PLUGIN_AUTHORIZATION_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-plugin-authorization-v2\0";
+const PROVIDER_COST_ACCEPTANCE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-provider-cost-acceptance-v2\0";
+const PROVIDER_RESULT_RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-provider-result-receipt-v1\0";
 const MAX_PROVIDER_COST_ACCEPTANCE_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub const MAX_PROVIDER_RESULT_RECEIPT_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
 pub const MAX_PROVIDER_RESULT_RECEIPT_BYTES: usize = 32 * 1024;
-const ROCM_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-rocm-package-v1\0";
-const METAL_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-metal-package-v1\0";
-const MLU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-mlu-package-v1\0";
-const NPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-npu-package-v1\0";
-const CUDA_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-cuda-package-v1\0";
-const XPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-xpu-package-v1\0";
-const DIRECTML_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-directml-package-v1\0";
-const VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"sim-comfy-video-codec-package-v1\0";
+const ROCM_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-rocm-package-v1\0";
+const METAL_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-metal-package-v1\0";
+const MLU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-mlu-package-v1\0";
+const NPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-npu-package-v1\0";
+const CUDA_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-cuda-package-v1\0";
+const XPU_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-xpu-package-v1\0";
+const DIRECTML_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-directml-package-v1\0";
+const VIDEO_CODEC_PACKAGE_SIGNATURE_DOMAIN: &[u8] = b"zed-comfy-video-codec-package-v1\0";
 const VIDEO_CODEC_DEPENDENCY_CONTRACT_SIGNATURE_DOMAIN: &[u8] =
-    b"sim-comfy-video-codec-dependency-contract-v1\0";
+    b"zed-comfy-video-codec-dependency-contract-v1\0";
 const NATIVE_PACKAGE_SIGNATURE_ALGORITHM: &str = "ed25519";
 const MAX_NATIVE_PACKAGE_SIGNATURE_RECEIPT_BYTES: usize = 1_024;
 const MAX_NATIVE_LIBRARY_IMAGE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -1054,7 +1054,7 @@ fn seal_native_library_image(
     use std::os::fd::{AsRawFd, FromRawFd};
 
     check_cancellation()?;
-    let name = CString::new(format!("sim-native-{snapshot_name}")).map_err(|error| {
+    let name = CString::new(format!("zed-native-{snapshot_name}")).map_err(|error| {
         NativeLibraryImageError::Invalid(format!("snapshot name is invalid: {error}"))
     })?;
     let descriptor =
@@ -1117,7 +1117,7 @@ fn seal_native_library_image(
     }
     check_cancellation()?;
     let temporary_directory = tempfile::Builder::new()
-        .prefix("sim-native-")
+        .prefix("zed-native-")
         .tempdir()
         .map_err(|error| NativeLibraryImageError::Invalid(error.to_string()))?;
     let loader_path = temporary_directory
@@ -2264,7 +2264,7 @@ impl ProviderInvocationIdentity {
     pub fn idempotency_key_sha256(&self) -> String {
         let mut digest = Sha256::new();
         for field in [
-            b"sim.comfy.provider-idempotency.v1".as_slice(),
+            b"zed.comfy.provider-idempotency.v1".as_slice(),
             self.profile_id.as_bytes(),
             self.prompt_sha256.as_bytes(),
             self.attempt_id.as_bytes(),
@@ -4643,7 +4643,7 @@ fn validate_video_codec_catalog_envelope(
         || !VIDEO_CODEC_FFI_TARGETS.contains(&catalog.target.as_str())
         || !valid_ascii_identifier(&catalog.signer, 256)
         || catalog.signature_algorithm != NATIVE_PACKAGE_SIGNATURE_ALGORITHM
-        || catalog.signature_domain != "sim-comfy-video-codec-package-v1"
+        || catalog.signature_domain != "zed-comfy-video-codec-package-v1"
         || catalog.certificate_owner != "comfy_runtime::NativeFfiRegistry"
         || catalog.unsafe_owner != VIDEO_CODEC_FFI_UNSAFE_OWNER
         || !catalog.runtime_compilation_forbidden
@@ -4689,7 +4689,7 @@ fn validate_video_codec_dependency_contract_envelope(
         || contract.target != primary.target()
         || !valid_ascii_identifier(&contract.signer, 256)
         || contract.signature_algorithm != NATIVE_PACKAGE_SIGNATURE_ALGORITHM
-        || contract.signature_domain != "sim-comfy-video-codec-dependency-contract-v1"
+        || contract.signature_domain != "zed-comfy-video-codec-dependency-contract-v1"
         || contract.certificate_owner != "comfy_runtime::NativeFfiRegistry"
         || contract.unsafe_owner != VIDEO_CODEC_FFI_UNSAFE_OWNER
         || !contract.runtime_compilation_forbidden
@@ -6109,7 +6109,7 @@ mod tests {
             target: target.to_owned(),
             signer: "video-codec.release".to_owned(),
             signature_algorithm: "ed25519".to_owned(),
-            signature_domain: "sim-comfy-video-codec-package-v1".to_owned(),
+            signature_domain: "zed-comfy-video-codec-package-v1".to_owned(),
             certificate_owner: "comfy_runtime::NativeFfiRegistry".to_owned(),
             unsafe_owner: VIDEO_CODEC_FFI_UNSAFE_OWNER.to_owned(),
             runtime_compilation_forbidden: true,
@@ -6152,7 +6152,7 @@ mod tests {
             target: VIDEO_CODEC_DEPENDENCY_CONTRACT_TARGET.to_owned(),
             signer: "video-codec.release".to_owned(),
             signature_algorithm: "ed25519".to_owned(),
-            signature_domain: "sim-comfy-video-codec-dependency-contract-v1".to_owned(),
+            signature_domain: "zed-comfy-video-codec-dependency-contract-v1".to_owned(),
             certificate_owner: "comfy_runtime::NativeFfiRegistry".to_owned(),
             unsafe_owner: VIDEO_CODEC_FFI_UNSAFE_OWNER.to_owned(),
             runtime_compilation_forbidden: true,

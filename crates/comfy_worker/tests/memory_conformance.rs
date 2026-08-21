@@ -773,7 +773,7 @@ fn source_device_and_memory_diagnostics_are_checked_worker_projections()
     let cancellation = CancellationToken::default();
     assert_eq!(
         cuda_memory_summary_exact_native(&capabilities, &snapshot, &cancellation)?,
-        "Sim native Cuda memory summary, device 1\nactive_bytes.all.current: 8192\nreserved_bytes.all.current: 8192\n"
+        "Zed native Cuda memory summary, device 1\nactive_bytes.all.current: 8192\nreserved_bytes.all.current: 8192\n"
     );
     assert_eq!(xpu_device_count_exact_native(&topology, &cancellation)?, 2);
 
@@ -1117,13 +1117,13 @@ fn runtime_policy_reaches_worker_configuration() -> Result<bool, Box<dyn Error>>
     let runtime_source =
         fs::read_to_string(root.join("crates/comfy_runtime/src/native_execution_controller.rs"))?;
     let worker_source = fs::read_to_string(root.join("crates/comfy_worker/src/comfy_worker.rs"))?;
-    let sim_source = fs::read_to_string(root.join("crates/sim/src/sim.rs"))?;
+    let zed_source = fs::read_to_string(root.join("crates/zed/src/zed.rs"))?;
     Ok(runtime_source.contains("pub memory_policy: MemoryPolicy")
         && runtime_source.contains("NativeImageWorkerPlan::new_with_memory_policy")
         && runtime_source.contains("execute_blocking_with_event_bus_and_configuration")
         && worker_source.contains("worker_plan.memory_policy")
         && worker_source.contains("effective_mode.configuration_token()")
-        && sim_source.contains("with_memory_policy(profile.memory_policy)"))
+        && zed_source.contains("with_memory_policy(profile.memory_policy)"))
 }
 
 fn oom_policy_is_bounded_and_monotonic() -> Result<bool, Box<dyn Error>> {

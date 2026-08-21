@@ -7,7 +7,7 @@ usage() {
   echo ""
   echo "Triggers the publish_extension_cli workflow on main to build a new"
   echo "extension CLI binary, bump the 'extension-cli' tag after a successful"
-  echo "build, and open PRs that update the SHA used by the sim and"
+  echo "build, and open PRs that update the SHA used by the zed and"
   echo "simtropolis/extensions repositories."
   echo ""
   echo "Arguments:"
@@ -31,4 +31,4 @@ which gh > /dev/null 2>&1 || {
 gh workflow run publish_extension_cli.yml --ref main -f message="$1"
 
 echo "Workflow triggered. Monitor progress at:"
-echo "  https://github.com/simtropolis/sim/actions/workflows/publish_extension_cli.yml"
+echo "  https://github.com/simtropolis/zed/actions/workflows/publish_extension_cli.yml"

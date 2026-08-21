@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-2255F11A43BA",
   "baseline_overload_id": "COMFY-TENSOR-OP-2255F11A43BA:blocked",
   "baseline_fixture_sha256": "dff8ab6a55d662d3043618129024bd9fbea5773a4248d4815429eb1c2cff52f9",
-  "overload_id": "sim.native.worker.xpu-device-count.v1",
+  "overload_id": "zed.native.worker.xpu-device-count.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
   "ordered_parameters": [
     {

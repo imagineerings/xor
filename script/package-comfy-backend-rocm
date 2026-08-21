@@ -7,7 +7,7 @@ licenses="$workspace/crates/comfy_backend_rocm/LICENSES"
 policy="$workspace/nix/comfy-backends/rocm/package-policy.json"
 contract_schema="$workspace/nix/comfy-backends/rocm/ffi-contracts-v1.schema.json"
 signature_algorithm="ed25519"
-signature_domain="sim-comfy-rocm-package-v1"
+signature_domain="zed-comfy-rocm-package-v1"
 coverage_file_name="package-coverage.sha256"
 
 usage() {
@@ -378,7 +378,7 @@ if policy.get("schema_version") != 2 or manifest.get("schema_version") != 2:
     raise SystemExit("self-test package did not use the breaking package/manifest schema v2")
 if policy.get("signature_algorithm") != "ed25519":
     raise SystemExit("self-test package did not use the native Ed25519 signature contract")
-if policy.get("signature_domain") != "sim-comfy-rocm-package-v1":
+if policy.get("signature_domain") != "zed-comfy-rocm-package-v1":
     raise SystemExit("self-test package did not retain the ROCm package signature domain")
 if policy.get("signature_payload_format") != "domain-nul-u64be-signer-u64be-coverage":
     raise SystemExit("self-test package did not retain the signature payload framing")

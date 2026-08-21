@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-015751FC6965",
   "baseline_overload_id": "COMFY-TENSOR-OP-015751FC6965:blocked",
   "baseline_fixture_sha256": "4c9979616a33f3751a72c9b4388bed0f27901f5fc0babb381bbdecb93212da97",
-  "overload_id": "sim.native.tensor.signbit.cpu.v1",
+  "overload_id": "zed.native.tensor.signbit.cpu.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-010917b0d872",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "input", "type": "real Tensor"}

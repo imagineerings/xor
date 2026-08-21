@@ -263,7 +263,7 @@ impl TextEncoderArchitectureRegistry {
 
     pub fn identity_sha256(self) -> [u8; 32] {
         let mut digest = Sha256::new();
-        digest.update(b"sim-native-text-encoder-architecture-registry\0");
+        digest.update(b"zed-native-text-encoder-architecture-registry\0");
         digest.update(self.version.to_be_bytes());
         for fact in TEXT_ENCODER_OWNER_FACTS {
             digest.update(fact.native_owner.as_bytes());

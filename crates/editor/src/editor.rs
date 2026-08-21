@@ -1,6 +1,6 @@
 #![allow(rustdoc::private_intra_doc_links)]
 //! This is the place where everything editor-related is stored (data-wise) and displayed (ui-wise).
-//! The main point of interest in this crate is [`Editor`] type, which is used in every other Sim part as a user input element.
+//! The main point of interest in this crate is [`Editor`] type, which is used in every other Zed part as a user input element.
 //! It comes in different flavors: single line, multiline and a fixed height one.
 //!
 //! Editor contains of multiple large submodules:
@@ -135,7 +135,7 @@ use ::git::{Blame, status::FileStatus};
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder, BuildError};
 use anyhow::{Context as _, Result, anyhow, bail};
 use blink_manager::BlinkManager;
-use client::{Collaborator, ParticipantIndex, parse_sim_link};
+use client::{Collaborator, ParticipantIndex, parse_zed_link};
 use clock::ReplicaId;
 use code_context_menus::{
     AvailableCodeAction, CodeActionContents, CodeActionsItem, CodeActionsMenu, CodeContextMenu,
@@ -233,8 +233,8 @@ use settings::{
     GitGutterSetting, RelativeLineNumbers, Settings, SettingsLocation, SettingsStore,
     update_settings_file,
 };
-pub use sim_actions::editor::RevealInFileManager;
-use sim_actions::editor::{MoveDown, MoveUp};
+pub use zed_actions::editor::RevealInFileManager;
+use zed_actions::editor::{MoveDown, MoveUp};
 use smallvec::{SmallVec, smallvec};
 use snippet::Snippet;
 use std::{
@@ -917,7 +917,7 @@ struct ActionFetchReady {
     actions: Rc<[AvailableCodeAction]>,
 }
 
-/// Sim's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
+/// Zed's primary implementation of text input, allowing users to edit a [`MultiBuffer`].
 ///
 /// See the [module level documentation](self) for more information.
 pub struct Editor {
@@ -2839,7 +2839,7 @@ impl Editor {
             cx,
             |e, _, _| match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
+                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -2919,7 +2919,7 @@ impl Editor {
         .detach_and_prompt_err("Failed to create buffer", window, cx, |e, _, _| {
             match e.error_code() {
                 ErrorCode::RemoteUpgradeRequired => Some(format!(
-                "The remote instance of Sim does not support this yet. It must be upgraded to {}",
+                "The remote instance of Zed does not support this yet. It must be upgraded to {}",
                 e.error_tag("required").unwrap_or("the latest version")
             )),
                 _ => None,
@@ -8598,7 +8598,7 @@ impl Editor {
 
     fn copy_path(
         &mut self,
-        _: &sim_actions::workspace::CopyPath,
+        _: &zed_actions::workspace::CopyPath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -8613,7 +8613,7 @@ impl Editor {
 
     fn copy_relative_path(
         &mut self,
-        _: &sim_actions::workspace::CopyRelativePath,
+        _: &zed_actions::workspace::CopyRelativePath,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {

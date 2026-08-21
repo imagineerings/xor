@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add recipe behavior at the narrowest existing agent/session integration point, separating it into a crate only if implementation review shows multiple existing consumers need a stable library boundary. Reuse Sim's prompt, credentials, settings, git/HTTP, deeplink, session, permission, and executor services.
+Add recipe behavior at the narrowest existing agent/session integration point, separating it into a crate only if implementation review shows multiple existing consumers need a stable library boundary. Reuse Zed's prompt, credentials, settings, git/HTTP, deeplink, session, permission, and executor services.
 
 ## Tasks
 

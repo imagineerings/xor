@@ -326,7 +326,7 @@ impl Domain for ComfyRuntimeDb {
             ALTER TABLE comfy_runtime_profiles RENAME TO comfy_runtime_profile_quarantine;
             ALTER TABLE comfy_runtime_profile_quarantine
                 ADD COLUMN quarantine_reason TEXT NOT NULL
-                DEFAULT "superseded by Sim SettingsStore runtime profiles";
+                DEFAULT "superseded by Zed SettingsStore runtime profiles";
 
             ALTER TABLE comfy_runtime_mappings RENAME TO comfy_runtime_mapping_quarantine;
             ALTER TABLE comfy_runtime_mapping_quarantine

@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-231238FDA88D",
   "baseline_overload_id": "COMFY-TENSOR-OP-231238FDA88D:blocked",
   "baseline_fixture_sha256": "371ca96625dc410ad5eb99dfc405b4a9becee27fb30f640ec86ad82b79c20380",
-  "overload_id": "sim.native.tensor.cudnn-convolution-facade.cpu-f32.v1",
+  "overload_id": "zed.native.tensor.cudnn-convolution-facade.cpu-f32.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
   "ordered_parameters": [
     {

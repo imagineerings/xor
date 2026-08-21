@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Register game commands and project-panel metadata through existing Sim command, workspace, project-panel, task, and debugger integration points only when project detection succeeds. Supported run/debug workflows execute through Sim-owned runtime services; unsupported runtime behavior remains explicit rather than launching Godot. Migrated Comfy/world-model authoring affordances are recreated as native Sim commands and metadata instead of compatibility labels.
+Register game commands and project-panel metadata through existing Zed command, workspace, project-panel, task, and debugger integration points only when project detection succeeds. Supported run/debug workflows execute through Zed-owned runtime services; unsupported runtime behavior remains explicit rather than launching Godot. Migrated Comfy/world-model authoring affordances are recreated as native Zed commands and metadata instead of compatibility labels.
 
 ## Components
 
@@ -18,21 +18,21 @@ _For any_ non-Godot workspace, Godot commands SHALL remain unregistered.
 
 **Validates: Requirement 1.2**
 
-### Property 2: Native Sim Commands
+### Property 2: Native Zed Commands
 
-_For any_ migrated authoring command, Sim SHALL expose a native `sim_game.*` command id rather than a Comfy compatibility route.
+_For any_ migrated authoring command, Zed SHALL expose a native `zed_game.*` command id rather than a Comfy compatibility route.
 
 **Validates: Requirement 1.3**
 
 ### Property 3: Native Execution
 
-_For any_ supported run/debug operation, Sim SHALL execute through Sim-owned task/runtime/debugger services; unavailable native behavior SHALL remain unresolved or excluded.
+_For any_ supported run/debug operation, Zed SHALL execute through Zed-owned task/runtime/debugger services; unavailable native behavior SHALL remain unresolved or excluded.
 
 **Validates: Requirement 3.1, 3.2**
 
 ### D-NATIVE: Native editor path
 
-Commands, project metadata, UI state, task execution, debugging, diagnostics, cancellation, and cleanup remain inside existing Sim owners. Godot-compatible inputs are translated at file or protocol boundaries, and hermetic validation denies any Godot process or library.
+Commands, project metadata, UI state, task execution, debugging, diagnostics, cancellation, and cleanup remain inside existing Zed owners. Godot-compatible inputs are translated at file or protocol boundaries, and hermetic validation denies any Godot process or library.
 
 **Validates: Requirement 9.1, 9.2, 9.3, 9.4, 9.5**
 

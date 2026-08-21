@@ -1,11 +1,11 @@
 ---
 title: Sandboxing
-description: Sim Agent tool calls can run in an OS-level sandbox to restrict certain operations.
+description: Zed Agent tool calls can run in an OS-level sandbox to restrict certain operations.
 ---
 
 # Sandboxing
 
-You can restrict what operations the [Sim Agent](./sim-agent.md) can run in multiple ways. One way to restrict them is
+You can restrict what operations the [Zed Agent](./zed-agent.md) can run in multiple ways. One way to restrict them is
 [Tool Permissions](./tool-permissions.md), but these are of limited use when the agent wants to do things like run a
 complicated script in a terminal.
 
@@ -18,12 +18,12 @@ script will only be able to write to the files and folders you have allowed it t
 - Tool permissions restrict the agent's ability to run certain tool actions in the first place
 - Once a tool action is actually running, sandboxing restricts what it can do
 
-Sandboxing applies only to Sim Agent. It does not sandbox Sim itself, language servers, extensions, tasks, your normal
+Sandboxing applies only to Zed Agent. It does not sandbox Zed itself, language servers, extensions, tasks, your normal
 terminal tabs, [External Agents](./external-agents.md), or [Terminal Threads](./terminal-threads.md).
 
 ## Sandboxed Tools {#sandboxed-tools}
 
-Sim Agent sandboxing currently applies to the `terminal` tool.
+Zed Agent sandboxing currently applies to the `terminal` tool.
 
 | Tool       | What sandboxing limits                                                                                |
 | ---------- | ----------------------------------------------------------------------------------------------------- |
@@ -34,7 +34,7 @@ Other built-in tools, including `fetch`, are still governed by [Tool Permissions
 
 ## Default Access {#default-access}
 
-By default, sandboxed Sim Agent tool actions have these restrictions:
+By default, sandboxed Zed Agent tool actions have these restrictions:
 
 | Access type         | Default behavior                                                                                                                                                    |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ By default, sandboxed Sim Agent tool actions have these restrictions:
 
 ## Approval Prompts {#approval-prompts}
 
-When the agent needs access outside the default sandbox, Sim shows a sandbox approval prompt before the tool action runs.
+When the agent needs access outside the default sandbox, Zed shows a sandbox approval prompt before the tool action runs.
 Depending on what the tool requested, the prompt can ask you to allow:
 
 - network access to specific hosts, such as `github.com` or `*.npmjs.org`
@@ -110,7 +110,7 @@ enforcement details vary.
 
 ### macOS {#macos}
 
-On macOS, Sim uses Apple's Seatbelt sandbox through `sandbox-exec`.
+On macOS, Zed uses Apple's Seatbelt sandbox through `sandbox-exec`.
 
 Sandboxed terminal commands:
 
@@ -122,17 +122,17 @@ Sandboxed terminal commands:
 - cannot write elsewhere unless you approve additional paths or broader write access
 - cannot reach the network unless you approve network access
 
-When network access is approved on macOS, Sim uses an HTTP/HTTPS proxy so access can be limited to approved hosts.
+When network access is approved on macOS, Zed uses an HTTP/HTTPS proxy so access can be limited to approved hosts.
 Tools that do not honor proxy environment variables, such as SSH, FTP, and raw socket clients, may not work even after host-specific network access is approved.
 For networked terminal commands, prefer HTTPS URLs over SSH URLs when possible.
 
 ### Linux {#linux}
 
-On Linux, Sim uses Bubblewrap (`bwrap`) for sandboxing.
+On Linux, Zed uses Bubblewrap (`bwrap`) for sandboxing.
 
-Sim only uses a non-setuid `bwrap` binary. Its sandbox is built entirely on unprivileged user namespaces, so a setuid-root
+Zed only uses a non-setuid `bwrap` binary. Its sandbox is built entirely on unprivileged user namespaces, so a setuid-root
 `bwrap` provides no extra functionality, and running one would mean executing root-privileged setup with arguments partly
-derived from model-influenced input. If the only `bwrap` found on your `PATH` is setuid-root, Sim refuses to run it;
+derived from model-influenced input. If the only `bwrap` found on your `PATH` is setuid-root, Zed refuses to run it;
 install a non-setuid Bubblewrap to enable sandboxing.
 
 Sandboxed terminal commands:
@@ -144,20 +144,20 @@ Sandboxed terminal commands:
 - cannot write elsewhere unless you approve additional paths or broader write access
 - cannot reach the network unless you approve network access
 
-When host-specific network access is approved on Linux, Sim uses an HTTP/HTTPS proxy so access can be limited to approved
+When host-specific network access is approved on Linux, Zed uses an HTTP/HTTPS proxy so access can be limited to approved
 hosts. Tools that do not honor proxy environment variables, such as SSH, FTP, and raw socket clients, may not work even
 after host-specific network access is approved.
 
-If Bubblewrap is unavailable or cannot create a sandbox in the current environment, Sim may run the command without the OS
+If Bubblewrap is unavailable or cannot create a sandbox in the current environment, Zed may run the command without the OS
 sandbox and show a warning in the tool output.
 
 ### Windows {#windows}
 
-On Windows, Sim Agent sandboxing is supported only when the agent action runs inside WSL.
+On Windows, Zed Agent sandboxing is supported only when the agent action runs inside WSL.
 
-Sim uses the Linux Bubblewrap sandbox inside WSL because WSL provides the Linux process and filesystem primitives that
-Bubblewrap needs. Native Windows processes do not currently have the same sandbox integration in Sim, so a native Windows
-command cannot be confined by Sim Agent's OS sandbox in the same way.
+Zed uses the Linux Bubblewrap sandbox inside WSL because WSL provides the Linux process and filesystem primitives that
+Bubblewrap needs. Native Windows processes do not currently have the same sandbox integration in Zed, so a native Windows
+command cannot be confined by Zed Agent's OS sandbox in the same way.
 
 When running inside WSL, the Linux sandboxing behavior applies, including the requirement that `bwrap` not be setuid-root:
 
@@ -166,7 +166,7 @@ When running inside WSL, the Linux sandboxing behavior applies, including the re
 - `/tmp` is temporary for sandboxed terminal calls
 - network access is all-or-nothing rather than host-specific, so host-specific network requests are rejected and the agent must request unrestricted network access when network access is needed
 
-If WSL is not installed, or if you choose to run a command without the sandbox, Sim falls back to the standard terminal
+If WSL is not installed, or if you choose to run a command without the sandbox, Zed falls back to the standard terminal
 behavior of running in your native shell. It selects the shell using the usual preference order: Git Bash (or scoop's
 bash) when one is installed, otherwise PowerShell, and finally `cmd.exe`. Because the command then runs against native
 Windows paths instead of WSL's Linux filesystem, path conventions change accordingly (for example `C:\...` or `/c/...`

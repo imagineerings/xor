@@ -252,11 +252,11 @@ members = [
     "crates/worktree",
     "crates/worktree_benchmarks",
     "crates/x_ai",
-    "crates/sim",
-    "crates/sim_actions",
+    "crates/zed",
+    "crates/zed_actions",
     "crates/windows_resources",
-    "crates/sim_credentials_provider",
-    "crates/sim_env_vars",
+    "crates/zed_credentials_provider",
+    "crates/zed_env_vars",
     "crates/zeta_prompt",
     "crates/zlog",
     "crates/zlog_settings",
@@ -280,7 +280,7 @@ members = [
     "tooling/perf",
     "tooling/xtask",
 ]
-default-members = ["crates/sim"]
+default-members = ["crates/zed"]
 
 [workspace.package]
 publish = false
@@ -536,10 +536,10 @@ web_search_providers = { path = "crates/web_search_providers" }
 workspace = { path = "crates/workspace" }
 worktree = { path = "crates/worktree" }
 x_ai = { path = "crates/x_ai" }
-sim = { path = "crates/sim" }
-sim_actions = { path = "crates/sim_actions" }
-sim_credentials_provider = { path = "crates/sim_credentials_provider" }
-sim_env_vars = { path = "crates/sim_env_vars" }
+zed = { path = "crates/zed" }
+zed_actions = { path = "crates/zed_actions" }
+zed_credentials_provider = { path = "crates/zed_credentials_provider" }
+zed_env_vars = { path = "crates/zed_env_vars" }
 edit_prediction = { path = "crates/edit_prediction" }
 edit_prediction_metrics = { path = "crates/edit_prediction_metrics" }
 zeta_prompt = { path = "crates/zeta_prompt" }
@@ -776,7 +776,7 @@ rayon = "1.8"
 regex = "1.5"
 unicode-normalization = "0.1"
 ring = "0.17.14"
-# WARNING: If you change this, you must also publish a new version of sim-reqwest to crates.io
+# WARNING: If you change this, you must also publish a new version of zed-reqwest to crates.io
 reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c6e14025e406a0c5cb0c96a4a969e601c9fef3c9", default-features = false, features = [
     "charset",
     "http2",
@@ -785,7 +785,7 @@ reqwest = { git = "https://github.com/simtropolis/reqwest.git", rev = "c6e14025e
     "rustls-tls-native-roots",
     "socks",
     "stream",
-], package = "sim-reqwest", version = "0.12.15-sim" }
+], package = "zed-reqwest", version = "0.12.15-zed" }
 resvg = { version = "0.46.0", default-features = false, features = [
     "text",
     "system-fonts",
@@ -800,8 +800,8 @@ rust-embed = { version = "8.11", features = ["include-exclude"] }
 rustc-hash = "2.1.0"
 rustls = { version = "0.23.26" }
 rustls-platform-verifier = "0.5.0"
-# WARNING: If you change this, you must also publish a new version of sim-scap to crates.io
-scap = { git = "https://github.com/simtropolis/scap", rev = "3d5bdb02b2fbc166b7754642db9063748b9082da", default-features = false, package = "sim-scap", version = "0.0.8-sim" }
+# WARNING: If you change this, you must also publish a new version of zed-scap to crates.io
+scap = { git = "https://github.com/simtropolis/scap", rev = "3d5bdb02b2fbc166b7754642db9063748b9082da", default-features = false, package = "zed-scap", version = "0.0.8-zed" }
 schemars = { version = "1.0", features = ["indexmap2"] }
 secp256k1 = { version = "0.29.1", default-features = false, features = ["std"] }
 semver = { version = "1.0", features = ["serde"] }
@@ -1064,7 +1064,7 @@ telemetry_events = { codegen-units = 1 }
 theme_selector = { codegen-units = 1 }
 time_format = { codegen-units = 1 }
 ui_input = { codegen-units = 1 }
-sim_actions = { codegen-units = 1 }
+zed_actions = { codegen-units = 1 }
 
 [profile.release]
 debug = "limited"
@@ -1072,7 +1072,7 @@ lto = "thin"
 codegen-units = 1
 
 [profile.release.package]
-sim = { codegen-units = 16 }
+zed = { codegen-units = 16 }
 
 [profile.release-fast]
 inherits = "release"
@@ -1093,7 +1093,7 @@ redundant_clone = "deny"
 disallowed_methods = "deny"
 
 # We currently do not restrict any style rules
-# as it slows down shipping code to Sim.
+# as it slows down shipping code to Zed.
 #
 # Running ./script/clippy can take several minutes, and so it's
 # common to skip that step and let CI do it. Any unexpected failures
@@ -1101,7 +1101,7 @@ disallowed_methods = "deny"
 # to an old branch, manual fixing, and re-pushing.
 #
 # In the future we could improve this by either making sure
-# Sim can surface clippy errors in diagnostics (in addition to the
+# Zed can surface clippy errors in diagnostics (in addition to the
 # rust-analyzer errors), or by having CI fix style nits automatically.
 style = { level = "allow", priority = -1 }
 

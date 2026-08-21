@@ -3,17 +3,17 @@ wit_bindgen::generate!({
     world: "comfy-provider-plugin",
 });
 
-use exports::sim::comfy_plugin::{plugin, provider_binding};
-use sim::comfy_plugin::{host, types};
+use exports::zed::comfy_plugin::{plugin, provider_binding};
+use zed::comfy_plugin::{host, types};
 
 struct ProviderComponent;
 
 impl plugin::Guest for ProviderComponent {
     fn manifest() -> types::ManifestProjection {
         types::ManifestProjection {
-            component_world: "sim:comfy-provider-plugin@1.0.0".to_owned(),
+            component_world: "zed:comfy-provider-plugin@1.0.0".to_owned(),
             schema_version: 1,
-            identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
+            identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
             plugin_version: version(1, 0, 0),
             api: types::ApiRequirement {
                 major: 1,
@@ -110,7 +110,7 @@ impl provider_binding::Guest for ProviderComponent {
     fn binding_set() -> types::ProviderBindingSet {
         types::ProviderBindingSet {
             schema_version: 1,
-            implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
+            implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
             bindings_sha256: "cbed6307f899b4a0fca14d8ff4acac6065128e64a6dea945a629b1890b42ec6a"
                 .to_owned(),
             bindings: vec![types::ProviderBindingClaim {
@@ -119,8 +119,8 @@ impl provider_binding::Guest for ProviderComponent {
                 contract_sha256:
                     "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
                         .to_owned(),
-                transport_schema: "sim:comfy-provider-transport@1".to_owned(),
-                materializer_schema: "sim:comfy-provider-materializer@1".to_owned(),
+                transport_schema: "zed:comfy-provider-transport@1".to_owned(),
+                materializer_schema: "zed:comfy-provider-materializer@1".to_owned(),
             }],
         }
     }
@@ -134,7 +134,7 @@ impl provider_binding::Guest for ProviderComponent {
                 "invalid provider request".to_owned(),
             ));
         }
-        let receipt = if request.starts_with(b"sim.comfy.provider-transport-request\0") {
+        let receipt = if request.starts_with(b"zed.comfy.provider-transport-request\0") {
             let receipt = host::provider_request(
                 "fixture",
                 "https://fixture.invalid/v1/generate",
@@ -167,7 +167,7 @@ impl provider_binding::Guest for ProviderComponent {
 }
 
 fn receipt_set(receipts: &[&[u8]]) -> Vec<u8> {
-    let mut encoded = b"sim.comfy.provider-result-receipt-set\0".to_vec();
+    let mut encoded = b"zed.comfy.provider-result-receipt-set\0".to_vec();
     encoded.extend_from_slice(&1_u16.to_le_bytes());
     encoded.extend_from_slice(&(receipts.len() as u32).to_le_bytes());
     for receipt in receipts {

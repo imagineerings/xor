@@ -25,7 +25,7 @@
     "request": "canonical IMAGE plus VP9 or AV1 identity, positive reduced frame rate, exact floating CRF bits, ordered serialized metadata, caller stream, scratch, and cancellation",
     "portable_output": "one moved exact-length contiguous rank-one CPU U8 Tensor plus SHA-256, dimensions, reduced frame rate, frame count, codec, pixel format, bit depth, and alpha projection",
     "post_actor_copy_count": 0,
-    "service_identity_version": "sim.comfy.webm-node-service.v1",
+    "service_identity_version": "zed.comfy.webm-node-service.v1",
     "service_identity_binds_actor_and_all_configured_limits": true,
     "execution_configuration_component": "webm"
   },

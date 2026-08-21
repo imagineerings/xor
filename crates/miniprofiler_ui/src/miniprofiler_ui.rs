@@ -16,7 +16,7 @@ use gpui::{
 };
 use rpc::{AnyProtoClient, proto};
 use settings::{RegisterSetting, Settings, SettingsContent, SettingsStore};
-use sim_actions::OpenPerformanceProfiler;
+use zed_actions::OpenPerformanceProfiler;
 use std::any::TypeId;
 use util::ResultExt;
 use workspace::{

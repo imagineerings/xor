@@ -12,7 +12,7 @@ mod thread_switcher;
 
 use acp_thread::ThreadStatus;
 use action_log::DiffStats;
-use agent::{SIM_AGENT_ID, ThreadStore};
+use agent::{ZED_AGENT_ID, ThreadStore};
 use agent_client_protocol::schema::v1 as acp;
 use agent_settings::AgentSettings;
 use agent_ui::terminal_thread_metadata_store::{
@@ -80,10 +80,10 @@ use workspace::{
 };
 
 use git_ui::worktree_service::{RemoteBranchName, worktree_create_targets};
-use sim_actions::editor::{MoveDown, MoveUp};
-use sim_actions::{CreateWorktree, NewWorktreeBranchTarget, OpenRecent};
+use zed_actions::editor::{MoveDown, MoveUp};
+use zed_actions::{CreateWorktree, NewWorktreeBranchTarget, OpenRecent};
 
-use sim_actions::agents_sidebar::{FocusSidebarFilter, ToggleThreadSwitcher};
+use zed_actions::agents_sidebar::{FocusSidebarFilter, ToggleThreadSwitcher};
 
 #[cfg(feature = "multiplayer-tools")]
 use crate::collaborative_rail::CollaborativeRail;
@@ -6536,8 +6536,8 @@ impl Sidebar {
             ThreadEntryWorkspace::Closed { .. } => None,
         };
 
-        let is_sim_thread = thread.metadata.agent_id.as_ref() == SIM_AGENT_ID.as_ref();
-        let can_open_as_markdown = thread.is_live || is_sim_thread;
+        let is_zed_thread = thread.metadata.agent_id.as_ref() == ZED_AGENT_ID.as_ref();
+        let can_open_as_markdown = thread.is_live || is_zed_thread;
         let folder_paths = thread.metadata.folder_paths().clone();
 
         right_click_menu(context_menu_id)
@@ -6573,7 +6573,7 @@ impl Sidebar {
                             }
                         });
 
-                        if is_sim_thread {
+                        if is_zed_thread {
                             menu = menu.entry("Regenerate Thread Title", None, {
                                 let session_id = session_id.clone();
                                 let sidebar = sidebar.clone();
@@ -6618,7 +6618,7 @@ impl Sidebar {
                                         }
                                     }
 
-                                    if is_sim_thread
+                                    if is_zed_thread
                                         && let Some(active_workspace) = &active_workspace
                                     {
                                         Self::open_closed_native_thread_as_markdown(
@@ -7749,7 +7749,7 @@ impl Sidebar {
         render_import_onboarding_banner(
             "acp",
             "Looking for threads from external agents?",
-            "Import threads from agents like Claude Agent, Codex, and more, whether started in Sim or another client.",
+            "Import threads from agents like Claude Agent, Codex, and more, whether started in Zed or another client.",
             if verbose_labels {
                 "Import Threads from External Agents"
             } else {
@@ -8010,7 +8010,7 @@ impl WorkspaceSidebar for Sidebar {
         self.cycle_thread_impl(forward, window, cx);
     }
 
-    fn serialisim_state(&self, _cx: &App) -> Option<String> {
+    fn serialized_state(&self, _cx: &App) -> Option<String> {
         let serialized = SerializedSidebar {
             width: Some(f32::from(self.width)),
             active_view: match self.view {
@@ -8021,7 +8021,7 @@ impl WorkspaceSidebar for Sidebar {
         serde_json::to_string(&serialized).ok()
     }
 
-    fn restore_serialisim_state(
+    fn restore_serialized_state(
         &mut self,
         state: &str,
         window: &mut Window,

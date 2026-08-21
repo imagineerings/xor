@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 pub const EXECUTION_ABI_JSON: &str = include_str!("../abi/execution-v1.json");
-pub const EXECUTION_CONTRACT: &str = "sim-comfy-metal-execution-v1";
+pub const EXECUTION_CONTRACT: &str = "zed-comfy-metal-execution-v1";
 pub const EXECUTION_UNSAFE_OWNER: &str = "comfy_backend_metal::execution";
-pub const METAL_ADD_F16_FUNCTION: &str = "sim_comfy_metal_add_f16_v1";
-pub const METAL_ADD_F32_FUNCTION: &str = "sim_comfy_metal_add_f32_v1";
+pub const METAL_ADD_F16_FUNCTION: &str = "zed_comfy_metal_add_f16_v1";
+pub const METAL_ADD_F32_FUNCTION: &str = "zed_comfy_metal_add_f32_v1";
 pub const MAXIMUM_COMMAND_BUFFERS_PER_STREAM: usize = 64;
 
 const RESOURCE_SELECTORS: [(&str, &str, &str, ReturnNullability); 29] = [

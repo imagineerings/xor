@@ -306,7 +306,7 @@ impl SerializedThreadTaskTimings {
     ///
     /// `anchor` - [`Instant`] that should be earlier than all timings to use as base anchor
     pub fn convert(anchor: Instant, timings: ThreadTaskTimings) -> SerializedThreadTaskTimings {
-        let serialisim_timings = SerializedTaskTiming::convert(anchor, &timings.timings);
+        let serialized_timings = SerializedTaskTiming::convert(anchor, &timings.timings);
 
         let mut hasher = DefaultHasher::new();
         timings.thread_id.hash(&mut hasher);
@@ -315,7 +315,7 @@ impl SerializedThreadTaskTimings {
         SerializedThreadTaskTimings {
             thread_name: timings.thread_name,
             thread_id,
-            timings: serialisim_timings,
+            timings: serialized_timings,
         }
     }
 }

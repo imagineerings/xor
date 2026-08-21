@@ -2,7 +2,7 @@
 
 //! # Theme
 //!
-//! This crate provides the theme system for Sim.
+//! This crate provides the theme system for Zed.
 //!
 //! ## Overview
 //!

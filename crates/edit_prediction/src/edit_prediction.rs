@@ -18,7 +18,7 @@ use cloud_llm_client::{
     EditPredictionRejectReason, EditPredictionRejection,
     MAX_EDIT_PREDICTION_REJECTIONS_PER_REQUEST, MINIMUM_REQUIRED_VERSION_HEADER_NAME,
     PREFERRED_EXPERIMENT_HEADER_NAME, PredictEditsRequestTrigger, RejectEditPredictionsBodyRef,
-    SIM_VERSION_HEADER_NAME,
+    ZED_VERSION_HEADER_NAME,
 };
 use collections::{HashMap, HashSet};
 use copilot::{Copilot, Reinstall, SignIn, SignOut};
@@ -87,7 +87,7 @@ mod prediction;
 pub mod udiff;
 
 pub mod open_ai_compatible;
-mod sim_edit_prediction_delegate;
+mod zed_edit_prediction_delegate;
 pub mod zeta;
 
 #[cfg(test)]
@@ -103,7 +103,7 @@ use crate::onboarding_modal::SimPredictModal;
 use crate::prediction::EditPredictionResult;
 pub use crate::prediction::{EditPrediction, EditPredictionId, EditPredictionInputs};
 pub use language_model::ApiKeyState;
-pub use sim_edit_prediction_delegate::SimEditPredictionDelegate;
+pub use zed_edit_prediction_delegate::ZedEditPredictionDelegate;
 pub use telemetry_events::EditPredictionRating;
 
 actions!(
@@ -124,7 +124,7 @@ const EDIT_HISTORY_DIFF_SIZE_LIMIT: usize = 2048 * 3; // ~2048 tokens or ~50% of
 const COLLABORATOR_EDIT_LOCALITY_CONTEXT_TOKENS: usize = 512;
 const GIT_CHANGED_FILE_SETS_COMMIT_LIMIT: usize = 100;
 const LAST_CHANGE_GROUPING_TIME: Duration = Duration::from_secs(1);
-const SIM_PREDICT_DATA_COLLECTION_CHOICE: &str = "sim_predict_data_collection_choice";
+const ZED_PREDICT_DATA_COLLECTION_CHOICE: &str = "zed_predict_data_collection_choice";
 const REJECT_REQUEST_DEBOUNCE: Duration = Duration::from_secs(15);
 const REQUEST_TIMEOUT_BACKOFF: Duration = Duration::from_secs(10);
 
@@ -620,7 +620,7 @@ impl PendingPredictionCapture {
     fn try_record_future_event(
         &mut self,
         last_event: &LastEvent,
-        finalisim_event: Option<&StoredEvent>,
+        finalized_event: Option<&StoredEvent>,
         license_detection_watchers: &HashMap<WorktreeId, Rc<LicenseDetectionWatcher>>,
         cx: &App,
     ) {
@@ -651,7 +651,7 @@ impl PendingPredictionCapture {
                 };
                 suffix.event
             }
-            None => match finalisim_event {
+            None => match finalized_event {
                 Some(event) => event.event.clone(),
                 None => return,
             },
@@ -1009,7 +1009,7 @@ impl EditPredictionStore {
             .log_err();
         });
 
-        let credentials_provider = sim_credentials_provider::global(cx);
+        let credentials_provider = zed_credentials_provider::global(cx);
 
         let this = Self {
             projects: HashMap::default(),
@@ -1040,10 +1040,10 @@ impl EditPredictionStore {
     }
 
     fn zeta2_raw_config_from_env() -> Option<Zeta2RawConfig> {
-        let version_str = env::var("SIM_ZETA_FORMAT").ok()?;
+        let version_str = env::var("ZED_ZETA_FORMAT").ok()?;
         let format = ZetaFormat::parse(&version_str).ok()?;
-        let model_id = env::var("SIM_ZETA_MODEL").ok();
-        let environment = env::var("SIM_ZETA_ENVIRONMENT").ok();
+        let model_id = env::var("ZED_ZETA_MODEL").ok();
+        let environment = env::var("ZED_ZETA_ENVIRONMENT").ok();
         Some(Zeta2RawConfig {
             model_id,
             environment,
@@ -1121,7 +1121,7 @@ impl EditPredictionStore {
                 .background_spawn(async move {
                     let organization_id =
                         organization_id.ok_or_else(|| anyhow!("No organization selected."))?;
-                    let url = client.http_client().build_sim_llm_url(
+                    let url = client.http_client().build_zed_llm_url(
                         "/edit_prediction_experiments",
                         &[("is_jumps_api", if is_jumps_api { "true" } else { "false" })],
                     )?;
@@ -1131,7 +1131,7 @@ impl EditPredictionStore {
                                 .method(Method::GET)
                                 .uri(url.as_ref())
                                 .header("Authorization", format!("Bearer {token}"))
-                                .header(SIM_VERSION_HEADER_NAME, app_version.to_string())
+                                .header(ZED_VERSION_HEADER_NAME, app_version.to_string())
                                 .body(Default::default())?)
                         })
                         .await?;
@@ -1892,7 +1892,7 @@ impl EditPredictionStore {
 
             let url = client
                 .http_client()
-                .build_sim_llm_url("/predict_edits/reject", &[])
+                .build_zed_llm_url("/predict_edits/reject", &[])
                 .unwrap();
 
             let flush_count = batched
@@ -2007,11 +2007,11 @@ impl EditPredictionStore {
                                 .collect::<String>();
                             let mut pending_capture =
                                 pending_prediction_captures.remove(pending_index);
-                            if let Some((last_event, finalisim_event)) = pending_last_event.as_ref()
+                            if let Some((last_event, finalized_event)) = pending_last_event.as_ref()
                             {
                                 pending_capture.try_record_future_event(
                                     last_event,
-                                    finalisim_event.as_ref(),
+                                    finalized_event.as_ref(),
                                     license_detection_watchers,
                                     cx,
                                 );
@@ -2333,7 +2333,7 @@ async fn send_settled_batches(
 ) {
     let Some(url) = client
         .http_client()
-        .build_sim_llm_url("/predict_edits/settled", &[])
+        .build_zed_llm_url("/predict_edits/settled", &[])
         .context("failed to build edit predictions settled url")
         .log_err()
     else {
@@ -2473,7 +2473,7 @@ fn currently_following(project: &Entity<Project>, cx: &App) -> bool {
 
 fn is_ep_store_provider(provider: EditPredictionProvider) -> bool {
     match provider {
-        EditPredictionProvider::Sim
+        EditPredictionProvider::Zed
         | EditPredictionProvider::Mercury
         | EditPredictionProvider::Ollama
         | EditPredictionProvider::OpenAiCompatibleApi => true,
@@ -2497,7 +2497,7 @@ impl EditPredictionStore {
     ) {
         let (needs_acceptance_tracking, max_pending_predictions) =
             match all_language_settings(None, cx).edit_predictions.provider {
-                EditPredictionProvider::Sim | EditPredictionProvider::Mercury => (true, 2),
+                EditPredictionProvider::Zed | EditPredictionProvider::Mercury => (true, 2),
                 EditPredictionProvider::Ollama => (false, 1),
                 EditPredictionProvider::OpenAiCompatibleApi => (false, 2),
                 EditPredictionProvider::None
@@ -2801,11 +2801,11 @@ impl EditPredictionStore {
             })
             .unwrap_or_default();
 
-        let is_staff_sim_repo = cx.is_staff()
+        let is_staff_zed_repo = cx.is_staff()
             && repository_url
                 .as_ref()
-                .is_some_and(|url| is_sim_industries_repo(url));
-        let is_open_source = is_staff_sim_repo
+                .is_some_and(|url| is_zed_industries_repo(url));
+        let is_open_source = is_staff_zed_repo
             || (snapshot
                 .file()
                 .map_or(false, |file| self.is_file_open_source(&project, file, cx))
@@ -2899,7 +2899,7 @@ impl EditPredictionStore {
         } else {
             client
                 .http_client()
-                .build_sim_llm_url("/predict_edits/raw", &[])?
+                .build_zed_llm_url("/predict_edits/raw", &[])?
         };
 
         Self::send_api_request(
@@ -2982,7 +2982,7 @@ impl EditPredictionStore {
         Req: serde::Serialize,
         Res: serde::de::DeserializeOwned,
     {
-        let url = client.http_client().build_sim_llm_url(path, &[])?;
+        let url = client.http_client().build_zed_llm_url(path, &[])?;
         let request_id = uuid::Uuid::new_v4().to_string();
 
         let json_bytes = serde_json::to_vec(&request)?;
@@ -3031,7 +3031,7 @@ impl EditPredictionStore {
                     http_client::Request::builder()
                         .method(Method::POST)
                         .header("Content-Type", "application/json")
-                        .header(SIM_VERSION_HEADER_NAME, app_version.to_string())
+                        .header(ZED_VERSION_HEADER_NAME, app_version.to_string())
                         .header("Authorization", format!("Bearer {token}")),
                 )
             })
@@ -3234,7 +3234,7 @@ impl EditPredictionStore {
 
     fn load_legacy_data_collection_enabled(cx: &App) -> bool {
         KeyValueStore::global(cx)
-            .read_kvp(SIM_PREDICT_DATA_COLLECTION_CHOICE)
+            .read_kvp(ZED_PREDICT_DATA_COLLECTION_CHOICE)
             .log_err()
             .flatten()
             .as_deref()
@@ -3441,7 +3441,7 @@ fn merge_anchor_ranges(
 
 #[derive(Error, Debug)]
 #[error(
-    "You must update to Sim version {minimum_version} or higher to continue using edit predictions."
+    "You must update to Zed version {minimum_version} or higher to continue using edit predictions."
 )]
 pub struct SimUpdateRequiredError {
     minimum_version: Version,
@@ -3454,13 +3454,13 @@ pub(crate) struct CloudRequestTimeoutError;
 struct SimPredictUpsell;
 
 fn is_upsell_dismissed(cx: &App) -> bool {
-    // To make this backwards compatible with older versions of Sim, we
+    // To make this backwards compatible with older versions of Zed, we
     // check if the user has seen the previous Edit Prediction Onboarding
     // before, by checking the data collection choice which was written to
     // the database once the user clicked on "Accept and Enable"
     let kvp = KeyValueStore::global(cx);
     if kvp
-        .read_kvp(SIM_PREDICT_DATA_COLLECTION_CHOICE)
+        .read_kvp(ZED_PREDICT_DATA_COLLECTION_CHOICE)
         .log_err()
         .is_some_and(|s| s.is_some())
     {
@@ -3487,7 +3487,7 @@ pub fn should_show_upsell_modal(cx: &App) -> bool {
 pub fn init(cx: &mut App) {
     cx.observe_new(move |workspace: &mut Workspace, _, _cx| {
         workspace.register_action(
-            move |workspace, _: &sim_actions::OpenSimPredictOnboarding, window, cx| {
+            move |workspace, _: &zed_actions::OpenSimPredictOnboarding, window, cx| {
                 SimPredictModal::toggle(
                     workspace,
                     workspace.user_store().clone(),
@@ -3533,7 +3533,7 @@ pub fn init(cx: &mut App) {
     .detach();
 }
 
-fn is_sim_industries_repo(url: &str) -> bool {
+fn is_zed_industries_repo(url: &str) -> bool {
     url.strip_prefix("https://github.com/simtropolis/")
         .or_else(|| url.strip_prefix("http://github.com/simtropolis/"))
         .or_else(|| url.strip_prefix("git@github.com:simtropolis/"))

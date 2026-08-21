@@ -2,7 +2,7 @@
 .target sm_52
 .address_size 64
 
-.visible .entry sim_cuda_add_f32(
+.visible .entry zed_cuda_add_f32(
     .param .u64 input_a,
     .param .u64 input_b,
     .param .u64 output,

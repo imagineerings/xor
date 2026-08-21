@@ -635,13 +635,13 @@ mod tests {
     }
 
     #[test]
-    fn test_mermaid_font_family_resolves_sim_virtual_fonts() {
+    fn test_mermaid_font_family_resolves_zed_virtual_fonts() {
         assert_eq!(
             super::mermaid_font_family(".SimSans"),
             "IBM Plex Sans, sans-serif"
         );
         assert_eq!(
-            super::mermaid_font_family("Sim Plex Sans"),
+            super::mermaid_font_family("Zed Plex Sans"),
             "IBM Plex Sans, sans-serif"
         );
         assert_eq!(super::mermaid_font_family(".SimMono"), "Lilex, sans-serif");

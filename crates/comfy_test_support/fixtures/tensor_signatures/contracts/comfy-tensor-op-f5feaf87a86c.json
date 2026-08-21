@@ -2288,7 +2288,7 @@
       "source_path": "comfy/ldm/depth_anything_3/reference_view_selector.py",
       "source_sha256": "24e9428a820b5287d622bc865d4fd6520486294c4337a28de71fca6ec62e0c29",
       "status": "static-call-observed",
-      "target_syntax": "sim_no_diag.sum"
+      "target_syntax": "zed_no_diag.sum"
     },
     {
       "catalog_field": "production_call_sites",

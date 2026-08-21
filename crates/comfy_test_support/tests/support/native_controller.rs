@@ -316,7 +316,7 @@ pub(crate) fn run_native_controller_e2e() -> Result<BTreeMap<&'static str, bool>
         true,
     );
 
-    initial_plan.extra_data.remove("sim_native_delay_millis");
+    initial_plan.extra_data.remove("zed_native_delay_millis");
     let completed_attempt = dispatch_assigned(
         &presentation,
         controller.as_ref(),
@@ -367,7 +367,7 @@ fn delayed_plan(prompt_id: PromptId) -> Result<comfy_runtime::CompiledPlan, Box<
     let mut plan = compile_native_image_workflow(WORKFLOW_FIXTURE, &BTreeSet::new())?;
     plan.prompt_id = prompt_id;
     plan.extra_data.insert(
-        "sim_native_delay_millis".to_owned(),
+        "zed_native_delay_millis".to_owned(),
         json!(EXECUTION_DELAY_MILLIS),
     );
     Ok(plan)
@@ -609,8 +609,8 @@ fn assert_typed_outputs(events: &[AttemptEvent]) -> Result<(), Box<dyn Error>> {
         .find(|output| output.storage_type.as_deref() == Some("output"))
         .ok_or("typed final output is absent")?;
     for (output, expected_node, expected_prefix) in [
-        (temporary, "4", "sim-asset://temp/"),
-        (final_output, "5", "sim-asset://output/"),
+        (temporary, "4", "zed-asset://temp/"),
+        (final_output, "5", "zed-asset://output/"),
     ] {
         assert_eq!(output.node_id.0, expected_node);
         assert_eq!(output.media_kind, OutputMediaKind::Image);

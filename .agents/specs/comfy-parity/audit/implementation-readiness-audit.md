@@ -65,7 +65,7 @@ Exit status: `0`.
 The prior ABI blockers are resolved:
 
 - First-party plugins have explicit `RustComfyPlugin` and `RustNodeInstance` source traits; no stable Rust dylib ABI is promised.
-- `sim:comfy-plugin@1.0.0` uses a host-owned invocation and explicit port IDs. `input-info` distinguishes absent optional input, present empty list, singular values, and non-empty lists.
+- `zed:comfy-plugin@1.0.0` uses a host-owned invocation and explicit port IDs. `input-info` distinguishes absent optional input, present empty list, singular values, and non-empty lists.
 - Indexed reads/takes and push-plus-finish writes cover scalar, tensor, artifact, and model values for required, optional, singular, and list cardinalities. Transfer, bounds, finish validation, use-after-take, cancellation, and terminal revocation are specified.
 - The canonical `namespace:name@major` type-ID registry fixes value family, wire schema, aliases, publisher namespace ownership, additive minor negotiation, major-version representation changes, and unknown-type placeholders.
 - Versioned bounded capabilities cover typed-root filesystem reads, network/provider calls, secrets, clocks, randomness, model handles, transactional outputs, sanitized logs, declarative UI state, and routes. Grants, bounds, quotas, redaction, idempotency, cancellation, rollback, and no-late-effect rules are explicit.
@@ -92,18 +92,18 @@ The reduced artifact is admitted only by test support with a production-detector
 - D27 fixes a per-backend binding/load strategy, ABI/SDK floor, supported targets, library discovery order, package payload/license/signature policy, and typed unavailable behavior for CUDA, ROCm, Metal, DirectML, XPU, NPU, MLU, and CoreX.
 - Each accelerator has a serialized ABI-foundation leaf owning its disjoint adapter source/build/ABI/package files and a generated symbol/signature/layout ledger before kernel implementation. Hardware certification cannot promote an unavailable or legally unverified backend.
 
-## Sim/GPUI repository fit
+## Zed/GPUI repository fit
 
-- Root workspace and `crates/sim/Cargo.toml` registration, descriptive crate roots, the separate worker binary, Sim CLI entry point, `sim.rs`, application menus, and later Desktop integration module all have explicit owners.
+- Root workspace and `crates/zed/Cargo.toml` registration, descriptive crate roots, the separate worker binary, Zed CLI entry point, `zed.rs`, application menus, and later Desktop integration module all have explicit owners.
 - The graph is a registered serializable workspace item. Queue/history/execution, assets, settings, operations, logs, viewers/editors, and lifecycle surfaces map to GPUI entities, dock panels, modals/popovers, application services, background tasks, or managed child processes.
-- Keymap assets are explicitly loaded through Sim initialization; action/menu registration and the production accessibility constructor path are tested.
+- Keymap assets are explicitly loaded through Zed initialization; action/menu registration and the production accessibility constructor path are tested.
 - Settings/default content and the central Settings Editor are updated through their existing crates. Runtime/profile/workflow/attempt/cache/journal persistence uses registered settings and DB domains with migrations and restart/crash tests.
 - Expensive parsing, indexing, hashing, layout, codec, model, and execution work stays off the GPUI foreground thread. Task handles/cancellation lifetimes and visible error propagation are explicit.
 - Numeric performance, responsiveness, cancellation, worker readiness, preview latency, and resource-convergence budgets are measurable and release-gated.
 
 ## Native-only boundary and retained gates
 
-Searches of the planning artifacts found no production Python/ComfyUI process, external-Comfy proxy, JavaScript/Node extension host, or browser execution fallback. Public HTTP/WebSocket and `sim comfy` are native projections over the same Rust services used by GPUI. Source applications remain development-only conformance oracles and release tests consume recorded fixtures without source trees or network access.
+Searches of the planning artifacts found no production Python/ComfyUI process, external-Comfy proxy, JavaScript/Node extension host, or browser execution fallback. Public HTTP/WebSocket and `zed comfy` are native projections over the same Rust services used by GPUI. Source applications remain development-only conformance oracles and release tests consume recorded fixtures without source trees or network access.
 
 The following are honest implementation/release gates rather than planning blockers:
 

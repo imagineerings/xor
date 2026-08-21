@@ -32,11 +32,11 @@ use wasmtime::{
 pub use latest::CodeLabelSpanLiteral;
 pub use latest::{
     CodeLabel, CodeLabelSpan, Command, DebugAdapterBinary, ExtensionProject, Range, SlashCommand,
-    sim::extension::context_server::ContextServerConfiguration,
-    sim::extension::lsp::{
+    zed::extension::context_server::ContextServerConfiguration,
+    zed::extension::lsp::{
         Completion, CompletionKind, CompletionLabelDetails, InsertTextFormat, Symbol, SymbolKind,
     },
-    sim::extension::slash_command::{SlashCommandArgumentCompletion, SlashCommandOutput},
+    zed::extension::slash_command::{SlashCommandArgumentCompletion, SlashCommandOutput},
 };
 pub use since_v0_0_4::LanguageServerConfig;
 
@@ -85,7 +85,7 @@ pub fn authorize_access_to_unreleased_wasm_api_version(
 
     anyhow::ensure!(
         allow_unreleased_version,
-        "unreleased versions of the extension API can only be used on development builds of Sim"
+        "unreleased versions of the extension API can only be used on development builds of Zed"
     );
 
     Ok(())

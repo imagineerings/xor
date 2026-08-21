@@ -1177,7 +1177,7 @@ mod tests {
 
     #[test]
     fn discovery_order_is_exact_and_deduplicated() {
-        let first = PathBuf::from("/opt/sim/ascend");
+        let first = PathBuf::from("/opt/zed/ascend");
         let second = PathBuf::from("/opt/vendor/ascend");
         let package = unsafe {
             SignedPackageRoot::from_runtime_verified_path(&(), second.clone())

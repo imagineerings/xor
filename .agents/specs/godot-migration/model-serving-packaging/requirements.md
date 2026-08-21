@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim should package world-model execution as diagnosable local, persistent, and remote worker modes without silently downloading large assets.
+Zed should package world-model execution as diagnosable local, persistent, and remote worker modes without silently downloading large assets.
 
 ### Requirement 1: Environment Diagnostics
 

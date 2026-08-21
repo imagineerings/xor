@@ -116,7 +116,7 @@ impl ConditioningIdentity {
 
     pub fn digest(&self) -> Result<String, ConditioningError> {
         let mut hasher = Sha256::new();
-        hasher.update(b"sim.comfy.conditioning-identity.v1");
+        hasher.update(b"zed.comfy.conditioning-identity.v1");
         hasher.update(CONDITIONING_SCHEMA_VERSION.to_le_bytes());
         hash_string(&mut hasher, &self.namespace)?;
         hash_string(&mut hasher, self.model_family.feature_id())?;

@@ -71,7 +71,7 @@ const HISTORY_PANEL_SOURCE: &str = include_str!("history_panel.rs");
 const OUTPUT_VIEW_SOURCE: &str = include_str!("output_view.rs");
 const GRAPH_RENDER_SOURCE: &str = include_str!("graph_render.rs");
 const WORKFLOW_ITEM_SOURCE: &str = include_str!("workflow_item.rs");
-const SIM_SOURCE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../sim/src/sim.rs"));
+const ZED_SOURCE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../zed/src/zed.rs"));
 const RUNTIME_PRESENTATION_SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../comfy_runtime/src/execution_presentation.rs"
@@ -214,7 +214,7 @@ const DEFAULT_COMFY_KEYMAP: &str = include_str!(concat!(
 ));
 const EXECUTION_LEDGER_GENERATOR: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../.agents/specs/comfy-parity/regenerate_native_sim_evidence.py"
+    "/../../.agents/specs/comfy-parity/regenerate_native_zed_evidence.py"
 ));
 
 struct ErrorOverlayProbe {
@@ -548,7 +548,7 @@ impl ExecutionOutputOperationHandler for RecordingOperationHandler {
                 reference: output
                     .view_reference
                     .clone()
-                    .unwrap_or_else(|| "sim-asset://output/recovered-output".to_owned()),
+                    .unwrap_or_else(|| "zed-asset://output/recovered-output".to_owned()),
                 byte_length: 1,
             },
             ExecutionOutputOperationAction::Remove => ExecutionOutputAvailability::Removed {
@@ -2466,7 +2466,7 @@ fn profile_bound_confirmation_fixture(
                         originating_attempt_id,
                         output_id,
                         "profile-bound-output.png",
-                        "sim-asset://output/profile-bound-output.png",
+                        "zed-asset://output/profile-bound-output.png",
                     ),
                 },
             ),
@@ -6305,10 +6305,10 @@ fn gpui_interaction_case(cx: &mut TestAppContext) -> Result<Value, String> {
     {
         return Err("graph node execution status projection is missing".to_owned());
     }
-    if !SIM_SOURCE.contains("comfy_ui::ExecutionPanel::load")
-        || !SIM_SOURCE.contains("workspace.add_panel(panel, window, cx)")
+    if !ZED_SOURCE.contains("comfy_ui::ExecutionPanel::load")
+        || !ZED_SOURCE.contains("workspace.add_panel(panel, window, cx)")
     {
-        return Err("Sim does not load and register the production execution panel".to_owned());
+        return Err("Zed does not load and register the production execution panel".to_owned());
     }
     let expected_runtime_components = execution_component_ids()
         .into_iter()
@@ -6364,7 +6364,7 @@ fn gpui_interaction_case(cx: &mut TestAppContext) -> Result<Value, String> {
         "rendered_data_sources": 3,
         "rendered_provider_states": 8,
         "rendered_unknown_states": 1,
-        "sim_production_panel_load_registered": true,
+        "zed_production_panel_load_registered": true,
         "runtime_component_evidence": rendered_component_evidence
             .values()
             .cloned()
@@ -6462,7 +6462,7 @@ fn write_artifact(cases: Vec<Value>) -> Result<(), Box<dyn Error>> {
             "output_view": digest(OUTPUT_VIEW_SOURCE),
             "graph_render": digest(GRAPH_RENDER_SOURCE),
             "workflow_item": digest(WORKFLOW_ITEM_SOURCE),
-            "sim": digest(SIM_SOURCE),
+            "zed": digest(ZED_SOURCE),
             "runtime_execution_presentation": digest(RUNTIME_PRESENTATION_SOURCE),
             "runtime_queue_history": digest(RUNTIME_QUEUE_HISTORY_SOURCE),
             "runtime_persistence": digest(RUNTIME_PERSISTENCE_SOURCE),
@@ -6955,7 +6955,7 @@ async fn native_image_ui_queues_projects_outputs_and_rejects_late_cancelled_outp
     );
 
     let first_output_id = identifier(0x1901);
-    let first_reference = "sim-asset://output/task19/native-image.png";
+    let first_reference = "zed-asset://output/task19/native-image.png";
     graph_window
         .background_executor
         .timer(Duration::from_millis(10))
@@ -7241,7 +7241,7 @@ async fn native_image_ui_queues_projects_outputs_and_rejects_late_cancelled_outp
                     second_attempt.attempt_id,
                     late_output_id,
                     "late-native-image.png",
-                    "sim-asset://output/task19/late-native-image.png",
+                    "zed-asset://output/task19/late-native-image.png",
                 ),
             },
         ))

@@ -50,7 +50,7 @@ workspace.workspace = true
 language.workspace = true
 language_tools = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
-sim_actions.workspace = true
+zed_actions.workspace = true
 serde_json = { workspace = true, optional = true }
 ui_input = { workspace = true, optional = true }
 

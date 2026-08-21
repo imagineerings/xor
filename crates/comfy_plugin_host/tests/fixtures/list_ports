@@ -1,4 +1,4 @@
-world=sim:comfy-plugin@1.0.0
+world=zed:comfy-plugin@1.0.0
 scalar-single-in|input|comfy:string@1|singular|required|visible|eager|inline|legacy_scalar
 scalar-single-out|output|comfy:string@1|singular|required|visible|eager|inline|
 scalar-list-in|input|comfy:string@1|list|optional|visible|lazy|inline|

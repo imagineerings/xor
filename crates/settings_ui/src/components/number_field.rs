@@ -15,7 +15,7 @@ use settings::{
     CenteredPaddingSettings, CodeFade, DelayMs, FontSize, FontWeightContent, InactiveOpacity,
     MinimumContrast,
 };
-use sim_actions::editor::{MoveDown, MoveUp};
+use zed_actions::editor::{MoveDown, MoveUp};
 use ui::prelude::*;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]

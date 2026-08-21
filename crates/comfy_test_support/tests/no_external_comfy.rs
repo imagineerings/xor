@@ -58,7 +58,7 @@ fn production_sources(workspace_root: &Path) -> Result<Vec<(String, String)>, Bo
         let crate_name = entry.file_name();
         let crate_name = crate_name.to_string_lossy();
         if (crate_name.starts_with("comfy_") && crate_name != "comfy_test_support")
-            || crate_name == "sim"
+            || crate_name == "zed"
         {
             let source_directory = entry.path().join("src");
             if source_directory.is_dir() {
@@ -133,7 +133,7 @@ fn val_e2e_001() -> Result<(), Box<dyn Error>> {
         credential: Some(credential_sentinel.into()),
         model_roots: vec!["models/checkpoints".into(), "/imported/models".into()],
         api_host_enabled: true,
-        plugin_mappings: vec!["LegacyNode=sim.native.LegacyNode".into()],
+        plugin_mappings: vec!["LegacyNode=zed.native.LegacyNode".into()],
         workflow_state: BTreeMap::from([(
             "workflow-a".into(),
             json!({
@@ -212,7 +212,7 @@ fn val_e2e_001() -> Result<(), Box<dyn Error>> {
                     String::from("/imported/models"),
                 ]
             && migration.inactive_legacy_profile.plugin_mappings
-                == vec![String::from("LegacyNode=sim.native.LegacyNode")]
+                == vec![String::from("LegacyNode=zed.native.LegacyNode")]
             && migration
                 .inactive_legacy_profile
                 .unknown_fields

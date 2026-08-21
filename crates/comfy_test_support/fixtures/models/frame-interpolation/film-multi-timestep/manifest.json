@@ -1,5 +1,5 @@
 {
-  "artifact": "sim-native-film-multi-timestep-v1",
+  "artifact": "zed-native-film-multi-timestep-v1",
   "evidence_kind": "source-fingerprinted reduced exact-weight pair synthesis plus production retained orchestration",
   "source": {
     "repository": "ComfyUI",

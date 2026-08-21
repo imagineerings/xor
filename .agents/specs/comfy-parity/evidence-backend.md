@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-This report covers the Python ComfyUI execution engine, registered built-in and hosted API nodes, HTTP and WebSocket protocols, queue/history/jobs, model and device registries, persisted formats, custom-node and public extension contracts, configuration, and security boundaries in `projects/comfy/ComfyUI`. It is supporting evidence for the shared parity specification; it does not select the final Sim architecture or implement any behavior.
+This report covers the Python ComfyUI execution engine, registered built-in and hosted API nodes, HTTP and WebSocket protocols, queue/history/jobs, model and device registries, persisted formats, custom-node and public extension contracts, configuration, and security boundaries in `projects/comfy/ComfyUI`. It is supporting evidence for the shared parity specification; it does not select the final Zed architecture or implement any behavior.
 
 The effective static registries for this source snapshot are reconciled in [`catalogs/backend-reconciliation.json`](catalogs/backend-reconciliation.json). Capabilities that could not be exercised are retained as `code-inferred`, `documented-only`, or `uncertain`, rather than being treated as runtime-confirmed.
 
@@ -24,7 +24,7 @@ The all-file fingerprint is deterministic for this tree: enumerate regular files
 
 ## Discovery and evidence method
 
-The inventory was derived from executable entry points, AST evaluation of registration mappings and schema methods, route decorators, OpenAPI operations, WebSocket send sites and tests, CLI parser declarations, environment reads, model/device registries, Alembic migrations, typed schemas, persistence code, extension loading, and existing tests. Registration expressions were resolved through imports, inheritance, comprehensions, dictionary expansion, and V3 extension providers. Each catalog row preserves source file, symbol, line, evidence level, availability, Sim status, gap, and test evidence where applicable.
+The inventory was derived from executable entry points, AST evaluation of registration mappings and schema methods, route decorators, OpenAPI operations, WebSocket send sites and tests, CLI parser declarations, environment reads, model/device registries, Alembic migrations, typed schemas, persistence code, extension loading, and existing tests. Registration expressions were resolved through imports, inheritance, comprehensions, dictionary expansion, and V3 extension providers. Each catalog row preserves source file, symbol, line, evidence level, availability, Zed status, gap, and test evidence where applicable.
 
 Evidence labels have their shared meanings: `observed` is direct execution, `test-backed` is demonstrated by an existing test, `code-inferred` is supported by executable source without runtime confirmation, `documented-only` is present only in a declarative API document, and `unverified`/`uncertain` preserves insufficient evidence. A test was used as backing only when its body or parametrization directly exercises the cataloged behavior; discovery of a test name alone did not upgrade evidence.
 

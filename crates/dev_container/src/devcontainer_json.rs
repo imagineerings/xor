@@ -128,7 +128,7 @@ impl std::fmt::Display for FeatureOptionValue {
 
 #[derive(Clone, Debug, Serialize, Eq, PartialEq, Default)]
 pub(crate) struct SimCustomizationsWrapper {
-    pub(crate) sim: SimCustomization,
+    pub(crate) zed: SimCustomization,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq, Default)]
@@ -306,7 +306,7 @@ impl DevContainer {
 }
 
 // Custom deserializer that parses the entire customizations object as a
-// serde_json_lenient::Value first, then extracts the "sim" portion.
+// serde_json_lenient::Value first, then extracts the "zed" portion.
 // This avoids a bug in serde_json_lenient's `ignore_value` codepath which
 // does not handle trailing commas in skipped values.
 impl<'de> Deserialize<'de> for SimCustomizationsWrapper {
@@ -315,13 +315,13 @@ impl<'de> Deserialize<'de> for SimCustomizationsWrapper {
         D: Deserializer<'de>,
     {
         let value = Value::deserialize(deserializer)?;
-        let sim = value
-            .get("sim")
-            .map(|sim_value| serde_json_lenient::from_value::<SimCustomization>(sim_value.clone()))
+        let zed = value
+            .get("zed")
+            .map(|zed_value| serde_json_lenient::from_value::<SimCustomization>(zed_value.clone()))
             .transpose()
             .map_err(serde::de::Error::custom)?
             .unwrap_or_default();
-        Ok(SimCustomizationsWrapper { sim })
+        Ok(SimCustomizationsWrapper { zed })
     }
 }
 
@@ -646,7 +646,7 @@ mod test {
                       "GitHub.vscode-pull-request-github",
                     ],
                   },
-                  "sim": {
+                  "zed": {
                     "extensions": ["vue", "ruby"],
                   },
                   "codespaces": {
@@ -674,7 +674,7 @@ mod test {
         assert_eq!(
             devcontainer.customizations,
             Some(SimCustomizationsWrapper {
-                sim: SimCustomization {
+                zed: SimCustomization {
                     extensions: vec!["vue".to_string(), "ruby".to_string()]
                 }
             })
@@ -682,7 +682,7 @@ mod test {
     }
 
     #[test]
-    fn should_deserialize_customizations_without_sim_key() {
+    fn should_deserialize_customizations_without_zed_key() {
         let json_without_zed = r#"
             {
                 "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
@@ -698,14 +698,14 @@ mod test {
 
         assert!(
             result.is_ok(),
-            "Should handle missing sim key in customizations, but got: {:?}",
+            "Should handle missing zed key in customizations, but got: {:?}",
             result.err()
         );
         let devcontainer = result.expect("ok");
         assert_eq!(
             devcontainer.customizations,
             Some(SimCustomizationsWrapper {
-                sim: SimCustomization { extensions: vec![] }
+                zed: SimCustomization { extensions: vec![] }
             })
         );
     }
@@ -815,7 +815,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "sim": {
+                    "zed": {
                         "extensions": [
                             "html"
                         ]
@@ -948,7 +948,7 @@ mod test {
                     mount_type: Some("bind".to_string())
                 }),
                 customizations: Some(SimCustomizationsWrapper {
-                    sim: SimCustomization {
+                    zed: SimCustomization {
                         extensions: vec!["html".to_string()]
                     }
                 }),
@@ -1591,7 +1591,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "sim": {
+                    "zed": {
                         "extensions": [
                             "html"
                         ]
@@ -1629,7 +1629,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "sim": {
+                    "zed": {
                         "extensions": [
                             "html"
                         ]
@@ -1666,7 +1666,7 @@ mod test {
                     "vscode": {
                         // Just confirm that this can be included and ignored
                     },
-                    "sim": {
+                    "zed": {
                         "extensions": [
                             "html"
                         ]

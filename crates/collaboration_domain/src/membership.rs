@@ -471,7 +471,7 @@ mod tests {
         community_id: CommunityId,
         actor_principal_id: PrincipalId,
     ) -> crate::AuthenticatedPrincipal {
-        crate::AuthenticatedPrincipal::sim_account(
+        crate::AuthenticatedPrincipal::zed_account(
             actor_principal_id,
             community_id,
             ServiceAccountId::new(1),
@@ -753,7 +753,7 @@ mod tests {
         let current = membership.fields().version;
         let read_scope = AuthorizationScope::new("messages:read").expect("read scope");
         let target_scopes = PrincipalScopes::new([read_scope.clone()]).expect("target scopes");
-        let target_principal = crate::AuthenticatedPrincipal::sim_account(
+        let target_principal = crate::AuthenticatedPrincipal::zed_account(
             target,
             community_id,
             ServiceAccountId::new(2),

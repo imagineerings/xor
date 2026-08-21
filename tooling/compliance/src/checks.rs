@@ -4,7 +4,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 
 use crate::{
-    git::{AutomatedChangeKind, CommitDetails, CommitList, SIM_ZIPPY_LOGIN},
+    git::{AutomatedChangeKind, CommitDetails, CommitList, ZED_ZIPPY_LOGIN},
     github::{
         Approvable, CommitAuthor, CommitFileChange, CommitMetadata, GithubApiClient, GithubLogin,
         PullRequestComment, PullRequestData, PullRequestReview, Repository, ReviewState,
@@ -12,8 +12,8 @@ use crate::{
     report::{Report, ReportEntry},
 };
 
-const SIM_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@sim-zippy approve";
-const SIM_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
+const ZED_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@zed-zippy approve";
+const ZED_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
 
 #[derive(Debug)]
 pub enum ReviewSuccess {
@@ -82,7 +82,7 @@ impl fmt::Display for ReviewFailure {
             Self::Unreviewed => formatter
                 .write_str("No qualifying organization approval found for the pull request"),
             Self::UnexpectedZippyAction(failure) => {
-                write!(formatter, "Validating Sim Zippy change failed: {failure}")
+                write!(formatter, "Validating Zed Zippy change failed: {failure}")
             }
             Self::Other(error) => write!(formatter, "Failed to inspect review state: {error}"),
         }
@@ -212,7 +212,7 @@ impl Reporter {
         commit: &CommitDetails,
     ) -> Result<ReviewSuccess, ReviewFailure> {
         let Some(pr_number) = commit.pr_number() else {
-            if commit.author().is_sim_zippy() {
+            if commit.author().is_zed_zippy() {
                 return self.check_zippy_automated_change(commit).await;
             } else {
                 return Err(ReviewFailure::NoPullRequestFound);
@@ -221,7 +221,7 @@ impl Reporter {
 
         let pull_request = self
             .github_client
-            .get_pull_request(&Repository::SIM, pr_number)
+            .get_pull_request(&Repository::ZED, pr_number)
             .await?;
 
         if let Some(approval) = self
@@ -258,7 +258,7 @@ impl Reporter {
 
         let commit_data = self
             .github_client
-            .get_commit_metadata(&Repository::SIM, &[commit.sha()])
+            .get_commit_metadata(&Repository::ZED, &[commit.sha()])
             .await?;
 
         let metadata =
@@ -271,7 +271,7 @@ impl Reporter {
         if !metadata
             .primary_author()
             .user()
-            .is_some_and(|login| login.as_str() == SIM_ZIPPY_LOGIN)
+            .is_some_and(|login| login.as_str() == ZED_ZIPPY_LOGIN)
         {
             return Err(ReviewFailure::UnexpectedZippyAction(
                 AutomatedChangeFailure::AuthorMismatch,
@@ -298,7 +298,7 @@ impl Reporter {
 
         let files = self
             .github_client
-            .get_commit_files(&Repository::SIM, commit.sha())
+            .get_commit_files(&Repository::ZED, commit.sha())
             .await?;
 
         change_kind
@@ -318,7 +318,7 @@ impl Reporter {
         if commit.co_authors().is_some()
             && let Some(commit_authors) = self
                 .github_client
-                .get_commit_metadata(&Repository::SIM, &[commit.sha()])
+                .get_commit_metadata(&Repository::ZED, &[commit.sha()])
                 .await?
                 .get(commit.sha())
                 .and_then(|authors| authors.co_authors())
@@ -328,7 +328,7 @@ impl Reporter {
                 if let Some(github_login) = co_author.user()
                     && self
                         .github_client
-                        .check_repo_write_permission(&Repository::SIM, github_login)
+                        .check_repo_write_permission(&Repository::ZED, github_login)
                         .await?
                 {
                     org_co_authors.push(co_author.clone());
@@ -350,7 +350,7 @@ impl Reporter {
     ) -> Result<Option<ReviewSuccess>, ReviewFailure> {
         let reviews = self
             .github_client
-            .get_pull_request_reviews(&Repository::SIM, pull_request.number)
+            .get_pull_request_reviews(&Repository::ZED, pull_request.number)
             .await?;
 
         let qualifying_reviews = reviews
@@ -370,7 +370,7 @@ impl Reporter {
     ) -> Result<Option<ReviewSuccess>, ReviewFailure> {
         let comments = self
             .github_client
-            .get_pull_request_comments(&Repository::SIM, pull_request.number)
+            .get_pull_request_comments(&Repository::ZED, pull_request.number)
             .await?;
 
         let qualifying_comments = comments
@@ -407,7 +407,7 @@ impl Reporter {
     }
 
     fn contains_approving_pattern(body: &str) -> bool {
-        body.contains(SIM_ZIPPY_COMMENT_APPROVAL_PATTERN) || body.contains(SIM_ZIPPY_GROUP_APPROVAL)
+        body.contains(ZED_ZIPPY_COMMENT_APPROVAL_PATTERN) || body.contains(ZED_ZIPPY_GROUP_APPROVAL)
     }
 
     pub async fn generate_report(mut self, max_concurrent_checks: usize) -> Report {
@@ -450,7 +450,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::git::{
-        AutomatedChangeKind, CommitDetails, CommitList, CommitSha, SIM_ZIPPY_EMAIL, SIM_ZIPPY_LOGIN,
+        AutomatedChangeKind, CommitDetails, CommitList, CommitSha, ZED_ZIPPY_EMAIL, ZED_ZIPPY_LOGIN,
     };
     use crate::github::{
         AuthorAssociation, CommitFileChange, CommitMetadataBySha, GithubApiClient, GithubLogin,
@@ -605,9 +605,9 @@ mod tests {
 
     fn zippy_author() -> serde_json::Value {
         serde_json::json!({
-            "name": "Sim Zippy",
-            "email": SIM_ZIPPY_EMAIL,
-            "user": { "login": SIM_ZIPPY_LOGIN }
+            "name": "Zed Zippy",
+            "email": ZED_ZIPPY_EMAIL,
+            "user": { "login": ZED_ZIPPY_LOGIN }
         })
     }
 
@@ -698,7 +698,7 @@ mod tests {
                         "authors": { "nodes": [] },
                         "signature": {
                             "isValid": true,
-                            "signer": { "login": SIM_ZIPPY_LOGIN }
+                            "signer": { "login": ZED_ZIPPY_LOGIN }
                         },
                         "additions": 2,
                         "deletions": 2
@@ -709,14 +709,14 @@ mod tests {
                         filename: "Cargo.lock".to_owned(),
                     },
                     CommitFileChange {
-                        filename: "crates/sim/Cargo.toml".to_owned(),
+                        filename: "crates/zed/Cargo.toml".to_owned(),
                     },
                 ],
                 org_members: vec![],
                 commit: make_commit(
                     "abc12345abc12345",
-                    "Sim Zippy",
-                    SIM_ZIPPY_EMAIL,
+                    "Zed Zippy",
+                    ZED_ZIPPY_EMAIL,
                     "Bump to 0.230.2 for @cole-miller",
                     "",
                 ),
@@ -739,20 +739,20 @@ mod tests {
                         "authors": { "nodes": [] },
                         "signature": {
                             "isValid": true,
-                            "signer": { "login": SIM_ZIPPY_LOGIN }
+                            "signer": { "login": ZED_ZIPPY_LOGIN }
                         },
                         "additions": 1,
                         "deletions": 1
                     }
                 }),
                 commit_files: vec![CommitFileChange {
-                    filename: "crates/sim/RELEASE_CHANNEL".to_owned(),
+                    filename: "crates/zed/RELEASE_CHANNEL".to_owned(),
                 }],
                 org_members: vec![],
                 commit: make_commit(
                     "abc12345abc12345",
-                    "Sim Zippy",
-                    SIM_ZIPPY_EMAIL,
+                    "Zed Zippy",
+                    ZED_ZIPPY_EMAIL,
                     "v0.233.x stable for @cole-miller",
                     "",
                 ),
@@ -831,7 +831,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "alice",
-                "@sim-zippy approve",
+                "@zed-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -844,7 +844,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@sim-zippy approve",
+                "@zed-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -903,7 +903,7 @@ mod tests {
             )])
             .with_comments(vec![comment(
                 "charlie",
-                "@sim-zippy approve",
+                "@zed-zippy approve",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -916,7 +916,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@sim-zippy approve",
+                "@zed-zippy approve",
                 AuthorAssociation::Member,
             )])
             .with_commit_metadata_json(serde_json::json!({
@@ -970,7 +970,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@sim-zippy approve"),
+                    .with_body("@zed-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1006,7 +1006,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::None)
-                    .with_body("@sim-zippy approve"),
+                    .with_body("@zed-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1018,7 +1018,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("alice", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@sim-zippy approve"),
+                    .with_body("@zed-zippy approve"),
             ])
             .run_scenario()
             .await;
@@ -1045,8 +1045,8 @@ mod tests {
         let result = TestScenario::zippy_version_bump()
             .with_commit(make_commit(
                 "abc12345abc12345",
-                "Sim Zippy",
-                SIM_ZIPPY_EMAIL,
+                "Zed Zippy",
+                ZED_ZIPPY_EMAIL,
                 "Bump to 0.230.2",
                 "",
             ))
@@ -1090,7 +1090,7 @@ mod tests {
                     "authors": { "nodes": [] },
                     "signature": {
                         "isValid": false,
-                        "signer": { "login": SIM_ZIPPY_LOGIN }
+                        "signer": { "login": ZED_ZIPPY_LOGIN }
                     },
                     "additions": 2,
                     "deletions": 2
@@ -1115,7 +1115,7 @@ mod tests {
                     "authors": { "nodes": [] },
                     "signature": {
                         "isValid": true,
-                        "signer": { "login": SIM_ZIPPY_LOGIN }
+                        "signer": { "login": ZED_ZIPPY_LOGIN }
                     },
                     "additions": 5,
                     "deletions": 2
@@ -1165,7 +1165,7 @@ mod tests {
                     "authors": { "nodes": [alice_author()] },
                     "signature": {
                         "isValid": true,
-                        "signer": { "login": SIM_ZIPPY_LOGIN }
+                        "signer": { "login": ZED_ZIPPY_LOGIN }
                     },
                     "additions": 2,
                     "deletions": 2
@@ -1184,7 +1184,7 @@ mod tests {
     #[tokio::test]
     async fn zippy_version_bump_with_wrong_files_fails() {
         let result = TestScenario::zippy_version_bump()
-            .with_commit_files(vec!["crates/sim/RELEASE_CHANNEL"])
+            .with_commit_files(vec!["crates/zed/RELEASE_CHANNEL"])
             .run_scenario()
             .await;
         assert!(matches!(
@@ -1232,8 +1232,8 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_commit(make_commit(
                 "abc12345abc12345",
-                "Sim Zippy",
-                SIM_ZIPPY_EMAIL,
+                "Zed Zippy",
+                ZED_ZIPPY_EMAIL,
                 "Some change (#1234)",
                 "",
             ))

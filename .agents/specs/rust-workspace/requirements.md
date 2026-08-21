@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This specification consolidates Sim's implemented Cargo workspace tool window with the next Rust workspace capabilities: richer project configuration, contextual Cargo actions, reusable execution presets, structured execution results, and a Rust test explorer. It translates the source material in `new-requirements/` from historical Zed terminology into the current Sim architecture and treats `tool-window/` as an implemented baseline rather than a greenfield plan.
+This specification consolidates Zed's implemented Cargo workspace tool window with the next Rust workspace capabilities: richer project configuration, contextual Cargo actions, reusable execution presets, structured execution results, and a Rust test explorer. It translates the source material in `new-requirements/` from historical Zed terminology into the current Zed architecture and treats `tool-window/` as an implemented baseline rather than a greenfield plan.
 
 The specification was audited against the repository at commit `58c21883` on 2026-08-14. The three documents in this directory are self-contained; the source folders remain research and provenance only.
 
@@ -19,7 +19,7 @@ The checkout already contains the following behavior:
 - `language_tools::language_tool_tree` is a Cargo-agnostic, virtualized tree host with opaque node identities, selection, expansion, focus, keyboard navigation, refresh generations, stale/error states, accessibility roles, and large-tree tests.
 - `project::cargo_workspace` and `CargoWorkspaceStore`, behind `project/cargo-workspace`, discover visible Cargo manifests and collect format-version-1 Cargo metadata on the authoritative project host. The typed snapshot covers workspaces, packages, targets, defined and resolved features, direct dependencies, navigation paths, candidate failures, revisions, and completeness.
 - `cargo_ui` projects that snapshot into the dedicated dockable **Cargo** panel, with lazy activation, refresh/expand/collapse controls, navigation, stable tree state, read-only context menus, settings, and partial/stale states.
-- `sim/rust-tools` optionally selects `cargo_ui`; `remote_server/rust-tools` selects host-side Cargo workspace support. Disabled graphs exclude `cargo_ui` and `cargo_metadata`, and Cargo registration and execution paths are conditionally compiled.
+- `zed/rust-tools` optionally selects `cargo_ui`; `remote_server/rust-tools` selects host-side Cargo workspace support. Disabled graphs exclude `cargo_ui` and `cargo_metadata`, and Cargo registration and execution paths are conditionally compiled.
 - The Cargo metadata store uses the project environment, trust state, remote project host, bounded typed protocol, cancellation, and privacy filtering. It is not a general Cargo command runner.
 - Rust task templates and rust-analyzer runnables already resolve through `TaskTemplate`, `TaskContext`, `TaskStore`, `Workspace::schedule_task`, terminals, and task history. Cargo debug builds already resolve through `DebugScenario`, the Cargo debugger locator, and DAP.
 
@@ -76,7 +76,7 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 
 #### Acceptance criteria
 
-1. **1.1** WHERE `rust-tools` is enabled and a supported project contains visible Cargo manifests, THE system SHALL expose a dockable panel titled `Cargo` through Sim's existing panel, settings, menu, persistence, and focus systems.
+1. **1.1** WHERE `rust-tools` is enabled and a supported project contains visible Cargo manifests, THE system SHALL expose a dockable panel titled `Cargo` through Zed's existing panel, settings, menu, persistence, and focus systems.
 2. **1.2** WHEN the Cargo panel is first activated, THE system SHALL lazily request the authoritative Cargo snapshot and SHALL NOT collect Cargo metadata merely because an unopened workspace window exists.
 3. **1.3** WHEN visible worktrees contain virtual workspaces, ordinary workspaces, standalone packages, nested manifests, or multiple independent roots, THE authoritative host SHALL discover them deterministically, deduplicate covered members, and retain candidate-scoped failures as partial results.
 4. **1.4** WHEN Cargo metadata is converted, THE model SHALL represent packages, libraries, binaries, examples, tests, benches, build scripts, defined features, resolved enabled features, and finite direct dependency declarations with the source and dependency distinctions already supported by `cargo_workspace`.
@@ -109,7 +109,7 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 
 1. **3.1** THE system SHALL support ephemeral presets and named user- and project-scoped Cargo presets containing a Cargo subcommand, workspace/package scope, target selector, profile, features, default-feature policy, target triple, additional argument arrays, working-directory policy, and environment-key/value overrides.
 2. **3.2** WHEN user and project presets have the same stable identifier, THE project preset SHALL override the user preset for that project; invalid presets SHALL be isolated and surfaced without preventing valid presets from loading.
-3. **3.3** THE system SHALL persist user and project presets through Sim's existing settings scope and trust behavior and SHALL persist only an active preset identifier and non-secret selection state in workspace persistence.
+3. **3.3** THE system SHALL persist user and project presets through Zed's existing settings scope and trust behavior and SHALL persist only an active preset identifier and non-secret selection state in workspace persistence.
 4. **3.4** WHEN a preset is executed, THE Cargo adapter SHALL compile it into an ordinary `TaskTemplate` plus `TaskContext` and call the existing workspace task scheduler, so save policy, shell/environment resolution, remote execution, terminal presentation, concurrency, cancellation, history, and rerun behavior remain owned by Tasks and terminals.
 5. **3.5** WHEN a preset is debugged and the selected target is debuggable, THE Cargo adapter SHALL compile it into an existing `DebugScenario`/Cargo build task and start it through the existing debugger provider and DAP locator; it SHALL NOT launch or speak DAP itself.
 6. **3.6** WHEN the selection represents an applicable package, binary, example, test, bench, or workspace scope, THE Cargo panel SHALL offer only contextually valid Build, Check, Run, Test, Bench, and Debug actions, with unavailable actions disabled or omitted and an accessible reason.
@@ -131,7 +131,7 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 5. **4.5** WHEN a structured execution task is scheduled, THE generic task bridge SHALL expose lifecycle completion and cancellation to the result adapter while preserving the ordinary terminal task, task history, and user-visible output.
 6. **4.6** THE generic results UI SHALL provide a dockable panel titled `Tests` with provider/suite/test hierarchy, filtering by status or text, keyboard and accessible tree interaction, run/cancel/rerun-failed controls, summaries, failure navigation, and links to the owning task terminal.
 7. **4.7** WHEN no structured provider is available, data is loading, results are empty, discovery is partial/stale, execution fails, or a host is incompatible, THE Tests panel SHALL show a distinct actionable state and SHALL NOT infer success from absent data.
-8. **4.8** THE structured result types, protocol, store, task bridge, and tree projection SHALL be usable by a future in-tree non-Rust provider without depending on `cargo_ui`, `cargo_metadata`, or Cargo/Rust domain types, and SHALL remain an internal Sim contract rather than a public extension API.
+8. **4.8** THE structured result types, protocol, store, task bridge, and tree projection SHALL be usable by a future in-tree non-Rust provider without depending on `cargo_ui`, `cargo_metadata`, or Cargo/Rust domain types, and SHALL remain an internal Zed contract rather than a public extension API.
 
 ### Requirement 5: Provide a Rust test provider and explorer [Required change]
 
@@ -159,7 +159,7 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 
 1. **6.1** WHEN the project is local, all Cargo model probes, test discovery, and user-invoked tasks SHALL use the existing local project environment and worktree/trust boundaries.
 2. **6.2** WHEN the project is hosted by `remote_server`, SSH, or another supported remote mode, Cargo model probes and test discovery SHALL execute on that authoritative host and user actions SHALL use existing remote Tasks/DAP; THE client SHALL NOT execute against a mirrored local path.
-3. **6.3** WHERE WSL or dev-container projects are represented by Sim's existing remote/project-environment mechanisms, THE Rust workspace SHALL use those mechanisms without a provider-specific local-filesystem execution path; unsupported modes SHALL be labeled explicitly.
+3. **6.3** WHERE WSL or dev-container projects are represented by Zed's existing remote/project-environment mechanisms, THE Rust workspace SHALL use those mechanisms without a provider-specific local-filesystem execution path; unsupported modes SHALL be labeled explicitly.
 4. **6.4** WHEN a multiplayer guest views a shared project, THE host SHALL filter snapshots and structured results to worktrees visible to that peer and SHALL reject guest execution where existing Tasks/DAP policy disallows it.
 5. **6.5** WHEN client and host capabilities or protocol versions differ, THE UI SHALL show an actionable feature-mismatch state, avoid retry loops, preserve unrelated editor functionality, and SHALL NOT downgrade to unsafe local execution.
 6. **6.6** THE remote protocol SHALL carry stable IDs, bounded status/configuration/result fields, and visible `ProjectPath` values only; it SHALL NOT carry absolute host paths, environment values, raw Cargo metadata, terminal streams, or unbounded diagnostics.
@@ -184,12 +184,12 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 
 ### Requirement 8: Preserve the `rust-tools` build boundary [Compatibility and required change]
 
-**User story:** As a Sim distributor, I want Rust workspace tooling to remain optional without claiming all existing Rust language support is optional.
+**User story:** As a Zed distributor, I want Rust workspace tooling to remain optional without claiming all existing Rust language support is optional.
 
 #### Acceptance criteria
 
-1. **8.1** WHERE `sim/rust-tools` is enabled, THE build SHALL include and initialize the Cargo panel, Cargo presets/actions, structured Tests panel, Rust test provider, and their settings/menu registrations.
-2. **8.2** WHERE `sim/rust-tools` is disabled, THE build SHALL register none of those Cargo/Rust workspace UI elements, settings, actions, context keys, menus, providers, stores, or request handlers and SHALL execute no Cargo workspace/configuration or Rust test-discovery command on their behalf.
+1. **8.1** WHERE `zed/rust-tools` is enabled, THE build SHALL include and initialize the Cargo panel, Cargo presets/actions, structured Tests panel, Rust test provider, and their settings/menu registrations.
+2. **8.2** WHERE `zed/rust-tools` is disabled, THE build SHALL register none of those Cargo/Rust workspace UI elements, settings, actions, context keys, menus, providers, stores, or request handlers and SHALL execute no Cargo workspace/configuration or Rust test-discovery command on their behalf.
 3. **8.3** WHERE the corresponding project features are disabled, THE selected normal dependency graph SHALL exclude `cargo_metadata`, `cargo_ui`, and every dependency introduced solely for Cargo workspace or Rust test tooling.
 4. **8.4** THE generic `language_tools` tree host and generic structured-result contract SHALL have no dependency on `cargo_ui`, `cargo_metadata`, `project::cargo_workspace`, or Rust test provider types.
 5. **8.5** WHERE `remote_server/rust-tools` is enabled or disabled, THE headless build SHALL respectively include or exclude the Cargo configuration/test provider stores and request handlers in parity with the desktop capability.
@@ -214,9 +214,9 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 
 ## Open questions
 
-### OQ1: Should project presets live in `.sim/settings.json` or a dedicated Cargo preset file?
+### OQ1: Should project presets live in `.zed/settings.json` or a dedicated Cargo preset file?
 
-**Recommended default:** Store `cargo.presets` in existing user and project settings (`settings.json` and `.sim/settings.json`) for Now, because Settings already provides precedence, remote synchronization, trust gating, schemas, and edit surfaces. Persist only the active preset ID in workspace persistence. A dedicated file would add another watcher, schema, migration, and trust surface without replacing Tasks.
+**Recommended default:** Store `cargo.presets` in existing user and project settings (`settings.json` and `.zed/settings.json`) for Now, because Settings already provides precedence, remote synchronization, trust gating, schemas, and edit surfaces. Persist only the active preset ID in workspace persistence. A dedicated file would add another watcher, schema, migration, and trust surface without replacing Tasks.
 
 **Work affected:** The preset schema/storage task and documentation. The runtime preset-to-Task/DAP contract is unaffected.
 
@@ -234,4 +234,4 @@ The checkout does **not** yet provide Cargo profiles, declared/effective toolcha
 - Cargo model/store: `cargo_workspace` and `CargoWorkspaceStore`.
 - Cargo panel/preset adapter: `cargo_ui`.
 - Recommended new descriptive modules: `structured_execution`, `test_explorer`, and `rust_test_provider`.
-- **Metal Rust** is acceptable product/distribution branding. If an umbrella crate is ever justified, `metal_rust` is acceptable only with documentation distinguishing it from Sim's Apple Metal GPU features/modules. This specification does not add such a crate.
+- **Metal Rust** is acceptable product/distribution branding. If an umbrella crate is ever justified, `metal_rust` is acceptable only with documentation distinguishing it from Zed's Apple Metal GPU features/modules. This specification does not add such a crate.

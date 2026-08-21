@@ -191,7 +191,7 @@ fn manifest(component_digest: String) -> Result<PluginManifest, Box<dyn Error>> 
         },
         provenance: ManifestProvenance {
             source: "fixture://test.echo-plugin".to_owned(),
-            publisher: "Sim test publisher".to_owned(),
+            publisher: "Zed test publisher".to_owned(),
             registry: Some("fixture://signed-registry".to_owned()),
         },
         provider_binding: None,
@@ -269,21 +269,21 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
     )?;
     let mut provider_binding = ProviderBindingSet {
         schema_version: PROVIDER_BINDING_SCHEMA_VERSION,
-        implementation_namespace: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
         bindings_sha256: "0".repeat(64),
         bindings: vec![ProviderBindingClaim {
             feature_id: "COMFY-NODE-0141".to_owned(),
             node_id: "ElevenLabsAudioIsolation".to_owned(),
             contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
                 .to_owned(),
-            transport_schema: "sim:comfy-provider-transport@1".parse()?,
-            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+            transport_schema: "zed:comfy-provider-transport@1".parse()?,
+            materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
         }],
     };
     provider_binding.bindings_sha256 = provider_binding.canonical_bindings_sha256()?;
     Ok(PluginManifest {
         schema_version: 1,
-        identifier: "sim.comfy.provider.comfy-node-0141".to_owned(),
+        identifier: "zed.comfy.provider.comfy-node-0141".to_owned(),
         plugin_version: ApiVersion::new(1, 0, 0),
         api: ApiRequirement {
             major: 1,
@@ -299,7 +299,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         },
         provenance: ManifestProvenance {
             source: "fixture://test.provider-plugin".to_owned(),
-            publisher: "Sim provider fixture".to_owned(),
+            publisher: "Zed provider fixture".to_owned(),
             registry: Some("fixture://signed-registry".to_owned()),
         },
         provider_binding: Some(provider_binding),
@@ -722,7 +722,7 @@ impl PluginCapabilityServices for TestPluginServices {
         let mut bytes = Vec::with_capacity(length);
         while bytes.len() < length {
             let mut hasher = Sha256::new();
-            hasher.update(b"sim-comfy-plugin-random-v1");
+            hasher.update(b"zed-comfy-plugin-random-v1");
             hasher.update(seed);
             hasher.update(counter.to_le_bytes());
             let block = hasher.finalize();
@@ -793,9 +793,9 @@ fn resources_with_log_blocker(
         .insert("workflow".to_owned(), 1_234);
     resources.random_seeds.insert("sampler".to_owned(), [7; 32]);
     resources.models.insert(
-        "sim-asset://model/fixture.json".to_owned(),
+        "zed-asset://model/fixture.json".to_owned(),
         ModelValue::new(
-            "sim-asset://model/fixture.json",
+            "zed-asset://model/fixture.json",
             "json-config",
             "4".repeat(64),
         )?,
@@ -809,7 +809,7 @@ struct TestDirectory {
 
 impl TestDirectory {
     fn new(name: &str) -> Result<Self, Box<dyn Error>> {
-        let path = std::env::temp_dir().join(format!("sim-{name}-{}", Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("zed-{name}-{}", Uuid::new_v4()));
         fs::create_dir_all(&path)?;
         Ok(Self { path })
     }
@@ -899,7 +899,7 @@ fn rust_and_wit_fixtures_project_the_same_ports() -> Result<(), Box<dyn Error>> 
         .split_once("[component-base64]\n")
         .ok_or("component fixture marker is missing")?;
     let mut lines = port_fixture.lines();
-    assert_eq!(lines.next(), Some("world=sim:comfy-plugin@1.0.0"));
+    assert_eq!(lines.next(), Some("world=zed:comfy-plugin@1.0.0"));
     let projected = manifest.nodes[0]
         .ports
         .iter()
@@ -934,7 +934,7 @@ fn rust_and_wit_fixtures_project_the_same_ports() -> Result<(), Box<dyn Error>> 
         .collect::<Vec<_>>();
     assert_eq!(lines.collect::<Vec<_>>(), projected);
     let wit = include_str!("../../comfy_plugin_sdk/wit/comfy-plugin.wit");
-    assert!(wit.contains("package sim:comfy-plugin@1.0.0;"));
+    assert!(wit.contains("package zed:comfy-plugin@1.0.0;"));
     assert!(wit.contains("variant invocation-error"));
     for operation in [
         "get-input-state",
@@ -1078,8 +1078,8 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
     let contract = registry
         .provider_binding_contract_sha256(
             "ElevenLabsAudioIsolation",
-            "sim:comfy-provider-transport@1",
-            "sim:comfy-provider-materializer@1",
+            "zed:comfy-provider-transport@1",
+            "zed:comfy-provider-materializer@1",
         )?
         .ok_or("paid provider contract is absent")?;
     assert_eq!(
@@ -1634,7 +1634,7 @@ fn every_capability_is_scoped_bounded_and_transactional() -> Result<(), Box<dyn 
     assert!(matches!(random, CapabilityResponse::Bytes(bytes) if bytes.len() == 48));
     assert!(matches!(
         state.execute(CapabilityCall::ModelOpen {
-            identifier: "sim-asset://model/fixture.json".to_owned(),
+            identifier: "zed-asset://model/fixture.json".to_owned(),
         })?,
         CapabilityResponse::Handle(1)
     ));
@@ -2514,7 +2514,7 @@ fn provider_component_activation_publishes_one_exact_registry_bundle_and_rolls_b
         bundle
             .registry()
             .binding_implementation_namespace("ElevenLabsAudioIsolation"),
-        Some("sim.comfy.provider.comfy-node-0141")
+        Some("zed.comfy.provider.comfy-node-0141")
     );
     assert!(bundle.registry().node("ElevenLabsAudioIsolation").is_some());
     let pin = bundle
@@ -2906,7 +2906,7 @@ fn val_plugin_001() -> Result<(), Box<dyn Error>> {
         concat!(
             "{{\n",
             "  \"validation\": \"VAL-PLUGIN-001\",\n",
-            "  \"world\": \"sim:comfy-plugin@1.0.0\",\n",
+            "  \"world\": \"zed:comfy-plugin@1.0.0\",\n",
             "  \"backend\": \"native-rust-wasmtime\",\n",
             "  \"environment\": {{\n",
             "    \"os\": \"{}\",\n",

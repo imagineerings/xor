@@ -1,11 +1,11 @@
 ---
-name: sim-cherry-pick
-description: Cherry-pick one or more merged PRs and/or commits into Sim's `preview` or `stable` release branch. Use this whenever the user mentions cherry-picking to preview/stable, a failed cherry-pick run, or wants to manually port fix(es) into a release branch.
+name: zed-cherry-pick
+description: Cherry-pick one or more merged PRs and/or commits into Zed's `preview` or `stable` release branch. Use this whenever the user mentions cherry-picking to preview/stable, a failed cherry-pick run, or wants to manually port fix(es) into a release branch.
 ---
 
-# Sim Cherry-Pick
+# Zed Cherry-Pick
 
-Sim ships from two long-lived release branches that live on `origin`:
+Zed ships from two long-lived release branches that live on `origin`:
 
 - `preview` channel → branch like `v1.4.x`
 - `stable` channel → branch like `v1.3.x`

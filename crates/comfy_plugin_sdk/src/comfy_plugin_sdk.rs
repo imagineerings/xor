@@ -22,8 +22,8 @@ use std::{
 use zeroize::Zeroizing;
 
 pub const COMPONENT_API_VERSION: ApiVersion = ApiVersion::new(1, 0, 0);
-pub const COMPONENT_WORLD: &str = "sim:comfy-plugin@1.0.0";
-pub const PROVIDER_COMPONENT_WORLD: &str = "sim:comfy-provider-plugin@1.0.0";
+pub const COMPONENT_WORLD: &str = "zed:comfy-plugin@1.0.0";
+pub const PROVIDER_COMPONENT_WORLD: &str = "zed:comfy-provider-plugin@1.0.0";
 pub const MANIFEST_SCHEMA_VERSION: u16 = 1;
 pub const MAX_MANIFEST_NODES: usize = 4_096;
 pub const MAX_PORTS_PER_NODE: usize = 1_024;
@@ -39,7 +39,7 @@ pub const ED25519_PRIVATE_KEY_SEED_BYTES: usize = 32;
 pub const ED25519_PUBLIC_KEY_BYTES: usize = 32;
 pub const ED25519_SIGNATURE_BYTES: usize = 64;
 
-const PROVIDER_RESULT_RECEIPT_SET_DOMAIN: &[u8] = b"sim.comfy.provider-result-receipt-set\0";
+const PROVIDER_RESULT_RECEIPT_SET_DOMAIN: &[u8] = b"zed.comfy.provider-result-receipt-set\0";
 const PROVIDER_RESULT_RECEIPT_SET_VERSION: u16 = 1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -451,7 +451,7 @@ pub enum EffectPolicy {
 
 pub const PROVIDER_BINDING_SCHEMA_VERSION: u16 = 1;
 pub const PROVIDER_BINDING_API_FEATURE: &str = "provider.bindings.v1";
-const PROVIDER_BINDING_CANONICAL_DOMAIN: &str = "sim:comfy-provider-binding-set@1";
+const PROVIDER_BINDING_CANONICAL_DOMAIN: &str = "zed:comfy-provider-binding-set@1";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -2446,7 +2446,7 @@ mod tests {
             },
             provenance: ManifestProvenance {
                 source: "test fixture".to_owned(),
-                publisher: "Sim tests".to_owned(),
+                publisher: "Zed tests".to_owned(),
                 registry: None,
             },
             provider_binding: None,
@@ -2928,8 +2928,8 @@ mod tests {
             feature_id: "COMFY-NODE-0001".to_owned(),
             node_id: manifest.nodes[0].id.clone(),
             contract_sha256: "3".repeat(64),
-            transport_schema: "sim:comfy-provider-transport@1".parse()?,
-            materializer_schema: "sim:comfy-provider-materializer@1".parse()?,
+            transport_schema: "zed:comfy-provider-transport@1".parse()?,
+            materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
         };
         let mut provider_binding = ProviderBindingSet {
             schema_version: PROVIDER_BINDING_SCHEMA_VERSION,

@@ -16,7 +16,7 @@ use menu::{SelectNext, SelectPrevious};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{DefaultOpenBehavior, Settings};
-use sim_actions::{
+use zed_actions::{
     Extensions, OpenKeymap, OpenOnboarding, OpenSettings, assistant::ToggleFocus, command_palette,
 };
 use ui::{ButtonLike, Divider, DividerColor, KeyBinding, Vector, VectorName, prelude::*};
@@ -30,9 +30,9 @@ pub struct OpenRecentProject {
 }
 
 actions!(
-    sim,
+    zed,
     [
-        /// Show the Sim welcome screen
+        /// Show the Zed welcome screen
         ShowWelcome
     ]
 );
@@ -319,7 +319,7 @@ impl WelcomePage {
                         })
                         .log_err();
                 } else {
-                    use sim_actions::OpenRecent;
+                    use zed_actions::OpenRecent;
                     window.dispatch_action(OpenRecent::default().boxed_clone(), cx);
                 }
             }
@@ -448,9 +448,9 @@ impl Render for WelcomePage {
         };
 
         let welcome_label = if self.fallback_to_recent_projects {
-            "Welcome back to Sim"
+            "Welcome back to Zed"
         } else {
-            "Welcome to Sim"
+            "Welcome to Zed"
         };
 
         h_flex()
@@ -540,7 +540,7 @@ impl Item for WelcomePage {
 }
 
 impl crate::SerializableItem for WelcomePage {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "WelcomePage"
     }
 
@@ -686,8 +686,8 @@ mod tests {
     #[test]
     fn test_project_name_multiple() {
         // PathList sorts lexicographically, so filenames appear in alpha order
-        let paths = PathList::new(&["/home/user/sim", "/home/user/api"]);
-        assert_eq!(project_name(&paths), "api, sim");
+        let paths = PathList::new(&["/home/user/zed", "/home/user/api"]);
+        assert_eq!(project_name(&paths), "api, zed");
     }
 
     #[test]

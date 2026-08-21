@@ -33,7 +33,7 @@ const FIXTURE: &[u8] = include_bytes!(concat!(
 const GENERATED_SOURCE: &[u8] = include_bytes!("generated_frontend_extension_catalog.rs");
 const PROJECTION_SOURCE: &str = include_str!("plugin_contributions.rs");
 const PLACEHOLDER_SOURCE: &[u8] = include_bytes!("legacy_extension_placeholder.rs");
-const SIM_SOURCE: &str = include_str!("../../sim/src/sim.rs");
+const ZED_SOURCE: &str = include_str!("../../zed/src/zed.rs");
 
 #[derive(Clone)]
 enum TestSourceResult {
@@ -317,12 +317,12 @@ fn placeholder_render_case(cx: &mut TestAppContext) -> Result<Value, String> {
 }
 
 fn production_boundary_case() -> Result<Value, String> {
-    if SIM_SOURCE
+    if ZED_SOURCE
         .matches("impl comfy_ui::PluginContributionSource")
         .count()
         != 1
-        || !SIM_SOURCE.contains("router.current()?.installed_plugins()?")
-        || !SIM_SOURCE.contains("PluginContributionInput::from_verified_manifest")
+        || !ZED_SOURCE.contains("router.current()?.installed_plugins()?")
+        || !ZED_SOURCE.contains("PluginContributionInput::from_verified_manifest")
         || PROJECTION_SOURCE.contains("eval(")
         || PROJECTION_SOURCE.contains("Command::new")
         || PROJECTION_SOURCE.contains("open_url")
@@ -360,7 +360,7 @@ fn write_artifact(cases: Vec<Value>) -> anyhow::Result<()> {
             "generated_rust": format!("{:x}", Sha256::digest(GENERATED_SOURCE)),
             "projection_source": format!("{:x}", Sha256::digest(PROJECTION_SOURCE.as_bytes())),
             "placeholder_source": format!("{:x}", Sha256::digest(PLACEHOLDER_SOURCE)),
-            "sim_adapter_source": format!("{:x}", Sha256::digest(SIM_SOURCE.as_bytes())),
+            "zed_adapter_source": format!("{:x}", Sha256::digest(ZED_SOURCE.as_bytes())),
         },
         "summary": {
             "passed": passed,

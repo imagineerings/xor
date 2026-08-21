@@ -23,7 +23,7 @@ use project::{
     },
     worktree_store::WorktreeStore,
 };
-use sim_actions::{ToggleEnableBreakpoint, UnsetBreakpoint};
+use zed_actions::{ToggleEnableBreakpoint, UnsetBreakpoint};
 use ui::{
     Divider, DividerColor, FluentBuilder as _, Indicator, IntoElement, ListItem, Render,
     ScrollAxes, StatefulInteractiveElement, Tooltip, WithScrollbar, prelude::*,

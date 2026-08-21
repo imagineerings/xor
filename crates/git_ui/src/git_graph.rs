@@ -4400,7 +4400,7 @@ impl Item for GitGraph {
 }
 
 impl workspace::SerializableItem for GitGraph {
-    fn serialisim_item_kind() -> &'static str {
+    fn serialized_item_kind() -> &'static str {
         "GitGraph"
     }
 
@@ -6055,7 +6055,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn test_serialisim_state_roundtrip(_cx: &mut TestAppContext) {
+    fn test_serialized_state_roundtrip(_cx: &mut TestAppContext) {
         use persistence::SerializedGitGraphState;
 
         let path = RepoPath::new(&"src/main.rs").unwrap();
@@ -7130,12 +7130,12 @@ mod tests {
                         &serde_json::to_string(&json!([
                             // Tagged global task that should be scheduled from the Git graph context menu.
                             {
-                                "label": "Git Show $SIM_GIT_SHA_SHORT",
+                                "label": "Git Show $ZED_GIT_SHA_SHORT",
                                 "command": "git",
-                                "args": ["show", "$SIM_GIT_SHA"],
-                                "cwd": "$SIM_GIT_REPOSITORY_PATH",
+                                "args": ["show", "$ZED_GIT_SHA"],
+                                "cwd": "$ZED_GIT_REPOSITORY_PATH",
                                 "env": {
-                                    "REPOSITORY": "$SIM_GIT_REPOSITORY_NAME",
+                                    "REPOSITORY": "$ZED_GIT_REPOSITORY_NAME",
                                 },
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
@@ -7148,9 +7148,9 @@ mod tests {
                             // Tagged task that still should not appear because Git graph task contexts
                             // do not provide editor-specific variables.
                             {
-                                "label": "Print File $SIM_FILE",
+                                "label": "Print File $ZED_FILE",
                                 "command": "echo",
-                                "args": ["$SIM_FILE"],
+                                "args": ["$ZED_FILE"],
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
                         ]))
@@ -7283,10 +7283,10 @@ mod tests {
                     Some(
                         &serde_json::to_string(&json!([
                             {
-                                "label": "Check out $SIM_GIT_REF",
+                                "label": "Check out $ZED_GIT_REF",
                                 "command": "git",
-                                "args": ["checkout", "$SIM_GIT_REF"],
-                                "cwd": "$SIM_GIT_REPOSITORY_PATH",
+                                "args": ["checkout", "$ZED_GIT_REF"],
+                                "cwd": "$ZED_GIT_REPOSITORY_PATH",
                                 "tags": [GIT_COMMAND_TASK_TAG],
                             },
                         ]))

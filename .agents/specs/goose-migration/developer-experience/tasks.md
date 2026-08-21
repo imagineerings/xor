@@ -11,12 +11,12 @@ The tasks are intentionally sequenced because several touch `crates/agent/src/ag
 - Wave 1: Task 1 establishes native local command output and the catalog.
 - Wave 2: Task 2 completes MCP prompt command discovery and argument execution in the same owner.
 - Wave 3: Tasks 3-4 complete clear and conversation submission behavior.
-- Wave 4: Tasks 5-6 complete and verify Sim-native developer context.
+- Wave 4: Tasks 5-6 complete and verify Zed-native developer context.
 - Wave 5: Task 7 closes session-lifecycle regression coverage after the shared agent test surface is stable.
 
 ## Tasks
 
-- [x] 1. Add Sim-native `/skills` and `/status` commands to the existing catalog and dispatcher
+- [x] 1. Add Zed-native `/skills` and `/status` commands to the existing catalog and dispatcher
   - Reserve `clear`, `skills`, and `status` alongside `compact` when qualifying MCP prompt collisions; advertise the approved native commands with descriptions and native category metadata.
   - Route `/skills` and `/status` from `NativeAgentConnection::prompt` using the existing `Command::parse` result and existing `ProjectState`, `Thread`, `UserAgentsMd`, and `ProjectContext` snapshots.
   - Add the narrow `AcpThread` operation needed to append a distinct, transient local command result without adding a `Thread::Message` or model context.

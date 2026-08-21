@@ -1,6 +1,6 @@
-# The Sim Rust Extension API
+# The Zed Rust Extension API
 
-This crate lets you write extensions for Sim in Rust.
+This crate lets you write extensions for Zed in Rust.
 
 ## Extension Manifest
 
@@ -18,7 +18,7 @@ repository = "https://github.com/your/extension-repository"
 
 ## Cargo metadata
 
-Sim extensions are packaged as WebAssembly files. In your Cargo.toml, you'll
+Zed extensions are packaged as WebAssembly files. In your Cargo.toml, you'll
 need to set your `crate-type` accordingly:
 
 ```toml
@@ -34,36 +34,36 @@ crate-type = ["cdylib"]
 To define your extension, create a type that implements the `Extension` trait, and register it.
 
 ```rust
-use zed_extension_api as sim;
+use zed_extension_api as zed;
 
 struct MyExtension {
     // ... state
 }
 
-impl sim::Extension for MyExtension {
+impl zed::Extension for MyExtension {
     // ...
 }
 
-sim::register_extension!(MyExtension);
+zed::register_extension!(MyExtension);
 ```
 
 ## Testing your extension
 
-To run your extension in Sim as you're developing it:
+To run your extension in Zed as you're developing it:
 
 - Make sure you have [Rust installed](https://www.rust-lang.org/learn/get-started)
 - Have the `wasm32-wasip2` target installed (`rustup target add wasm32-wasip2`)
-- Open the extensions view using the `sim: extensions` action in the command palette.
+- Open the extensions view using the `zed: extensions` action in the command palette.
 - Click the `Install Dev Extension` button in the top right
 - Choose the path to your extension directory.
 
-## Compatible Sim versions
+## Compatible Zed versions
 
-Extensions created using newer versions of the Sim extension API won't be compatible with older versions of Sim.
+Extensions created using newer versions of the Zed extension API won't be compatible with older versions of Zed.
 
-Here is the compatibility of the `zed_extension_api` with versions of Sim:
+Here is the compatibility of the `zed_extension_api` with versions of Zed:
 
-| Sim version | `zed_extension_api` version |
+| Zed version | `zed_extension_api` version |
 | ----------- | --------------------------- |
 | `0.192.x`   | `0.0.1` - `0.6.0`           |
 | `0.186.x`   | `0.0.1` - `0.5.0`           |

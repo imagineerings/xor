@@ -8,7 +8,7 @@
 
 ## Context
 
-Sim already has `livekit_api`, `livekit_client`, native audio capture/playback, participant, room, token and device abstractions. Buzz has a separate bounded Opus-over-WebSocket huddle protocol with NIP-42 authentication, community/channel admission, room-version pinning, participant indexes, roster control, connection limits, heartbeats, dropped-on-backpressure media, cross-pod fencing and lifecycle events. Buzz also supplies local voice/TTS and transcription behavior.
+Zed already has `livekit_api`, `livekit_client`, native audio capture/playback, participant, room, token and device abstractions. Buzz has a separate bounded Opus-over-WebSocket huddle protocol with NIP-42 authentication, community/channel admission, room-version pinning, participant indexes, roster control, connection limits, heartbeats, dropped-on-backpressure media, cross-pod fencing and lifecycle events. Buzz also supplies local voice/TTS and transcription behavior.
 
 Shipping both transports as peers would create two room owners, participant rosters and failure models. Removing Buzz audio immediately would break existing desktop/mobile clients. The huddle lifecycle therefore needs one transport-neutral domain owner, one native media authority and a compatibility route whose behavior and lifetime are explicit.
 
@@ -16,9 +16,9 @@ Shipping both transports as peers would create two room owners, participant rost
 
 ### Canonical domain and native transport
 
-The Sim collaboration domain owns transport-neutral huddle identity and lifecycle: community, channel, session/generation, start, join, leave, end, participant identity, role, reaction, moderation state and transcript references. Domain events are authoritative for collaboration history and policy; they contain media/session references rather than audio frames.
+The Zed collaboration domain owns transport-neutral huddle identity and lifecycle: community, channel, session/generation, start, join, leave, end, participant identity, role, reaction, moderation state and transcript references. Domain events are authoritative for collaboration history and policy; they contain media/session references rather than audio frames.
 
-LiveKit is the sole native realtime media transport and room authority. A canonical huddle generation maps to exactly one LiveKit room. LiveKit owns current media participants, track publication/subscription, reconnect state and media quality. Sim collaboration authorization issues short-lived, room-scoped participant tokens only after trusted tenant, membership, role and huddle-generation checks.
+LiveKit is the sole native realtime media transport and room authority. A canonical huddle generation maps to exactly one LiveKit room. LiveKit owns current media participants, track publication/subscription, reconnect state and media quality. Zed collaboration authorization issues short-lived, room-scoped participant tokens only after trusted tenant, membership, role and huddle-generation checks.
 
 The existing `livekit_api` and `livekit_client` crates remain the native API/client owners. `audio` owns device capture/playback and transport integration. `collaboration_domain` must not depend on LiveKit, GPUI, devices or wire codecs.
 
@@ -63,7 +63,7 @@ Community isolation is enforced before token issuance and legacy WebSocket upgra
 
 ### Platform support
 
-Native Sim desktop huddles use the existing LiveKit Rust/client integration on every supported packaged desktop target for which its media dependencies pass build and device tests. A platform without a validated LiveKit client is reported as unsupported for native huddles; it does not silently use the legacy relay.
+Native Zed desktop huddles use the existing LiveKit Rust/client integration on every supported packaged desktop target for which its media dependencies pass build and device tests. A platform without a validated LiveKit client is reported as unsupported for native huddles; it does not silently use the legacy relay.
 
 Companion web, iOS and Android clients may use their platform LiveKit SDKs behind the same token and lifecycle contracts. During migration, released Buzz companion clients continue through the Opus adapter. Platform-specific implementations do not own huddle domain state.
 
@@ -71,7 +71,7 @@ The release gate includes microphone permission, input/output selection, mute, p
 
 ### TTS and transcription
 
-Local TTS is a cancellable media producer under Sim's audio/model/permission owners. It joins or publishes into the canonical huddle only with visible agent/human attribution and the same participant policy. A missing model, synthesis error or cancellation affects only that action and cannot end or fork the huddle.
+Local TTS is a cancellable media producer under Zed's audio/model/permission owners. It joins or publishes into the canonical huddle only with visible agent/human attribution and the same participant policy. A missing model, synthesis error or cancellation affects only that action and cannot end or fork the huddle.
 
 Transcription consumes an explicitly authorized canonical audio source and emits partial/final segments with huddle, participant, time-range, model/provider, consent and retention provenance. Partial segments can be replaced deterministically; final segments project into authorized channel records. Failure, retry and redaction remain visible and do not fabricate a completed transcript.
 

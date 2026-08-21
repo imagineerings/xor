@@ -2,7 +2,7 @@
 
 ## Overview
 
-Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.
+Extend zed's observability infrastructure with Langfuse tracing, OpenTelemetry OTLP export, an observation layer, rate limiter, PostHog analytics, token counter, and tool monitoring.
 
 ## Repo Reconciliation
 
@@ -68,7 +68,7 @@ Extend sim's observability infrastructure with Langfuse tracing, OpenTelemetry O
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
 - [ ] 6. Resolve analytics event and exporter policy
-  - Reuse Sim's telemetry abstraction and add PostHog only as an approved exporter
+  - Reuse Zed's telemetry abstraction and add PostHog only as an approved exporter
   - Define each event's purpose, consent basis, stable schema, cardinality, owner, retention, and deletion behavior
   - Exclude prompts, tool data, paths, secrets, attachments, and direct identifiers by default
   - Bound queues/retries and isolate offline, backpressure, shutdown, and exporter failures from the agent

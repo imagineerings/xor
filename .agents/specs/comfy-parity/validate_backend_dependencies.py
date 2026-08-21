@@ -72,7 +72,7 @@ FORBIDDEN_SOURCE_PATTERNS = (
 )
 PLATFORM_LOADER_NON_OWNER_PATHS = (
     Path("crates/gpui_windows/src"),
-    Path("crates/sim/src/main.rs"),
+    Path("crates/zed/src/main.rs"),
 )
 COMFY_COMPUTE_OWNER_SYMBOLS = (
     "comfy_backend_",
@@ -180,7 +180,7 @@ def validate_platform_loader_non_ownership() -> None:
                     f"platform loader {relative} claims Comfy compute ownership: {conflicts}"
                 )
     if inspected == 0:
-        raise ValidationError("no Sim or GPUI platform loader sources were inspected")
+        raise ValidationError("no Zed or GPUI platform loader sources were inspected")
 
 
 def validate_adapter_manifests() -> dict[str, dict]:
@@ -269,7 +269,7 @@ def validate_production_feature_manifests() -> None:
             if adapter == "metal"
             else [f"comfy_tensor/{adapter}"]
         ),
-        "crates/sim/Cargo.toml": lambda adapter: ["comfy", f"comfy_runtime/{adapter}"],
+        "crates/zed/Cargo.toml": lambda adapter: ["comfy", f"comfy_runtime/{adapter}"],
     }
     for relative_path, expected_feature in manifests.items():
         path = REPOSITORY_ROOT / relative_path
@@ -409,7 +409,7 @@ def expected_ledger(workspace: dict, lock: dict) -> dict:
                 if adapter == "metal"
                 else [f"comfy_tensor/{adapter}"]
             ),
-            "sim": ["comfy", f"comfy_runtime/{adapter}"],
+            "zed": ["comfy", f"comfy_runtime/{adapter}"],
             "reason": (
                 "CoreX forwarding compiles the zero-symbol structural adapter through each layer "
                 "only so all production surfaces report the same canonical typed Unbound state; "
@@ -419,7 +419,7 @@ def expected_ledger(workspace: dict, lock: dict) -> dict:
                 else "The private worker alone combines runtime certification and tensor execution "
                 "in production; test support selects tensor conformance, with Metal additionally "
                 "selecting the existing runtime verifier solely for development hardware "
-                "certification, and host Sim selects runtime/profile presentation only."
+                "certification, and host Zed selects runtime/profile presentation only."
             ),
         }
         for adapter in ADAPTERS
@@ -434,7 +434,7 @@ def expected_ledger(workspace: dict, lock: dict) -> dict:
             "vendor_abi_owner_boundary": "each focused comfy_backend_* adapter",
             "native_ffi_certificate_owner": "comfy_runtime::NativeFfiRegistry",
             "runtime_adapter_boundary": "enabled vendor adapters inspect exact immutable bytes and consume certificates before unsafe loading; CoreX is the sole zero-symbol typed-Unbound forwarding exception with no loader or certificate projection",
-            "platform_loader_non_owner_boundary": "Sim and GPUI platform/UI loaders own no Comfy compute semantics",
+            "platform_loader_non_owner_boundary": "Zed and GPUI platform/UI loaders own no Comfy compute semantics",
         },
         "lockfile": {
             "path": "Cargo.lock",
@@ -492,7 +492,7 @@ def validate_later_task_writes() -> None:
         "comfy-parity-opt-in-product-build-boundary": {
             "Cargo.lock",
             "crates/extension_host/Cargo.toml",
-            "crates/sim/Cargo.toml",
+            "crates/zed/Cargo.toml",
         },
         "comfy-parity-native-text-value-regex-foundation": {
             "Cargo.lock",

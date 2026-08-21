@@ -825,7 +825,7 @@
         {
           "index": 0,
           "starred": false,
-          "syntax": "sim.dtype",
+          "syntax": "zed.dtype",
           "syntax_kind": "Attribute"
         }
       ],
@@ -1424,7 +1424,7 @@
         {
           "index": 0,
           "starred": false,
-          "syntax": "sim.dtype",
+          "syntax": "zed.dtype",
           "syntax_kind": "Attribute"
         }
       ],

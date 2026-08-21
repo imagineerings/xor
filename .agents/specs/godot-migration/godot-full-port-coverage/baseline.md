@@ -4,12 +4,12 @@
 
 | Source | Inspected revision | Verification |
 | --- | --- | --- |
-| Sim | `95c903d0d2feba228d73b813216c2ff2cc585119` (`Add feature specification workflows (#598)`, 2026-08-08T21:31:51+01:00) | `git rev-parse HEAD`; tracked worktree had no modifications. The pre-audit `.agents/specs/godot-migration/` tree was untracked user material and was preserved. |
+| Zed | `95c903d0d2feba228d73b813216c2ff2cc585119` (`Add feature specification workflows (#598)`, 2026-08-08T21:31:51+01:00) | `git rev-parse HEAD`; tracked worktree had no modifications. The pre-audit `.agents/specs/godot-migration/` tree was untracked user material and was preserved. |
 | Godot | `5b4e0cb0fd279832bbdd69fed5354d4e5ad26f88`, official `4.7-stable` | `projects/godot` has no nested `.git`; `version.py` declares 4.7.0 stable. The official tag was resolved with `git ls-remote`, and all 13,979 local paths and normalized Git blob hashes matched the tag tree. |
 
 The sorted content manifest SHA-256 is `3f52220d352a6156c26f75006476201b548b41b418903832f8d318eb9aca34e2`. `verify_snapshot.py --manifest --index-content projects/godot` reproduces its rows. Twenty-five Windows/Visual Studio files are stored with LF in Git and checked out with CRLF according to `projects/godot/.gitattributes`; the snapshot also does not preserve upstream executable bits. Those expected working-tree transformations explain why the raw local Git tree hash `b410c076a7f1b178f651005d90ad6dc573f7a4a8` differs from the tag tree `a74f51b5f510fdacf72be7d8f8d598e7b7c192cd` without indicating content drift.
 
-Sim and Godot have no configured Git submodules in the inspected trees. Godot's `thirdparty/` contents are vendored source, not submodules.
+Zed and Godot have no configured Git submodules in the inspected trees. Godot's `thirdparty/` contents are vendored source, not submodules.
 
 ## Godot build surface
 
@@ -53,6 +53,6 @@ Platform-specific behavior also exists under `drivers/` for AccessKit, SDL, Vulk
 - CI: `.github/workflows/{android,ios,linux,macos,web,windows}_builds.yml`, `runner.yml`, and `static_checks.yml`.
 - Build/release tooling: `SConstruct`, 209 `SCsub` files, `methods.py`, builder scripts, `misc/scripts`, `misc/dist`, platform templates, and third-party manifests.
 
-## Sim evidence boundary
+## Zed evidence boundary
 
-The Sim workspace has existing project/worktree/workspace/editor/GPUI/language/LSP/DAP/task/filesystem/network/settings/persistence/sandbox/extension/media/platform/test infrastructure. It has no `crates/sim_game` or `crates/world_model` workspace member and repository-wide source searches found no connected `project.godot`, `.tscn`, `.tres`, GDScript, GDExtension, Godot importer, or Godot exporter implementation. Accordingly, checked tasks and proposed interfaces in the pre-audit specifications were not accepted as implementation evidence.
+The Zed workspace has existing project/worktree/workspace/editor/GPUI/language/LSP/DAP/task/filesystem/network/settings/persistence/sandbox/extension/media/platform/test infrastructure. It has no `crates/zed_game` or `crates/world_model` workspace member and repository-wide source searches found no connected `project.godot`, `.tscn`, `.tres`, GDScript, GDExtension, Godot importer, or Godot exporter implementation. Accordingly, checked tasks and proposed interfaces in the pre-audit specifications were not accepted as implementation evidence.

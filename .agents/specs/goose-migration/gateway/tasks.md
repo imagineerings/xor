@@ -50,7 +50,7 @@ Implement the multi-channel gateway system as a new `crates/gateway/` crate, sta
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
 - [ ] 5. Implement pairing service
-  - Link external platform user IDs to sim user identities
+  - Link external platform user IDs to zed user identities
   - Persistent storage for pairings
   - Unlink support
 
@@ -60,7 +60,7 @@ Implement the multi-channel gateway system as a new `crates/gateway/` crate, sta
   - _Writes: crates/gateway/src/pairing.rs_
   - _Validation: Run focused behavior and failure-path tests, then ./script/clippy for affected Rust crates_
 
-- [ ] 6. Integrate gateway into sim application
+- [ ] 6. Integrate gateway into zed application
   - Gateway manager initialization during app startup
   - CLI command for gateway configuration
   - Configuration via settings files

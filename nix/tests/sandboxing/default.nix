@@ -162,8 +162,8 @@ let
         # whole test on a non-zero exit; we print its output so the per-check
         # results show up in the build log.
         print(machine.succeed(
-            "SIM_SANDBOX_CHECKS=${checksFile} "
-            "SIM_TEST_ECHO_PORT=${toString echoPort} "
+            "ZED_SANDBOX_CHECKS=${checksFile} "
+            "ZED_TEST_ECHO_PORT=${toString echoPort} "
             "bwrap_test_helper 2>&1"
         ))
       '';

@@ -299,9 +299,9 @@ impl RunningMode {
                     breakpoints
                         .into_iter()
                         .zip(raw_breakpoints)
-                        .filter_map(|(dap_bp, sim_bp)| {
+                        .filter_map(|(dap_bp, zed_bp)| {
                             Some((
-                                sim_bp,
+                                zed_bp,
                                 BreakpointSessionState {
                                     id: dap_bp.id?,
                                     verified: dap_bp.verified,
@@ -384,9 +384,9 @@ impl RunningMode {
                     let breakpoints = cx.background_spawn(send_request).await?;
 
                     let breakpoints = breakpoints.into_iter().zip(raw_breakpoints).filter_map(
-                        |(dap_bp, sim_bp)| {
+                        |(dap_bp, zed_bp)| {
                             Some((
-                                sim_bp,
+                                zed_bp,
                                 BreakpointSessionState {
                                     id: dap_bp.id?,
                                     verified: dap_bp.verified,
@@ -418,7 +418,7 @@ impl RunningMode {
     fn initialize_sequence(
         &self,
         capabilities: &Capabilities,
-        initialisim_rx: oneshot::Receiver<()>,
+        initialized_rx: oneshot::Receiver<()>,
         dap_store: WeakEntity<DapStore>,
         cx: &mut Context<Session>,
     ) -> Task<Result<()>> {
@@ -463,7 +463,7 @@ impl RunningMode {
                             dap_store.adapter_options(&adapter_name),
                         )
                     })?;
-                initialisim_rx.await?;
+                initialized_rx.await?;
                 let errors_by_path = cx
                     .update(|cx| this.send_source_breakpoints(false, &breakpoint_store, cx))
                     .await;
@@ -916,14 +916,14 @@ impl Session {
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
         let (message_tx, mut message_rx) = futures::channel::mpsc::unbounded();
-        let (initialisim_tx, initialisim_rx) = futures::channel::oneshot::channel();
+        let (initialized_tx, initialized_rx) = futures::channel::oneshot::channel();
 
         let background_tasks = vec![cx.spawn(async move |this: WeakEntity<Session>, cx| {
-            let mut initialisim_tx = Some(initialisim_tx);
+            let mut initialized_tx = Some(initialized_tx);
             while let Some(message) = message_rx.next().await {
                 if let Message::Event(event) = message {
                     if let Events::Initialized(_) = *event {
-                        if let Some(tx) = initialisim_tx.take() {
+                        if let Some(tx) = initialized_tx.take() {
                             tx.send(()).ok();
                         }
                     } else {
@@ -981,7 +981,7 @@ impl Session {
 
             let result = this
                 .update(cx, |session, cx| {
-                    session.initialize_sequence(initialisim_rx, dap_store.clone(), cx)
+                    session.initialize_sequence(initialized_rx, dap_store.clone(), cx)
                 })?
                 .await;
 

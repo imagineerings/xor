@@ -16,7 +16,7 @@ This is a future hardware/vendor-input specification. Missing proprietary inputs
 
 ### VAL-COREX-OWNERSHIP-001: Authoritative ownership
 
-- Search all Sim and comfy crates for competing CoreX ABI, trust, binding, capability, resource, memory, workspace, event, cancellation, queue, persistence, recovery, or transaction owners.
+- Search all Zed and comfy crates for competing CoreX ABI, trust, binding, capability, resource, memory, workspace, event, cancellation, queue, persistence, recovery, or transaction owners.
 - Command: `cargo test --locked -p comfy_test_support --test ownership_consolidation val_ownership_001`.
 
 ### VAL-COREX-ADAPTER-001: Native semantic adapter
@@ -32,7 +32,7 @@ This is a future hardware/vendor-input specification. Missing proprietary inputs
 ### VAL-COREX-INTEGRATION-001: Production worker integration
 
 - Verify profile selection, private protocol, retained session/workspace ownership, readiness operation, matrix negotiation, cancellation, device loss, teardown, restart recertification, CLI/GPUI typed unavailable behavior, and no external execution path.
-- Command: `cargo test --locked -p comfy_worker --features corex --all-targets`, `cargo test --locked -p sim --features corex --all-targets`, and `cargo test --locked -p comfy_test_support --test native_controller_e2e`.
+- Command: `cargo test --locked -p comfy_worker --features corex --all-targets`, `cargo test --locked -p zed --features corex --all-targets`, and `cargo test --locked -p comfy_test_support --test native_controller_e2e`.
 
 ### VAL-COREX-HARDWARE-001: Physical CoreX certification
 

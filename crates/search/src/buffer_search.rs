@@ -31,7 +31,7 @@ use project::{
 };
 
 use settings::{SeedQuerySetting, Settings};
-use sim_actions::{outline::ToggleOutline, workspace::CopyPath, workspace::CopyRelativePath};
+use zed_actions::{outline::ToggleOutline, workspace::CopyPath, workspace::CopyRelativePath};
 use std::{any::TypeId, sync::Arc};
 
 use ui::{BASE_REM_SIZE_IN_PX, IconButtonShape, Tooltip, prelude::*, utils::SearchInputWidth};
@@ -50,7 +50,7 @@ use registrar::{ForDeployed, ForDismissed, SearchActionsRegistrar};
 
 const MAX_BUFFER_SEARCH_HISTORY_SIZE: usize = 50;
 
-pub use sim_actions::buffer_search::{
+pub use zed_actions::buffer_search::{
     Deploy, DeployReplace, Dismiss, FocusEditor, UseSelectionForFind,
 };
 

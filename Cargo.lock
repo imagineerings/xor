@@ -307,7 +307,7 @@ dependencies = [
  "serde_json",
  "settings",
  "shell_command_parser",
- "sim_env_vars",
+ "zed_env_vars",
  "smallvec 1.15.2",
  "sqlez",
  "streaming_diff",
@@ -410,7 +410,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "task",
  "tempfile",
  "terminal",
@@ -546,7 +546,7 @@ dependencies = [
  "serde_json_lenient",
  "settings",
  "shlex 1.3.0",
- "sim_actions",
+ "zed_actions",
  "streaming_diff",
  "task",
  "telemetry",
@@ -615,7 +615,7 @@ dependencies = [
  "gpui",
  "language_model",
  "serde",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "telemetry",
  "ui",
@@ -1482,7 +1482,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "sim_actions",
+ "zed_actions",
  "smol",
  "telemetry",
  "ui",
@@ -2234,7 +2234,7 @@ dependencies = [
  "rand 0.9.5",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "text",
  "theme",
  "theme_settings",
@@ -3377,7 +3377,7 @@ dependencies = [
  "serde_urlencoded",
  "settings",
  "sha2 0.10.9",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "smol",
  "telemetry",
  "telemetry_events",
@@ -3560,7 +3560,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "text",
  "zeta_prompt",
 ]
@@ -3644,7 +3644,7 @@ dependencies = [
  "session",
  "settings",
  "sha2 0.10.9",
- "sim_actions",
+ "zed_actions",
  "smol",
  "sqlx",
  "strum 0.27.2",
@@ -3694,7 +3694,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "telemetry",
  "theme",
@@ -4167,7 +4167,7 @@ dependencies = [
  "project",
  "serde",
  "settings",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -5479,7 +5479,7 @@ dependencies = [
  "log",
  "paths",
  "release_channel",
- "sim_env_vars",
+ "zed_env_vars",
  "sqlez",
  "sqlez_macros",
  "tempfile",
@@ -5568,7 +5568,7 @@ dependencies = [
  "serde_json",
  "serde_json_lenient",
  "settings",
- "sim_actions",
+ "zed_actions",
  "sysinfo 0.37.2",
  "task",
  "tasks_ui",
@@ -5799,7 +5799,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "text",
  "theme",
  "theme_settings",
@@ -6124,8 +6124,8 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
- "sim_credentials_provider",
+ "zed_actions",
+ "zed_credentials_provider",
  "strum 0.27.2",
  "telemetry",
  "telemetry_events",
@@ -6290,7 +6290,7 @@ dependencies = [
  "project",
  "regex",
  "settings",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "text",
  "theme",
@@ -6355,7 +6355,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "snippet",
  "sum_tree",
@@ -7002,7 +7002,7 @@ dependencies = [
  "semver",
  "serde",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "strum 0.27.2",
  "telemetry",
@@ -7124,7 +7124,7 @@ dependencies = [
  "client",
  "extension_host",
  "gpui",
- "sim_actions",
+ "zed_actions",
  "system_specs",
  "urlencoding",
  "util",
@@ -7168,7 +7168,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -7959,7 +7959,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "strum 0.27.2",
  "sysinfo 0.37.2",
@@ -8278,8 +8278,8 @@ dependencies = [
  "seahash",
  "serde",
  "serde_json",
- "sim-font-kit",
- "sim-scap",
+ "zed-font-kit",
+ "zed-scap",
  "slotmap",
  "smallvec 1.15.2",
  "spin 0.10.0",
@@ -8331,8 +8331,8 @@ dependencies = [
  "pollster 0.4.0",
  "profiling",
  "raw-window-handle",
- "sim-scap",
- "sim-xim",
+ "zed-scap",
+ "zed-xim",
  "smallvec 1.15.2",
  "smol",
  "strum 0.27.2",
@@ -8390,7 +8390,7 @@ dependencies = [
  "pathfinder_geometry",
  "raw-window-handle",
  "semver",
- "sim-font-kit",
+ "zed-font-kit",
  "smallvec 1.15.2",
  "strum 0.27.2",
  "uuid",
@@ -8489,7 +8489,7 @@ dependencies = [
  "pollster 0.4.0",
  "profiling",
  "raw-window-handle",
- "sim-font-kit",
+ "zed-font-kit",
  "smallvec 1.15.2",
  "swash",
  "unicode-segmentation",
@@ -8518,7 +8518,7 @@ dependencies = [
  "parking_lot",
  "rand 0.9.5",
  "raw-window-handle",
- "sim-scap",
+ "zed-scap",
  "smallvec 1.15.2",
  "uuid",
  "windows 0.61.3",
@@ -9627,7 +9627,7 @@ dependencies = [
  "project",
  "serde_json",
  "serde_json_lenient",
- "sim_actions",
+ "zed_actions",
  "theme_settings",
  "ui",
  "util",
@@ -10106,7 +10106,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "tempfile",
  "theme",
@@ -10518,7 +10518,7 @@ dependencies = [
  "semver",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "sysinfo 0.37.2",
  "telemetry",
  "theme",
@@ -10902,7 +10902,7 @@ dependencies = [
  "prost-build 0.9.0",
  "prost-types 0.9.0",
  "serde",
- "sim-reqwest",
+ "zed-reqwest",
 ]
 
 [[package]]
@@ -10937,7 +10937,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "settings",
- "sim-scap",
+ "zed-scap",
  "simplelog",
  "smallvec 1.15.2",
  "tokio",
@@ -11255,7 +11255,7 @@ dependencies = [
  "project",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "tempfile",
  "theme",
  "theme_settings",
@@ -11680,7 +11680,7 @@ dependencies = [
  "rpc",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smol",
  "theme_settings",
  "util",
@@ -12119,7 +12119,7 @@ dependencies = [
  "futures-lite 1.13.0",
  "gpui",
  "rpc",
- "sim_actions",
+ "zed_actions",
  "sum_tree",
  "time",
  "ui",
@@ -12797,7 +12797,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "settings",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -13106,7 +13106,7 @@ dependencies = [
  "rope",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -13139,7 +13139,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "theme",
  "theme_settings",
@@ -14092,7 +14092,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -14206,7 +14206,7 @@ dependencies = [
  "gpui",
  "project",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "theme",
  "theme_settings",
@@ -14661,7 +14661,7 @@ dependencies = [
  "settings",
  "sha2 0.10.9",
  "shellexpand",
- "sim_credentials_provider",
+ "zed_credentials_provider",
  "smallvec 1.15.2",
  "smol",
  "snippet",
@@ -14740,7 +14740,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "telemetry",
  "tempfile",
@@ -15621,7 +15621,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "task",
  "telemetry",
  "ui",
@@ -15957,7 +15957,7 @@ dependencies = [
  "serde_json",
  "settings",
  "shlex 1.3.0",
- "sim_actions",
+ "zed_actions",
  "smol",
  "task",
  "telemetry",
@@ -16067,7 +16067,7 @@ dependencies = [
  "log",
  "regex",
  "serde",
- "sim-reqwest",
+ "zed-reqwest",
  "tokio",
 ]
 
@@ -16980,7 +16980,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smol",
  "text",
  "theme",
@@ -17424,7 +17424,7 @@ dependencies = [
  "project",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "theme",
  "theme_settings",
  "ui",
@@ -17481,8 +17481,8 @@ dependencies = [
  "serde_yaml_ng",
  "settings",
  "shell_command_parser",
- "sim_actions",
- "sim_credentials_provider",
+ "zed_actions",
+ "zed_credentials_provider",
  "strum 0.27.2",
  "telemetry",
  "theme",
@@ -17672,7 +17672,7 @@ dependencies = [
  "serde_json",
  "settings",
  "sha2 0.10.9",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -17713,7 +17713,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim"
+name = "zed"
 version = "1.11.3"
 dependencies = [
  "acp_thread",
@@ -17851,10 +17851,10 @@ dependencies = [
  "sha2 0.10.9",
  "shellexpand",
  "sidebar",
- "sim-reqwest",
- "sim_actions",
- "sim_credentials_provider",
- "sim_env_vars",
+ "zed-reqwest",
+ "zed_actions",
+ "zed_credentials_provider",
+ "zed_env_vars",
  "smol",
  "snippet_provider",
  "snippets_ui",
@@ -17899,8 +17899,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-font-kit"
-version = "0.14.1-sim"
+name = "zed-font-kit"
+version = "0.14.1-zed"
 source = "git+https://github.com/simtropolis/font-kit?rev=fd81ce08907c63cb054dfdb5fc46e024529ad160#fd81ce08907c63cb054dfdb5fc46e024529ad160"
 dependencies = [
  "bitflags 2.13.0",
@@ -17923,8 +17923,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-reqwest"
-version = "0.12.15-sim"
+name = "zed-reqwest"
+version = "0.12.15-zed"
 source = "git+https://github.com/simtropolis/reqwest.git?rev=c6e14025e406a0c5cb0c96a4a969e601c9fef3c9#c6e14025e406a0c5cb0c96a4a969e601c9fef3c9"
 dependencies = [
  "base64 0.22.1",
@@ -17972,7 +17972,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-scap"
+name = "zed-scap"
 version = "0.0.8-zed"
 source = "git+https://github.com/simtropolis/scap?rev=3d5bdb02b2fbc166b7754642db9063748b9082da#3d5bdb02b2fbc166b7754642db9063748b9082da"
 dependencies = [
@@ -17993,7 +17993,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-xim"
+name = "zed-xim"
 version = "0.4.0-zed"
 source = "git+https://github.com/simtropolis/xim-rs.git?rev=420375270d2c7ce59a76129d40e62f0a035dc701#420375270d2c7ce59a76129d40e62f0a035dc701"
 dependencies = [
@@ -18006,7 +18006,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_actions"
+name = "zed_actions"
 version = "0.1.0"
 dependencies = [
  "gpui",
@@ -18016,7 +18016,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_credentials_provider"
+name = "zed_credentials_provider"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -18040,35 +18040,35 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim_env_vars"
+name = "zed_env_vars"
 version = "0.1.0"
 dependencies = [
  "env_var",
 ]
 
 [[package]]
-name = "sim_glsl"
+name = "zed_glsl"
 version = "0.2.4"
 dependencies = [
  "zed_extension_api 0.1.0",
 ]
 
 [[package]]
-name = "sim_html"
+name = "zed_html"
 version = "0.3.1"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "sim_proto"
+name = "zed_proto"
 version = "0.3.2"
 dependencies = [
  "zed_extension_api 0.7.0",
 ]
 
 [[package]]
-name = "sim_test_extension"
+name = "zed_test_extension"
 version = "0.1.0"
 dependencies = [
  "zed_extension_api 0.8.0",
@@ -18920,7 +18920,7 @@ dependencies = [
  "gpui",
  "language",
  "multi_buffer",
- "sim_actions",
+ "zed_actions",
  "ui",
  "workspace",
 ]
@@ -19372,7 +19372,7 @@ dependencies = [
  "serde_json_lenient",
  "sha2 0.10.9",
  "shellexpand",
- "sim_actions",
+ "zed_actions",
  "util",
 ]
 
@@ -19399,7 +19399,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "task",
  "tree-sitter-rust",
  "tree-sitter-typescript",
@@ -19554,7 +19554,7 @@ dependencies = [
  "settings",
  "shellexpand",
  "shlex 1.3.0",
- "sim_actions",
+ "zed_actions",
  "task",
  "terminal",
  "theme",
@@ -19652,7 +19652,7 @@ dependencies = [
  "serde",
  "serde_json",
  "settings",
- "sim_actions",
+ "zed_actions",
  "telemetry",
  "theme",
  "theme_settings",
@@ -19901,7 +19901,7 @@ dependencies = [
  "semver",
  "serde",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "telemetry",
  "theme",
@@ -21256,7 +21256,7 @@ dependencies = [
  "serde_json",
  "settings",
  "settings_ui",
- "sim_actions",
+ "zed_actions",
  "task",
  "text",
  "theme",
@@ -23585,7 +23585,7 @@ dependencies = [
  "serde_json",
  "session",
  "settings",
- "sim_actions",
+ "zed_actions",
  "smallvec 1.15.2",
  "sqlez",
  "strum 0.27.2",

@@ -479,11 +479,11 @@ async fn test_edit_prediction_invalidation_range(cx: &mut gpui::TestAppContext) 
 }
 
 #[gpui::test]
-async fn test_edit_prediction_jump_disabled_for_non_sim_providers(cx: &mut gpui::TestAppContext) {
+async fn test_edit_prediction_jump_disabled_for_non_zed_providers(cx: &mut gpui::TestAppContext) {
     init_test(cx, |_| {});
 
     let mut cx = EditorTestContext::new(cx).await;
-    let provider = cx.new(|_| FakeNonSimEditPredictionDelegate::default());
+    let provider = cx.new(|_| FakeNonZedEditPredictionDelegate::default());
     assign_editor_completion_provider_non_zed(provider.clone(), &mut cx);
 
     // Cursor is 2+ lines above the proposed edit
@@ -503,17 +503,17 @@ async fn test_edit_prediction_jump_disabled_for_non_sim_providers(cx: &mut gpui:
 
     cx.update_editor(|editor, window, cx| editor.update_visible_edit_prediction(window, cx));
 
-    // For non-Sim providers, there should be no move completion (jump functionality disabled)
+    // For non-Zed providers, there should be no move completion (jump functionality disabled)
     cx.editor(|editor, _, _| {
         if let Some(completion_state) = &editor.active_edit_prediction {
             // Should be an Edit prediction, not a Move prediction
             match &completion_state.completion {
                 EditPrediction::Edit { .. } => {
-                    // This is expected for non-Sim providers
+                    // This is expected for non-Zed providers
                 }
                 EditPrediction::MoveWithin { .. } | EditPrediction::MoveOutside { .. } => {
                     panic!(
-                        "Non-Sim providers should not show Move predictions (jump functionality)"
+                        "Non-Zed providers should not show Move predictions (jump functionality)"
                     );
                 }
             }
@@ -1645,7 +1645,7 @@ fn assign_editor_completion_menu_provider(cx: &mut EditorTestContext) {
 }
 
 fn propose_edits_non_zed<T: ToOffset>(
-    provider: &Entity<FakeNonSimEditPredictionDelegate>,
+    provider: &Entity<FakeNonZedEditPredictionDelegate>,
     edits: Vec<(Range<T>, &str)>,
     cx: &mut EditorTestContext,
 ) {
@@ -1668,7 +1668,7 @@ fn propose_edits_non_zed<T: ToOffset>(
 }
 
 fn assign_editor_completion_provider_non_zed(
-    provider: Entity<FakeNonSimEditPredictionDelegate>,
+    provider: Entity<FakeNonZedEditPredictionDelegate>,
     cx: &mut EditorTestContext,
 ) {
     cx.update_editor(|editor, window, cx| {
@@ -1810,11 +1810,11 @@ impl EditPredictionDelegate for FakeEditPredictionDelegate {
 }
 
 #[derive(Default, Clone)]
-pub struct FakeNonSimEditPredictionDelegate {
+pub struct FakeNonZedEditPredictionDelegate {
     pub completion: Option<edit_prediction_types::EditPrediction>,
 }
 
-impl FakeNonSimEditPredictionDelegate {
+impl FakeNonZedEditPredictionDelegate {
     pub fn set_edit_prediction(
         &mut self,
         completion: Option<edit_prediction_types::EditPrediction>,
@@ -1823,13 +1823,13 @@ impl FakeNonSimEditPredictionDelegate {
     }
 }
 
-impl EditPredictionDelegate for FakeNonSimEditPredictionDelegate {
+impl EditPredictionDelegate for FakeNonZedEditPredictionDelegate {
     fn name() -> &'static str {
-        "fake-non-sim-provider"
+        "fake-non-zed-provider"
     }
 
     fn display_name() -> &'static str {
-        "Fake Non-Sim Provider"
+        "Fake Non-Zed Provider"
     }
 
     fn show_predictions_in_menu() -> bool {

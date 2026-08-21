@@ -27,8 +27,8 @@ FIELDS = [
     "implementation_task",
     "validation_surface",
     "disposition",
-    "current_sim_status",
-    "sim_evidence",
+    "current_zed_status",
+    "zed_evidence",
     "validation_artifact_sha256",
     "closure_artifact",
 ]
@@ -563,8 +563,8 @@ def closure_fields(
     )
     if promoted:
         return {
-            "current_sim_status": "equivalent",
-            "sim_evidence": (
+            "current_zed_status": "equivalent",
+            "zed_evidence": (
                 f"Owning task is complete with durable validation evidence for {disposition}; "
                 f"{closure_artifact} artifact {artifact_path} has exact task and contract "
                 f"coverage with SHA-256 {artifact_digest}."
@@ -572,8 +572,8 @@ def closure_fields(
             "validation_artifact_sha256": artifact_digest,
         }
     return {
-        "current_sim_status": "missing",
-        "sim_evidence": (
+        "current_zed_status": "missing",
+        "zed_evidence": (
             "Executable closure remains pending; a checked task box without durable evidence and "
             "a schema-valid artifact covering this exact task and contract cannot promote this row."
         ),
@@ -599,13 +599,13 @@ def validate_closure_rules() -> None:
     ):
         values = dict(base)
         values.update(changed)
-        if closure_fields(**values)["current_sim_status"] != "missing":
+        if closure_fields(**values)["current_zed_status"] != "missing":
             raise RuntimeError(f"conditioning closure self-test promoted {changed}")
-    if closure_fields(**base)["current_sim_status"] != "equivalent":
+    if closure_fields(**base)["current_zed_status"] != "equivalent":
         raise RuntimeError("conditioning closure self-test rejected valid completed row")
     fail_closed = dict(base)
     fail_closed["disposition"] = "native_fail_closed"
-    if closure_fields(**fail_closed)["current_sim_status"] != "equivalent":
+    if closure_fields(**fail_closed)["current_zed_status"] != "equivalent":
         raise RuntimeError("conditioning closure self-test rejected validated fail-closed row")
 
 

@@ -44,7 +44,7 @@
     "batch_lifecycle": "one bounded retained session, increasing frame PTS, one terminal flush, one trailer, and final-only bytes",
     "metadata": "the existing ordered duplicate-preserving pre-header metadata path is unchanged in both profiles",
     "actor_transport": "the sole capacity-one retained codec actor returns a fresh exact-length CPU U8 tensor and the checked has_alpha projection",
-    "codec_thread_identity_version": "sim.comfy.video-codec-thread.v6"
+    "codec_thread_identity_version": "zed.comfy.video-codec-thread.v6"
   },
   "vectors": [
     {

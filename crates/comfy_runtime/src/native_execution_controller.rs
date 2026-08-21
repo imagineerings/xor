@@ -246,19 +246,19 @@ impl PreboundControlExecution {
         let vae_binding_digest = vae_execution_digest.as_deref().map_or_else(
             || {
                 sha256_tagged(
-                    "sim.comfy.controlnet.vae-binding.absent.v1",
+                    "zed.comfy.controlnet.vae-binding.absent.v1",
                     std::iter::empty(),
                 )
             },
             |digest| {
                 sha256_tagged(
-                    "sim.comfy.controlnet.vae-binding.exact.v1",
+                    "zed.comfy.controlnet.vae-binding.exact.v1",
                     [digest.as_bytes()],
                 )
             },
         );
         let execution_digest = sha256_tagged(
-            "sim.comfy.controlnet.prebound-execution.v1",
+            "zed.comfy.controlnet.prebound-execution.v1",
             [
                 chain.identity().digest().as_bytes(),
                 executor_digest.as_bytes(),
@@ -306,11 +306,11 @@ impl NativeConditioningExecution {
         .map_err(map_conditioning_runtime_error)?;
         let conditioning_digest = sha256_serialized("conditioning ABI", &identity)?;
         let guidance_digest = sha256_tagged(
-            "sim.comfy.guidance-adapter.identity.v1",
+            "zed.comfy.guidance-adapter.identity.v1",
             [GUIDANCE_ADAPTER_ID.as_bytes()],
         );
         let control_digest = control_execution_digest.map_or_else(
-            || sha256_tagged("sim.comfy.controlnet.absent.v1", std::iter::empty()),
+            || sha256_tagged("zed.comfy.controlnet.absent.v1", std::iter::empty()),
             str::to_owned,
         );
         CanonicalConditioningCacheIdentities::checked(
@@ -915,7 +915,7 @@ impl NativeProviderRegistryPin {
 
     pub fn identity_sha256(&self) -> String {
         let mut digest = Sha256::new();
-        digest.update(b"sim-native-provider-registry-pin-v1\0");
+        digest.update(b"zed-native-provider-registry-pin-v1\0");
         digest.update(self.generation.to_le_bytes());
         digest.update(self.registry_digest_sha256.as_bytes());
         for binding_digest in &self.binding_digests_sha256 {
@@ -979,7 +979,7 @@ impl NativeExecutionRegistryBundle {
             }
         }
         let mut digest = Sha256::new();
-        digest.update(b"sim.native-execution-registry-bundle.v1\0");
+        digest.update(b"zed.native-execution-registry-bundle.v1\0");
         digest.update(profile_id.0.as_bytes());
         digest.update(deployment_generation.to_le_bytes());
         digest.update(deployment_digest.as_bytes());
@@ -1849,7 +1849,7 @@ fn provider_required_binding(
         .bind_execution_ports(&input_names, &source_schema.dynamic_inputs, &output_names)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let provider_namespace = format!(
-        "sim.comfy.provider.{}",
+        "zed.comfy.provider.{}",
         catalog_descriptor.feature_id.to_ascii_lowercase()
     );
     Ok(NativeNodeBinding::ProviderRequired {
@@ -2158,7 +2158,7 @@ pub fn compile_native_image_workflow(
     let workflow = WorkflowFormatDocument::parse(workflow_bytes)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let descriptors = native_image_frontend_descriptors()?;
-    let submission = graph_to_prompt(&workflow, &descriptors, "sim-native-image-v1")
+    let submission = graph_to_prompt(&workflow, &descriptors, "zed-native-image-v1")
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let registry = native_image_registry_projection()?;
     let mut plan = crate::PromptCompiler::new(&registry).compile(submission)?;
@@ -2188,7 +2188,7 @@ pub fn compile_native_diffusion_workflow(
     let workflow = WorkflowFormatDocument::parse(workflow_bytes)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let descriptors = native_diffusion_frontend_descriptors()?;
-    let submission = graph_to_prompt(&workflow, &descriptors, "sim-native-diffusion-v1")
+    let submission = graph_to_prompt(&workflow, &descriptors, "zed-native-diffusion-v1")
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     let backend = projection_only_cpu_backend()?;
     let registry = native_registry_with_diffusion_provider(
@@ -5711,7 +5711,7 @@ fn native_output_transaction_id(
     request_digest_sha256: &str,
 ) -> Uuid {
     let mut hasher = Sha256::new();
-    hasher.update(b"sim.comfy.native-output-transaction.v1");
+    hasher.update(b"zed.comfy.native-output-transaction.v1");
     hasher.update(identity.service_id().as_bytes());
     hasher.update(identity.attempt_id().0.as_bytes());
     hasher.update(identity.node_id().0.as_bytes());
@@ -6673,7 +6673,7 @@ impl NativeControllerState {
             lease
                 .plan
                 .extra_data
-                .get("sim_native_delay_millis")
+                .get("zed_native_delay_millis")
                 .and_then(Value::as_u64)
                 .unwrap_or(0),
         )?;
@@ -7670,7 +7670,7 @@ mod tests {
                     }
                 } else {
                     NativeValue::PreservedUnknown {
-                        type_name: "sim.json-number@1".to_owned(),
+                        type_name: "zed.json-number@1".to_owned(),
                         value: Value::Number(value),
                     }
                 }
@@ -7679,7 +7679,7 @@ mod tests {
                 value: NativePrimitive::String(value),
             },
             value => NativeValue::PreservedUnknown {
-                type_name: "sim.json@1".to_owned(),
+                type_name: "zed.json@1".to_owned(),
                 value,
             },
         }
@@ -8342,7 +8342,7 @@ mod tests {
             },
         );
         assert!(cache.get(&key(&inputs, &change_token)?).is_some());
-        assert!(cache.get(&key(&inputs, "sim.comfy.guidance.v0")?).is_none());
+        assert!(cache.get(&key(&inputs, "zed.comfy.guidance.v0")?).is_none());
 
         for (name, value) in [
             ("model", native(json!("model-digest-b"))),
@@ -8825,7 +8825,7 @@ mod tests {
             assert!(registry.node(class_type).is_some());
             assert_eq!(
                 registry.implementation_namespace(class_type),
-                Some("sim.native_rust")
+                Some("zed.native_rust")
             );
             assert!(registry.binding_source(class_type).is_some());
         }
@@ -8864,7 +8864,7 @@ mod tests {
         paid.validate()?;
         assert_eq!(
             registry.binding_implementation_namespace("ElevenLabsAudioIsolation"),
-            Some("sim.comfy.provider.comfy-node-0141")
+            Some("zed.comfy.provider.comfy-node-0141")
         );
         for class_type in [
             "LoadImage",

@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-1B60D420F7C7",
   "baseline_overload_id": "COMFY-TENSOR-OP-1B60D420F7C7:blocked",
   "baseline_fixture_sha256": "086008a10f0cf51aad00e8c8309ec35c033696ba41c022a4bad204e33996ec96",
-  "overload_id": "sim.native.worker.cuda-memory-summary.v1",
+  "overload_id": "zed.native.worker.cuda-memory-summary.v1",
   "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-1917b7227a5c",
   "ordered_parameters": [
     {

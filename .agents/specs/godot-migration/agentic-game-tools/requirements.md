@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Sim agents should be able to edit diffusion graphs, create world generation requests, and generate/import mesh assets through typed and validated tools.
+Zed agents should be able to edit diffusion graphs, create world generation requests, and generate/import mesh assets through typed and validated tools.
 
 ### Requirement 1: Graph Editing Tools
 

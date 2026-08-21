@@ -17,7 +17,7 @@ use project::project_settings::ProjectSettings;
 use project::trusted_worktrees::{PathTrust, TrustedWorktrees};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
-use sim_actions::NewWorktreeBranchTarget;
+use zed_actions::NewWorktreeBranchTarget;
 use ui::prelude::*;
 use workspace::{
     MultiWorkspace, OpenMode, PreviousWorkspaceState, ToastView, Workspace, dock::DockPosition,
@@ -268,7 +268,7 @@ impl Render for WorktreeFetchFailedToast {
                         workspace.update(cx, |workspace, cx| {
                             let task = create_worktree_workspace_inner(
                                 workspace,
-                                &sim_actions::CreateWorktree {
+                                &zed_actions::CreateWorktree {
                                     worktree_name: worktree_name.clone(),
                                     branch_target: branch_target.clone(),
                                 },
@@ -445,7 +445,7 @@ async fn fetch_remote_for_worktree_base(
 ///
 /// Multiple entries in `git_repos` can be linked worktrees of the *same*
 /// underlying repository (e.g. a project that has both the main checkout and
-/// one of its linked worktrees open as separate Sim worktrees). Those entries
+/// one of its linked worktrees open as separate Zed worktrees). Those entries
 /// resolve to the same target path via [`Repository::path_for_new_linked_worktree`],
 /// so we create the new worktree only once and remap every contributing
 /// work directory onto it. Without this dedup, the second `git worktree add`
@@ -677,7 +677,7 @@ fn maybe_propagate_worktree_trust(
 /// workspace (e.g., the `create_thread` agent tool spawns a thread in it).
 pub fn handle_create_worktree(
     workspace: &mut Workspace,
-    action: &sim_actions::CreateWorktree,
+    action: &zed_actions::CreateWorktree,
     window: &mut gpui::Window,
     fallback_focused_dock: Option<DockPosition>,
     cx: &mut gpui::Context<Workspace>,
@@ -699,7 +699,7 @@ pub fn handle_create_worktree(
 pub struct CreatedWorktreeWorkspace {
     /// The newly opened workspace.
     pub workspace: Entity<Workspace>,
-    /// True when the project contained more than one Sim worktree backed by
+    /// True when the project contained more than one Zed worktree backed by
     /// the same underlying git repository, so they were consolidated into a
     /// single new worktree (they resolve to the same target path). Callers
     /// that care — like the `create_thread` agent tool — can use this to warn
@@ -725,7 +725,7 @@ pub struct CreatedWorktreeWorkspace {
 /// background rather than yanking the user away from what they're doing.
 pub fn create_worktree_workspace(
     workspace: &mut Workspace,
-    action: &sim_actions::CreateWorktree,
+    action: &zed_actions::CreateWorktree,
     window: &mut gpui::Window,
     fallback_focused_dock: Option<DockPosition>,
     cx: &mut gpui::Context<Workspace>,
@@ -744,7 +744,7 @@ pub fn create_worktree_workspace(
 
 fn create_worktree_workspace_inner(
     workspace: &mut Workspace,
-    action: &sim_actions::CreateWorktree,
+    action: &zed_actions::CreateWorktree,
     window: &mut gpui::Window,
     fallback_focused_dock: Option<DockPosition>,
     remote_branch_fetch_mode: RemoteBranchFetchMode,
@@ -886,7 +886,7 @@ fn create_worktree_workspace_inner(
 
 pub fn handle_switch_worktree(
     workspace: &mut Workspace,
-    action: &sim_actions::SwitchWorktree,
+    action: &zed_actions::SwitchWorktree,
     window: &mut gpui::Window,
     fallback_focused_dock: Option<DockPosition>,
     cx: &mut gpui::Context<Workspace>,
@@ -1055,7 +1055,7 @@ async fn do_create_worktree(
     let created_paths = await_and_rollback_on_failure(creation_infos, fs, cx).await?;
 
     // Record each created worktree so thread archival can later verify that
-    // Sim created it before deleting it from disk. Failures are non-fatal:
+    // Zed created it before deleting it from disk. Failures are non-fatal:
     // the worktree just won't be eligible for automatic archival.
     for (repo, path) in creation_pairs {
         crate::created_worktrees::record_created_worktree_for_repo(
@@ -1468,7 +1468,7 @@ mod tests {
                     .update_file_based_tasks(
                         TaskSettingsLocation::Worktree(SettingsLocation {
                             worktree_id,
-                            path: rel_path(".sim"),
+                            path: rel_path(".zed"),
                         }),
                         Some(hook_tasks_json),
                     )
@@ -1491,7 +1491,7 @@ mod tests {
             json!({
                 "project": {
                     ".git": {},
-                    ".sim": {
+                    ".zed": {
                         "tasks.json": hook_tasks_json,
                     },
                     "src": {
@@ -1529,7 +1529,7 @@ mod tests {
         main_workspace.update_in(cx, |workspace, window, cx| {
             handle_create_worktree(
                 workspace,
-                &sim_actions::CreateWorktree {
+                &zed_actions::CreateWorktree {
                     worktree_name: Some("feature".to_string()),
                     branch_target: NewWorktreeBranchTarget::CurrentBranch,
                 },
@@ -1568,7 +1568,7 @@ mod tests {
         active_workspace.update_in(cx, |workspace, window, cx| {
             handle_switch_worktree(
                 workspace,
-                &sim_actions::SwitchWorktree {
+                &zed_actions::SwitchWorktree {
                     path: main_project_root.clone(),
                     display_name: "project".to_string(),
                 },
@@ -1663,7 +1663,7 @@ mod tests {
         main_workspace.update_in(cx, |workspace, window, cx| {
             handle_create_worktree(
                 workspace,
-                &sim_actions::CreateWorktree {
+                &zed_actions::CreateWorktree {
                     worktree_name: Some("feature".to_string()),
                     branch_target: NewWorktreeBranchTarget::CurrentBranch,
                 },

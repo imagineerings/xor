@@ -34,7 +34,7 @@ fn envelope(community_id: CommunityId, sequence: u64, version: &str) -> FanoutEn
         sequence,
         "conversation.activity",
         Provenance::new(
-            SourceSystem::Sim,
+            SourceSystem::Zed,
             SourceRecordId::new("conversation:42/activity:7").expect("source ID"),
             1_900_000_000_000,
         )
@@ -137,7 +137,7 @@ fn collaboration_pubsub_envelope_rejects_unknown_fields_versions_and_unversioned
             1,
             "conversation.activity",
             Provenance::new(
-                SourceSystem::Sim,
+                SourceSystem::Zed,
                 SourceRecordId::new("conversation:42/activity:7").expect("source ID"),
                 1_900_000_000_000,
             ),

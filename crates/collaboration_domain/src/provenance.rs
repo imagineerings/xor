@@ -37,7 +37,7 @@ impl fmt::Display for AggregateVersion {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceSystem {
-    Sim,
+    Zed,
     Buzz,
     Nostr,
     Acp,

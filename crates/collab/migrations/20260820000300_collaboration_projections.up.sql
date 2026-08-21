@@ -4,7 +4,7 @@ CREATE TABLE public.collaboration_projection_checkpoints (
         octet_length(projection_name) BETWEEN 1 AND 128
     ),
     source_system text NOT NULL CHECK (
-        source_system IN ('sim', 'buzz', 'nostr', 'acp', 'external_git')
+        source_system IN ('zed', 'buzz', 'nostr', 'acp', 'external_git')
     ),
     source_record_id text NOT NULL CHECK (
         octet_length(source_record_id) BETWEEN 1 AND 1024

@@ -1,11 +1,11 @@
 ---
 title: MCP Server Extensions
-description: "MCP Server Extensions for Sim extensions."
+description: "MCP Server Extensions for Zed extensions."
 ---
 
 # MCP Server Extensions
 
-> We plan to deprecate MCP server extensions in favor of the [official MCP registry](https://registry.modelcontextprotocol.io/). To keep your MCP server available in Sim, publish it to the official registry as well. Follow our deprecation progress in the [tracking issue](https://github.com/simtropolis/sim/issues/59351).
+> We plan to deprecate MCP server extensions in favor of the [official MCP registry](https://registry.modelcontextprotocol.io/). To keep your MCP server available in Zed, publish it to the official registry as well. Follow our deprecation progress in the [tracking issue](https://github.com/simtropolis/zed/issues/59351).
 
 [Model Context Protocol servers](../ai/mcp.md) can be exposed as extensions for use in the Agent Panel.
 
@@ -21,13 +21,13 @@ Each MCP server must be registered in the `extension.toml`:
 Then, in the Rust code for your extension, implement the `context_server_command` method on your extension:
 
 ```rust
-impl sim::Extension for MyExtension {
+impl zed::Extension for MyExtension {
     fn context_server_command(
         &mut self,
         context_server_id: &ContextServerId,
-        project: &sim::Project,
-    ) -> Result<sim::Command> {
-        Ok(sim::Command {
+        project: &zed::Project,
+    ) -> Result<zed::Command> {
+        Ok(zed::Command {
             command: get_path_to_context_server_executable()?,
             args: get_args_for_context_server()?,
             env: get_env_for_context_server()?,
@@ -44,7 +44,7 @@ If you need to download the MCP server from an external source (GitHub Releases,
 
 ## Available Extensions
 
-See MCP servers published as extensions [on Sim's site](https://sim.dev/extensions?filter=context-servers).
+See MCP servers published as extensions [on Zed's site](https://zed.dev/extensions?filter=context-servers).
 
 Review their repositories to see common implementation patterns and structure.
 

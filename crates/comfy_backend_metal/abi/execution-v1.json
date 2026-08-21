@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "contract": "sim-comfy-metal-execution-v1",
+  "contract": "zed-comfy-metal-execution-v1",
   "backend": "metal",
   "abi_floor": "macos-13-metal-3",
   "targets": [
@@ -57,8 +57,8 @@
     {"path": "System/Library/Frameworks/Metal.framework/Headers/MTLTypes.h", "sha256": "835ba381014a9a666b61dfa9277c6213b6f73cec9d2d64f1a567bb5cd51de1ec"}
   ],
   "kernels": [
-    {"dtype": "f16", "function": "sim_comfy_metal_add_f16_v1", "input_buffers": [0, 1], "output_buffer": 2, "element_count_buffer": 3},
-    {"dtype": "f32", "function": "sim_comfy_metal_add_f32_v1", "input_buffers": [0, 1], "output_buffer": 2, "element_count_buffer": 3}
+    {"dtype": "f16", "function": "zed_comfy_metal_add_f16_v1", "input_buffers": [0, 1], "output_buffer": 2, "element_count_buffer": 3},
+    {"dtype": "f32", "function": "zed_comfy_metal_add_f32_v1", "input_buffers": [0, 1], "output_buffer": 2, "element_count_buffer": 3}
   ],
   "storage_modes": {
     "unified_memory": "shared",

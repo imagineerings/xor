@@ -31,7 +31,7 @@ pub const MAX_WORKER_FATAL_CODE_BYTES: usize = 128;
 pub const MAX_WORKER_FATAL_MESSAGE_BYTES: usize = 4_096;
 pub const WORKER_OPERATION_SUPPORT_VERSION: u16 = 2;
 pub const LEGACY_WORKER_OPERATION_SUPPORT_VERSION: u16 = 1;
-pub const WORKER_REGISTRY_DIGEST_DOMAIN: &[u8] = b"sim-comfy-worker-registry-v1";
+pub const WORKER_REGISTRY_DIGEST_DOMAIN: &[u8] = b"zed-comfy-worker-registry-v1";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(transparent)]

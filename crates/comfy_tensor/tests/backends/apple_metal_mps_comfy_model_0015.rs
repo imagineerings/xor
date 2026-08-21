@@ -56,7 +56,7 @@ fn test_backend(
     host_memory: u64,
 ) -> Result<(MetalTensorBackend, ScratchReservation), TensorError> {
     let runtime = MetalRuntime::for_test_harness(capacity, true)
-        .map_err(|error| map_execution_error("sim.metal.test-harness", error))?;
+        .map_err(|error| map_execution_error("zed.metal.test-harness", error))?;
     let cancellation = CancellationToken::default();
     let (backend, authority) =
         MetalTensorBackend::from_certified_runtime(runtime, host_memory, capacity, &cancellation)?;
@@ -261,7 +261,7 @@ fn cancellation_preflight_and_terminal_wait_retirement_converge() -> Result<(), 
     backend
         .runtime
         .inject_test_command_failure(11)
-        .map_err(|error| map_execution_error("sim.metal.failure-injection", error))?;
+        .map_err(|error| map_execution_error("zed.metal.failure-injection", error))?;
     let terminal_event = backend.record_event(&live_context)?;
     let cancelled_after_dispatch = CancellationToken::default();
     cancelled_after_dispatch.cancel();
@@ -296,7 +296,7 @@ fn post_dispatch_cancellation_waits_retires_discards_and_returns_cancelled()
     backend
         .runtime
         .inject_test_command_failure(11)
-        .map_err(|error| map_execution_error("sim.metal.failure-injection", error))?;
+        .map_err(|error| map_execution_error("zed.metal.failure-injection", error))?;
     backend.cancel_after_next_native_event(cancellation.clone())?;
     assert!(matches!(
         backend.binary(
@@ -448,7 +448,7 @@ fn val_memory_001_cpu_copy_staging_is_bounded_and_offset_gaps_are_zeroed()
 -> Result<(), TensorError> {
     let (backend, authority) = {
         let runtime = MetalRuntime::for_test_harness(64, true)
-            .map_err(|error| map_execution_error("sim.metal.test-harness", error))?;
+            .map_err(|error| map_execution_error("zed.metal.test-harness", error))?;
         let cancellation = CancellationToken::default();
         MetalTensorBackend::from_certified_runtime(runtime, 4096, 64, &cancellation)?
     };
@@ -524,7 +524,7 @@ fn val_memory_001_cpu_copy_staging_is_bounded_and_offset_gaps_are_zeroed()
     backend
         .runtime
         .copy_device_to_host(&stream, allocation, 0, &mut backing)
-        .map_err(|error| map_execution_error("sim.metal.test.backing-read", error))?;
+        .map_err(|error| map_execution_error("zed.metal.test.backing-read", error))?;
     assert_eq!(&backing[..8], &[0; 8]);
     assert_eq!(&backing[8..], source.contiguous_bytes()?);
     drop(storage);
@@ -548,39 +548,39 @@ fn initialization_symbol_pipeline_and_execution_errors_map_to_distinct_typed_dom
             reason: "certificate".into(),
         },
         MetalExecutionError::MissingFunction {
-            function: "sim_comfy_metal_add_f32_v1".into(),
+            function: "zed_comfy_metal_add_f32_v1".into(),
         },
         MetalExecutionError::PipelineCreation {
-            function: "sim_comfy_metal_add_f32_v1".into(),
+            function: "zed_comfy_metal_add_f32_v1".into(),
             reason: "pipeline".into(),
         },
     ] {
         assert!(matches!(
-            map_execution_error("sim.metal.initialize", error),
+            map_execution_error("zed.metal.initialize", error),
             TensorError::UnsupportedCapability { .. }
         ));
     }
     assert!(matches!(
         map_execution_error(
-            "sim.metal.allocate",
+            "zed.metal.allocate",
             MetalExecutionError::OutOfMemory { requested: 17 },
         ),
         TensorError::AllocationFailed { requested: 17, .. }
     ));
     assert!(matches!(
         map_execution_error(
-            "sim.metal.wait",
+            "zed.metal.wait",
             MetalExecutionError::DeviceLost { code: 11 },
         ),
         TensorError::DeviceLost { .. }
     ));
     assert!(matches!(
-        map_execution_error("sim.metal.copy", MetalExecutionError::ForeignResource),
+        map_execution_error("zed.metal.copy", MetalExecutionError::ForeignResource),
         TensorError::UnsupportedCapability { .. }
     ));
     assert!(matches!(
         map_execution_error(
-            "sim.metal.copy",
+            "zed.metal.copy",
             MetalExecutionError::ResourceBounds {
                 offset: 8,
                 length: 8,
@@ -595,7 +595,7 @@ fn initialization_symbol_pipeline_and_execution_errors_map_to_distinct_typed_dom
 fn val_memory_001_logical_physical_accounting_oom_device_loss_and_drop_converge()
 -> Result<(), TensorError> {
     let runtime = MetalRuntime::for_test_harness(24, false)
-        .map_err(|error| map_execution_error("sim.metal.test-harness", error))?;
+        .map_err(|error| map_execution_error("zed.metal.test-harness", error))?;
     let injector = runtime.clone();
     let cancellation = CancellationToken::default();
     let (backend, authority) =
@@ -622,7 +622,7 @@ fn val_memory_001_logical_physical_accounting_oom_device_loss_and_drop_converge(
 
     injector
         .inject_test_command_failure(11)
-        .map_err(|error| map_execution_error("sim.metal.failure-injection", error))?;
+        .map_err(|error| map_execution_error("zed.metal.failure-injection", error))?;
     let (sum, event) = backend.binary(
         BinaryOperation::Add,
         &left,

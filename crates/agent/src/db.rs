@@ -11,7 +11,7 @@ use indoc::indoc;
 use language_model::Speed;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use sim_env_vars::SIM_STATELESS;
+use zed_env_vars::ZED_STATELESS;
 use sqlez::{
     bindable::{Bind, Column},
     connection::Connection,
@@ -435,7 +435,7 @@ impl ThreadsDatabase {
     }
 
     pub fn new(executor: BackgroundExecutor) -> Result<Self> {
-        let connection = if *SIM_STATELESS {
+        let connection = if *ZED_STATELESS {
             Connection::open_memory(Some("THREAD_FALLBACK_DB"))
         } else if cfg!(any(feature = "test-support", test)) {
             // rust stores the name of the test on the current thread.
@@ -521,14 +521,14 @@ impl ThreadsDatabase {
             .subagent_context
             .as_ref()
             .map(|ctx| ctx.parent_thread_id.0.clone());
-        let serialisim_folder_paths = folder_paths.serialize();
+        let serialized_folder_paths = folder_paths.serialize();
         let (folder_paths_str, folder_paths_order_str): (Option<String>, Option<String>) =
             if folder_paths.is_empty() {
                 (None, None)
             } else {
                 (
-                    Some(serialisim_folder_paths.paths),
-                    Some(serialisim_folder_paths.order),
+                    Some(serialized_folder_paths.paths),
+                    Some(serialized_folder_paths.order),
                 )
             };
         let json_data = serde_json::to_string(&SerializedThread {
@@ -995,7 +995,7 @@ mod tests {
         let database = ThreadsDatabase::new(cx.executor()).unwrap();
         let thread_id = session_id("sandbox-temp-dir-thread");
         let temp_dir = tempfile::Builder::new()
-            .prefix("sim-agent-terminal-test-")
+            .prefix("zed-agent-terminal-test-")
             .tempdir()
             .unwrap()
             .keep();
@@ -1024,7 +1024,7 @@ mod tests {
         let database = ThreadsDatabase::new(cx.executor()).unwrap();
         let thread_id = session_id("sandbox-temp-dir-delete-thread");
         let temp_dir = tempfile::Builder::new()
-            .prefix("sim-agent-terminal-test-")
+            .prefix("zed-agent-terminal-test-")
             .tempdir()
             .unwrap()
             .keep();

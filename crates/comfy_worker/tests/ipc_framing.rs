@@ -211,7 +211,7 @@ fn fixture_plan(
         prompt_id: Some(PromptId(uuid::Uuid::from_u128(1902))),
         client_id: Some("native-worker-test".to_owned()),
         number: Some(1.0),
-        extra_data: BTreeMap::from([("sim_native_delay_millis".to_owned(), json!(delay_millis))]),
+        extra_data: BTreeMap::from([("zed_native_delay_millis".to_owned(), json!(delay_millis))]),
         unknown: BTreeMap::new(),
     };
     let registry = native_image_registry_projection()?;

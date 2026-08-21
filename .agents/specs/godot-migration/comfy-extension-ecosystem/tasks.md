@@ -6,7 +6,7 @@ Build extension support with policy and diagnostics first. Only after disabled a
 
 ## Gates
 
-- Start gate: G0 spec consistency, G1 boundary policy, G7 dependency review for install/update behavior, and G8 Comfy harness alignment, G9 Sim coverage are satisfied.
+- Start gate: G0 spec consistency, G1 boundary policy, G7 dependency review for install/update behavior, and G8 Comfy harness alignment, G9 Zed coverage are satisfied.
 - Validation gate: discovery, policy, loader, asset path, translation, and manager-policy tests pass.
 - Handoff gate: every skipped, blocked, or failed extension has a visible diagnostic.
 - Completion gate: disabled extensions cannot execute or expose assets.
@@ -27,8 +27,8 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: none_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 2. Implement extension policy and diagnostics
   - Add enable/disable/block/whitelist decisions, script permission, web asset permission, network/install permission, and diagnostic records.
   - Represent policy decisions, permission reports, install review gates, and diagnostics with native `SimExtensionPolicy*` records.
@@ -36,8 +36,8 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Writes: crates/world_model/src/comfy_extension_policy.rs, crates/world_model/src/comfy_extension_diagnostics.rs, crates/world_model/src/comfy_extension_policy_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 1_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 3. Implement controlled extension loader
   - Load allowed packs, run permitted prestartup scripts, restore protected hooks, and isolate import failures.
   - Represent load metadata, loaded/skipped packs, restored hooks, missing dependencies, and import diagnostics with native `SimExtensionLoad*` records without arbitrary ComfyUI execution.
@@ -45,26 +45,26 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Writes: crates/world_model/src/comfy_extension_loader.rs, crates/world_model/src/comfy_extension_loader_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 2_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 4. Implement custom node registration bridge
   - Support V1 mappings and modern extension entrypoints, display names, module metadata, and unsupported registration diagnostics.
-  - Represent custom node declarations, module metadata, registration records, and diagnostics with native `SimCustomNode*` records while registering Sim-owned node definitions.
+  - Represent custom node declarations, module metadata, registration records, and diagnostics with native `SimCustomNode*` records while registering Zed-owned node definitions.
   - _Requirements: 2.1, 2.2, 2.4_
   - _Writes: crates/world_model/src/comfy_custom_node_bridge.rs, crates/world_model/src/comfy_custom_node_bridge_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 3_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 5. Implement extension web asset service
   - Serve registered web directories and templates with path confinement, cache policy, and safe content types.
-  - Represent extension web/template roots, responses, and diagnostics with native `SimExtensionAsset*` records and Sim-owned routes rather than ComfyUI asset pass-throughs.
+  - Represent extension web/template roots, responses, and diagnostics with native `SimExtensionAsset*` records and Zed-owned routes rather than ComfyUI asset pass-throughs.
   - _Requirements: 2.3, 4.2_
   - _Writes: crates/world_model/src/comfy_extension_assets.rs, crates/world_model/src/comfy_extension_assets_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 4_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 6. Implement translations, templates, and subgraph indexing
   - Merge locale bundles, expose template names/assets, and feed custom node subgraphs into workflow subgraph index.
   - Represent locale bundles, template declarations, subgraph declarations, and index reports with native `SimExtensionLocale*` and `SimExtensionTemplate*` records.
@@ -72,30 +72,30 @@ Build extension support with policy and diagnostics first. Only after disabled a
   - _Writes: crates/world_model/src/comfy_extension_i18n.rs, crates/world_model/src/comfy_extension_templates.rs, crates/world_model/src/comfy_extension_i18n_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 5_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 7. Implement manager compatibility boundary
   - Add manager status/policy metadata and approval gates for install, update, disable, and background operations.
-  - Represent manager actions, status, approvals, evaluations, and diagnostics with native `SimManager*` records that enforce Sim policy and dependency review instead of calling ComfyUI-Manager directly.
+  - Represent manager actions, status, approvals, evaluations, and diagnostics with native `SimManager*` records that enforce Zed policy and dependency review instead of calling ComfyUI-Manager directly.
   - _Requirements: 5.1, 5.2, 5.3_
   - _Writes: crates/world_model/src/comfy_manager.rs, crates/world_model/src/comfy_manager_tests.rs_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Depends on: 6_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 - [ ] 8. Materialize remaining extension-ecosystem coverage backlog
-  - Convert 149 planned coverage records in extension-ecosystem into native Sim implementation, delegation, unsupported, or divergent outcomes without ComfyUI pass-through.
+  - Convert 149 planned coverage records in extension-ecosystem into native Zed implementation, delegation, unsupported, or divergent outcomes without ComfyUI pass-through.
   - Coverage IDs: all former records in `crates/world_model/fixtures/comfy/coverage_ledger.json` with `backlog_task.task_id = coverage-backlog-extension-ecosystem` are now marked `Implemented` with `crates/world_model/fixtures/comfy/extension_backlog.json` evidence; representative IDs: extensionhook:projects_comfy_app_assets_api_routes_py:routes, extensionhook:projects_comfy_comfy_api_nodes_nodes_anthropic_py:AnthropicExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_beeble_py:BeebleExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_bfl_py:BFLExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_bria_py:BriaExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_bytedance_py:ByteDanceExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_bytedance_llm_py:ByteDanceLLMExtension, extensionhook:projects_comfy_comfy_api_nodes_nodes_elevenlabs_py:ElevenLabsExtension.
-  - Native Sim writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs, crates/world_model/src/world_model.rs, crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/coverage_ledger.json, crates/world_model/fixtures/comfy/extension_backlog.json.
+  - Native Zed writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs, crates/world_model/src/world_model.rs, crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/coverage_ledger.json, crates/world_model/fixtures/comfy/extension_backlog.json.
   - Validation: `cargo test -p world_model comfy_extension`.
-  - Parity evidence: Records are implemented only with native Sim extension discovery, policy, loader, asset, i18n, template, or manager-boundary evidence; the backlog fixture is metadata-only and does not execute ComfyUI extension code.
+  - Parity evidence: Records are implemented only with native Zed extension discovery, policy, loader, asset, i18n, template, or manager-boundary evidence; the backlog fixture is metadata-only and does not execute ComfyUI extension code.
   - _CoverageTask: coverage-backlog-extension-ecosystem_
   - _CoverageOwner: .agents/specs/godot-migration/comfy-extension-ecosystem_
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
   - _Writes: crates/world_model/src/comfy_extensions.rs, crates/world_model/src/comfy_extensions_tests.rs, crates/world_model/src/world_model.rs, crates/world_model/tests/comfy_compat_suite.rs, crates/world_model/fixtures/comfy/coverage_ledger.json, crates/world_model/fixtures/comfy/extension_backlog.json
   - _Depends on: 7_
-  - _Reads: /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
-  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/sim/.agents/specs/godot-migration/comfy-extension-ecosystem_
+  - _Reads: /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/requirements.md, /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem/design.md, Cargo.toml, projects/comfy_
+  - _Validation: python3 .agents/skills/feature-spec/scripts/validate_spec.py /Users/ahmad.vegah/repos/zed/.agents/specs/godot-migration/comfy-extension-ecosystem_
 
 ## Notes
 

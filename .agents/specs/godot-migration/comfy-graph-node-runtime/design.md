@@ -36,7 +36,7 @@ pub trait SimNodeRegistry {
 
 ### NodeSchemaAdapter
 
-- **Purpose**: Convert Comfy node input/output declarations into Sim graph schemas.
+- **Purpose**: Convert Comfy node input/output declarations into Zed graph schemas.
 - **Responsibilities**: Normalize required, optional, hidden, lazy, list, combo, and primitive inputs; preserve descriptions and display names.
 
 ### NodeReplacementEngine
@@ -134,38 +134,38 @@ pub enum CachePolicy {
 }
 ```
 
-The node registry is a native Sim registry. It stores core, extra, API-provider,
+The node registry is a native Zed registry. It stores core, extra, API-provider,
 and custom node definitions as typed records, filters disabled nodes from
 object-info responses, and returns deterministic availability diagnostics for
 unknown or disabled node classes. It does not proxy object-info lookup to
 ComfyUI.
 
-The schema adapter is native Sim normalization. It converts required, optional,
-hidden, primitive, combo, list, and lazy Comfy declarations into typed Sim graph
+The schema adapter is native Zed normalization. It converts required, optional,
+hidden, primitive, combo, list, and lazy Comfy declarations into typed Zed graph
 schema inputs with deterministic diagnostics for unsupported types or invalid
 combo declarations, then reuses native node outputs from the registry.
 
-The node replacement engine is a native Sim graph rewrite pass. It applies
+The node replacement engine is a native Zed graph rewrite pass. It applies
 validated old-to-new node type mappings only when a node type is missing from
-the enabled Sim registry, rewrites input and output port names on graph nodes
-and links, preserves literal input metadata under the new Sim input names, and
+the enabled Zed registry, rewrites input and output port names on graph nodes
+and links, preserves literal input metadata under the new Zed input names, and
 leaves invalid replacement targets untouched with deterministic diagnostics for
 later validation.
 
-The prompt graph validator is native Sim graph validation. It validates node
-availability through the enabled Sim registry, required inputs satisfied by
-links or literal Sim metadata, linked port existence, link type compatibility,
+The prompt graph validator is native Zed graph validation. It validates node
+availability through the enabled Zed registry, required inputs satisfied by
+links or literal Zed metadata, linked port existence, link type compatibility,
 cycles, duplicate links, partial execution targets, and provider/model/asset
 capability gates without passing prompt validation through ComfyUI.
 
-The execution planner and cache policy are native Sim graph scheduling records.
+The execution planner and cache policy are native Zed graph scheduling records.
 The planner computes target dependency closures, deterministic dependency-first
-execution order, reusable cached nodes, and dirty nodes from Sim graph edges.
+execution order, reusable cached nodes, and dirty nodes from Zed graph edges.
 Cache policy models classic reuse, LRU limits, RAM-pressure limits, and disabled
-cache semantics from Sim cache snapshots and deterministic node cache keys
+cache semantics from Zed cache snapshots and deterministic node cache keys
 without relying on ComfyUI execution state.
 
-The node executor adapter is a native Sim execution coordinator. It consumes
+The node executor adapter is a native Zed execution coordinator. It consumes
 execution plans, records cached, completed, async-pending, list-mapped, blocked,
 interrupted, failed, and skipped node states, preserves UI outputs and
 provenance, stops dependents when upstream nodes cannot complete, and emits
@@ -173,9 +173,9 @@ explicit dispatch records for sampler, conditioning, VAE, latent, model patch,
 diffusion, or world-model node types owned by
 `comfy-diffusion-world-model-runtime/`.
 
-Core node compatibility fixtures are native Sim fixture contracts. They snapshot
+Core node compatibility fixtures are native Zed fixture contracts. They snapshot
 object-info coverage for core node categories and run representative prompt
-graphs through Sim registry lookup, graph validation, execution planning, and
+graphs through Zed registry lookup, graph validation, execution planning, and
 executor dispatch with mock native outcomes. They are not ComfyUI proxy tests.
 
 ## Correctness Properties
@@ -237,7 +237,7 @@ _For any_ node that requires sampler, scheduler, conditioning, VAE, latent, mode
 
 - Unit tests for schema adaptation, node replacement, link validation, cycle detection, cache key generation, and partial execution closure.
 - Integration tests for prompt validation through queue submission and object info retrieval.
-- Compatibility fixtures for core Comfy nodes: sampler, loaders, CLIP text encode, VAE encode/decode, image save/load, latent operations, LoRA, ControlNet, GLIGEN, and inpaint conditioning. Fixture approval requires native Sim object-info records, prompt validation, execution planning, and executor dispatch assertions rather than ComfyUI pass-through.
+- Compatibility fixtures for core Comfy nodes: sampler, loaders, CLIP text encode, VAE encode/decode, image save/load, latent operations, LoRA, ControlNet, GLIGEN, and inpaint conditioning. Fixture approval requires native Zed object-info records, prompt validation, execution planning, and executor dispatch assertions rather than ComfyUI pass-through.
 - Property tests for topological ordering and replacement link preservation.
 
 

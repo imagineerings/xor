@@ -8,7 +8,7 @@
     "target": "aarch64-apple-darwin",
     "observed_at_utc": "2026-07-30T16:20:34Z",
     "environment": {
-      "lab_id": "sim-cpu-lab-mt-mbp-l2kh69c7rg",
+      "lab_id": "zed-cpu-lab-mt-mbp-l2kh69c7rg",
       "hostname": "MT-MBP-L2KH69C7RG",
       "os_name": "macOS",
       "os_version": "26.5.2",
@@ -50,7 +50,7 @@
       "abi_contract_sha256": "c1fddcc2eab4b38f0a19250258a1b37b11343e2635fd8af2f1084c2b3e7c114a",
       "abi_manifest_sha256": "9218324d56a61d51923c2c2b974f7eb7ee7e722fda7d9b943bffb00b95e6e491",
       "execution_abi_sha256": "992cc3d10d7f270db2d21c033ef6deb1ad6dfab369d3233c1a05cf6b720ba037",
-      "abi_floor": "sim-tensor-backend-v1",
+      "abi_floor": "zed-tensor-backend-v1",
       "framework_count": 0,
       "symbol_count": 3,
       "class_count": 0,
@@ -62,7 +62,7 @@
       ],
       "package": {
         "kind": "not_applicable",
-        "reason": "CPU adapter is compiled into the native Rust Sim worker and has no separately signed vendor package"
+        "reason": "CPU adapter is compiled into the native Rust Zed worker and has no separately signed vendor package"
       }
     },
     "matrix": [
@@ -19889,8 +19889,8 @@
   },
   "attestation": {
     "algorithm": "ed25519",
-    "domain": "sim-comfy-device-certification-v2",
-    "signer": "sim.hardware.lab.cpu.mt-mbp-l2kh69c7rg",
+    "domain": "zed-comfy-device-certification-v2",
+    "signer": "zed.hardware.lab.cpu.mt-mbp-l2kh69c7rg",
     "public_key": "627d26c97f76a810b90828422cff3e6cdaa083ed885d40169bae0e08255d07eb",
     "signature": "d258bbf9b5cb7896a0c13c7c221ee4d87889ce4d89fd247c41078b3aa9bbd59b1afaaf15d65d82741fa9cb94077f0e9821c5439bf505f1f30989945cef68be01",
     "payload_sha256": "4ed954d620496f10e120fa0e9cfa1a1c5a916fee4be1745675ca1d3772d178ce"

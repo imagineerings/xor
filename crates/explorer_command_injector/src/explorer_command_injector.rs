@@ -44,15 +44,15 @@ struct ExplorerCommandInjector;
 impl IExplorerCommand_Impl for ExplorerCommandInjector_Impl {
     fn GetTitle(&self, _: Ref<IShellItemArray>) -> Result<windows_core::PWSTR> {
         let command_description =
-            retrieve_command_description().unwrap_or(HSTRING::from("Open with Sim"));
+            retrieve_command_description().unwrap_or(HSTRING::from("Open with Zed"));
         unsafe { SHStrDupW(&command_description) }
     }
 
     fn GetIcon(&self, _: Ref<IShellItemArray>) -> Result<windows_core::PWSTR> {
-        let Some(sim_exe) = get_sim_exe_path() else {
+        let Some(zed_exe) = get_zed_exe_path() else {
             return Err(E_FAIL.into());
         };
-        unsafe { SHStrDupW(&HSTRING::from(sim_exe)) }
+        unsafe { SHStrDupW(&HSTRING::from(zed_exe)) }
     }
 
     fn GetToolTip(&self, _: Ref<IShellItemArray>) -> Result<windows_core::PWSTR> {
@@ -69,7 +69,7 @@ impl IExplorerCommand_Impl for ExplorerCommandInjector_Impl {
 
     fn Invoke(&self, psiitemarray: Ref<IShellItemArray>, _: Ref<IBindCtx>) -> Result<()> {
         let items = psiitemarray.ok()?;
-        let Some(sim_exe) = get_sim_exe_path() else {
+        let Some(zed_exe) = get_zed_exe_path() else {
             return Ok(());
         };
 
@@ -78,7 +78,7 @@ impl IExplorerCommand_Impl for ExplorerCommandInjector_Impl {
             let item = unsafe { items.GetItemAt(idx)? };
             let item_path = unsafe { item.GetDisplayName(SIGDN_FILESYSPATH)?.to_string()? };
             #[allow(clippy::disallowed_methods, reason = "no async context in sight..")]
-            std::process::Command::new(&sim_exe)
+            std::process::Command::new(&zed_exe)
                 .arg(&item_path)
                 .spawn()
                 .map_err(|_| E_INVALIDARG)?;
@@ -160,7 +160,7 @@ extern "system" fn DllGetClassObject(
     }
 }
 
-fn get_sim_install_folder() -> Option<PathBuf> {
+fn get_zed_install_folder() -> Option<PathBuf> {
     let mut buf = vec![0u16; MAX_PATH as usize];
     unsafe { GetModuleFileNameW(Some(DLL_INSTANCE.into()), &mut buf) };
 
@@ -177,8 +177,8 @@ fn get_sim_install_folder() -> Option<PathBuf> {
 }
 
 #[inline]
-fn get_sim_exe_path() -> Option<String> {
-    get_sim_install_folder().map(|path| path.join("Sim.exe").to_string_lossy().into_owned())
+fn get_zed_exe_path() -> Option<String> {
+    get_zed_install_folder().map(|path| path.join("Zed.exe").to_string_lossy().into_owned())
 }
 
 #[inline]

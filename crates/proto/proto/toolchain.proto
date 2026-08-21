@@ -1,5 +1,5 @@
 syntax = "proto3";
-package sim.messages;
+package zed.messages;
 
 message ListToolchains {
   uint64 project_id = 1;

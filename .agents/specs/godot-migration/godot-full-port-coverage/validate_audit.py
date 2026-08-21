@@ -15,11 +15,11 @@ ROOT = Path(__file__).resolve().parent
 REPOSITORY = ROOT.parents[3]
 CATALOG = ROOT / "catalogs" / "master-coverage.csv"
 EXPECTED_GODOT_COMMIT = "5b4e0cb0fd279832bbdd69fed5354d4e5ad26f88"
-EXPECTED_SIM_COMMIT = "95c903d0d2feba228d73b813216c2ff2cc585119"
+EXPECTED_ZED_COMMIT = "95c903d0d2feba228d73b813216c2ff2cc585119"
 EXPECTED_MANIFEST_SHA256 = "3f52220d352a6156c26f75006476201b548b41b418903832f8d318eb9aca34e2"
 CLASSIFICATIONS = {
-    "Already implemented in Sim and reusable without changes",
-    "Partially implemented in Sim and should be extended",
+    "Already implemented in Zed and reusable without changes",
+    "Partially implemented in Zed and should be extended",
     "Fully covered by an existing Godot migration spec",
     "Partially covered by an existing migration spec",
     "Missing from the migration specs",
@@ -34,19 +34,19 @@ REQUIRED_COLUMNS = {
     "supported_modes_and_platform_differences",
     "success_failure_persistence_lifecycle",
     "godot_evidence",
-    "existing_sim_evidence",
+    "existing_zed_evidence",
     "spec_coverage",
     "classification",
     "proposed_owner_in_sim",
-    "existing_or_proposed_native_sim_owner",
+    "existing_or_proposed_native_zed_owner",
     "build_time_dependency_on_godot",
     "runtime_dependency_on_godot",
-    "sim_native_storage_path",
-    "sim_native_execution_path",
-    "sim_native_ui_path",
-    "sim_native_lifecycle_path",
+    "zed_native_storage_path",
+    "zed_native_execution_path",
+    "zed_native_ui_path",
+    "zed_native_lifecycle_path",
     "godot_compatible_file_or_api_boundary",
-    "existing_sim_reuse_evidence",
+    "existing_zed_reuse_evidence",
     "reuse_or_extension_strategy",
     "remaining_gap",
     "verification_needed",
@@ -121,13 +121,13 @@ def main() -> int:
             elif not (REPOSITORY / source_path).exists():
                 fail(f"{row['capability_id']} Godot evidence path does not exist: {source_path}")
                 errors += 1
-        sim_path_found = False
-        for evidence in row["existing_sim_evidence"].split("; "):
-            sim_path = evidence.split("::", 1)[0].strip()
-            if sim_path.startswith(("crates/", "script/", "tooling/", ".github/", "Cargo.toml", "Cargo.lock", "deny.toml")):
-                sim_path_found = sim_path_found or (REPOSITORY / sim_path).exists()
-        if not sim_path_found:
-            fail(f"{row['capability_id']} has no existing precise Sim evidence path")
+        zed_path_found = False
+        for evidence in row["existing_zed_evidence"].split("; "):
+            zed_path = evidence.split("::", 1)[0].strip()
+            if zed_path.startswith(("crates/", "script/", "tooling/", ".github/", "Cargo.toml", "Cargo.lock", "deny.toml")):
+                zed_path_found = zed_path_found or (REPOSITORY / zed_path).exists()
+        if not zed_path_found:
+            fail(f"{row['capability_id']} has no existing precise Zed evidence path")
             errors += 1
         if not re.search(r"Audit closure: R\d+\.1-R\d+\.4; D-[A-Z0-9]+; T\d+\. Native gate: R23\.1-R23\.10; D-NATIVE; T200\.", row["spec_coverage"]):
             fail(f"{row['capability_id']} lacks exact audit traceability")
@@ -138,8 +138,8 @@ def main() -> int:
         if not row["runtime_dependency_on_godot"].startswith("No."):
             fail(f"{row['capability_id']} does not prohibit a Godot runtime dependency")
             errors += 1
-        if row["existing_or_proposed_native_sim_owner"] != row["proposed_owner_in_sim"]:
-            fail(f"{row['capability_id']} native owner disagrees with proposed Sim owner")
+        if row["existing_or_proposed_native_zed_owner"] != row["proposed_owner_in_sim"]:
+            fail(f"{row['capability_id']} native owner disagrees with proposed Zed owner")
             errors += 1
         validation_text = row["no_godot_installation_validation"].lower()
         if "godot absent" not in validation_text or "process tree" not in validation_text or "dependency manifest" not in validation_text:
@@ -166,13 +166,13 @@ def main() -> int:
             fail(f"{row['capability_id']} references missing task {task}")
             errors += 1
     if any(f"23.{acceptance}" not in requirement_ids for acceptance in range(1, 11)):
-        fail("native Sim acceptance criteria 23.1-23.10 are incomplete")
+        fail("native Zed acceptance criteria 23.1-23.10 are incomplete")
         errors += 1
     if "D-NATIVE" not in design_ids:
-        fail("native Sim design element D-NATIVE is missing")
+        fail("native Zed design element D-NATIVE is missing")
         errors += 1
     if "200" not in task_ids:
-        fail("native Sim audit leaf task 200 is missing")
+        fail("native Zed audit leaf task 200 is missing")
         errors += 1
     migration_root = ROOT.parent
     checked_tasks = []
@@ -214,13 +214,13 @@ def main() -> int:
         fail("classification totals do not reconcile")
         errors += 1
     baseline_exists = subprocess.run(
-        ["git", "cat-file", "-e", f"{EXPECTED_SIM_COMMIT}^{{commit}}"],
+        ["git", "cat-file", "-e", f"{EXPECTED_ZED_COMMIT}^{{commit}}"],
         cwd=REPOSITORY,
         capture_output=True,
         text=True,
     )
     baseline_is_ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", EXPECTED_SIM_COMMIT, "HEAD"],
+        ["git", "merge-base", "--is-ancestor", EXPECTED_ZED_COMMIT, "HEAD"],
         cwd=REPOSITORY,
         capture_output=True,
         text=True,
@@ -229,7 +229,7 @@ def main() -> int:
         current_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=REPOSITORY, check=True, capture_output=True, text=True
         ).stdout.strip()
-        fail(f"Sim baseline {EXPECTED_SIM_COMMIT} is missing or is not an ancestor of {current_commit}")
+        fail(f"Zed baseline {EXPECTED_ZED_COMMIT} is missing or is not an ancestor of {current_commit}")
         errors += 1
     file_count, digest = manifest_digest(REPOSITORY / "projects" / "godot")
     if file_count != 13979 or digest != EXPECTED_MANIFEST_SHA256:

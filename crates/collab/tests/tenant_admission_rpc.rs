@@ -53,13 +53,13 @@ async fn tenant_admission_rpc_authorizes_before_database_queries() {
     let community_id = community(1);
     let principal_id = principal(2);
     let tenant = bind_rpc_tenant(
-        Some(TrustedTenantRoute::from_listener(community_id, "sim-rpc").expect("trusted route")),
+        Some(TrustedTenantRoute::from_listener(community_id, "zed-rpc").expect("trusted route")),
         &[],
     )
     .expect("tenant");
     let required_scope = AuthorizationScope::new("projects:read").expect("scope");
     let scopes = PrincipalScopes::new([required_scope.clone()]).expect("scopes");
-    let authenticated = AuthenticatedPrincipal::sim_account(
+    let authenticated = AuthenticatedPrincipal::zed_account(
         principal_id,
         community_id,
         ServiceAccountId::new(3),
@@ -107,7 +107,7 @@ fn tenant_admission_rpc_rejects_payload_selected_and_conflicting_tenants() {
         Err(RpcAdmissionError::Denied)
     );
 
-    let route = TrustedTenantRoute::from_listener(community(1), "sim-rpc").expect("trusted route");
+    let route = TrustedTenantRoute::from_listener(community(1), "zed-rpc").expect("trusted route");
     let body_claim = UntrustedTenantClaim::new(community(2), UntrustedTenantClaimSource::BodyField);
     assert_eq!(
         bind_rpc_tenant(Some(route), &[body_claim]),

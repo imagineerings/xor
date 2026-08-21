@@ -13,7 +13,7 @@ from generate_shell_catalog import KEYMAP_CONTEXT
 
 ROOT = Path(__file__).resolve().parent
 REPO_ROOT = ROOT.parents[2]
-CATALOG = ROOT / "catalogs/sim-architecture.csv"
+CATALOG = ROOT / "catalogs/zed-architecture.csv"
 EXECUTION_DISPOSITIONS = ROOT / "catalogs/native-execution-dispositions.csv"
 GENERATED_EXECUTION_CATALOG = (
     REPO_ROOT / "crates/comfy_ui/src/generated_execution_catalog.rs"
@@ -291,12 +291,12 @@ def validate_task18_disposition_ledger() -> None:
         if disposition is None or disposition["owner_task_id"] != expected_owner:
             raise RuntimeError(f"Task 18 component ownership drift for {feature_id}")
 def accessible_comfy_bootstrap_present() -> bool:
-    main_source = (REPO_ROOT / "crates/sim/src/main.rs").read_text(encoding="utf-8")
+    main_source = (REPO_ROOT / "crates/zed/src/main.rs").read_text(encoding="utf-8")
     graph_source = (REPO_ROOT / "crates/comfy_ui/src/graph_render.rs").read_text(encoding="utf-8")
     return (
         "Application::with_platform(platform)" in main_source
         and "Application::new_inaccessible" not in main_source
-        and "SIM_EXPERIMENTAL_A11Y" not in main_source
+        and "ZED_EXPERIMENTAL_A11Y" not in main_source
         and ".key_context(crate::COMFY_GRAPH_KEY_CONTEXT)" in graph_source
         and ".role(Role::Application)" in graph_source
     )
@@ -310,7 +310,7 @@ ACCESSIBILITY_EVIDENCE = (
     "VAL-GPUI-012/013 own this bootstrap; later surface tasks retain the whole-application audit."
     if ACCESSIBLE_COMFY_BOOTSTRAP
     else "`build_application` defaults to `Application::new_inaccessible` unless "
-    "`SIM_EXPERIMENTAL_A11Y=1`; production parity requires an accessible default and tests."
+    "`ZED_EXPERIMENTAL_A11Y=1`; production parity requires an accessible default and tests."
 )
 
 NATIVE_GRAPH_PRESENT = all(
@@ -328,7 +328,7 @@ NATIVE_GRAPH_PRESENT = all(
 )
 actions_source = (REPO_ROOT / "crates/comfy_ui/src/actions.rs").read_text(encoding="utf-8")
 shell_source = (REPO_ROOT / "crates/comfy_ui/src/shell.rs").read_text(encoding="utf-8")
-sim_menus_source = (REPO_ROOT / "crates/sim/src/sim/app_menus.rs").read_text(
+zed_menus_source = (REPO_ROOT / "crates/zed/src/zed/app_menus.rs").read_text(
     encoding="utf-8"
 )
 keymap_sections = json.loads(
@@ -340,7 +340,7 @@ GRAPH_SHELL_PRESENT = (
     and "GENERATED_KEYBINDING_CATALOG" in shell_source
     and "pub fn menu_registry()" in shell_source
     and "pub fn comfy_menu() -> Menu" in shell_source
-    and "comfy_ui::comfy_menu()" in sim_menus_source
+    and "comfy_ui::comfy_menu()" in zed_menus_source
     and len(keymap_sections) == 1
     and keymap_sections[0].get("context") == KEYMAP_CONTEXT
     and len(keymap_sections[0].get("bindings", {})) == 34
@@ -357,13 +357,13 @@ EXECUTION_PRESENTATION_PRESENT = all(
         ("crates/comfy_ui/src/queue_panel.rs", "pub struct QueuePanelContent"),
         ("crates/comfy_ui/src/history_panel.rs", "pub struct HistoryPanelContent"),
         ("crates/comfy_ui/src/output_view.rs", "pub struct OutputView"),
-        ("crates/sim/src/sim.rs", "comfy_ui::ExecutionPanel::load"),
+        ("crates/zed/src/zed.rs", "comfy_ui::ExecutionPanel::load"),
     )
 )
 
 CURRENT_IMPLEMENTATION_UPDATES: dict[str, dict[str, str]] = {}
 if ACCESSIBLE_COMFY_BOOTSTRAP:
-    CURRENT_IMPLEMENTATION_UPDATES["SIM-ARCH-001"] = {
+    CURRENT_IMPLEMENTATION_UPDATES["ZED-ARCH-001"] = {
         "current_comfy_status": "partial",
         "constraint_or_gap": "Production GPUI accessibility is enabled without an environment gate; later route, platform, screen-reader, localization, and visual audits remain",
         "recommended_mapping": "Retain the accessible bootstrap and complete VAL-GPUI-011 through the later surface/platform owners",
@@ -371,22 +371,22 @@ if ACCESSIBLE_COMFY_BOOTSTRAP:
 if NATIVE_GRAPH_PRESENT:
     CURRENT_IMPLEMENTATION_UPDATES.update(
         {
-            "SIM-ARCH-004": {
+            "ZED-ARCH-004": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "GraphWorkspaceItem is a registered native project/workspace item; later panels and content items remain",
                 "recommended_mapping": "Extend through the declared execution, asset, workflow-experience, content, settings, and diagnostics owners",
             },
-            "SIM-ARCH-005": {
+            "ZED-ARCH-005": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "GraphWorkspaceItem has registered versioned serialization/restoration and tested workflow authority; later cross-service persistence audit remains",
                 "recommended_mapping": "Retain lossless schema/restoration and complete VAL-DOMAIN-001/006 in the persistence audit",
             },
-            "SIM-ARCH-021": {
+            "ZED-ARCH-021": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "The native GPUI graph implements typed ports/widgets/links, selection, groups, reroutes, subgraphs, viewport, minimap, commands, undo/redo, focus, and serialization; library/execution/content breadth remains",
                 "recommended_mapping": "Keep GraphCommand as the mutation boundary and complete later node-library, execution, content, accessibility, and performance matrices",
             },
-            "SIM-ARCH-055": {
+            "ZED-ARCH-055": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "Validated native foundations now exist, but exact feature-level equivalence still requires every mapped executable task and final closure artifact",
                 "recommended_mapping": "Promote only the exact rows whose implementation and validation evidence pass; retain missing, conflicting, deferred, and uncertain rows until final reconciliation",
@@ -396,12 +396,12 @@ if NATIVE_GRAPH_PRESENT:
 if GRAPH_SHELL_PRESENT:
     CURRENT_IMPLEMENTATION_UPDATES.update(
         {
-            "SIM-ARCH-018": {
+            "ZED-ARCH-018": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "A graph-scoped Comfy keymap and typed 118-command registry are present; later-owned command results remain with their executable tasks",
                 "recommended_mapping": "Preserve ComfyGraph scoping and user override precedence while later owners activate their registered commands",
             },
-            "SIM-ARCH-019": {
+            "ZED-ARCH-019": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "The generated canonical Comfy menu targets registered native actions and all 236 menu rows retain placement/owner dispositions; later surfaces remain",
                 "recommended_mapping": "Add later menu contributions only with real enablement, visible errors, and the existing registry identities",
@@ -409,7 +409,7 @@ if GRAPH_SHELL_PRESENT:
         }
     )
 if ACCESSIBLE_COMFY_BOOTSTRAP and NATIVE_GRAPH_PRESENT:
-    CURRENT_IMPLEMENTATION_UPDATES["SIM-ARCH-024"] = {
+    CURRENT_IMPLEMENTATION_UPDATES["ZED-ARCH-024"] = {
         "current_comfy_status": "partial",
         "constraint_or_gap": "The native graph exposes an application semantic root, entity/control labels and states, keyboard focus, errors, and live announcements; later whole-application and platform audits remain",
         "recommended_mapping": "Keep semantic state derived from the graph model and complete VAL-GPUI-011 across later surfaces and platforms",
@@ -417,17 +417,17 @@ if ACCESSIBLE_COMFY_BOOTSTRAP and NATIVE_GRAPH_PRESENT:
 if EXECUTION_PRESENTATION_PRESENT:
     CURRENT_IMPLEMENTATION_UPDATES.update(
         {
-            "SIM-ARCH-007": {
+            "ZED-ARCH-007": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "The production-registered ExecutionPanel provides profile-scoped queue, history, output, and error tabs; later node-library, assets/models, operations, logs, and diagnostics panels remain",
                 "recommended_mapping": "Retain one application-owned execution model and extend only through the declared later panel owners",
             },
-            "SIM-ARCH-029": {
+            "ZED-ARCH-029": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "OutputView preserves ordered output identity, media kind, metadata, unavailable state, and capability-gated view/download/recover/remove actions; specialized media viewers remain later-owned",
                 "recommended_mapping": "Keep typed artifact references and register specialized viewers through comfy-parity-assets-editors-viewers",
             },
-            "SIM-ARCH-042": {
+            "ZED-ARCH-042": {
                 "current_comfy_status": "partial",
                 "constraint_or_gap": "ExecutionPresentationService and ExecutionUiModel reduce monotonic profile/attempt events, reject stale or cross-profile updates, coalesce notifications, and preserve terminal ordering",
                 "recommended_mapping": "Retain the canonical reducer as the sole GPUI execution projection and complete later worker/device recovery matrices",
@@ -437,49 +437,49 @@ if EXECUTION_PRESENTATION_PRESENT:
 
 
 UPDATES = {
-    "SIM-ARCH-003": ("No Comfy workflow/native-worker lifecycle participates", "Register workflow items early and coordinate Sim-owned Rust worker cancellation/shutdown after save decisions"),
-    "SIM-ARCH-007": ("No Comfy panels", "Use for node library, queue, history, assets, models, native worker logs, and operations"),
-    "SIM-ARCH-008": ("No Comfy dialogs", "Use for bounded runtime-profile, legacy-mapping, permission, and destructive decisions"),
-    "SIM-ARCH-010": ("No Comfy workflow/runtime-profile/attempt records", "Create a dedicated Comfy DB domain with only necessary WorkspaceDb dependency"),
-    "SIM-ARCH-012": ("Silent UI success after a parity-critical write failure would violate requirements", "Await and surface critical workflow, attempt, output, and operation-journal writes"),
-    "SIM-ARCH-016": ("These are not native Comfy runtime profiles", "Persist native runtime profiles with stable ProfileId, device/memory/API/plugin/provider policy, and inactive legacy connection data"),
-    "SIM-ARCH-028": ("No Comfy file layout, artifact index, metadata codec, or operation journal", "Use for workflow authority, artifact/model/plugin staging, transactional outputs, and failure injection"),
-    "SIM-ARCH-029": ("No Comfy output association, metadata, native codec contract, or editing", "Adapt as a native output-view primitive after runtime/artifact integration"),
-    "SIM-ARCH-034": ("No native Comfy handler schemas, limits, idempotency, or authentication", "Use only as a provider client primitive; implement Comfy HTTP as a native Rust host over runtime services"),
-    "SIM-ARCH-035": ("Response timeout/cancellation/limits remain relevant only for approved provider clients", "Apply per-provider operation policies; GPUI does not call a Comfy server"),
-    "SIM-ARCH-036": ("Product-specific client code is not a native Comfy WebSocket host and drops some send errors", "Implement Rust WebSocket compatibility projection from the native event bus with explicit errors and bounds"),
-    "SIM-ARCH-037": ("RPC transport is not Comfy and production requires no external Comfy reconnection", "Reuse reducer/epoch testing patterns for worker supervision and native API client sessions only"),
-    "SIM-ARCH-038": ("No native worker readiness, private IPC, device-fence cancellation, or recovery", "Use or extend for the Sim-owned Rust compute worker only, with bounded shutdown and verified ownership"),
-    "SIM-ARCH-039": ("It does not itself establish cross-platform process-tree semantics", "Do not cite it as native worker process-tree ownership; use util::process::Child where an owned worker is required"),
-    "SIM-ARCH-040": ("A visible terminal is not the authoritative native worker owner", "Use for bounded sanitized logs or approved environment tooling, never Python engine ownership"),
-    "SIM-ARCH-041": ("Adding an application runtime here would inflate all workspace/test construction", "Prefer an application RuntimeSupervisor/global with explicit native profile entities"),
-    "SIM-ARCH-042": ("No native Comfy runtime state reducer", "Store runtime-profile/worker tasks and reject stale profile, attempt, worker, and event-sequence completions"),
-    "SIM-ARCH-043": ("No backend/model/plugin/codec byte progress, journal, snapshot, or rollback", "Build a durable native component/artifact operation manager; do not reproduce Python/custom-node update internals"),
-    "SIM-ARCH-044": ("Existing host is Wasmtime/WASI precedent but lacks explicit Comfy tensor/node ports and has broader editor/Node integration", "Build a dedicated bounded comfy_plugin_host with versioned WIT, explicit ports, opaque handles, grants, legacy mappings, and no Python/JavaScript execution"),
-    "SIM-ARCH-045": ("External URL launch is not an owned compatibility host and production browser handoff is prohibited for extension execution", "Use only for ordinary approved documentation/navigation; preserve unsupported web-extension data as native placeholders"),
-    "SIM-ARCH-046": ("No native Comfy provider/plugin secret namespace; development storage has weaker guarantees", "Store secret references only and scope grants by runtime profile/provider/plugin"),
-    "SIM-ARCH-047": ("Project trust is not native API, model parser, plugin, provider, codec, or vendor-FFI trust", "Implement distinct trust records and prompts for each native boundary"),
-    "SIM-ARCH-048": ("Command sandboxing is not validated for the Rust compute worker, GPU drivers, vendor FFI, or codecs", "Treat it as a pattern; build and certify platform worker/plugin/FFI boundaries without launching Python"),
-    "SIM-ARCH-049": ("Host specs cannot establish the exact operation/dtype/layout/memory matrix of native compute adapters", "Native worker probes plus checked-in certified backend matrices are authoritative"),
-    "SIM-ARCH-050": ("No native runtime model/output/cache/plugin/snapshot roots", "Add typed derived paths and non-ASCII/platform/path-containment tests"),
-    "SIM-ARCH-052": ("No stable per-workflow native runtime-profile binding", "Persist ProfileId on each workflow and isolate workers, handles, events, models, plugins, queues, outputs, and secrets"),
-    "SIM-ARCH-054": ("No verified native model/plugin/backend/codec journal, resumability, rollback, cleanup, or worker recovery", "Introduce transactional staged native operations with restart reconciliation"),
-    "SIM-ARCH-055": ("No target Comfy implementation was found; planned native architecture is not support evidence", "Treat rows as missing, conflicting, deferred, or uncertain until an exact native implementation and validation exists"),
-    "SIM-ARCH-056": ("Every new native crate shares a root Cargo.toml write and can create wave conflicts", "Register all proposed native crates in one foundation task; family tasks write disjoint files and a later task generates central registries"),
+    "ZED-ARCH-003": ("No Comfy workflow/native-worker lifecycle participates", "Register workflow items early and coordinate Zed-owned Rust worker cancellation/shutdown after save decisions"),
+    "ZED-ARCH-007": ("No Comfy panels", "Use for node library, queue, history, assets, models, native worker logs, and operations"),
+    "ZED-ARCH-008": ("No Comfy dialogs", "Use for bounded runtime-profile, legacy-mapping, permission, and destructive decisions"),
+    "ZED-ARCH-010": ("No Comfy workflow/runtime-profile/attempt records", "Create a dedicated Comfy DB domain with only necessary WorkspaceDb dependency"),
+    "ZED-ARCH-012": ("Silent UI success after a parity-critical write failure would violate requirements", "Await and surface critical workflow, attempt, output, and operation-journal writes"),
+    "ZED-ARCH-016": ("These are not native Comfy runtime profiles", "Persist native runtime profiles with stable ProfileId, device/memory/API/plugin/provider policy, and inactive legacy connection data"),
+    "ZED-ARCH-028": ("No Comfy file layout, artifact index, metadata codec, or operation journal", "Use for workflow authority, artifact/model/plugin staging, transactional outputs, and failure injection"),
+    "ZED-ARCH-029": ("No Comfy output association, metadata, native codec contract, or editing", "Adapt as a native output-view primitive after runtime/artifact integration"),
+    "ZED-ARCH-034": ("No native Comfy handler schemas, limits, idempotency, or authentication", "Use only as a provider client primitive; implement Comfy HTTP as a native Rust host over runtime services"),
+    "ZED-ARCH-035": ("Response timeout/cancellation/limits remain relevant only for approved provider clients", "Apply per-provider operation policies; GPUI does not call a Comfy server"),
+    "ZED-ARCH-036": ("Product-specific client code is not a native Comfy WebSocket host and drops some send errors", "Implement Rust WebSocket compatibility projection from the native event bus with explicit errors and bounds"),
+    "ZED-ARCH-037": ("RPC transport is not Comfy and production requires no external Comfy reconnection", "Reuse reducer/epoch testing patterns for worker supervision and native API client sessions only"),
+    "ZED-ARCH-038": ("No native worker readiness, private IPC, device-fence cancellation, or recovery", "Use or extend for the Zed-owned Rust compute worker only, with bounded shutdown and verified ownership"),
+    "ZED-ARCH-039": ("It does not itself establish cross-platform process-tree semantics", "Do not cite it as native worker process-tree ownership; use util::process::Child where an owned worker is required"),
+    "ZED-ARCH-040": ("A visible terminal is not the authoritative native worker owner", "Use for bounded sanitized logs or approved environment tooling, never Python engine ownership"),
+    "ZED-ARCH-041": ("Adding an application runtime here would inflate all workspace/test construction", "Prefer an application RuntimeSupervisor/global with explicit native profile entities"),
+    "ZED-ARCH-042": ("No native Comfy runtime state reducer", "Store runtime-profile/worker tasks and reject stale profile, attempt, worker, and event-sequence completions"),
+    "ZED-ARCH-043": ("No backend/model/plugin/codec byte progress, journal, snapshot, or rollback", "Build a durable native component/artifact operation manager; do not reproduce Python/custom-node update internals"),
+    "ZED-ARCH-044": ("Existing host is Wasmtime/WASI precedent but lacks explicit Comfy tensor/node ports and has broader editor/Node integration", "Build a dedicated bounded comfy_plugin_host with versioned WIT, explicit ports, opaque handles, grants, legacy mappings, and no Python/JavaScript execution"),
+    "ZED-ARCH-045": ("External URL launch is not an owned compatibility host and production browser handoff is prohibited for extension execution", "Use only for ordinary approved documentation/navigation; preserve unsupported web-extension data as native placeholders"),
+    "ZED-ARCH-046": ("No native Comfy provider/plugin secret namespace; development storage has weaker guarantees", "Store secret references only and scope grants by runtime profile/provider/plugin"),
+    "ZED-ARCH-047": ("Project trust is not native API, model parser, plugin, provider, codec, or vendor-FFI trust", "Implement distinct trust records and prompts for each native boundary"),
+    "ZED-ARCH-048": ("Command sandboxing is not validated for the Rust compute worker, GPU drivers, vendor FFI, or codecs", "Treat it as a pattern; build and certify platform worker/plugin/FFI boundaries without launching Python"),
+    "ZED-ARCH-049": ("Host specs cannot establish the exact operation/dtype/layout/memory matrix of native compute adapters", "Native worker probes plus checked-in certified backend matrices are authoritative"),
+    "ZED-ARCH-050": ("No native runtime model/output/cache/plugin/snapshot roots", "Add typed derived paths and non-ASCII/platform/path-containment tests"),
+    "ZED-ARCH-052": ("No stable per-workflow native runtime-profile binding", "Persist ProfileId on each workflow and isolate workers, handles, events, models, plugins, queues, outputs, and secrets"),
+    "ZED-ARCH-054": ("No verified native model/plugin/backend/codec journal, resumability, rollback, cleanup, or worker recovery", "Introduce transactional staged native operations with restart reconciliation"),
+    "ZED-ARCH-055": ("No target Comfy implementation was found; planned native architecture is not support evidence", "Treat rows as missing, conflicting, deferred, or uncertain until an exact native implementation and validation exists"),
+    "ZED-ARCH-056": ("Every new native crate shares a root Cargo.toml write and can create wave conflicts", "Register all proposed native crates in one foundation task; family tasks write disjoint files and a later task generates central registries"),
 }
 
 
 ADDITIONS = [
     {
-        "architecture_id": "SIM-ARCH-057", "domain": "tensor-runtime", "source_file": "Cargo.toml",
+        "architecture_id": "ZED-ARCH-057", "domain": "tensor-runtime", "source_file": "Cargo.toml",
         "symbol_or_area": "workspace dependencies", "evidence_level": "code-inferred", "availability": "active",
         "reusable_primitive": "wgpu, Metal bindings, Wasmtime, image/audio support",
         "current_comfy_status": "missing",
         "constraint_or_gap": "No direct native tensor, autograd, safetensors, tokenizer, diffusion, sampler, or model-family runtime dependency exists",
-        "recommended_mapping": "Create a Sim-owned comfy_tensor facade and certify native Rust backend adapters; do not expose a third-party framework in compatibility APIs",
+        "recommended_mapping": "Create a Zed-owned comfy_tensor facade and certify native Rust backend adapters; do not expose a third-party framework in compatibility APIs",
     },
     {
-        "architecture_id": "SIM-ARCH-058", "domain": "inference-runtime", "source_file": "crates/llama_cpp",
+        "architecture_id": "ZED-ARCH-058", "domain": "inference-runtime", "source_file": "crates/llama_cpp",
         "symbol_or_area": "HTTP client", "evidence_level": "code-inferred", "availability": "active",
         "reusable_primitive": "remote model service client patterns",
         "current_comfy_status": "missing",
@@ -487,7 +487,7 @@ ADDITIONS = [
         "recommended_mapping": "Do not count it as native inference; implement Comfy model execution in the Rust worker",
     },
     {
-        "architecture_id": "SIM-ARCH-059", "domain": "gpu-device", "source_file": "crates/gpui_wgpu",
+        "architecture_id": "ZED-ARCH-059", "domain": "gpu-device", "source_file": "crates/gpui_wgpu",
         "symbol_or_area": "WgpuContext Device Queue", "evidence_level": "code-inferred", "availability": "active",
         "reusable_primitive": "rendering GPU context",
         "current_comfy_status": "missing",
@@ -495,7 +495,7 @@ ADDITIONS = [
         "recommended_mapping": "Initially use a separate worker-owned compute device; share only after a separately validated scheduling and loss-recovery design",
     },
     {
-        "architecture_id": "SIM-ARCH-060", "domain": "wasm-plugin", "source_file": "crates/extension_host/src/wasm_host.rs",
+        "architecture_id": "ZED-ARCH-060", "domain": "wasm-plugin", "source_file": "crates/extension_host/src/wasm_host.rs",
         "symbol_or_area": "Wasmtime Component Model async epoch interruption", "evidence_level": "code-inferred", "availability": "active",
         "reusable_primitive": "Wasmtime 36, WIT versioning, Component Model, async, epoch interruption",
         "current_comfy_status": "missing",
@@ -503,7 +503,7 @@ ADDITIONS = [
         "recommended_mapping": "Reuse narrow patterns only in a dedicated comfy_plugin_host with explicit WIT ports, grants, opaque handles, fuel/epoch/deadline/memory/table/channel/output limits",
     },
     {
-        "architecture_id": "SIM-ARCH-061", "domain": "media", "source_file": "crates/media; crates/image_viewer; crates/audio",
+        "architecture_id": "ZED-ARCH-061", "domain": "media", "source_file": "crates/media; crates/image_viewer; crates/audio",
         "symbol_or_area": "media primitives", "evidence_level": "code-inferred", "availability": "platform-specific",
         "reusable_primitive": "image rendering and some audio/platform media primitives",
         "current_comfy_status": "missing",
@@ -511,7 +511,7 @@ ADDITIONS = [
         "recommended_mapping": "Build bounded versioned Rust readers/writers and reviewed native FFI where needed; no required FFmpeg command subprocess",
     },
     {
-        "architecture_id": "SIM-ARCH-062", "domain": "native-release-boundary", "source_file": "crates excluding projects/comfy and .agents/specs/comfy-parity",
+        "architecture_id": "ZED-ARCH-062", "domain": "native-release-boundary", "source_file": "crates excluding projects/comfy and .agents/specs/comfy-parity",
         "symbol_or_area": "production dependency and runtime paths", "evidence_level": "code-inferred", "availability": "active",
         "reusable_primitive": "Cargo metadata, package scripts, tests",
         "current_comfy_status": "missing",
@@ -617,23 +617,23 @@ TASK_18_MENU_LEDGER_TABLE = task18_menu_ledger_table()
 TASK_18_COMPONENT_LEDGER_TABLE = task18_component_ledger_table()
 
 
-REPORT = f"""# Sim native-runtime architecture evidence
+REPORT = f"""# Zed native-runtime architecture evidence
 
 ## Outcome
 
 The target has strong generic GPUI, workspace, persistence, task, Wasmtime, rendering, media, process, settings, and testing primitives plus validated native Comfy foundations for schemas, settings, trust, tensors/CPU execution, the Rust worker, safe formats, Rust/WASM plugins, registries, execution reducers, workflow/media adapters, file services, the GPUI graph shell, and a profile-scoped execution presentation service with a production-registered Execution dock panel. These foundations are partial until their later breadth and release tasks pass; planned work is never counted as current support.
 
-Production must be a Sim-owned Rust control plane plus a Sim-owned Rust compute worker per selected device group. ComfyUI is a development-only conformance oracle. Production may not launch, manage, bundle, connect to, or depend on ComfyUI/Python, and may not execute Python or JavaScript compatibility extensions.
+Production must be a Zed-owned Rust control plane plus a Zed-owned Rust compute worker per selected device group. ComfyUI is a development-only conformance oracle. Production may not launch, manage, bundle, connect to, or depend on ComfyUI/Python, and may not execute Python or JavaScript compatibility extensions.
 
 ## Inspected target areas
 
-- `crates/sim/src/main.rs`, `crates/sim/src/sim.rs`, generated canonical menus, and visual-test infrastructure.
-- `crates/workspace`, `crates/gpui`, `crates/ui`, `crates/sim_actions`, `assets/keymaps`, `crates/settings`, `crates/settings_content`, `crates/settings_ui`, and `crates/db`.
+- `crates/zed/src/main.rs`, `crates/zed/src/zed.rs`, generated canonical menus, and visual-test infrastructure.
+- `crates/workspace`, `crates/gpui`, `crates/ui`, `crates/zed_actions`, `assets/keymaps`, `crates/settings`, `crates/settings_content`, `crates/settings_ui`, and `crates/db`.
 - `crates/git_ui/src/git_graph.rs`, GPUI interaction tests, `crates/http_client`, `crates/remote`, `crates/util/src/process.rs`, `crates/terminal`, and `crates/fs`.
 - `crates/image_viewer`, `crates/audio`, `crates/media`, `crates/auto_update`, `crates/extension_host`, `crates/sandbox`, `crates/system_specs`, `crates/paths`, and credentials providers.
 - Root `Cargo.toml`, `crates/llama_cpp`, and `crates/gpui_wgpu` for native compute/runtime evidence.
 
-The machine-readable companion is `catalogs/sim-architecture.csv`.
+The machine-readable companion is `catalogs/zed-architecture.csv`.
 
 ## Current support and constraints
 
@@ -643,7 +643,7 @@ The machine-readable companion is `catalogs/sim-architecture.csv`.
 | Native models/formats/samplers/schedulers | partial | Safe bounded model formats and descriptor registries are implemented; full family, quantization, attention, sampler, scheduler, latent, and diffusion execution remains. |
 | Native worker/device/memory planner | partial | Versioned private Rust IPC, worker supervision, cancellation, output transactions, recovery, and the CPU backend are implemented; vendor devices and the full memory planner remain. |
 | Workflow/graph/UI | partial | Lossless workflow/prompt/media adapters, file authority, a registered serializable GPUI graph item, typed ports/widgets/links, commands, persistence, generated scoped keymaps and native menus, and the profile-scoped Execution dock panel with queue/history/output/error projections are implemented; later panels/editors/shell breadth remains. |
-| Native HTTP/WebSocket/CLI host | missing | Generic clients exist; no Rust Comfy handlers/event projection or `sim comfy` contract exists. |
+| Native HTTP/WebSocket/CLI host | missing | Generic clients exist; no Rust Comfy handlers/event projection or `zed comfy` contract exists. |
 | Rust/WASM plugins | partial | The dedicated versioned Rust/WIT SDK and bounded Component Model host implement explicit typed ports, handles, grants, limits, cancellation, and deterministic legacy mapping; frontend/Python legacy breadth remains. |
 | Media/output compatibility | partial | Bounded shared metadata carriers, native asset namespaces, indexing, and transactional outputs are implemented; the full image/audio/video/3D codec and editor matrix remains. |
 | Accessibility | {ACCESSIBILITY_STATUS} | {ACCESSIBILITY_EVIDENCE} |
@@ -652,7 +652,7 @@ The machine-readable companion is `catalogs/sim-architecture.csv`.
 
 ## Task 18 exact execution ownership ledger
 
-This ledger is authoritative for Task 18. `regenerate_native_sim_evidence.py` rejects any mismatch between these 119 source feature IDs and `crates/comfy_ui/src/execution_catalog.rs`; it also rejects command, menu, component-catalog, and VAL-GPUI-005 component-set drift. `partial` records a concrete native or consumed foundation implementation without claiming later closure. `deferred` retains the exact later executable owner without misclassifying an intentionally later-owned row as an unaccounted gap.
+This ledger is authoritative for Task 18. `regenerate_native_zed_evidence.py` rejects any mismatch between these 119 source feature IDs and `crates/comfy_ui/src/execution_catalog.rs`; it also rejects command, menu, component-catalog, and VAL-GPUI-005 component-set drift. `partial` records a concrete native or consumed foundation implementation without claiming later closure. `deferred` retains the exact later executable owner without misclassifying an intentionally later-owned row as an unaccounted gap.
 
 ### Queue feature dispositions
 
@@ -681,18 +681,18 @@ ComfyRuntime application service
                 |
        private versioned Rust IPC
                 |
-Sim-owned Rust compute worker per device group
+Zed-owned Rust compute worker per device group
   tensor/autograd/RNG + native backends + memory planner
   ArtifactIndex/ModelStore + model families/patches
   native DAG executor + nodes + samplers/schedulers
   bounded Rust/WASM plugin host + native media/output transactions
 ```
 
-GPUI never talks to the public compatibility host internally. The worker isolates GPU faults and large model-memory lifetimes but remains part of Sim. Live tensors/device pointers do not cross IPC. Public HTTP/WebSocket and headless CLI project the same native services and never forward to ComfyUI.
+GPUI never talks to the public compatibility host internally. The worker isolates GPU faults and large model-memory lifetimes but remains part of Zed. Live tensors/device pointers do not cross IPC. Public HTTP/WebSocket and headless CLI project the same native services and never forward to ComfyUI.
 
 ## Compute and model implications
 
-Comfy source evidence uses autograd for training nodes, custom operations, and gradient-dependent samplers, so inference-only tensor support is insufficient. A Sim-owned tensor facade must define shape, broadcasting, dtype promotion/accumulation, strides/layout, view/copy, empty/scalar, NaN/infinity/rounding, device/fallback, determinism, VJP, RNG, cancellation, and structured errors. A native Rust backend ecosystem may sit behind that facade, but its types cannot become workflow/plugin compatibility APIs.
+Comfy source evidence uses autograd for training nodes, custom operations, and gradient-dependent samplers, so inference-only tensor support is insufficient. A Zed-owned tensor facade must define shape, broadcasting, dtype promotion/accumulation, strides/layout, view/copy, empty/scalar, NaN/infinity/rounding, device/fallback, determinism, VJP, RNG, cancellation, and structured errors. A native Rust backend ecosystem may sit behind that facade, but its types cannot become workflow/plugin compatibility APIs.
 
 The reference CPU backend anchors semantics. CUDA, ROCm, Metal, DirectML, XPU, NPU, MLU, and CoreX adapters require actual operation/dtype/layout/memory certification. WGPU is not described as MPS or DirectML merely because it uses Metal or D3D12. The GPUI rendering device has no current inference scheduling, long-kernel cancellation, memory isolation, or device-loss contract, so initial compute devices are worker-owned and separate.
 
@@ -724,7 +724,7 @@ WASM stores use bounded memory/table/instances/channels/output, fuel/epoch/deadl
 
 ## Open uncertainties
 
-- Native backend ecosystem selection remains an implementation ADR after prototype conformance and licensing/distribution measurement; the Sim tensor facade and fixtures prevent vendor lock-in.
+- Native backend ecosystem selection remains an implementation ADR after prototype conformance and licensing/distribution measurement; the Zed tensor facade and fixtures prevent vendor lock-in.
 - Device rows cannot be promoted without actual hardware/driver certification. Unavailable labs remain conditional, not guessed.
 - Native codec libraries, vendor SDKs, model licenses, package size, signing/notarization, and unsafe FFI require platform/security review.
 - Cloud/paid service semantics remain unverified without approved contracts and non-mutating test accounts.
@@ -736,8 +736,8 @@ def main() -> None:
     write_execution_disposition_registry()
     validate_task18_disposition_ledger()
     write_catalog()
-    (ROOT / "evidence-sim.md").write_text(REPORT, encoding="utf-8")
-    print("Regenerated native Sim evidence and 62 architecture rows.")
+    (ROOT / "evidence-zed.md").write_text(REPORT, encoding="utf-8")
+    print("Regenerated native Zed evidence and 62 architecture rows.")
 
 
 if __name__ == "__main__":

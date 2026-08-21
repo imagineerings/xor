@@ -149,7 +149,7 @@ pub struct SettingsContent {
     pub agent: Option<AgentSettingsContent>,
     pub agent_servers: Option<AllAgentServersSettings>,
 
-    /// Configuration of audio in Sim.
+    /// Configuration of audio in Zed.
     pub audio: Option<AudioSettingsContent>,
 
     /// Native Comfy execution profiles and compatibility-host policy.
@@ -160,8 +160,8 @@ pub struct SettingsContent {
     /// Default: true
     pub auto_update: Option<bool>,
 
-    /// This base keymap settings adjusts the default keybindings in Sim to be similar
-    /// to other common code editors. By default, Sim's keymap closely follows VSCode's
+    /// This base keymap settings adjusts the default keybindings in Zed to be similar
+    /// to other common code editors. By default, Zed's keymap closely follows VSCode's
     /// keymap, with minor adjustments, this corresponds to the "VSCode" setting.
     ///
     /// Default: VSCode
@@ -231,22 +231,22 @@ pub struct SettingsContent {
 
     pub proxy: Option<String>,
 
-    /// The URL of the Sim server to connect to.
+    /// The URL of the Zed server to connect to.
     pub server_url: Option<String>,
 
     /// The URL used as the key for credential storage.
     ///
     /// When set, credentials are stored under this URL instead of `server_url`.
-    /// This allows running multiple Sim instances side by side without them
+    /// This allows running multiple Zed instances side by side without them
     /// overwriting each other's keychain entries.
     pub credentials_url: Option<String>,
 
     /// Configuration for session-related features
     pub session: Option<SessionSettingsContent>,
-    /// Control what info is collected by Sim.
+    /// Control what info is collected by Zed.
     pub telemetry: Option<TelemetrySettingsContent>,
 
-    /// Configuration of the terminal in Sim.
+    /// Configuration of the terminal in Zed.
     pub terminal: Option<TerminalSettingsContent>,
 
     pub title_bar: Option<TitleBarSettingsContent>,
@@ -256,13 +256,13 @@ pub struct SettingsContent {
     /// Default: false
     pub vim_mode: Option<bool>,
 
-    // Settings related to calls in Sim
+    // Settings related to calls in Zed
     pub calls: Option<CallSettingsContent>,
 
     /// Settings for the which-key popup.
     pub which_key: Option<WhichKeySettingsContent>,
 
-    /// Settings related to Vim mode in Sim.
+    /// Settings related to Vim mode in Zed.
     pub vim: Option<VimSettingsContent>,
 
     /// Number of lines to search for modelines at the beginning and end of files.
@@ -404,12 +404,12 @@ pub struct ComfyCredentialScopeContent {
 }
 
 /// Configuration for developer-oriented instrumentation tools that collect
-/// diagnostic data about a running Sim instance.
+/// diagnostic data about a running Zed instance.
 #[with_fallible_options]
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct InstrumentationSettingsContent {
     /// Configuration for the performance profiler, accessed via the
-    /// `sim: open performance profiler` action.
+    /// `zed: open performance profiler` action.
     pub performance_profiler: Option<PerformanceProfilerSettingsContent>,
 }
 
@@ -522,7 +522,7 @@ pub enum ProfileBase {
     /// Apply profile settings on top of the user's current settings.
     #[default]
     User,
-    /// Apply profile settings on top of Sim's default settings, ignoring user customizations.
+    /// Apply profile settings on top of Zed's default settings, ignoring user customizations.
     Default,
 }
 
@@ -533,7 +533,7 @@ pub struct SettingsProfile {
     /// What base settings to start from before applying this profile's overrides.
     ///
     /// - `user`: Apply on top of user's settings (default)
-    /// - `default`: Apply on top of Sim's default settings, ignoring user customizations
+    /// - `default`: Apply on top of Zed's default settings, ignoring user customizations
     #[serde(default)]
     pub base: ProfileBase,
 
@@ -603,7 +603,7 @@ impl strum::VariantNames for BaseKeymapContent {
     ];
 }
 
-/// Configuration of audio in Sim.
+/// Configuration of audio in Zed.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
 pub struct AudioSettingsContent {
@@ -647,7 +647,7 @@ impl From<Option<String>> for AudioOutputDeviceName {
     }
 }
 
-/// Control what info is collected by Sim.
+/// Control what info is collected by Zed.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Debug, MergeFrom)]
 pub struct TelemetrySettingsContent {
@@ -655,7 +655,7 @@ pub struct TelemetrySettingsContent {
     ///
     /// Default: false
     pub diagnostics: Option<bool>,
-    /// Send anonymized usage data like what languages you're using Sim with.
+    /// Send anonymized usage data like what languages you're using Zed with.
     ///
     /// Default: false
     pub metrics: Option<bool>,
@@ -683,7 +683,7 @@ pub struct DebuggerSettingsContent {
     ///
     /// Default: line
     pub stepping_granularity: Option<SteppingGranularity>,
-    /// Whether the breakpoints should be reused across Sim sessions.
+    /// Whether the breakpoints should be reused across Zed sessions.
     ///
     /// Default: true
     pub save_breakpoints: Option<bool>,
@@ -695,7 +695,7 @@ pub struct DebuggerSettingsContent {
     ///
     /// Default: 2000ms
     pub timeout: Option<u64>,
-    /// Whether to log messages between active debug adapters and Sim
+    /// Whether to log messages between active debug adapters and Zed
     ///
     /// Default: true
     pub log_dap_communications: Option<bool>,
@@ -756,7 +756,7 @@ pub enum DockPosition {
     Right,
 }
 
-/// Configuration of voice calls in Sim.
+/// Configuration of voice calls in Zed.
 #[with_fallible_options]
 #[derive(Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug)]
 pub struct CallSettingsContent {
@@ -990,7 +990,7 @@ pub struct FileFinderSettingsContent {
     /// Default: true
     pub skip_focus_for_active_in_search: Option<bool>,
     /// Whether to use gitignored files when searching.
-    /// Only the file Sim had indexed will be used, not necessary all the gitignored files.
+    /// Only the file Zed had indexed will be used, not necessary all the gitignored files.
     ///
     /// Default: Smart
     pub include_ignored: Option<IncludeIgnoredContent>,
@@ -1018,7 +1018,7 @@ pub struct FileFinderSettingsContent {
 pub enum IncludeIgnoredContent {
     /// Use all gitignored files
     All,
-    /// Use only the files Sim had indexed
+    /// Use only the files Zed had indexed
     Indexed,
     /// Be smart and search for ignored when called from a gitignored worktree
     #[default]
@@ -1358,7 +1358,7 @@ pub struct RemoteSettingsContent {
     pub use_podman: Option<bool>,
     /// Whether to build dev container images with BuildKit.
     ///
-    /// When unset, Sim auto-detects BuildKit by probing for the `buildx` CLI
+    /// When unset, Zed auto-detects BuildKit by probing for the `buildx` CLI
     /// plugin. Set to `false` to force the classic Docker builder, which is
     /// required for Docker-compatible engines that lack an integrated BuildKit
     /// (e.g. Apple Container via a Docker-API bridge), where BuildKit builds
@@ -1393,8 +1393,8 @@ pub struct SshConnection {
     pub projects: collections::BTreeSet<RemoteProject>,
     /// Name to use for this server in UI.
     pub nickname: Option<String>,
-    // By default Sim will download the binary to the host directly.
-    // If this is set to true, Sim will download the binary to your local machine,
+    // By default Zed will download the binary to the host directly.
+    // If this is set to true, Zed will download the binary to your local machine,
     // and then upload it over the SSH connection. Useful if your SSH server has
     // limited outbound internet access.
     pub upload_binary_over_ssh: Option<bool>,

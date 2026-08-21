@@ -4,7 +4,7 @@
   "operation_id": "COMFY-TENSOR-OP-4B62764DCD01",
   "baseline_overload_id": "COMFY-TENSOR-OP-4B62764DCD01:blocked",
   "baseline_fixture_sha256": "20b3944c30e1350e7b42422a5011ad0356b24777952b8995f2d3bc4391597987",
-  "overload_id": "sim.native.model.disable_weight_init.conv2d.v1",
+  "overload_id": "zed.native.model.disable_weight_init.conv2d.v1",
   "owner_task_id": "comfy-parity-tensor-ops-comfy-operator-indirection-comfy-tensor-op-227f5d04687a",
   "ordered_parameters": [
     {"default": null, "keyword_only": false, "kind": "positional_or_keyword", "name": "input_channels", "type": "nonzero usize"},

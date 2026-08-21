@@ -42,7 +42,7 @@ impl RuntimeAdapter {
             .ok_or(TensorError::ShapeOverflow)?;
         self.0
             .allocate(&[elements], element_type, cancellation)
-            .map_err(|error| map_execution_error("sim.xpu.allocate", error))
+            .map_err(|error| map_execution_error("zed.xpu.allocate", error))
     }
 
     fn create_stream(
@@ -65,7 +65,7 @@ impl RuntimeAdapter {
             usize::try_from(destination_offset).map_err(|_| TensorError::ShapeOverflow)?;
         self.0
             .copy_from_host(destination, destination_offset, bytes, cancellation)
-            .map_err(|error| map_execution_error("sim.xpu.transfer.host-to-device", error))
+            .map_err(|error| map_execution_error("zed.xpu.transfer.host-to-device", error))
     }
 
     fn copy_to_host(
@@ -80,7 +80,7 @@ impl RuntimeAdapter {
             usize::try_from(source_offset).map_err(|_| TensorError::ShapeOverflow)?;
         self.0
             .copy_to_host(source, source_offset, bytes, cancellation)
-            .map_err(|error| map_execution_error("sim.xpu.transfer.device-to-host", error))
+            .map_err(|error| map_execution_error("zed.xpu.transfer.device-to-host", error))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -97,7 +97,7 @@ impl RuntimeAdapter {
         self.0
             .add(left, right, output, cancellation)
             .map(XpuTrackedEvent::Native)
-            .map_err(|error| map_execution_error("sim.xpu.binary.add", error))
+            .map_err(|error| map_execution_error("zed.xpu.binary.add", error))
     }
 
     fn record_event(
@@ -108,7 +108,7 @@ impl RuntimeAdapter {
         self.0
             .synchronize(cancellation)
             .map(|()| XpuTrackedEvent::Synchronized)
-            .map_err(|error| map_execution_error("sim.xpu.event.record", error))
+            .map_err(|error| map_execution_error("zed.xpu.event.record", error))
     }
 
     fn wait_event(
@@ -120,7 +120,7 @@ impl RuntimeAdapter {
             XpuTrackedEvent::Native(event) => self
                 .0
                 .wait_event(event, cancellation)
-                .map_err(|error| map_execution_error("sim.xpu.event.wait", error)),
+                .map_err(|error| map_execution_error("zed.xpu.event.wait", error)),
             XpuTrackedEvent::Synchronized => {
                 cancellation.check()?;
                 Ok(())
@@ -301,7 +301,7 @@ impl XpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.xpu.transfer.host-to-device",
+            "zed.xpu.transfer.host-to-device",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &descriptor,
@@ -356,7 +356,7 @@ impl XpuTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.xpu.transfer.device-to-host", tensor, context)?;
+        self.require_input("zed.xpu.transfer.device-to-host", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = tensor.descriptor().byte_len()?;
         let staging = self.reserve_workspace(context, byte_length)?;
@@ -383,7 +383,7 @@ impl XpuTensorBackend {
         tensor: &Tensor,
         context: &ExecutionContext<'_>,
     ) -> Result<Vec<u8>, TensorError> {
-        self.require_input("sim.xpu.test.download-storage", tensor, context)?;
+        self.require_input("zed.xpu.test.download-storage", tensor, context)?;
         let storage = self.storage(tensor)?;
         let byte_length = usize::try_from(storage.byte_length)
             .map_err(|_| TensorError::ShapeOverflow)?;
@@ -459,7 +459,7 @@ impl XpuTensorBackend {
             .filter(|storage| storage.backend_id == self.backend_id)
             .map(|storage| storage.inner.clone())
             .ok_or_else(|| TensorError::UnsupportedCapability {
-                operation: "sim.xpu.storage.lookup".to_owned(),
+                operation: "zed.xpu.storage.lookup".to_owned(),
                 device: tensor.descriptor().device(),
                 reason: "tensor storage is not owned by this certified XPU backend instance"
                     .to_owned(),
@@ -536,7 +536,7 @@ impl XpuTensorBackend {
             });
         }
         if source.descriptor().device() == self.device {
-            self.require_input("sim.xpu.copy", source, context)?;
+            self.require_input("zed.xpu.copy", source, context)?;
             return Ok(PreparedCopySource::Xpu {
                 storage: self.storage(source)?,
                 byte_offset: tensor_byte_offset(source.descriptor())?,
@@ -547,7 +547,7 @@ impl XpuTensorBackend {
             return try_copy_bytes(bytes, "XPU CPU copy staging").map(PreparedCopySource::Cpu);
         }
         Err(self.unsupported(
-            "sim.xpu.copy",
+            "zed.xpu.copy",
             "source must be host-addressable contiguous CPU storage or this XPU backend instance",
         ))
     }
@@ -594,7 +594,7 @@ impl CachedAllocationOwner for XpuTensorBackend {
     }
 
     fn allocator_backend_name(&self) -> &'static str {
-        "sim-native-xpu-v1"
+        "zed-native-xpu-v1"
     }
 
     fn release_cached_allocations(
@@ -629,7 +629,7 @@ impl TensorBackend for XpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.xpu.allocate",
+            "zed.xpu.allocate",
             PrimitiveOperation::Allocation,
             TensorRole::Output,
             &descriptor,
@@ -664,7 +664,7 @@ impl TensorBackend for XpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         self.require_descriptor(
-            "sim.xpu.copy",
+            "zed.xpu.copy",
             PrimitiveOperation::Copy,
             TensorRole::Output,
             &destination,
@@ -673,7 +673,7 @@ impl TensorBackend for XpuTensorBackend {
         if source.descriptor().shape() != destination.shape() {
             return Err(TensorError::Faulted {
                 reason: format!(
-                    "sim.xpu.copy: source shape {:?} does not match destination shape {:?}",
+                    "zed.xpu.copy: source shape {:?} does not match destination shape {:?}",
                     source.descriptor().shape(),
                     destination.shape()
                 ),
@@ -753,7 +753,7 @@ impl TensorBackend for XpuTensorBackend {
     fn record_event(&self, context: &ExecutionContext<'_>) -> Result<EventFence, TensorError> {
         self.check_context(context)?;
         self.capabilities.require(
-            "sim.xpu.event.record",
+            "zed.xpu.event.record",
             OperationSupport::record_event(),
         )?;
         let stream = self.stream(context.stream, context.cancellation)?;
@@ -769,7 +769,7 @@ impl TensorBackend for XpuTensorBackend {
     ) -> Result<(), TensorError> {
         check_backend_context_identity(self.backend_id, context)?;
         self.capabilities
-            .require("sim.xpu.event.wait", OperationSupport::wait_event())?;
+            .require("zed.xpu.event.wait", OperationSupport::wait_event())?;
         if event.backend_id != self.backend_id {
             return Err(TensorError::Faulted {
                 reason: "XPU event belongs to a different backend instance".to_owned(),
@@ -802,7 +802,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.fill", context)
+        self.unsupported_result("zed.xpu.fill", context)
     }
 
     fn unary(
@@ -812,7 +812,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.unary", context)
+        self.unsupported_result("zed.xpu.unary", context)
     }
 
     fn binary(
@@ -824,11 +824,11 @@ impl TensorBackend for XpuTensorBackend {
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
         if operation != BinaryOperation::Add {
-            return self.unsupported_result("sim.xpu.binary", context);
+            return self.unsupported_result("zed.xpu.binary", context);
         }
         for input in [left, right] {
             self.require_descriptor(
-                "sim.xpu.binary.add",
+                "zed.xpu.binary.add",
                 PrimitiveOperation::Binary(BinaryOperation::Add),
                 TensorRole::Input,
                 input.descriptor(),
@@ -837,7 +837,7 @@ impl TensorBackend for XpuTensorBackend {
             self.storage(input)?;
         }
         self.require_descriptor(
-            "sim.xpu.binary.add",
+            "zed.xpu.binary.add",
             PrimitiveOperation::Binary(BinaryOperation::Add),
             TensorRole::Output,
             &output,
@@ -867,7 +867,7 @@ impl TensorBackend for XpuTensorBackend {
             || output.offset_elements() != 0
         {
             return Err(self.unsupported(
-                "sim.xpu.binary.add",
+                "zed.xpu.binary.add",
                 "the reviewed XPU Add binding requires zero-offset whole buffers",
             ));
         }
@@ -922,7 +922,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.binary-scalar", context)
+        self.unsupported_result("zed.xpu.binary-scalar", context)
     }
 
     fn reduction(
@@ -932,7 +932,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.reduction", context)
+        self.unsupported_result("zed.xpu.reduction", context)
     }
 
     fn indexing(
@@ -942,7 +942,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.indexing", context)
+        self.unsupported_result("zed.xpu.indexing", context)
     }
 
     fn resize(
@@ -952,7 +952,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.resize", context)
+        self.unsupported_result("zed.xpu.resize", context)
     }
 
     fn convolution(
@@ -962,7 +962,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.convolution", context)
+        self.unsupported_result("zed.xpu.convolution", context)
     }
 
     fn linear_algebra(
@@ -972,7 +972,7 @@ impl TensorBackend for XpuTensorBackend {
         _output: TensorDescriptor,
         context: &ExecutionContext<'_>,
     ) -> Result<(Tensor, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.linear-algebra", context)
+        self.unsupported_result("zed.xpu.linear-algebra", context)
     }
 
     fn custom_kernel(
@@ -982,7 +982,7 @@ impl TensorBackend for XpuTensorBackend {
         _outputs: &[TensorDescriptor],
         context: &ExecutionContext<'_>,
     ) -> Result<(Vec<Tensor>, EventFence), TensorError> {
-        self.unsupported_result("sim.xpu.custom-kernel", context)
+        self.unsupported_result("zed.xpu.custom-kernel", context)
     }
 }
 
@@ -1033,7 +1033,7 @@ fn xpu_element_type(dtype: DType) -> Result<XpuElementType, TensorError> {
         DType::F16 => Ok(XpuElementType::F16),
         DType::F32 => Ok(XpuElementType::F32),
         _ => Err(TensorError::UnsupportedCapability {
-            operation: "sim.xpu.element-type".to_owned(),
+            operation: "zed.xpu.element-type".to_owned(),
             device: DeviceId::new(DeviceKind::Xpu, 0),
             reason: format!("XPU element type for {dtype:?} is not reviewed"),
         }),

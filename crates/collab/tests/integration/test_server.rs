@@ -110,7 +110,7 @@ impl TestServer {
         let app_state = Self::build_app_state(&test_db, &livekit_server, executor.clone()).await;
         let epoch = app_state
             .db
-            .create_server(&app_state.config.sim_environment)
+            .create_server(&app_state.config.zed_environment)
             .await
             .unwrap();
         let server = Server::new(epoch, app_state.clone());
@@ -164,7 +164,7 @@ impl TestServer {
         let epoch = self
             .app_state
             .db
-            .create_server(&self.app_state.config.sim_environment)
+            .create_server(&self.app_state.config.zed_environment)
             .await
             .unwrap();
         self.server.reset(epoch);
@@ -596,14 +596,14 @@ impl TestServer {
                 livekit_secret: None,
                 rust_log: None,
                 log_json: None,
-                sim_environment: "test".into(),
-                sim_cloud_internal_api_key: "test-internal-api-key".into(),
+                zed_environment: "test".into(),
+                zed_cloud_internal_api_key: "test-internal-api-key".into(),
                 blob_store_url: None,
                 blob_store_region: None,
                 blob_store_access_key: None,
                 blob_store_secret_key: None,
                 blob_store_bucket: None,
-                sim_client_checksum_seed: None,
+                zed_client_checksum_seed: None,
                 kinesis_region: None,
                 kinesis_stream: None,
                 kinesis_access_key: None,

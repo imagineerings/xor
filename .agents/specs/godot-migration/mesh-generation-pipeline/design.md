@@ -3,9 +3,9 @@
 ## Architecture
 
 Represent mesh generation as typed requests and artifacts in `crates/world_model`, with previews routed through existing media/project infrastructure.
-The pipeline is a native Sim feature: mesh requests, backend choices, export
+The pipeline is a native Zed feature: mesh requests, backend choices, export
 formats, texture options, and generated artifact metadata are represented by
-Sim-owned `Mesh*` world-model records rather than Comfy labels or pass-through
+Zed-owned `Mesh*` world-model records rather than Comfy labels or pass-through
 backend state.
 
 ## Components

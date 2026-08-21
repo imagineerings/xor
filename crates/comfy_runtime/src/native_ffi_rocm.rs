@@ -1446,9 +1446,9 @@ mod tests {
                 "abi_manifest_sha256":"3259ee5fc5657e3d06597d8b1782a04024540287135b9d6ec7edb10935e83d8c",
                 "ffi_contracts_sha256":"{ffi_contracts_sha256}",
                 "redistributes_amd_runtime":false,
-                "signer":"sim.release",
+                "signer":"zed.release",
                 "signature_algorithm":"ed25519",
-                "signature_domain":"sim-comfy-rocm-package-v1",
+                "signature_domain":"zed-comfy-rocm-package-v1",
                 "signature_coverage":"package-coverage-v1",
                 "runtime_root":{}
             }}"#,
@@ -1473,7 +1473,7 @@ mod tests {
         fs::write(package.join("package-coverage.sha256"), &coverage)?;
         let key_pair = Ed25519KeyPair::from_seed_unchecked(&[7_u8; 32])
             .map_err(|error| std::io::Error::other(format!("fixture key rejected: {error:?}")))?;
-        let signing_payload = rocm_package_signing_payload("sim.release", coverage.as_bytes())?;
+        let signing_payload = rocm_package_signing_payload("zed.release", coverage.as_bytes())?;
         let signature = key_pair.sign(&signing_payload);
         let receipt = format!(
             "{{\"schema_version\":1,\"algorithm\":\"ed25519\",\"signature\":\"{}\"}}\n",
@@ -1485,7 +1485,7 @@ mod tests {
         );
         fs::write(package.join("adapter-manifest.sig"), receipt)?;
         Ok(RocmPackageVerificationKey::new(
-            "sim.release",
+            "zed.release",
             key_pair.public_key().as_ref(),
         )?)
     }
@@ -1538,7 +1538,7 @@ mod tests {
         let coverage = fs::read(package.join("package-coverage.sha256"))?;
         let key_pair = Ed25519KeyPair::from_seed_unchecked(&[7_u8; 32])
             .map_err(|error| std::io::Error::other(format!("fixture key rejected: {error:?}")))?;
-        let signature = key_pair.sign(&fixture_signing_payload(domain, "sim.release", &coverage)?);
+        let signature = key_pair.sign(&fixture_signing_payload(domain, "zed.release", &coverage)?);
         let receipt = format!(
             "{{\"schema_version\":1,\"algorithm\":\"ed25519\",\"signature\":\"{}\"}}\n",
             signature
@@ -1720,7 +1720,7 @@ mod tests {
             signed_fixture_with_catalog_bytes(&valid_catalog)?;
         rewrite_fixture_receipt(
             &wrong_domain_root.path().join("package"),
-            b"sim-comfy-rocm-package-v0\0",
+            b"zed-comfy-rocm-package-v0\0",
         )?;
         assert_signed_fixture_rejected(
             &wrong_domain_root.path().join("package"),
@@ -1732,7 +1732,7 @@ mod tests {
         let unknown_key_pair = Ed25519KeyPair::from_seed_unchecked(&[8_u8; 32])
             .map_err(|error| std::io::Error::other(format!("fixture key rejected: {error:?}")))?;
         let unknown_key =
-            RocmPackageVerificationKey::new("sim.release", unknown_key_pair.public_key().as_ref())?;
+            RocmPackageVerificationKey::new("zed.release", unknown_key_pair.public_key().as_ref())?;
         assert_signed_fixture_rejected(&unknown_key_root.path().join("package"), &unknown_key, 0)?;
 
         let (uncovered_root, uncovered_key) = signed_fixture_with_catalog_bytes(&valid_catalog)?;
@@ -1747,7 +1747,7 @@ mod tests {
             uncovered_package.join("package-coverage.sha256"),
             uncovered_coverage,
         )?;
-        rewrite_fixture_receipt(&uncovered_package, b"sim-comfy-rocm-package-v1\0")?;
+        rewrite_fixture_receipt(&uncovered_package, b"zed-comfy-rocm-package-v1\0")?;
         assert_signed_fixture_rejected(&uncovered_package, &uncovered_key, 0)?;
 
         Ok(())

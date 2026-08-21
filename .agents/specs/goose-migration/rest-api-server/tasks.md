@@ -2,7 +2,7 @@
 
 ## Approach
 
-These tasks are conditional on approval of a standalone ACP server. They add adapters around existing Sim owners; they do not create the previously proposed REST/OpenAPI server.
+These tasks are conditional on approval of a standalone ACP server. They add adapters around existing Zed owners; they do not create the previously proposed REST/OpenAPI server.
 
 ## Tasks
 
@@ -27,12 +27,12 @@ These tasks are conditional on approval of a standalone ACP server. They add ada
   - Implement connection/session streams, loopback default, generated/configured secret, capacity/idle limits, and disconnect cleanup.
   - _Requirements: 3.1, 3.2, 3.3, 3.5, 3.6, 3.7, 5.5_
   - _Depends on: 1_
-  - _Reads: projects/goose/crates/goose/src/acp/transport/mod.rs, projects/goose/ui/sdk/src/http-stream.ts, existing Sim HTTP server primitives_
+  - _Reads: projects/goose/crates/goose/src/acp/transport/mod.rs, projects/goose/ui/sdk/src/http-stream.ts, existing Zed HTTP server primitives_
   - _Writes: existing ACP server transport files selected after architecture review_
   - _Validation: connection/session stream compatibility, invalid-secret, timeout, capacity, disconnect, and backpressure tests_
 
 - [ ] 4. Integrate TLS and transport security policy
-  - Reuse Sim TLS/credential/logging facilities and enforce redaction and safe startup failure.
+  - Reuse Zed TLS/credential/logging facilities and enforce redaction and safe startup failure.
   - _Requirements: 3.4, 3.7, 5.1, 5.2, 5.3, 5.6_
   - _Depends on: 3_
   - _Reads: projects/goose/crates/goose/src/acp/transport/auth.rs, projects/goose/crates/goose/src/acp/transport/tls.rs, crates/credentials_provider, crates/http_client_tls_
