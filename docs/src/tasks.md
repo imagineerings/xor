@@ -7,6 +7,10 @@ description: Run and rerun shell commands from Zed with task definitions. Suppor
 
 Zed supports ways to spawn (and rerun) commands using its integrated [terminal](./terminal.md) to output the results. These commands can read a limited subset of Zed state (such as a path to the file currently being edited or selected text).
 
+Language-specific workspace tools may compile contextual actions into these same task templates. For example, the Rust **Cargo** and **Tests** panels resolve Build, Check, Run, Test, Bench, and test-case actions into ordinary structured `cargo` arguments, then use the existing task scheduler and terminal. They do not launch a parallel Cargo runner or parse terminal text for structured results. Task save policy, terminal reveal, history, cancellation, and rerun behavior therefore remain consistent with tasks started from the task picker or `tasks.json`.
+
+Cargo presets are not a replacement for `tasks.json`. They provide Cargo-node selection and configuration for the Cargo panel, while `tasks.json` remains the general user-authored command format.
+
 ```json [tasks]
 [
   {

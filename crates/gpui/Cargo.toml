@@ -4,7 +4,7 @@ version = "0.2.2"
 edition.workspace = true
 authors = ["Nathan Sobo <nathan@zed.dev>"]
 description = "Zed's GPU-accelerated UI framework"
-repository = "https://github.com/zed-industries/zed"
+repository = "https://github.com/simtropolis/zed"
 publish = true
 license = "Apache-2.0"
 homepage = "https://gpui.rs"
@@ -123,7 +123,7 @@ core-graphics.workspace = true
 core-video.workspace = true
 core-text.workspace = true
 # WARNING: If you change this, you must also publish a new version of zed-font-kit to crates.io
-font-kit = { git = "https://github.com/zed-industries/font-kit", rev = "94b0f28166665e8fd2f53ff6d268a14955c82269", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
+font-kit = { git = "https://github.com/simtropolis/font-kit", rev = "fd81ce08907c63cb054dfdb5fc46e024529ad160", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
 foreign-types.workspace = true
 log.workspace = true
 media.workspace = true

@@ -18,7 +18,7 @@ Questions? Contact us at privacy@zed.dev. The full policy below contains complet
 
 ## Introduction
 
-This Privacy Policy explains how Zed Industries, Inc. ("**Zed**," "**we**," "**our**," or "**us**") collects, uses, and shares your personal data when you use our websites (including [https://zed.dev](https://zed.dev)), our downloadable software ("**Software**"), our subscription service ("**Service**"), or otherwise interact with us.
+This Privacy Policy explains how Simtropolis, Inc. ("**Zed**," "**we**," "**our**," or "**us**") collects, uses, and shares your personal data when you use our websites (including [https://zed.dev](https://zed.dev)), our downloadable software ("**Software**"), our subscription service ("**Service**"), or otherwise interact with us.
 
 As used in this Privacy Policy, “personal data” means any information relating to an identified or identifiable individual and includes any information that constitutes "personally identifiable information," “personal data,” or "personal information" under applicable privacy or data protection laws or regulations.
 
@@ -174,7 +174,7 @@ We will post any adjustments to the Privacy Policy on this page, and the revised
 
 When data is used as outlined in this Privacy Policy, Zed is the data controller and responsible for the processing of your personal data. When Zed processes personal data on behalf of Zed Business customers as a data processor, the terms of our Data Processing Agreement apply. If you have any questions, comments, or concerns about our processing activities, please email us at [privacy@zed.dev](mailto:privacy@zed.dev) or write to us at:
 
-Zed Industries, Inc.
+Simtropolis, Inc.
 2590 Welton St
 Suite 200, PO Box 1916
 Denver, CO 80205

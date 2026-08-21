@@ -8,7 +8,7 @@ description: "Configure JSON language support in Zed, including language servers
 JSON support is available natively in Zed.
 
 - Tree-sitter: [tree-sitter/tree-sitter-json](https://github.com/tree-sitter/tree-sitter-json)
-- Language Server: [zed-industries/json-language-server](https://github.com/zed-industries/json-language-server)
+- Language Server: [simtropolis/json-language-server](https://github.com/simtropolis/json-language-server)
 
 ## JSONC
 

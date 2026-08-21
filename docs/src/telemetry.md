@@ -5,7 +5,9 @@ description: "What data Zed collects and how to control telemetry settings."
 
 # Telemetry in Zed
 
-Zed collects anonymous telemetry to understand usage patterns and diagnose issues.
+Zed supports anonymous telemetry to understand usage patterns and diagnose issues.
+Client-side telemetry is temporarily disabled by default and is sent only after
+you explicitly enable it.
 
 Telemetry falls into two categories:
 
@@ -14,19 +16,27 @@ Telemetry falls into two categories:
 
 ## Configuring Telemetry Settings
 
-You have full control over what data is sent out by Zed.
-To enable or disable some or all telemetry types, open Settings ({#kb zed::OpenSettings}) and search for "telemetry", or add the following to your settings file:
+You have full control over what data is sent out by Zed. To explicitly enable or
+disable some or all client-side telemetry types, open Settings
+({#kb zed::OpenSettings}) and search for "telemetry", or set the existing keys in
+your settings file. For example, to opt in to both categories:
 
 ```json [settings]
 "telemetry": {
-    "diagnostics": false,
-    "metrics": false
+    "diagnostics": true,
+    "metrics": true
 },
 ```
 
+Both `telemetry.diagnostics` and `telemetry.metrics` currently default to
+`false`. These settings are the restoration point when client-side telemetry is
+re-enabled by policy; no separate feature flag or configuration system is used.
+
 ## Dataflow
 
-Telemetry is sent from the application to our servers every 5 minutes (or when 50 events accumulate), then routed to the appropriate service. We currently use:
+When enabled, telemetry is sent from the application to our servers every 5
+minutes (or when 50 events accumulate), then routed to the appropriate service.
+We currently use:
 
 - [Sentry](https://sentry.io): Crash-monitoring service - stores diagnostic events
 - [Snowflake](https://snowflake.com): Data warehouse - stores both diagnostic and metric events
@@ -39,7 +49,7 @@ Telemetry is sent from the application to our servers every 5 minutes (or when 5
 
 Crash reports consist of a [minidump](https://learn.microsoft.com/en-us/windows/win32/debug/minidump-files) and debug metadata. Reports are sent on the next launch after a crash, allowing Zed to identify and fix issues without requiring you to file a bug report.
 
-You can inspect what data is sent in the `CrashInfo` struct in [crates/crashes/src/crashes.rs](https://github.com/zed-industries/zed/blob/main/crates/crashes/src/crashes.rs). See also: [Debugging Crashes](./development/debugging-crashes.md).
+You can inspect what data is sent in the `CrashInfo` struct in [crates/crashes/src/crashes.rs](https://github.com/simtropolis/zed/blob/main/crates/crashes/src/crashes.rs). See also: [Debugging Crashes](./development/debugging-crashes.md).
 
 ### Client-Side Metrics
 
@@ -56,7 +66,7 @@ Usage data is tied to a random telemetry ID. If you've authenticated, this ID ma
 
 To audit what Zed has reported, run {#action zed::OpenTelemetryLog} from the command palette or click `Help > View Telemetry Log`.
 
-For the full list of event types, see the `Event` enum in [telemetry_events.rs](https://github.com/zed-industries/zed/blob/main/crates/telemetry_events/src/telemetry_events.rs).
+For the full list of event types, see the `Event` enum in [telemetry_events.rs](https://github.com/simtropolis/zed/blob/main/crates/telemetry_events/src/telemetry_events.rs).
 
 ### Server-Side Metrics
 
@@ -72,4 +82,4 @@ Administrators on Zed Business can enforce a no-sharing policy org-wide; members
 
 ## Concerns and Questions
 
-If you have concerns about telemetry, you can [open an issue](https://github.com/zed-industries/zed/issues/new/choose) or email hi@zed.dev.
+If you have concerns about telemetry, you can [open an issue](https://github.com/simtropolis/zed/issues/new/choose) or email hi@zed.dev.

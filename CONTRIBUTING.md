@@ -19,18 +19,18 @@ In particular **we love PRs that are**:
 - Fixing **bugs**.
 - **Small** enhancements to existing features to **make them work for more people** (making things work on more platforms/modes/whatever).
 - **Small** extra features, like keybindings or actions you miss from other editors or extensions.
-- Part of a **Community Program** like [Let's Git Together](https://github.com/zed-industries/zed/issues/41541) or [The Guild](https://zed.dev/community/guild).
+- Part of a **Community Program** like [Let's Git Together](https://github.com/simtropolis/zed/issues/41541) or [The Guild](https://zed.dev/community/guild).
 - Features we **explicitly called out as open to community contributions**
 
 If you're looking for concrete ideas:
 
-- [Docs issues](https://github.com/zed-industries/zed/issues?q=is%3Aissue%20state%3Aopen%20type%3ADocs)
-- Issues suitable for [first-time contributors](https://github.com/zed-industries/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20first%20issue%22), [returning contributors](https://github.com/zed-industries/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20second%20issue%22), and [expert contributors](https://github.com/zed-industries/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20expert%20issue%22)
-- [Triaged bugs with confirmed steps to reproduce](https://github.com/zed-industries/zed/issues?q=is%3Aissue%20state%3Aopen%20type%3ABug%20label%3Astate%3Areproducible)
-- [Area labels](https://github.com/zed-industries/zed/labels?q=area%3A*) to browse bugs in a specific part of the product you care about (after clicking on an area label, add type:Bug to the search)
-- [The board with the features](https://github.com/orgs/zed-industries/projects/78/views/4) we explicitly invited the community's contributions for.
+- [Docs issues](https://github.com/simtropolis/zed/issues?q=is%3Aissue%20state%3Aopen%20type%3ADocs)
+- Issues suitable for [first-time contributors](https://github.com/simtropolis/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20first%20issue%22), [returning contributors](https://github.com/simtropolis/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20second%20issue%22), and [expert contributors](https://github.com/simtropolis/zed/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22.contrib%2Fgood%20expert%20issue%22)
+- [Triaged bugs with confirmed steps to reproduce](https://github.com/simtropolis/zed/issues?q=is%3Aissue%20state%3Aopen%20type%3ABug%20label%3Astate%3Areproducible)
+- [Area labels](https://github.com/simtropolis/zed/labels?q=area%3A*) to browse bugs in a specific part of the product you care about (after clicking on an area label, add type:Bug to the search)
+- [The board with the features](https://github.com/orgs/simtropolis/projects/78/views/4) we explicitly invited the community's contributions for.
 
-**Thinking about proposing or building a larger feature? Don't start with a PR**, start with reading the [Zed Feature Process](./docs/src/development/feature-process.md) for how we think about feature design — what context to provide, what integration points to consider, and how to put together a strong proposal. The right place for the proposals is [GitHub discussions](https://github.com/zed-industries/zed/discussions) (not GitHub issues).
+**Thinking about proposing or building a larger feature? Don't start with a PR**, start with reading the [Zed Feature Process](./docs/src/development/feature-process.md) for how we think about feature design — what context to provide, what integration points to consider, and how to put together a strong proposal. The right place for the proposals is [GitHub discussions](https://github.com/simtropolis/zed/discussions) (not GitHub issues).
 
 ## Sending changes
 
@@ -52,7 +52,7 @@ submitted. **If you'd like your PR to have the best chance of being merged**:
 - Make sure the change is **desired**: we're always happy to accept bugfixes,
   but **features should be confirmed with us first** if you aim to avoid wasted
   effort. If there isn't already a GitHub issue for your feature with staff
-  confirmation that we want it, start with a [GitHub discussion](https://github.com/zed-industries/zed/discussions) rather than a PR.
+  confirmation that we want it, start with a [GitHub discussion](https://github.com/simtropolis/zed/discussions) rather than a PR.
   - This especially applies to any changes proposed to the Zed Extension API.
 - Include a clear description of **what you're solving**, and why it's important.
 - Include **tests**. For UI changes, consider updating visual regression tests (see [Building Zed for macOS](./docs/src/development/macos.md#visual-regression-tests)).
@@ -136,7 +136,7 @@ When your changes affect UI, consult this checklist:
 **Consistency**
 
 - Does it match Zed’s design language (spacing, typography, icons)?
-  - Make sure to visit [the icon design guidelines](https://github.com/zed-industries/zed/blob/main/crates/icons/README.md)
+  - Make sure to visit [the icon design guidelines](https://github.com/simtropolis/zed/blob/main/crates/icons/README.md)
 - Are terminology, labels, and tone consistent with the rest of Zed?
 - Are interactions consistent (e.g., how tabs close, how modals dismiss, how errors show)?
 

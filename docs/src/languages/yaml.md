@@ -7,7 +7,7 @@ description: "Configure YAML language support in Zed, including language servers
 
 YAML support is available natively in Zed.
 
-- Tree-sitter: [zed-industries/tree-sitter-yaml](https://github.com/zed-industries/tree-sitter-yaml)
+- Tree-sitter: [simtropolis/tree-sitter-yaml](https://github.com/simtropolis/tree-sitter-yaml)
 - Language Server: [redhat-developer/yaml-language-server](https://github.com/redhat-developer/yaml-language-server)
 
 ## Configuration

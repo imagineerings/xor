@@ -1271,7 +1271,7 @@ impl RandomizedTest for ProjectCollaborationTest {
                     });
 
                 // A hack to work around a hack in
-                // https://github.com/zed-industries/zed/pull/16696 that wasn't
+                // https://github.com/simtropolis/zed/pull/16696 that wasn't
                 // detected until we upgraded the rng crate. This whole crate is
                 // going away with DeltaDB soon, so we hold our nose and
                 // continue.

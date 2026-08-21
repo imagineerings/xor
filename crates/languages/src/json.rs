@@ -443,7 +443,7 @@ impl LspInstaller for NodeVersionAdapter {
         _: &mut AsyncApp,
     ) -> Result<GitHubLspBinaryVersion> {
         let release = latest_github_release(
-            "zed-industries/package-version-server",
+            "simtropolis/package-version-server",
             true,
             false,
             delegate.http_client(),

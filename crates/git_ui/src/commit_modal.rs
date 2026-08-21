@@ -11,6 +11,10 @@ use ui::{
     PopoverMenu, PopoverMenuHandle, SplitButton, Tooltip, prelude::*,
 };
 use zed_actions::{DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize};
+use ui::{
+    ButtonLike, ContextMenu, ElevationIndex, KeybindingHint, PopoverMenu, PopoverMenuHandle,
+    SplitButton, Tooltip, prelude::*,
+};
 
 use editor::{Editor, EditorElement};
 use gpui::*;
@@ -458,9 +462,12 @@ impl CommitModal {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 telemetry::event!("Git Committed", source = "Git Modal");
                                 this.git_panel.update(cx, |git_panel, cx| {
-                                    let options = git_panel.commit_options();
-                                    git_panel.commit_changes(options, window, cx)
-                                });
+                                    let options = git_panel.commit_options();git_panel.commit_changes(
+                                        options,
+                                        window,
+                                        cx)
+                                    });
+
                                 cx.emit(DismissEvent);
                             }))
                             .tooltip({
@@ -481,8 +488,7 @@ impl CommitModal {
                                                 if commit_options.no_verify {
                                                     " --no-verify"
                                                 } else {
-                                                    ""
-                                                }
+                                                    "" }
                                             ),
                                             &focus_handle.clone(),
                                             cx,

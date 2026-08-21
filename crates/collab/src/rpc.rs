@@ -30,7 +30,7 @@ use axum::{
     routing::get,
 };
 use collections::{HashSet, TypeIdHashMap};
-pub use connection_pool::{ConnectionPool, ZedVersion};
+pub use connection_pool::{ConnectionPool, SimVersion};
 use core::fmt::{self, Debug, Formatter};
 use futures::TryFutureExt as _;
 use rpc::proto::split_repository_update;
@@ -868,7 +868,7 @@ impl Server {
         connection: Connection,
         address: String,
         principal: Principal,
-        zed_version: ZedVersion,
+        zed_version: SimVersion,
         release_channel: Option<String>,
         user_agent: Option<String>,
         geoip_country_code: Option<String>,
@@ -1037,7 +1037,7 @@ impl Server {
     async fn send_initial_client_update(
         &self,
         connection_id: ConnectionId,
-        zed_version: ZedVersion,
+        zed_version: SimVersion,
         mut send_connection_id: Option<oneshot::Sender<ConnectionId>>,
         session: &Session,
     ) -> Result<()> {
@@ -1240,7 +1240,7 @@ pub async fn handle_websocket_request(
             .into_response();
     }
 
-    let Some(version) = app_version_header.map(|header| ZedVersion(header.0.0)) else {
+    let Some(version) = app_version_header.map(|header| SimVersion(header.0.0)) else {
         return (
             StatusCode::UPGRADE_REQUIRED,
             "no version header found".to_string(),

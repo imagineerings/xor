@@ -1246,7 +1246,7 @@ impl RatePredictionsModal {
                         (IconName::Code, "LSP Completion Accepted")
                     }
                     PredictEditsRequestTrigger::PredictionAccepted => {
-                        (IconName::ZedPredict, "Prediction Accepted")
+                        (IconName::SimPredict, "Prediction Accepted")
                     }
                     PredictEditsRequestTrigger::PredictionPartiallyAccepted => {
                         (IconName::CheckDouble, "Prediction Partially Accepted")

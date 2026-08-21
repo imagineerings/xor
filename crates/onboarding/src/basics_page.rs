@@ -603,9 +603,9 @@ fn render_zed_agent_button(user_store: &Entity<UserStore>, cx: &mut App) -> impl
     let status = *client.status().borrow();
 
     let plan = user_store.read(cx).plan();
-    let is_free = matches!(plan, Some(Plan::ZedFree) | None);
-    let is_pro = matches!(plan, Some(Plan::ZedPro));
-    let is_trial = matches!(plan, Some(Plan::ZedProTrial));
+    let is_free = matches!(plan, Some(Plan::SimFree) | None);
+    let is_pro = matches!(plan, Some(Plan::SimPro));
+    let is_trial = matches!(plan, Some(Plan::SimProTrial));
 
     let is_signed_out = status.is_signed_out()
         || matches!(
@@ -646,7 +646,7 @@ fn render_zed_agent_button(user_store: &Entity<UserStore>, cx: &mut App) -> impl
 
     AgentSetupButton::new("zed-agent-onboarding")
         .icon(
-            Icon::new(IconName::ZedAgent)
+            Icon::new(IconName::SimAgent)
                 .size(IconSize::XSmall)
                 .color(Color::Muted),
         )
@@ -718,6 +718,10 @@ pub(crate) fn render_basics_page(user_store: &Entity<UserStore>, cx: &mut App) -
     v_flex()
         .id("basics-page")
         .gap_6()
+        .child(crate::workspace_choice::render_workspace_choice(
+            &mut tab_index,
+            cx,
+        ))
         .child(render_theme_section(&mut tab_index, cx))
         .child(render_base_keymap_section(&mut tab_index, cx))
         .child(render_ai_section(user_store, cx))

@@ -1,0 +1,44 @@
+feature_id,flag_key,sources,default_or_fallback,availability,source_file,evidence_level
+COMFY-CLOUD-179,asset_rename_enabled,server:ASSET_RENAME_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-180,comfy_api_base_url,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-181,comfy_platform_base_url,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-182,comfyhub_profile_gate_enabled,server:COMFYHUB_PROFILE_GATE_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-183,comfyhub_upload_enabled,server:COMFYHUB_UPLOAD_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-184,consolidated_billing_enabled,server:CONSOLIDATED_BILLING_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-185,customer_io,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-186,enable_telemetry,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-FRONTEXT-EXT-080,extension.manager.supports_v4,server:MANAGER_SUPPORTS_V4,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-187,firebase_config,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-188,firebase_env,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-189,free_tier_credits,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-190,ga_measurement_id,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-191,gtm_container_id,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-192,linear_toggle_enabled,server:LINEAR_TOGGLE_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-193,manager_survey_url,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-194,max_upload_size,server:MAX_UPLOAD_SIZE | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-195,mixpanel_token,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-196,model_upload_button_enabled,server:MODEL_UPLOAD_BUTTON_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-197,new_free_tier_subscriptions,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-198,node_library_essentials_enabled,server:NODE_LIBRARY_ESSENTIALS_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-FRONTEXT-EXT-081,node_replacements,server:NODE_REPLACEMENTS,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-199,onboarding_survey,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-200,onboarding_survey_enabled,server:ONBOARDING_SURVEY_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-201,posthog_api_host,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-202,posthog_config,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-203,posthog_project_token,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-204,private_models_enabled,server:PRIVATE_MODELS_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-205,sentry_dsn,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-206,server_health_alert,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-FRONTEXT-EXT-082,show_signin_button,server:SHOW_SIGNIN_BUTTON,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-207,signup_turnstile,server:SIGNUP_TURNSTILE | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-208,subscription_required,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-FRONTEXT-EXT-083,supports_manager_v4_ui,client hello,true,active,src/config/clientFeatureFlags.json,test-backed
+COMFY-FRONTEXT-EXT-084,supports_preview_metadata,client hello | server:SUPPORTS_PREVIEW_METADATA,true,active,src/config/clientFeatureFlags.json,test-backed
+COMFY-FRONTEXT-EXT-085,supports_progress_text_metadata,client hello,true,active,src/config/clientFeatureFlags.json,test-backed
+COMFY-CLOUD-209,syftdata_source_id,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-210,team_workspaces_enabled,server:TEAM_WORKSPACES_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-211,telemetry_disabled_events,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-212,turnstile_sitekey,remote config,absent/consumer fallback,cloud/paid,src/platform/remoteConfig/types.ts,test-backed
+COMFY-CLOUD-213,unified_cloud_auth,server:UNIFIED_CLOUD_AUTH | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-214,user_secrets_enabled,server:USER_SECRETS_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed
+COMFY-CLOUD-215,workflow_sharing_enabled,server:WORKFLOW_SHARING_ENABLED | remote config,getter-defined,conditional,src/composables/useFeatureFlags.ts,test-backed

@@ -174,7 +174,7 @@ impl Pasteboard {
                     // Agus NB: We're currently only writing string entries to the clipboard when we have more than one.
                     //
                     // This was the existing behavior before I refactored the outer clipboard code:
-                    // https://github.com/zed-industries/zed/blob/65f7412a0265552b06ce122655369d6cc7381dd6/crates/gpui/src/platform/mac/platform.rs#L1060-L1110
+                    // https://github.com/simtropolis/zed/blob/65f7412a0265552b06ce122655369d6cc7381dd6/crates/gpui/src/platform/mac/platform.rs#L1060-L1110
                     //
                     // Note how `any_images` is always `false`. We should fix that, but that's orthogonal to the refactor.
 

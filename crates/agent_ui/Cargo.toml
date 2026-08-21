@@ -13,6 +13,7 @@ path = "src/agent_ui.rs"
 doctest = false
 
 [features]
+multiplayer-tools = ["git_ui/multiplayer-tools", "workspace/multiplayer-tools"]
 test-support = [
     "acp_thread/test-support",
     "eval_utils",

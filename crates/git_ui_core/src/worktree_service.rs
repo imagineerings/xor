@@ -17,11 +17,11 @@ use project::project_settings::ProjectSettings;
 use project::trusted_worktrees::{PathTrust, TrustedWorktrees};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
+use zed_actions::NewWorktreeBranchTarget;
 use ui::prelude::*;
 use workspace::{
     MultiWorkspace, OpenMode, PreviousWorkspaceState, ToastView, Workspace, dock::DockPosition,
 };
-use zed_actions::NewWorktreeBranchTarget;
 
 use git::repository::{FetchOptions, Remote};
 

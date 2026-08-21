@@ -384,11 +384,11 @@ Note that a save will be triggered when an unsaved tab is closed, even if this i
 
 - Description: The name of a font to use for rendering text in the editor.
 - Setting: `buffer_font_family`
-- Default: `.ZedMono`. This currently aliases to [Lilex](https://lilex.myrt.co).
+- Default: `.SimMono`. This currently aliases to [Lilex](https://lilex.myrt.co).
 
 **Options**
 
-The name of any font family installed on the user's system, or `".ZedMono"`.
+The name of any font family installed on the user's system, or `".SimMono"`.
 
 ## Buffer Font Features
 
@@ -4227,8 +4227,8 @@ List of `integer` column numbers
 ```json [settings]
 {
   "telemetry": {
-    "diagnostics": true,
-    "metrics": true
+    "diagnostics": false,
+    "metrics": false
   }
 }
 ```
@@ -4239,7 +4239,7 @@ List of `integer` column numbers
 
 - Description: Setting for sending debug-related data, such as crash reports.
 - Setting: `diagnostics`
-- Default: `true`
+- Default: `false` (temporarily disabled; set to `true` to opt in)
 
 **Options**
 
@@ -4249,7 +4249,7 @@ List of `integer` column numbers
 
 - Description: Setting for sending anonymized usage data, such as what languages you're using Zed with.
 - Setting: `metrics`
-- Default: `true`
+- Default: `false` (temporarily disabled; set to `true` to opt in)
 
 **Options**
 
@@ -5755,11 +5755,11 @@ Float values between `0.0` and `0.9`, where:
 
 - Description: The name of the font to use for text in the UI.
 - Setting: `ui_font_family`
-- Default: `.ZedSans`. This currently aliases to [IBM Plex](https://www.ibm.com/plex/).
+- Default: `.SimSans`. This currently aliases to [IBM Plex](https://www.ibm.com/plex/).
 
 **Options**
 
-The name of any font family installed on the system, `".ZedSans"` to use the Zed-provided default, or `".SystemUIFont"` to use the system's default UI font (on macOS and Windows).
+The name of any font family installed on the system, `".SimSans"` to use the Zed-provided default, or `".SystemUIFont"` to use the system's default UI font (on macOS and Windows).
 
 ## UI Font Features
 
@@ -5895,7 +5895,7 @@ To preview and enable a settings profile, open the command palette via {#kb comm
   "soft_wrap": "none",
 
   "buffer_font_size": 18,
-  "buffer_font_family": ".ZedMono",
+  "buffer_font_family": ".SimMono",
 
   "autosave": "on_focus_change",
   "format_on_save": "off",

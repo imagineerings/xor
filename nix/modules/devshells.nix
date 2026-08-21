@@ -5,8 +5,8 @@
     let
       # NOTE: Duplicated because this is in a separate flake-parts partition
       # than ./packages.nix
-      mkZed = import ../toolchain.nix { inherit inputs; };
-      zed-editor = mkZed pkgs;
+      mkSim = import ../toolchain.nix { inherit inputs; };
+      zed-editor = mkSim pkgs;
 
       # mdBook pinned to 0.4.40 via a dedicated nixpkgs input, because the docs
       # rely on behavior that newer mdBook releases break (see

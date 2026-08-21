@@ -28,6 +28,9 @@ pub async fn run_database_migrations(
 
     let mut new_migrations = Vec::new();
     for migration in migrations {
+        if migration.migration_type.is_down_migration() {
+            continue;
+        }
         match applied_migrations.get(&migration.version) {
             Some(applied_migration) => {
                 anyhow::ensure!(

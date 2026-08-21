@@ -3,7 +3,7 @@ use credentials_provider::CredentialsProvider;
 use fs::Fs;
 use futures::Stream;
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
-use gpui::{App, AsyncApp, Context, Entity, Subscription, Task, TaskExt};
+use gpui::{App, AsyncApp, Context, Entity, Subscription, Task, TaskExt, Window};
 use http_client::{CustomHeaders, HttpClient};
 use language_model::{
     ApiKeyState, AuthenticateError, EnvVar, IconOrSvg, LanguageModel, LanguageModelCompletionError,
@@ -11,9 +11,9 @@ use language_model::{
     LanguageModelToolUse, MessageContent, StopReason, TokenUsage, env_var,
 };
 use language_model::{
-    InlineDescription, LanguageModelId, LanguageModelName, LanguageModelProvider,
-    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
-    LanguageModelRequest, ProviderSettingsView, RateLimiter, Role, SubPageProviderSettings,
+    ConfigurationViewTargetAgent, InlineDescription, LanguageModelId, LanguageModelName,
+    LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
+    LanguageModelProviderState, LanguageModelRequest, ProviderSettingsView, RateLimiter, Role, SubPageProviderSettings,
 };
 use lmstudio::{LMSTUDIO_API_URL, ModelType, get_models};
 
@@ -322,6 +322,12 @@ impl LanguageModelProvider for LmStudioLanguageModelProvider {
             .description(InlineDescription::Text(
                 "Run local LLMs like Llama, Phi, and Qwen with LM Studio.".into(),
             )),
+        ))
+    }
+
+    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
+        Some(InlineDescription::Text(
+            "Run local LLMs like Llama, Phi, and Qwen with LM Studio.".into(),
         ))
     }
 }

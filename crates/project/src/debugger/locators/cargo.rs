@@ -241,7 +241,7 @@ mod tests {
     use super::build_test_binary_args;
 
     #[test]
-    fn non_test_invocation_has_no_test_args() {
+    fn cargo_locator_non_test_invocation_has_no_test_args() {
         assert_eq!(
             build_test_binary_args(None, false, false),
             Vec::<String>::new()

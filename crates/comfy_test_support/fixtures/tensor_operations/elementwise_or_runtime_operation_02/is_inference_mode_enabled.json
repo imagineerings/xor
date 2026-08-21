@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "resolution_module": "elementwise_or_runtime_operation_02",
+  "operation_id": "COMFY-TENSOR-OP-160E75523010",
+  "baseline_overload_id": "COMFY-TENSOR-OP-160E75523010:blocked",
+  "baseline_fixture_sha256": "1abcc42bdc81f18f32f9b43a29a25f9b4b72cbe83fd88316e979df7a08d9bd8a",
+  "overload_id": "zed.native.autograd.inference-mode-enabled.v1",
+  "owner_task_id": "comfy-parity-tensor-ops-elementwise-or-runtime-operation-comfy-tensor-op-0fb8594194a8",
+  "ordered_parameters": [],
+  "output_types": ["bool"],
+  "semantics": {
+    "rust_signature": "fn is_inference_mode_enabled_exact_native(mode: GradientMode, cancellation: &CancellationToken) -> Result<bool, ElementwiseRuntimePartTwoError>",
+    "mutation_rule": "read-only projection from the canonical GradientMode",
+    "alias_rule": "returns a copyable boolean",
+    "shape_rule": "not applicable to execution metadata",
+    "dtype_rule": "not applicable to execution metadata",
+    "accumulation_dtype": "not applicable to execution metadata",
+    "layout_rule": "not applicable to execution metadata",
+    "device_rule": "device independent",
+    "numeric_rule": "true exactly for GradientMode::Inference and false for every other canonical mode",
+    "tolerance": "exact",
+    "determinism": "immutable enum projection",
+    "cancellation_points": "before and after the mode projection",
+    "vjp_rule": "execution mode metadata is non-differentiable",
+    "jvp_rule": "execution mode metadata has no tangent"
+  }
+}

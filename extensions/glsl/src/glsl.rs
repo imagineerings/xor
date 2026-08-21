@@ -1,5 +1,5 @@
-use std::fs;
 use zed::settings::LspSettings;
+use std::fs;
 use zed_extension_api::{self as zed, LanguageServerId, Result, serde_json};
 
 struct GlslExtension {

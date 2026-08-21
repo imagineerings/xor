@@ -14,7 +14,7 @@ use gpui::BackgroundExecutor;
 use language::LanguageName;
 use lsp::LanguageServerName;
 use release_channel::ReleaseChannel;
-use task::{DebugScenario, SpawnInTerminal, TaskTemplate, ZedDebugConfig};
+use task::{DebugScenario, SimDebugConfig, SpawnInTerminal, TaskTemplate};
 
 use latest::dap::StartDebuggingRequestArgumentsRequest;
 
@@ -1142,7 +1142,7 @@ impl Extension {
     pub async fn call_dap_config_to_scenario(
         &self,
         store: &mut Store<WasmState>,
-        config: ZedDebugConfig,
+        config: SimDebugConfig,
     ) -> Result<Result<DebugScenario, String>> {
         match self {
             Extension::V0_8_0(ext) => {

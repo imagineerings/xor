@@ -108,7 +108,7 @@ let
         pkg-config
         protobuf
         # Pin cargo-about to 0.8.2. Newer versions don't work with the current license identifiers
-        # See https://github.com/zed-industries/zed/pull/44012
+        # See https://github.com/simtropolis/zed/pull/44012
         (cargo-about.overrideAttrs (
           new: old: rec {
             version = "0.8.2";
@@ -144,7 +144,7 @@ let
           new: old: {
             version = "0.6.1-zed";
             src = fetchFromGitHub {
-              owner = "zed-industries";
+              owner = "simtropolis";
               repo = "cargo-bundle";
               rev = "2be2669972dff3ddd4daf89a2cb29d2d06cad7c7";
               hash = "sha256-cSvW0ND148AGdIGWg/ku0yIacVgW+9f1Nsi+kAQxVrI=";
@@ -321,7 +321,7 @@ craneLib.buildPackage (
     dontUseCmakeConfigure = true;
 
     # without the env var generate-licenses fails due to crane's fetchCargoVendor, see:
-    # https://github.com/zed-industries/zed/issues/19971#issuecomment-2688455390
+    # https://github.com/simtropolis/zed/issues/19971#issuecomment-2688455390
     # TODO: put this in a separate derivation that depends on src to avoid running it on every build
     preBuild = ''
       ALLOW_MISSING_LICENSES=yes bash script/generate-licenses

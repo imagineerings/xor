@@ -1,6 +1,8 @@
 // Disable command line from opening on release mode
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(feature = "comfy")]
+mod comfy_cli;
 mod reliability;
 mod zed;
 
@@ -50,6 +52,11 @@ use recent_projects::{RemoteSettings, open_remote_project};
 use release_channel::{AppCommitSha, AppVersion, ReleaseChannel};
 use session::{AppSession, Session};
 use settings::{BaseKeymap, Settings, SettingsStore, watch_config_file};
+use zed::{
+    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
+    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
+    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
+};
 use smol::future::poll_once;
 use std::{
     cell::RefCell,
@@ -71,11 +78,6 @@ use workspace::{
     notifications::{NotificationId, NotifyResultExt},
     restore_multiworkspace,
 };
-use zed::{
-    OpenListener, OpenRequest, RawOpenRequest, app_menus, build_window_options,
-    derive_paths_with_position, edit_prediction_registry, handle_cli_connection,
-    handle_keymap_file_changes, initialize_workspace, open_paths_with_positions,
-};
 
 use crate::zed::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon_theme};
 
@@ -84,12 +86,11 @@ use crate::zed::{CrashHandler, OpenRequestKind, eager_load_active_theme_and_icon
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn build_application() -> Application {
-    let platform = gpui_platform::current_platform(false);
-    if std::env::var("ZED_EXPERIMENTAL_A11Y").as_deref() == Ok("1") {
-        Application::with_platform(platform)
-    } else {
-        Application::new_inaccessible(platform)
-    }
+    build_application_with_platform(gpui_platform::current_platform(false))
+}
+
+fn build_application_with_platform(platform: Rc<dyn gpui::Platform>) -> Application {
+    Application::with_platform(platform)
 }
 
 fn files_not_created_on_launch(errors: HashMap<io::ErrorKind, Vec<&Path>>) {
@@ -209,6 +210,18 @@ fn main() {
     #[cfg(unix)]
     util::prevent_root_execution();
 
+    #[cfg(all(not(debug_assertions), target_os = "windows", feature = "comfy"))]
+    unsafe {
+        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+
+        let needs_console = std::env::args_os()
+            .skip(1)
+            .any(|argument| argument == "comfy" || argument == "--foreground");
+        if needs_console {
+            let _attachment_result = AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+
     let args = Args::parse();
 
     // `zed --askpass` Makes zed operate in nc/netcat mode for use with askpass
@@ -248,15 +261,6 @@ fn main() {
         return;
     }
 
-    #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    unsafe {
-        use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
-
-        if args.foreground {
-            let _ = AttachConsole(ATTACH_PARENT_PROCESS);
-        }
-    }
-
     // `zed --printenv` Outputs environment variables as JSON to stdout
     if args.printenv {
         util::shell_env::print_env();
@@ -271,6 +275,15 @@ fn main() {
     // Set custom data directory.
     if let Some(dir) = &args.user_data_dir {
         paths::set_custom_data_dir(dir);
+    }
+
+    #[cfg(feature = "comfy")]
+    if let Some(SimCommand::Comfy(comfy_args)) = args.command.clone() {
+        let exit_code = comfy_cli::run(comfy_args);
+        if exit_code != 0 {
+            process::exit(exit_code);
+        }
+        return;
     }
 
     #[cfg(target_os = "windows")]
@@ -742,6 +755,8 @@ fn main() {
         project_symbols::init(cx);
         project_panel::init(cx);
         outline_panel::init(cx);
+        #[cfg(feature = "rust-tools")]
+        cargo_ui::init(cx);
         tasks_ui::init(cx);
         snippets_ui::init(cx);
         channel::init(&app_state.client.clone(), app_state.user_store.clone(), cx);
@@ -1684,8 +1699,17 @@ fn stdout_is_a_pty() -> bool {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "zed", disable_version_flag = true, max_term_width = 100)]
+#[command(
+    name = "zed",
+    disable_version_flag = true,
+    max_term_width = 100,
+    subcommand_precedence_over_arg = true
+)]
 struct Args {
+    #[cfg(feature = "comfy")]
+    #[command(subcommand)]
+    command: Option<SimCommand>,
+
     /// A sequence of space-separated paths or urls that you want to open.
     ///
     /// Use `path:line:row` syntax to open a file at a specific location.
@@ -1747,7 +1771,7 @@ struct Args {
 
     /// Run zed in the foreground, only used on Windows, to match the behavior on macOS.
     #[arg(long)]
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", feature = "comfy"))]
     #[arg(hide = true)]
     foreground: bool,
 
@@ -1790,6 +1814,13 @@ struct Args {
     #[cfg(target_os = "windows")]
     #[arg(long, hide = true)]
     etw_socket: Option<String>,
+}
+
+#[cfg(feature = "comfy")]
+#[derive(clap::Subcommand, Clone, Debug)]
+enum SimCommand {
+    /// Run native Comfy lifecycle, automation, and compatibility-host commands.
+    Comfy(comfy_cli::ComfyArgs),
 }
 
 #[derive(Clone, Debug)]

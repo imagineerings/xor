@@ -27,7 +27,7 @@ pub struct AllLanguageModelSettingsContent {
     pub vercel_ai_gateway: Option<VercelAiGatewaySettingsContent>,
     pub x_ai: Option<XAiSettingsContent>,
     #[serde(rename = "zed.dev")]
-    pub zed_dot_dev: Option<ZedDotDevSettingsContent>,
+    pub zed_dot_dev: Option<SimDotDevSettingsContent>,
 }
 
 #[with_fallible_options]
@@ -245,6 +245,18 @@ pub struct OpenCodeSettingsContent {
     pub show_zen_models: Option<bool>,
     /// Whether to show OpenCode Go models. Defaults to true.
     pub show_go_models: Option<bool>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub enum OpenCodeApiProtocol {
+    #[serde(rename = "anthropic")]
+    Anthropic,
+    #[serde(rename = "openai_responses", alias = "open_ai_responses")]
+    OpenAiResponses,
+    #[serde(rename = "openai_chat", alias = "open_ai_chat")]
+    OpenAiChat,
+    #[serde(rename = "google")]
+    Google,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom)]
@@ -530,15 +542,15 @@ pub struct XaiAvailableModel {
 
 #[with_fallible_options]
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema, MergeFrom)]
-pub struct ZedDotDevSettingsContent {
-    pub available_models: Option<Vec<ZedDotDevAvailableModel>>,
+pub struct SimDotDevSettingsContent {
+    pub available_models: Option<Vec<SimDotDevAvailableModel>>,
 }
 
 #[with_fallible_options]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-pub struct ZedDotDevAvailableModel {
+pub struct SimDotDevAvailableModel {
     /// The provider of the language model.
-    pub provider: ZedDotDevAvailableProvider,
+    pub provider: SimDotDevAvailableProvider,
     /// The model's name in the provider's API. e.g. claude-3-5-sonnet-20240620
     pub name: String,
     /// The name displayed in the UI, such as in the agent panel model dropdown menu.
@@ -565,7 +577,7 @@ pub struct ZedDotDevAvailableModel {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 #[serde(rename_all = "lowercase")]
-pub enum ZedDotDevAvailableProvider {
+pub enum SimDotDevAvailableProvider {
     Anthropic,
     OpenAi,
     Google,

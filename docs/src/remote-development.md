@@ -7,6 +7,8 @@ description: Use remote development in Zed to edit code over SSH with local UI p
 
 Remote Development lets you edit code on a remote server while running Zed locally. The UI stays responsive because it runs on your machine, while language servers, tasks, and terminals run on the server.
 
+For Rust workspace tooling, Cargo metadata, Rust test discovery, Cargo tasks, and DAP build commands also run on the authoritative remote project host. The local Cargo and Tests panels receive bounded project-relative models and structured lifecycle state; they do not receive environment values, raw terminal output, or absolute host paths, and they never fall back to a local Cargo installation. The remote server must be built with the same `rust-tools` capability. A disabled or older host is shown as an unsupported protocol/capability state rather than repeatedly retrying commands.
+
 For day-to-day workflows, pair remote development with [Tasks](./tasks.md),
 [Terminal](./terminal.md), and [Debugger](./debugger.md).
 
@@ -224,16 +226,16 @@ Once the master connection is established, Zed will check to see if the remote s
 
 If it is not there or the version mismatches, Zed will try to download the latest version. By default, it will download from `https://zed.dev` directly, but if you set: `{"upload_binary_over_ssh":true}` in your settings for that server, it will download the binary to your local machine and then upload it to the remote server.
 
-If you'd like to maintain the server binary yourself you can. You can either download our prebuilt versions from [GitHub](https://github.com/zed-industries/zed/releases), or [build your own](https://zed.dev/docs/development):
+If you'd like to maintain the server binary yourself you can. You can either download our prebuilt versions from [GitHub](https://github.com/simtropolis/zed/releases), or [build your own](https://zed.dev/docs/development):
 
 ```bash
 cargo build --release --package remote_server
 llvm-objcopy --strip-debug target/release/remote_server
 ```
 
-Stripping debug symbols matches the packaging step in [`script/bundle-linux`](https://github.com/zed-industries/zed/blob/main/script/bundle-linux) and keeps the binary closer to the size of Zed's prebuilt downloads. Prefer `llvm-objcopy` because GNU `objcopy` may not understand newer LLVM-emitted CREL sections.
+Stripping debug symbols matches the packaging step in [`script/bundle-linux`](https://github.com/simtropolis/zed/blob/main/script/bundle-linux) and keeps the binary closer to the size of Zed's prebuilt downloads. Prefer `llvm-objcopy` because GNU `objcopy` may not understand newer LLVM-emitted CREL sections.
 
-The official Linux release builds a musl/static remote server. If you need that, follow the current target and flags in [`script/bundle-linux`](https://github.com/zed-industries/zed/blob/main/script/bundle-linux); for x86-64 Linux, that looks like:
+The official Linux release builds a musl/static remote server. If you need that, follow the current target and flags in [`script/bundle-linux`](https://github.com/simtropolis/zed/blob/main/script/bundle-linux); for x86-64 Linux, that looks like:
 
 ```bash
 RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --package remote_server --target x86_64-unknown-linux-musl
@@ -250,7 +252,7 @@ Each connection tries to run the development server in proxy mode. This mode wil
 
 In the case that reconnecting fails, the daemon will not be re-used. That said, unsaved changes are by default persisted locally, so that you do not lose work. You can always reconnect to the project at a later date and Zed will restore unsaved changes.
 
-If you are struggling with connection issues, you should be able to see more information in the Zed log `cmd-shift-p Open Log`. If you are seeing things that are unexpected, please file a [GitHub issue](https://github.com/zed-industries/zed/issues/new) or reach out in the #support forums on [Discord](https://zed.dev/community-links).
+If you are struggling with connection issues, you should be able to see more information in the Zed log `cmd-shift-p Open Log`. If you are seeing things that are unexpected, please file a [GitHub issue](https://github.com/simtropolis/zed/issues/new) or reach out in the #support forums on [Discord](https://zed.dev/community-links).
 
 ## Supported SSH Options
 

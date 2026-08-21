@@ -1,5 +1,5 @@
 +++
-repository_url = "https://github.com/zed-industries/codex-acp"
+repository_url = "https://github.com/simtropolis/codex-acp"
 revision = "c3d24ee70928fc9da08c131fc632d624413ccc43"
 +++
 

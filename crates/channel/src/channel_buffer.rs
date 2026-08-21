@@ -1,6 +1,6 @@
 use crate::{Channel, ChannelStore};
 use anyhow::Result;
-use client::{ChannelId, Client, Collaborator, UserStore, ZED_ALWAYS_ACTIVE};
+use client::{ChannelId, Client, Collaborator, ZED_ALWAYS_ACTIVE, UserStore};
 use collections::HashMap;
 use gpui::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter, Task};
 use language::proto::serialize_version;

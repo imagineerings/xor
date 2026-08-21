@@ -111,7 +111,7 @@ Download the importer
 
 ### Alternative: Building it yourself
 
-- Clone the repo at git@github.com:zed-industries/tracy.git on v0.12.2 branch
+- Clone the repo at git@github.com:simtropolis/tracy.git on v0.12.2 branch
 - `cd import && mkdir build && cd build`
 - Run cmake to generate build files: `cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..`
 - Build the importer: `ninja`

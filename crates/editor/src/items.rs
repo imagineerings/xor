@@ -32,6 +32,9 @@ use project::{
 use rope::TextSummary;
 use rpc::proto::{self, update_view};
 use settings::Settings;
+use zed_actions::preview::{
+    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
+};
 use std::{
     any::{Any, TypeId},
     borrow::Cow,
@@ -58,9 +61,6 @@ use workspace::{
     Pane, TabBarSettings, WorkspaceSettings,
     item::{FollowEvent, ProjectItemKind},
     searchable::SearchOptions,
-};
-use zed_actions::preview::{
-    markdown::OpenPreview as OpenMarkdownPreview, svg::OpenPreview as OpenSvgPreview,
 };
 
 pub const MAX_TAB_TITLE_LEN: usize = 24;
@@ -3042,7 +3042,7 @@ mod tests {
         });
     }
 
-    // Regression test for https://github.com/zed-industries/zed/issues/35947
+    // Regression test for https://github.com/simtropolis/zed/issues/35947
     // Verifies that deserializing a non-worktree editor does not add the item
     // to any pane as a side effect.
     #[gpui::test]

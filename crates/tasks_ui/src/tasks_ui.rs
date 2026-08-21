@@ -13,8 +13,12 @@ use tree_sitter::{Query, StreamingIterator as _};
 use workspace::Workspace;
 
 mod modal;
+#[cfg(feature = "test-explorer")]
+mod test_explorer;
 
 pub use modal::{Rerun, ShowAttachModal, Spawn, TaskOverrides, TasksModal};
+#[cfg(feature = "test-explorer")]
+pub use test_explorer::*;
 
 /// Inserts `new_task` (pretty-printed JSON object text) at the end of the top-level JSON
 /// array in the editor's buffer, creating the array if the buffer has none, and moves the
@@ -99,6 +103,9 @@ pub fn insert_task_json_into_editor(
 }
 
 pub fn init(cx: &mut App) {
+    #[cfg(feature = "test-explorer")]
+    test_explorer::init(cx);
+
     cx.observe_new(
         |workspace: &mut Workspace, _: Option<&mut Window>, _: &mut Context<Workspace>| {
             workspace

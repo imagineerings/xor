@@ -1,0 +1,4 @@
+platform,packages,bootstrap,data_location,input_conventions,specific_behavior,feature_id,source,evidence_level
+Windows,NSIS; win-unpacked,win-x64,LOCALAPPDATA or installation drive,Ctrl conventions,VC++ bootstrap/audit; port process kill; staged startup updater,COMFY-DESKTOP-192,projects/comfy/Comfy-Desktop/electron-builder.yml,code-inferred
+macOS,DMG; ZIP,mac-arm64,Electron userData,Command conventions,notarization; app/dock menu; fullscreen events; update single-instance handoff,COMFY-DESKTOP-194,projects/comfy/Comfy-Desktop/electron-builder.yml,code-inferred
+Linux,AppImage; DEB,linux-x64,XDG config/data/cache,Ctrl conventions,AppArmor hook; DEB system-managed updates; AppImage capability,COMFY-DESKTOP-195,projects/comfy/Comfy-Desktop/electron-builder.yml,code-inferred

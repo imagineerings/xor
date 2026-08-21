@@ -105,10 +105,12 @@ impl UpdateButton {
             .disabled(true)
     }
 
-    pub fn downloading(progress: Option<f32>) -> Self {
-        Self::new(IconName::Download, "Downloading Zed Update…")
+    pub fn downloading(progress: Option<f32>, progress: Option<f32>) -> Self {
+        let mut this = Self::new(IconName::Download, "Downloading Zed Update…")
             .progress(progress)
-            .disabled(true)
+            .disabled(true);
+        this.progress = progress;
+        this
     }
 
     pub fn installing(version: impl Into<SharedString>) -> Self {
@@ -185,6 +187,12 @@ impl RenderOnce for UpdateButton {
 
         let button_id = ElementId::Name(self.message.clone());
         let dismiss_button_id = ElementId::Name(format!("dismiss-{}", self.message).into());
+
+        let label_row = h_flex()
+            .h_full()
+            .gap_1()
+            .child(icon_element)
+            .child(Label::new(self.message).size(LabelSize::Small));
 
         let label_row = h_flex()
             .h_full()

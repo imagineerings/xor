@@ -4,7 +4,7 @@ use agent_ui::ExternalSourcePrompt;
 use anyhow::{Context as _, Result, anyhow};
 use cli::{CliRequest, CliResponse, CliResponseSink};
 use cli::{IpcHandshake, ipc};
-use client::{ZedLink, parse_zed_link};
+use client::{SimLink, parse_zed_link};
 use db::kvp::KeyValueStore;
 use editor::Editor;
 use fs::Fs;
@@ -196,10 +196,10 @@ impl OpenRequest {
                 this.parse_ssh_file_path(&url, cx)?
             } else if let Some(zed_link) = parse_zed_link(&url, cx) {
                 match zed_link {
-                    ZedLink::Channel { channel_id } => {
+                    SimLink::Channel { channel_id } => {
                         this.join_channel = Some(channel_id);
                     }
-                    ZedLink::ChannelNotes {
+                    SimLink::ChannelNotes {
                         channel_id,
                         heading,
                     } => {
@@ -2054,7 +2054,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https://github.com/zed-industries/zed.git".into(),
+                        "zed://git/clone/?repo=https://github.com/simtropolis/zed.git".into(),
                     ],
                     ..Default::default()
                 },
@@ -2065,7 +2065,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
             }
             _ => panic!("Expected GitClone kind"),
         }
@@ -2079,7 +2079,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone?repo=https://github.com/zed-industries/zed.git".into(),
+                        "zed://git/clone?repo=https://github.com/simtropolis/zed.git".into(),
                     ],
                     ..Default::default()
                 },
@@ -2090,7 +2090,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
             }
             _ => panic!("Expected GitClone kind"),
         }
@@ -2104,7 +2104,7 @@ mod tests {
             OpenRequest::parse(
                 RawOpenRequest {
                     urls: vec![
-                        "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fzed-industries%2Fzed.git"
+                        "zed://git/clone/?repo=https%3A%2F%2Fgithub.com%2Fsimtropolis%2Fsim.git"
                             .into(),
                     ],
                     ..Default::default()
@@ -2116,7 +2116,7 @@ mod tests {
 
         match request.kind {
             Some(OpenRequestKind::GitClone { repo_url }) => {
-                assert_eq!(repo_url, "https://github.com/zed-industries/zed.git");
+                assert_eq!(repo_url, "https://github.com/simtropolis/zed.git");
             }
             _ => panic!("Expected GitClone kind"),
         }

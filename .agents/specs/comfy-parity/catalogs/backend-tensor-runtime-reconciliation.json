@@ -1,0 +1,173 @@
+{
+  "autograd": {
+    "availability": {
+      "active": 25,
+      "conditional": 11
+    },
+    "confidence": {
+      "high": 25,
+      "low": 6,
+      "medium": 5
+    },
+    "construct": {
+      "activation-checkpointing": 1,
+      "custom-autograd-function": 7,
+      "custom-function-context": 4,
+      "gradient-mode": 3,
+      "gradient-state": 3,
+      "graph-detachment-or-storage-alias": 2,
+      "mixed-precision-autograd": 3,
+      "optimizer-or-gradient-scaler": 10,
+      "reverse-mode-execution": 3
+    },
+    "custom_function_rows": 7,
+    "evidence_level": {
+      "code-inferred": 35,
+      "test-backed": 1
+    },
+    "rows": 36,
+    "use_totals": {
+      "production_uses": 382,
+      "support_uses": 0,
+      "test_uses": 1
+    }
+  },
+  "generated_by": "generate_tensor_runtime_catalogs.py",
+  "generated_catalogs": {
+    "backend-autograd.csv": {
+      "rows": 36,
+      "sha256": "d51ff8465e2a161bef2093bbdb37f7547a6d6157d0fa1c4d6f0a30b8fd682670"
+    },
+    "backend-rng.csv": {
+      "rows": 54,
+      "sha256": "d207ea66d8949eb73067828da6f2ed160ab8bdf641b4cf6ed1789faa0f65d06b"
+    },
+    "backend-tensor-operations.csv": {
+      "rows": 600,
+      "sha256": "7f2f90249fe6d4413aaade485d6197359818cc0c2feb47df73c56d25283f11dc"
+    }
+  },
+  "generator_sha256": "4f1522d541c5ce0695e91c820b8185c084c706c6b59fb72ee55df11bf65b3d49",
+  "limitations": [
+    "This is static code evidence, not runtime observation; branch reachability, dynamic dispatch, overload selection, backend kernels, and numeric equivalence remain unverified.",
+    "Tensor method calls without a statically recoverable receiver are retained as low-confidence receiver-unverified candidates instead of being guessed or omitted.",
+    "One Python 3.10 match statement file is parsed after syntax-only match/case header normalization; line numbers and call expressions are preserved.",
+    "NumPy arithmetic, SciPy, PIL, OpenCV, model container parsing, and media codecs are outside this PyTorch/tensor-runtime surface; NumPy and Python random calls are included only in the RNG catalog.",
+    "Test call sites show direct use of the same API symbol, not necessarily semantic coverage of every production call, shape, dtype, device, or failure mode."
+  ],
+  "rng": {
+    "availability": {
+      "active": 34,
+      "conditional": 15,
+      "developer-only": 5
+    },
+    "call_totals": {
+      "production_calls": 134,
+      "support_calls": 0,
+      "test_calls": 46
+    },
+    "confidence": {
+      "high": 50,
+      "medium": 4
+    },
+    "evidence_level": {
+      "code-inferred": 49,
+      "test-backed": 5
+    },
+    "phase": {
+      "context-window-selection": 3,
+      "model-internal-stochasticity": 16,
+      "node-level-noise": 3,
+      "runtime-utility": 8,
+      "sampling-noise-and-solver": 8,
+      "stochastic-quantization": 4,
+      "temporary-output-naming": 1,
+      "test-fixture": 5,
+      "training-and-data-order": 6
+    },
+    "rows": 54
+  },
+  "schema_version": 1,
+  "source_baseline": {
+    "all_file_count": 949,
+    "all_file_fingerprint_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+    "git_metadata": false,
+    "package_version": "0.27.1",
+    "rg_visible_file_count": 884,
+    "rg_visible_fingerprint_sha256": "38fec15d8dadeef9ccd1f677d61c8f36db5e1a2080d445ef5bd8a28ee1e6dea6"
+  },
+  "source_closure": {
+    "backend_source_coverage_rows": 949,
+    "missing_from_backend_source_coverage": 0,
+    "note": "This catalog references the canonical backend-source-coverage.csv closure and does not duplicate its 949 per-file rows.",
+    "parser_modes": {
+      "native-ast": 683
+    },
+    "python_file_classifications": {
+      "infrastructure-only": 309,
+      "production data/template": 1,
+      "production source": 280,
+      "test-only": 93
+    },
+    "python_file_execution_tiers": {
+      "production": 586,
+      "support": 4,
+      "test": 93
+    },
+    "python_files_scanned": 683
+  },
+  "tensor_operations": {
+    "availability": {
+      "active": 534,
+      "conditional": 65,
+      "developer-only": 1
+    },
+    "confidence": {
+      "high": 499,
+      "low": 94,
+      "medium": 7
+    },
+    "evidence_level": {
+      "code-inferred": 579,
+      "test-backed": 21
+    },
+    "inventory_kind": {
+      "callable-operation": 511,
+      "namespace-or-value-reference": 67,
+      "reclassified-external-operation": 7,
+      "type-reference": 15
+    },
+    "receiver_unverified_rows": 94,
+    "rows": 600,
+    "semantic_group": {
+      "accelerated-attention-kernel": 4,
+      "activation-normalization-functional": 10,
+      "comfy-operator-indirection": 19,
+      "elementwise-or-runtime-operation": 266,
+      "external-tensor-kernel": 31,
+      "indexing-masking": 14,
+      "linear-algebra": 15,
+      "namespace-contract": 3,
+      "neural-network-functional": 12,
+      "neural-network-module": 43,
+      "random-number-generation": 13,
+      "reduction": 25,
+      "shape-layout-transform": 29,
+      "spatial-functional-kernel": 12,
+      "spectral-transform": 4,
+      "storage-dtype-device": 11,
+      "tensor-creation": 10,
+      "type-contract": 15,
+      "value-or-constant-contract": 64
+    },
+    "site_totals": {
+      "decorator_calls": 65,
+      "namespace_references": 7,
+      "production_calls": 15717,
+      "support_calls": 1,
+      "test_calls": 262,
+      "type_references": 2725,
+      "value_references": 1186
+    }
+  }
+}

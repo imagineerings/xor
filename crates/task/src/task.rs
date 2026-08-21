@@ -10,18 +10,20 @@ mod vscode_format;
 
 use anyhow::Context as _;
 use collections::{HashMap, HashSet, hash_map};
-use gpui::SharedString;
+use gpui::{App, SharedString, Window};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 use std::str::FromStr;
 use std::sync::Arc;
 
 pub use adapter_schema::{AdapterSchema, AdapterSchemas};
 pub use debug_format::{
     AttachRequest, BuildTaskDefinition, DebugRequest, DebugScenario, DebugTaskFile, LaunchRequest,
-    Request, TcpArgumentsTemplate, ZedDebugConfig,
+    Request, SimDebugConfig, TcpArgumentsTemplate,
 };
+pub use zed_actions::RevealTarget;
 pub use task_template::{
     DebugArgsRequest, HideStrategy, RevealStrategy, SaveStrategy, TaskHook, TaskTemplate,
     TaskTemplates, substitute_variables_in_map, substitute_variables_in_str,
@@ -30,12 +32,271 @@ pub use util::shell::{Shell, ShellKind};
 pub use util::shell_builder::ShellBuilder;
 pub use vscode_debug_format::VsCodeDebugTaskFile;
 pub use vscode_format::VsCodeTaskFile;
-pub use zed_actions::RevealTarget;
 
 /// Task identifier, unique within the application.
 /// Based on it, task reruns and terminal tabs are managed.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Deserialize)]
 pub struct TaskId(pub String);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StructuredTerminalId(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StructuredTaskState {
+    Queued,
+    Running {
+        terminal_id: Option<StructuredTerminalId>,
+    },
+    Completed {
+        terminal_id: Option<StructuredTerminalId>,
+        exit_code: Option<i32>,
+        success: bool,
+    },
+    SpawnError {
+        message: String,
+    },
+    Cancelled {
+        terminal_id: Option<StructuredTerminalId>,
+        termination_confirmed: bool,
+    },
+}
+
+impl StructuredTaskState {
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Completed { .. } | Self::SpawnError { .. } | Self::Cancelled { .. }
+        )
+    }
+
+    pub fn terminal_id(&self) -> Option<StructuredTerminalId> {
+        match self {
+            Self::Running { terminal_id }
+            | Self::Completed { terminal_id, .. }
+            | Self::Cancelled { terminal_id, .. } => *terminal_id,
+            Self::Queued | Self::SpawnError { .. } => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructuredTaskLifecycleEvent {
+    pub task_id: TaskId,
+    pub state: StructuredTaskState,
+}
+
+type StructuredTaskSubscriber = Arc<dyn Fn(&StructuredTaskLifecycleEvent, &mut App) + Send + Sync>;
+type StructuredTaskCancel = Arc<dyn Fn(&mut App) -> bool + Send + Sync>;
+type StructuredTaskReveal = Arc<dyn Fn(&mut Window, &mut App) -> bool + Send + Sync>;
+
+struct StructuredTaskHandleInner {
+    task_id: TaskId,
+    state: StructuredTaskState,
+    subscribers: Vec<StructuredTaskSubscriber>,
+    cancel: Option<StructuredTaskCancel>,
+    reveal: Option<StructuredTaskReveal>,
+}
+
+#[derive(Clone)]
+pub struct StructuredTaskHandle {
+    inner: Arc<parking_lot::Mutex<StructuredTaskHandleInner>>,
+}
+
+impl std::fmt::Debug for StructuredTaskHandle {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("StructuredTaskHandle")
+            .field("task_id", &self.task_id())
+            .field("state", &self.state())
+            .finish_non_exhaustive()
+    }
+}
+
+impl StructuredTaskHandle {
+    pub fn new(task_id: TaskId) -> Self {
+        Self {
+            inner: Arc::new(parking_lot::Mutex::new(StructuredTaskHandleInner {
+                task_id,
+                state: StructuredTaskState::Queued,
+                subscribers: Vec::new(),
+                cancel: None,
+                reveal: None,
+            })),
+        }
+    }
+
+    pub fn task_id(&self) -> TaskId {
+        self.inner.lock().task_id.clone()
+    }
+
+    pub fn state(&self) -> StructuredTaskState {
+        self.inner.lock().state.clone()
+    }
+
+    pub fn subscribe(
+        &self,
+        cx: &mut App,
+        subscriber: impl Fn(&StructuredTaskLifecycleEvent, &mut App) + Send + Sync + 'static,
+    ) {
+        let subscriber: StructuredTaskSubscriber = Arc::new(subscriber);
+        let event = self.event();
+        subscriber(&event, cx);
+        self.inner.lock().subscribers.push(subscriber);
+    }
+
+    pub fn mark_running(&self, terminal_id: Option<StructuredTerminalId>, cx: &mut App) -> bool {
+        self.transition(StructuredTaskState::Running { terminal_id }, cx)
+    }
+
+    pub fn bind_terminal(
+        &self,
+        terminal_id: StructuredTerminalId,
+        cancel: impl Fn(&mut App) -> bool + Send + Sync + 'static,
+        cx: &mut App,
+    ) -> bool {
+        let cancel: StructuredTaskCancel = Arc::new(cancel);
+        let was_cancelled = {
+            let mut inner = self.inner.lock();
+            inner.cancel = Some(cancel.clone());
+            matches!(inner.state, StructuredTaskState::Cancelled { .. })
+        };
+        if was_cancelled {
+            cancel(cx);
+            self.mark_cancelled(Some(terminal_id), false, cx);
+            false
+        } else {
+            self.mark_running(Some(terminal_id), cx)
+        }
+    }
+
+    pub fn set_reveal(
+        &self,
+        reveal: impl Fn(&mut Window, &mut App) -> bool + Send + Sync + 'static,
+    ) {
+        self.inner.lock().reveal = Some(Arc::new(reveal));
+    }
+
+    pub fn reveal_terminal(&self, window: &mut Window, cx: &mut App) -> bool {
+        let reveal = self.inner.lock().reveal.clone();
+        reveal.is_some_and(|reveal| reveal(window, cx))
+    }
+
+    pub fn cancel(&self, cx: &mut App) -> bool {
+        let (state, cancel) = {
+            let inner = self.inner.lock();
+            (inner.state.clone(), inner.cancel.clone())
+        };
+        if state.is_terminal() {
+            return false;
+        }
+        let terminal_id = state.terminal_id();
+        let termination_confirmed = if let Some(cancel) = cancel {
+            cancel(cx);
+            false
+        } else {
+            matches!(state, StructuredTaskState::Queued)
+        };
+        self.mark_cancelled(terminal_id, termination_confirmed, cx)
+    }
+
+    pub fn mark_completed(&self, exit_status: ExitStatus, cx: &mut App) -> bool {
+        self.transition(
+            StructuredTaskState::Completed {
+                terminal_id: self.state().terminal_id(),
+                exit_code: exit_status.code(),
+                success: exit_status.success(),
+            },
+            cx,
+        )
+    }
+
+    pub fn mark_spawn_error(&self, message: impl Into<String>, cx: &mut App) -> bool {
+        const MAX_ERROR_BYTES: usize = 4 * 1024;
+        let mut message = message.into();
+        if message.len() > MAX_ERROR_BYTES {
+            let mut end = MAX_ERROR_BYTES;
+            while end > 0 && !message.is_char_boundary(end) {
+                end -= 1;
+            }
+            message.truncate(end);
+        }
+        self.transition(StructuredTaskState::SpawnError { message }, cx)
+    }
+
+    pub fn mark_cancelled(
+        &self,
+        terminal_id: Option<StructuredTerminalId>,
+        termination_confirmed: bool,
+        cx: &mut App,
+    ) -> bool {
+        self.transition(
+            StructuredTaskState::Cancelled {
+                terminal_id,
+                termination_confirmed,
+            },
+            cx,
+        )
+    }
+
+    fn event(&self) -> StructuredTaskLifecycleEvent {
+        let inner = self.inner.lock();
+        StructuredTaskLifecycleEvent {
+            task_id: inner.task_id.clone(),
+            state: inner.state.clone(),
+        }
+    }
+
+    fn transition(&self, state: StructuredTaskState, cx: &mut App) -> bool {
+        let subscribers = {
+            let mut inner = self.inner.lock();
+            if inner.state == state {
+                return false;
+            }
+            let cancellation_update = matches!(
+                (&inner.state, &state),
+                (
+                    StructuredTaskState::Cancelled {
+                        terminal_id: old_terminal_id,
+                        termination_confirmed: old_confirmed,
+                    },
+                    StructuredTaskState::Cancelled {
+                        terminal_id: new_terminal_id,
+                        termination_confirmed: new_confirmed,
+                    },
+                ) if (!old_confirmed && *new_confirmed)
+                    || (old_terminal_id.is_none() && new_terminal_id.is_some())
+            );
+            if inner.state.is_terminal() && !cancellation_update {
+                return false;
+            }
+            let valid = matches!(
+                (&inner.state, &state),
+                (
+                    StructuredTaskState::Queued,
+                    StructuredTaskState::Running { .. }
+                        | StructuredTaskState::SpawnError { .. }
+                        | StructuredTaskState::Cancelled { .. }
+                ) | (
+                    StructuredTaskState::Running { .. },
+                    StructuredTaskState::Running { .. }
+                        | StructuredTaskState::Completed { .. }
+                        | StructuredTaskState::SpawnError { .. }
+                        | StructuredTaskState::Cancelled { .. }
+                )
+            ) || cancellation_update;
+            if !valid {
+                return false;
+            }
+            inner.state = state;
+            inner.subscribers.clone()
+        };
+        let event = self.event();
+        for subscriber in subscribers {
+            subscriber(&event, cx);
+        }
+        true
+    }
+}
 
 /// Contains all information needed by Zed to spawn a new terminal tab for the given task.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -402,15 +663,15 @@ pub fn shell_to_proto(shell: Shell) -> proto::Shell {
 
 type VsCodeEnvVariable = String;
 type VsCodeCommand = String;
-type ZedEnvVariable = String;
+type SimEnvVariable = String;
 
 struct EnvVariableReplacer {
-    variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>,
-    commands: HashMap<VsCodeCommand, ZedEnvVariable>,
+    variables: HashMap<VsCodeEnvVariable, SimEnvVariable>,
+    commands: HashMap<VsCodeCommand, SimEnvVariable>,
 }
 
 impl EnvVariableReplacer {
-    fn new(variables: HashMap<VsCodeEnvVariable, ZedEnvVariable>) -> Self {
+    fn new(variables: HashMap<VsCodeEnvVariable, SimEnvVariable>) -> Self {
         Self {
             variables,
             commands: HashMap::default(),
@@ -419,7 +680,7 @@ impl EnvVariableReplacer {
 
     fn with_commands(
         mut self,
-        commands: impl IntoIterator<Item = (VsCodeCommand, ZedEnvVariable)>,
+        commands: impl IntoIterator<Item = (VsCodeCommand, SimEnvVariable)>,
     ) -> Self {
         self.commands = commands.into_iter().collect();
         self

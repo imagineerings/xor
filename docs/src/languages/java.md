@@ -55,7 +55,7 @@ Here is a common `settings.json` including the above mentioned configurations:
 
 ## Debugging
 
-Debug support is enabled via our [Fork of Java Debug](https://github.com/zed-industries/java-debug), which the extension will automatically download and start for you. Please refer to the [Debugger Documentation](https://zed.dev/docs/debugger#getting-started) for general information about how debugging works in Zed.
+Debug support is enabled via our [Fork of Java Debug](https://github.com/simtropolis/java-debug), which the extension will automatically download and start for you. Please refer to the [Debugger Documentation](https://zed.dev/docs/debugger#getting-started) for general information about how debugging works in Zed.
 
 To get started with Java, click the `edit debug.json` button in the Debug menu, and replace the contents of the file with the following:
 

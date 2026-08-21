@@ -233,9 +233,7 @@ fn docs_job(channel_expr: impl Into<String>, checkout_ref: Option<String>) -> Na
         job: docs_deploy_steps(
             docs_build_steps(
                 release_job(&[])
-                    .cond(Expression::new(
-                        "github.repository_owner == 'zed-industries'",
-                    ))
+                    .cond(Expression::new("github.repository_owner == 'simtropolis'"))
                     .name("Build and Deploy Docs")
                     .add_step(resolve_step),
                 checkout_ref,
@@ -255,7 +253,7 @@ pub(crate) fn deploy_docs_workflow_call(
         .with_repository_owner_guard()
         .permissions(Permissions::default().contents(Level::Read))
         .uses(
-            "zed-industries",
+            "simtropolis",
             "zed",
             ".github/workflows/deploy_docs.yml",
             // Pinned to a commit rather than the mutable `main` ref (supply-chain hardening).

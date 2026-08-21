@@ -291,9 +291,9 @@ mod tests {
     use project::{FakeFs, Project};
     use serde_json::json;
     use settings::Settings;
+    use zed_actions::settings_profile_selector;
     use theme_settings::ThemeSettings;
     use workspace::{self, AppState, MultiWorkspace};
-    use zed_actions::settings_profile_selector;
 
     async fn init_test(
         user_settings_json: serde_json::Value,

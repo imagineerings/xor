@@ -19,6 +19,7 @@ use ui::{
     WithScrollbar as _, prelude::*, rems_from_px,
 };
 
+use zed_actions::OpenOnboarding;
 pub use workspace::welcome::ShowWelcome;
 use workspace::welcome::WelcomePage;
 use workspace::{
@@ -28,12 +29,12 @@ use workspace::{
     notifications::NotifyResultExt as _,
     open_new, register_serializable_item, with_active_or_new_workspace,
 };
-use zed_actions::OpenOnboarding;
 
 mod base_keymap_picker;
 mod basics_page;
 pub mod multibuffer_hint;
 mod theme_preview;
+mod workspace_choice;
 
 /// Imports settings from Visual Studio Code.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Deserialize, JsonSchema, Action)]
@@ -234,12 +235,12 @@ impl Onboarding {
             "signing_in"
         } else {
             match plan {
-                Some(Plan::ZedPro) => "pro",
-                Some(Plan::ZedProTrial) => "trial",
-                Some(Plan::ZedBusiness) => "business",
-                Some(Plan::ZedVip) => "vip",
-                Some(Plan::ZedStudent) => "student",
-                Some(Plan::ZedFree) | None => "free",
+                Some(Plan::SimPro) => "pro",
+                Some(Plan::SimProTrial) => "trial",
+                Some(Plan::SimBusiness) => "business",
+                Some(Plan::SimVip) => "vip",
+                Some(Plan::SimStudent) => "student",
+                Some(Plan::SimFree) | None => "free",
             }
         };
         let agents_installed = basics_page::FEATURED_AGENT_IDS
@@ -347,7 +348,7 @@ impl Render for Onboarding {
                                     .child(
                                         h_flex()
                                             .gap_4()
-                                            .child(Vector::square(VectorName::ZedLogo, rems(2.5)))
+                                            .child(Vector::square(VectorName::SimLogo, rems(2.5)))
                                             .child(
                                                 v_flex()
                                                     .child(

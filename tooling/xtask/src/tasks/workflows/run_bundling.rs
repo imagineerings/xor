@@ -63,7 +63,9 @@ pub(crate) fn bundle_mac(
     deps: &[&NamedJob],
 ) -> NamedJob {
     pub fn bundle_mac(arch: Arch) -> Step<Run> {
-        named::bash(&format!("./script/bundle-mac {arch}-apple-darwin"))
+        named::bash(&format!(
+            "./script/bundle-mac --rust-tools {arch}-apple-darwin"
+        ))
     }
     let platform = Platform::Mac;
     let artifact_name = match arch {
@@ -174,7 +176,7 @@ pub(crate) fn bundle_linux(
             })
             .add_step(steps::setup_sentry())
             .map(steps::install_linux_dependencies)
-            .add_step(steps::script("./script/bundle-linux"))
+            .add_step(steps::script("./script/bundle-linux --rust-tools"))
             .add_step(upload_artifact(&format!("target/release/{artifact_name}")))
             .add_step(upload_artifact(&format!(
                 "target/{remote_server_artifact_name}"
@@ -190,8 +192,12 @@ pub(crate) fn bundle_windows(
     let platform = Platform::Windows;
     pub fn bundle_windows(arch: Arch) -> Step<Run> {
         let step = match arch {
-            Arch::X86_64 => named::pwsh("script/bundle-windows.ps1 -Architecture x86_64"),
-            Arch::AARCH64 => named::pwsh("script/bundle-windows.ps1 -Architecture aarch64"),
+            Arch::X86_64 => {
+                named::pwsh("script/bundle-windows.ps1 -RustTools -Architecture x86_64")
+            }
+            Arch::AARCH64 => {
+                named::pwsh("script/bundle-windows.ps1 -RustTools -Architecture aarch64")
+            }
         };
         step.working_directory("${{ env.ZED_WORKSPACE }}")
     }

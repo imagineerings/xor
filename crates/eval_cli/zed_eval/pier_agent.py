@@ -61,7 +61,7 @@ BASE_URL_ENV_VARS = (
 )
 
 
-class ZedPierAgent(BaseInstalledAgent):
+class SimPierAgent(BaseInstalledAgent):
     """Runs Zed's headless eval-cli binary under Pier."""
 
     SUPPORTS_ATIF: bool = False
@@ -74,7 +74,7 @@ class ZedPierAgent(BaseInstalledAgent):
         path = self._get_env("EVAL_CLI_CONTAINER_PATH")
         if not path:
             raise ValueError(
-                "ZedPierAgent requires EVAL_CLI_CONTAINER_PATH (the eval-cli binary "
+                "SimPierAgent requires EVAL_CLI_CONTAINER_PATH (the eval-cli binary "
                 "on the mounted volume, e.g. /data/builds/<id>/eval-cli)"
             )
         return path

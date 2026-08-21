@@ -13,14 +13,14 @@ use crate::{
 };
 
 const ZED_ZIPPY_COMMENT_APPROVAL_PATTERN: &str = "@zed-zippy approve";
-const ZED_ZIPPY_GROUP_APPROVAL: &str = "@zed-industries/approved";
+const ZED_ZIPPY_GROUP_APPROVAL: &str = "@simtropolis/approved";
 
 #[derive(Debug)]
 pub enum ReviewSuccess {
     ApprovingComment(Vec<PullRequestComment>),
     CoAuthored(Vec<CommitAuthor>),
     PullRequestReviewed(Vec<PullRequestReview>),
-    ZedZippyCommit(AutomatedChangeKind, GithubLogin),
+    SimZippyCommit(AutomatedChangeKind, GithubLogin),
 }
 
 impl ReviewSuccess {
@@ -36,7 +36,7 @@ impl ReviewSuccess {
                 .iter()
                 .map(|comment| format!("@{}", comment.user.login))
                 .collect_vec(),
-            Self::ZedZippyCommit(_, login) => vec![login.to_string()],
+            Self::SimZippyCommit(_, login) => vec![login.to_string()],
         };
 
         let reviewers = reviewers.into_iter().unique().collect_vec();
@@ -59,7 +59,7 @@ impl fmt::Display for ReviewSuccess {
             Self::ApprovingComment(_) => {
                 formatter.write_str("Approved by an organization approval comment")
             }
-            Self::ZedZippyCommit(kind, _) => {
+            Self::SimZippyCommit(kind, _) => {
                 write!(formatter, "Fully untampered automated {kind}")
             }
         }
@@ -305,7 +305,7 @@ impl Reporter {
             .validate_changes(metadata, &files)
             .map_err(ReviewFailure::UnexpectedZippyAction)?;
 
-        Ok(ReviewSuccess::ZedZippyCommit(
+        Ok(ReviewSuccess::SimZippyCommit(
             change_kind,
             GithubLogin::new(responsible_actor.to_owned()),
         ))
@@ -857,7 +857,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_comments(vec![comment(
                 "bob",
-                "@zed-industries/approved",
+                "@simtropolis/approved",
                 AuthorAssociation::Member,
             )])
             .run_scenario()
@@ -982,7 +982,7 @@ mod tests {
         let result = TestScenario::single_commit()
             .with_reviews(vec![
                 review("bob", ReviewState::Other, AuthorAssociation::Member)
-                    .with_body("@zed-industries/approved"),
+                    .with_body("@simtropolis/approved"),
             ])
             .run_scenario()
             .await;
@@ -1030,12 +1030,12 @@ mod tests {
         let result = TestScenario::zippy_version_bump().run_scenario().await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::ZedZippyCommit(
+            Ok(ReviewSuccess::SimZippyCommit(
                 AutomatedChangeKind::VersionBump,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::ZedZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }
@@ -1202,12 +1202,12 @@ mod tests {
             .await;
         assert!(matches!(
             result,
-            Ok(ReviewSuccess::ZedZippyCommit(
+            Ok(ReviewSuccess::SimZippyCommit(
                 AutomatedChangeKind::ReleaseChannelUpdate,
                 _
             ))
         ));
-        if let Ok(ReviewSuccess::ZedZippyCommit(_, login)) = &result {
+        if let Ok(ReviewSuccess::SimZippyCommit(_, login)) = &result {
             assert_eq!(login.as_str(), "cole-miller");
         }
     }

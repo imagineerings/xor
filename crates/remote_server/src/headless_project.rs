@@ -56,6 +56,12 @@ pub struct HeadlessProject {
     pub buffer_store: Entity<BufferStore>,
     pub lsp_store: Entity<LspStore>,
     pub task_store: Entity<TaskStore>,
+    #[cfg(feature = "rust-tools")]
+    pub cargo_workspace_store: Entity<project::cargo_workspace_store::CargoWorkspaceStore>,
+    #[cfg(feature = "rust-tools")]
+    pub structured_execution_store: Entity<project::structured_execution::StructuredExecutionStore>,
+    #[cfg(feature = "rust-tools")]
+    pub rust_test_provider_store: Entity<project::rust_test_provider::RustTestProviderStore>,
     pub dap_store: Entity<DapStore>,
     pub breakpoint_store: Entity<BreakpointStore>,
     pub agent_server_store: Entity<AgentServerStore>,
@@ -123,6 +129,35 @@ impl HeadlessProject {
 
         let environment =
             cx.new(|cx| ProjectEnvironment::new(None, worktree_store.downgrade(), None, true, cx));
+        #[cfg(feature = "rust-tools")]
+        let cargo_workspace_store = cx.new(|cx| {
+            let mut store = project::cargo_workspace_store::CargoWorkspaceStore::local(
+                worktree_store.clone(),
+                environment.clone(),
+                cx,
+            );
+            store.shared(REMOTE_SERVER_PROJECT_ID, session.clone(), cx);
+            store
+        });
+        #[cfg(feature = "rust-tools")]
+        let structured_execution_store = cx.new(|_| {
+            let mut store = project::structured_execution::StructuredExecutionStore::local(
+                worktree_store.clone(),
+                1,
+            );
+            store.shared(REMOTE_SERVER_PROJECT_ID, session.clone());
+            store
+        });
+        #[cfg(feature = "rust-tools")]
+        let rust_test_provider_store = cx.new(|cx| {
+            project::rust_test_provider::RustTestProviderStore::local(
+                worktree_store.clone(),
+                environment.clone(),
+                cargo_workspace_store.clone(),
+                structured_execution_store.clone(),
+                cx,
+            )
+        });
         let manifest_tree = ManifestTree::new(worktree_store.clone(), cx);
         let toolchain_store = cx.new(|cx| {
             ToolchainStore::local(
@@ -281,6 +316,12 @@ impl HeadlessProject {
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &cx.entity());
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &lsp_store);
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &task_store);
+        #[cfg(feature = "rust-tools")]
+        session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &cargo_workspace_store);
+        #[cfg(feature = "rust-tools")]
+        session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &structured_execution_store);
+        #[cfg(feature = "rust-tools")]
+        session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &rust_test_provider_store);
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &toolchain_store);
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &dap_store);
         session.subscribe_to_entity(REMOTE_SERVER_PROJECT_ID, &breakpoint_store);
@@ -331,6 +372,12 @@ impl HeadlessProject {
         SettingsObserver::init(&session);
         LspStore::init(&session);
         TaskStore::init(Some(&session));
+        #[cfg(feature = "rust-tools")]
+        project::cargo_workspace_store::CargoWorkspaceStore::init(&session);
+        #[cfg(feature = "rust-tools")]
+        project::structured_execution::StructuredExecutionStore::init(&session);
+        #[cfg(feature = "rust-tools")]
+        project::rust_test_provider::RustTestProviderStore::init(&session);
         ToolchainStore::init(&session);
         DapStore::init(&session, cx);
         // todo(debugger): Re init breakpoint store when we set it up for collab
@@ -348,6 +395,12 @@ impl HeadlessProject {
             buffer_store,
             lsp_store,
             task_store,
+            #[cfg(feature = "rust-tools")]
+            cargo_workspace_store,
+            #[cfg(feature = "rust-tools")]
+            structured_execution_store,
+            #[cfg(feature = "rust-tools")]
+            rust_test_provider_store,
             dap_store,
             breakpoint_store,
             agent_server_store,
@@ -1366,4 +1419,77 @@ fn find_venv_python(working_directory: &str) -> Option<std::path::PathBuf> {
         }
     }
     None
+}
+
+#[cfg(all(test, feature = "rust-tools"))]
+mod cargo_workspace_feature_tests {
+    #[test]
+    fn cargo_workspace_enabled_build_has_rust_tools_capability() {
+        assert!(cfg!(feature = "rust-tools"));
+    }
+}
+
+#[cfg(all(test, feature = "rust-tools"))]
+mod rust_test_provider_feature_tests {
+    #[test]
+    fn rust_test_provider_enabled_build_has_typed_host_capability() {
+        assert!(cfg!(feature = "rust-tools"));
+        assert_eq!(
+            project::rust_test_provider::RUST_TEST_DISCOVERY_PROTOCOL_VERSION,
+            1
+        );
+        assert_eq!(
+            project::structured_execution::STRUCTURED_EXECUTION_PROTOCOL_VERSION,
+            1
+        );
+        let source = include_str!("headless_project.rs")
+            .split_once("#[cfg(all(test, feature = \"rust-tools\"))]")
+            .map(|(production_source, _)| production_source)
+            .expect("feature tests should follow headless initialization");
+        for required in [
+            "CargoWorkspaceStore::init(&session)",
+            "StructuredExecutionStore::init(&session)",
+            "RustTestProviderStore::init(&session)",
+        ] {
+            assert!(
+                source.contains(required),
+                "missing host capability {required}"
+            );
+        }
+    }
+
+    #[test]
+    fn rust_workspace_headless_routes_discovery_actions_and_results_on_the_host() {
+        let source = include_str!("headless_project.rs")
+            .split_once("#[cfg(all(test, feature = \"rust-tools\"))]")
+            .map(|(production_source, _)| production_source)
+            .expect("feature tests should follow headless initialization");
+        for required in [
+            "CargoWorkspaceStore::local",
+            "StructuredExecutionStore::local",
+            "RustTestProviderStore::local",
+            "CargoWorkspaceStore::init(&session)",
+            "StructuredExecutionStore::init(&session)",
+            "RustTestProviderStore::init(&session)",
+        ] {
+            assert!(
+                source.contains(required),
+                "missing authoritative host path {required}"
+            );
+        }
+        assert!(!source.contains("cargo_ui::"));
+    }
+}
+
+#[cfg(all(test, not(feature = "rust-tools")))]
+mod cargo_workspace_disabled_feature_tests {
+    #[test]
+    fn cargo_workspace_disabled_build_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
+
+    #[test]
+    fn rust_workspace_disabled_headless_has_no_rust_tools_capability() {
+        assert!(!cfg!(feature = "rust-tools"));
+    }
 }

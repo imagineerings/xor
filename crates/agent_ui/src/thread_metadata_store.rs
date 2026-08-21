@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use agent::{ThreadStore, ZED_AGENT_ID};
+use agent::{ZED_AGENT_ID, ThreadStore};
 use agent_client_protocol::schema::v1 as acp;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};
@@ -1835,6 +1835,7 @@ mod tests {
 
     fn make_db_thread(title: &str, updated_at: DateTime<Utc>) -> DbThread {
         DbThread {
+            goal: None,
             title: title.to_string().into(),
             messages: Vec::new(),
             updated_at,

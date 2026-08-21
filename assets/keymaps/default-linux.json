@@ -42,6 +42,13 @@
     },
   },
   {
+    "context": "AgentTerminalThread",
+    "use_key_equivalents": true,
+    "bindings": {
+      "ctrl-f": "agent::ToggleSearch",
+    },
+  },
+  {
     "context": "Picker || menu",
     "bindings": {
       "up": "menu::SelectPrevious",
@@ -1295,7 +1302,7 @@
     },
   },
   {
-    "context": "ZedPredictModal",
+    "context": "SimPredictModal",
     "bindings": {
       "escape": "menu::Cancel",
     },

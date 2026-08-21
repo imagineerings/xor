@@ -14,13 +14,13 @@
   IgnorableNamespaces="uap uap2 uap3 rescap desktop desktop4 desktop5 desktop6 uap10 com">
   <!-- TODO: Use Zed's signature here. -->
   <Identity
-    Name="ZedIndustries.Zed"
-    Publisher="CN=Zed Industries Inc, O=Zed Industries Inc, L=Denver, S=Colorado, C=US"
+    Name="Simtropolis.Zed"
+    Publisher="CN=Simtropolis Inc, O=Simtropolis Inc, L=Denver, S=Colorado, C=US"
     Version="1.0.0.0" />
   <Properties>
     <DisplayName>Zed</DisplayName>
 
-    <PublisherDisplayName>Zed Industries</PublisherDisplayName>
+    <PublisherDisplayName>Simtropolis</PublisherDisplayName>
     <!-- TODO: Use actual icon here. -->
     <Logo>resources\logo_150x150.png</Logo>
     <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
@@ -56,13 +56,13 @@
         <desktop4:Extension Category="windows.fileExplorerContextMenus">
           <desktop4:FileExplorerContextMenus>
             <desktop5:ItemType Type="Directory">
-              <desktop5:Verb Id="OpenWithZed" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
+              <desktop5:Verb Id="OpenWithSim" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="Directory\Background">
-              <desktop5:Verb Id="OpenWithZed" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
+              <desktop5:Verb Id="OpenWithSim" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
             </desktop5:ItemType>
             <desktop5:ItemType Type="*">
-              <desktop5:Verb Id="OpenWithZed" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
+              <desktop5:Verb Id="OpenWithSim" Clsid="6a1f6b13-3b82-48a1-9e06-7bb0a6d0bffd" />
             </desktop5:ItemType>
           </desktop4:FileExplorerContextMenus>
         </desktop4:Extension>

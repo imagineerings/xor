@@ -1148,7 +1148,7 @@ mod tests {
             crate::language("javascript", tree_sitter_typescript::LANGUAGE_TSX.into()),
         ] {
             let text = r#"
-            // Reproduction from https://github.com/zed-industries/zed/issues/48711
+            // Reproduction from https://github.com/simtropolis/zed/issues/48711
             const a = {
               p01: '01',
               fn01: () => {},

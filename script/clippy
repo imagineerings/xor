@@ -2,12 +2,26 @@
 
 set -euo pipefail
 
+all_features=true
+filtered_arguments=()
+for argument in "$@"; do
+    case "$argument" in
+        --no-all-features) all_features=false ;;
+        *) filtered_arguments+=("$argument") ;;
+    esac
+done
+set -- "${filtered_arguments[@]}"
+
 if [[ ! " $* " == *" -p "* && ! " $* " == *" --package "* ]]; then
     set -- "$@" --workspace
 fi
 
 set -x
-"${CARGO:-cargo}" clippy "$@" --release --all-targets --all-features -- --deny warnings
+if [[ "$all_features" = true ]]; then
+    "${CARGO:-cargo}" clippy "$@" --release --all-targets --all-features -- --deny warnings
+else
+    "${CARGO:-cargo}" clippy "$@" --release --all-targets -- --deny warnings
+fi
 
 # If local, run other checks if we have the tools installed.
 if [[ -z "${GITHUB_ACTIONS+x}" ]]; then

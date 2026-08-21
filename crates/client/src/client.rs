@@ -3,9 +3,9 @@ pub mod test;
 
 mod llm_token;
 mod proxy;
+pub mod zed_urls;
 pub mod telemetry;
 pub mod user;
-pub mod zed_urls;
 
 use anyhow::{Context as _, Result, anyhow};
 use async_tungstenite::tungstenite::{
@@ -1943,7 +1943,7 @@ pub const ZED_URL_SCHEME: &str = "zed";
 
 /// A parsed Zed link that can be handled internally by the application.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ZedLink {
+pub enum SimLink {
     /// Join a channel: `zed.dev/channel/channel-name-123` or `zed://channel/channel-name-123`
     Channel { channel_id: u64 },
     /// Open channel notes: `zed.dev/channel/channel-name-123/notes` or with heading `notes#heading`
@@ -1958,7 +1958,7 @@ pub enum ZedLink {
 /// Returns a [`Some`] containing the parsed link if the link is a recognized Zed link
 /// that should be handled internally by the application.
 /// Returns [`None`] for links that should be opened in the browser.
-pub fn parse_zed_link(link: &str, cx: &App) -> Option<ZedLink> {
+pub fn parse_zed_link(link: &str, cx: &App) -> Option<SimLink> {
     let server_url = &ClientSettings::get_global(cx).server_url;
     let path = link
         .strip_prefix(server_url)
@@ -1979,18 +1979,18 @@ pub fn parse_zed_link(link: &str, cx: &App) -> Option<ZedLink> {
     let channel_id = id_str.parse::<u64>().ok()?;
 
     let Some(next) = parts.next() else {
-        return Some(ZedLink::Channel { channel_id });
+        return Some(SimLink::Channel { channel_id });
     };
 
     if let Some(heading) = next.strip_prefix("notes#") {
-        return Some(ZedLink::ChannelNotes {
+        return Some(SimLink::ChannelNotes {
             channel_id,
             heading: Some(heading.to_string()),
         });
     }
 
     if next == "notes" {
-        return Some(ZedLink::ChannelNotes {
+        return Some(SimLink::ChannelNotes {
             channel_id,
             heading: None,
         });

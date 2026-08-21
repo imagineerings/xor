@@ -25,9 +25,9 @@ pub fn router() -> Router {
         .route("/telemetry/hangs", post(post_panic))
 }
 
-pub struct ZedChecksumHeader(Vec<u8>);
+pub struct SimChecksumHeader(Vec<u8>);
 
-impl Header for ZedChecksumHeader {
+impl Header for SimChecksumHeader {
     fn name() -> &'static HeaderName {
         static ZED_CHECKSUM_HEADER: OnceLock<HeaderName> = OnceLock::new();
         ZED_CHECKSUM_HEADER.get_or_init(|| HeaderName::from_static("x-zed-checksum"))
@@ -61,7 +61,7 @@ pub async fn post_panic() -> Result<()> {
 
 pub async fn post_events(
     Extension(app): Extension<Arc<AppState>>,
-    TypedHeader(ZedChecksumHeader(checksum)): TypedHeader<ZedChecksumHeader>,
+    TypedHeader(SimChecksumHeader(checksum)): TypedHeader<SimChecksumHeader>,
     country_code_header: Option<TypedHeader<CloudflareIpCountryHeader>>,
     body: Bytes,
 ) -> Result<()> {

@@ -1,0 +1,206 @@
+# Design: Comfy Asset Library
+
+## Overview
+
+The asset library provides the world-model harness asset model and Comfy-compatible asset APIs on top of Zed storage, artifact, and media services. Every supported Comfy asset behavior is recreated as native Zed functionality: compatibility adapters may preserve external route shapes, but core modules, types, and records use `SimAsset*` and `SimUserData*` names and do not pass through to ComfyUI.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Api[SimAssetApi] --> Service[SimAssetService]
+    Service --> Store[SimAssetRepository]
+    Service --> Tags[SimAssetTagService]
+    Service --> Seed[SimAssetSeeder]
+    Seed --> Scanner[SimAssetFilesystemScanner]
+    Service --> Media[Zed Media Preview]
+    Service --> Provenance[Generated Artifact Store]
+```
+
+## Components and Interfaces
+
+### SimAssetRepository
+
+- **Purpose**: Persist asset content metadata, references, tags, and metadata entries.
+- **Responsibilities**: Hash lookup, reference CRUD, owner scoping, soft delete, cache state, and metadata indexing.
+- **Native asset records**: Asset content, owner-scoped references, tag links,
+  metadata entries, soft-delete timestamps, provenance ids, and cache state are
+  stored as Zed-owned repository records. Hash dedupe reuses content while
+  preserving distinct reference metadata, and repository behavior does not
+  depend on ComfyUI's asset database or storage layer.
+
+```rust
+pub trait SimAssetRepository {
+    fn asset_by_hash(&self, hash: &SimAssetHash) -> Result<Option<SimAssetContentRecord>, SimAssetDiagnostic>;
+    fn list_references(&self, query: SimAssetListQuery) -> Result<SimAssetListPage, SimAssetDiagnostic>;
+    fn create_reference(&self, request: SimAssetReferenceRequest) -> Result<SimAssetReferenceRecord, SimAssetDiagnostic>;
+    fn soft_delete_reference(&self, owner: &SimAssetOwnerId, reference: &SimAssetReferenceId) -> Result<bool, SimAssetDiagnostic>;
+}
+```
+
+### SimAssetApi
+
+- **Purpose**: Expose Comfy-compatible `/api/assets` and `/api/tags` routes.
+- **Responsibilities**: Query validation, multipart parsing, upload dedupe, download streaming, tag mutation, and error shape normalization.
+- **Native query validation**: Hashes, cursors, metadata filters, sort/order,
+  tags, pagination, and owner scopes are parsed into typed Zed query models
+  before any repository access. Compatibility route adapters may translate
+  legacy parameter names, but they do not forward ComfyUI query strings or
+  rely on ComfyUI validation behavior.
+- **Native CRUD/upload service**: List, detail, create-from-hash, upload,
+  update, delete, and hash-exists operations execute against Zed repository
+  records and owner scopes. Comfy-compatible routes adapt request/response
+  shapes only; they do not proxy asset mutations to ComfyUI.
+- **Native download/preview resolution**: Download descriptors resolve from
+  owner-scoped Zed asset records, force safe content types and content
+  disposition, and return Zed media preview routes for preview references
+  instead of forwarding to ComfyUI preview handlers.
+
+### SimAssetSeeder
+
+- **Purpose**: Synchronize filesystem roots into asset records.
+- **Responsibilities**: Scan models/input/output roots, pause during generation, resume after output registration, report progress, cancel, and prune missing references.
+- **Native seeding and pruning**: Model, input, and output root scans
+  register files through Zed asset APIs with progress, cancellation, and
+  diagnostics. Prune marks out-of-root references missing in Zed cache state
+  without deleting content or invoking ComfyUI scanners.
+
+### SimAssetOutputRegistrar and SimAssetEnrichmentQueue
+
+- **Purpose**: Extract safe metadata for assets.
+- **Responsibilities**: MIME type, image dimensions, safetensors metadata, filename metadata, and generated artifact metadata links.
+- **Native output enrichment**: Generated outputs register through Zed asset
+  APIs with job ids, provenance ids, optional hashes, cache state, and extracted
+  metadata. Enrichment jobs update Zed system metadata and enrichment levels
+  after execution without calling ComfyUI output registration or metadata
+  extraction handlers.
+
+### SimUserDataStore
+
+- **Purpose**: Provide Comfy-compatible user files and settings.
+- **Responsibilities**: User resolution, system-user protection, path confinement, list/read/write/move/delete, and settings JSON persistence.
+- **Native tags and user data**: Tag mutation, tag listing, refinement
+  histograms, user files, and settings execute against Zed-owned asset records
+  and user storage paths. Comfy-compatible endpoints adapt names and response
+  shapes only; they do not call ComfyUI tag, settings, or user-data handlers.
+
+## Data Models
+
+```rust
+pub struct SimAssetContentRecord {
+    pub id: SimAssetContentId,
+    pub hash: Option<SimAssetHash>,
+    pub size_bytes: u64,
+    pub mime_type: Option<String>,
+    pub created_at: Timestamp,
+}
+
+pub struct SimAssetReferenceRecord {
+    pub id: SimAssetReferenceId,
+    pub content_id: SimAssetContentId,
+    pub owner_id: SimAssetOwnerId,
+    pub name: String,
+    pub tags: Vec<TagName>,
+    pub preview_id: Option<SimAssetReferenceId>,
+    pub user_metadata: JsonObject,
+    pub system_metadata: JsonObject,
+    pub job_id: Option<Uuid>,
+    pub file_path: Option<PathBuf>,
+    pub is_missing: bool,
+    pub enrichment_level: u8,
+}
+```
+
+## Correctness Properties
+
+### Property 1: Content Deduplication
+
+_For any_ asset upload or registration with a known hash, the system SHALL reuse the existing content record and create a distinct reference when reference metadata differs.
+
+**Validates: Requirement 1.1, 1.3, 2.2, 2.3**
+
+### Property 2: Owner Isolation
+
+_For any_ asset, tag, or user-data operation, the system SHALL only read or mutate records and paths accessible to the resolved owner.
+
+**Validates: Requirement 2.5, 5.1, 5.3**
+
+### Property 3: Non-Destructive Reference Delete
+
+_For any_ reference delete request, the system SHALL soft-delete the reference and preserve shared content unless an explicit orphan cleanup policy runs.
+
+**Validates: Requirement 2.5**
+
+### Property 4: Scan Progress Monotonicity
+
+_For any_ active seed scan, scanned count SHALL never exceed total count and created plus skipped SHALL never exceed scanned.
+
+**Validates: Requirement 4.2**
+
+### Property 5: Missing File Preservation
+
+_For any_ prune operation, references outside known roots SHALL be marked missing without deleting asset content or user metadata.
+
+**Validates: Requirement 4.4**
+
+## Error Handling
+
+- Disabled asset routes return a service-disabled error.
+- Invalid hash, cursor, query, metadata filter, or multipart field returns a structured validation error.
+- Hash mismatch rejects upload and removes temporary upload data.
+- Missing content for create-from-hash returns not found.
+- Download of missing underlying file returns file-not-found without exposing host paths.
+- Database lock or missing dependency fails startup when `--enable-assets` is required.
+- User path escape returns forbidden and does not create files.
+
+## Testing Strategy
+
+- Unit tests for hash validation, tag normalization, cursor encoding/decoding,
+  metadata filters, owner scope resolution, and path confinement.
+- Repository tests for content/reference dedupe, soft delete, owner scoping,
+  cache state, provenance ids, and tag histograms.
+- API tests for upload, download, create-from-hash, CRUD, preview resolution,
+  tags, user data, settings, seed status, cancel, and prune.
+- Scanner tests for models/input/output roots, missing files, cancellation,
+  pruning, enrichment, and output registration.
+
+
+## Audit traceability reconciliation
+
+### D-TRACE: Preserve legacy design while exposing complete criterion coverage
+
+This reconciliation table preserves the existing design decisions and IDs while making every acceptance criterion visible to the current feature-spec validator. Capability-level gaps and ownership corrections are defined by the Godot full-port coverage catalog.
+
+## Requirements traceability
+
+| Requirement | Design element | Verification |
+| --- | --- | --- |
+| 1.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 1.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 1.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 2.5 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 3.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 3.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 3.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 3.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 4.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 4.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 4.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 4.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 4.5 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 5.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 5.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 5.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 5.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 6.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 6.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 6.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 6.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 9.1 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 9.2 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 9.3 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |
+| 9.4 | D-TRACE and existing design properties | Owner-spec scenario and failure-path validation |

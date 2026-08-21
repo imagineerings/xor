@@ -2,6 +2,9 @@
 
 set -euxo pipefail
 source script/lib/blob-store.sh
+comfy=false
+rust_tools=false
+dry_run=false
 
 # Function for displaying help info
 help_info() {
@@ -12,6 +15,9 @@ Build a release .tar.gz for Linux.
 Options:
   -h, --help     Display this help and exit.
   --flatpak      Set ZED_BUNDLE_TYPE=flatpak so that this can be included in system info
+  --comfy        Include the Comfy integration, accelerator backends, worker, and assets.
+  --rust-tools   Include the Cargo tool window and matching remote-server support.
+  --dry-run      Print the selected package plan without building it.
   "
 }
 
@@ -24,6 +30,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --flatpak)
             export ZED_BUNDLE_TYPE=flatpak
+            shift
+            ;;
+        --comfy)
+            comfy=true
+            shift
+            ;;
+        --rust-tools)
+            rust_tools=true
+            shift
+            ;;
+        --dry-run)
+            dry_run=true
             shift
             ;;
         --)
@@ -42,6 +60,26 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$dry_run" = true ]]; then
+    zed_features="none"
+    remote_features="none"
+    if [[ "$rust_tools" = true ]]; then
+        zed_features="rust-tools"
+        remote_features="rust-tools"
+    fi
+    if [[ "$comfy" = true ]]; then
+        if [[ "$rust_tools" = true ]]; then
+            zed_features="comfy,cuda,rocm,mlu,npu,xpu,rust-tools"
+        else
+            zed_features="comfy,cuda,rocm,mlu,npu,xpu"
+        fi
+        echo "mode=comfy packages=zed,cli,comfy_worker zed_features=${zed_features} remote_features=${remote_features} worker_features=cuda,rocm,mlu,npu,xpu include_comfy_worker=true rust_tools=${rust_tools}"
+    else
+        echo "mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
+    fi
+    exit 0
+fi
 
 export ZED_BUNDLE=true
 
@@ -83,7 +121,17 @@ if [[ "$(uname -m)" == "aarch64" ]]; then
 else
     export RUSTFLAGS="${RUSTFLAGS:-} -C link-args=-Wl,--disable-new-dtags,-rpath,\$ORIGIN/../lib"
 fi
-cargo build --release --target "${target_triple}" --package zed --package cli
+if [[ "$comfy" = true ]]; then
+    zed_build_features="zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu"
+    if [[ "$rust_tools" = true ]]; then
+        zed_build_features="${zed_build_features},zed/rust-tools"
+    fi
+    cargo build --release --target "${target_triple}" --package zed --package cli --package comfy_worker --features "${zed_build_features}"
+elif [[ "$rust_tools" = true ]]; then
+    cargo build --release --target "${target_triple}" --package zed --package cli --features zed/rust-tools
+else
+    cargo build --release --target "${target_triple}" --package zed --package cli
+fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
 if [[ "$remote_server_triple" == "$musl_triple" ]]; then
@@ -91,7 +139,11 @@ if [[ "$remote_server_triple" == "$musl_triple" ]]; then
     musl_cc_var="CC_$(echo "$remote_server_triple" | tr '-' '_')"
     export "$musl_cc_var"=musl-gcc
 fi
-cargo build --release --target "${remote_server_triple}" --package remote_server
+if [[ "$rust_tools" = true ]]; then
+    cargo build --release --target "${remote_server_triple}" --package remote_server --features rust-tools
+else
+    cargo build --release --target "${remote_server_triple}" --package remote_server
+fi
 
 # Upload debug info to sentry.io
 if ! command -v sentry-cli >/dev/null 2>&1; then
@@ -126,6 +178,9 @@ fi
 # doesn't understand CREL sections produced by newer LLVM.
 llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/zed"
 llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/cli"
+if [[ "$comfy" = true ]]; then
+    llvm-objcopy --strip-debug "${target_dir}/${target_triple}/release/comfy-worker"
+fi
 llvm-objcopy --strip-debug "${target_dir}/${remote_server_triple}/release/remote_server"
 
 # Ensure that remote_server does not depend on libssl nor libcrypto, as we got rid of these deps.
@@ -150,6 +205,9 @@ zed_dir="${temp_dir}/zed$suffix.app"
 # Binary
 mkdir -p "${zed_dir}/bin" "${zed_dir}/libexec"
 cp "${target_dir}/${target_triple}/release/zed" "${zed_dir}/libexec/zed-editor"
+if [[ "$comfy" = true ]]; then
+    cp "${target_dir}/${target_triple}/release/comfy-worker" "${zed_dir}/libexec/comfy-worker"
+fi
 cp "${target_dir}/${target_triple}/release/cli" "${zed_dir}/bin/zed"
 
 # Libs

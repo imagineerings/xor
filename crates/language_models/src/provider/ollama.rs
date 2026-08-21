@@ -4,15 +4,15 @@ use credentials_provider::CredentialsProvider;
 use fs::Fs;
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::BoxStream};
 use futures::{Stream, TryFutureExt, stream};
-use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt};
+use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt, Window};
 use http_client::{CustomHeaders, HttpClient};
 use language_model::{
-    ApiKeyState, AuthenticateError, DisabledReason, EnvVar, IconOrSvg, InlineDescription,
-    LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelId,
-    LanguageModelName, LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
-    LanguageModelProviderState, LanguageModelRequest, LanguageModelRequestTool,
-    LanguageModelToolChoice, LanguageModelToolUse, LanguageModelToolUseId, MessageContent,
-    ProviderSettingsView, RateLimiter, Role, StopReason, SubPageProviderSettings, TokenUsage,
+    ApiKeyState, AuthenticateError, ConfigurationViewTargetAgent, DisabledReason, EnvVar,
+    IconOrSvg, InlineDescription, LanguageModel, LanguageModelCompletionError,
+    LanguageModelCompletionEvent, LanguageModelId, LanguageModelName, LanguageModelProvider,
+    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
+    LanguageModelRequest, LanguageModelRequestTool, LanguageModelToolChoice, LanguageModelToolUse,
+    LanguageModelToolUseId, MessageContent,ProviderSettingsView, RateLimiter, Role, StopReason, SubPageProviderSettings, TokenUsage,
     env_var,
 };
 use menu;
@@ -346,6 +346,12 @@ impl LanguageModelProvider for OllamaLanguageModelProvider {
             .description(InlineDescription::Text(
                 "Run local models on your machine with Ollama.".into(),
             )),
+        ))
+    }
+
+    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
+        Some(InlineDescription::Text(
+            "Run local models on your machine with Ollama.".into(),
         ))
     }
 }
@@ -1176,7 +1182,7 @@ mod tests {
 
     #[test]
     fn test_merge_settings_preserves_display_names_for_similar_models() {
-        // Regression test for https://github.com/zed-industries/zed/issues/43646
+        // Regression test for https://github.com/simtropolis/zed/issues/43646
         // When multiple models share the same base name (e.g., qwen2.5-coder:1.5b and qwen2.5-coder:3b),
         // each model should get its own display_name from settings, not a random one.
 

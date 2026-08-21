@@ -83,7 +83,7 @@ pub struct SplitCommitArgs {
 pub struct AnnotatedCommit {
     /// Repository path (e.g., "repos/zed")
     pub repo: String,
-    /// Repository URL (e.g., "https://github.com/zed-industries/zed")
+    /// Repository URL (e.g., "https://github.com/simtropolis/zed")
     pub repo_url: String,
     /// Commit SHA
     pub commit_sha: String,

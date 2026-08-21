@@ -232,6 +232,8 @@ use settings::{
     GitGutterSetting, RelativeLineNumbers, Settings, SettingsLocation, SettingsStore,
     update_settings_file,
 };
+pub use zed_actions::editor::RevealInFileManager;
+use zed_actions::editor::{MoveDown, MoveUp};
 use smallvec::{SmallVec, smallvec};
 use snippet::Snippet;
 use std::{
@@ -269,8 +271,6 @@ use workspace::{
     notifications::{DetachAndPromptErr, NotificationId, NotifyResultExt, NotifyTaskExt},
     searchable::SearchEvent,
 };
-pub use zed_actions::editor::RevealInFileManager;
-use zed_actions::editor::{MoveDown, MoveUp};
 
 use crate::{
     code_context_menus::CompletionsMenuSource,
@@ -8608,7 +8608,7 @@ impl Editor {
         cx: &mut Context<Self>,
     ) -> Entity<Self> {
         const MINIMAP_FONT_WEIGHT: gpui::FontWeight = gpui::FontWeight::BLACK;
-        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".ZedMono");
+        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".SimMono");
 
         let mut minimap = Editor::new_internal(
             EditorMode::Minimap {

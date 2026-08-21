@@ -8,8 +8,8 @@
       ...
     }:
     let
-      mkZed = import ../toolchain.nix { inherit inputs; };
-      zed-editor = mkZed pkgs;
+      mkSim = import ../toolchain.nix { inherit inputs; };
+      zed-editor = mkSim pkgs;
     in
     {
       packages = {

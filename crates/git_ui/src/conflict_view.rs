@@ -15,13 +15,13 @@ use project::{
     git_store::{GitStore, GitStoreEvent, RepositoryEvent},
 };
 use settings::Settings;
+use zed_actions::agent::{
+    ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
+};
 use std::{ops::Range, sync::Arc};
 use ui::{ButtonLike, Divider, Tooltip, prelude::*};
 use util::debug_panic;
 use workspace::{HideStatusItem, StatusItemView, Workspace, item::ItemHandle};
-use zed_actions::agent::{
-    ConflictContent, ResolveConflictedFilesWithAgent, ResolveConflictsWithAgent,
-};
 
 pub(crate) struct ConflictAddon {
     buffers: HashMap<BufferId, BufferConflicts>,
@@ -398,7 +398,7 @@ fn render_conflict_buttons(
                 Button::new("resolve-with-agent", "Resolve with Agent")
                     .label_size(LabelSize::Small)
                     .start_icon(
-                        Icon::new(IconName::ZedAssistant)
+                        Icon::new(IconName::SimAssistant)
                             .size(IconSize::Small)
                             .color(Color::Muted),
                     )

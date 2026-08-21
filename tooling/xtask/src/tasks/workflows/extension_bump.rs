@@ -336,7 +336,7 @@ fn trigger_release(
     app_id: &WorkflowSecret,
     app_secret: &WorkflowSecret,
 ) -> NamedJob {
-    let extension_registry = RepositoryTarget::new("zed-industries", &["extensions"]);
+    let extension_registry = RepositoryTarget::new("simtropolis", &["extensions"]);
     let (generate_token, generated_token) =
         generate_token(&app_id.to_string(), &app_secret.to_string())
             .for_repository(extension_registry)
@@ -392,7 +392,7 @@ fn release_action(
     )
     .id("extension-update")
     .add_with(("extension-name", extension_id.to_string()))
-    .add_with(("push-to", "zed-industries/extensions"))
+    .add_with(("push-to", "simtropolis/extensions"))
     .add_with(("tag", tag.to_string()))
     .add_env(("COMMITTER_TOKEN", generated_token.to_string()));
 
@@ -416,7 +416,7 @@ fn enable_automerge_if_staff(
         let isStaff = false;
         try {
             const response = await github.rest.teams.getMembershipForUserInOrg({
-                org: 'zed-industries',
+                org: 'simtropolis',
                 team_slug: 'staff',
                 username: author
             });
@@ -436,16 +436,16 @@ fn enable_automerge_if_staff(
         const pullNumber = parseInt(prNumber);
 
         await github.rest.issues.addAssignees({
-            owner: 'zed-industries',
+            owner: 'simtropolis',
             repo: 'extensions',
             issue_number: pullNumber,
             assignees: [author]
         });
-        console.log(`Assigned ${author} to PR #${prNumber} in zed-industries/extensions`);
+        console.log(`Assigned ${author} to PR #${prNumber} in simtropolis/extensions`);
 
         // Get the GraphQL node ID
         const { data: pr } = await github.rest.pulls.get({
-            owner: 'zed-industries',
+            owner: 'simtropolis',
             repo: 'extensions',
             pull_number: pullNumber
         });
@@ -462,7 +462,7 @@ fn enable_automerge_if_staff(
             }
         `, { pullRequestId: pr.node_id });
 
-        console.log(`Automerge enabled for PR #${prNumber} in zed-industries/extensions`);
+        console.log(`Automerge enabled for PR #${prNumber} in simtropolis/extensions`);
     "#})
     .custom_name("enable_automerge_if_staff")
     .token(generated_token)

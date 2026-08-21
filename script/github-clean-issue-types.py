@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 GITHUB_API_BASE_URL = "https://api.github.com"
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 HEADERS = {

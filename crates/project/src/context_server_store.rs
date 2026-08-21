@@ -860,6 +860,86 @@ impl ContextServerStore {
         );
     }
 
+    /// Watches a running server's transport and initiates the OAuth flow if it
+    /// shuts down on an authentication challenge.
+    ///
+    /// MCP servers may accept `initialize` unauthenticated and only send a 401
+    /// with a `WWW-Authenticate` challenge on a later request or notification.
+    /// The HTTP transport records the challenge, and the failed send tears
+    /// down the client's output loop. Observing that shutdown lets any
+    /// post-initialize 401 move the server into `AuthRequired` instead of
+    /// leaving it `Running` with a dead client.
+    fn watch_transport_shutdown(
+        this: WeakEntity<Self>,
+        server: Arc<ContextServer>,
+        cx: &mut AsyncApp,
+    ) -> Task<()> {
+        let Some(shutdown) = server
+            .client()
+            .and_then(|client| client.wait_for_shutdown())
+        else {
+            return Task::ready(());
+        };
+        cx.spawn(async move |cx| {
+            let Some(www_authenticate) = shutdown.await else {
+                return;
+            };
+            this.update(cx, |this, cx| {
+                this.handle_auth_challenge(server, www_authenticate, cx);
+            })
+            .log_err();
+        })
+    }
+
+    fn handle_auth_challenge(
+        &mut self,
+        server: Arc<ContextServer>,
+        www_authenticate: oauth::WwwAuthenticate,
+        cx: &mut Context<Self>,
+    ) {
+        let id = server.id();
+        let Some(ContextServerState::Running {
+            server: running_server,
+            configuration,
+            ..
+        }) = self.servers.get(&id)
+        else {
+            return;
+        };
+        if !Arc::ptr_eq(running_server, &server) {
+            return;
+        }
+        let configuration = configuration.clone();
+
+        log::info!("{id} received 401 after initialization; initiating OAuth authorization");
+
+        server.stop().log_err();
+
+        let task = cx.spawn({
+            let id = id.clone();
+            let server = server.clone();
+            let configuration = configuration.clone();
+            async move |this, cx| {
+                let new_state =
+                    resolve_auth_required(&id, &www_authenticate, server, configuration, cx).await;
+                this.update(cx, |this, cx| {
+                    this.update_server_state(id.clone(), new_state, cx)
+                })
+                .log_err();
+            }
+        });
+
+        self.update_server_state(
+            id,
+            ContextServerState::Starting {
+                configuration,
+                _task: task,
+                server,
+            },
+            cx,
+        );
+    }
+
     fn remove_server(&mut self, id: &ContextServerId, cx: &mut Context<Self>) -> Result<()> {
         let state = self
             .servers

@@ -14,8 +14,8 @@ use language_model::{
 use ordered_float::OrderedFloat;
 use picker::{Picker, PickerDelegate};
 use settings::Settings;
-use ui::prelude::*;
 use zed_actions::agent::OpenSettings;
+use ui::prelude::*;
 
 use crate::ui::{ModelSelectorFooter, ModelSelectorHeader, ModelSelectorListItem};
 
@@ -666,7 +666,7 @@ mod tests {
                     .any(|(fav_provider, fav_name)| *fav_provider == provider && *fav_name == name);
                 ModelInfo {
                     model: Arc::new(TestLanguageModel::new(name, provider)),
-                    icon: IconOrSvg::Icon(IconName::ZedAgent),
+                    icon: IconOrSvg::Icon(IconName::SimAgent),
                     is_favorite,
                 }
             })
@@ -745,11 +745,11 @@ mod tests {
         // In the case below, `zed/gpt-5-mini` and `openai/gpt-5-mini` have identical
         // similarity scores, but `zed/gpt-5-mini` was higher in the models list,
         // so it should appear first in the results.
-        let results = matcher.fuzzy_search("mini");
+        let results = matcher.fuzzy_search("gpt-5-mini");
         assert_models_eq(results, vec!["zed/gpt-5-mini", "openai/gpt-5-mini"]);
 
         // Model provider should be searchable as well
-        let results = matcher.fuzzy_search("ol"); // meaning "ollama"
+        let results = matcher.fuzzy_search("ollama/");
         assert_models_eq(results, vec!["ollama/mistral", "ollama/deepseek"]);
 
         // Fuzzy search - search for Claude to get the Thinking variant

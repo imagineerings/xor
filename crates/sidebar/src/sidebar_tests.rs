@@ -24,6 +24,9 @@ use std::{
 };
 use util::{path_list::PathList, rel_path::rel_path};
 
+#[cfg(feature = "multiplayer-tools")]
+include!("../../workspace/tests/visual/collaborative_workspace.rs");
+
 fn init_test(cx: &mut TestAppContext) {
     cx.update(|cx| {
         let settings_store = SettingsStore::test(cx);
@@ -603,6 +606,126 @@ fn visible_entries_as_strings(
     })
 }
 
+#[cfg(not(feature = "multiplayer-tools"))]
+#[gpui::test]
+async fn standard_sidebar_excludes_collaborative_rail(cx: &mut TestAppContext) {
+    let project = init_test_project("/my-project", cx).await;
+    let (multi_workspace, cx) =
+        cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+    let sidebar = setup_sidebar(&multi_workspace, cx);
+
+    assert!(multi_workspace.read_with(cx, |multi_workspace, _| multi_workspace.sidebar_open()));
+    assert!(sidebar.read_with(cx, |sidebar, cx| {
+        sidebar.collaborative_rail_width(cx).is_none() && sidebar.width == DEFAULT_WIDTH
+    }));
+    assert!(cx.debug_bounds("COLLABORATIVE-RAIL").is_none());
+}
+
+#[cfg(feature = "multiplayer-tools")]
+#[gpui::test]
+async fn collaborative_rail_layout(cx: &mut TestAppContext) {
+    let project = init_test_project("/my-project", cx).await;
+    let (multi_workspace, cx) =
+        cx.add_window_view(|window, cx| MultiWorkspace::test_new(project, window, cx));
+    let sidebar = setup_sidebar_closed(&multi_workspace, cx);
+
+    assert!(
+        !multi_workspace.read_with(cx, |multi_workspace, _| { multi_workspace.sidebar_open() })
+    );
+    cx.dispatch_action(workspace::SwitchToCollaborativeWorkspace);
+    cx.run_until_parked();
+
+    let render_state = multi_workspace.read_with(cx, |multi_workspace, cx| {
+        multi_workspace.sidebar_render_state(cx)
+    });
+    assert!(render_state.open);
+    assert_eq!(render_state.side, SidebarSide::Left);
+    assert!(
+        !multi_workspace.read_with(cx, |multi_workspace, _| { multi_workspace.sidebar_open() })
+    );
+
+    let rail_bounds = cx
+        .debug_bounds("COLLABORATIVE-RAIL")
+        .expect("collaborative rail should render for a closed Editor sidebar");
+    let editor_sidebar_width = sidebar.read_with(cx, |sidebar, _| sidebar.width);
+    let resize_bounds = cx
+        .debug_bounds("COLLABORATIVE-RAIL-RESIZE-HANDLE")
+        .expect("collaborative rail resize handle should render");
+    let drag_start = resize_bounds.center();
+    let drag_end = gpui::point(drag_start.x + px(48.), drag_start.y);
+    cx.simulate_mouse_down(
+        drag_start,
+        gpui::MouseButton::Left,
+        gpui::Modifiers::default(),
+    );
+    cx.simulate_mouse_move(
+        gpui::point(drag_start.x + px(8.), drag_start.y),
+        gpui::MouseButton::Left,
+        gpui::Modifiers::default(),
+    );
+    cx.simulate_mouse_move(
+        drag_end,
+        gpui::MouseButton::Left,
+        gpui::Modifiers::default(),
+    );
+    cx.simulate_mouse_up(
+        drag_end,
+        gpui::MouseButton::Left,
+        gpui::Modifiers::default(),
+    );
+    cx.run_until_parked();
+
+    let resized_rail_bounds = cx
+        .debug_bounds("COLLABORATIVE-RAIL")
+        .expect("collaborative rail should remain rendered after resize");
+    assert!(resized_rail_bounds.size.width > rail_bounds.size.width);
+    assert_eq!(
+        sidebar.read_with(cx, |sidebar, _| sidebar.width),
+        editor_sidebar_width,
+        "collaborative resizing must not change the Editor sidebar width"
+    );
+
+    let section_bounds = [
+        "COLLABORATIVE-RAIL-PINNED",
+        "COLLABORATIVE-RAIL-PROJECTS",
+        "COLLABORATIVE-RAIL-TASKS",
+    ]
+    .map(|selector| {
+        cx.debug_bounds(selector)
+            .unwrap_or_else(|| panic!("missing collaborative rail section {selector}"))
+    });
+    assert!(section_bounds[0].bottom() <= section_bounds[1].top());
+    assert!(section_bounds[1].bottom() <= section_bounds[2].top());
+    for bounds in section_bounds {
+        assert!(bounds.size.height > px(0.));
+        assert!(bounds.top() >= resized_rail_bounds.top());
+        assert!(bounds.bottom() <= resized_rail_bounds.bottom());
+    }
+
+    let (labels, empty_labels, scroll_handles) = sidebar.read_with(cx, |sidebar, cx| {
+        let rail = sidebar.collaborative_rail.read(cx);
+        let (labels, empty_labels) = rail.test_labels();
+        (labels, empty_labels, rail.test_scroll_handles())
+    });
+    assert_eq!(
+        labels,
+        ["Pinned", "Communities and Projects", "Tasks and Threads"]
+    );
+    assert_eq!(
+        empty_labels,
+        [
+            "No pinned or recent work",
+            "No communities or projects",
+            "No tasks or threads"
+        ]
+    );
+
+    scroll_handles[0].set_offset(gpui::point(px(0.), px(-12.)));
+    assert_eq!(scroll_handles[0].offset().y, px(-12.));
+    assert_eq!(scroll_handles[1].offset().y, px(0.));
+    assert_eq!(scroll_handles[2].offset().y, px(0.));
+}
+
 #[gpui::test]
 async fn test_thread_metadata_update_preserves_sticky_header_measurements(cx: &mut TestAppContext) {
     let (fs, project_a) = init_multi_project_test(&["/project-a", "/project-b"], cx).await;
@@ -1175,7 +1298,7 @@ async fn test_visible_entries_as_strings(cx: &mut TestAppContext) {
                     archived: false,
                     remote_connection: None,
                 },
-                icon: IconName::ZedAgent,
+                icon: IconName::SimAgent,
                 icon_from_external_svg: None,
                 status: AgentThreadStatus::Completed,
                 workspace: ThreadEntryWorkspace::Open(workspace.clone()),
@@ -1202,7 +1325,7 @@ async fn test_visible_entries_as_strings(cx: &mut TestAppContext) {
                     archived: false,
                     remote_connection: None,
                 },
-                icon: IconName::ZedAgent,
+                icon: IconName::SimAgent,
                 icon_from_external_svg: None,
                 status: AgentThreadStatus::Running,
                 workspace: ThreadEntryWorkspace::Open(workspace.clone()),
@@ -1229,7 +1352,7 @@ async fn test_visible_entries_as_strings(cx: &mut TestAppContext) {
                     archived: false,
                     remote_connection: None,
                 },
-                icon: IconName::ZedAgent,
+                icon: IconName::SimAgent,
                 icon_from_external_svg: None,
                 status: AgentThreadStatus::Error,
                 workspace: ThreadEntryWorkspace::Open(workspace.clone()),
@@ -1257,7 +1380,7 @@ async fn test_visible_entries_as_strings(cx: &mut TestAppContext) {
                     archived: false,
                     remote_connection: None,
                 },
-                icon: IconName::ZedAgent,
+                icon: IconName::SimAgent,
                 icon_from_external_svg: None,
                 status: AgentThreadStatus::WaitingForConfirmation,
                 workspace: ThreadEntryWorkspace::Open(workspace.clone()),
@@ -1285,7 +1408,7 @@ async fn test_visible_entries_as_strings(cx: &mut TestAppContext) {
                     archived: false,
                     remote_connection: None,
                 },
-                icon: IconName::ZedAgent,
+                icon: IconName::SimAgent,
                 icon_from_external_svg: None,
                 status: AgentThreadStatus::Completed,
                 workspace: ThreadEntryWorkspace::Open(workspace.clone()),

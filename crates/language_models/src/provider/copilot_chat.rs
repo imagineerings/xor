@@ -5,7 +5,7 @@ use copilot_chat::{
     CopilotChat, CopilotChatConfiguration, Model as CopilotChatModel, PROVIDER_ID, PROVIDER_NAME,
     create_language_model,
 };
-use gpui::{App, Entity, Subscription, Task};
+use gpui::{App, Entity, SharedString, Subscription, Task, Window};
 use language::language_settings::all_language_settings;
 use language_model::{
     AuthenticateError, IconOrSvg, LanguageModel, LanguageModelProvider, LanguageModelProviderId,

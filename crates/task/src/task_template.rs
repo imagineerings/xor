@@ -9,8 +9,8 @@ use util::serde::default_true;
 use util::{ResultExt, truncate_and_remove_front};
 
 use crate::{
-    AttachRequest, ResolvedTask, RevealTarget, Shell, SpawnInTerminal, TaskContext, TaskId,
-    VariableName, ZED_VARIABLE_NAME_PREFIX, serde_helpers::non_empty_string_vec,
+    AttachRequest, ResolvedTask, RevealTarget, ZED_VARIABLE_NAME_PREFIX, Shell, SpawnInTerminal,
+    TaskContext, TaskId, VariableName, serde_helpers::non_empty_string_vec,
 };
 
 /// A template definition of a Zed task to run.

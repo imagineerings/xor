@@ -178,7 +178,14 @@ impl VsCodeSettings {
             auto_update: None,
             base_keymap: Some(BaseKeymapContent::VSCode),
             calls: None,
+            #[cfg(feature = "rust-tools")]
+            cargo_panel: None,
+            #[cfg(feature = "rust-tools")]
+            cargo: None,
+            #[cfg(feature = "test-explorer")]
+            tests_panel: None,
             collaboration_panel: None,
+            comfy_runtime: None,
             credentials_url: None,
             debugger: None,
             diagnostics: None,

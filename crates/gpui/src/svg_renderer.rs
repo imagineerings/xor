@@ -253,6 +253,10 @@ impl SvgRenderer {
     }
 
     fn render_pixmap(&self, bytes: &[u8], size: SvgSize) -> Result<Pixmap, usvg::Error> {
+        // Cap the size of the rendered pixmap to avoid texture allocation panics
+        // Related issue: #56466
+        const MAX_SIZE: f32 = 8192.0;
+
         let tree = usvg::Tree::from_data(bytes, &self.usvg_options)?;
         rasterize_tree(&tree, size)
     }
@@ -269,23 +273,25 @@ fn rasterize_tree(tree: &usvg::Tree, size: SvgSize) -> Result<Pixmap, usvg::Erro
         SvgSize::ScaleFactor(scale) => scale,
     };
 
-    let width = svg_size.width() * scale;
-    if width > MAX_SIZE {
-        log::warn!("Attempted to render pixmap where width ({width}) > MAX_SIZE ({MAX_SIZE})");
-        scale *= MAX_SIZE / width;
-    }
-    let height = svg_size.height() * scale;
-    if height > MAX_SIZE {
-        log::warn!("Attempted to render pixmap where height ({height}) > MAX_SIZE ({MAX_SIZE})");
-        scale *= MAX_SIZE / height;
-    }
+        let width = svg_size.width() * scale;
+        if width > MAX_SIZE {
+            log::warn!("Attempted to render pixmap where width ({width}) > MAX_SIZE ({MAX_SIZE})");
+            scale *= MAX_SIZE / width;
+        }
+        let height = svg_size.height() * scale;
+        if height > MAX_SIZE {
+            log::warn!(
+                "Attempted to render pixmap where height ({height}) > MAX_SIZE ({MAX_SIZE})"
+            );
+            scale *= MAX_SIZE / height;
+        }
 
-    // Render the SVG to a pixmap with the specified width and height.
-    let mut pixmap = resvg::tiny_skia::Pixmap::new(
-        (svg_size.width() * scale) as u32,
-        (svg_size.height() * scale) as u32,
-    )
-    .ok_or(usvg::Error::InvalidSize)?;
+        // Render the SVG to a pixmap with the specified width and height.
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(
+            (svg_size.width() * scale) as u32,
+            (svg_size.height() * scale) as u32,
+        )
+        .ok_or(usvg::Error::InvalidSize)?;
 
     let transform = resvg::tiny_skia::Transform::from_scale(scale, scale);
 

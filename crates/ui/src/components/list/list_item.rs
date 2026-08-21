@@ -119,6 +119,11 @@ impl ListItem {
         self
     }
 
+    pub fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.aria_expanded = Some(expanded);
+        self
+    }
+
     /// Sets the keyboard shortcut announced by assistive technology for this
     /// item, e.g. a menu item's accelerator. Requires [`Self::aria_role`] to be
     /// set. Use a human-friendly display string (the accelerator shown to
@@ -346,8 +351,15 @@ impl RenderOnce for ListItem {
                         this.aria_keyshortcuts(keyshortcuts)
                     })
                     .when(self.aria_role.is_some(), |this| {
-                        this.aria_selected(self.selected).when_some(
-                            self.aria_checked.or(self.toggle),
+                        this.aria_disabled(self.disabled)
+                            .when(
+                                !matches!(
+                                    self.aria_role,
+                                    Some(Role::MenuItem | Role::MenuItemCheckBox)
+                                ),
+                                |this| this.aria_selected(self.selected),
+                            )
+                            .when_some(self.aria_checked.or(self.toggle),
                             |this, toggled| {
                                 this.aria_toggled(if toggled {
                                     gpui::Toggled::True

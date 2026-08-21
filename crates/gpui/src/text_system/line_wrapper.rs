@@ -688,7 +688,7 @@ mod tests {
     fn build_wrapper() -> LineWrapper {
         let dispatcher = TestDispatcher::new(0);
         let cx = TestAppContext::build(dispatcher, None);
-        let id = cx.text_system().resolve_font(&font(".ZedMono"));
+        let id = cx.text_system().resolve_font(&font(".SimMono"));
         LineWrapper::new(id, px(16.), cx.text_system().clone())
     }
 
@@ -1158,8 +1158,8 @@ mod tests {
 
         // URL case
         assert_word("github.com");
-        assert_not_word("zed-industries/zed");
-        assert_not_word("zed-industries\\zed");
+        assert_not_word("simtropolis/zed");
+        assert_not_word("simtropolis\\zed");
         assert_not_word("a=1&b=2");
         assert_not_word("foo?b=2");
 
@@ -1171,7 +1171,7 @@ mod tests {
         assert_word("ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƏ");
         // Cyrillic
         assert_word("АБВГДЕЖЗИЙКЛМНОП");
-        // Vietnamese (https://github.com/zed-industries/zed/issues/23245)
+        // Vietnamese (https://github.com/simtropolis/zed/issues/23245)
         assert_word("ThậmchíđếnkhithuachạychúngcònnhẫntâmgiếtnốtsốđôngtùchínhtrịởYênBáivàCaoBằng");
         // Bengali
         assert_word("গিয়েছিলেন");
@@ -1186,7 +1186,7 @@ mod tests {
         assert_not_word("()[]{}<>");
 
         // Non-breaking ("Glue") characters, see https://www.unicode.org/reports/tr14/
-        // (https://github.com/zed-industries/zed/issues/59664)
+        // (https://github.com/simtropolis/zed/issues/59664)
         assert_word("\u{202F}"); // NNBSP " "
         assert_word("\u{00A0}"); // NBSP " "
         assert_word("\u{2011}"); // NBH "‑"
@@ -1257,7 +1257,7 @@ mod tests {
     fn test_multiline_truncation_fits_within_wrapped_lines() {
         let mut wrapper = build_wrapper();
 
-        // With .ZedMono at 16px, each char is 9.6px wide.
+        // With .SimMono at 16px, each char is 9.6px wide.
         // wrap_width = 72px fits ~7 chars per line.
         //
         // "aa bbbbbb cccccc dddddd eeee ffff" with wrap_width=72px wraps as:

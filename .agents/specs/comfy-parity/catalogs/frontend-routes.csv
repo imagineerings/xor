@@ -1,0 +1,83 @@
+feature_id,surface,route,name,behavior,availability,source_file,evidence_level
+COMFY-ROUTE-001,desktop-ui,/,WelcomeView,Empty child route under LayoutDefault opens first-run welcome and source-selection choices; file protocol uses hash history and Electron/non-file uses base-aware web history,platform-specific,apps/desktop-ui/src/router.ts:14-25,code-inferred
+COMFY-UI-054,main-app,/,GraphView,Graph workspace; initializes user and redirects to /user-select when login is required,active,src/router.ts,code-inferred
+COMFY-UI-055,main-app,/user-select,UserSelectView,Select or create a server user before entering the graph workspace,conditional,src/router.ts,code-inferred
+COMFY-CLOUD-113,main-app,/cloud/login,cloud-login,Cloud login; authenticated users resume OAuth consent or user check unless switching accounts,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-115,main-app,/cloud/signup,cloud-signup,Cloud signup with optional Turnstile and post-auth redirect,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-112,main-app,/cloud/forgot-password,cloud-forgot-password,Cloud password reset request,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-118,main-app,/cloud/survey,cloud-survey,Authenticated dynamic onboarding survey,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-114,main-app,/cloud/oauth/consent,cloud-oauth-consent,OAuth authorization consent and denial surface,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-119,main-app,/cloud/user-check,cloud-user-check,"Authenticated account status, verification, survey, and app routing",cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-116,main-app,/cloud/sorry-contact-support,cloud-sorry-contact-support,Cloud access failure and support route,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-111,main-app,/cloud/auth-timeout,cloud-auth-timeout,Authentication initialization timeout recovery route,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-CLOUD-117,main-app,/cloud/subscribe,cloud-subscribe,Authenticated subscription checkout redirect,cloud/paid,src/platform/cloud/onboarding/onboardingCloudRoutes.ts,code-inferred
+COMFY-UI-053,desktop-ui,/welcome,WelcomeViewAlias,Render the localized first-run welcome at /welcome and navigate to /install only from the explicit primary action; the empty child / route is the equivalent canonical WelcomeView entry.,platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/WelcomeView.vue,code-inferred
+COMFY-UI-047,desktop-ui,/install,InstallView,"Require every install step to be visited, collect install path, device/GPU and Desktop settings, validate path state, track step changes, invoke installComfyUI once, then navigate to manual configuration for unsupported/custom setup or server start otherwise.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/InstallView.vue,code-inferred
+COMFY-UI-046,desktop-ui,/download-git,DownloadGitView,"Explain the missing Git prerequisite, open the platform Git download destination on request, or let the user skip and navigate to the install route.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/DownloadGitView.vue,code-inferred
+COMFY-UI-044,desktop-ui,/desktop-start,DesktopStartView,Render the localized initialising StartupDisplay while the Desktop shell owns startup and the next navigation decision.,platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/DesktopStartView.vue,code-inferred
+COMFY-UI-045,desktop-ui,/desktop-update,DesktopUpdateView,Render localized update progress with a spinner and keyboard-operable console-log drawer; dispose the Desktop validation subscription when the route unmounts.,platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/DesktopUpdateView.vue,code-inferred
+COMFY-UI-052,desktop-ui,/server-start,ServerStartView,"Subscribe to Desktop progress and install-stage updates, render stage/message/percentage and terminal output, distinguish critical error state, and expose report issue, logs and troubleshooting actions.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/ServerStartView.vue,code-inferred
+COMFY-UI-049,desktop-ui,/manual-configuration,ManualConfigurationView,"Show localized custom Python/venv requirements and the virtual-environment path, then relaunch only from the explicit Manual configuration complete action.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/ManualConfigurationView.vue,code-inferred
+COMFY-UI-050,desktop-ui,/metrics-consent,MetricsConsentView,"Show current metrics consent, privacy-policy link and enable/disable choice; persist through the Desktop settings bridge and return to the root welcome flow.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/MetricsConsentView.vue,code-inferred
+COMFY-UI-048,desktop-ui,/maintenance,MaintenanceView,"Project maintenance task status, all/error filters, unsafe-migration reason, terminal drawer and validation refresh; continue only after the refreshed task set contains no unresolved error.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/MaintenanceView.vue,code-inferred
+COMFY-UI-051,desktop-ui,/not-supported,NotSupportedView,"Explain unsupported hardware/platform status and offer documentation, issue reporting, or an explicit continue-to-install path.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/NotSupportedView.vue,code-inferred
+COMFY-UI-043,desktop-ui,/desktop-dialog/:dialogId,DesktopDialogView,"Resolve dialogId through the Desktop dialog registry, render localized title/message and source-ordered buttons, and send the chosen returnValue through electronAPI().Dialog.clickButton.",platform-specific,apps/desktop-ui/src/router.ts; apps/desktop-ui/src/views/DesktopDialogView.vue,code-inferred
+COMFY-CLOUD-121,website,/404,404,Astro file-based route,active,apps/website/src/pages/404.astro,code-inferred
+COMFY-CLOUD-122,website,/about,about,Astro file-based route,active,apps/website/src/pages/about.astro,code-inferred
+COMFY-CLOUD-123,website,/affiliates,index,Astro file-based route,active,apps/website/src/pages/affiliates/index.astro,code-inferred
+COMFY-CLOUD-124,website,/affiliates/terms,terms,Astro file-based route,active,apps/website/src/pages/affiliates/terms.astro,code-inferred
+COMFY-CLOUD-125,website,/api,api,Astro file-based route,active,apps/website/src/pages/api.astro,code-inferred
+COMFY-CLOUD-126,website,/careers,careers,Astro file-based route,active,apps/website/src/pages/careers.astro,code-inferred
+COMFY-CLOUD-127,website,/case-studies,case-studies,Astro file-based route,active,apps/website/src/pages/case-studies.astro,code-inferred
+COMFY-CLOUD-129,website,/cloud/enterprise,enterprise,Astro file-based route,cloud/paid,apps/website/src/pages/cloud/enterprise.astro,code-inferred
+COMFY-CLOUD-128,website,/cloud,index,Astro file-based route,cloud/paid,apps/website/src/pages/cloud/index.astro,code-inferred
+COMFY-CLOUD-130,website,/cloud/pricing,pricing,Astro file-based route,cloud/paid,apps/website/src/pages/cloud/pricing.astro,code-inferred
+COMFY-CLOUD-132,website,/cloud/supported-nodes/[pack],[pack],Astro file-based route,cloud/paid,apps/website/src/pages/cloud/supported-nodes/[pack].astro,code-inferred
+COMFY-CLOUD-131,website,/cloud/supported-nodes,supported-nodes,Astro file-based route,cloud/paid,apps/website/src/pages/cloud/supported-nodes.astro,code-inferred
+COMFY-CLOUD-133,website,/contact,contact,Astro file-based route,active,apps/website/src/pages/contact.astro,code-inferred
+COMFY-CLOUD-135,website,/customers/[slug],[slug],Astro file-based route,active,apps/website/src/pages/customers/[slug].astro,code-inferred
+COMFY-CLOUD-134,website,/customers,customers,Astro file-based route,active,apps/website/src/pages/customers.astro,code-inferred
+COMFY-CLOUD-137,website,/demos/[slug],[slug],Astro file-based route,active,apps/website/src/pages/demos/[slug].astro,code-inferred
+COMFY-CLOUD-136,website,/demos,index,Astro file-based route,active,apps/website/src/pages/demos/index.astro,code-inferred
+COMFY-CLOUD-138,website,/download,download,Astro file-based route,active,apps/website/src/pages/download.astro,code-inferred
+COMFY-CLOUD-139,website,/enterprise-msa,enterprise-msa,Astro file-based route,active,apps/website/src/pages/enterprise-msa.astro,code-inferred
+COMFY-CLOUD-140,website,/gallery,gallery,Astro file-based route,active,apps/website/src/pages/gallery.astro,code-inferred
+COMFY-CLOUD-120,website,/,index,Astro file-based route,active,apps/website/src/pages/index.astro,code-inferred
+COMFY-CLOUD-141,website,/launches,launches,Astro file-based route,active,apps/website/src/pages/launches.astro,code-inferred
+COMFY-CLOUD-142,website,/learning,learning,Astro file-based route,active,apps/website/src/pages/learning.astro,code-inferred
+COMFY-CLOUD-143,website,/mcp,mcp,Astro file-based route,active,apps/website/src/pages/mcp.astro,code-inferred
+COMFY-CLOUD-144,website,/models,models,Astro file-based route,active,apps/website/src/pages/models.astro,code-inferred
+COMFY-CLOUD-146,website,/p/supported-models/[slug],[slug],Astro file-based route,cloud/paid,apps/website/src/pages/p/supported-models/[slug].astro,code-inferred
+COMFY-CLOUD-145,website,/p/supported-models,index,Astro file-based route,cloud/paid,apps/website/src/pages/p/supported-models/index.astro,code-inferred
+COMFY-CLOUD-147,website,/payment/failed,failed,Astro file-based route,cloud/paid,apps/website/src/pages/payment/failed.astro,code-inferred
+COMFY-CLOUD-148,website,/payment/success,success,Astro file-based route,cloud/paid,apps/website/src/pages/payment/success.astro,code-inferred
+COMFY-CLOUD-150,website,/privacy/desktop,desktop,Astro file-based route,active,apps/website/src/pages/privacy/desktop.astro,code-inferred
+COMFY-CLOUD-149,website,/privacy-policy,privacy-policy,Astro file-based route,active,apps/website/src/pages/privacy-policy.astro,code-inferred
+COMFY-CLOUD-151,website,/terms-of-service,terms-of-service,Astro file-based route,active,apps/website/src/pages/terms-of-service.astro,code-inferred
+COMFY-CLOUD-152,website,/videos,videos,Astro file-based route,active,apps/website/src/pages/videos.astro,code-inferred
+COMFY-CLOUD-154,website,/zh-CN/about,about,Astro file-based route,active,apps/website/src/pages/zh-CN/about.astro,code-inferred
+COMFY-CLOUD-155,website,/zh-CN/api,api,Astro file-based route,active,apps/website/src/pages/zh-CN/api.astro,code-inferred
+COMFY-CLOUD-156,website,/zh-CN/careers,careers,Astro file-based route,active,apps/website/src/pages/zh-CN/careers.astro,code-inferred
+COMFY-CLOUD-157,website,/zh-CN/case-studies,case-studies,Astro file-based route,active,apps/website/src/pages/zh-CN/case-studies.astro,code-inferred
+COMFY-CLOUD-159,website,/zh-CN/cloud/enterprise,enterprise,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/cloud/enterprise.astro,code-inferred
+COMFY-CLOUD-158,website,/zh-CN/cloud,index,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/cloud/index.astro,code-inferred
+COMFY-CLOUD-160,website,/zh-CN/cloud/pricing,pricing,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/cloud/pricing.astro,code-inferred
+COMFY-CLOUD-162,website,/zh-CN/cloud/supported-nodes/[pack],[pack],Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/cloud/supported-nodes/[pack].astro,code-inferred
+COMFY-CLOUD-161,website,/zh-CN/cloud/supported-nodes,supported-nodes,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/cloud/supported-nodes.astro,code-inferred
+COMFY-CLOUD-163,website,/zh-CN/contact,contact,Astro file-based route,active,apps/website/src/pages/zh-CN/contact.astro,code-inferred
+COMFY-CLOUD-165,website,/zh-CN/customers/[slug],[slug],Astro file-based route,active,apps/website/src/pages/zh-CN/customers/[slug].astro,code-inferred
+COMFY-CLOUD-164,website,/zh-CN/customers,customers,Astro file-based route,active,apps/website/src/pages/zh-CN/customers.astro,code-inferred
+COMFY-CLOUD-167,website,/zh-CN/demos/[slug],[slug],Astro file-based route,active,apps/website/src/pages/zh-CN/demos/[slug].astro,code-inferred
+COMFY-CLOUD-166,website,/zh-CN/demos,index,Astro file-based route,active,apps/website/src/pages/zh-CN/demos/index.astro,code-inferred
+COMFY-CLOUD-168,website,/zh-CN/download,download,Astro file-based route,active,apps/website/src/pages/zh-CN/download.astro,code-inferred
+COMFY-CLOUD-169,website,/zh-CN/gallery,gallery,Astro file-based route,active,apps/website/src/pages/zh-CN/gallery.astro,code-inferred
+COMFY-CLOUD-153,website,/zh-CN,index,Astro file-based route,active,apps/website/src/pages/zh-CN/index.astro,code-inferred
+COMFY-CLOUD-170,website,/zh-CN/launches,launches,Astro file-based route,active,apps/website/src/pages/zh-CN/launches.astro,code-inferred
+COMFY-CLOUD-171,website,/zh-CN/learning,learning,Astro file-based route,active,apps/website/src/pages/zh-CN/learning.astro,code-inferred
+COMFY-CLOUD-172,website,/zh-CN/mcp,mcp,Astro file-based route,active,apps/website/src/pages/zh-CN/mcp.astro,code-inferred
+COMFY-CLOUD-173,website,/zh-CN/models,models,Astro file-based route,active,apps/website/src/pages/zh-CN/models.astro,code-inferred
+COMFY-CLOUD-174,website,/zh-CN/payment/failed,failed,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/payment/failed.astro,code-inferred
+COMFY-CLOUD-175,website,/zh-CN/payment/success,success,Astro file-based route,cloud/paid,apps/website/src/pages/zh-CN/payment/success.astro,code-inferred
+COMFY-CLOUD-177,website,/zh-CN/privacy/desktop,desktop,Astro file-based route,active,apps/website/src/pages/zh-CN/privacy/desktop.astro,code-inferred
+COMFY-CLOUD-176,website,/zh-CN/privacy-policy,privacy-policy,Astro file-based route,active,apps/website/src/pages/zh-CN/privacy-policy.astro,code-inferred
+COMFY-CLOUD-178,website,/zh-CN/videos,videos,Astro file-based route,active,apps/website/src/pages/zh-CN/videos.astro,code-inferred

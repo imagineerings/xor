@@ -13,7 +13,9 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use task::{Shell, ShellBuilder, ShellKind, SpawnInTerminal};
+use task::{
+    Shell, ShellBuilder, ShellKind, SpawnInTerminal, StructuredTaskHandle, StructuredTerminalId,
+};
 use terminal::{
     TaskState, TaskStatus, Terminal, TerminalBuilder, insert_zed_terminal_env,
     terminal_settings::TerminalSettings,
@@ -66,11 +68,20 @@ impl Project {
         spawn_task: SpawnInTerminal,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Terminal>>> {
+        self.create_terminal_task_with_structured_handle(spawn_task, None, cx)
+    }
+
+    pub fn create_terminal_task_with_structured_handle(
+        &mut self,
+        spawn_task: SpawnInTerminal,
+        structured_task: Option<StructuredTaskHandle>,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<Entity<Terminal>>> {
         let is_via_remote = self.remote_client.is_some();
 
         let path: Option<Arc<Path>> = if let Some(cwd) = &spawn_task.cwd {
             if is_via_remote {
-                Some(Arc::from(cwd.as_ref()))
+                Some(Arc::from(cwd.as_path()))
             } else {
                 let cwd = cwd.to_string_lossy();
                 let tilde_substituted = shellexpand::tilde(&cwd);
@@ -99,6 +110,7 @@ impl Project {
             spawned_task: spawn_task.clone(),
             status: TaskStatus::Running,
             completion_rx,
+            structured_task: structured_task.clone(),
         });
         let remote_client = self.remote_client.clone();
         let shell = match &remote_client {
@@ -263,6 +275,19 @@ impl Project {
                 .await?;
             project.update(cx, move |this, cx| {
                 let terminal_handle = cx.new(|cx| builder.subscribe(cx));
+
+                if let Some(structured_task) = structured_task {
+                    let weak_terminal = terminal_handle.downgrade();
+                    structured_task.bind_terminal(
+                        StructuredTerminalId(terminal_handle.entity_id().as_u64()),
+                        move |cx| {
+                            weak_terminal
+                                .update(cx, |terminal, _| terminal.kill_active_task())
+                                .is_ok()
+                        },
+                        cx,
+                    );
+                }
 
                 this.terminals
                     .local_handles

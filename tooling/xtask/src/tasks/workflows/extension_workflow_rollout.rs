@@ -259,7 +259,7 @@ fn rollout_workflows_to_extension(
 
         let body = formatdoc! {r#"
             This PR updates the CI workflow files from the main Zed repository
-            based on the commit zed-industries/zed@${{{{ github.sha }}}}
+            based on the commit simtropolis/zed@${{{{ github.sha }}}}
 
             {context_input}
         "#,

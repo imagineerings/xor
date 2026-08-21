@@ -51,7 +51,7 @@ pub(crate) fn call_bump_version(
                 .actions(Level::Write),
         )
         .uses(
-            "zed-industries",
+            "simtropolis",
             "zed",
             ".github/workflows/extension_bump.yml",
             target_ref.map_or("main", AsRef::as_ref),

@@ -1404,13 +1404,13 @@ mod test {
         cx.simulate_keystrokes("c s b [");
         cx.assert_state(indoc! {"ˇ[ bracketed ]"}, Mode::Normal);
 
-        cx.set_state(indoc! {"(<ˇZed>)"}, Mode::Normal);
+        cx.set_state(indoc! {"(<ˇSim>)"}, Mode::Normal);
         cx.simulate_keystrokes("c s b )");
         cx.assert_state(indoc! {"(ˇ(Zed))"}, Mode::Normal);
 
         cx.set_state(
             indoc! {"
-                (<ˇZed>)
+                (<ˇSim>)
                 (<ˇDeltaDB>)
             "},
             Mode::Normal,

@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use futures::{FutureExt, channel::mpsc, future::BoxFuture, stream::BoxStream, stream::StreamExt};
-use gpui::{App, AsyncApp, Entity, Task};
+use gpui::{App, AppContext, AsyncApp, EmptyView, Entity, Task};
 use http_client::Result;
 use parking_lot::Mutex;
 use std::sync::{

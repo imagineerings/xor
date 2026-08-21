@@ -18,13 +18,13 @@ use gpui::{
 use menu::{Cancel, Confirm};
 use project::git_store::Repository;
 use project_diff::ProjectDiff;
+use zed_actions;
 use time::OffsetDateTime;
 use ui::{ButtonLike, ContextMenu, ElevationIndex, PopoverMenuHandle, TintColor, prelude::*};
 use workspace::{
     ModalView, OpenMode, Workspace,
     notifications::{DetachAndPromptErr, NotifyTaskExt},
 };
-use zed_actions;
 
 use crate::{
     commit_view::CommitView,
@@ -34,13 +34,18 @@ use crate::{
 };
 
 pub mod branch_diff;
+pub mod branch_diff;
 pub mod branch_picker;
 mod commit_context_menu;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review;
 mod commit_modal;
 pub mod commit_tooltip;
 pub mod commit_view;
 mod conflict_view;
 mod diff_multibuffer;
+pub mod created_worktrees;
+pub mod file_diff_view;
 pub mod git_graph;
 pub mod git_panel;
 mod git_panel_settings;
@@ -55,6 +60,7 @@ pub mod solo_diff_view;
 pub mod staged_diff;
 pub mod stash_picker;
 pub mod text_diff_view;
+pub mod unstaged_diff;
 pub mod unstaged_diff;
 
 pub use blame_ui::GitBlameStatus;

@@ -1,9 +1,9 @@
 # Zed
 
-[![Zed](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/zed-industries/zed/main/assets/badge/v0.json)](https://zed.dev)
-[![CI](https://github.com/zed-industries/zed/actions/workflows/run_tests.yml/badge.svg)](https://github.com/zed-industries/zed/actions/workflows/run_tests.yml)
+[![Zed](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/simtropolis/zed/main/assets/badge/v0.json)](https://zed.dev)
+[![CI](https://github.com/simtropolis/zed/actions/workflows/run_tests.yml/badge.svg)](https://github.com/simtropolis/zed/actions/workflows/run_tests.yml)
 
-Welcome to Zed, a high-performance, multiplayer code editor from the creators of [Atom](https://github.com/atom/atom) and [Tree-sitter](https://github.com/tree-sitter/tree-sitter).
+Welcome to Zed, an open platform for agentic software development. A set of high-performance, multiplayer code editors designed specifically for your main programming language and related technology stack.
 
 ---
 
@@ -13,7 +13,7 @@ On macOS, Linux, and Windows you can [download Zed directly](https://zed.dev/dow
 
 Other platforms are not yet available:
 
-- Web ([tracking discussion](https://github.com/zed-industries/zed/discussions/26195))
+- Web ([tracking discussion](https://github.com/simtropolis/zed/discussions/26195))
 
 ### Developing Zed
 
@@ -41,9 +41,9 @@ We use [`cargo-about`](https://github.com/EmbarkStudios/cargo-about) to automati
 
 ## Sponsorship
 
-Zed is developed by **Zed Industries, Inc.**, a for-profit company.
+Zed is developed by **Simtropolis, Inc.**, a for-profit company.
 
 If you’d like to financially support the project, you can do so via GitHub Sponsors.
-Sponsorships go directly to Zed Industries and are used as general company revenue.
+Sponsorships go directly to Simtropolis and are used as general company revenue.
 There are no perks or entitlements associated with sponsorship.
 

@@ -1875,7 +1875,7 @@ mod tests {
     }
 
     #[gpui::test]
-    // https://github.com/zed-industries/zed/issues/15498
+    // https://github.com/simtropolis/zed/issues/15498
     async fn test_info_hover_with_hrs(cx: &mut gpui::TestAppContext) {
         init_test(cx, |_| {});
 

@@ -116,19 +116,35 @@ mod tests {
 
     #[test]
     fn test_system_prompt_renders_user_agents_md_before_project_rules() {
+        use agent_skills::SkillSummary;
         use prompt_store::{ProjectContext, RulesFileContext, WorktreeContext};
         use util::rel_path::RelPath;
 
-        let worktrees = vec![WorktreeContext {
-            root_name: "my-project".to_string(),
-            abs_path: std::path::Path::new("/tmp/my-project").into(),
-            rules_file: Some(RulesFileContext {
-                path_in_worktree: RelPath::from_unix_str("AGENTS.md").unwrap().into(),
-                text: "project-specific guidance".to_string(),
-                project_entry_id: 1,
-            }),
-        }];
-        let project = ProjectContext::new(worktrees);
+        let worktrees = vec![
+            WorktreeContext {
+                root_name: "my-project".to_string(),
+                abs_path: std::path::Path::new("/tmp/my-project").into(),
+                rules_file: Some(RulesFileContext {
+                    path_in_worktree: RelPath::from_unix_str("AGENTS.md").unwrap().into(),
+                    text: "project-specific guidance".to_string(),
+                    project_entry_id: 1,
+                }),
+            },
+            WorktreeContext {
+                root_name: "second-root".to_string(),
+                abs_path: std::path::Path::new("/tmp/second-root").into(),
+                rules_file: Some(RulesFileContext {
+                    path_in_worktree: RelPath::unix("CLAUDE.md").unwrap().into(),
+                    text: "second-root guidance".to_string(),
+                    project_entry_id: 2,
+                }),
+            },
+        ];
+        let project = ProjectContext::new(worktrees).with_skills(vec![SkillSummary {
+            name: "review".to_string(),
+            description: "Review project changes".to_string(),
+            location: "/tmp/my-project/.agents/skills/review/SKILL.md".to_string(),
+        }]);
         let template = SystemPromptTemplate {
             project: &project,
             available_tools: vec!["echo".into()],
@@ -146,6 +162,16 @@ mod tests {
         assert!(rendered.contains("always be concise"));
         assert!(rendered.contains("### Project Rules"));
         assert!(rendered.contains("project-specific guidance"));
+        assert!(rendered.contains("`my-project/AGENTS.md`"));
+        assert!(rendered.contains("`second-root/CLAUDE.md`"));
+        assert!(rendered.contains("second-root guidance"));
+        assert!(rendered.contains("<name>review</name>"));
+        assert!(rendered.contains("<description>Review project changes</description>"));
+        assert!(
+            rendered
+                .contains("<location>/tmp/my-project/.agents/skills/review/SKILL.md</location>")
+        );
+        assert_eq!(rendered.matches("## User's Custom Instructions").count(), 1);
 
         let personal_idx = rendered.find("### Personal `AGENTS.md`").unwrap();
         let project_idx = rendered.find("### Project Rules").unwrap();
@@ -153,6 +179,9 @@ mod tests {
             personal_idx < project_idx,
             "personal AGENTS.md should render before project rules so project rules can override it"
         );
+        let first_root_idx = rendered.find("`my-project/AGENTS.md`").unwrap();
+        let second_root_idx = rendered.find("`second-root/CLAUDE.md`").unwrap();
+        assert!(first_root_idx < second_root_idx);
     }
 
     #[test]

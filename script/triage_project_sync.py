@@ -3,7 +3,7 @@
 triage_project_sync.py
 ======================
 
-Sync triage state from `zed-industries/zed` issues into the
+Sync triage state from `simtropolis/zed` issues into the
 "Zed weekly triage" project (#84).
 
 Auto-derives `Status`, `Stale since`, `Aged?`, `Intake week` from issue labels
@@ -26,7 +26,7 @@ Auth
 ----
 Reads `GITHUB_TOKEN` from env. For production, this is an installation token
 from the `ZED_COMMUNITY_BOT_APP_ID` GitHub App, scoped to
-`owner: zed-industries`, with `Organization Projects: Read and write`.
+`owner: simtropolis`, with `Organization Projects: Read and write`.
 
 For local `--dry-run` testing, a personal token with `repo, read:org,
 read:project` is sufficient.
@@ -59,7 +59,7 @@ import requests
 # ---------------------------------------------------------------------------
 # Constants
 
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 REPO = f"{REPO_OWNER}/{REPO_NAME}"
 

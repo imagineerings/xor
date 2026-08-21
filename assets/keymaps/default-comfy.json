@@ -1,0 +1,41 @@
+[
+  {
+    "context": "ComfyGraph && !ComfyTextInput",
+    "bindings": {
+      "ctrl-enter": "comfy_shell::QueuePrompt",
+      "ctrl-shift-enter": "comfy_shell::QueuePromptFront",
+      "ctrl-alt-enter": "comfy_shell::Interrupt",
+      "r": "comfy_shell::RefreshNodeDefinitions",
+      "w": "comfy_shell::ToggleWorkflowsSidebar",
+      "n": "comfy_shell::ToggleNodeLibrarySidebar",
+      "m": "comfy_shell::ToggleModelLibrarySidebar",
+      "a": "comfy_shell::ToggleAssetsSidebar",
+      "alt-m": "comfy_shell::ToggleLinear",
+      "alt-µ": "comfy_shell::ToggleLinear",
+      "ctrl-s": "comfy_shell::SaveWorkflow",
+      "ctrl-o": "comfy_shell::OpenWorkflow",
+      "ctrl-g": "comfy_shell::GroupSelectedNodes",
+      "ctrl-,": "comfy_shell::ShowSettings",
+      "alt-=": "comfy_graph::GraphZoomIn",
+      "alt-shift-+": "comfy_graph::GraphZoomIn",
+      "alt-+": "comfy_graph::GraphZoomIn",
+      "alt--": "comfy_graph::GraphZoomOut",
+      ".": "comfy_graph::GraphFitView",
+      "p": "comfy_shell::ToggleSelectedItemsPin",
+      "alt-c": "comfy_shell::ToggleSelectedCollapse",
+      "ctrl-b": "comfy_shell::ToggleSelectedBypass",
+      "ctrl-m": "comfy_shell::ToggleSelectedMute",
+      "ctrl-`": "comfy_shell::ToggleLogsPanel",
+      "ctrl-shift-e": "comfy_shell::ConvertToSubgraph",
+      "alt-shift-m": "comfy_shell::ToggleMinimap",
+      "ctrl-shift-k": "comfy_shell::ShowKeybindings",
+      "v": "comfy_shell::UnlockCanvas",
+      "h": "comfy_shell::LockCanvas",
+      "escape": "comfy_shell::ExitSubgraph",
+      "ctrl-a": "comfy_graph::GraphSelectAll",
+      "ctrl-shift-v": "comfy_shell::PasteWithConnect",
+      "delete": "comfy_graph::GraphDelete",
+      "backspace": "comfy_graph::GraphDelete"
+    }
+  }
+]

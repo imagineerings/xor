@@ -211,7 +211,8 @@ fn parse_git_diff_raw_entry<'a>(metadata: &'a str, path: &'a str) -> Result<Comm
     let status = match fields.next() {
         Some("M") => StatusCode::Modified,
         Some("T") => StatusCode::TypeChanged,
-        Some("A") => StatusCode::Added,
+        Some("T" => StatusCode::TypeChanged,
+                "A") => StatusCode::Added,
         Some("D") => StatusCode::Deleted,
         Some(status) => anyhow::bail!("unsupported raw diff status {status}"),
         None => anyhow::bail!("raw diff is missing the status"),

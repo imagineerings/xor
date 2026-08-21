@@ -6,7 +6,7 @@ use gpui::{Entity, IntoElement, ParentElement};
 use language_model::{LanguageModelRegistry, ZED_CLOUD_PROVIDER_ID};
 use ui::prelude::*;
 
-use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, ZedAiOnboarding};
+use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, SimAiOnboarding};
 
 pub struct AgentPanelOnboarding {
     user_store: Entity<UserStore>,
@@ -58,15 +58,15 @@ impl Render for AgentPanelOnboarding {
             .user_store
             .read(cx)
             .plan()
-            .is_some_and(|plan| plan == Plan::ZedProTrial);
+            .is_some_and(|plan| plan == Plan::SimProTrial);
 
         let is_pro_user = self
             .user_store
             .read(cx)
             .plan()
-            .is_some_and(|plan| plan == Plan::ZedPro);
+            .is_some_and(|plan| plan == Plan::SimPro);
 
-        let onboarding = ZedAiOnboarding::new(
+        let onboarding = SimAiOnboarding::new(
             self.client.clone(),
             &self.user_store,
             self.continue_with_zed_ai.clone(),

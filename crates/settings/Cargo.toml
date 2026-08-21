@@ -13,6 +13,9 @@ path = "src/settings.rs"
 doctest = false
 
 [features]
+default = []
+rust-tools = ["settings_content/rust-tools"]
+test-explorer = ["settings_content/test-explorer"]
 test-support = ["gpui/test-support", "fs/test-support"]
 
 [dependencies]

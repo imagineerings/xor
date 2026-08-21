@@ -1,0 +1,47 @@
+[package]
+name = "comfy_worker"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+[lints]
+workspace = true
+[lib]
+path = "src/comfy_worker.rs"
+[[bin]]
+name = "comfy-worker"
+path = "src/comfy_worker_main.rs"
+[features]
+default = []
+corex = ["comfy_runtime/corex", "comfy_tensor/corex"]
+cuda = ["comfy_runtime/cuda", "comfy_tensor/cuda"]
+directml = ["comfy_runtime/directml", "comfy_tensor/directml"]
+metal = ["comfy_runtime/metal", "comfy_tensor/metal"]
+mlu = ["comfy_runtime/mlu", "comfy_tensor/mlu"]
+npu = ["comfy_runtime/npu", "comfy_tensor/npu"]
+rocm = ["comfy_runtime/rocm", "comfy_tensor/rocm"]
+xpu = ["comfy_runtime/xpu", "comfy_tensor/xpu"]
+[dependencies]
+anyhow.workspace = true
+async-channel.workspace = true
+async-io.workspace = true
+comfy_runtime.workspace = true
+comfy_nodes.workspace = true
+comfy_plugin_host.workspace = true
+comfy_plugin_sdk.workspace = true
+comfy_tensor.workspace = true
+comfy_types.workspace = true
+futures.workspace = true
+postcard.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+smol.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+comfy_runtime = { workspace = true, features = ["test-support"] }
+comfy_media.workspace = true
+tempfile.workspace = true
+uuid.workspace = true

@@ -41,7 +41,7 @@ use std::{
     cell::Cell,
     ops::Range,
     rc::Rc,
-    sync::{Arc, OnceLock},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use zed_actions::{
@@ -50,7 +50,9 @@ use zed_actions::{
 };
 
 use theme::AccentColors;
-use time::{OffsetDateTime, UtcOffset, format_description::BorrowedFormatItem};
+use time::{
+    OffsetDateTime, UtcOffset, format_description::BorrowedFormatItem, macros::format_description,
+};
 use ui::{
     Chip, ColumnWidthConfig, CommonAnimationExt as _, ContextMenu, DiffStat, Divider,
     HeaderResizeInfo, HighlightedLabel, IndentGuideColors, ListItem, ListItemSpacing,
@@ -603,11 +605,7 @@ pub struct OpenAtCommit {
 }
 
 fn timestamp_format() -> &'static [BorrowedFormatItem<'static>] {
-    static FORMAT: OnceLock<Vec<BorrowedFormatItem<'static>>> = OnceLock::new();
-    FORMAT.get_or_init(|| {
-        time::format_description::parse("[day] [month repr:short] [year] [hour]:[minute]")
-            .unwrap_or_default()
-    })
+    format_description!("[day] [month repr:short] [year] [hour]:[minute]")
 }
 
 fn format_timestamp(timestamp: i64) -> String {
@@ -2234,6 +2232,70 @@ impl GitGraph {
         cx.notify();
     }
 
+    fn load_selected_commit_message(
+        &mut self,
+        cx: &mut Context<'_, Self>,
+        sha: &Oid,
+        repository: &Entity<Repository>,
+    ) {
+        if self
+            .selected_commit_message
+            .as_ref()
+            .is_some_and(|old| old.sha == *sha)
+        {
+            return;
+        }
+
+        self._selected_commit_message_task = None;
+        match repository.update(cx, |repo, cx| {
+            repo.fetch_commit_data(*sha, true, cx).clone()
+        }) {
+            CommitDataState::Loaded(commit_data) => {
+                self.set_selected_commit_message(cx, commit_data.sha, commit_data.message.clone());
+            }
+            CommitDataState::Loading(Some(receiver)) => {
+                self._selected_commit_message_task = Some(cx.spawn(async move |this, cx| {
+                    if let Ok(commit_data) = receiver.await {
+                        this.update(cx, |this, cx| {
+                            this.set_selected_commit_message(
+                                cx,
+                                commit_data.sha,
+                                commit_data.message.clone(),
+                            );
+                        })
+                        .log_err();
+                    }
+                }))
+            }
+            _ => {
+                debug_panic!(
+                    "Fetched commit data asynchronously, but was not given a listener or cached commit data."
+                );
+            }
+        };
+    }
+
+    fn set_selected_commit_message(
+        &mut self,
+        cx: &mut Context<'_, GitGraph>,
+        sha: Oid,
+        message: SharedString,
+    ) {
+        let languages = self
+            .workspace
+            .read_with(cx, |workspace, cx| {
+                workspace.project().read(cx).languages().clone()
+            })
+            .log_err();
+        self.selected_commit_message = Some(DetailPanelCommitMessage {
+            sha,
+            message: cx.new(|cx| Markdown::new(message, languages, None, cx)),
+            scroll_handle: ScrollHandle::new(),
+        });
+        self._selected_commit_message_task = None;
+        cx.notify();
+    }
+
     fn select_previous_match(&mut self, cx: &mut Context<Self>) {
         if self.search_state.matches.is_empty() {
             return;
@@ -2534,6 +2596,63 @@ impl GitGraph {
         self.set_context_menu(context_menu, position, None, window, cx);
     }
 
+    fn toggle_column_visibility(&mut self, col_idx: usize, cx: &mut Context<Self>) {
+        if let Some(slot) = self.column_visibility.as_mut_slice().get_mut(col_idx) {
+            *slot = !*slot;
+            // Column visibility is persisted per item, so schedule a workspace serialization.
+            cx.emit(ItemEvent::Edit);
+        }
+    }
+
+    fn deploy_header_context_menu(
+        &mut self,
+        position: Point<Pixels>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let is_path_history = matches!(self.log_source, LogSource::Path(_));
+        let columns: &[&str] = if is_path_history {
+            &["Description", "Date", "Author", "Commit"]
+        } else {
+            &["Graph", "Description", "Date", "Author", "Commit"]
+        };
+
+        let filter = self.column_visibility.clone();
+        let visible_count = filter
+            .as_slice()
+            .iter()
+            .filter(|filtered| !**filtered)
+            .count();
+
+        let focus_handle = self.focus_handle.clone();
+        let git_graph = cx.entity();
+        let context_menu = ContextMenu::build(window, cx, |mut context_menu, _window, _cx| {
+            context_menu = context_menu.context(focus_handle).header("Columns");
+            for (col_idx, label) in columns.iter().enumerate() {
+                let is_visible = !filter.get(col_idx).copied().unwrap_or(false);
+                // Disable hiding the last remaining visible column.
+                let can_toggle = !is_visible || visible_count > 1;
+                let git_graph = git_graph.clone();
+                context_menu = context_menu.toggleable_entry_disabled_when(
+                    label.to_string(),
+                    is_visible,
+                    !can_toggle,
+                    IconPosition::End,
+                    None,
+                    move |_window, cx| {
+                        git_graph.update(cx, |this, cx| {
+                            this.toggle_column_visibility(col_idx, cx);
+                            cx.notify();
+                        });
+                    },
+                );
+            }
+            context_menu
+        });
+
+        self.set_context_menu(context_menu, position, None, window, cx);
+    }
+
     fn render_search_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let color = cx.theme().colors();
         let query_focus_handle = self
@@ -2740,10 +2859,9 @@ impl GitGraph {
             .map(|datetime| {
                 let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
                 let local_datetime = datetime.to_offset(local_offset);
-                let format =
-                    time::format_description::parse("[month repr:short] [day], [year]").ok();
-                format
-                    .and_then(|f| local_datetime.format(&f).ok())
+                local_datetime
+                    .format(format_description!("[month repr:short] [day], [year]"))
+                    .ok()
                     .unwrap_or_default()
             })
             .unwrap_or_default();

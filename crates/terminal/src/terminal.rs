@@ -1495,6 +1495,7 @@ pub struct TaskState {
     pub status: TaskStatus,
     pub completion_rx: Receiver<Option<ExitStatus>>,
     pub spawned_task: SpawnInTerminal,
+    pub structured_task: Option<task::StructuredTaskHandle>,
 }
 
 /// A status of the current terminal tab's task.
@@ -2993,6 +2994,20 @@ impl Terminal {
                 task.status.register_terminal_exit();
             }
         };
+        if let Some(handle) = task.structured_task.as_ref() {
+            match handle.state() {
+                task::StructuredTaskState::Cancelled { terminal_id, .. } => {
+                    handle.mark_cancelled(terminal_id, true, cx);
+                }
+                _ => {
+                    if let Some(exit_status) = exit_status {
+                        handle.mark_completed(exit_status, cx);
+                    } else {
+                        handle.mark_cancelled(handle.state().terminal_id(), true, cx);
+                    }
+                }
+            }
+        }
 
         let (finished_successfully, task_line, command_line) = task_summary(task, exit_status);
         let mut lines_to_show = Vec::new();
@@ -3438,7 +3453,10 @@ mod tests {
     };
     use parking_lot::Mutex;
     use rand::{Rng, distr, rngs::StdRng};
-    use task::{Shell, ShellBuilder};
+    use task::{
+        Shell, ShellBuilder, StructuredTaskHandle, StructuredTaskState, StructuredTerminalId,
+        TaskId,
+    };
 
     #[test]
     fn test_init_command_startup_marker_commands_do_not_contain_marker() {
@@ -3625,6 +3643,7 @@ mod tests {
                 args: args.clone(),
                 ..Default::default()
             },
+            structured_task: None,
         };
         let builder = cx
             .update(|cx| {
@@ -4511,6 +4530,66 @@ mod tests {
             input_log.is_empty(),
             "init command should not be written after the child has exited, got {input_log:?}"
         );
+    }
+
+    #[gpui::test]
+    async fn structured_task_terminal_reports_completion_and_close(cx: &mut TestAppContext) {
+        let terminal = cx.new(|cx| {
+            TerminalBuilder::new_display_only(
+                SettingsCursorShape::default(),
+                AlternateScroll::On,
+                None,
+                0,
+                cx.background_executor(),
+                PathStyle::local(),
+            )
+            .subscribe(cx)
+        });
+        let completed = StructuredTaskHandle::new(TaskId("completed".to_string()));
+        let (_, completion_rx) = async_channel::unbounded();
+        terminal.update(cx, |terminal, cx| {
+            completed.mark_running(Some(StructuredTerminalId(cx.entity_id().as_u64())), cx);
+            terminal.task = Some(TaskState {
+                status: TaskStatus::Running,
+                completion_rx,
+                spawned_task: SpawnInTerminal::default(),
+                structured_task: Some(completed.clone()),
+            });
+            #[cfg(unix)]
+            let exit_status =
+                <ExitStatus as std::os::unix::process::ExitStatusExt>::from_raw(3 << 8);
+            #[cfg(windows)]
+            let exit_status = <ExitStatus as std::os::windows::process::ExitStatusExt>::from_raw(3);
+            terminal.register_task_finished(Some(exit_status), cx);
+        });
+        assert!(matches!(
+            completed.state(),
+            StructuredTaskState::Completed {
+                exit_code: Some(3),
+                success: false,
+                ..
+            }
+        ));
+
+        let closed = StructuredTaskHandle::new(TaskId("closed".to_string()));
+        let (_, completion_rx) = async_channel::unbounded();
+        terminal.update(cx, |terminal, cx| {
+            closed.mark_running(Some(StructuredTerminalId(cx.entity_id().as_u64())), cx);
+            terminal.task = Some(TaskState {
+                status: TaskStatus::Running,
+                completion_rx,
+                spawned_task: SpawnInTerminal::default(),
+                structured_task: Some(closed.clone()),
+            });
+            terminal.register_task_finished(None, cx);
+        });
+        assert!(matches!(
+            closed.state(),
+            StructuredTaskState::Cancelled {
+                termination_confirmed: true,
+                ..
+            }
+        ));
     }
 
     #[gpui::test]

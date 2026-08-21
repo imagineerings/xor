@@ -2072,7 +2072,7 @@ fn get_scale_factor(native_window: id) -> f32 {
     };
 
     // We are not certain what triggers this, but it seems that sometimes
-    // this method would return 0 (https://github.com/zed-industries/zed/issues/6412)
+    // this method would return 0 (https://github.com/simtropolis/zed/issues/6412)
     // It seems most likely that this would happen if the window has no screen
     // (if it is off-screen), though we'd expect to see viewDidChangeBackingProperties before
     // it was rendered for real.
@@ -3282,6 +3282,16 @@ extern "C" fn blurred_view_update_layer(this: &Object, _: Sel) {
         if !layer.is_null() {
             remove_layer_background(layer);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_id_for_screen_returns_none_for_null_screen() {
+        assert_eq!(display_id_for_screen(nil), None);
     }
 }
 

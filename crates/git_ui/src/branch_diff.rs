@@ -79,6 +79,7 @@ impl BranchDiff {
 
     pub(crate) fn deploy_branch_diff(
         workspace: &mut Workspace,
+        _: &DeployBranchDiff,
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) {
@@ -215,6 +216,17 @@ impl BranchDiff {
         });
         if let Some(existing) = existing {
             workspace.activate_item(&existing, true, true, window, cx);
+
+            let needs_switch = existing.read(cx).repo(cx).map_or(true, |current| {
+                current.read(cx).id != intended_repo.read(cx).id
+            });
+
+            if needs_switch {
+                existing.update(cx, |branch_diff, cx| {
+                    branch_diff.set_repo(Some(intended_repo), cx);
+                });
+            }
+
             return;
         }
 
@@ -378,6 +390,10 @@ impl BranchDiff {
 
     pub(crate) fn repo(&self, cx: &App) -> Option<Entity<Repository>> {
         self.diff.read(cx).repo(cx)
+    }
+
+    pub(crate) fn set_repo(&mut self, repo: Option<Entity<Repository>>, cx: &mut Context<Self>) {
+        self.diff.update(cx, |diff, cx| diff.set_repo(repo, cx));
     }
 
     fn set_merge_base(&mut self, base_ref: SharedString, cx: &mut Context<Self>) {
