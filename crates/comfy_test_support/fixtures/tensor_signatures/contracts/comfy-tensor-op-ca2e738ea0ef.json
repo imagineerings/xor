@@ -255,8 +255,8 @@
   "operation_id": "COMFY-TENSOR-OP-CA2E738EA0EF",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "e789f5498840f17d6f8865ce405aa4ea17b95bef422e011fa97112279df34c39",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "631aa556310bc5d7c8d03774b8d3a82fcef4594e97553cae361c1a437f8ed103",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -397,7 +397,7 @@
         {
           "expanded_mapping": false,
           "name": "device",
-          "syntax": "zed.device",
+          "syntax": "sim.device",
           "syntax_kind": "Attribute"
         }
       ],
@@ -428,7 +428,7 @@
         {
           "expanded_mapping": false,
           "name": "device",
-          "syntax": "zed.device",
+          "syntax": "sim.device",
           "syntax_kind": "Attribute"
         }
       ],

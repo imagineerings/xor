@@ -1553,8 +1553,8 @@
   "operation_id": "COMFY-TENSOR-OP-F5FEAF87A86C",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "3a024964f619a44052f4863ff0d552eaaae50dadd85386dcee325bdc79a3428a",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "9ea9e7cba141128fa3b3dce5f2b0e3c0b9878fa7aab2b887cecc99a0f8d48369",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -2288,7 +2288,7 @@
       "source_path": "comfy/ldm/depth_anything_3/reference_view_selector.py",
       "source_sha256": "24e9428a820b5287d622bc865d4fd6520486294c4337a28de71fca6ec62e0c29",
       "status": "static-call-observed",
-      "target_syntax": "zed_no_diag.sum"
+      "target_syntax": "sim_no_diag.sum"
     },
     {
       "catalog_field": "production_call_sites",

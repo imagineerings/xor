@@ -1036,8 +1036,8 @@
   "operation_id": "COMFY-TENSOR-OP-3D09997B7D21",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "0bc44807d1e6929a418e0c55c60374c95a4969a67c79401d32d3eee56b0c5c21",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "4eebddbc9745cd04d1d44faa740f70af517e96db9a2165ae5e50bb64e9cb9df1",
     "source_declared_version": "0.27.1",
     "source_files": [
       {

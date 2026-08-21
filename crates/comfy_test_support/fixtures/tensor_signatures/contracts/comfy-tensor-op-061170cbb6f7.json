@@ -807,8 +807,8 @@
   "operation_id": "COMFY-TENSOR-OP-061170CBB6F7",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "cd0d9b0a952330a922264ddc90af97fb9d6ed88afcf8e57eca5e073081006fee",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "e95fe4e24bb54e8fe6900fcbc34eea1cd83187c21dd2dd43f9e8271e6da41a34",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -1584,7 +1584,7 @@
         {
           "index": 1,
           "starred": false,
-          "syntax": "zed.to(v.dtype)",
+          "syntax": "sim.to(v.dtype)",
           "syntax_kind": "Call"
         },
         {
@@ -3459,7 +3459,7 @@
         {
           "index": 1,
           "starred": false,
-          "syntax": "zed.to(v.dtype)",
+          "syntax": "sim.to(v.dtype)",
           "syntax_kind": "Call"
         },
         {

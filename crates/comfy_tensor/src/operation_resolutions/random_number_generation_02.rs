@@ -3,7 +3,7 @@
         resolution_module: "random_number_generation_02",
         operation_id: "COMFY-TENSOR-OP-FD729B8A5363",
         baseline_overload_id: "COMFY-TENSOR-OP-FD729B8A5363:blocked",
-        baseline_fixture_sha256: "9859b7a115de51af013dce1e7770c77495336ff7a3f0a3b284cbb0aac77a6b1e",
+        baseline_fixture_sha256: "af310549525214106fad584e9103e28724fbd13d8df29570ab226f8c14c96bfd",
         overload_id: "zed.native.rng.randn.cpu-floating-strided.v1",
         ordered_parameters_json: "[{\"name\":\"shape\",\"type\":\"&[u64]\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"dtype\",\"type\":\"DType\",\"default\":\"F32\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"layout\",\"type\":\"Layout\",\"default\":\"Strided\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"device\",\"type\":\"DeviceId\",\"default\":\"CPU\",\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"transaction\",\"type\":\"RngTransaction\",\"default\":null,\"keyword_only\":true,\"kind\":\"keyword_only\"}]",
         output_arity: "2",
@@ -24,6 +24,6 @@
         jvp_rule: "forward-only entropy creation with no differentiable inputs",
         owner_task_id: "comfy-parity-tensor-ops-random-number-generation-comfy-tensor-op-fd729b8a5363",
         evidence_fixture: "crates/comfy_test_support/fixtures/tensor_operations/random_number_generation_02/randn.json",
-        evidence_fixture_sha256: "83c2b01b02f55dfd68ac5ab052f7cf8a7ce8325280734e7c04d8b1064acae570",
+        evidence_fixture_sha256: "42d79487babb030b27a8d9062c29d5927f35f16b096b843e453a7c9297b2297d",
     },
 ]

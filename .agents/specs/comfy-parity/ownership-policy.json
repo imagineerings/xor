@@ -14108,7 +14108,7 @@
         {
           "name": "video-encoded-ten-bit-backing-fixture-preserves-one-closed-owner",
           "path": "crates/comfy_test_support/fixtures/video/component-h264-mp4-10bit-backing/manifest.json",
-        "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*source_depth_is_authoritative[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*eight_bit_semantic_identity_byte_stable"
+          "pattern": "synthetic-component-h264-mp4-eight-and-ten-bit-backing[\\s\\S]*source_depth_is_authoritative[\\s\\S]*actor_owned_tensor_moved_without_second_copy[\\s\\S]*eight_bit_semantic_identity_byte_stable"
         }
       ],
       "known_open_reasons": [],
@@ -21223,122 +21223,6 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "WorkerBackendSession is the only owner that pairs a selected Arc<dyn TensorBackend> with its non-cloneable BackendWorkspaceAuthority, runs the real workspace-reservation/allocation/transfer/event readiness transaction, and retains the backend resources for the worker process lifetime. TensorBackend::reserve_workspace is the object-safe canonical backend adapter to the existing backend-neutral lease transaction; durable returned tensors remain separately governed by the exact backend capacity owner. Protocol-7 WorkerBackendCapabilities and WorkerNativeDeviceProperties are bounded ABI DTOs that map explicitly through BackendCapabilityMatrix and NativeDeviceProperties, which alone validate semantic capability and device facts. Runtime configuration, certification factories, controllers, and GPUI are focused adapters that only project the accepted name, architecture, physical capacity, and effective ceiling; none may repeat readiness, capability validation, allocator state, workspace authorization, or fallback decisions."
-    },
-    {
-      "concern": "zed_runtime_profile_settings",
-      "canonical_owner": "settings::SettingsStore",
-      "owner_files": [
-        "crates/settings/src/settings_store.rs"
-      ],
-      "owner_symbols": [
-        "SettingsStore"
-      ],
-      "allowed_adapters": [
-        "comfy_runtime::NativeRuntimeSettings validates the merged Comfy profile projection without storing or observing it",
-        "NativeRuntimeProfile::disabled_migration_replacement constructs the sole safe disabled settings projection for imported legacy evidence",
-        "zed::active_native_comfy_profile_from_settings maps the selected profile into production initialization",
-        "zed::native_comfy_profile_id_from_settings preserves a parseable invalid selection as a disconnected error scope",
-        "zed::NativeComfyRuntimeBinding is a non-persistent behavior projection that detects same-identity runtime-policy changes and rebinds canonical service adapters",
-        "comfy_ui::init_for_profile binds the GPUI execution model to the selected canonical profile identity"
-      ],
-      "definitions": [
-        {
-          "path": "crates/settings/src/settings_store.rs",
-          "qualified": "settings::SettingsStore",
-          "role": "canonical",
-          "symbol": "SettingsStore"
-        },
-        {
-          "path": "crates/comfy_runtime/src/settings.rs",
-          "qualified": "comfy_runtime::NativeRuntimeSettings",
-          "role": "allowed_adapter",
-          "symbol": "NativeRuntimeSettings"
-        },
-        {
-          "path": "crates/comfy_runtime/src/settings.rs",
-          "qualified": "comfy_runtime::NativeRuntimeProfile",
-          "role": "allowed_adapter",
-          "symbol": "NativeRuntimeProfile"
-        },
-        {
-          "path": "crates/zed/src/zed.rs",
-          "qualified": "zed::active_native_comfy_profile_from_settings",
-          "role": "allowed_adapter",
-          "symbol": "active_native_comfy_profile_from_settings"
-        },
-        {
-          "path": "crates/zed/src/zed.rs",
-          "qualified": "zed::native_comfy_profile_id_from_settings",
-          "role": "allowed_adapter",
-          "symbol": "native_comfy_profile_id_from_settings"
-        },
-        {
-          "path": "crates/zed/src/zed.rs",
-          "qualified": "zed::NativeComfyRuntimeBinding",
-          "role": "allowed_adapter",
-          "symbol": "NativeComfyRuntimeBinding"
-        }
-      ],
-      "call_symbols": [
-        "NativeRuntimeSettings",
-        "NativeRuntimeProfile",
-        "NativeComfyRuntimeBinding",
-        "SettingsStore",
-        "active_native_comfy_profile_from_settings",
-        "native_comfy_profile_id_from_settings",
-        "parse_runtime_settings"
-      ],
-      "required_mappings": [
-        {
-          "name": "merged-settings-to-native-profile",
-          "path": "crates/zed/src/zed.rs",
-          "pattern": "parse_runtime_settings"
-        },
-        {
-          "name": "selected-profile-to-gpui-model",
-          "path": "crates/zed/src/zed.rs",
-          "pattern": "init_for_profile"
-        },
-        {
-          "name": "invalid-profile-to-error-scope",
-          "path": "crates/zed/src/zed.rs",
-          "pattern": "configured_native_comfy_profile_id"
-        },
-        {
-          "name": "same-profile-policy-change-to-service-rebind",
-          "path": "crates/zed/src/zed.rs",
-          "pattern": "NativeComfyRuntimeBinding::new[\\s\\S]*requires_rebind[\\s\\S]*register_native_comfy_execution"
-        },
-        {
-          "name": "legacy-evidence-to-disabled-settings-projection",
-          "path": "crates/comfy_runtime/src/settings.rs",
-          "pattern": "pub fn disabled_migration_replacement\\([\\s\\S]*model_roots: Vec::new\\(\\)[\\s\\S]*api_host: NativeApiHostPolicy::default\\(\\)"
-        }
-      ],
-      "known_open_reasons": [],
-      "consolidation_tasks": [
-        "comfy-parity-settings-persistence-foundation"
-      ],
-      "production_consumers": [
-        "Zed native Comfy initialization",
-        "comfy_ui active execution profile",
-        "later native settings UI"
-      ],
-      "requirements": [
-        "Requirement 21",
-        "Requirement 24",
-        "Requirement 29"
-      ],
-      "design": [
-        "D2",
-        "D16",
-        "D41"
-      ],
-      "validation": [
-        "VAL-RUNTIME-SETTINGS-001",
-        "VAL-OWNERSHIP-001"
-      ],
-      "decision_reason": "Zed's existing settings domain alone owns default/user/project/policy precedence, parsing state, persistence, and watchers. Comfy code validates and consumes one selected profile but never creates a parallel store or observer."
     },
     {
       "concern": "sqlite_runtime_operational_persistence",
@@ -29127,6 +29011,122 @@
         "VAL-OWNERSHIP-001"
       ],
       "decision_reason": "The whole-repository definition and call-site audit found an unused three-field SamplingPlan, duplicate SD15 sigma-grid and sigma-to-time equations, runtime-owned KSampler validation/noise addressing/noise scaling, sampler-owned canonical RNG transactions, later row-local trace and progress types, repeated eight-field row-local compatibility-noise request and transaction-opening implementations, an attempted row-local owner for standard-versus-CONST SNR classification, and a missing production mapping from sampler identity to Comfy's discard-penultimate policy. comfy_sampler::sampler now alone owns stable sampler identity and definitions, registry, checked plan, canonical fixed-step and adaptive progress payloads, failure-atomic fixed-step and bounded adaptive-attempt sessions, pre-update observed-step/final-commit tokens, accepted/rejected counters and latent history, callback order, and trace; scheduler owns identity, definitions, registry, request, the sole SamplingPlan adapter mapping dpm_2/dpm_2_ancestral/uni_pc/uni_pc_bh2 to discard-penultimate, denoise and explicit step slicing; sampling_profile owns identity, prediction interpretation, the profile contract, the SD15 sigma grid, sigma/time conversion, input/noise scaling, SNR conversion, first-sigma adjustment, and checked model noise-scale composition; noise owns phase identity, requests, Brownian interval address, trace, and the one CompatibilityNoiseRequest address adapter while delegating transaction/checkpoint state to comfy_tensor::rng_profiles::compat and RngStream. Generated sampler rows contribute only immutable identities, row equations, compatibility metadata, and source-derived fixtures; every fixed-step callback maps through canonical SamplingProgress including sigma-hat. The tokenized whole-source ownership suite recursively scans the complete algorithms tree, rejects symlink escapes, ignores comments, ordinary strings, and raw strings, normalizes raw and Unicode-prefixed identifiers, checks private and public struct/enum/type/trait/union declarations and competing shared-type aliases regardless of formatting, resolves qualified import/type aliases and unbounded statement-local UFCS, and fails closed on row-local trace, progress, observation, noise-request, or cancellation-token types, any direct RngCompatibilityRequest/RngStreamAddress/RngStream reference, every associated open constructor, and direct or aliased CompatibilityRngTransaction opening. Row macro expansion and out-of-directory helper injection are closed by fail-closed audited bang-macro, attribute, derive, and path-attribute allowlists, and adversarial tests cover literals, raw identifiers, Unicode prefixes, qualified aliases, shared-name re-exports, long UFCS, nested helpers, symlinks, helper paths, macro definitions, qualified/shadowed macros, attributes, and derives. Model and runtime consumers are focused adapters, and sampler code owns no queue transition, persistence, security, output commit, tensor allocation rule, workspace authority, RNG state, or cancellation state."
+    },
+    {
+      "concern": "zed_runtime_profile_settings",
+      "canonical_owner": "settings::SettingsStore",
+      "owner_files": [
+        "crates/settings/src/settings_store.rs"
+      ],
+      "owner_symbols": [
+        "SettingsStore"
+      ],
+      "allowed_adapters": [
+        "comfy_runtime::NativeRuntimeSettings validates the merged Comfy profile projection without storing or observing it",
+        "NativeRuntimeProfile::disabled_migration_replacement constructs the sole safe disabled settings projection for imported legacy evidence",
+        "zed::active_native_comfy_profile_from_settings maps the selected profile into production initialization",
+        "zed::native_comfy_profile_id_from_settings preserves a parseable invalid selection as a disconnected error scope",
+        "zed::NativeComfyRuntimeBinding is a non-persistent behavior projection that detects same-identity runtime-policy changes and rebinds canonical service adapters",
+        "comfy_ui::init_for_profile binds the GPUI execution model to the selected canonical profile identity"
+      ],
+      "definitions": [
+        {
+          "path": "crates/settings/src/settings_store.rs",
+          "qualified": "settings::SettingsStore",
+          "role": "canonical",
+          "symbol": "SettingsStore"
+        },
+        {
+          "path": "crates/comfy_runtime/src/settings.rs",
+          "qualified": "comfy_runtime::NativeRuntimeSettings",
+          "role": "allowed_adapter",
+          "symbol": "NativeRuntimeSettings"
+        },
+        {
+          "path": "crates/comfy_runtime/src/settings.rs",
+          "qualified": "comfy_runtime::NativeRuntimeProfile",
+          "role": "allowed_adapter",
+          "symbol": "NativeRuntimeProfile"
+        },
+        {
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::active_native_comfy_profile_from_settings",
+          "role": "allowed_adapter",
+          "symbol": "active_native_comfy_profile_from_settings"
+        },
+        {
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::native_comfy_profile_id_from_settings",
+          "role": "allowed_adapter",
+          "symbol": "native_comfy_profile_id_from_settings"
+        },
+        {
+          "path": "crates/zed/src/zed.rs",
+          "qualified": "zed::NativeComfyRuntimeBinding",
+          "role": "allowed_adapter",
+          "symbol": "NativeComfyRuntimeBinding"
+        }
+      ],
+      "call_symbols": [
+        "NativeRuntimeSettings",
+        "NativeRuntimeProfile",
+        "NativeComfyRuntimeBinding",
+        "SettingsStore",
+        "active_native_comfy_profile_from_settings",
+        "native_comfy_profile_id_from_settings",
+        "parse_runtime_settings"
+      ],
+      "required_mappings": [
+        {
+          "name": "merged-settings-to-native-profile",
+          "path": "crates/zed/src/zed.rs",
+          "pattern": "parse_runtime_settings"
+        },
+        {
+          "name": "selected-profile-to-gpui-model",
+          "path": "crates/zed/src/zed.rs",
+          "pattern": "init_for_profile"
+        },
+        {
+          "name": "invalid-profile-to-error-scope",
+          "path": "crates/zed/src/zed.rs",
+          "pattern": "configured_native_comfy_profile_id"
+        },
+        {
+          "name": "same-profile-policy-change-to-service-rebind",
+          "path": "crates/zed/src/zed.rs",
+          "pattern": "NativeComfyRuntimeBinding::new[\\s\\S]*requires_rebind[\\s\\S]*register_native_comfy_execution"
+        },
+        {
+          "name": "legacy-evidence-to-disabled-settings-projection",
+          "path": "crates/comfy_runtime/src/settings.rs",
+          "pattern": "pub fn disabled_migration_replacement\\([\\s\\S]*model_roots: Vec::new\\(\\)[\\s\\S]*api_host: NativeApiHostPolicy::default\\(\\)"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-settings-persistence-foundation"
+      ],
+      "production_consumers": [
+        "Zed native Comfy initialization",
+        "comfy_ui active execution profile",
+        "later native settings UI"
+      ],
+      "requirements": [
+        "Requirement 21",
+        "Requirement 24",
+        "Requirement 29"
+      ],
+      "design": [
+        "D2",
+        "D16",
+        "D41"
+      ],
+      "validation": [
+        "VAL-RUNTIME-SETTINGS-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "Zed's existing settings domain alone owns default/user/project/policy precedence, parsing state, persistence, and watchers. Comfy code validates and consumes one selected profile but never creates a parallel store or observer."
     }
   ]
 }

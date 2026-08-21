@@ -88,7 +88,7 @@ Zed must not use a process-global RNG as an implicit compatibility mechanism. Ea
 
 | Artifact | Rows | SHA-256 |
 |---|---:|---|
-| [`catalogs/backend-tensor-operations.csv`](catalogs/backend-tensor-operations.csv) | 600 | `7f2f90249fe6d4413aaade485d6197359818cc0c2feb47df73c56d25283f11dc` |
+| [`catalogs/backend-tensor-operations.csv`](catalogs/backend-tensor-operations.csv) | 600 | `e60844bdf259418b8f808f1122408edaeac11bffdf03a65d205a79b251e9911b` |
 | [`catalogs/backend-autograd.csv`](catalogs/backend-autograd.csv) | 36 | `d51ff8465e2a161bef2093bbdb37f7547a6d6157d0fa1c4d6f0a30b8fd682670` |
 | [`catalogs/backend-rng.csv`](catalogs/backend-rng.csv) | 54 | `d207ea66d8949eb73067828da6f2ed160ab8bdf641b4cf6ed1789faa0f65d06b` |
 | [`catalogs/backend-tensor-runtime-reconciliation.json`](catalogs/backend-tensor-runtime-reconciliation.json) | reconciliation | generated deterministically |

@@ -2464,7 +2464,7 @@ mod tests {
         let fixture_path = ".agents/specs/comfy-parity/catalogs/backend-tensor-operations.csv";
         let fixture_digest = validation_artifacts::workspace_fixture_digest(
             fixture_path,
-            "7f2f90249fe6d4413aaade485d6197359818cc0c2feb47df73c56d25283f11dc",
+            "e60844bdf259418b8f808f1122408edaeac11bffdf03a65d205a79b251e9911b",
         )?;
         let resize_fixture_path =
             "crates/comfy_test_support/fixtures/tensor_operations/image_resize_foundation.json";

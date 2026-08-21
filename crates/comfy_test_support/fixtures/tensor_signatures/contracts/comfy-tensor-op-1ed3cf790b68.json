@@ -243,8 +243,8 @@
   "operation_id": "COMFY-TENSOR-OP-1ED3CF790B68",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "f82a17c619027f6c3a7fb383454565432cd4bd01349571e7175c81b9af97f76f",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "e97c8de5ddf3276b4490ca100dea66d24590af46dadeb9268b137206907b8017",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -492,7 +492,7 @@
       "source_path": "comfy/ldm/modules/attention.py",
       "source_sha256": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
       "status": "static-call-observed",
-      "target_syntax": "zed.add_"
+      "target_syntax": "sim.add_"
     },
     {
       "catalog_field": "production_call_sites",

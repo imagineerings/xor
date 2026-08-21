@@ -44,10 +44,10 @@
     },
     "backend-tensor-operations.csv": {
       "rows": 600,
-      "sha256": "7f2f90249fe6d4413aaade485d6197359818cc0c2feb47df73c56d25283f11dc"
+      "sha256": "e60844bdf259418b8f808f1122408edaeac11bffdf03a65d205a79b251e9911b"
     }
   },
-  "generator_sha256": "4f1522d541c5ce0695e91c820b8185c084c706c6b59fb72ee55df11bf65b3d49",
+  "generator_sha256": "74e8a3fa5a320465ed1f316184e033757cbb22e1c4dbb9f2b1b5abda0299e97d",
   "limitations": [
     "This is static code evidence, not runtime observation; branch reachability, dynamic dispatch, overload selection, backend kernels, and numeric equivalence remain unverified.",
     "Tensor method calls without a statically recoverable receiver are retained as low-confidence receiver-unverified candidates instead of being guessed or omitted.",

@@ -30,7 +30,7 @@
   "inputs": [
     {
       "name": "catalogs/backend-tensor-operations.csv",
-      "sha256": "7f2f90249fe6d4413aaade485d6197359818cc0c2feb47df73c56d25283f11dc"
+      "sha256": "e60844bdf259418b8f808f1122408edaeac11bffdf03a65d205a79b251e9911b"
     },
     {
       "name": "ComfyUI/requirements.txt",

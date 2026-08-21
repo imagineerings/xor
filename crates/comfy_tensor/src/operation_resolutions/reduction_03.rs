@@ -3,7 +3,7 @@
         resolution_module: "reduction_03",
         operation_id: "COMFY-TENSOR-OP-FF3F06B4B591",
         baseline_overload_id: "COMFY-TENSOR-OP-FF3F06B4B591:blocked",
-        baseline_fixture_sha256: "b52d6a11a1bf92369e13e73db7c71d58ab594b0fcee22c3a9c78d35e2fe4b59b",
+        baseline_fixture_sha256: "2f282d9e2468a9269706a736cc8f7befae1673f245c108745f38d35ea75402f2",
         overload_id: "zed.native.reduction.tensor-norm.vector-norm-adapter.v1",
         ordered_parameters_json: "[{\"name\":\"input\",\"type\":\"&Tensor\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"order\",\"type\":\"f64\",\"default\":2,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"dimensions\",\"type\":\"Option<&[i64]>\",\"default\":null,\"keyword_only\":false,\"kind\":\"positional_or_keyword\"},{\"name\":\"keep_dimensions\",\"type\":\"bool\",\"default\":false,\"keyword_only\":true,\"kind\":\"keyword_only\"},{\"name\":\"dtype\",\"type\":\"Option<DType>\",\"default\":null,\"keyword_only\":true,\"kind\":\"keyword_only\"}]",
         output_arity: "1",
@@ -24,6 +24,6 @@
         jvp_rule: "delegates Task 73 analytical vector-norm JVP",
         owner_task_id: "comfy-parity-tensor-ops-reduction-comfy-tensor-op-ff3f06b4b591",
         evidence_fixture: "crates/comfy_test_support/fixtures/tensor_operations/reduction_03/tensor_norm.json",
-        evidence_fixture_sha256: "4805989212c090ef68c576461880e54bcb92f2842fa4a8579d652d5a668123ef",
+        evidence_fixture_sha256: "a430fbfef0435f2e5c1907ebe8f892100204abb30d71fc0e56dec05b4f83dedc",
     },
 ]

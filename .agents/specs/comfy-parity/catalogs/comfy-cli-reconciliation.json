@@ -23,7 +23,7 @@
     "test-backed": 2583
   },
   "catalog_sha256": {
-    "comfy-cli-commands.csv": "dd865ce7a3c0fb3e23708f36b6db65d49ed65b86f4e3ab7d5ea07b7c5df730d1",
+    "comfy-cli-commands.csv": "423c3a5e13f2a5f7e32b3b791d662928637fac5c37f6157c34d158fcda97d03f",
     "comfy-cli-config.csv": "62545831c8826cfcb7beb06509c24a5d14e17349df3bcc36ff00972d41cfd558",
     "comfy-cli-cql-policy.csv": "5608ddf5e37e9df5d8ee60a666538f844ec96d7ae8a43cb6da03aa1de982a1ec",
     "comfy-cli-documentation.csv": "29d49bd7586f47be9634938e848d322364b6f3c836aaf7947cb414c56da49312",
@@ -34,7 +34,7 @@
     "comfy-cli-formats.csv": "7716b3cf4c564f73d408e2094bf6a7e1788e24098e3eb2fe43bdb4be9da08096",
     "comfy-cli-lifecycle.csv": "49bc45d68ade04bd9fd11aeacfd1ef636dae56597af67ce968593e71418f7b7e",
     "comfy-cli-modules.csv": "c4784be6ab274cff07256a971621247e557115d61d72fc3fc7a5d37dbac4e617",
-    "comfy-cli-parameters.csv": "4ea9fe50b4073493020b74f16d9fea84ede63d8f438bf2d39a8be8b6415e7e32",
+    "comfy-cli-parameters.csv": "f4919448071b0d42077296f6b7e5d11477bdc254f4ff2cc13542800b161b2186",
     "comfy-cli-partner-openapi.csv": "e1a1a86dd4628bcc6d5744cbc7a823d01858df42054dbb852ebbecb92ee6f188",
     "comfy-cli-schema-mappings.csv": "db9c5d5d73b42f6f283d65157bcaad776300a46709c9fc775c42485976c5a86b",
     "comfy-cli-schemas.csv": "06429ac0b6476172c99f5c09cffeeb33b7d2c89cb56d488812f6c926a292cd55",

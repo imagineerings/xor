@@ -11721,8 +11721,8 @@
   "operation_id": "COMFY-TENSOR-OP-D9F653A3B821",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "9db68c7daf60241678569ec3308787dbd444585bf1bfc7da8a69566dc8ddd754",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "2c984542eb618c8df6152e7fe0f30842eb2756fcc94ee6d8c1c39965792052c3",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -23423,7 +23423,7 @@
       "source_path": "comfy/ldm/modules/attention.py",
       "source_sha256": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
       "status": "static-call-observed",
-      "target_syntax": "zed.to"
+      "target_syntax": "sim.to"
     },
     {
       "catalog_field": "production_call_sites",
@@ -37926,7 +37926,7 @@
       "source_path": "comfy_extras/nodes_sag.py",
       "source_sha256": "e600938bc4fc7e868bf705fc0c7eb2ddb11d9989a357c88da6c0cc6d6e0be1a0",
       "status": "static-call-observed",
-      "target_syntax": "zed.to"
+      "target_syntax": "sim.to"
     },
     {
       "catalog_field": "production_call_sites",

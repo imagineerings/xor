@@ -6629,8 +6629,8 @@
   "operation_id": "COMFY-TENSOR-OP-17E7C823A86F",
   "provenance": {
     "environment_fixture": "resolution-environment.json",
-    "environment_fixture_sha256": "5e1faf6ac9a130496193bf67095d8becb424ff17b9aa98af70716752c367fa6a",
-    "inventory_row_sha256": "d6351d38fb01e46d39a5c13c6da6fd97cad98e99b4271d965ea585aabc6e93d6",
+    "environment_fixture_sha256": "d7eae0f3eb4607ba09e36c0aba3fa2fc21ded68b707f739770f628660a756312",
+    "inventory_row_sha256": "f91f186a7299aa73038ce5c5b7f26780e412014fe8fd3b17142569630c9a206f",
     "source_declared_version": "0.27.1",
     "source_files": [
       {
@@ -11796,7 +11796,7 @@
       "source_path": "comfy/ldm/depth_anything_3/reference_view_selector.py",
       "source_sha256": "24e9428a820b5287d622bc865d4fd6520486294c4337a28de71fca6ec62e0c29",
       "status": "static-call-observed",
-      "target_syntax": "torch.eye(S, device=zed.device).unsqueeze"
+      "target_syntax": "torch.eye(S, device=sim.device).unsqueeze"
     },
     {
       "catalog_field": "production_call_sites",
@@ -11819,7 +11819,7 @@
       "source_path": "comfy/ldm/depth_anything_3/reference_view_selector.py",
       "source_sha256": "24e9428a820b5287d622bc865d4fd6520486294c4337a28de71fca6ec62e0c29",
       "status": "static-call-observed",
-      "target_syntax": "torch.eye(S, device=zed.device).unsqueeze"
+      "target_syntax": "torch.eye(S, device=sim.device).unsqueeze"
     },
     {
       "catalog_field": "production_call_sites",

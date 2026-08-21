@@ -13,7 +13,7 @@
     },
     {
       "normalized_bytes": 162862,
-      "normalized_sha256": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33",
+      "normalized_sha256": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d",
       "path": ".agents/specs/comfy-parity/catalogs/backend-models.csv"
     }
   ],
