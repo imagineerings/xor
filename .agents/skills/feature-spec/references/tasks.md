@@ -8,6 +8,8 @@ and design. Produce implementation units, not a capability inventory.
 - [Planning levels](#planning-levels)
 - [Structure](#structure)
 - [Task rules](#task-rules)
+- [Task state and evidence](#task-state-and-evidence)
+- [Legacy compatibility](#legacy-compatibility)
 - [Decomposition audit](#decomposition-audit)
 - [Generic examples](#generic-examples)
 
@@ -72,7 +74,8 @@ already obvious.
 - Use milestone headings, integer epic IDs such as `2`, and decimal leaf IDs
   such as `2.1`. Use no deeper task nesting.
 - Put `_Requirements:`, `_Depends on:`, `_Reads:`, `_Writes:`, and
-  `_Validation:` metadata on every leaf and only on leaves.
+  `_Validation:` metadata on every leaf and only on leaves. Spell and capitalize
+  these keys exactly. `_Evidence:` is the only optional execution-state metadata.
 - Reference every acceptance criterion from at least one leaf task.
 - Include `_Depends on: none_` when a task has no prerequisite.
 - Make dependencies reference leaf IDs. Recompute them whenever leaves split.
@@ -92,6 +95,47 @@ already obvious.
   not execute them as part of planning.
 - Avoid orphaned code, speculative extensibility, and tasks that exist only to
   create boilerplate.
+
+Do not use the retired alternate `coding` dialect for new or materially rewritten
+plans. In particular, do not create top-level executable packets with `_id`,
+lowercase `_reads`/`_writes`/`_validation`, `_blocked_by`, `_priority`, `_value`,
+`_wave`, or packet-only Outcome/Design/Done fields.
+
+## Task state and evidence
+
+Use the same state markers for canonical leaves and legacy compatibility packets:
+
+- `[ ]` pending and not yet implemented;
+- `[~]` started, implemented but not fully validated, or otherwise incomplete;
+- `[x]` implemented and validated;
+- `[-]` deliberately superseded or removed without redefining the original work.
+
+Add one `_Evidence:` line when transitioning a leaf to `[x]` or `[-]`. Evidence
+must name the validation performed and its result, or explain why the task was
+superseded. Validation that was not run is not completion evidence: keep the leaf
+at `[~]`, record what remains, and do not mark it `[x]`. Preserve existing evidence
+and append material new evidence rather than erasing delivery history.
+
+Epic state summarizes its leaves and carries no task metadata: mark it `[x]` only
+when every non-superseded leaf is `[x]`, `[~]` while any descendant work is active,
+and `[ ]` while pending work remains. Never change a completed leaf to describe
+new behavior; add a new leaf instead.
+
+## Legacy compatibility
+
+Existing packs may use the retired top-level packet dialect previously generated
+by `coding`. The canonical validator auto-detects these packs and validates them
+through a compatibility path. A legacy top-level numbered checkbox is executable,
+its durable `_id` remains stable, and `_blocked_by` names durable prerequisite
+IDs. Narrow execution updates may preserve the existing spelling and add
+`_Evidence:` without migrating the entire pack.
+
+Compatibility is not an authoring mode. Use `--dialect canonical` when creating a
+new pack or materially rewriting task structure. Do not silently migrate a legacy
+pack during unrelated implementation. When migration is explicitly requested,
+preserve task meaning, ordering, checkbox state, evidence, completed history, and
+durable legacy IDs in an explicit migration mapping rather than as canonical leaf
+metadata; validate the migrated plan in canonical mode before using it.
 
 ## Decomposition audit
 

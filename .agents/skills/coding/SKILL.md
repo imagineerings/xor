@@ -1,93 +1,78 @@
 ---
 name: coding
-description: Define and deliver repository features through traceable specifications under .agents/specs/ and implementation of every resulting task. Use when Codex needs to turn an idea into requirements, design, validation strategy, and working code; implement an existing spec pack; resume unfinished spec tasks; or update specifications while delivering a change. Stop after planning only when the user explicitly requests specification or planning work without implementation.
+description: Deliver complete repository features from specification through implementation and validation. Use for new features, incomplete specifications, implementing an existing specification in full, or completing all remaining executable tasks. Do not use when the user requests only named task(s) or one next-unblocked task; use execute-spec-task for that bounded scope.
 ---
 
-# Spec-driven delivery
+# End-to-end spec-driven delivery
 
-Create the smallest spec pack that makes implementation unambiguous. Store it at
-`.agents/specs/{feature-name}/`, using a kebab-case feature name.
+Own the complete requested local delivery: create or reconcile the specification,
+implement every pending executable task in dependency order, and validate the
+result. Do not stop between tasks unless the work is genuinely blocked.
 
-## Select the delivery mode
+## Authorization boundary
 
-- **Specification only:** Create or update only the requested planning artifacts
-  when the user explicitly asks for planning without implementation.
-- **Implement existing specification:** Validate the existing pack, reconcile it
-  with the repository, and complete every pending executable task.
-- **Full delivery:** Define the requirements and design, create executable tasks,
-  then continue through implementation without requiring another prompt.
+- A request to build a feature, implement an existing specification, or complete
+  all remaining tasks authorizes the corresponding specification reconciliation
+  and local implementation work.
+- A request for planning or specification only does not authorize product-code
+  changes. Stop after the requested planning artifacts.
+- A request for named/numbered tasks or the next unblocked task belongs to
+  `execute-spec-task`; do not broaden it into full delivery.
+- Publishing, landing, deployment, live migrations, and other external mutations
+  remain separate actions unless the user explicitly authorizes them.
 
-When implementation is authorized, do not stop after writing the specification.
-Continue until every executable task is implemented and validated, or until a
-blocking decision, permission, or external dependency prevents further progress.
+## Delivery modes
 
-## Establish scope
+- **New or incompletely specified feature:** inspect the repository, create or
+  complete the smallest unambiguous spec pack, then implement all executable
+  leaves.
+- **Implement an existing specification:** validate and reconcile the approved
+  pack with the repository, then implement every pending executable leaf.
+- **Complete all remaining tasks:** preserve completed state and continue through
+  every pending, dependency-satisfied leaf until none remains.
+- **Specification only:** create or update only the requested planning artifacts
+  when the user explicitly excludes implementation.
 
-1. Read applicable repository instructions, related specs, relevant code, tests,
-   dependencies, and build commands before proposing behavior or architecture.
-2. Determine which artifacts the user requested and which already exist.
-3. Update only affected artifacts unless the user requests a complete spec pack.
-4. Preserve established repository terminology. Narrative prose may use the
-   user's language, but keep machine-parsed headings, identifiers, and metadata
-   keys exactly as shown in the references.
+## Canonical specification contract
 
-Do not force a new feature through separate conversational gates when the request
-is already clear. Produce all requested artifacts in one pass. Pause after
-requirements only when unresolved choices would materially change the design.
+`feature-spec` owns the canonical artifacts and task dialect. Read the references
+needed for the requested phases:
 
-## Create the artifacts
+- [requirements](../feature-spec/references/requirements.md)
+- [design](../feature-spec/references/design.md)
+- [tasks and task state](../feature-spec/references/tasks.md)
+- [shared implementation and evidence workflow](../feature-spec/references/implementation.md)
 
-- For requirements work, read
-  [references/requirements.md](references/requirements.md).
-- For architecture or design work, read
-  [references/design.md](references/design.md).
-- For an implementation plan or checklist, read
-  [references/tasks.md](references/tasks.md).
-- For implementation or full delivery, read
-  [references/implementation.md](references/implementation.md).
+Future or materially reworked task plans must use milestone headings, epic parent
+checkboxes, decimal implementation leaves, and the exact `_Requirements:`,
+`_Depends on:`, `_Reads:`, `_Writes:`, and `_Validation:` keys. Do not generate
+the retired top-level packet dialect, durable `_id`, lowercase metadata,
+`_blocked_by`, priority/value/wave fields, or packet-only Outcome/Design/Done
+metadata.
 
-Use only sections relevant to the feature. Do not add empty deployment, data,
-integration, performance, or property-testing sections for template compliance.
+## Validate and deliver
 
-## Maintain traceability
-
-Use stable identifiers and maintain this chain for every testable behavior:
-
-`requirement -> design decision/component -> task -> validation`
-
-Classify verification according to the behavior. Use example-based, integration,
-property-based, static, accessibility, performance, or manual verification as
-appropriate. Do not mechanically rewrite every acceptance criterion as a
-universal property.
-
-Before starting implementation, reconcile all changed documents and run:
+Before implementation, run the canonical validator in complete, canonical mode
+for new or migrated packs:
 
 ```bash
-python3 .agents/skills/coding/scripts/validate_spec.py .agents/specs/{feature-name}
+python3 .agents/skills/feature-spec/scripts/validate_spec.py \
+  .agents/specs/{feature-name} --require-complete --dialect canonical
 ```
 
-Add `--require-complete` before implementation or when the user requested a
-complete pack. Requirements are a prerequisite for design, and requirements plus
-design are prerequisites for executable tasks.
+For an existing legacy `coding` pack, use the validator's default `auto` dialect.
+Compatibility validation permits execution and state/evidence maintenance without
+silently invalidating the pack. Do not use compatibility mode to author a new
+legacy plan. Avoid structural migration during unrelated task execution; if the
+user requests a task-plan rewrite, migrate it deliberately while preserving task
+meaning, order, checkbox state, durable legacy IDs, and evidence.
 
-Treat canonical `_reads:` and `_writes:` entries as coordination estimates. Keep
-them current as implementation discovery changes the expected scope.
+Follow the shared implementation reference for each task. Reconcile changed
+paths and validation metadata as implementation discovers the real scope. When
+behavior or architecture changes, update the affected requirements and design,
+revalidate, and continue. Never redefine a completed task; add corrective work.
 
-## Deliver the implementation
-
-Use the repository's `workflow` skill when applicable to plan, claim, validate,
-and hand off task packets. Preserve durable task IDs and task state. Execute tasks
-in dependency order, and parallelize only packets whose dependencies and read or
-write sets do not conflict.
-
-For each task, implement the smallest complete increment, run its declared
-validation, and use `living-documentation` when delivered behavior or design
-changes. If implementation invalidates the specification, update and revalidate
-the affected artifacts before continuing. Do not mark a task complete without
-concrete validation evidence.
-
-After all tasks are implemented, rerun pack validation and the smallest relevant
-repository checks. Distinguish locally implemented and validated work from merged
-delivery: publish, land, deploy, or mutate external systems only when authorized.
-Ask first only for expensive, destructive, privileged, or externally mutating
-checks that are not already implied by the requested delivery workflow.
+Completion means all requested executable leaves are implemented with concrete
+evidence and the relevant repository checks pass. If no executable work remains,
+report that directly. If blocked, identify the exact decision, permission, or
+external dependency and preserve the remaining task state.

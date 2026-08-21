@@ -1,6 +1,6 @@
 ---
 name: feature-spec
-description: Create, review, or update feature specification packs under .agents/specs, including requirements, acceptance criteria, technical designs, and implementation task plans. Use for PRDs, RFCs, feature specs, requirements, user stories, EARS acceptance criteria, architecture or design documents, traceability reviews, and implementation checklists. Do not use to implement the planned code.
+description: Create, review, or update planning-only feature specification packs under .agents/specs, including requirements, designs, and canonical implementation task plans. Use for PRDs, RFCs, acceptance criteria, architecture documents, traceability reviews, and implementation checklists. Do not implement product code or execute planned tasks.
 ---
 
 # Feature Spec
@@ -25,7 +25,7 @@ Create traceable planning artifacts under `.agents/specs/{feature-name}/`, where
 
    ```bash
    python3 .agents/skills/feature-spec/scripts/validate_spec.py \
-     .agents/specs/{feature-name}
+     .agents/specs/{feature-name} --require-complete --dialect canonical
    ```
 
 6. Before handoff, perform the mandatory manual decomposition audit in
@@ -42,7 +42,8 @@ Create traceable planning artifacts under `.agents/specs/{feature-name}/`, where
 - Ask before choosing between materially different product or architecture
   directions when repository context does not resolve the choice.
 - Always require a separate implementation request before changing product
-  code. Use the `execute-spec-task` skill for that work.
+  code. Use `execute-spec-task` for named or next-unblocked task scope and
+  `coding` for full-spec or all-remaining delivery.
 
 ## Quality rules
 
@@ -53,6 +54,9 @@ Create traceable planning artifacts under `.agents/specs/{feature-name}/`, where
 - Trace every criterion through the design and at least one leaf task.
 - Structure implementation plans as milestone headings, epic parent tasks, and
   implementation leaves. Never present a capability epic as a leaf.
+- Use the exact task metadata and state/evidence conventions in
+  [tasks.md](references/tasks.md). Do not create the retired `coding` packet
+  dialect.
 - Prefer concrete observable behavior over implementation detail in
   requirements.
 - Prefer the smallest design that satisfies the approved requirements without
