@@ -19,6 +19,9 @@ required-features = ["test-support"]
 path = "tests/integration/project_tests.rs"
 
 [features]
+cargo-workspace = ["dep:cargo_metadata"]
+structured-execution = []
+rust-tests = ["cargo-workspace", "structured-execution"]
 test-support = [
     "buffer_diff/test-support",
     "client/test-support",
@@ -42,6 +45,7 @@ async-trait.workspace = true
 base64.workspace = true
 buffer_diff.workspace = true
 circular-buffer.workspace = true
+cargo_metadata = { workspace = true, optional = true }
 client.workspace = true
 clock.workspace = true
 collections.workspace = true

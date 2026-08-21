@@ -350,9 +350,9 @@ pub fn release_notes_url(cx: &mut App) -> Option<String> {
             auto_updater.client.http_client().build_url(&path)
         }
         ReleaseChannel::Nightly => {
-            "https://github.com/zed-industries/zed/commits/nightly/".to_string()
+            "https://github.com/simtropolis/zed/commits/nightly/".to_string()
         }
-        ReleaseChannel::Dev => "https://github.com/zed-industries/zed/commits/main/".to_string(),
+        ReleaseChannel::Dev => "https://github.com/simtropolis/zed/commits/main/".to_string(),
     };
     Some(url)
 }

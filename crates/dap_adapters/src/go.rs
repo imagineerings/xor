@@ -37,7 +37,7 @@ impl GoDebugAdapter {
         delegate: &Arc<dyn DapDelegate>,
     ) -> Result<AdapterVersion> {
         let release = latest_github_release(
-            "zed-industries/delve-shim-dap",
+            "simtropolis/delve-shim-dap",
             true,
             false,
             delegate.http_client(),
@@ -394,7 +394,7 @@ impl DebugAdapter for GoDebugAdapter {
         })
     }
 
-    async fn config_from_zed_format(&self, zed_scenario: ZedDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_zed_format(&self, zed_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let mut args = match &zed_scenario.request {
             dap::DebugRequest::Attach(attach_config) => {
                 json!({

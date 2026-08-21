@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GitHub PR Analyzer for zed-industries/zed repository
+GitHub PR Analyzer for simtropolis/zed repository
 Downloads all PRs and groups them by first assignee with status, open date, and last updated date.
 """
 
@@ -15,7 +15,7 @@ import os
 
 # GitHub API configuration
 GITHUB_API_BASE = "https://api.github.com"
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 

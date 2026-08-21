@@ -24,6 +24,7 @@ members = [
     "crates/breadcrumbs",
     "crates/buffer_diff",
     "crates/call",
+    "crates/cargo_ui",
     "crates/channel",
     "crates/cli",
     "crates/client",
@@ -31,9 +32,31 @@ members = [
     "crates/cloud_api_client",
     "crates/cloud_api_types",
     "crates/cloud_llm_client",
+    "crates/comfy_api",
+    "crates/comfy_backend_corex",
+    "crates/comfy_backend_cuda",
+    "crates/comfy_backend_directml",
+    "crates/comfy_backend_metal",
+    "crates/comfy_backend_mlu",
+    "crates/comfy_backend_npu",
+    "crates/comfy_backend_rocm",
+    "crates/comfy_backend_xpu",
+    "crates/comfy_media",
+    "crates/comfy_model",
+    "crates/comfy_nodes",
+    "crates/comfy_plugin_host",
+    "crates/comfy_plugin_sdk",
+    "crates/comfy_runtime",
+    "crates/comfy_sampler",
+    "crates/comfy_tensor",
+    "crates/comfy_test_support",
+    "crates/comfy_types",
+    "crates/comfy_ui",
+    "crates/comfy_worker",
     "crates/codestral",
     "crates/collab",
     "crates/collab_ui",
+    "crates/collaboration_domain",
     "crates/collections",
     "crates/command_palette",
     "crates/command_palette_hooks",
@@ -142,6 +165,7 @@ members = [
     "crates/multi_buffer",
     "crates/net",
     "crates/node_runtime",
+    "crates/nostr_compat",
     "crates/notifications",
     "crates/oauth_callback_server",
     "crates/ollama",
@@ -294,6 +318,7 @@ bedrock = { path = "crates/bedrock" }
 breadcrumbs = { path = "crates/breadcrumbs" }
 buffer_diff = { path = "crates/buffer_diff" }
 call = { path = "crates/call" }
+cargo_ui = { path = "crates/cargo_ui" }
 channel = { path = "crates/channel" }
 cli = { path = "crates/cli" }
 client = { path = "crates/client" }
@@ -302,6 +327,8 @@ cloud_api_client = { path = "crates/cloud_api_client" }
 cloud_api_types = { path = "crates/cloud_api_types" }
 cloud_llm_client = { path = "crates/cloud_llm_client" }
 collab = { path = "crates/collab" }
+collaboration_domain = { path = "crates/collaboration_domain" }
+nostr_compat = { path = "crates/nostr_compat" }
 collab_ui = { path = "crates/collab_ui" }
 collections = { path = "crates/collections", version = "0.1.0" }
 command_palette = { path = "crates/command_palette" }
@@ -449,6 +476,27 @@ scheduler = { path = "crates/scheduler" }
 sandbox = { path = "crates/sandbox" }
 search = { path = "crates/search" }
 session = { path = "crates/session" }
+comfy_api = { path = "crates/comfy_api" }
+comfy_backend_corex = { path = "crates/comfy_backend_corex" }
+comfy_backend_cuda = { path = "crates/comfy_backend_cuda" }
+comfy_backend_directml = { path = "crates/comfy_backend_directml" }
+comfy_backend_metal = { path = "crates/comfy_backend_metal" }
+comfy_backend_mlu = { path = "crates/comfy_backend_mlu" }
+comfy_backend_npu = { path = "crates/comfy_backend_npu" }
+comfy_backend_rocm = { path = "crates/comfy_backend_rocm" }
+comfy_backend_xpu = { path = "crates/comfy_backend_xpu" }
+comfy_media = { path = "crates/comfy_media" }
+comfy_model = { path = "crates/comfy_model" }
+comfy_nodes = { path = "crates/comfy_nodes" }
+comfy_plugin_host = { path = "crates/comfy_plugin_host" }
+comfy_plugin_sdk = { path = "crates/comfy_plugin_sdk" }
+comfy_runtime = { path = "crates/comfy_runtime" }
+comfy_sampler = { path = "crates/comfy_sampler" }
+comfy_tensor = { path = "crates/comfy_tensor" }
+comfy_test_support = { path = "crates/comfy_test_support" }
+comfy_types = { path = "crates/comfy_types" }
+comfy_ui = { path = "crates/comfy_ui" }
+comfy_worker = { path = "crates/comfy_worker" }
 sidebar = { path = "crates/sidebar" }
 settings = { path = "crates/settings" }
 settings_content = { path = "crates/settings_content" }
@@ -523,6 +571,7 @@ aho-corasick = "1.1"
 alacritty_terminal = { git = "https://github.com/zed-industries/alacritty", rev = "4c129667ce56611becdc82de6e28218c80e2e88f" }
 any_vec = "0.14"
 anyhow = "1.0.86"
+bytemuck = { version = "1.23", features = ["derive"] }
 ashpd = { version = "0.13", default-features = false, features = [
     "async-io",
     "notification",
@@ -560,11 +609,13 @@ aws-smithy-runtime-api = { version = "1.9.2", features = ["http-1x", "client"] }
 aws-smithy-types = { version = "1.3.4", features = ["http-body-1-x"] }
 backtrace = "0.3"
 base64 = "0.22"
+bech32 = "0.11"
 bitflags = "2.6.0"
 block = "0.1"
 block2 = "0.6"
 brotli = "8.0.2"
 bytes = "1.0"
+cap-std = "3.4.5"
 cargo_metadata = "0.19"
 cargo_toml = "0.21"
 brush-parser = "0.3"
@@ -615,6 +666,7 @@ encoding_rs = "0.8"
 etagere = "0.2"
 exec = "0.3.1"
 fancy-regex = "0.18.0"
+flate2 = "1.1.9"
 fork = "0.4.0"
 flume = "0.12"
 foreign-types = "0.5"
@@ -622,6 +674,7 @@ futures = "0.3.32"
 futures-concurrency = "7.7.1"
 futures-lite = "1.13"
 futures-util = "0.3.32"
+getrandom = "0.3.4"
 gh-workflow = { git = "https://github.com/zed-industries/gh-workflow", rev = "37f3c0575d379c218a9c455ee67585184e40d43f" }
 
 globset = "0.4"
@@ -657,6 +710,7 @@ image = { version = "0.25.1", default-features = false, features = [
     "tiff",
     "webp",
 ] }
+half = { version = "2.6", features = ["bytemuck", "serde"] }
 imara-diff = "0.2.0"
 indexmap = { version = "2.7.0", features = ["serde"] }
 indoc = "2"
@@ -687,6 +741,7 @@ notify-rust = "4"
 nucleo = "0.5"
 num-format = "0.4.4"
 objc = "0.2"
+nostr = { version = "=0.44.7", default-features = false, features = ["std", "nip49"] }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "NSButton",
@@ -728,6 +783,7 @@ open = "5.0.0"
 ordered-float = "2.1.1"
 palette = { version = "0.7.5", default-features = false, features = ["std"] }
 parking_lot = "0.12.1"
+postcard = { version = "1.1", features = ["alloc", "use-std"] }
 partial-json-fixer = "0.5.3"
 parse_int = "0.9"
 pathfinder_geometry = "0.5"
@@ -755,6 +811,7 @@ prost = "0.9"
 prost-build = "0.9"
 prost-types = "0.9"
 pollster = "0.4.0"
+naga = { version = "29.0.4", features = ["glsl-in"] }
 pulldown-cmark = { version = "0.13.0", default-features = false }
 quick-xml = "0.38"
 quote = "1.0.9"
@@ -762,6 +819,8 @@ rand = "0.9"
 rayon = "1.8"
 raw-window-handle = "0.6"
 regex = "1.5"
+unicode-normalization = "0.1"
+ring = "0.17.14"
 # WARNING: If you change this, you must also publish a new version of zed-reqwest to crates.io
 reqwest = { git = "https://github.com/zed-industries/reqwest.git", rev = "c15662463bda39148ba154100dd44d3fba5873a4", default-features = false, features = [
     "charset",
@@ -790,6 +849,7 @@ rustls-platform-verifier = "0.5.0"
 # WARNING: If you change this, you must also publish a new version of zed-scap to crates.io
 scap = { git = "https://github.com/zed-industries/scap", rev = "4afea48c3b002197176fb19cd0f9b180dd36eaac", default-features = false, package = "zed-scap", version = "0.0.8-zed" }
 schemars = { version = "1.0", features = ["indexmap2"] }
+secp256k1 = { version = "0.29.1", default-features = false, features = ["std"] }
 seccompiler = "0.5"
 semver = { version = "1.0", features = ["serde"] }
 serde = { version = "1.0.221", features = ["derive", "rc"] }

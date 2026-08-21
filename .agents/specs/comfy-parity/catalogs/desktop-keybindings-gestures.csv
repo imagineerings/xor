@@ -1,0 +1,20 @@
+surface,input,behavior,availability,feature_id,source,evidence_level
+Comfy view,CmdOrCtrl+W,Close through host guard; raw browser close is suppressed,active,COMFY-DESKTOP-076,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Comfy view,F5,Reload hosted Comfy view,active,COMFY-DESKTOP-076,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Comfy view,CmdOrCtrl+R,Reload hosted Comfy view,active,COMFY-DESKTOP-076,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Comfy view,CmdOrCtrl++ or =,Increase zoom by 0.5,active,COMFY-DESKTOP-180,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Comfy view,CmdOrCtrl+-,Decrease zoom by 0.5,active,COMFY-DESKTOP-180,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Comfy view,CmdOrCtrl+0,Reset zoom,active,COMFY-DESKTOP-180,projects/comfy/Comfy-Desktop/src/main/host/createHostWindow.ts,code-inferred
+Terminal macOS,Cmd+C / Cmd+V,Copy selection / paste clipboard,platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Terminal macOS,Ctrl+C,Send SIGINT,platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Terminal Windows,Ctrl+Shift+C / Ctrl+Shift+V,Copy / paste,platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Terminal Windows,Ctrl+C,"Copy selection, otherwise send SIGINT",platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Terminal Linux,Ctrl+Shift+C / Ctrl+Shift+V,Copy / paste,platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Terminal Linux,Ctrl+C,Send SIGINT,platform-specific,COMFY-DESKTOP-091,projects/comfy/Comfy-Desktop/src/renderer/src/views/ConsoleModal.vue,code-inferred
+Modal/popover,Escape,Cancel or close topmost permitted surface,active,COMFY-DESKTOP-176,projects/comfy/Comfy-Desktop/src/renderer/src,code-inferred
+Menu/list/tab,Arrow keys,Move roving focus/selection,active,COMFY-DESKTOP-177,projects/comfy/Comfy-Desktop/src/renderer/src,code-inferred
+Menu/card/button,Enter or Space,Activate focused item,active,COMFY-DESKTOP-177,projects/comfy/Comfy-Desktop/src/renderer/src,code-inferred
+Snapshot loader,Drop one .json file,Validate and preview snapshot,active,COMFY-DESKTOP-121,projects/comfy/Comfy-Desktop/src/renderer/src,code-inferred
+Installation list,Pointer drag,Reorder cards and persist order,active,COMFY-DESKTOP-022,projects/comfy/Comfy-Desktop/src/renderer/src,code-inferred
+Development,CmdOrCtrl+Alt+U,Cycle app-update state,developer-only,COMFY-DESKTOP-107,projects/comfy/Comfy-Desktop/src/main/lib/devShortcuts.ts,code-inferred
+Development,CmdOrCtrl+Alt+I,Toggle installation-update state,developer-only,COMFY-DESKTOP-022,projects/comfy/Comfy-Desktop/src/main/lib/devShortcuts.ts,code-inferred

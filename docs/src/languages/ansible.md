@@ -7,7 +7,7 @@ description: "Configure Ansible language support in Zed, including language serv
 
 Support for Ansible in Zed is provided via a community-maintained [Ansible extension](https://github.com/kartikvashistha/zed-ansible).
 
-- Tree-sitter: [zed-industries/tree-sitter-yaml](https://github.com/zed-industries/tree-sitter-yaml)
+- Tree-sitter: [simtropolis/tree-sitter-yaml](https://github.com/simtropolis/tree-sitter-yaml)
 - Language Server: [ansible/vscode-ansible](https://github.com/ansible/vscode-ansible/tree/main/packages/ansible-language-server)
 
 ## Setup

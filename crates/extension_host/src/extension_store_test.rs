@@ -1,13 +1,15 @@
 use crate::{
-    Event, ExtensionIndex, ExtensionIndexEntry, ExtensionIndexLanguageEntry,
-    ExtensionIndexThemeEntry, ExtensionManifest, ExtensionStore, GrammarManifestEntry,
-    RELOAD_DEBOUNCE_DURATION, SchemaVersion,
+    COMFY_COMPONENT_BINARY_FILE, COMFY_COMPONENT_MANIFEST_FILE, ComponentLifecycleAdapter, Event,
+    ExtensionIndex, ExtensionIndexEntry, ExtensionIndexLanguageEntry, ExtensionIndexThemeEntry,
+    ExtensionManifest, ExtensionStore, GrammarManifestEntry, InstalledComponent,
+    RELOAD_DEBOUNCE_DURATION, RegisteredComponentAdapters, SchemaVersion,
+    register_component_lifecycle_adapter, validate_component_file_metadata,
 };
 use async_compression::futures::bufread::GzipEncoder;
 use collections::{BTreeMap, HashSet};
 use extension::ExtensionHostProxy;
 use fs::{FakeFs, Fs, RealFs};
-use futures::{AsyncReadExt, FutureExt, StreamExt, io::BufReader};
+use futures::{AsyncReadExt, FutureExt, StreamExt, future::BoxFuture, io::BufReader};
 use gpui::{AppContext as _, BackgroundExecutor, TaskExt, TestAppContext};
 use http_client::{FakeHttpClient, Response};
 use language::{BinaryStatus, LanguageMatcher, LanguageName, LanguageRegistry};
@@ -35,11 +37,21 @@ fn init_logger() {
 }
 
 fn remote_sync_entry(id: &str, manifest_body: &str) -> ExtensionIndexEntry {
+    remote_sync_entry_with_version(id, "1.0.0", manifest_body)
+}
+
+fn remote_sync_entry_with_version(
+    id: &str,
+    version: &str,
+    manifest_body: &str,
+) -> ExtensionIndexEntry {
+    let id = toml::Value::String(id.to_owned()).to_string();
+    let version = toml::Value::String(version.to_owned()).to_string();
     let manifest = format!(
         r#"
-        id = "{id}"
-        name = "{id}"
-        version = "1.0.0"
+        id = {id}
+        name = {id}
+        version = {version}
         schema_version = 0
 
         {manifest_body}
@@ -49,6 +61,75 @@ fn remote_sync_entry(id: &str, manifest_body: &str) -> ExtensionIndexEntry {
     ExtensionIndexEntry {
         manifest: Arc::new(toml::from_str(&manifest).unwrap()),
         dev: false,
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RecordedComponent {
+    extension_id: String,
+    extension_version: String,
+    manifest_bytes: Vec<u8>,
+    component_bytes: Vec<u8>,
+}
+
+#[derive(Clone)]
+struct RecordingComponentAdapter {
+    snapshots: Arc<Mutex<Vec<Vec<RecordedComponent>>>>,
+    rejected_manifest: Option<Vec<u8>>,
+}
+
+impl RecordingComponentAdapter {
+    fn new() -> Self {
+        Self {
+            snapshots: Arc::new(Mutex::new(Vec::new())),
+            rejected_manifest: None,
+        }
+    }
+
+    fn rejecting(rejected_manifest: Vec<u8>) -> Self {
+        Self {
+            snapshots: Arc::new(Mutex::new(Vec::new())),
+            rejected_manifest: Some(rejected_manifest),
+        }
+    }
+
+    fn snapshots(&self) -> Vec<Vec<RecordedComponent>> {
+        self.snapshots.lock().clone()
+    }
+}
+
+impl ComponentLifecycleAdapter for RecordingComponentAdapter {
+    fn adapter_id(&self) -> &'static str {
+        "test.component-lifecycle"
+    }
+
+    fn synchronize(
+        &self,
+        components: Vec<InstalledComponent>,
+    ) -> BoxFuture<'static, Result<(), String>> {
+        let snapshots = self.snapshots.clone();
+        let rejected_manifest = self.rejected_manifest.clone();
+        Box::pin(async move {
+            if let Some(rejected_manifest) = rejected_manifest
+                && components
+                    .iter()
+                    .any(|component| component.manifest_bytes() == rejected_manifest)
+            {
+                return Err("component verification failed".to_owned());
+            }
+            snapshots.lock().push(
+                components
+                    .into_iter()
+                    .map(|component| RecordedComponent {
+                        extension_id: component.extension_id().to_owned(),
+                        extension_version: component.extension_version().to_owned(),
+                        manifest_bytes: component.manifest_bytes().to_vec(),
+                        component_bytes: component.component_bytes().to_vec(),
+                    })
+                    .collect(),
+            );
+            Ok(())
+        })
     }
 }
 
@@ -72,6 +153,527 @@ fn remote_sync_extension_ids(index: &ExtensionIndex) -> Vec<String> {
     extensions.sort();
 
     extensions
+}
+
+#[gpui::test]
+async fn component_inventory_is_fixed_bounded_and_symlink_free(cx: &mut TestAppContext) {
+    assert_eq!(COMFY_COMPONENT_MANIFEST_FILE, "comfy-plugin.json");
+    assert_eq!(COMFY_COMPONENT_BINARY_FILE, "comfy-plugin.wasm");
+    let fs = FakeFs::new(cx.executor());
+    fs.insert_tree(
+        "/component-extensions/installed/alpha",
+        json!({
+            "comfy-plugin.json": r#"{"identifier":"alpha"}"#,
+            "comfy-plugin.wasm": "component-bytes",
+        }),
+    )
+    .await;
+    let entries = [remote_sync_entry("alpha", "")];
+    let components = ExtensionStore::load_installed_components(
+        fs.clone(),
+        Path::new("/component-extensions/installed"),
+        &entries,
+    )
+    .await
+    .expect("load fixed component pair");
+    assert_eq!(components.len(), 1);
+    assert_eq!(components[0].extension_id(), "alpha");
+    assert_eq!(components[0].extension_version(), "1.0.0");
+    assert_eq!(components[0].manifest_bytes(), br#"{"identifier":"alpha"}"#);
+    assert_eq!(components[0].component_bytes(), b"component-bytes");
+
+    fs.insert_tree(
+        "/component-extensions/installed/missing-pair",
+        json!({
+            "comfy-plugin.json": r#"{"identifier":"missing-pair"}"#,
+        }),
+    )
+    .await;
+    let missing_pair = [remote_sync_entry("missing-pair", "")];
+    let error = ExtensionStore::load_installed_components(
+        fs.clone(),
+        Path::new("/component-extensions/installed"),
+        &missing_pair,
+    )
+    .await
+    .err()
+    .expect("component inventory must reject an incomplete fixed pair");
+    assert!(error.to_string().contains("must provide both"));
+
+    fs.insert_tree(
+        "/component-extensions/installed/symlinked",
+        json!({
+            "comfy-plugin.json": r#"{"identifier":"symlinked"}"#,
+        }),
+    )
+    .await;
+    fs.insert_tree(
+        "/component-extensions/source",
+        json!({"component.wasm": "outside-component"}),
+    )
+    .await;
+    fs.insert_symlink(
+        "/component-extensions/installed/symlinked/comfy-plugin.wasm",
+        PathBuf::from("/component-extensions/source/component.wasm"),
+    )
+    .await;
+    let symlinked = [remote_sync_entry("symlinked", "")];
+    let error = ExtensionStore::load_installed_components(
+        fs.clone(),
+        Path::new("/component-extensions/installed"),
+        &symlinked,
+    )
+    .await
+    .err()
+    .expect("component inventory must reject symlinked component bytes");
+    assert!(error.to_string().contains("is invalid"));
+
+    fs.insert_tree(
+        "/component-extensions/outside/symlink-parent",
+        json!({
+            "comfy-plugin.json": r#"{"identifier":"symlink-parent"}"#,
+            "comfy-plugin.wasm": "outside-component",
+        }),
+    )
+    .await;
+    fs.insert_symlink(
+        "/component-extensions/installed/symlink-parent",
+        PathBuf::from("/component-extensions/outside/symlink-parent"),
+    )
+    .await;
+    let symlink_parent = [remote_sync_entry("symlink-parent", "")];
+    let error = ExtensionStore::load_installed_components(
+        fs.clone(),
+        Path::new("/component-extensions/installed"),
+        &symlink_parent,
+    )
+    .await
+    .err()
+    .expect("component inventory must reject a symlinked extension directory");
+    assert!(error.to_string().contains("not a direct real directory"));
+
+    for extension_id in ["../escape", "nested/escape", r"nested\escape"] {
+        let traversal = [remote_sync_entry(extension_id, "")];
+        let error = ExtensionStore::load_installed_components(
+            fs.clone(),
+            Path::new("/component-extensions/installed"),
+            &traversal,
+        )
+        .await
+        .err()
+        .expect("component inventory must reject a non-component extension identifier");
+        assert!(
+            error.to_string().contains("one normal path component"),
+            "unexpected traversal error for {extension_id}: {error}"
+        );
+    }
+
+    let oversized_manifest_dir = Path::new("/component-extensions/installed/oversized-manifest");
+    fs.create_dir(oversized_manifest_dir)
+        .await
+        .expect("create oversized manifest extension directory");
+    fs.insert_file(
+        oversized_manifest_dir.join("comfy-plugin.json"),
+        vec![
+            b'x';
+            usize::try_from(crate::MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES + 1)
+                .expect("manifest limit fits usize")
+        ],
+    )
+    .await;
+    fs.insert_file(
+        oversized_manifest_dir.join("comfy-plugin.wasm"),
+        b"component".to_vec(),
+    )
+    .await;
+    let oversized_manifest = [remote_sync_entry("oversized-manifest", "")];
+    let error = ExtensionStore::load_installed_components(
+        fs.clone(),
+        Path::new("/component-extensions/installed"),
+        &oversized_manifest,
+    )
+    .await
+    .err()
+    .expect("component inventory must reject an oversized manifest");
+    assert!(error.to_string().contains("is oversized"));
+
+    let metadata = fs
+        .metadata(Path::new(
+            "/component-extensions/installed/alpha/comfy-plugin.wasm",
+        ))
+        .await
+        .expect("read component metadata")
+        .expect("component binary exists");
+    let mut changed_metadata = metadata;
+    changed_metadata.len += 1;
+    let error = validate_component_file_metadata(
+        &metadata,
+        &changed_metadata,
+        changed_metadata.len,
+        crate::MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+        "component binary",
+        "alpha",
+    )
+    .expect_err("component inventory must reject post-read identity changes");
+    assert!(
+        error
+            .to_string()
+            .contains("changed while it was being loaded")
+    );
+
+    let error = validate_component_file_metadata(
+        &metadata,
+        &metadata,
+        crate::MAXIMUM_COMFY_COMPONENT_BINARY_BYTES + 1,
+        crate::MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+        "component binary",
+        "alpha",
+    )
+    .expect_err("component inventory must enforce bounds after reading bytes");
+    assert!(error.to_string().contains("is oversized"));
+}
+
+#[test]
+fn installed_component_constructor_owns_identity_and_payload_bounds() {
+    let empty_bytes: Arc<[u8]> = Vec::new().into();
+    let error = InstalledComponent::checked(
+        "../escape".into(),
+        "1.0.0".into(),
+        empty_bytes.clone(),
+        empty_bytes.clone(),
+    )
+    .err()
+    .expect("installed component must reject a non-component identifier");
+    assert!(error.to_string().contains("one normal path component"));
+
+    for invalid_identifier in ["", ".", "..", "a/b", "a\\b", "a:b", "NUL", "trailing."] {
+        let error = InstalledComponent::checked(
+            invalid_identifier.into(),
+            "1.0.0".into(),
+            empty_bytes.clone(),
+            empty_bytes.clone(),
+        )
+        .err()
+        .expect("non-portable component identities must be rejected");
+        assert!(error.to_string().contains("one normal path component"));
+    }
+
+    InstalledComponent::checked(
+        "插件".into(),
+        "1.0.0".into(),
+        empty_bytes.clone(),
+        empty_bytes,
+    )
+    .expect("one normal non-ASCII path component is a valid canonical identity");
+
+    crate::validate_component_payload_length(
+        crate::MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+        crate::MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+        "component manifest",
+        "alpha",
+    )
+    .expect("manifest payload at the canonical bound is valid");
+    let error = crate::validate_component_payload_length(
+        crate::MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES + 1,
+        crate::MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+        "component manifest",
+        "alpha",
+    )
+    .expect_err("manifest payload over the canonical bound must fail");
+    assert!(error.to_string().contains("is oversized"));
+
+    let error = crate::validate_component_payload_length(
+        crate::MAXIMUM_COMFY_COMPONENT_BINARY_BYTES + 1,
+        crate::MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+        "component binary",
+        "alpha",
+    )
+    .expect_err("component payload over the canonical bound must fail");
+    assert!(error.to_string().contains("is oversized"));
+}
+
+#[test]
+fn extension_lifecycle_mutations_share_one_checked_destination_mapper() {
+    let installed = Path::new("/extensions/installed");
+    assert_eq!(
+        crate::checked_extension_dir(installed, "theme-pack")
+            .expect("normal extension identifier must map below the installed root"),
+        installed.join("theme-pack")
+    );
+    for extension_id in [
+        "",
+        ".",
+        "..",
+        "../escape",
+        "nested/escape",
+        r"nested\escape",
+        "CON",
+        "aux.txt",
+        "trailing.",
+    ] {
+        let error = crate::checked_extension_dir(installed, extension_id)
+            .expect_err("unsafe extension identifier must fail before a lifecycle mutation");
+        assert!(
+            error.to_string().contains("one normal path component"),
+            "unexpected destination error for {extension_id:?}: {error}"
+        );
+    }
+}
+
+#[gpui::test]
+async fn registered_component_adapter_tracks_lifecycle_and_restart(cx: &mut TestAppContext) {
+    let fs = FakeFs::new(cx.executor());
+    let installed_dir = Path::new("/component-lifecycle/installed");
+    fs.insert_tree(
+        installed_dir.join("alpha"),
+        json!({
+            "comfy-plugin.json": "manifest-v1",
+            "comfy-plugin.wasm": "component-v1",
+        }),
+    )
+    .await;
+
+    let adapter = Arc::new(RecordingComponentAdapter::new());
+    cx.update(|cx| {
+        register_component_lifecycle_adapter(adapter.clone(), cx)
+            .expect("register component lifecycle adapter")
+    });
+    let adapters = cx.update(|cx| cx.global::<RegisteredComponentAdapters>().0.clone());
+
+    let mut entries = vec![remote_sync_entry_with_version("alpha", "1.0.0", "")];
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    assert_eq!(
+        adapter.snapshots(),
+        vec![vec![RecordedComponent {
+            extension_id: "alpha".to_owned(),
+            extension_version: "1.0.0".to_owned(),
+            manifest_bytes: b"manifest-v1".to_vec(),
+            component_bytes: b"component-v1".to_vec(),
+        }]]
+    );
+
+    fs.insert_file(
+        installed_dir.join("alpha/comfy-plugin.json"),
+        b"manifest-v2".to_vec(),
+    )
+    .await;
+    fs.insert_file(
+        installed_dir.join("alpha/comfy-plugin.wasm"),
+        b"component-v2".to_vec(),
+    )
+    .await;
+    entries = vec![remote_sync_entry_with_version("alpha", "2.0.0", "")];
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    assert_eq!(
+        adapter.snapshots().last(),
+        Some(&vec![RecordedComponent {
+            extension_id: "alpha".to_owned(),
+            extension_version: "2.0.0".to_owned(),
+            manifest_bytes: b"manifest-v2".to_vec(),
+            component_bytes: b"component-v2".to_vec(),
+        }])
+    );
+
+    let restarted_adapter = Arc::new(RecordingComponentAdapter::new());
+    let restarted_adapters: Vec<Arc<dyn ComponentLifecycleAdapter>> =
+        vec![restarted_adapter.clone()];
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &restarted_adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    assert_eq!(
+        restarted_adapter.snapshots(),
+        vec![vec![RecordedComponent {
+            extension_id: "alpha".to_owned(),
+            extension_version: "2.0.0".to_owned(),
+            manifest_bytes: b"manifest-v2".to_vec(),
+            component_bytes: b"component-v2".to_vec(),
+        }]]
+    );
+
+    let errors =
+        ExtensionStore::synchronize_component_adapters(fs, installed_dir, &[], &adapters).await;
+    assert!(errors.is_empty());
+    assert_eq!(adapter.snapshots().last(), Some(&Vec::new()));
+}
+
+#[gpui::test]
+async fn component_adapter_failures_converge_without_partial_verification(cx: &mut TestAppContext) {
+    let fs = FakeFs::new(cx.executor());
+    let installed_dir = Path::new("/component-failures/installed");
+    fs.insert_tree(
+        installed_dir.join("alpha"),
+        json!({
+            "comfy-plugin.json": "accepted-manifest",
+            "comfy-plugin.wasm": "component",
+        }),
+    )
+    .await;
+    let entries = vec![remote_sync_entry("alpha", "")];
+    let adapter = Arc::new(RecordingComponentAdapter::new());
+    let adapters: Vec<Arc<dyn ComponentLifecycleAdapter>> = vec![adapter.clone()];
+
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+
+    let missing_pair = vec![remote_sync_entry("missing-pair", "")];
+    fs.insert_tree(
+        installed_dir.join("missing-pair"),
+        json!({"comfy-plugin.json": "manifest"}),
+    )
+    .await;
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &missing_pair,
+        &adapters,
+    )
+    .await;
+    assert!(
+        errors
+            .get(adapter.adapter_id())
+            .is_some_and(|error| error.contains("must provide both"))
+    );
+    assert_eq!(adapter.snapshots().last(), Some(&Vec::new()));
+
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    assert_eq!(adapter.snapshots().last().map(Vec::len), Some(1));
+
+    let rejecting_adapter = Arc::new(RecordingComponentAdapter::rejecting(
+        b"rejected-manifest".to_vec(),
+    ));
+    let rejecting_adapters: Vec<Arc<dyn ComponentLifecycleAdapter>> =
+        vec![rejecting_adapter.clone()];
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &rejecting_adapters,
+    )
+    .await;
+    assert!(errors.is_empty());
+    let accepted_snapshots = rejecting_adapter.snapshots();
+
+    fs.insert_file(
+        installed_dir.join("alpha/comfy-plugin.json"),
+        b"rejected-manifest".to_vec(),
+    )
+    .await;
+    let errors = ExtensionStore::synchronize_component_adapters(
+        fs.clone(),
+        installed_dir,
+        &entries,
+        &rejecting_adapters,
+    )
+    .await;
+    assert_eq!(
+        errors.get(rejecting_adapter.adapter_id()),
+        Some(&"component verification failed".to_owned())
+    );
+    assert_eq!(
+        rejecting_adapter.snapshots(),
+        accepted_snapshots,
+        "verification failures must preserve the adapter's prior atomic state"
+    );
+
+    let errors =
+        ExtensionStore::synchronize_component_adapters(fs, installed_dir, &[], &rejecting_adapters)
+            .await;
+    assert!(errors.is_empty());
+    assert_eq!(rejecting_adapter.snapshots().last(), Some(&Vec::new()));
+}
+
+#[gpui::test]
+async fn component_adapter_failure_is_returned_by_reload(cx: &mut TestAppContext) {
+    init_test(cx);
+    let fs = FakeFs::new(cx.executor());
+    let extensions_dir = PathBuf::from("/component-reload-result");
+    fs.insert_tree(
+        extensions_dir.join("installed/alpha"),
+        json!({
+            "extension.json": r#"{
+                "id": "alpha",
+                "name": "Alpha",
+                "version": "1.0.0"
+            }"#,
+            "comfy-plugin.json": "rejected-manifest",
+            "comfy-plugin.wasm": "component",
+        }),
+    )
+    .await;
+
+    let proxy = Arc::new(ExtensionHostProxy::new());
+    let theme_registry = Arc::new(ThemeRegistry::new(Box::new(())));
+    theme_extension::init(proxy.clone(), theme_registry, cx.executor());
+    let language_registry = Arc::new(LanguageRegistry::test(cx.executor()));
+    language_extension::init(LspAccess::Noop, proxy.clone(), language_registry);
+    let http_client = FakeHttpClient::with_200_response();
+    let adapter = Arc::new(RecordingComponentAdapter::rejecting(
+        b"rejected-manifest".to_vec(),
+    ));
+    let store = cx.new(|cx| {
+        let mut store = ExtensionStore::new(
+            extensions_dir,
+            None,
+            proxy,
+            fs,
+            http_client.clone(),
+            http_client,
+            None,
+            NodeRuntime::unavailable(),
+            cx,
+        );
+        store.component_lifecycle_adapters = vec![adapter];
+        store
+    });
+
+    cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+    cx.executor().run_until_parked();
+    let reload = store.update(cx, |store, cx| store.reload(None, cx));
+    cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+    let error = reload
+        .await
+        .expect_err("adapter verification failure must fail extension reload");
+    assert!(error.to_string().contains("component verification failed"));
+    store.read_with(cx, |store, _| {
+        assert_eq!(
+            store
+                .component_adapter_errors()
+                .get("test.component-lifecycle"),
+            Some(&"component verification failed".to_owned())
+        );
+    });
 }
 
 #[test]
@@ -574,10 +1176,10 @@ async fn test_extension_store(cx: &mut TestAppContext) {
         },
     );
 
-    #[allow(clippy::let_underscore_future)]
-    let _ = store.update(cx, |store, cx| store.reload(None, cx));
+    let reload = store.update(cx, |store, cx| store.reload(None, cx));
 
     cx.executor().advance_clock(RELOAD_DEBOUNCE_DURATION);
+    reload.await.expect("reload extension inventory");
     store.read_with(cx, |store, _| {
         let index = &store.extension_index;
 
@@ -1180,7 +1782,8 @@ async fn test_extension_store_with_test_extension(cx: &mut TestAppContext) {
             store.reload(Some("test-extension".into()), cx)
         }),
     )
-    .await;
+    .await
+    .expect("reload test extension");
     cx.executor().run_until_parked();
     project.update(cx, |project, cx| {
         project.restart_language_servers_for_buffers(

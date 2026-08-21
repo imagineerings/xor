@@ -3,8 +3,23 @@ Param(
     [Parameter()][Alias('i')][switch]$Install,
     [Parameter()][Alias('h')][switch]$Help,
     [Parameter()][Alias('a')][string]$Architecture,
-    [Parameter()][string]$Name
+    [Parameter()][string]$Name,
+    [Parameter()][switch]$Comfy,
+    [Parameter()][switch]$RustTools,
+    [Parameter()][switch]$DryRun
 )
+
+if ($DryRun) {
+    $rustToolFeatures = if ($RustTools) { "rust-tools" } else { "none" }
+    if ($Comfy) {
+        $simFeatures = if ($RustTools) { "comfy,rocm,directml,rust-tools" } else { "comfy,rocm,directml" }
+        Write-Output "mode=comfy packages=zed,cli,comfy_worker,auto_update_helper zed_features=$simFeatures remote_features=$rustToolFeatures worker_features=rocm,directml include_comfy_worker=true rust_tools=$($RustTools.ToString().ToLower())"
+    }
+    else {
+        Write-Output "mode=default packages=zed,cli,auto_update_helper zed_features=$rustToolFeatures remote_features=$rustToolFeatures include_comfy_worker=false rust_tools=$($RustTools.ToString().ToLower())"
+    }
+    exit 0
+}
 
 . "$PSScriptRoot/lib/workspace.ps1"
 
@@ -52,6 +67,9 @@ if ($Help) {
     Write-Output "Options:"
     Write-Output "  -Architecture, -a Which architecture to build (x86_64 or aarch64)"
     Write-Output "  -Install, -i      Run the installer after building."
+    Write-Output "  -Comfy             Include Comfy, accelerator backends, worker, and assets."
+    Write-Output "  -RustTools         Include the Cargo tool window and matching remote-server support."
+    Write-Output "  -DryRun            Print the selected package plan without building it."
     Write-Output "  -Help, -h         Show this help message."
     exit 0
 }
@@ -113,12 +131,26 @@ function GenerateLicenses {
     . $PSScriptRoot/generate-licenses.ps1
 }
 
-function BuildZedAndItsFriends {
+function BuildSimAndItsFriends {
     Write-Output "Building Zed and its friends, for channel: $channel"
-    # Build zed.exe, cli.exe and auto_update_helper.exe
-    cargo build --release --package zed --package cli --package auto_update_helper --target $target
+    if ($Comfy) {
+        $features = "zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml"
+        if ($RustTools) {
+            $features = "$features,zed/rust-tools"
+        }
+        cargo build --release --package zed --package cli --package comfy_worker --package auto_update_helper --features $features --target $target
+    }
+    elseif ($RustTools) {
+        cargo build --release --package zed --package cli --package auto_update_helper --features zed/rust-tools --target $target
+    }
+    else {
+        cargo build --release --package zed --package cli --package auto_update_helper --target $target
+    }
     Copy-Item -Path ".\$CargoOutDir\zed.exe" -Destination "$innoDir\Zed.exe" -Force
     Copy-Item -Path ".\$CargoOutDir\cli.exe" -Destination "$innoDir\cli.exe" -Force
+    if ($Comfy) {
+        Copy-Item -Path ".\$CargoOutDir\comfy-worker.exe" -Destination "$innoDir\comfy-worker.exe" -Force
+    }
     Copy-Item -Path ".\$CargoOutDir\auto_update_helper.exe" -Destination "$innoDir\auto_update_helper.exe" -Force
     # Build explorer_command_injector.dll
     switch ($channel) {
@@ -137,7 +169,12 @@ function BuildZedAndItsFriends {
 
 function BuildRemoteServer {
     Write-Output "Building remote_server for $target"
-    cargo build --release --package remote_server --target $target
+    if ($RustTools) {
+        cargo build --release --package remote_server --features rust-tools --target $target
+    }
+    else {
+        cargo build --release --package remote_server --target $target
+    }
 
     # Create zipped remote server binary
     $remoteServerSrc = (Resolve-Path ".\$CargoOutDir\remote_server.exe").Path
@@ -154,7 +191,7 @@ function BuildRemoteServer {
     Write-Output "Remote server compressed successfully"
 }
 
-function ZipZedAndItsFriendsDebug {
+function ZipSimAndItsFriendsDebug {
     $items = @(
         ".\$CargoOutDir\zed.pdb",
         ".\$CargoOutDir\cli.pdb",
@@ -162,6 +199,9 @@ function ZipZedAndItsFriendsDebug {
         ".\$CargoOutDir\explorer_command_injector.pdb",
         ".\$CargoOutDir\remote_server.pdb"
     )
+    if ($Comfy) {
+        $items += ".\$CargoOutDir\comfy-worker.pdb"
+    }
 
     Compress-Archive -Path $items -DestinationPath ".\$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip" -Force
 }
@@ -213,12 +253,15 @@ function MakeAppx {
     makeAppx.exe pack /d "$innoDir\make_appx" /p "$innoDir\zed_explorer_command_injector.appx" /nv
 }
 
-function SignZedAndItsFriends {
+function SignSimAndItsFriends {
     if (-not $canCodeSign) {
         return
     }
 
     $files = "$innoDir\Zed.exe,$innoDir\cli.exe,$innoDir\auto_update_helper.exe,$innoDir\zed_explorer_command_injector.dll,$innoDir\zed_explorer_command_injector.appx"
+    if ($Comfy) {
+        $files += ",$innoDir\comfy-worker.exe"
+    }
     & "$innoDir\sign.ps1" $files
 }
 
@@ -273,9 +316,9 @@ function BuildInstaller {
             $appMutex = "Zed-Stable-Instance-Mutex"
             $appExeName = "Zed"
             $regValueName = "Zed"
-            $appUserId = "ZedIndustries.Zed"
+            $appUserId = "Simtropolis.Zed"
             $appShellNameShort = "Z&ed"
-            $appAppxFullName = "ZedIndustries.Zed_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Sim_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "preview" {
             $appId = "{{F70E4811-D0E2-4D88-AC99-D63752799F95}"
@@ -286,10 +329,10 @@ function BuildInstaller {
             # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
             $appMutex = "Zed-Preview-Instance-Mutex"
             $appExeName = "Zed"
-            $regValueName = "ZedPreview"
-            $appUserId = "ZedIndustries.Zed.Preview"
+            $regValueName = "SimPreview"
+            $appUserId = "Simtropolis.Zed.Preview"
             $appShellNameShort = "Z&ed Preview"
-            $appAppxFullName = "ZedIndustries.Zed.Preview_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Preview_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "nightly" {
             $appId = "{{1BDB21D3-14E7-433C-843C-9C97382B2FE0}"
@@ -300,10 +343,10 @@ function BuildInstaller {
             # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
             $appMutex = "Zed-Nightly-Instance-Mutex"
             $appExeName = "Zed"
-            $regValueName = "ZedNightly"
-            $appUserId = "ZedIndustries.Zed.Nightly"
+            $regValueName = "SimNightly"
+            $appUserId = "Simtropolis.Zed.Nightly"
             $appShellNameShort = "Z&ed Editor Nightly"
-            $appAppxFullName = "ZedIndustries.Zed.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Nightly_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "dev" {
             $appId = "{{8357632E-24A4-4F32-BA97-E575B4D1FE5D}"
@@ -314,10 +357,10 @@ function BuildInstaller {
             # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
             $appMutex = "Zed-Dev-Instance-Mutex"
             $appExeName = "Zed"
-            $regValueName = "ZedDev"
-            $appUserId = "ZedIndustries.Zed.Dev"
+            $regValueName = "SimDev"
+            $appUserId = "Simtropolis.Zed.Dev"
             $appShellNameShort = "Z&ed Dev"
-            $appAppxFullName = "ZedIndustries.Zed.Dev_1.0.0.0_neutral__japxn1gcva8rg"
+            $appAppxFullName = "Simtropolis.Zed.Dev_1.0.0.0_neutral__japxn1gcva8rg"
         }
         default {
             Write-Error "can't bundle installer for $channel."
@@ -346,6 +389,9 @@ function BuildInstaller {
         "Version"        = "$env:RELEASE_VERSION"
         "SourceDir"      = "$env:ZED_WORKSPACE"
         "AppxFullName"   = $appAppxFullName
+    }
+    if ($Comfy) {
+        $definitions["Comfy"] = "1"
     }
 
     $defs = @()
@@ -376,7 +422,7 @@ function BuildInstaller {
     }
 }
 
-ParseZedWorkspace
+ParseSimWorkspace
 $innoDir = "$env:ZED_WORKSPACE\inno\$Architecture"
 $debugArchive = "$CargoOutDir\zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
 $debugStoreKey = "$env:ZED_RELEASE_CHANNEL/zed-$env:RELEASE_VERSION-$env:ZED_RELEASE_CHANNEL.dbg.zip"
@@ -384,11 +430,11 @@ $debugStoreKey = "$env:ZED_RELEASE_CHANNEL/zed-$env:RELEASE_VERSION-$env:ZED_REL
 CheckEnvironmentVariables
 PrepareForBundle
 GenerateLicenses
-BuildZedAndItsFriends
+BuildSimAndItsFriends
 BuildRemoteServer
 MakeAppx
-SignZedAndItsFriends
-ZipZedAndItsFriendsDebug
+SignSimAndItsFriends
+ZipSimAndItsFriendsDebug
 DownloadAMDGpuServices
 DownloadConpty
 CollectFiles
@@ -402,7 +448,7 @@ if ($buildSuccess) {
     Write-Output "Build successful"
     if ($Install) {
         Write-Output "Installing Zed..."
-        Start-Process -FilePath "$env:ZED_WORKSPACE/target/ZedEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
+        Start-Process -FilePath "$env:ZED_WORKSPACE/target/SimEditorUserSetup-x64-$env:RELEASE_VERSION.exe"
     }
     exit 0
 }

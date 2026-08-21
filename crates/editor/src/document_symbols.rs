@@ -340,6 +340,7 @@ mod tests {
     use util::path;
     use workspace::item::{Item, ItemEvent};
     use zed_actions::editor::MoveDown;
+    use zed_actions::editor::{MoveDown, MoveUp};
 
     use crate::{
         Editor, LSP_REQUEST_DEBOUNCE_TIMEOUT,

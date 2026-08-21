@@ -22,7 +22,7 @@ while true
     new_nums = get_issues()
     # Open each new issue in a new browser tab
     for issue_num in setdiff(new_nums, nums)
-        url = "https://github.com/zed-industries/zed/issues/" * issue_num
+        url = "https://github.com/simtropolis/zed/issues/" * issue_num
         println("\nOpening $url")
         open_tab = `/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome $url`
         try

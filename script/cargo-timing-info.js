@@ -4,7 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-function getZedDataDir() {
+function getSimDataDir() {
   const platform = process.platform;
 
   if (platform === "darwin") {
@@ -73,7 +73,7 @@ function parseTimestampFromFilename(filePath) {
 }
 
 function writeBuildTimingJson(filePath, durationMs, firstCrate, target, blockedMs, command) {
-  const buildTimingsDir = path.join(getZedDataDir(), "build_timings");
+  const buildTimingsDir = path.join(getSimDataDir(), "build_timings");
 
   // Create directory if it doesn't exist
   if (!fs.existsSync(buildTimingsDir)) {

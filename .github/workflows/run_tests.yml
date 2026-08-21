@@ -18,7 +18,7 @@ permissions:
   contents: read
 jobs:
   orchestrate:
-    if: (github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: steps::harden_runner
@@ -140,7 +140,7 @@ jobs:
       run_tests: ${{ steps.filter.outputs.run_tests }}
       changed_extensions: ${{ steps.filter.outputs.changed_extensions }}
   check_style:
-    if: (github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-4x8-ubuntu-2204
     steps:
     - name: steps::harden_runner
@@ -716,6 +716,70 @@ jobs:
       with:
         license-check: false
     timeout-minutes: 60
+  check_rust_tools_feature_boundary:
+    needs:
+    - orchestrate
+    if: needs.orchestrate.outputs.run_tests == 'true' && github.event_name != 'merge_group'
+    runs-on: namespace-profile-8x16-ubuntu-2204
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+    - name: steps::harden_runner
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411
+      with:
+        egress-policy: audit
+    - name: steps::checkout_repo
+      uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      with:
+        clean: false
+    - name: steps::setup_cargo_config
+      run: |
+        mkdir -p ./../.cargo
+        cp ./.cargo/ci-config.toml ./../.cargo/config.toml
+    - name: steps::cache_rust_dependencies_namespace
+      uses: namespacelabs/nscloud-cache-action@a90bb5d4b27522ce881c6e98eebd7d7e6d1653f9
+      with:
+        cache: rust
+        path: ~/.rustup
+    - name: steps::setup_linux
+      run: ./script/linux
+    - name: steps::download_wasi_sdk
+      run: ./script/download-wasi-sdk
+    - name: steps::setup_sccache
+      run: ./script/setup-sccache
+      env:
+        R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+        R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        SCCACHE_BUCKET: sccache-zed
+    - name: ./script/check-rust-tools-feature-boundary
+      run: ./script/check-rust-tools-feature-boundary
+    - name: cargo check -p zed --features rust-tools
+      run: cargo check -p zed --features rust-tools
+    - name: cargo check -p zed --no-default-features
+      run: cargo check -p zed --no-default-features
+    - name: cargo check -p remote_server --features rust-tools
+      run: cargo check -p remote_server --features rust-tools
+    - name: cargo check -p remote_server --no-default-features
+      run: cargo check -p remote_server --no-default-features
+    - name: cargo test -p zed --features test-support,rust-tools cargo_panel
+      run: cargo test -p zed --features test-support,rust-tools cargo_panel
+    - name: cargo test -p zed --no-default-features cargo_panel_disabled
+      run: cargo test -p zed --no-default-features cargo_panel_disabled
+    - name: cargo test -p tasks_ui --features rust-test-actions rust_test_actions
+      run: cargo test -p tasks_ui --features rust-test-actions rust_test_actions
+    - name: cargo test -p remote_server --features test-support,rust-tools rust_test_provider
+      run: cargo test -p remote_server --features test-support,rust-tools rust_test_provider
+    - name: cargo test -p remote_server --no-default-features cargo_workspace_disabled
+      run: cargo test -p remote_server --no-default-features cargo_workspace_disabled
+    - name: steps::show_sccache_stats
+      run: sccache --show-stats || true
+    - name: steps::cleanup_cargo_config
+      if: always()
+      run: |
+        rm -rf ./../.cargo
+    timeout-minutes: 60
   check_docs:
     needs:
     - orchestrate
@@ -916,11 +980,12 @@ jobs:
     - build_visual_tests_binary
     - check_wasm
     - check_dependencies
+    - check_rust_tools_feature_boundary
     - check_docs
     - check_licenses
     - check_scripts
     - extension_tests
-    if: (github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions') && always()
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions') && always()
     runs-on: namespace-profile-2x4-ubuntu-2404
     steps:
     - name: run_tests::tests_pass
@@ -948,6 +1013,7 @@ jobs:
         check_result "build_visual_tests_binary" "$RESULT_BUILD_VISUAL_TESTS_BINARY"
         check_result "check_wasm" "$RESULT_CHECK_WASM"
         check_result "check_dependencies" "$RESULT_CHECK_DEPENDENCIES"
+        check_result "check_rust_tools_feature_boundary" "$RESULT_CHECK_RUST_TOOLS_FEATURE_BOUNDARY"
         check_result "check_docs" "$RESULT_CHECK_DOCS"
         check_result "check_licenses" "$RESULT_CHECK_LICENSES"
         check_result "check_scripts" "$RESULT_CHECK_SCRIPTS"
@@ -970,6 +1036,7 @@ jobs:
         RESULT_BUILD_VISUAL_TESTS_BINARY: ${{ needs.build_visual_tests_binary.result }}
         RESULT_CHECK_WASM: ${{ needs.check_wasm.result }}
         RESULT_CHECK_DEPENDENCIES: ${{ needs.check_dependencies.result }}
+        RESULT_CHECK_RUST_TOOLS_FEATURE_BOUNDARY: ${{ needs.check_rust_tools_feature_boundary.result }}
         RESULT_CHECK_DOCS: ${{ needs.check_docs.result }}
         RESULT_CHECK_LICENSES: ${{ needs.check_licenses.result }}
         RESULT_CHECK_SCRIPTS: ${{ needs.check_scripts.result }}

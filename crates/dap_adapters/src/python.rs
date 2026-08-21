@@ -439,7 +439,7 @@ impl DebugAdapter for PythonDebugAdapter {
         Some(SharedString::new_static("Python").into())
     }
 
-    async fn config_from_zed_format(&self, zed_scenario: ZedDebugConfig) -> Result<DebugScenario> {
+    async fn config_from_zed_format(&self, zed_scenario: SimDebugConfig) -> Result<DebugScenario> {
         let mut args = json!({
             "request": match zed_scenario.request {
                 DebugRequest::Launch(_) => "launch",

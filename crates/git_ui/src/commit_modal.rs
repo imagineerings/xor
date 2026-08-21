@@ -461,6 +461,7 @@ impl CommitModal {
                                     let options = git_panel.commit_options();
                                     git_panel.commit_changes(options, window, cx)
                                 });
+
                                 cx.emit(DismissEvent);
                             }))
                             .tooltip({

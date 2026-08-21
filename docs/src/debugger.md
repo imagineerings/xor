@@ -147,6 +147,8 @@ Build tasks can also refer to the existing tasks by unsubstituted label:
 Given a Zed task, Zed can automatically create a scenario for you. Automatic scenario creation also powers our scenario creation from gutter.
 Automatic scenario creation is currently supported for Rust, Go, Python, JavaScript, and TypeScript.
 
+Rust workspace builds with `rust-tools` also create DAP scenarios from eligible Cargo targets and Rust test cases. The Cargo panel's Debug action and the Tests panel's Debug action use the existing Cargo build locator and debug-adapter flow; they do not start Cargo directly from either panel. Unsupported harnesses, including doctests, show a disabled reason. User-authored `.zed/debug.json` and global debug scenarios remain available and are not replaced by Cargo presets.
+
 ## Breakpoints
 
 To set a breakpoint, simply click next to the line number in the editor gutter.
@@ -377,7 +379,7 @@ The Debugger supports the following theme options:
 
 ## Troubleshooting
 
-If you're running into problems with the debugger, please [open a GitHub issue](https://github.com/zed-industries/zed/issues/new?template=04_bug_debugger.yml), providing as much context as possible. There are also some features you can use to gather more information about the problem:
+If you're running into problems with the debugger, please [open a GitHub issue](https://github.com/simtropolis/zed/issues/new?template=04_bug_debugger.yml), providing as much context as possible. There are also some features you can use to gather more information about the problem:
 
 - When you have a session running in the debug panel, you can run the {#action dev::CopyDebugAdapterArguments} action to copy a JSON blob to the clipboard that describes how Zed initialized the session. This is especially useful when the session failed to start, and is great context to add if you open a GitHub issue.
 - You can also use the {#action dev::OpenDebugAdapterLogs} action to see a trace of all of Zed's communications with debug adapters during the most recent debug sessions.

@@ -7,7 +7,7 @@ description: "Configure Python language support in Zed, including language serve
 
 Python support is available natively in Zed.
 
-- Tree-sitter: [tree-sitter-python](https://github.com/zed-industries/tree-sitter-python)
+- Tree-sitter: [tree-sitter-python](https://github.com/simtropolis/tree-sitter-python)
 - Language Servers:
   - [DetachHead/basedpyright](https://github.com/DetachHead/basedpyright)
   - [astral-sh/ruff](https://github.com/astral-sh/ruff)

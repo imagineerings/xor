@@ -86,6 +86,9 @@ pub(crate) fn run_tests() -> Workflow {
         should_run_tests
             .and_not_in_merge_queue()
             .then(check_dependencies()), // could be more specific here?
+        should_run_tests
+            .and_not_in_merge_queue()
+            .then(check_rust_tools_feature_boundary()),
         should_check_docs
             .and_not_in_merge_queue()
             .then(deploy_docs::check_docs()),
@@ -135,7 +138,7 @@ pub(crate) fn run_tests() -> Workflow {
 enum OrchestrateTarget {
     /// For the main Zed repo: includes the cargo package filter and extension
     /// change detection, but no working-directory scoping.
-    ZedRepo,
+    SimRepo,
     /// For individual extension repos: scopes changed-file detection to the
     /// working directory, with no package filter or extension detection.
     Extension,
@@ -144,7 +147,7 @@ enum OrchestrateTarget {
 // Generates a bash script that checks changed files against regex patterns
 // and sets GitHub output variables accordingly
 pub fn orchestrate(rules: &[&PathCondition]) -> NamedJob {
-    orchestrate_impl(rules, OrchestrateTarget::ZedRepo)
+    orchestrate_impl(rules, OrchestrateTarget::SimRepo)
 }
 
 pub fn orchestrate_for_extension(rules: &[&PathCondition]) -> NamedJob {
@@ -198,7 +201,7 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
 
     let mut outputs = IndexMap::new();
 
-    if target == OrchestrateTarget::ZedRepo {
+    if target == OrchestrateTarget::SimRepo {
         script.push_str(indoc::indoc! {r#"
         # Check for changes that require full rebuild (no filter)
         # Direct pushes to main/stable/preview always run full suite
@@ -289,7 +292,7 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
         ));
     }
 
-    if target == OrchestrateTarget::ZedRepo {
+    if target == OrchestrateTarget::SimRepo {
         script.push_str(DETECT_CHANGED_EXTENSIONS_SCRIPT);
         script.push_str("echo \"changed_extensions=$EXTENSIONS_JSON\" >> \"$GITHUB_OUTPUT\"\n");
 
@@ -303,7 +306,7 @@ fn orchestrate_impl(rules: &[&PathCondition], target: OrchestrateTarget) -> Name
         .runs_on(runners::LINUX_SMALL)
         .with_repository_owner_guard()
         .outputs(outputs)
-        .when(target == OrchestrateTarget::ZedRepo, |this| {
+        .when(target == OrchestrateTarget::SimRepo, |this| {
             this.add_step(steps::harden_runner())
         })
         .add_step(steps::checkout_repo().with_deep_history_on_non_main())
@@ -406,7 +409,7 @@ pub(crate) fn fetch_ts_query_ls() -> Step<Use> {
 }
 
 pub(crate) enum RunContext {
-    ZedRepository,
+    SimRepository,
     Extension,
 }
 
@@ -421,7 +424,7 @@ pub(crate) fn run_ts_query_ls(context: RunContext) -> Step<Run> {
         }}"#,
         directory = match context {
             RunContext::Extension => "languages",
-            RunContext::ZedRepository => ".",
+            RunContext::SimRepository => ".",
         }
     ))
 }
@@ -449,7 +452,7 @@ fn check_style() -> NamedJob {
             .add_step(steps::script("./script/check-keymaps"))
             .add_step(check_for_typos())
             .add_step(fetch_ts_query_ls())
-            .add_step(run_ts_query_ls(RunContext::ZedRepository)),
+            .add_step(run_ts_query_ls(RunContext::SimRepository)),
     )
 }
 
@@ -491,6 +494,45 @@ fn check_dependencies() -> NamedJob {
             .add_step(check_cargo_lock())
             .add_step(check_crate_graph())
             .add_step(check_vulnerable_dependencies()),
+    ))
+}
+
+fn check_rust_tools_feature_boundary() -> NamedJob {
+    named::job(use_clang(
+        release_job(&[])
+            .runs_on(runners::LINUX_LARGE)
+            .add_step(steps::harden_runner())
+            .add_step(steps::checkout_repo())
+            .add_step(steps::setup_cargo_config(Platform::Linux))
+            .add_step(steps::cache_rust_dependencies_namespace())
+            .map(steps::install_linux_dependencies)
+            .add_step(steps::setup_sccache(Platform::Linux))
+            .add_step(steps::script("./script/check-rust-tools-feature-boundary"))
+            .add_step(steps::script("cargo check -p zed --features rust-tools"))
+            .add_step(steps::script("cargo check -p zed --no-default-features"))
+            .add_step(steps::script(
+                "cargo check -p remote_server --features rust-tools",
+            ))
+            .add_step(steps::script(
+                "cargo check -p remote_server --no-default-features",
+            ))
+            .add_step(steps::script(
+                "cargo test -p zed --features test-support,rust-tools cargo_panel",
+            ))
+            .add_step(steps::script(
+                "cargo test -p zed --no-default-features cargo_panel_disabled",
+            ))
+            .add_step(steps::script(
+                "cargo test -p tasks_ui --features rust-test-actions rust_test_actions",
+            ))
+            .add_step(steps::script(
+                "cargo test -p remote_server --features test-support,rust-tools rust_test_provider",
+            ))
+            .add_step(steps::script(
+                "cargo test -p remote_server --no-default-features cargo_workspace_disabled",
+            ))
+            .add_step(steps::show_sccache_stats(Platform::Linux))
+            .add_step(steps::cleanup_cargo_config(Platform::Linux)),
     ))
 }
 

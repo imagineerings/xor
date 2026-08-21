@@ -553,7 +553,7 @@ impl RemoteConnection for SshRemoteConnection {
 }
 
 /// Check if the user already has an active SSH ControlMaster session for the
-/// given destination. See: https://github.com/zed-industries/zed/issues/45271
+/// given destination. See: https://github.com/simtropolis/zed/issues/45271
 #[cfg(not(windows))]
 async fn find_existing_control_master(
     destination: &str,

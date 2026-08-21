@@ -79,7 +79,7 @@ To allow any file to be downloaded from `github.com`:
 To allow any file to be downloaded from a specific GitHub repository:
 
 ```toml
-{ kind = "download_file", host = "github.com", path = ["zed-industries", "zed", "**"] }
+{ kind = "download_file", host = "github.com", path = ["simtropolis", "zed", "**"] }
 ```
 
 ### `npm:install`

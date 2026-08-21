@@ -7,7 +7,7 @@
     <name>$APP_NAME</name>
     <summary>High-performance, multiplayer code editor</summary>
     <developer id="dev.zed">
-        <name translate="no">Zed Industries, Inc.</name>
+        <name translate="no">Simtropolis, Inc.</name>
     </developer>
     <description>
         <p>
@@ -35,12 +35,12 @@
     </content_rating>
 
     <url type="homepage">https://zed.dev</url>
-    <url type="bugtracker">https://github.com/zed-industries/zed/issues</url>
+    <url type="bugtracker">https://github.com/simtropolis/zed/issues</url>
     <url type="faq">https://zed.dev/faq</url>
     <url type="help">https://zed.dev/docs/getting-started</url>
     <url type="contact">https://zed.dev/community-links</url>
-    <url type="vcs-browser">https://github.com/zed-industries/zed</url>
-    <url type="contribute">https://github.com/zed-industries/zed/blob/main/CONTRIBUTING.md</url>
+    <url type="vcs-browser">https://github.com/simtropolis/zed</url>
+    <url type="contribute">https://github.com/simtropolis/zed/blob/main/CONTRIBUTING.md</url>
 
     <supports>
         <internet>offline-only</internet>

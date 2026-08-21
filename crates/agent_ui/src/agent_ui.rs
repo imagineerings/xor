@@ -1,3 +1,8 @@
+pub mod activity_acp;
+pub mod activity_actions;
+pub mod activity_diff_link;
+pub mod activity_projection;
+pub mod activity_reducer;
 mod agent_configuration;
 pub mod agent_connection_store;
 mod agent_diff;
@@ -5,6 +10,14 @@ mod agent_model_selector;
 mod agent_panel;
 mod agent_registry_ui;
 mod buffer_codegen;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_composer;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_participants;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_review;
+#[cfg(feature = "multiplayer-tools")]
+pub mod collaborative_timeline;
 mod completion_provider;
 mod config_options;
 mod context;
@@ -825,7 +838,7 @@ fn update_command_palette_filter(cx: &mut App) {
             filter.hide_namespace("edit_prediction");
 
             filter.hide_action_types(&edit_prediction_actions);
-            filter.hide_action_types(&[TypeId::of::<zed_actions::OpenZedPredictOnboarding>()]);
+            filter.hide_action_types(&[TypeId::of::<zed_actions::OpenSimPredictOnboarding>()]);
         } else {
             if agent_enabled {
                 filter.show_namespace("agent");
@@ -860,7 +873,7 @@ fn update_command_palette_filter(cx: &mut App) {
             }
 
             filter.show_namespace("zed_predict_onboarding");
-            filter.show_action_types(&[TypeId::of::<zed_actions::OpenZedPredictOnboarding>()]);
+            filter.show_action_types(&[TypeId::of::<zed_actions::OpenSimPredictOnboarding>()]);
 
             filter.show_namespace("multi_workspace");
         }

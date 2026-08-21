@@ -24,7 +24,7 @@ fi
 day_of_week=$(date +%u)
 if [[ $day_of_week -ne 3 ]]; then
   day_name=$(date +%A)
-  echo "Warning: Today is $day_name. Release version bumps are typically only done on Zednesdays."
+  echo "Warning: Today is $day_name. Release version bumps are typically only done on Simnesdays."
   read -r -p "Continue anyway? (y/N) " confirm
   if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
     echo "Aborted."
@@ -47,4 +47,4 @@ gh workflow run bump_zed_version.yml \
 
 echo ""
 echo "Workflow triggered. Monitor progress at:"
-echo "  https://github.com/zed-industries/zed/actions/workflows/bump_zed_version.yml"
+echo "  https://github.com/simtropolis/zed/actions/workflows/bump_zed_version.yml"

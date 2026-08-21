@@ -1187,7 +1187,7 @@ impl Database {
                     .filter(
                         channel::Column::Id
                             .is_in(channel.ancestors())
-                            .and(channel::Column::RequiresZedCla.eq(true)),
+                            .and(channel::Column::RequiresSimCla.eq(true)),
                     )
                     .count(tx)
                     .await?

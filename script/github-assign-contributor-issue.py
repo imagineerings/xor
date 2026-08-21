@@ -32,7 +32,7 @@ GITHUB_API = "https://api.github.com"
 TALLY_API = "https://api.tally.so"
 SLACK_API = "https://slack.com/api"
 
-REPO_OWNER = "zed-industries"
+REPO_OWNER = "simtropolis"
 REPO_NAME = "zed"
 PROJECT_NUMBER = 83
 SLACK_ACTIVITY_CHANNEL_ID = "C0B0JCE8GDC"

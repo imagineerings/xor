@@ -28,7 +28,7 @@ from collections import Counter, defaultdict
 
 import requests
 
-OWNER = "zed-industries"
+OWNER = "simtropolis"
 REPO = "zed"
 
 GRAPHQL_URL = "https://api.github.com/graphql"

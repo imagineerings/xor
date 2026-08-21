@@ -19,7 +19,10 @@ use itertools::Itertools;
 use project::{Fs, Project};
 
 use settings::{Settings, TerminalDockPosition};
-use task::{RevealStrategy, RevealTarget, Shell, ShellBuilder, SpawnInTerminal, TaskId};
+use task::{
+    RevealStrategy, RevealTarget, Shell, ShellBuilder, SpawnInTerminal, StructuredTaskHandle,
+    TaskId,
+};
 use terminal::{Terminal, terminal_settings::TerminalSettings};
 use ui::{
     ButtonLike, Clickable, ContextMenu, FluentBuilder, PopoverMenu, SplitButton, Toggleable,
@@ -539,6 +542,26 @@ impl TerminalPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<WeakEntity<Terminal>>> {
+        self.spawn_task_internal(task, None, window, cx)
+    }
+
+    pub fn spawn_task_with_structured_handle(
+        &mut self,
+        task: &SpawnInTerminal,
+        structured_task: StructuredTaskHandle,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<WeakEntity<Terminal>>> {
+        self.spawn_task_internal(task, Some(structured_task), window, cx)
+    }
+
+    fn spawn_task_internal(
+        &mut self,
+        task: &SpawnInTerminal,
+        structured_task: Option<StructuredTaskHandle>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<WeakEntity<Terminal>>> {
         let Some(workspace) = self.workspace.upgrade() else {
             return Task::ready(Err(anyhow!("failed to read workspace")));
         };
@@ -566,12 +589,12 @@ impl TerminalPanel {
         let task = prepare_task_for_spawn(task, &shell, is_windows);
 
         if task.allow_concurrent_runs && task.use_new_terminal {
-            return self.spawn_in_new_terminal(task, window, cx);
+            return self.spawn_in_new_terminal(task, structured_task, window, cx);
         }
 
         let mut terminals_for_task = self.terminals_for_task(&task.full_label, cx);
         let Some(existing) = terminals_for_task.pop() else {
-            return self.spawn_in_new_terminal(task, window, cx);
+            return self.spawn_in_new_terminal(task, structured_task, window, cx);
         };
 
         let (existing_item_index, task_pane, existing_terminal) = existing;
@@ -581,6 +604,7 @@ impl TerminalPanel {
                 task_pane,
                 existing_item_index,
                 existing_terminal,
+                structured_task,
                 window,
                 cx,
             );
@@ -594,13 +618,14 @@ impl TerminalPanel {
                 wait_for_terminals_tasks(terminals_for_task, cx).await;
                 let task = terminal_panel.update_in(cx, |terminal_panel, window, cx| {
                     if task.use_new_terminal {
-                        terminal_panel.spawn_in_new_terminal(task, window, cx)
+                        terminal_panel.spawn_in_new_terminal(task, structured_task, window, cx)
                     } else {
                         terminal_panel.replace_terminal(
                             task,
                             task_pane,
                             existing_item_index,
                             existing_terminal,
+                            structured_task,
                             window,
                             cx,
                         )
@@ -618,6 +643,7 @@ impl TerminalPanel {
     fn spawn_in_new_terminal(
         &mut self,
         spawn_task: SpawnInTerminal,
+        structured_task: Option<StructuredTaskHandle>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<WeakEntity<Terminal>>> {
@@ -628,11 +654,21 @@ impl TerminalPanel {
                 .workspace
                 .update(cx, |workspace, cx| {
                     Self::add_center_terminal(workspace, window, cx, |project, cx| {
-                        project.create_terminal_task(spawn_task, cx)
+                        project.create_terminal_task_with_structured_handle(
+                            spawn_task,
+                            structured_task,
+                            cx,
+                        )
                     })
                 })
                 .unwrap_or_else(|e| Task::ready(Err(e))),
-            RevealTarget::Dock => self.add_terminal_task(spawn_task, reveal, window, cx),
+            RevealTarget::Dock => self.add_terminal_task_with_structured_handle(
+                spawn_task,
+                reveal,
+                structured_task,
+                window,
+                cx,
+            ),
         }
     }
 
@@ -739,6 +775,67 @@ impl TerminalPanel {
         })
     }
 
+    fn reveal_structured_terminal(
+        &self,
+        terminal_id: task::StructuredTerminalId,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<bool> {
+        let Some(workspace) = self.workspace.upgrade() else {
+            return None;
+        };
+        let pane_terminal_views = |pane: Entity<Pane>| {
+            pane.read(cx)
+                .items()
+                .enumerate()
+                .filter_map(|(index, item)| Some((index, item.act_as::<TerminalView>(cx)?)))
+                .map(move |(index, terminal_view)| (pane.clone(), index, terminal_view))
+        };
+        let dock_panes = self.center.panes().into_iter().cloned().collect::<Vec<_>>();
+        let found = dock_panes
+            .iter()
+            .cloned()
+            .flat_map(&pane_terminal_views)
+            .map(|value| (true, value))
+            .chain(
+                workspace
+                    .read(cx)
+                    .panes()
+                    .iter()
+                    .cloned()
+                    .flat_map(pane_terminal_views)
+                    .map(|value| (false, value)),
+            )
+            .find(|(_, (_, _, terminal_view))| {
+                terminal_view.read(cx).terminal().entity_id().as_u64() == terminal_id.0
+            });
+        let Some((is_dock, (pane, index, _terminal_view))) = found else {
+            return None;
+        };
+        self.activate_terminal_view(&pane, index, true, window, cx);
+        Some(is_dock)
+    }
+
+    fn reveal_structured_terminal_handle(
+        panel: &Entity<Self>,
+        terminal_id: task::StructuredTerminalId,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> bool {
+        let is_dock = panel.update(cx, |panel, cx| {
+            panel.reveal_structured_terminal(terminal_id, window, cx)
+        });
+        if is_dock == Some(true) {
+            let workspace = panel.read(cx).workspace.clone();
+            if let Some(workspace) = workspace.upgrade() {
+                workspace.update(cx, |workspace, cx| {
+                    workspace.focus_panel::<Self>(window, cx)
+                });
+            }
+        }
+        is_dock.is_some()
+    }
+
     pub fn add_center_terminal(
         workspace: &mut Workspace,
         window: &mut Window,
@@ -792,6 +889,17 @@ impl TerminalPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<WeakEntity<Terminal>>> {
+        self.add_terminal_task_with_structured_handle(task, reveal_strategy, None, window, cx)
+    }
+
+    fn add_terminal_task_with_structured_handle(
+        &mut self,
+        task: SpawnInTerminal,
+        reveal_strategy: RevealStrategy,
+        structured_task: Option<StructuredTaskHandle>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Task<Result<WeakEntity<Terminal>>> {
         let workspace = self.workspace.clone();
         cx.spawn_in(window, async move |terminal_panel, cx| {
             if workspace.update(cx, |workspace, cx| !is_enabled_in_workspace(workspace, cx))? {
@@ -803,7 +911,9 @@ impl TerminalPanel {
             })?;
             let project = workspace.read_with(cx, |workspace, _| workspace.project().clone())?;
             let terminal = project
-                .update(cx, |project, cx| project.create_terminal_task(task, cx))
+                .update(cx, |project, cx| {
+                    project.create_terminal_task_with_structured_handle(task, structured_task, cx)
+                })
                 .await?;
             let result = workspace.update_in(cx, |workspace, window, cx| {
                 let terminal_view = Box::new(cx.new(|cx| {
@@ -993,6 +1103,7 @@ impl TerminalPanel {
         task_pane: Entity<Pane>,
         terminal_item_index: usize,
         terminal_to_replace: Entity<TerminalView>,
+        structured_task: Option<StructuredTaskHandle>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<WeakEntity<Terminal>>> {
@@ -1005,7 +1116,11 @@ impl TerminalPanel {
             })??;
             let new_terminal = project
                 .update(cx, |project, cx| {
-                    project.create_terminal_task(spawn_task, cx)
+                    project.create_terminal_task_with_structured_handle(
+                        spawn_task,
+                        structured_task,
+                        cx,
+                    )
                 })
                 .await?;
             terminal_to_replace.update_in(cx, |terminal_to_replace, window, cx| {
@@ -1688,10 +1803,11 @@ impl Panel for TerminalPanel {
 
 struct TerminalProvider(Entity<TerminalPanel>);
 
-impl workspace::TerminalProvider for TerminalProvider {
-    fn spawn(
+impl TerminalProvider {
+    fn spawn_internal(
         &self,
         task: SpawnInTerminal,
+        structured_task: Option<StructuredTaskHandle>,
         window: &mut Window,
         cx: &mut App,
     ) -> Task<Option<Result<ExitStatus>>> {
@@ -1699,21 +1815,63 @@ impl workspace::TerminalProvider for TerminalProvider {
         window.spawn(cx, async move |cx| {
             let terminal = terminal_panel
                 .update_in(cx, |terminal_panel, window, cx| {
-                    terminal_panel.spawn_task(&task, window, cx)
+                    if let Some(structured_task) = structured_task.clone() {
+                        terminal_panel.spawn_task_with_structured_handle(
+                            &task,
+                            structured_task,
+                            window,
+                            cx,
+                        )
+                    } else {
+                        terminal_panel.spawn_task(&task, window, cx)
+                    }
                 })
                 .ok()?
                 .await;
             match terminal {
                 Ok(terminal) => {
+                    if let Some(structured_task) = structured_task {
+                        let terminal_panel = terminal_panel.clone();
+                        let terminal_id = task::StructuredTerminalId(terminal.entity_id().as_u64());
+                        structured_task.set_reveal(move |window, cx| {
+                            TerminalPanel::reveal_structured_terminal_handle(
+                                &terminal_panel,
+                                terminal_id,
+                                window,
+                                cx,
+                            )
+                        });
+                    }
                     let exit_status = terminal
                         .read_with(cx, |terminal, cx| terminal.wait_for_completed_task(cx))
                         .ok()?
                         .await?;
                     Some(Ok(exit_status))
                 }
-                Err(e) => Some(Err(e)),
+                Err(error) => Some(Err(error)),
             }
         })
+    }
+}
+
+impl workspace::TerminalProvider for TerminalProvider {
+    fn spawn(
+        &self,
+        task: SpawnInTerminal,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Task<Option<Result<ExitStatus>>> {
+        self.spawn_internal(task, None, window, cx)
+    }
+
+    fn spawn_structured(
+        &self,
+        task: SpawnInTerminal,
+        handle: StructuredTaskHandle,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Task<Option<Result<ExitStatus>>> {
+        self.spawn_internal(task, Some(handle), window, cx)
     }
 }
 

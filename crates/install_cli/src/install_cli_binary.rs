@@ -123,11 +123,11 @@ pub fn install_cli_binary(window: &mut Window, cx: &mut Context<Workspace>) {
         };
 
         workspace.update_in(cx, |workspace, _, cx| {
-            struct InstalledZedCli;
+            struct InstalledSimCli;
 
             workspace.show_toast(
                 Toast::new(
-                    NotificationId::unique::<InstalledZedCli>(),
+                    NotificationId::unique::<InstalledSimCli>(),
                     format!(
                         "Installed `zed` to {}. You can launch {} from your terminal.",
                         path.to_string_lossy(),

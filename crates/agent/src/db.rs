@@ -56,6 +56,8 @@ pub struct DbThread {
     pub messages: Vec<Arc<DbMessage>>,
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
+    pub goal: Option<SharedString>,
+    #[serde(default)]
     pub detailed_summary: Option<SharedString>,
     #[serde(default)]
     pub initial_project_snapshot: Option<Arc<crate::ProjectSnapshot>>,
@@ -155,6 +157,7 @@ impl SharedThread {
             title: format!("🔗 {}", self.title).into(),
             messages: self.messages,
             updated_at: self.updated_at,
+            goal: None,
             detailed_summary: None,
             initial_project_snapshot: None,
             cumulative_token_usage: Default::default(),
@@ -187,6 +190,16 @@ impl SharedThread {
 
 impl DbThread {
     pub const VERSION: &'static str = "0.3.0";
+
+    pub fn clear_conversation(&mut self) {
+        self.messages.clear();
+        self.detailed_summary = None;
+        self.cumulative_token_usage = Default::default();
+        self.request_token_usage.clear();
+        self.draft_prompt = None;
+        self.ui_scroll_position = None;
+        self.updated_at = Utc::now();
+    }
 
     pub fn to_markdown(&self) -> String {
         crate::messages_to_markdown(&self.messages)
@@ -337,6 +350,7 @@ impl DbThread {
             title: thread.summary,
             messages,
             updated_at: thread.updated_at,
+            goal: None,
             detailed_summary: match thread.detailed_summary_state {
                 crate::legacy_thread::DetailedSummaryState::NotGenerated
                 | crate::legacy_thread::DetailedSummaryState::Generating => None,
@@ -399,6 +413,12 @@ struct GlobalThreadsDatabase(Shared<Task<Result<Arc<ThreadsDatabase>, Arc<anyhow
 impl Global for GlobalThreadsDatabase {}
 
 impl ThreadsDatabase {
+    #[cfg(test)]
+    pub(crate) fn fail_connections_for_test(cx: &mut App, message: &'static str) {
+        let task = Task::ready(Err(Arc::new(anyhow::anyhow!(message)))).shared();
+        cx.set_global(GlobalThreadsDatabase(task));
+    }
+
     pub fn connect(cx: &mut App) -> Shared<Task<Result<Arc<ThreadsDatabase>, Arc<anyhow::Error>>>> {
         if cx.has_global::<GlobalThreadsDatabase>() {
             return cx.global::<GlobalThreadsDatabase>().0.clone();
@@ -792,6 +812,7 @@ mod tests {
             title: title.to_string().into(),
             messages: Vec::new(),
             updated_at,
+            goal: None,
             detailed_summary: None,
             initial_project_snapshot: None,
             cumulative_token_usage: Default::default(),

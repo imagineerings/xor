@@ -1,0 +1,153 @@
+feature_id,setting_id,label,schema_type,ui_type,default_expression,version_added,availability,source_file,line,localized_en,test
+COMFY-SETTING-018,Comfy-Desktop.AutoUpdate,Automatically check for updates,z.boolean(),boolean,true,,platform-specific,src/extensions/core/electronAdapter.ts,33,yes,
+COMFY-SETTING-019,Comfy-Desktop.SendStatistics,Send anonymous usage metrics,z.boolean(),boolean,true,,platform-specific,src/extensions/core/electronAdapter.ts,41,yes,
+COMFY-SETTING-020,Comfy-Desktop.UV.PypiInstallMirror,Pypi Install Mirror,z.string(),url,'',,platform-specific,src/extensions/core/electronAdapter.ts,81,yes,
+COMFY-SETTING-021,Comfy-Desktop.UV.PythonInstallMirror,Python Install Mirror,z.string(),url,'',,platform-specific,src/extensions/core/electronAdapter.ts,67,yes,
+COMFY-SETTING-022,Comfy-Desktop.UV.TorchInstallMirror,Torch Install Mirror,z.string(),url,'',,platform-specific,src/extensions/core/electronAdapter.ts,91,yes,
+COMFY-SETTING-023,Comfy-Desktop.WindowStyle,Window Style,z.string(),combo,'default',,experimental,src/extensions/core/electronAdapter.ts,49,yes,
+COMFY-WORKFLOW-057,Comfy.AppBuilder.VueNodeSwitchDismissed,Comfy.AppBuilder.VueNodeSwitchDismissed,z.boolean(),hidden,false,,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1205,no,src/stores/appModeStore.test.ts
+COMFY-SETTING-024,Comfy.Appearance.DisableAnimations,Disable animations,z.boolean(),boolean,window.matchMedia('(prefers-reduced-motion: reduce)').matches,1.43.0,active,src/platform/settings/constants/coreSettings.ts,595,yes,
+COMFY-ASSET-038,Comfy.Assets.UseAssetAPI,Comfy.Assets.UseAssetAPI,z.boolean(),hidden,isCloud ? true : false,,experimental,src/platform/settings/constants/coreSettings.ts,1211,no,src/stores/modelStore.test.ts
+COMFY-ASSET-039,Comfy.Canvas.BackgroundImage,Canvas background image,z.string().optional(),backgroundImage,'',1.20.4,active,src/platform/settings/constants/coreSettings.ts,1130,yes,
+COMFY-GRAPH-026,Comfy.Canvas.LeftMouseClickBehavior,Left Mouse Click Behavior,z.string(),radio,'panning',1.27.4,active,src/platform/settings/constants/coreSettings.ts,202,yes,
+COMFY-GRAPH-027,Comfy.Canvas.MouseWheelScroll,Mouse Wheel Scroll,z.string(),radio,'zoom',1.27.4,active,src/platform/settings/constants/coreSettings.ts,233,yes,
+COMFY-GRAPH-028,Comfy.Canvas.NavigationMode,Navigation Mode,z.string(),combo,'legacy',1.25.0,active,src/platform/settings/constants/coreSettings.ts,167,yes,
+COMFY-GRAPH-029,Comfy.Canvas.SelectionToolbox,Show selection toolbox,z.boolean(),boolean,true,1.10.5,active,src/platform/settings/constants/coreSettings.ts,1027,yes,
+COMFY-SETTING-025,Comfy.ColorPalette,Comfy.ColorPalette,z.string(),hidden,'dark',,infrastructure-only,src/platform/settings/constants/coreSettings.ts,943,no,src/platform/settings/settingStore.test.ts
+COMFY-WORKFLOW-058,Comfy.ConfirmClear,Require confirmation when clearing workflow,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,490,yes,
+COMFY-SETTING-026,Comfy.CustomColorPalettes,Comfy.CustomColorPalettes,colorPalettesSchema,hidden,{} as ColorPalettes,,infrastructure-only,src/platform/settings/constants/coreSettings.ts,956,no,
+COMFY-SETTING-027,Comfy.DOMClippingEnabled,Enable DOM element clipping (enabling may reduce performance),z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,761,yes,
+COMFY-CLOUD-216,Comfy.Desktop.CloudNotificationShown,Comfy.Desktop.CloudNotificationShown,z.boolean(),hidden,false,,infrastructure-only,src/platform/settings/constants/coreSettings.ts,311,no,src/platform/cloud/notification/components/DesktopCloudNotificationController.test.ts
+COMFY-SETTING-028,Comfy.DevMode,"Enable dev mode options (API save, etc.)",z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,572,yes,
+COMFY-GRAPH-030,Comfy.DisableFloatRounding,Disable default float widget rounding.,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,531,yes,
+COMFY-GRAPH-031,Comfy.DisableSliders,Disable node widget sliders,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,524,yes,
+COMFY-SETTING-029,Comfy.EditAttention.Delta,Ctrl+up/down precision,z.number(),slider,0.05,,active,src/extensions/core/editAttention.ts,65,yes,
+COMFY-SETTING-030,Comfy.EnableTooltips,Enable Tooltips,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,565,yes,src/renderer/extensions/vueNodes/components/NodeHeader.test.ts
+COMFY-WORKFLOW-059,Comfy.EnableWorkflowViewRestore,Save and restore canvas position and zoom level in workflows,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,928,yes,
+COMFY-QUEUE-025,Comfy.Execution.PreviewMethod,Live preview method,zPreviewMethod,combo,'default',1.36.0,active,src/platform/settings/constants/coreSettings.ts,904,yes,src/stores/jobPreviewStore.test.ts
+COMFY-SETTING-031,Comfy.Extension.Disabled,Comfy.Extension.Disabled,z.array(z.string()),hidden,[] as string[],1.3.11,infrastructure-only,src/platform/settings/constants/coreSettings.ts,688,no,
+COMFY-GRAPH-032,Comfy.FloatRoundingPrecision,Float widget rounding decimal places [0 = auto].,z.number(),slider,0,,active,src/platform/settings/constants/coreSettings.ts,540,yes,
+COMFY-GRAPH-033,Comfy.Graph.AutoPanSpeed,Auto-pan speed,z.number(),slider,15,,active,src/platform/settings/constants/coreSettings.ts,329,yes,
+COMFY-GRAPH-034,Comfy.Graph.CanvasInfo,"Show canvas info on bottom left corner (fps, etc.)",z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,263,yes,
+COMFY-GRAPH-035,Comfy.Graph.CanvasMenu,Show graph canvas menu,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,641,yes,
+COMFY-SETTING-032,Comfy.Graph.CtrlShiftZoom,Enable fast-zoom shortcut (Ctrl + Shift + Drag),z.boolean(),boolean,true,1.4.0,active,src/platform/settings/constants/coreSettings.ts,768,yes,
+COMFY-GRAPH-036,Comfy.Graph.DeduplicateSubgraphNodeIds,Deduplicate subgraph node IDs,z.boolean(),boolean,true,1.40.0,deprecated/dead,src/platform/settings/constants/coreSettings.ts,1272,yes,
+COMFY-GRAPH-037,Comfy.Graph.LinkMarkers,Link midpoint markers,z.nativeEnum(LinkMarkerShape),combo,LinkMarkerShape.Circle,1.3.42,active,src/platform/settings/constants/coreSettings.ts,748,yes,
+COMFY-GRAPH-038,Comfy.Graph.LiveSelection,Live selection,z.boolean(),boolean,false,1.36.1,active,src/platform/settings/constants/coreSettings.ts,776,yes,
+COMFY-GRAPH-039,Comfy.Graph.ZoomSpeed,Canvas zoom speed,z.number(),slider,1.1,,active,src/platform/settings/constants/coreSettings.ts,317,yes,
+COMFY-GRAPH-040,Comfy.Group.DoubleClickTitleToEdit,Double click group title to edit,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,400,yes,
+COMFY-GRAPH-041,Comfy.GroupSelectedNodes.Padding,Group selected nodes padding,z.number(),slider,10,,active,src/platform/settings/constants/coreSettings.ts,375,yes,
+COMFY-SETTING-033,Comfy.InstalledVersion,Comfy.InstalledVersion,z.string().nullable(),hidden,null,1.24.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,981,no,src/platform/settings/settingStore.test.ts
+COMFY-SETTING-034,Comfy.Keybinding.CurrentPreset,Comfy.Keybinding.CurrentPreset,z.string(),hidden,'default',1.8.8,infrastructure-only,src/platform/settings/constants/coreSettings.ts,681,no,src/platform/keybindings/presetService.test.ts
+COMFY-SETTING-035,Comfy.Keybinding.NewBindings,Comfy.Keybinding.NewBindings,z.array(zKeybinding),hidden,[] as Keybinding[],1.3.7,infrastructure-only,src/platform/settings/constants/coreSettings.ts,674,no,
+COMFY-SETTING-036,Comfy.Keybinding.UnsetBindings,Comfy.Keybinding.UnsetBindings,z.array(zKeybinding),hidden,[] as Keybinding[],1.3.7,infrastructure-only,src/platform/settings/constants/coreSettings.ts,657,no,
+COMFY-GRAPH-042,Comfy.LinkRelease.Action,Action on link release (No modifier),zLinkReleaseTriggerAction,combo,LinkReleaseTriggerAction.CONTEXT_MENU,,active,src/platform/settings/constants/coreSettings.ts,46,yes,
+COMFY-GRAPH-043,Comfy.LinkRelease.ActionShift,Action on link release (Shift),zLinkReleaseTriggerAction,combo,LinkReleaseTriggerAction.SEARCH_BOX,,active,src/platform/settings/constants/coreSettings.ts,57,yes,
+COMFY-GRAPH-044,Comfy.LinkRenderMode,Link Render Mode,z.number(),combo,2,,active,src/platform/settings/constants/coreSettings.ts,695,yes,
+COMFY-ASSET-040,Comfy.Load3D.3DViewerEnable,Enable 3D Viewer (Beta),z.boolean(),boolean,false,,experimental,src/extensions/core/load3d.ts,229,yes,src/components/graph/SelectionToolbox.test.ts
+COMFY-ASSET-041,Comfy.Load3D.BackgroundColor,Initial Background Color,z.string(),color,'282828',,experimental,src/extensions/core/load3d.ts,163,yes,src/composables/useLoad3d.test.ts
+COMFY-ASSET-042,Comfy.Load3D.CameraType,Initial Camera Type,z.enum(['perspective',combo,'perspective',,experimental,src/extensions/core/load3d.ts,173,yes,src/extensions/core/load3d/Load3DConfiguration.test.ts
+COMFY-ASSET-043,Comfy.Load3D.LightAdjustmentIncrement,Light Adjustment Increment,z.number(),slider,0.5,,experimental,src/extensions/core/load3d.ts,214,yes,src/components/load3d/controls/LightControls.test.ts
+COMFY-ASSET-044,Comfy.Load3D.LightIntensity,Initial Light Intensity,z.number(),number,3,,experimental,src/extensions/core/load3d.ts,184,yes,src/components/load3d/controls/LightControls.test.ts
+COMFY-ASSET-045,Comfy.Load3D.LightIntensityMaximum,Light Intensity Maximum,z.number(),number,10,,experimental,src/extensions/core/load3d.ts,194,yes,src/components/load3d/controls/LightControls.test.ts
+COMFY-ASSET-046,Comfy.Load3D.LightIntensityMinimum,Light Intensity Minimum,z.number(),number,1,,experimental,src/extensions/core/load3d.ts,204,yes,src/components/load3d/controls/LightControls.test.ts
+COMFY-CLOUD-217,Comfy.Load3D.PLYEngine,Point Cloud Engine,z.enum(['threejs',combo,'threejs',,experimental,src/extensions/core/load3d.ts,239,yes,
+COMFY-ASSET-047,Comfy.Load3D.ShowGrid,Initial Grid Visibility,z.boolean(),boolean,true,,experimental,src/extensions/core/load3d.ts,153,yes,src/extensions/core/load3d/Load3DConfiguration.test.ts
+COMFY-SETTING-037,Comfy.Locale,Language,z.string(),combo,getDefaultLocale,,active,src/platform/settings/constants/coreSettings.ts,443,yes,src/platform/settings/composables/useSettingUI.test.ts
+COMFY-ASSET-048,Comfy.MaskEditor.BrushAdjustmentSpeed,Brush adjustment speed multiplier,z.number(),slider,1.0,1.0.0,active,src/extensions/core/maskeditor.ts,54,yes,src/composables/maskeditor/useToolManager.test.ts
+COMFY-ASSET-049,Comfy.MaskEditor.UseDominantAxis,Lock brush adjustment to dominant axis,z.boolean(),boolean,true,,active,src/extensions/core/maskeditor.ts,69,yes,src/composables/maskeditor/useToolManager.test.ts
+COMFY-SETTING-038,Comfy.Memory.AllowManualUnload,Comfy.Memory.AllowManualUnload,z.boolean(),hidden,isCloud ? false : true,1.18.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,24,no,
+COMFY-GRAPH-045,Comfy.Minimap.NodeColors,Comfy.Minimap.NodeColors,z.boolean(),hidden,false,1.26.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1063,no,src/renderer/extensions/minimap/composables/useMinimapSettings.test.ts
+COMFY-GRAPH-046,Comfy.Minimap.RenderBypassState,Comfy.Minimap.RenderBypassState,z.boolean(),hidden,true,1.26.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1084,no,src/renderer/extensions/minimap/composables/useMinimapSettings.test.ts
+COMFY-GRAPH-047,Comfy.Minimap.RenderErrorState,Comfy.Minimap.RenderErrorState,z.boolean(),hidden,true,1.26.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1091,no,src/renderer/extensions/minimap/composables/useMinimapSettings.test.ts
+COMFY-GRAPH-048,Comfy.Minimap.ShowGroups,Comfy.Minimap.ShowGroups,z.boolean(),hidden,true,1.26.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1077,no,src/renderer/extensions/minimap/composables/useMinimapSettings.test.ts
+COMFY-GRAPH-049,Comfy.Minimap.ShowLinks,Comfy.Minimap.ShowLinks,z.boolean(),hidden,true,1.26.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1070,no,src/renderer/extensions/minimap/composables/useMinimapSettings.test.ts
+COMFY-GRAPH-050,Comfy.Minimap.Visible,Comfy.Minimap.Visible,z.boolean(),hidden,window.innerWidth >= breakpointsTailwind.lg,1.25.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1056,no,src/renderer/extensions/minimap/composables/useMinimap.test.ts
+COMFY-SETTING-039,Comfy.ModelLibrary.AutoLoadAll,Automatically load all model folders,z.boolean(),z.boolean(),false,,active,src/platform/settings/constants/coreSettings.ts,426,yes,
+COMFY-ASSET-050,Comfy.ModelLibrary.NameFormat,What name to display in the model library tree view,z.enum(['filename',combo,'title',,active,src/platform/settings/constants/coreSettings.ts,434,yes,src/components/sidebar/tabs/ModelLibrarySidebarTab.test.ts
+COMFY-ASSET-051,Comfy.Node.AllowImageSizeDraw,Show width × height below the image preview,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,393,yes,
+COMFY-GRAPH-051,Comfy.Node.AlwaysShowAdvancedWidgets,Always show advanced widgets on all nodes,z.boolean(),boolean,false,1.39.0,active,src/platform/settings/constants/coreSettings.ts,1250,yes,src/renderer/extensions/vueNodes/components/LGraphNode.test.ts
+COMFY-GRAPH-052,Comfy.Node.AutoSnapLinkToSlot,Auto snap link to node slot,z.boolean(),boolean,true,1.3.29,active,src/platform/settings/constants/coreSettings.ts,710,yes,
+COMFY-GRAPH-053,Comfy.Node.BypassAllLinksOnDelete,Keep all links when deleting nodes,z.boolean(),boolean,true,1.3.40,active,src/platform/settings/constants/coreSettings.ts,730,yes,
+COMFY-GRAPH-054,Comfy.Node.DoubleClickTitleToEdit,Double click node title to edit,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,386,yes,
+COMFY-GRAPH-055,Comfy.Node.MiddleClickRerouteNode,Middle-click creates a new Reroute node,z.boolean(),boolean,true,1.3.42,active,src/platform/settings/constants/coreSettings.ts,740,yes,
+COMFY-GRAPH-056,Comfy.Node.Opacity,Node opacity,z.number(),slider,1,,active,src/platform/settings/constants/coreSettings.ts,286,yes,src/renderer/extensions/vueNodes/components/LGraphNode.test.ts
+COMFY-GRAPH-057,Comfy.Node.ShowDeprecated,Show deprecated nodes in search,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,270,yes,
+COMFY-GRAPH-058,Comfy.Node.ShowExperimental,Show experimental nodes in search,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,278,yes,
+COMFY-GRAPH-059,Comfy.Node.SnapHighlightsNode,Snap highlights node,z.boolean(),boolean,true,1.3.29,active,src/platform/settings/constants/coreSettings.ts,720,yes,
+COMFY-GRAPH-060,Comfy.NodeBadge.NodeIdBadgeMode,Node ID badge mode,zNodeBadgeMode,combo,NodeBadgeMode.None,,active,src/platform/settings/constants/coreSettings.ts,458,yes,
+COMFY-GRAPH-061,Comfy.NodeBadge.NodeLifeCycleBadgeMode,Node life cycle badge mode,zNodeBadgeMode,combo,NodeBadgeMode.ShowAll,,active,src/platform/settings/constants/coreSettings.ts,466,yes,
+COMFY-GRAPH-062,Comfy.NodeBadge.NodeSourceBadgeMode,Node source badge mode,zNodeBadgeMode,combo,NodeBadgeMode.HideBuiltIn,,active,src/platform/settings/constants/coreSettings.ts,450,yes,
+COMFY-GRAPH-063,Comfy.NodeBadge.ShowApiPricing,Show API node pricing badge,z.boolean(),boolean,true,1.20.3,active,src/platform/settings/constants/coreSettings.ts,474,yes,
+COMFY-GRAPH-064,Comfy.NodeLibrary.Bookmarks,Comfy.NodeLibrary.Bookmarks,z.array(z.string()),hidden,[],,deprecated/dead,src/platform/settings/constants/coreSettings.ts,355,no,src/components/searchbox/v2/NodeSearchContent.test.ts
+COMFY-GRAPH-065,Comfy.NodeLibrary.Bookmarks.V2,Comfy.NodeLibrary.Bookmarks.V2,z.array(z.string()),hidden,[],,infrastructure-only,src/platform/settings/constants/coreSettings.ts,362,no,src/components/searchbox/v2/NodeSearchContent.test.ts
+COMFY-GRAPH-066,Comfy.NodeLibrary.BookmarksCustomization,Comfy.NodeLibrary.BookmarksCustomization,z.record(,hidden,{},,infrastructure-only,src/platform/settings/constants/coreSettings.ts,369,no,src/components/searchbox/v2/NodeSearchContent.test.ts
+COMFY-GRAPH-067,Comfy.NodeLibrary.NewDesign,New Node Library Design,z.boolean(),boolean,true,,experimental,src/platform/settings/constants/coreSettings.ts,344,yes,src/components/graph/SelectionToolbox.test.ts
+COMFY-SETTING-040,Comfy.NodeReplacement.Enabled,Enable node replacement suggestions,z.boolean(),boolean,true,1.40.0,conditional,src/platform/settings/constants/coreSettings.ts,1260,yes,src/platform/nodeReplacement/nodeReplacementStore.test.ts
+COMFY-GRAPH-068,Comfy.NodeSearchBoxImpl,Node search box implementation,z.enum([,combo,'default',,experimental,src/platform/settings/constants/coreSettings.ts,37,yes,src/components/searchbox/NodeSearchBoxPopover.test.ts
+COMFY-GRAPH-069,Comfy.NodeSearchBoxImpl.FollowCursor,Added nodes follow the cursor,z.boolean(),boolean,true,1.44.4,active,src/platform/settings/constants/coreSettings.ts,76,yes,src/components/searchbox/NodeSearchBoxPopover.test.ts
+COMFY-GRAPH-070,Comfy.NodeSearchBoxImpl.NodePreview,Node preview,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,68,yes,
+COMFY-GRAPH-071,Comfy.NodeSearchBoxImpl.ShowCategory,Show node category in search results,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,86,yes,src/components/searchbox/v2/NodeSearchListItem.test.ts
+COMFY-GRAPH-072,Comfy.NodeSearchBoxImpl.ShowIdName,Show node id name in search results,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,94,yes,src/components/searchbox/v2/NodeSearchListItem.test.ts
+COMFY-GRAPH-073,Comfy.NodeSearchBoxImpl.ShowNodeFrequency,Show node frequency in search results,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,102,yes,src/components/searchbox/v2/NodeSearchListItem.test.ts
+COMFY-GRAPH-074,Comfy.NodeSuggestions.number,Number of nodes suggestions,z.number(),slider,5,,active,src/extensions/core/slotDefaults.ts,22,yes,
+COMFY-SETTING-041,Comfy.Notification.ShowVersionUpdates,Show version updates,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,482,yes,src/platform/updates/common/releaseStore.test.ts
+COMFY-SETTING-042,Comfy.Pointer.ClickBufferTime,Pointer click drift delay,z.number(),slider,32,1.4.3,experimental,src/platform/settings/constants/coreSettings.ts,802,yes,
+COMFY-SETTING-043,Comfy.Pointer.ClickDrift,Pointer click drift (maximum distance),z.number(),slider,6,1.4.3,experimental,src/platform/settings/constants/coreSettings.ts,786,yes,
+COMFY-SETTING-044,Comfy.Pointer.DoubleClickTime,Double click interval (maximum),z.number(),slider,300,1.4.3,active,src/platform/settings/constants/coreSettings.ts,819,yes,
+COMFY-ASSET-052,Comfy.PreviewFormat,Preview image format,z.string(),text,'',,active,src/platform/settings/constants/coreSettings.ts,515,yes,
+COMFY-QUEUE-026,Comfy.PromptFilename,Prompt for filename when saving workflow,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,497,yes,
+COMFY-QUEUE-027,Comfy.Queue.History.Expanded,Comfy.Queue.History.Expanded,z.boolean(),hidden,false,1.37.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,890,no,src/components/queue/QueueOverlayHeader.test.ts
+COMFY-QUEUE-028,Comfy.Queue.MaxHistoryItems,Queue history size,z.number(),slider,64,1.4.12,active,src/platform/settings/constants/coreSettings.ts,877,yes,
+COMFY-QUEUE-029,Comfy.Queue.QPOV2,Docked job history/queue panel,z.boolean(),boolean,isNightly,,experimental,src/platform/settings/constants/coreSettings.ts,1233,yes,src/components/TopMenuSection.test.ts
+COMFY-QUEUE-030,Comfy.Queue.ShowRunProgressBar,Comfy.Queue.ShowRunProgressBar,z.boolean(),hidden,true,1.41.3,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1243,no,src/components/TopMenuSection.test.ts
+COMFY-QUEUE-031,Comfy.QueueButton.BatchCountLimit,Batch count limit,z.number(),number,100,1.3.5,active,src/platform/settings/constants/coreSettings.ts,648,yes,src/components/actionbar/BatchCountEdit.test.ts
+COMFY-SETTING-045,Comfy.Release.Status,Comfy.Release.Status,z.enum([,hidden,'skipped',,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1148,no,src/platform/settings/settingStore.test.ts
+COMFY-SETTING-046,Comfy.Release.Timestamp,Comfy.Release.Timestamp,z.number(),hidden,0,,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1154,no,src/platform/updates/common/releaseStore.test.ts
+COMFY-SETTING-047,Comfy.Release.Version,Comfy.Release.Version,z.string(),hidden,'',,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1142,no,src/platform/settings/settingStore.test.ts
+COMFY-GRAPH-075,Comfy.RerouteBeta,Comfy.RerouteBeta,z.boolean(),z.boolean(),runtime/extension-defined,,active,src/schemas/apiSchema.ts,407,no,
+COMFY-SETTING-048,Comfy.RightSidePanel.IsOpen,Comfy.RightSidePanel.IsOpen,z.boolean(),hidden,false,1.37.0,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1226,no,src/components/TopMenuSection.test.ts
+COMFY-SETTING-049,Comfy.RightSidePanel.ShowErrorsTab,Show errors tab in side panel,z.boolean(),boolean,true,1.40.0,experimental,src/platform/settings/constants/coreSettings.ts,1284,yes,src/composables/graph/useGraphNodeManager.test.ts
+COMFY-SETTING-050,Comfy.Server.LaunchArgs,Comfy.Server.LaunchArgs,z.record(z.string(),hidden,{} as Record<string,1.4.8,infrastructure-only,src/platform/settings/constants/coreSettings.ts,868,no,
+COMFY-SETTING-051,Comfy.Server.ServerConfigValues,Comfy.Server.ServerConfigValues,z.record(z.string(),hidden,{} as Record<string,1.4.8,infrastructure-only,src/platform/settings/constants/coreSettings.ts,859,no,
+COMFY-SETTING-052,Comfy.Sidebar.Location,Sidebar location,z.enum(['left',combo,'left',,active,src/platform/settings/constants/coreSettings.ts,110,yes,
+COMFY-SETTING-053,Comfy.Sidebar.Size,Sidebar size,z.enum(['small',combo,() => (window.innerWidth < 1536 ? 'small' : 'normal'),,active,src/platform/settings/constants/coreSettings.ts,118,yes,
+COMFY-SETTING-054,Comfy.Sidebar.Style,Sidebar style,z.enum(['floating',combo,'connected',,active,src/platform/settings/constants/coreSettings.ts,135,yes,
+COMFY-SETTING-055,Comfy.Sidebar.UnifiedWidth,Unified sidebar width,z.boolean(),boolean,true,1.18.1,active,src/platform/settings/constants/coreSettings.ts,127,yes,
+COMFY-SETTING-056,Comfy.SnapToGrid.GridSize,Snap to grid size,z.number(),slider,LiteGraph.CANVAS_GRID_SIZE,,active,src/platform/settings/constants/coreSettings.ts,834,yes,
+COMFY-WORKFLOW-060,Comfy.Templates.SelectedModels,Comfy.Templates.SelectedModels,z.array(z.string()),hidden,[],,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1164,no,src/composables/useTemplateFiltering.test.ts
+COMFY-WORKFLOW-061,Comfy.Templates.SelectedRunsOn,Comfy.Templates.SelectedRunsOn,z.array(z.string()),hidden,[],,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1176,no,src/composables/useTemplateFiltering.test.ts
+COMFY-WORKFLOW-062,Comfy.Templates.SelectedUseCases,Comfy.Templates.SelectedUseCases,z.array(z.string()),hidden,[],,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1170,no,src/composables/useTemplateFiltering.test.ts
+COMFY-WORKFLOW-063,Comfy.Templates.SortBy,Comfy.Templates.SortBy,z.enum([,hidden,'default',,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1182,no,src/composables/useTemplateFiltering.test.ts
+COMFY-SETTING-057,Comfy.TextareaWidget.FontSize,Textarea widget font size,z.number(),slider,10,,active,src/platform/settings/constants/coreSettings.ts,143,yes,
+COMFY-GRAPH-076,Comfy.TextareaWidget.Spellcheck,Textarea widget spellcheck,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,154,yes,
+COMFY-QUEUE-032,Comfy.Toast.DisableReconnectingToast,Comfy.Toast.DisableReconnectingToast,z.boolean(),hidden,false,1.15.12,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1049,no,src/composables/useReconnectingNotification.test.ts
+COMFY-SETTING-058,Comfy.TreeExplorer.ItemPadding,Tree explorer item padding,z.number(),slider,2,,active,src/platform/settings/constants/coreSettings.ts,414,yes,
+COMFY-SETTING-059,Comfy.TutorialCompleted,Comfy.TutorialCompleted,z.boolean(),hidden,false,1.8.7,infrastructure-only,src/platform/settings/constants/coreSettings.ts,974,no,src/services/useNewUserService.test.ts
+COMFY-SETTING-060,Comfy.UI.TabBarLayout,Tab Bar Layout,z.enum(['Default',combo,'Default',,active,src/platform/settings/constants/coreSettings.ts,584,yes,src/components/TopMenuSection.test.ts
+COMFY-SETTING-061,Comfy.UseNewMenu,Use new menu,z.enum(['Disabled',combo,'Top',,active,src/platform/settings/constants/coreSettings.ts,608,yes,src/components/TopMenuSection.test.ts
+COMFY-WORKFLOW-064,Comfy.Validation.Workflows,Validate workflows,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,31,yes,
+COMFY-SETTING-062,Comfy.VersionCompatibility.DisableWarnings,Comfy.VersionCompatibility.DisableWarnings,z.boolean(),hidden,false,1.34.1,infrastructure-only,src/platform/settings/constants/coreSettings.ts,1219,no,src/platform/updates/common/versionCompatibilityStore.test.ts
+COMFY-GRAPH-077,Comfy.VueNodes.Enabled,Modern Node Design (Nodes 2.0),z.boolean(),boolean,false,1.27.1,experimental,src/platform/settings/constants/coreSettings.ts,1192,yes,src/stores/appModeStore.test.ts
+COMFY-GRAPH-078,Comfy.WidgetControlMode,Widget control mode,z.enum(['before',combo,'after',,active,src/platform/settings/constants/coreSettings.ts,963,yes,src/renderer/extensions/vueNodes/widgets/components/ValueControlPopover.test.ts
+COMFY-SETTING-063,Comfy.Window.UnloadConfirmation,Show confirmation when closing window,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,407,yes,
+COMFY-WORKFLOW-065,Comfy.Workflow.AutoSave,Auto Save,z.enum(['off',combo,'off',1.16.0,active,src/platform/settings/constants/coreSettings.ts,1106,yes,src/components/topbar/WorkflowTab.test.ts
+COMFY-WORKFLOW-066,Comfy.Workflow.AutoSaveDelay,Auto Save Delay (ms),z.number(),number,1000,1.16.0,active,src/platform/settings/constants/coreSettings.ts,1098,yes,src/platform/workflow/persistence/composables/useWorkflowAutoSave.test.ts
+COMFY-WORKFLOW-067,Comfy.Workflow.ConfirmDelete,Show confirmation when deleting workflows,z.boolean(),boolean,true,1.5.6,active,src/platform/settings/constants/coreSettings.ts,936,yes,
+COMFY-WORKFLOW-068,Comfy.Workflow.Persist,Persist workflow state and restore on page (re)load,z.boolean(),boolean,true,1.16.1,active,src/platform/settings/constants/coreSettings.ts,1114,yes,src/platform/workflow/core/services/workflowService.test.ts
+COMFY-WORKFLOW-069,Comfy.Workflow.ShowMissingModelsWarning,Show missing models warning,z.boolean(),z.boolean(),isCloud ? false : true,,experimental,src/platform/settings/constants/coreSettings.ts,298,yes,src/platform/workflow/core/services/workflowService.test.ts
+COMFY-WORKFLOW-070,Comfy.Workflow.SortNodeIdOnSave,Sort node IDs when saving workflow,z.boolean(),boolean,false,,active,src/platform/settings/constants/coreSettings.ts,161,yes,
+COMFY-WORKFLOW-071,Comfy.Workflow.WarnBlueprintOverwrite,Require confirmation to overwrite an existing subgraph blueprint,z.boolean(),boolean,true,,active,src/platform/settings/constants/coreSettings.ts,305,yes,
+COMFY-WORKFLOW-072,Comfy.Workflow.WorkflowTabsPosition,Opened workflows position,z.enum(['Sidebar',combo,'Topbar',,active,src/platform/settings/constants/coreSettings.ts,627,yes,src/components/sidebar/tabs/BaseWorkflowsSidebarTab.test.ts
+COMFY-WORKFLOW-073,Comfy.WorkflowActions.SeenItems,Comfy.WorkflowActions.SeenItems,z.array(z.string()),hidden,[] as string[],1.41.5,infrastructure-only,src/platform/settings/constants/coreSettings.ts,897,no,src/composables/useNewMenuItemIndicator.test.ts
+COMFY-GRAPH-079,LiteGraph.Canvas.LowQualityRenderingZoomThreshold,LiteGraph.Canvas.LowQualityRenderingZoomThreshold,z.number(),hidden,0.6,1.9.1,deprecated/dead,src/platform/settings/constants/coreSettings.ts,996,no,
+COMFY-GRAPH-080,LiteGraph.Canvas.MaximumFps,Maximum FPS,z.number(),slider,0,1.5.1,active,src/platform/settings/constants/coreSettings.ts,915,yes,
+COMFY-SETTING-064,LiteGraph.Canvas.MinFontSizeForLOD,Zoom Node Level of Detail - font size threshold,z.number(),slider,8,1.26.7,active,src/platform/settings/constants/coreSettings.ts,1012,yes,
+COMFY-GRAPH-081,LiteGraph.ContextMenu.Scaling,Scale node combo widget menus (lists) when zoomed in,z.boolean(),boolean,false,1.8.8,active,src/platform/settings/constants/coreSettings.ts,988,yes,
+COMFY-GRAPH-082,LiteGraph.Group.SelectChildrenOnClick,Select group children on click,z.boolean(),boolean,false,1.42.0,active,src/platform/settings/constants/coreSettings.ts,1295,yes,
+COMFY-GRAPH-083,LiteGraph.Node.DefaultPadding,Always shrink new nodes,z.boolean(),boolean,false,1.18.0,active,src/platform/settings/constants/coreSettings.ts,1121,yes,
+COMFY-GRAPH-084,LiteGraph.Node.TooltipDelay,Tooltip Delay,z.number(),number,500,1.9.0,active,src/platform/settings/constants/coreSettings.ts,553,yes,src/components/graph/NodeTooltip.test.ts
+COMFY-GRAPH-085,LiteGraph.Pointer.TrackpadGestures,LiteGraph.Pointer.TrackpadGestures,z.boolean(),z.boolean(),runtime/extension-defined,,active,src/schemas/apiSchema.ts,480,no,
+COMFY-GRAPH-086,LiteGraph.Reroute.SplineOffset,Reroute spline offset,z.number(),slider,20,1.15.7,active,src/platform/settings/constants/coreSettings.ts,1037,yes,
+COMFY-SETTING-065,VHS.AdvancedPreviews,VHS.AdvancedPreviews,z.string(),z.string(),runtime/extension-defined,,active,src/schemas/apiSchema.ts,453,no,
+COMFY-SETTING-066,pysssss.SnapToGrid,Always snap to grid,z.boolean(),boolean,false,1.3.13,active,src/platform/settings/constants/coreSettings.ts,849,yes,src/stores/extensionStore.test.ts

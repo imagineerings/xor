@@ -41,7 +41,7 @@ use std::{
     cell::Cell,
     ops::Range,
     rc::Rc,
-    sync::{Arc, OnceLock},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use zed_actions::{
@@ -50,7 +50,9 @@ use zed_actions::{
 };
 
 use theme::AccentColors;
-use time::{OffsetDateTime, UtcOffset, format_description::BorrowedFormatItem};
+use time::{
+    OffsetDateTime, UtcOffset, format_description::BorrowedFormatItem, macros::format_description,
+};
 use ui::{
     Chip, ColumnWidthConfig, CommonAnimationExt as _, ContextMenu, DiffStat, Divider,
     HeaderResizeInfo, HighlightedLabel, IndentGuideColors, ListItem, ListItemSpacing,
@@ -603,11 +605,7 @@ pub struct OpenAtCommit {
 }
 
 fn timestamp_format() -> &'static [BorrowedFormatItem<'static>] {
-    static FORMAT: OnceLock<Vec<BorrowedFormatItem<'static>>> = OnceLock::new();
-    FORMAT.get_or_init(|| {
-        time::format_description::parse("[day] [month repr:short] [year] [hour]:[minute]")
-            .unwrap_or_default()
-    })
+    format_description!("[day] [month repr:short] [year] [hour]:[minute]")
 }
 
 fn format_timestamp(timestamp: i64) -> String {
@@ -2740,10 +2738,9 @@ impl GitGraph {
             .map(|datetime| {
                 let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
                 let local_datetime = datetime.to_offset(local_offset);
-                let format =
-                    time::format_description::parse("[month repr:short] [day], [year]").ok();
-                format
-                    .and_then(|f| local_datetime.format(&f).ok())
+                local_datetime
+                    .format(format_description!("[month repr:short] [day], [year]"))
+                    .ok()
                     .unwrap_or_default()
             })
             .unwrap_or_default();

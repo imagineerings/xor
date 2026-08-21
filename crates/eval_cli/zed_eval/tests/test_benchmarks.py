@@ -92,7 +92,7 @@ class HarnessCommandTests(unittest.TestCase):
         self.assertIn("-p", command)
         self.assertIn("/tmp/datasets/deepswe/tasks", command)
         # Pier uses the Pier-native agent class.
-        self.assertIn("zed_eval.pier_agent:ZedPierAgent", command)
+        self.assertIn("zed_eval.pier_agent:SimPierAgent", command)
         # The Pier network allowlist is declared by the agent, not the CLI;
         # `pier run` has no --agent-allow-host option.
         self.assertNotIn("--agent-allow-host", command)
@@ -101,7 +101,7 @@ class HarnessCommandTests(unittest.TestCase):
         command = harness_command.build_harness_command(
             make_run_request("swe-atlas-rf"), "/tmp/jobs"
         )
-        self.assertIn("zed_eval.agent:ZedAgent", command)
+        self.assertIn("zed_eval.agent:SimAgent", command)
 
     def test_eval_cli_timeout_override(self) -> None:
         command = harness_command.build_harness_command(

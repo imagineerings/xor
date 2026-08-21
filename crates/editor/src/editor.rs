@@ -8608,7 +8608,7 @@ impl Editor {
         cx: &mut Context<Self>,
     ) -> Entity<Self> {
         const MINIMAP_FONT_WEIGHT: gpui::FontWeight = gpui::FontWeight::BLACK;
-        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".ZedMono");
+        const MINIMAP_FONT_FAMILY: SharedString = SharedString::new_static(".SimMono");
 
         let mut minimap = Editor::new_internal(
             EditorMode::Minimap {

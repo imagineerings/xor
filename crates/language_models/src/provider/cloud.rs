@@ -21,8 +21,8 @@ use rand::{Rng as _, SeedableRng as _, rngs::StdRng};
 use release_channel::AppVersion;
 
 use settings::SettingsStore;
-pub use settings::ZedDotDevAvailableModel as AvailableModel;
-pub use settings::ZedDotDevAvailableProvider as AvailableProvider;
+pub use settings::SimDotDevAvailableModel as AvailableModel;
+pub use settings::SimDotDevAvailableProvider as AvailableProvider;
 use std::sync::Arc;
 use std::time::Duration;
 use ui::{TintColor, prelude::*};
@@ -88,7 +88,7 @@ impl CloudLlmTokenProvider for ClientTokenProvider {
 }
 
 #[derive(Default, Clone, Debug, PartialEq)]
-pub struct ZedDotDevSettings {
+pub struct SimDotDevSettings {
     pub available_models: Vec<AvailableModel>,
 }
 
@@ -380,12 +380,12 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
             None
         } else {
             match state.user_store.read(cx).plan() {
-                Some(Plan::ZedPro) => Some("Subscribed to Pro".into()),
-                Some(Plan::ZedProTrial) => Some("Subscribed to Pro Trial".into()),
-                Some(Plan::ZedStudent) => Some("Subscribed to Student".into()),
-                Some(Plan::ZedBusiness) => Some("Subscribed to Business".into()),
-                Some(Plan::ZedVip) => Some("Subscribed to VIP".into()),
-                Some(Plan::ZedFree) | None => None,
+                Some(Plan::SimPro) => Some("Subscribed to Pro".into()),
+                Some(Plan::SimProTrial) => Some("Subscribed to Pro Trial".into()),
+                Some(Plan::SimStudent) => Some("Subscribed to Student".into()),
+                Some(Plan::SimBusiness) => Some("Subscribed to Business".into()),
+                Some(Plan::SimVip) => Some("Subscribed to VIP".into()),
+                Some(Plan::SimFree) | None => None,
             }
         };
 
@@ -426,7 +426,7 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
 }
 
 #[derive(IntoElement, RegisterComponent)]
-struct ZedAiConfiguration {
+struct SimAiConfiguration {
     is_connected: bool,
     plan: Option<Plan>,
     is_zed_model_provider_enabled: bool,
@@ -447,24 +447,24 @@ fn zed_ai_description(
     }
 
     match plan {
-        Some(Plan::ZedPro) => {
+        Some(Plan::SimPro) => {
             "You have access to Zed's hosted models through your Pro subscription."
         }
-        Some(Plan::ZedProTrial) => "You have access to Zed's hosted models through your Pro trial.",
-        Some(Plan::ZedStudent) => {
+        Some(Plan::SimProTrial) => "You have access to Zed's hosted models through your Pro trial.",
+        Some(Plan::SimStudent) => {
             "You have access to Zed's hosted models through your Student subscription."
         }
-        Some(Plan::ZedBusiness) => {
+        Some(Plan::SimBusiness) => {
             if is_zed_model_provider_enabled {
                 "You have access to Zed's hosted models through your organization."
             } else {
                 "Zed's hosted models are disabled by your organization's configuration."
             }
         }
-        Some(Plan::ZedVip) => {
+        Some(Plan::SimVip) => {
             "You have access to Zed's hosted models through your VIP subscription."
         }
-        Some(Plan::ZedFree) | None => {
+        Some(Plan::SimFree) | None => {
             if eligible_for_trial {
                 "Subscribe for access to Zed's hosted models. Start with a 14 day free trial."
             } else {
@@ -474,11 +474,11 @@ fn zed_ai_description(
     }
 }
 
-impl RenderOnce for ZedAiConfiguration {
+impl RenderOnce for SimAiConfiguration {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let has_paid_plan = matches!(
             self.plan,
-            Some(Plan::ZedPro | Plan::ZedStudent | Plan::ZedBusiness | Plan::ZedVip)
+            Some(Plan::SimPro | Plan::SimStudent | Plan::SimBusiness | Plan::SimVip)
         );
 
         let description = zed_ai_description(
@@ -591,7 +591,7 @@ impl Render for ConfigurationView {
             .current_organization_configuration()
             .map_or(true, |config| config.is_zed_model_provider_enabled);
 
-        ZedAiConfiguration {
+        SimAiConfiguration {
             is_connected: !state.is_signed_out(cx),
             plan: user_store.plan(),
             is_zed_model_provider_enabled,
@@ -923,7 +923,7 @@ mod tests {
     }
 }
 
-impl Component for ZedAiConfiguration {
+impl Component for SimAiConfiguration {
     fn name() -> &'static str {
         "AI Configuration Content"
     }
@@ -951,7 +951,7 @@ impl Component for ZedAiConfiguration {
         }
 
         let configuration = |config: PreviewConfiguration| -> AnyElement {
-            ZedAiConfiguration {
+            SimAiConfiguration {
                 is_connected: config.is_connected,
                 plan: config.plan,
                 is_zed_model_provider_enabled: config.is_zed_model_provider_enabled,
@@ -1006,7 +1006,7 @@ impl Component for ZedAiConfiguration {
                 single_example(
                     "Free Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::ZedFree),
+                        plan: Some(Plan::SimFree),
                         is_connected: true,
                         is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
@@ -1015,7 +1015,7 @@ impl Component for ZedAiConfiguration {
                 single_example(
                     "Zed Pro Trial Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::ZedProTrial),
+                        plan: Some(Plan::SimProTrial),
                         is_connected: true,
                         is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
@@ -1024,7 +1024,7 @@ impl Component for ZedAiConfiguration {
                 single_example(
                     "Zed Pro Plan",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::ZedPro),
+                        plan: Some(Plan::SimPro),
                         is_connected: true,
                         is_zed_model_provider_enabled: true,
                         eligible_for_trial: true,
@@ -1033,7 +1033,7 @@ impl Component for ZedAiConfiguration {
                 single_example(
                     "Business Plan - Zed models enabled",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::ZedBusiness),
+                        plan: Some(Plan::SimBusiness),
                         is_connected: true,
                         is_zed_model_provider_enabled: true,
                         eligible_for_trial: false,
@@ -1042,7 +1042,7 @@ impl Component for ZedAiConfiguration {
                 single_example(
                     "Business Plan - Zed models disabled",
                     configuration(PreviewConfiguration {
-                        plan: Some(Plan::ZedBusiness),
+                        plan: Some(Plan::SimBusiness),
                         is_connected: true,
                         is_zed_model_provider_enabled: false,
                         eligible_for_trial: false,

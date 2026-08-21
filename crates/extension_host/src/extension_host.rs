@@ -19,8 +19,8 @@ use extension::{
     ExtensionGrammarProxy, ExtensionHostProxy, ExtensionLanguageProxy,
     ExtensionLanguageServerProxy, ExtensionSnippetProxy, ExtensionThemeProxy,
 };
-use fs::{Fs, RemoveOptions, RenameOptions};
-use futures::future::join_all;
+use fs::{Fs, Metadata, RemoveOptions, RenameOptions};
+use futures::future::{BoxFuture, join_all};
 use futures::{
     AsyncReadExt as _, Future, FutureExt as _, StreamExt as _,
     channel::{
@@ -58,8 +58,8 @@ use std::{
 use task::TaskTemplates;
 use url::Url;
 use util::{PathExt, ResultExt, paths::RemotePathBuf};
-use wasm_host::{
-    WasmExtension, WasmHost,
+pub use wasm_host::{
+    ComponentRuntime, WasmExtension, WasmHost,
     wit::{is_supported_wasm_api_version, wasm_api_version_range},
 };
 
@@ -73,6 +73,228 @@ const FS_WATCH_LATENCY: Duration = Duration::from_millis(100);
 
 /// The current extension [`SchemaVersion`] supported by Zed.
 const CURRENT_SCHEMA_VERSION: SchemaVersion = SchemaVersion(1);
+
+pub const COMFY_COMPONENT_MANIFEST_FILE: &str = "comfy-plugin.json";
+pub const COMFY_COMPONENT_BINARY_FILE: &str = "comfy-plugin.wasm";
+const MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES: u64 = 4 * 1024 * 1024;
+const MAXIMUM_COMFY_COMPONENT_BINARY_BYTES: u64 = 64 * 1024 * 1024;
+
+#[derive(Clone)]
+pub struct InstalledComponent {
+    extension_id: Arc<str>,
+    extension_version: Arc<str>,
+    manifest_bytes: Arc<[u8]>,
+    component_bytes: Arc<[u8]>,
+}
+
+impl InstalledComponent {
+    pub fn checked(
+        extension_id: Arc<str>,
+        extension_version: Arc<str>,
+        manifest_bytes: Arc<[u8]>,
+        component_bytes: Arc<[u8]>,
+    ) -> Result<Self> {
+        validate_component_extension_id(&extension_id)?;
+        let manifest_length = u64::try_from(manifest_bytes.len())
+            .map_err(|_| anyhow!("component manifest for `{extension_id}` is oversized"))?;
+        validate_component_payload_length(
+            manifest_length,
+            MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+            "component manifest",
+            &extension_id,
+        )?;
+        let component_length = u64::try_from(component_bytes.len())
+            .map_err(|_| anyhow!("component binary for `{extension_id}` is oversized"))?;
+        validate_component_payload_length(
+            component_length,
+            MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+            "component binary",
+            &extension_id,
+        )?;
+        Ok(Self {
+            extension_id,
+            extension_version,
+            manifest_bytes,
+            component_bytes,
+        })
+    }
+
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+
+    pub fn extension_version(&self) -> &str {
+        &self.extension_version
+    }
+
+    pub fn manifest_bytes(&self) -> &[u8] {
+        &self.manifest_bytes
+    }
+
+    pub fn component_bytes(&self) -> &[u8] {
+        &self.component_bytes
+    }
+}
+
+pub trait ComponentLifecycleAdapter: Send + Sync {
+    fn adapter_id(&self) -> &'static str;
+
+    fn synchronize(
+        &self,
+        components: Vec<InstalledComponent>,
+    ) -> BoxFuture<'static, std::result::Result<(), String>>;
+}
+
+struct RegisteredComponentAdapters(Vec<Arc<dyn ComponentLifecycleAdapter>>);
+
+impl Global for RegisteredComponentAdapters {}
+
+pub fn register_component_lifecycle_adapter(
+    adapter: Arc<dyn ComponentLifecycleAdapter>,
+    cx: &mut App,
+) -> Result<()> {
+    if ExtensionStore::try_global(cx).is_some() {
+        bail!(
+            "component lifecycle adapters must be registered before ExtensionStore initialization"
+        );
+    }
+    let adapter_id = adapter.adapter_id();
+    if adapter_id.is_empty() || adapter_id.len() > 256 || adapter_id.chars().any(char::is_control) {
+        bail!("component lifecycle adapter identifier is invalid");
+    }
+    if cx.try_global::<RegisteredComponentAdapters>().is_none() {
+        cx.set_global(RegisteredComponentAdapters(Vec::new()));
+    }
+    let adapters = &mut cx.global_mut::<RegisteredComponentAdapters>().0;
+    if adapters
+        .iter()
+        .any(|registered| registered.adapter_id() == adapter_id)
+    {
+        bail!("component lifecycle adapter `{adapter_id}` is already registered");
+    }
+    adapters.push(adapter);
+    adapters.sort_by_key(|adapter| adapter.adapter_id());
+    Ok(())
+}
+
+fn validate_component_extension_id(extension_id: &str) -> Result<()> {
+    const MAXIMUM_EXTENSION_ID_BYTES: usize = 64 * 1024;
+
+    let portable_name = !extension_id.is_empty()
+        && extension_id.len() <= MAXIMUM_EXTENSION_ID_BYTES
+        && !extension_id.contains(['/', '\\', ':'])
+        && !extension_id.ends_with(['.', ' '])
+        && !extension_id.chars().any(char::is_control);
+    let device_name = extension_id
+        .split_once('.')
+        .map_or(extension_id, |(name, _)| name)
+        .to_ascii_uppercase();
+    let reserved_device_name = matches!(device_name.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || device_name
+            .strip_prefix("COM")
+            .or_else(|| device_name.strip_prefix("LPT"))
+            .is_some_and(|suffix| {
+                suffix.len() == 1
+                    && suffix
+                        .as_bytes()
+                        .first()
+                        .is_some_and(|byte| matches!(byte, b'1'..=b'9'))
+            });
+    let mut components = Path::new(extension_id).components();
+    if !portable_name
+        || reserved_device_name
+        || !matches!(components.next(), Some(path::Component::Normal(_)))
+        || components.next().is_some()
+    {
+        bail!("component extension identifier `{extension_id}` is not one normal path component");
+    }
+    Ok(())
+}
+
+fn checked_extension_dir(installed_dir: &Path, extension_id: &str) -> Result<PathBuf> {
+    validate_component_extension_id(extension_id)?;
+    Ok(installed_dir.join(extension_id))
+}
+
+fn validate_component_payload_length(
+    length: u64,
+    maximum_bytes: u64,
+    subject: &str,
+    extension_id: &str,
+) -> Result<()> {
+    if length > maximum_bytes {
+        bail!("{subject} for `{extension_id}` is oversized");
+    }
+    Ok(())
+}
+
+fn validate_component_file_metadata(
+    initial: &Metadata,
+    current: &Metadata,
+    loaded_bytes: u64,
+    maximum_bytes: u64,
+    subject: &str,
+    extension_id: &str,
+) -> Result<()> {
+    if initial.is_dir
+        || initial.is_symlink
+        || initial.is_fifo
+        || current.is_dir
+        || current.is_symlink
+        || current.is_fifo
+    {
+        bail!("{subject} for `{extension_id}` is invalid");
+    }
+    validate_component_payload_length(initial.len, maximum_bytes, subject, extension_id)?;
+    validate_component_payload_length(current.len, maximum_bytes, subject, extension_id)?;
+    validate_component_payload_length(loaded_bytes, maximum_bytes, subject, extension_id)?;
+    if initial.inode != current.inode
+        || initial.mtime != current.mtime
+        || initial.len != current.len
+        || loaded_bytes != current.len
+    {
+        bail!("{subject} for `{extension_id}` changed while it was being loaded");
+    }
+    Ok(())
+}
+
+async fn load_bounded_component_file(
+    fs: Arc<dyn Fs>,
+    path: &Path,
+    initial_metadata: Metadata,
+    maximum_bytes: u64,
+    subject: &str,
+    extension_id: &str,
+) -> Result<Vec<u8>> {
+    let bytes = fs
+        .load_bytes(path)
+        .await
+        .with_context(|| format!("loading {subject} for `{extension_id}`"))?;
+    let current_metadata = fs
+        .metadata(path)
+        .await
+        .with_context(|| format!("revalidating {subject} metadata for `{extension_id}`"))?
+        .ok_or_else(|| anyhow!("{subject} for `{extension_id}` disappeared while loading"))?;
+    let loaded_bytes = u64::try_from(bytes.len())
+        .map_err(|_| anyhow!("{subject} for `{extension_id}` is oversized"))?;
+    validate_component_file_metadata(
+        &initial_metadata,
+        &current_metadata,
+        loaded_bytes,
+        maximum_bytes,
+        subject,
+        extension_id,
+    )?;
+    Ok(bytes)
+}
+
+fn format_component_adapter_errors(errors: &BTreeMap<String, String>) -> String {
+    errors
+        .iter()
+        .map(|(adapter, error)| format!("component lifecycle adapter {adapter} failed: {error}"))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
 
 /// Extensions that should no longer be loaded or downloaded.
 ///
@@ -134,7 +356,7 @@ pub struct ExtensionStore {
     pub http_client: Arc<HttpClientWithUrl>,
     pub telemetry: Option<Arc<Telemetry>>,
     pub reload_tx: UnboundedSender<Option<Arc<str>>>,
-    pub reload_complete_senders: Vec<oneshot::Sender<()>>,
+    reload_complete_senders: Vec<oneshot::Sender<std::result::Result<(), Arc<str>>>>,
     pub installed_dir: PathBuf,
     pub staging_dir: PathBuf,
     pub outstanding_operations: BTreeMap<Arc<str>, ExtensionOperation>,
@@ -145,6 +367,8 @@ pub struct ExtensionStore {
     pub tasks: Vec<Task<()>>,
     pub remote_clients: Vec<WeakEntity<RemoteClient>>,
     pub ssh_registered_tx: UnboundedSender<()>,
+    component_lifecycle_adapters: Vec<Arc<dyn ComponentLifecycleAdapter>>,
+    component_adapter_errors: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Copy)]
@@ -269,8 +493,12 @@ pub fn init(
     node_runtime: NodeRuntime,
     cx: &mut App,
 ) {
+    let component_lifecycle_adapters = cx
+        .try_global::<RegisteredComponentAdapters>()
+        .map(|adapters| adapters.0.clone())
+        .unwrap_or_default();
     let store = cx.new(move |cx| {
-        ExtensionStore::new(
+        let mut store = ExtensionStore::new(
             paths::extensions_dir().clone(),
             None,
             extension_host_proxy,
@@ -280,12 +508,15 @@ pub fn init(
             Some(client.telemetry().clone()),
             node_runtime,
             cx,
-        )
+        );
+        store.component_lifecycle_adapters = component_lifecycle_adapters;
+        store
     });
 
     cx.on_action(|_: &ReloadExtensions, cx| {
         let store = cx.global::<GlobalExtensionStore>().0.clone();
-        store.update(cx, |store, cx| drop(store.reload(None, cx)));
+        let reload = store.update(cx, |store, cx| store.reload(None, cx));
+        cx.spawn(async move |_| reload.await).detach_and_log_err(cx);
     });
 
     cx.set_global(GlobalExtensionStore(store));
@@ -299,6 +530,10 @@ impl ExtensionStore {
 
     pub fn global(cx: &App) -> Entity<Self> {
         cx.global::<GlobalExtensionStore>().0.clone()
+    }
+
+    pub fn component_adapter_errors(&self) -> &BTreeMap<String, String> {
+        &self.component_adapter_errors
     }
 
     pub fn new(
@@ -347,6 +582,8 @@ impl ExtensionStore {
 
             remote_clients: Default::default(),
             ssh_registered_tx: connection_registered_tx,
+            component_lifecycle_adapters: Vec::new(),
+            component_adapter_errors: BTreeMap::new(),
         };
 
         // The extensions store maintains an index file, which contains a complete
@@ -390,7 +627,9 @@ impl ExtensionStore {
 
         cx.spawn(async move |this, cx| {
             if let Some(future) = reload_future {
-                future.await;
+                if let Err(error) = future.await {
+                    log::error!("Failed to reload extensions during initialization: {error:#}");
+                }
             }
             this.update(cx, |this, cx| this.auto_install_extensions(cx))
                 .ok();
@@ -475,16 +714,32 @@ impl ExtensionStore {
         &mut self,
         modified_extension: Option<Arc<str>>,
         cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<> {
+    ) -> impl Future<Output = Result<()>> + use<> {
         let (tx, rx) = oneshot::channel();
         self.reload_complete_senders.push(tx);
-        self.reload_tx
-            .unbounded_send(modified_extension)
-            .expect("reload task exited");
-        cx.emit(Event::StartedReloading);
+        if self.reload_tx.unbounded_send(modified_extension).is_err() {
+            self.complete_reloads(Err("extension reload task exited".to_owned()));
+        } else {
+            cx.emit(Event::StartedReloading);
+        }
 
         async move {
-            rx.await.ok();
+            match rx.await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(anyhow!(error.to_string())),
+                Err(_) => Err(anyhow!(
+                    "extension reload exited before reporting its result"
+                )),
+            }
+        }
+    }
+
+    fn complete_reloads(&mut self, result: std::result::Result<(), String>) {
+        let result = result.map_err(Arc::<str>::from);
+        for sender in self.reload_complete_senders.drain(..) {
+            if sender.send(result.clone()).is_err() {
+                log::debug!("extension reload completion receiver was dropped");
+            }
         }
     }
 
@@ -778,7 +1033,10 @@ impl ExtensionStore {
         operation: ExtensionOperation,
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
-        let extension_dir = self.installed_dir.join(extension_id.as_ref());
+        let extension_dir = match checked_extension_dir(&self.installed_dir, &extension_id) {
+            Ok(extension_dir) => extension_dir,
+            Err(error) => return Task::ready(Err(error)),
+        };
         let staging_dir = self.staging_dir.clone();
         let http_client = self.http_client.clone();
         let fs = self.fs.clone();
@@ -865,7 +1123,7 @@ impl ExtensionStore {
             .await?;
 
             this.update(cx, |this, cx| this.reload(Some(extension_id.clone()), cx))?
-                .await;
+                .await?;
 
             if let ExtensionOperation::Install = operation {
                 this.update(cx, |this, cx| {
@@ -955,7 +1213,10 @@ impl ExtensionStore {
         extension_id: Arc<str>,
         cx: &mut Context<Self>,
     ) -> Task<Result<()>> {
-        let extension_dir = self.installed_dir.join(extension_id.as_ref());
+        let extension_dir = match checked_extension_dir(&self.installed_dir, &extension_id) {
+            Ok(extension_dir) => extension_dir,
+            Err(error) => return Task::ready(Err(error)),
+        };
         let work_dir = self.wasm_host.work_dir.join(extension_id.as_ref());
         let fs = self.fs.clone();
 
@@ -987,7 +1248,7 @@ impl ExtensionStore {
 
             extension_store
                 .update(cx, |extension_store, cx| extension_store.reload(None, cx))?
-                .await;
+                .await?;
 
             // There's a race between wasm extension fully stopping and the directory removal.
             // On Windows, it's impossible to remove a directory that has a process running in it.
@@ -1114,7 +1375,7 @@ impl ExtensionStore {
             fs.create_symlink(output_path, extension_source_path)
                 .await?;
 
-            this.update(cx, |this, cx| this.reload(None, cx))?.await;
+            this.update(cx, |this, cx| this.reload(None, cx))?.await?;
             this.update(cx, |this, cx| {
                 cx.emit(Event::ExtensionInstalled(extension_id.clone()));
                 if let Some(events) = ExtensionEvents::try_global(cx)
@@ -1131,7 +1392,13 @@ impl ExtensionStore {
     }
 
     pub fn rebuild_dev_extension(&mut self, extension_id: Arc<str>, cx: &mut Context<Self>) {
-        let path = self.installed_dir.join(extension_id.as_ref());
+        let path = match checked_extension_dir(&self.installed_dir, &extension_id) {
+            Ok(path) => path,
+            Err(error) => {
+                log::error!("cannot rebuild extension `{extension_id}`: {error}");
+                return;
+            }
+        };
         let builder = self.builder.clone();
         let fs = self.fs.clone();
 
@@ -1158,7 +1425,7 @@ impl ExtensionStore {
 
             if result.is_ok() {
                 this.update(cx, |this, cx| this.reload(Some(extension_id), cx))?
-                    .await;
+                    .await?;
             }
 
             result
@@ -1233,8 +1500,11 @@ impl ExtensionStore {
                 }
             };
 
-        if extensions_to_load.is_empty() && extensions_to_unload.is_empty() {
-            self.reload_complete_senders.clear();
+        if extensions_to_load.is_empty()
+            && extensions_to_unload.is_empty()
+            && self.component_lifecycle_adapters.is_empty()
+        {
+            self.complete_reloads(Ok(()));
             trigger_suppressed_extension_removal(self, cx);
             return Task::ready(());
         }
@@ -1452,6 +1722,9 @@ impl ExtensionStore {
             .iter()
             .filter_map(|name| new_index.extensions.get(name).cloned())
             .collect::<Vec<_>>();
+        let component_extension_entries =
+            new_index.extensions.values().cloned().collect::<Vec<_>>();
+        let component_lifecycle_adapters = self.component_lifecycle_adapters.clone();
         self.extension_index = new_index;
         cx.notify();
         cx.emit(Event::ExtensionsUpdated);
@@ -1493,6 +1766,14 @@ impl ExtensionStore {
             })
             .await;
 
+            let component_adapter_errors = Self::synchronize_component_adapters(
+                fs.clone(),
+                &root_dir,
+                &component_extension_entries,
+                &component_lifecycle_adapters,
+            )
+            .await;
+
             let mut wasm_extensions = Vec::new();
             for extension in extension_entries {
                 if extension.manifest.lib.kind.is_none() {
@@ -1528,7 +1809,15 @@ impl ExtensionStore {
             }
 
             this.update(cx, |this, cx| {
-                this.reload_complete_senders.clear();
+                this.component_adapter_errors = component_adapter_errors;
+                let reload_result = if this.component_adapter_errors.is_empty() {
+                    Ok(())
+                } else {
+                    Err(format_component_adapter_errors(
+                        &this.component_adapter_errors,
+                    ))
+                };
+                this.complete_reloads(reload_result);
 
                 for (manifest, wasm_extension) in &wasm_extensions {
                     let extension = Arc::new(wasm_extension.clone());
@@ -1585,6 +1874,151 @@ impl ExtensionStore {
             })
             .ok();
         })
+    }
+
+    pub async fn synchronize_component_adapters(
+        fs: Arc<dyn Fs>,
+        installed_dir: &Path,
+        entries: &[ExtensionIndexEntry],
+        adapters: &[Arc<dyn ComponentLifecycleAdapter>],
+    ) -> BTreeMap<String, String> {
+        if adapters.is_empty() {
+            return BTreeMap::new();
+        }
+
+        let components = match Self::load_installed_components(fs, installed_dir, entries).await {
+            Ok(components) => components,
+            Err(error) => {
+                let inventory_error = error.to_string();
+                log::error!("Failed to load installed components: {inventory_error}");
+                let mut errors = BTreeMap::new();
+                for adapter in adapters {
+                    let error = match adapter.synchronize(Vec::new()).await {
+                        Ok(()) => inventory_error.clone(),
+                        Err(revocation_error) => format!(
+                            "{inventory_error}; additionally failed to revoke stale component state: {revocation_error}"
+                        ),
+                    };
+                    errors.insert(adapter.adapter_id().to_owned(), error);
+                }
+                return errors;
+            }
+        };
+
+        let mut errors = BTreeMap::new();
+        for adapter in adapters {
+            if let Err(error) = adapter.synchronize(components.clone()).await {
+                log::error!(
+                    "Component lifecycle adapter {} failed: {error}",
+                    adapter.adapter_id()
+                );
+                errors.insert(adapter.adapter_id().to_owned(), error);
+            }
+        }
+        errors
+    }
+
+    async fn load_installed_components(
+        fs: Arc<dyn Fs>,
+        installed_dir: &Path,
+        entries: &[ExtensionIndexEntry],
+    ) -> Result<Vec<InstalledComponent>> {
+        let mut components = Vec::new();
+        for entry in entries {
+            let extension_id = entry.manifest.id.clone();
+            let extension_dir = checked_extension_dir(installed_dir, &extension_id)?;
+            let manifest_path = extension_dir.join(COMFY_COMPONENT_MANIFEST_FILE);
+            let component_path = extension_dir.join(COMFY_COMPONENT_BINARY_FILE);
+            let manifest_metadata = fs.metadata(&manifest_path).await.with_context(|| {
+                format!("reading component manifest metadata for `{extension_id}`")
+            })?;
+            let component_metadata = fs.metadata(&component_path).await.with_context(|| {
+                format!("reading component binary metadata for `{extension_id}`")
+            })?;
+            if manifest_metadata.is_some() || component_metadata.is_some() {
+                let extension_metadata = fs
+                    .metadata(&extension_dir)
+                    .await
+                    .with_context(|| {
+                        format!("reading extension directory metadata for `{extension_id}`")
+                    })?
+                    .ok_or_else(|| {
+                        anyhow!("extension directory for `{extension_id}` is missing")
+                    })?;
+                if extension_metadata.is_symlink || !extension_metadata.is_dir {
+                    bail!(
+                        "extension directory for `{extension_id}` is not a direct real directory"
+                    );
+                }
+                let canonical_installed_dir = fs
+                    .canonicalize(installed_dir)
+                    .await
+                    .context("resolving the installed extension root")?;
+                let canonical_extension_dir =
+                    fs.canonicalize(&extension_dir).await.with_context(|| {
+                        format!("resolving extension directory for `{extension_id}`")
+                    })?;
+                if canonical_extension_dir.parent() != Some(canonical_installed_dir.as_path()) {
+                    bail!("extension directory for `{extension_id}` escapes the installed root");
+                }
+            }
+            let (manifest_metadata, component_metadata) = match (
+                manifest_metadata,
+                component_metadata,
+            ) {
+                (None, None) => continue,
+                (Some(manifest), Some(component)) => {
+                    validate_component_file_metadata(
+                        &manifest,
+                        &manifest,
+                        manifest.len,
+                        MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+                        "component manifest",
+                        &extension_id,
+                    )?;
+                    validate_component_file_metadata(
+                        &component,
+                        &component,
+                        component.len,
+                        MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+                        "component binary",
+                        &extension_id,
+                    )?;
+                    (manifest, component)
+                }
+                _ => {
+                    bail!(
+                        "extension `{extension_id}` must provide both {COMFY_COMPONENT_MANIFEST_FILE} and {COMFY_COMPONENT_BINARY_FILE}"
+                    );
+                }
+            };
+            let manifest_bytes = load_bounded_component_file(
+                fs.clone(),
+                &manifest_path,
+                manifest_metadata,
+                MAXIMUM_COMFY_COMPONENT_MANIFEST_BYTES,
+                "component manifest",
+                &extension_id,
+            )
+            .await?;
+            let component_bytes = load_bounded_component_file(
+                fs.clone(),
+                &component_path,
+                component_metadata,
+                MAXIMUM_COMFY_COMPONENT_BINARY_BYTES,
+                "component binary",
+                &extension_id,
+            )
+            .await?;
+            components.push(InstalledComponent::checked(
+                extension_id,
+                entry.manifest.version.clone(),
+                manifest_bytes.into(),
+                component_bytes.into(),
+            )?);
+        }
+        components.sort_by(|left, right| left.extension_id().cmp(right.extension_id()));
+        Ok(components)
     }
 
     fn rebuild_extension_index(&self, cx: &mut Context<Self>) -> Task<ExtensionIndex> {

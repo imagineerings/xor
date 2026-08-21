@@ -8,9 +8,27 @@ target_dir="release"
 open_result=false
 local_install=false
 can_code_sign=false
+comfy=false
+rust_tools=false
+dry_run=false
+
+filtered_arguments=()
+for argument in "$@"; do
+    case "$argument" in
+        --comfy) comfy=true ;;
+        --rust-tools) rust_tools=true ;;
+        --dry-run) dry_run=true ;;
+        *) filtered_arguments+=("$argument") ;;
+    esac
+done
+if [[ ${#filtered_arguments[@]} -gt 0 ]]; then
+    set -- "${filtered_arguments[@]}"
+else
+    set --
+fi
 
 # This must match the team in the provisioning profile.
-IDENTITY="Zed Industries, Inc."
+IDENTITY="Simtropolis, Inc."
 APPLE_NOTARIZATION_TEAM="MQ55VZLNZQ"
 
 # Function for displaying help info
@@ -20,6 +38,9 @@ Usage: ${0##*/} [options] [architecture=host]
 Build the application bundle for macOS.
 
 Options:
+  --comfy  Include the Comfy integration, Metal backend, worker, and assets.
+  --rust-tools  Include the Cargo tool window and matching remote-server support.
+  --dry-run  Print the selected package plan without building it.
   -d    Compile in debug mode
   -o    Open dir with the resulting DMG or launch the app itself in local mode.
   -i    Install the resulting DMG into /Applications.
@@ -47,6 +68,26 @@ done
 
 shift $((OPTIND-1))
 
+if [[ "$dry_run" = true ]]; then
+    zed_features="none"
+    remote_features="none"
+    if [[ "$rust_tools" = true ]]; then
+        zed_features="rust-tools"
+        remote_features="rust-tools"
+    fi
+    if [[ "$comfy" = true ]]; then
+        if [[ "$rust_tools" = true ]]; then
+            zed_features="comfy,metal,rust-tools"
+        else
+            zed_features="comfy,metal"
+        fi
+        echo "mode=comfy packages=zed,cli,comfy_worker zed_features=${zed_features} remote_features=${remote_features} worker_features=metal include_comfy_worker=true rust_tools=${rust_tools}"
+    else
+        echo "mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false rust_tools=${rust_tools}"
+    fi
+    exit 0
+fi
+
 
 # Get release channel
 pushd crates/zed
@@ -58,7 +99,7 @@ export ZED_BUNDLE=true
 
 cargo_bundle_version=$(cargo -q bundle --help 2>&1 | head -n 1 || echo "")
 if [ "$cargo_bundle_version" != "cargo-bundle v0.6.1-zed" ]; then
-    cargo install cargo-bundle --git https://github.com/zed-industries/cargo-bundle.git --branch zed-deploy
+    cargo install cargo-bundle --git https://github.com/simtropolis/cargo-bundle.git --branch zed-deploy
 fi
 
 # Deal with versions of macOS that don't include libstdc++ headers
@@ -87,10 +128,24 @@ script/generate-licenses
 rustup target add $target_triple
 
 echo "Compiling zed binaries"
-cargo build ${build_flag} --package zed --package cli --target $target_triple
+if [[ "$comfy" = true ]]; then
+    zed_build_features="zed/comfy,zed/metal,comfy_worker/metal"
+    if [[ "$rust_tools" = true ]]; then
+        zed_build_features="${zed_build_features},zed/rust-tools"
+    fi
+    cargo build ${build_flag} --package zed --package cli --package comfy_worker --features "${zed_build_features}" --target $target_triple
+elif [[ "$rust_tools" = true ]]; then
+    cargo build ${build_flag} --package zed --package cli --features zed/rust-tools --target $target_triple
+else
+    cargo build ${build_flag} --package zed --package cli --target $target_triple
+fi
 # Build remote_server in separate invocation to prevent feature unification from other crates
 # from influencing dynamic libraries required by it.
-cargo build ${build_flag} --package remote_server --target $target_triple
+if [[ "$rust_tools" = true ]]; then
+    cargo build ${build_flag} --package remote_server --features rust-tools --target $target_triple
+else
+    cargo build ${build_flag} --package remote_server --target $target_triple
+fi
 
 echo "Creating application bundle"
 pushd crates/zed
@@ -100,7 +155,11 @@ sed \
     "s/package.metadata.bundle-${channel}/package.metadata.bundle/" \
     Cargo.toml
 
-app_path=$(cargo bundle ${build_flag} --target $target_triple --select-workspace-root | xargs)
+if [[ "$rust_tools" = true ]]; then
+    app_path=$(cargo bundle ${build_flag} --features rust-tools --target $target_triple --select-workspace-root | xargs)
+else
+    app_path=$(cargo bundle ${build_flag} --target $target_triple --select-workspace-root | xargs)
+fi
 
 mv Cargo.toml.backup Cargo.toml
 popd
@@ -202,6 +261,9 @@ function sign_app_binaries() {
         echo "Code signing binaries"
         # sequence of codesign commands modeled after this example: https://developer.apple.com/forums/thread/701514
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/cli" -v
+        if [[ "$comfy" = true ]]; then
+            /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/comfy-worker" -v
+        fi
         /usr/bin/codesign --deep --force --timestamp --options runtime --sign "$IDENTITY" "${app_path}/Contents/MacOS/git" -v
         /usr/bin/codesign --deep --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}/Contents/MacOS/zed" -v
         /usr/bin/codesign --force --timestamp --options runtime --entitlements crates/zed/resources/zed.entitlements --sign "$IDENTITY" "${app_path}" -v
@@ -334,6 +396,9 @@ upload_debug_symbols
 
 cp target/${target_triple}/${target_dir}/zed "${app_path}/Contents/MacOS/zed"
 cp target/${target_triple}/${target_dir}/cli "${app_path}/Contents/MacOS/cli"
+if [[ "$comfy" = true ]]; then
+    cp target/${target_triple}/${target_dir}/comfy-worker "${app_path}/Contents/MacOS/comfy-worker"
+fi
 sign_app_binaries
 
 sign_binary "target/$target_triple/release/remote_server"

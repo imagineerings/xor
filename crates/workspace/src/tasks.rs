@@ -7,8 +7,8 @@ use language::Buffer;
 use project::{TaskSourceKind, WorktreeId};
 use remote::ConnectionState;
 use task::{
-    DebugScenario, ResolvedTask, SaveStrategy, SharedTaskContext, SpawnInTerminal, TaskContext,
-    TaskHook, TaskTemplate, TaskVariables, VariableName,
+    DebugScenario, ResolvedTask, SaveStrategy, SharedTaskContext, SpawnInTerminal,
+    StructuredTaskHandle, TaskContext, TaskHook, TaskTemplate, TaskVariables, VariableName,
 };
 use ui::Window;
 use util::TryFutureExt;
@@ -74,9 +74,37 @@ impl Workspace {
             resolved_task,
             omit_history,
             None,
+            None,
             window,
             cx,
         );
+    }
+
+    pub fn schedule_resolved_task_with_structured_handle(
+        &mut self,
+        task_source_kind: TaskSourceKind,
+        resolved_task: ResolvedTask,
+        omit_history: bool,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) -> StructuredTaskHandle {
+        let handle = StructuredTaskHandle::new(resolved_task.resolved.id.clone());
+        if let Some(message) =
+            structured_task_connection_error(self.project.read(cx).remote_connection_state(cx))
+        {
+            handle.mark_spawn_error(message, cx);
+            return handle;
+        }
+        self.schedule_resolved_task_internal(
+            task_source_kind,
+            resolved_task,
+            omit_history,
+            Some(handle.clone()),
+            None,
+            window,
+            cx,
+        );
+        handle
     }
 
     pub fn schedule_resolved_task_with_completion(
@@ -92,6 +120,7 @@ impl Workspace {
             task_source_kind,
             resolved_task,
             omit_history,
+            None,
             Some(Box::new(on_complete)),
             window,
             cx,
@@ -103,6 +132,7 @@ impl Workspace {
         task_source_kind: TaskSourceKind,
         resolved_task: ResolvedTask,
         omit_history: bool,
+        structured_handle: Option<StructuredTaskHandle>,
         on_complete: Option<TaskCompletionHandler>,
         window: &mut Window,
         cx: &mut Context<Workspace>,
@@ -128,18 +158,41 @@ impl Workspace {
             let task = cx.spawn_in(window, async move |workspace, cx| {
                 Self::save_for_task(&workspace, spawn_in_terminal.save, cx).await;
 
+                if structured_handle
+                    .as_ref()
+                    .is_some_and(|handle| handle.state().is_terminal())
+                {
+                    return;
+                }
+
                 let spawn_task = workspace.update_in(cx, |workspace, window, cx| {
                     workspace
                         .terminal_provider
                         .as_ref()
                         .map(|terminal_provider| {
-                            terminal_provider.spawn(spawn_in_terminal, window, cx)
+                            if let Some(handle) = structured_handle.clone() {
+                                terminal_provider.spawn_structured(
+                                    spawn_in_terminal,
+                                    handle,
+                                    window,
+                                    cx,
+                                )
+                            } else {
+                                terminal_provider.spawn(spawn_in_terminal, window, cx)
+                            }
                         })
                 });
                 if let Some(spawn_task) = spawn_task.ok().flatten() {
                     let res = cx.background_spawn(spawn_task).await;
                     let result = match res {
                         Some(Ok(status)) => {
+                            if let Some(handle) = structured_handle.as_ref() {
+                                if let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_completed(status, cx);
+                                }) {
+                                    log::debug!("Structured task window closed: {error:#}");
+                                }
+                            }
                             if status.success() {
                                 log::debug!("Task spawn succeeded");
                                 ScheduledTaskResult::Success
@@ -149,14 +202,30 @@ impl Workspace {
                             }
                         }
                         Some(Err(e)) => {
+                            if let Some(handle) = structured_handle.as_ref() {
+                                if let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_spawn_error(e.to_string(), cx);
+                                }) {
+                                    log::debug!("Structured task window closed: {error:#}");
+                                }
+                            }
                             log::error!("Task spawn failed: {e:#}");
-                            _ = workspace.update(cx, |w, cx| {
+                            if let Err(error) = workspace.update(cx, |w, cx| {
                                 let id = NotificationId::unique::<ResolvedTask>();
                                 w.show_toast(Toast::new(id, format!("Task spawn failed: {e}")), cx);
-                            });
+                            }) {
+                                log::debug!("Task error toast could not be shown: {error:#}");
+                            }
                             ScheduledTaskResult::SpawnFailed
                         }
                         None => {
+                            if let Some(handle) = structured_handle.as_ref()
+                                && let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_cancelled(handle.state().terminal_id(), false, cx);
+                                })
+                            {
+                                log::debug!("Structured task window closed: {error:#}");
+                            }
                             log::debug!("Task spawn got cancelled");
                             ScheduledTaskResult::Cancelled
                         }
@@ -164,11 +233,22 @@ impl Workspace {
                     if let Some(on_complete) = on_complete {
                         on_complete(result, cx);
                     }
-                } else if let Some(on_complete) = on_complete {
-                    on_complete(ScheduledTaskResult::Cancelled, cx);
+                } else {
+                    if let Some(handle) = structured_handle.as_ref()
+                        && let Err(error) = cx.update(|_, cx| {
+                            handle.mark_cancelled(handle.state().terminal_id(), false, cx);
+                        })
+                    {
+                        log::debug!("Structured task window closed: {error:#}");
+                    }
+                    if let Some(on_complete) = on_complete {
+                        on_complete(ScheduledTaskResult::Cancelled, cx);
+                    }
                 }
             });
             self.scheduled_tasks.push(task);
+        } else if let Some(handle) = structured_handle {
+            handle.mark_spawn_error("No terminal provider is available", cx);
         }
     }
 
@@ -335,6 +415,18 @@ impl Workspace {
             anyhow::Ok(())
         });
         task.detach_and_log_err(cx);
+    }
+}
+
+fn structured_task_connection_error(state: Option<ConnectionState>) -> Option<&'static str> {
+    match state {
+        None | Some(ConnectionState::Connected) => None,
+        Some(ConnectionState::Connecting) => Some("The project host is still connecting"),
+        Some(
+            ConnectionState::Disconnected
+            | ConnectionState::HeartbeatMissed
+            | ConnectionState::Reconnecting,
+        ) => Some("The project host is disconnected"),
     }
 }
 

@@ -5733,6 +5733,24 @@ impl AgentPanel {
 
                             menu = menu
                                 .separator()
+                                .header("MCP Servers")
+                                .action(
+                                    "Add Server…",
+                                    Box::new(zed_actions::OpenSettingsAt {
+                                        path: "context_servers".to_string(),
+                                        target: None,
+                                    }),
+                                )
+                                .action(
+                                    "Install New Servers…",
+                                    Box::new(zed_actions::Extensions {
+                                        category_filter: Some(
+                                            zed_actions::ExtensionCategoryFilter::ContextServers,
+                                        ),
+                                        id: None,
+                                    }),
+                                )
+                                .separator()
                                 .action("Profiles", Box::new(ManageProfiles::default()));
                         }
 
@@ -6175,7 +6193,7 @@ impl AgentPanel {
         let plan = self.user_store.read(cx).plan();
         let has_previous_trial = self.user_store.read(cx).trial_started_at().is_some();
 
-        plan.is_some_and(|plan| plan == Plan::ZedFree) && has_previous_trial
+        plan.is_some_and(|plan| plan == Plan::SimFree) && has_previous_trial
     }
 
     fn dismiss_ai_onboarding(&mut self, cx: &mut Context<Self>) {
@@ -6195,7 +6213,7 @@ impl AgentPanel {
 
         let user_store = self.user_store.read(cx);
 
-        if user_store.plan().is_some_and(|plan| plan == Plan::ZedPro)
+        if user_store.plan().is_some_and(|plan| plan == Plan::SimPro)
             && user_store
                 .subscription_period()
                 .and_then(|period| period.0.checked_add_days(chrono::Days::new(1)))
@@ -10884,6 +10902,7 @@ mod tests {
         let source_session_id = acp::SessionId::new("source-thread-session");
         let source_title: SharedString = "Source Thread Title".into();
         let db_thread = agent::DbThread {
+            goal: None,
             title: source_title.clone(),
             messages: Vec::new(),
             updated_at: Utc::now(),

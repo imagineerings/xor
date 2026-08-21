@@ -34,6 +34,7 @@ mod base_keymap_picker;
 mod basics_page;
 pub mod multibuffer_hint;
 mod theme_preview;
+mod workspace_choice;
 
 /// Imports settings from Visual Studio Code.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Deserialize, JsonSchema, Action)]
@@ -234,12 +235,12 @@ impl Onboarding {
             "signing_in"
         } else {
             match plan {
-                Some(Plan::ZedPro) => "pro",
-                Some(Plan::ZedProTrial) => "trial",
-                Some(Plan::ZedBusiness) => "business",
-                Some(Plan::ZedVip) => "vip",
-                Some(Plan::ZedStudent) => "student",
-                Some(Plan::ZedFree) | None => "free",
+                Some(Plan::SimPro) => "pro",
+                Some(Plan::SimProTrial) => "trial",
+                Some(Plan::SimBusiness) => "business",
+                Some(Plan::SimVip) => "vip",
+                Some(Plan::SimStudent) => "student",
+                Some(Plan::SimFree) | None => "free",
             }
         };
         let agents_installed = basics_page::FEATURED_AGENT_IDS

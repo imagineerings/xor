@@ -32,6 +32,27 @@ mod runners;
 mod steps;
 mod vars;
 
+const ARCHIVED_ZED_WORKFLOWS: &[&str] = &[
+    "after_release",
+    "autofix_pr",
+    "bump_patch_version",
+    "bump_zed_version",
+    "cherry_pick",
+    "compliance_check",
+    "danger",
+    "deploy_collab",
+    "deploy_docs",
+    "deploy_nightly_docs",
+    "extension_auto_bump",
+    "extension_bump",
+    "extension_tests",
+    "extension_workflow_rollout",
+    "nix_build",
+    "publish_extension_cli",
+    "release_nightly",
+    "run_bundling",
+];
+
 #[derive(Clone)]
 pub(crate) struct GitSha(String);
 
@@ -120,13 +141,39 @@ impl WorkflowFile {
         }
     }
 
-    fn generate_file(&self, workflow_args: &GenerateWorkflowArgs) -> Result<()> {
-        let workflow = match &self.source {
+    fn workflow(&self, workflow_args: &GenerateWorkflowArgs) -> Workflow {
+        match &self.source {
             WorkflowSource::Contextless(f) => f(),
             WorkflowSource::WithContext(f) => f(workflow_args),
-        };
-        let workflow_folder = self.r#type.folder_path();
+        }
+    }
 
+    fn active_output_path(&self, workflow_name: &str) -> Option<PathBuf> {
+        let workflow_file_stem = workflow_name.rsplit("::").next().unwrap_or(workflow_name);
+        if self.r#type == WorkflowType::Zed && ARCHIVED_ZED_WORKFLOWS.contains(&workflow_file_stem)
+        {
+            return None;
+        }
+
+        Some(
+            self.r#type
+                .folder_path()
+                .join(format!("{workflow_file_stem}.yml")),
+        )
+    }
+
+    fn generate_file(&self, workflow_args: &GenerateWorkflowArgs) -> Result<()> {
+        let workflow = self.workflow(workflow_args);
+
+        let workflow_name = workflow
+            .name
+            .as_ref()
+            .context("Workflow must have a name at this point")?;
+        let Some(workflow_path) = self.active_output_path(workflow_name) else {
+            return Ok(());
+        };
+
+        let workflow_folder = self.r#type.folder_path();
         fs::create_dir_all(&workflow_folder).with_context(|| {
             format!("Failed to create directory: {}", workflow_folder.display())
         })?;
@@ -151,6 +198,33 @@ impl WorkflowFile {
         let content = [disclaimer, content].join("\n");
         fs::write(&workflow_path, content).map_err(Into::into)
     }
+}
+
+fn workflow_files() -> impl IntoIterator<Item = WorkflowFile> {
+    [
+        WorkflowFile::zed(after_release::after_release),
+        WorkflowFile::zed(autofix_pr::autofix_pr),
+        WorkflowFile::zed(bump_patch_version::bump_patch_version),
+        WorkflowFile::zed(bump_zed_version::bump_zed_version),
+        WorkflowFile::zed(cherry_pick::cherry_pick),
+        WorkflowFile::zed(compliance_check::compliance_check),
+        WorkflowFile::zed(danger::danger),
+        WorkflowFile::zed(deploy_collab::deploy_collab),
+        WorkflowFile::zed(deploy_docs::deploy_docs),
+        WorkflowFile::zed(deploy_docs::deploy_nightly_docs),
+        WorkflowFile::zed(extension_bump::extension_bump),
+        WorkflowFile::zed(extension_auto_bump::extension_auto_bump),
+        WorkflowFile::zed(extension_tests::extension_tests),
+        WorkflowFile::zed(extension_workflow_rollout::extension_workflow_rollout),
+        WorkflowFile::zed(nix_build::nix_build),
+        WorkflowFile::zed(publish_extension_cli::publish_extension_cli),
+        WorkflowFile::zed(release::release),
+        WorkflowFile::zed(release_nightly::release_nightly),
+        WorkflowFile::zed(run_bundling::run_bundling),
+        WorkflowFile::zed(run_tests::run_tests),
+        WorkflowFile::extension(extensions::run_tests::run_tests),
+        WorkflowFile::extension_shared(extensions::bump_version::bump_version),
+    ]
 }
 
 #[derive(PartialEq, Eq, strum::EnumIter)]
@@ -219,35 +293,59 @@ pub fn run_workflows(args: GenerateWorkflowArgs) -> Result<()> {
     // Remove all previously generated workflows to ensure these do not become stale.
     WorkflowType::remove_generated_workflows()?;
 
-    let workflows = [
-        WorkflowFile::zed(after_release::after_release),
-        WorkflowFile::zed(autofix_pr::autofix_pr),
-        WorkflowFile::zed(bump_patch_version::bump_patch_version),
-        WorkflowFile::zed(bump_zed_version::bump_zed_version),
-        WorkflowFile::zed(cherry_pick::cherry_pick),
-        WorkflowFile::zed(compliance_check::compliance_check),
-        WorkflowFile::zed(danger::danger),
-        WorkflowFile::zed(deploy_collab::deploy_collab),
-        WorkflowFile::zed(deploy_docs::deploy_docs),
-        WorkflowFile::zed(deploy_docs::deploy_nightly_docs),
-        WorkflowFile::zed(extension_bump::extension_bump),
-        WorkflowFile::zed(extension_auto_bump::extension_auto_bump),
-        WorkflowFile::zed(extension_tests::extension_tests),
-        WorkflowFile::zed(extension_workflow_rollout::extension_workflow_rollout),
-        WorkflowFile::zed(nix_build::nix_build),
-        WorkflowFile::zed(publish_extension_cli::publish_extension_cli),
-        WorkflowFile::zed(release::release),
-        WorkflowFile::zed(release_nightly::release_nightly),
-        WorkflowFile::zed(run_bundling::run_bundling),
-        WorkflowFile::zed(run_tests::run_tests),
-        /* workflows used for CI/CD in extension repositories */
-        WorkflowFile::extension(extensions::run_tests::run_tests),
-        WorkflowFile::extension_shared(extensions::bump_version::bump_version),
-    ];
-
-    for workflow_file in workflows {
+    for workflow_file in workflow_files() {
         workflow_file.generate_file(&args)?;
     }
 
     workflow_checks::validate(Default::default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zed_workflow_generation_matches_archive_policy() -> Result<()> {
+        let workflow_args = GenerateWorkflowArgs { sha: None };
+        let mut active_workflow_files = Vec::new();
+        let mut archived_workflow_files = Vec::new();
+
+        for workflow_file in workflow_files() {
+            if workflow_file.r#type != WorkflowType::Zed {
+                continue;
+            }
+
+            let workflow = workflow_file.workflow(&workflow_args);
+            let workflow_name = workflow
+                .name
+                .as_deref()
+                .context("generated workflows must have a name")?;
+            let workflow_file_stem = workflow_name.rsplit("::").next().unwrap_or(workflow_name);
+            let filename = format!("{workflow_file_stem}.yml");
+
+            if workflow_file.active_output_path(workflow_name).is_some() {
+                active_workflow_files.push(filename);
+            } else {
+                archived_workflow_files.push(filename);
+            }
+        }
+
+        active_workflow_files.sort();
+        archived_workflow_files.sort();
+
+        assert_eq!(active_workflow_files, ["release.yml", "run_tests.yml"]);
+        assert_eq!(archived_workflow_files.len(), ARCHIVED_ZED_WORKFLOWS.len());
+        for workflow_name in ARCHIVED_ZED_WORKFLOWS {
+            assert!(archived_workflow_files.contains(&format!("{workflow_name}.yml")));
+            assert!(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../..")
+                    .join(".github/workflows/archive")
+                    .join(format!("{workflow_name}.yml"))
+                    .is_file()
+            );
+        }
+
+        Ok(())
+    }
 }

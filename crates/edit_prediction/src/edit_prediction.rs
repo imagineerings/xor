@@ -100,7 +100,7 @@ use crate::example_spec::RecentFile;
 use crate::license_detection::LicenseDetectionWatcher;
 use crate::mercury::Mercury;
 pub use crate::metrics::{KeptRateResult, compute_kept_rate};
-use crate::onboarding_modal::ZedPredictModal;
+use crate::onboarding_modal::SimPredictModal;
 use crate::prediction::EditPredictionResult;
 pub use crate::prediction::{EditPrediction, EditPredictionId, EditPredictionInputs};
 pub use language_model::ApiKeyState;
@@ -3077,7 +3077,7 @@ impl EditPredictionStore {
         {
             anyhow::ensure!(
                 *app_version >= minimum_required_version,
-                ZedUpdateRequiredError {
+                SimUpdateRequiredError {
                     minimum_version: minimum_required_version
                 }
             );
@@ -3466,7 +3466,7 @@ fn merge_anchor_ranges(
 #[error(
     "You must update to Zed version {minimum_version} or higher to continue using edit predictions."
 )]
-pub struct ZedUpdateRequiredError {
+pub struct SimUpdateRequiredError {
     minimum_version: Version,
 }
 
@@ -3474,7 +3474,7 @@ pub struct ZedUpdateRequiredError {
 #[error("Cloud request timed out")]
 pub(crate) struct CloudRequestTimeoutError;
 
-struct ZedPredictUpsell;
+struct SimPredictUpsell;
 
 fn is_upsell_dismissed(cx: &App) -> bool {
     // To make this backwards compatible with older versions of Zed, we
@@ -3490,12 +3490,12 @@ fn is_upsell_dismissed(cx: &App) -> bool {
         return true;
     }
 
-    kvp.read_kvp(ZedPredictUpsell::KEY)
+    kvp.read_kvp(SimPredictUpsell::KEY)
         .log_err()
         .is_some_and(|s| s.is_some())
 }
 
-impl Dismissable for ZedPredictUpsell {
+impl Dismissable for SimPredictUpsell {
     const KEY: &'static str = "dismissed-edit-predict-upsell";
 
     fn dismissed(cx: &App) -> bool {
@@ -3510,8 +3510,8 @@ pub fn should_show_upsell_modal(cx: &App) -> bool {
 pub fn init(cx: &mut App) {
     cx.observe_new(move |workspace: &mut Workspace, _, _cx| {
         workspace.register_action(
-            move |workspace, _: &zed_actions::OpenZedPredictOnboarding, window, cx| {
-                ZedPredictModal::toggle(
+            move |workspace, _: &zed_actions::OpenSimPredictOnboarding, window, cx| {
+                SimPredictModal::toggle(
                     workspace,
                     workspace.user_store().clone(),
                     workspace.client().clone(),
@@ -3547,9 +3547,9 @@ pub fn init(cx: &mut App) {
 }
 
 fn is_zed_industries_repo(url: &str) -> bool {
-    url.strip_prefix("https://github.com/zed-industries/")
-        .or_else(|| url.strip_prefix("http://github.com/zed-industries/"))
-        .or_else(|| url.strip_prefix("git@github.com:zed-industries/"))
-        .or_else(|| url.strip_prefix("ssh://git@github.com/zed-industries/"))
+    url.strip_prefix("https://github.com/simtropolis/")
+        .or_else(|| url.strip_prefix("http://github.com/simtropolis/"))
+        .or_else(|| url.strip_prefix("git@github.com:simtropolis/"))
+        .or_else(|| url.strip_prefix("ssh://git@github.com/simtropolis/"))
         .is_some_and(|repo| !repo.is_empty())
 }

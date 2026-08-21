@@ -2,7 +2,7 @@
 description = "The fast, collaborative code editor."
 edition.workspace = true
 name = "zed"
-version = "1.16.1"
+version = "1.16.2"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Zed Team <hi@zed.dev>"]
@@ -12,7 +12,37 @@ default-run = "zed"
 workspace = true
 
 [features]
+default = []
+multiplayer-tools = [
+    "agent_ui/multiplayer-tools",
+    "channel/multiplayer-tools",
+    "git_ui/multiplayer-tools",
+    "onboarding/multiplayer-tools",
+    "sidebar/multiplayer-tools",
+    "zed_credentials_provider/multiplayer-tools",
+    "workspace/multiplayer-tools",
+]
+comfy = [
+    "dep:comfy_api",
+    "dep:comfy_model",
+    "dep:comfy_plugin_host",
+    "dep:comfy_runtime",
+    "dep:comfy_tensor",
+    "dep:comfy_types",
+    "dep:comfy_ui",
+]
+comfy-test-support = ["comfy", "test-support", "comfy_ui/test-support"]
+rust-tools = ["dep:cargo_ui", "tasks_ui/rust-test-actions"]
+corex = ["comfy", "comfy_runtime/corex"]
+cuda = ["comfy", "comfy_runtime/cuda"]
+directml = ["comfy", "comfy_runtime/directml"]
+metal = ["comfy", "comfy_runtime/metal"]
+mlu = ["comfy", "comfy_runtime/mlu"]
+npu = ["comfy", "comfy_runtime/npu"]
+rocm = ["comfy", "comfy_runtime/rocm"]
+xpu = ["comfy", "comfy_runtime/xpu"]
 tracy = ["ztracing/tracy"]
+runtime-shaders = ["gpui_platform/runtime_shaders"]
 # LEAK_BACKTRACE=1 cargo run --features zed/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
@@ -63,6 +93,15 @@ path = "src/visual_test_runner.rs"
 required-features = ["visual-tests"]
 
 [dependencies]
+async-channel.workspace = true
+cargo_ui = { workspace = true, optional = true }
+comfy_api = { workspace = true, optional = true }
+comfy_model = { workspace = true, optional = true }
+comfy_plugin_host = { workspace = true, optional = true }
+comfy_runtime = { workspace = true, optional = true }
+comfy_tensor = { workspace = true, optional = true }
+comfy_types = { workspace = true, optional = true }
+comfy_ui = { workspace = true, optional = true }
 acp_tools.workspace = true
 activity_indicator.workspace = true
 agent.workspace = true
@@ -188,6 +227,8 @@ sandbox.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
 session.workspace = true
 settings.workspace = true
 settings_profile_selector.workspace = true

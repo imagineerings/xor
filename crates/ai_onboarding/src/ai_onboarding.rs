@@ -39,7 +39,7 @@ impl From<client::Status> for SignInStatus {
 }
 
 #[derive(RegisterComponent, IntoElement)]
-pub struct ZedAiOnboarding {
+pub struct SimAiOnboarding {
     pub sign_in_status: SignInStatus,
     pub plan: Option<Plan>,
     pub account_too_young: bool,
@@ -48,7 +48,7 @@ pub struct ZedAiOnboarding {
     pub dismiss_onboarding: Option<Arc<dyn Fn(&mut Window, &mut App)>>,
 }
 
-impl ZedAiOnboarding {
+impl SimAiOnboarding {
     pub fn new(
         client: Arc<Client>,
         user_store: &Entity<UserStore>,
@@ -378,17 +378,17 @@ impl ZedAiOnboarding {
     }
 }
 
-impl RenderOnce for ZedAiOnboarding {
+impl RenderOnce for SimAiOnboarding {
     fn render(self, _window: &mut ui::Window, cx: &mut App) -> impl IntoElement {
         if matches!(self.sign_in_status, SignInStatus::SignedIn) {
             match self.plan {
                 None => self.render_free_plan_state(cx),
-                Some(Plan::ZedFree) => self.render_free_plan_state(cx),
-                Some(Plan::ZedProTrial) => self.render_trial_state(cx),
-                Some(Plan::ZedPro) => self.render_pro_plan_state(cx),
-                Some(Plan::ZedBusiness) => self.render_business_plan_state(cx),
-                Some(Plan::ZedVip) => self.render_vip_plan_state(cx),
-                Some(Plan::ZedStudent) => self.render_student_plan_state(cx),
+                Some(Plan::SimFree) => self.render_free_plan_state(cx),
+                Some(Plan::SimProTrial) => self.render_trial_state(cx),
+                Some(Plan::SimPro) => self.render_pro_plan_state(cx),
+                Some(Plan::SimBusiness) => self.render_business_plan_state(cx),
+                Some(Plan::SimVip) => self.render_vip_plan_state(cx),
+                Some(Plan::SimStudent) => self.render_student_plan_state(cx),
             }
         } else {
             self.render_sign_in_disclaimer(cx)
@@ -396,7 +396,7 @@ impl RenderOnce for ZedAiOnboarding {
     }
 }
 
-impl Component for ZedAiOnboarding {
+impl Component for SimAiOnboarding {
     fn scope() -> ComponentScope {
         ComponentScope::Onboarding
     }
@@ -423,7 +423,7 @@ impl Component for ZedAiOnboarding {
                 .max_w(px(1100.))
                 .child(
                     AgentPanelOnboardingCard::new().child(
-                        ZedAiOnboarding {
+                        SimAiOnboarding {
                             sign_in_status,
                             plan,
                             account_too_young,
@@ -451,27 +451,27 @@ impl Component for ZedAiOnboarding {
                 ),
                 single_example(
                     "Free Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedFree), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimFree), false),
                 ),
                 single_example(
                     "Pro Trial",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedProTrial), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimProTrial), false),
                 ),
                 single_example(
                     "Pro Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedPro), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimPro), false),
                 ),
                 single_example(
                     "Business Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedBusiness), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimBusiness), false),
                 ),
                 single_example(
                     "VIP Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedVip), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimVip), false),
                 ),
                 single_example(
                     "Student Plan",
-                    onboarding(SignInStatus::SignedIn, Some(Plan::ZedStudent), false),
+                    onboarding(SignInStatus::SignedIn, Some(Plan::SimStudent), false),
                 ),
             ])
             .into_any_element()

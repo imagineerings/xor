@@ -7,7 +7,7 @@ description: "Configure Diff language support in Zed, including language servers
 
 Diff support is available natively in Zed.
 
-- Tree-sitter: [zed-industries/the-mikedavis/tree-sitter-diff](https://github.com/the-mikedavis/tree-sitter-diff)
+- Tree-sitter: [simtropolis/the-mikedavis/tree-sitter-diff](https://github.com/the-mikedavis/tree-sitter-diff)
 
 ## Configuration
 

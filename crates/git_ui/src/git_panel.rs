@@ -102,10 +102,9 @@ use workspace::{
     dock::{DockPosition, Panel, PanelEvent},
     notifications::{DetachAndPromptErr, NotificationId, NotifyTaskExt},
 };
+use zed_actions::workspace::{CopyPath, CopyRelativePath};
 use zed_actions::{
-    DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize,
-    git_panel::ToggleFocus,
-    workspace::{CopyPath, CopyRelativePath},
+    DecreaseBufferFontSize, IncreaseBufferFontSize, ResetBufferFontSize, git_panel::ToggleFocus,
 };
 
 const GIT_PANEL_KEY: &str = "GitPanel";
@@ -1029,6 +1028,9 @@ pub struct GitPanel {
     reopen_commit_buffer_task: Task<()>,
     pub(crate) workspace: WeakEntity<Workspace>,
     context_menu: Option<GitPanelContextMenu>,
+    commit_menu_handle: PopoverMenuHandle<ContextMenu>,
+    changes_actions_menu_handle: PopoverMenuHandle<ContextMenu>,
+    remote_action_menu_handle: PopoverMenuHandle<ContextMenu>,
     modal_open: bool,
     show_placeholders: bool,
     // Only read to compute collaborative co-authors, which requires the `call` feature.
@@ -1047,9 +1049,6 @@ pub struct GitPanel {
     _repo_subscriptions: Vec<Subscription>,
     _settings_subscription: Subscription,
     git_access: Option<GitAccess>,
-    commit_menu_handle: PopoverMenuHandle<ContextMenu>,
-    changes_actions_menu_handle: PopoverMenuHandle<ContextMenu>,
-    remote_action_menu_handle: PopoverMenuHandle<ContextMenu>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1334,6 +1333,9 @@ impl GitPanel {
                 local_committer_task: None,
                 commit_template: None,
                 context_menu: None,
+                commit_menu_handle: PopoverMenuHandle::default(),
+                changes_actions_menu_handle: PopoverMenuHandle::default(),
+                remote_action_menu_handle: PopoverMenuHandle::default(),
                 workspace: workspace.weak_handle(),
                 modal_open: false,
                 entry_count: 0,
@@ -1348,9 +1350,6 @@ impl GitPanel {
                 _repo_subscriptions: Vec::new(),
                 _settings_subscription,
                 git_access: None,
-                commit_menu_handle: PopoverMenuHandle::default(),
-                changes_actions_menu_handle: PopoverMenuHandle::default(),
-                remote_action_menu_handle: PopoverMenuHandle::default(),
             };
 
             this.schedule_update(window, cx);
@@ -5424,6 +5423,10 @@ impl GitPanel {
                 ))
             })
             .anchor(Anchor::TopRight)
+            .offset(gpui::Point {
+                x: px(0.),
+                y: px(2.),
+            })
     }
 
     pub(crate) fn render_generate_commit_message_button(
@@ -8952,7 +8955,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("zed-industries-community-examples"),
+                                    SharedString::from("simtropolis-community-examples"),
                                     Some(custom("gpui", ahead_of_upstream)),
                                 ))
                                 .into_any_element(),
@@ -8963,7 +8966,7 @@ impl Component for PanelRepoFooter {
                                 .w(example_width)
                                 .overflow_hidden()
                                 .child(PanelRepoFooter::new_preview(
-                                    SharedString::from("zed-industries-community-examples"),
+                                    SharedString::from("simtropolis-community-examples"),
                                     Some(custom(
                                         "redesign-and-update-git-ui-list-entry-style",
                                         behind_upstream,

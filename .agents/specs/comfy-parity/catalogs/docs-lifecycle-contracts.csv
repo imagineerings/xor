@@ -1,0 +1,21 @@
+record_id,name,documented_behavior,corroborated_feature_ids,native_parity_treatment,evidence_level
+COMFY-DOC-LIFECYCLE-D33111910C80,Embedded docs optional load,ComfyUI imports comfyui_embedded_docs; absence logs and omits /docs,COMFY-API-0090,native resource registry reports package/version absence,documented-only
+COMFY-DOC-LIFECYCLE-FD4D12B23B9F,Embedded docs version skew,ComfyUI pins 0.5.6 while this source snapshot declares 0.5.7,,version negotiation and fixture pinning,documented-only
+COMFY-DOC-LIFECYCLE-FDD9993027AB,V1 custom-node failure isolation,Failed Python import does not stop remaining startup,COMFY-EXT-003,plugin quarantine with visible error,documented-only
+COMFY-DOC-LIFECYCLE-560536718162,V3 extension on_load,Async extension initialization precedes node availability,COMFY-EXT-007,bounded native/WASM initialization task,documented-only
+COMFY-DOC-LIFECYCLE-75FC2D14E96F,Node replacement before validation,Legacy identifiers and ports migrate before prompt validation,COMFY-EXEC-004; COMFY-EXT-022,native migration stage,documented-only
+COMFY-DOC-LIFECYCLE-E75059CADF6E,Frontend extension init sequence,init through setup and graph hooks run in documented order,COMFY-FRONTEXT-EXT-046; COMFY-FRONTEXT-EXT-059,ordered capability-port lifecycle,documented-only
+COMFY-DOC-LIFECYCLE-F78EF68D3819,Translation incremental resume,Hashes skip unchanged blocks and checkpoint each translated block,,documentation infrastructure only,documented-only
+COMFY-DOC-LIFECYCLE-450BA9F5FA08,Translation truncation recovery,Detect missing fences/sections and repair or retranslate,,documentation infrastructure only,documented-only
+COMFY-DOC-LIFECYCLE-196EAC3132BF,Analytics checkpoint resume,Flush store/checkpoint and resume after interruption or rate errors,,documentation infrastructure only,documented-only
+COMFY-DOC-LIFECYCLE-10CD9C2F0A22,CMS staged publish,"Prepare English, translate locales, sync drafts, then explicitly publish",,documentation infrastructure only,documented-only
+COMFY-DOC-LIFECYCLE-68D3CCA9AB7D,Cloud async job,"Submit, poll/watch, cancel, and collect output",,deferred provider contract until executable service evidence,documented-only
+COMFY-DOC-LIFECYCLE-7756ED65A12C,CLI local/cloud routing,Resolve local or cloud with per-call/environment/persisted override,,reconcile with executable comfy-cli catalog,documented-only
+COMFY-DOC-LIFECYCLE-854F0C216848,CLI background server,Launch in background and stop later,,conformance-oracle lifecycle only; production Zed remains native,documented-only
+COMFY-DOC-LIFECYCLE-47498BA0546A,Desktop install and first run,Platform installation/onboarding pages describe managed lifecycle,,reconcile against Desktop executable catalog,documented-only
+COMFY-DOC-LIFECYCLE-B60918A257C3,Desktop snapshots and migration,"Snapshot, rollback, instance management, and migration pages",,reconcile against Desktop executable catalog,documented-only
+COMFY-DOC-LIFECYCLE-A60610585D89,Documentation redirect migration,65 source paths redirect to current documentation destinations,,documentation-site compatibility only,documented-only
+COMFY-DOC-LIFECYCLE-6930344F36FF,Cloud queue compatibility exceptions,Cloud ignores or changes selected local-compatible fields,,documented-only cloud semantic delta,documented-only
+COMFY-DOC-LIFECYCLE-5F3C7EC401C7,Uploaded reference expiration,CLI docs claim cloud assets delete after 24 hours,,documented-only external lifecycle,documented-only
+COMFY-DOC-LIFECYCLE-1A6D3264FBC0,OAuth token refresh,CLI docs claim short-lived session and on-demand refresh,,reconcile against executable comfy-cli source,documented-only
+COMFY-DOC-LIFECYCLE-73791F94B5EE,Embedded package publication,"pyproject change or manual dispatch builds, publishes, tags, and releases",,repository infrastructure only,documented-only

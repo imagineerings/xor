@@ -63,6 +63,7 @@ pub struct ListItem {
     aria_label: Option<SharedString>,
     aria_keyshortcuts: Option<SharedString>,
     aria_checked: Option<bool>,
+    aria_expanded: Option<bool>,
     aria_active_descendant: bool,
 }
 
@@ -99,6 +100,7 @@ impl ListItem {
             aria_label: None,
             aria_keyshortcuts: None,
             aria_checked: None,
+            aria_expanded: None,
             aria_active_descendant: false,
         }
     }
@@ -116,6 +118,11 @@ impl ListItem {
     /// label exists.
     pub fn aria_label(mut self, label: impl Into<SharedString>) -> Self {
         self.aria_label = Some(label.into());
+        self
+    }
+
+    pub fn aria_expanded(mut self, expanded: bool) -> Self {
+        self.aria_expanded = Some(expanded);
         self
     }
 
@@ -345,17 +352,25 @@ impl RenderOnce for ListItem {
                     .when_some(self.aria_keyshortcuts, |this, keyshortcuts| {
                         this.aria_keyshortcuts(keyshortcuts)
                     })
+                    .when_some(self.aria_expanded, |this, expanded| {
+                        this.aria_expanded(expanded)
+                    })
                     .when(self.aria_role.is_some(), |this| {
-                        this.aria_selected(self.selected).when_some(
-                            self.aria_checked.or(self.toggle),
-                            |this, toggled| {
+                        this.aria_disabled(self.disabled)
+                            .when(
+                                !matches!(
+                                    self.aria_role,
+                                    Some(Role::MenuItem | Role::MenuItemCheckBox)
+                                ),
+                                |this| this.aria_selected(self.selected),
+                            )
+                            .when_some(self.aria_checked.or(self.toggle), |this, toggled| {
                                 this.aria_toggled(if toggled {
                                     gpui::Toggled::True
                                 } else {
                                     gpui::Toggled::False
                                 })
-                            },
-                        )
+                            })
                     })
                     .group("list_item")
                     .w_full()

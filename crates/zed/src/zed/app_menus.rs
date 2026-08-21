@@ -40,6 +40,8 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
         MenuItem::separator(),
         MenuItem::action("Project Panel", project_panel::ToggleFocus),
         MenuItem::action("Outline Panel", outline_panel::ToggleFocus),
+        #[cfg(feature = "rust-tools")]
+        MenuItem::action("Cargo", cargo_ui::ToggleCargoPanel),
         MenuItem::action("Collab Panel", collab_panel::ToggleFocus),
         MenuItem::action("Terminal Panel", terminal_panel::Toggle),
         MenuItem::action("Debugger Panel", debug_panel::ToggleFocus),
@@ -275,6 +277,8 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::action("Clear All Breakpoints", debugger_ui::ClearAllBreakpoints),
             ],
         },
+        #[cfg(feature = "comfy")]
+        comfy_ui::comfy_menu(),
         Menu {
             name: "Window".into(),
             disabled: false,
@@ -298,7 +302,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 MenuItem::separator(),
                 MenuItem::action("File Bug Report...", zed_actions::feedback::FileBugReport),
                 MenuItem::action("Request Feature...", zed_actions::feedback::RequestFeature),
-                MenuItem::action("Email Us...", zed_actions::feedback::EmailZed),
+                MenuItem::action("Email Us...", zed_actions::feedback::EmailSim),
                 MenuItem::separator(),
                 MenuItem::action(
                     "Documentation",
@@ -306,7 +310,7 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                         url: "https://zed.dev/docs".into(),
                     },
                 ),
-                MenuItem::action("Zed Repository", feedback::OpenZedRepo),
+                MenuItem::action("Zed Repository", feedback::OpenSimRepo),
                 MenuItem::action(
                     "Zed Twitter",
                     super::OpenBrowser {

@@ -1,0 +1,21 @@
+registry,discovered,cataloged,reconciliation
+Source plugins,6,6,"standalone, portable, git, cloud, remote, and legacy desktop are distinct rows."
+Current settings/schema keys,27,27,Every current KnownSettings/SETTINGS_SCHEMA contract is represented.
+Discarded legacy settings,4,4,"primaryInstallId, pinnedInstallIds, maxCachedFiles, and closeDirectlyOnLastWindow are explicit deprecated/dead load-time removal contracts."
+IPC contract union,273,273,Request/response and one-way directions retain exact static source signatures and explicit runtime uncertainty.
+Preload API members,299,299,Nine context-isolated bridge surfaces are enumerated member by member.
+Menu/context actions,45,45,All rows are code-inferred because no focused test was attached to each exact item and condition.
+Title-bar/chooser shell actions,26,26,Title-bar and conditional chooser actions are distinct.
+Window/application/WebContents/updater events,44,44,"Includes will-navigate, did-navigate-in-page, embedded-popup blur, Firebase console-message, update-available, update-downloaded, and download-progress."
+Keyboard/mouse/drop gestures,19,19,Hosted view terminal modal menu card snapshot reorder and developer inputs are distinct.
+Persisted artifacts,36,36,"Includes the four previously omitted one-shot/model-path artifacts and the process.ts port-lock source."
+Production comfy.desktop.* and app:* literals,139,139,"137 comfy.desktop.* plus app:relaunch and app:user_logged_in; tracked-step bases retain their derived .start/.end/.error wire names."
+Datadog-mirrored literal event names,23,23,Every exact allow-list name retains the matching production emitter or derived tracked-step evidence.
+Feature flags,3,3,Two PostHog flags plus one negotiated Comfy flag.
+CLI flags and environment variables,74,74,39 command-line flags plus 35 environment variables.
+Renderer CSS custom properties,21,21,Separated from command-line flags including two main-host injected CSS variables.
+Production Vue renderer surfaces absent from prior direct Desktop catalog evidence,43,43,"41 functional contracts and two explicit presentational/infrastructure dispositions; every row has exact props/emits/handlers and its stable ID is mapped back into desktop-source-coverage.csv."
+Localized scalar paths per locale,1176,1176,English and Chinese key sets match.
+Source tree files,735,735,Every vendored file is mapped or explicitly classified.
+Test files,232,232,Existing tests are inventoried but were not executed in this environment.
+Test suite-or-case declarations,3422,3422,Declaration count is retained in desktop-tests.csv.

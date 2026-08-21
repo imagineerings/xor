@@ -2,7 +2,7 @@
 AppId={#AppId}
 AppName={#AppName}
 AppVerName={#AppDisplayName}
-AppPublisher=Zed Industries
+AppPublisher=Simtropolis
 AppPublisherURL=https://www.zed.dev/
 AppSupportURL=https://www.zed.dev/
 AppUpdatesURL=https://www.zed.dev/
@@ -66,6 +66,9 @@ Name: "{app}"; AfterInstall: DisableAppDirInheritance
 
 [Files]
 Source: "{#ResourcesDir}\Zed.exe"; DestDir: "{code:GetInstallDir}"; Flags: ignoreversion
+#ifdef Comfy
+Source: "{#ResourcesDir}\comfy-worker.exe"; DestDir: "{code:GetInstallDir}"; Flags: ignoreversion
+#endif
 Source: "{#ResourcesDir}\bin\*"; DestDir: "{code:GetInstallDir}\bin"; Flags: ignoreversion
 Source: "{#ResourcesDir}\tools\*"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "{#ResourcesDir}\appx\*"; DestDir: "{app}\appx";  BeforeInstall: RemoveAppxPackage; AfterInstall: AddAppxPackage; Flags: ignoreversion; Check: IsWindows11OrLater

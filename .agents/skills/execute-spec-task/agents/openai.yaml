@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execute Spec Task"
+  short_description: "Implement one task from an approved spec"
+  default_prompt: "Use $execute-spec-task to implement the next approved task from this feature specification."

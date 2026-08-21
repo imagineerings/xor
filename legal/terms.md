@@ -5,7 +5,7 @@ slug: terms
 
 **Last Updated**: March 2, 2026
 
-Welcome, and thank you for your interest in Zed Industries, Inc. (“**Zed**,” “**we**,” or “**us**”) and our website at [www.zed.dev](https://www.zed.dev), along with our downloadable Zed software (the “**Software**”) and related subscription service (the “**Service**”). These Terms of Service are a legally binding contract between you and Zed regarding your use of the Service.
+Welcome, and thank you for your interest in Simtropolis, Inc. (“**Zed**,” “**we**,” or “**us**”) and our website at [www.zed.dev](https://www.zed.dev), along with our downloadable Zed software (the “**Software**”) and related subscription service (the “**Service**”). These Terms of Service are a legally binding contract between you and Zed regarding your use of the Service.
 
 Please read the following Terms carefully.
 
@@ -185,7 +185,7 @@ The Terms are governed by the laws of the State of Delaware and the United State
 
 ANY CONTROVERSY OR CLAIM ARISING OUT OF OR RELATING TO THESE TERMS, OR THE BREACH THEREOF, SHALL BE SETTLED BY ARBITRATION AND JUDGMENT ON THE AWARD RENDERED BY THE ARBITRATOR MAY BE ENTERED IN ANY COURT HAVING JURISDICTION THEREOF. IF THERE IS A DISPUTE ABOUT WHETHER THIS ARBITRATION AGREEMENT CAN BE ENFORCED OR APPLIES TO THE DISPUTE, CUSTOMER AND ZED AGREE THAT THE ARBITRATOR WILL DECIDE THAT ISSUE.
 
-**a. Opt-Out.** If Customer does not wish to resolve disputes by binding arbitration, Customer may opt out of the provisions of this Section 17.2 (Dispute Resolution and Arbitration) within 30 days after the date that Customer agrees to these Terms by sending an email to [arbitration-opt-out@zed.dev](mailto:arbitration-opt-out@zed.dev) or a letter to Zed Industries, Inc., Attention: Legal Department – Arbitration Opt-Out, 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 that specifies: Customer’s full legal name, the email address associated with Customer’s account on the Service, and a statement that Customer wishes to opt out of arbitration (“**Opt-Out Notice**”). Once Zed receives Customer’s Opt-Out Notice, this Section 15.2 (Dispute Resolution and Arbitration) will be void and any action arising out of these Terms will be resolved as set forth in Section 15.1 (Governing Law). The remaining provisions of these Terms will not be affected by Customer’s Opt-Out Notice.
+**a. Opt-Out.** If Customer does not wish to resolve disputes by binding arbitration, Customer may opt out of the provisions of this Section 17.2 (Dispute Resolution and Arbitration) within 30 days after the date that Customer agrees to these Terms by sending an email to [arbitration-opt-out@zed.dev](mailto:arbitration-opt-out@zed.dev) or a letter to Simtropolis, Inc., Attention: Legal Department – Arbitration Opt-Out, 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 that specifies: Customer’s full legal name, the email address associated with Customer’s account on the Service, and a statement that Customer wishes to opt out of arbitration (“**Opt-Out Notice**”). Once Zed receives Customer’s Opt-Out Notice, this Section 15.2 (Dispute Resolution and Arbitration) will be void and any action arising out of these Terms will be resolved as set forth in Section 15.1 (Governing Law). The remaining provisions of these Terms will not be affected by Customer’s Opt-Out Notice.
 
 **b. Pre-Arbitration Dispute Resolution and Notification.** Prior to initiating an arbitration, Customer and Zed each agree to notify the other party of the dispute and attempt to negotiate an informal resolution to it first. Zed will contact Customer at the email address Customer has provided to Zed; Customer can contact Zed by email at [legal@zed.dev](mailto:legal@zed.dev). If after a good faith effort to negotiate, one party feels the dispute has not and cannot be resolved informally, the party intending to pursue arbitration agrees to notify the other party via email prior to initiating the arbitration.
 
@@ -207,7 +207,7 @@ These Terms, including the Privacy Policy and any other agreements expressly inc
 
 ### 16.2. Notices
 
-Except as set out in the Terms, any notice or consent under the Terms must be in writing to the Customer email address on the Order and Customer shall send all notices to Zed at Zed Industries, Inc., 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@zed.dev](mailto:legal@zed.dev) and will be deemed given: (a) upon receipt if by personal delivery; (b) upon receipt if by certified or registered U.S. mail (return receipt requested); or (c) one day after dispatch if by a commercial overnight delivery service. Either Party may update its address with notice to the other Party pursuant to this Section. Zed may also send operational notices to Customer by email or through the Service.
+Except as set out in the Terms, any notice or consent under the Terms must be in writing to the Customer email address on the Order and Customer shall send all notices to Zed at Simtropolis, Inc., 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@zed.dev](mailto:legal@zed.dev) and will be deemed given: (a) upon receipt if by personal delivery; (b) upon receipt if by certified or registered U.S. mail (return receipt requested); or (c) one day after dispatch if by a commercial overnight delivery service. Either Party may update its address with notice to the other Party pursuant to this Section. Zed may also send operational notices to Customer by email or through the Service.
 
 ### 16.3. DPA
 
@@ -247,7 +247,7 @@ By using the Service, Customer consents to receiving certain electronic communic
 
 ### 16.12. Contact Information
 
-The Service is offered by Zed Industries, Inc. Customer may contact Zed by sending correspondence to 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@zed.dev](mailto:legal@zed.dev).
+The Service is offered by Simtropolis, Inc. Customer may contact Zed by sending correspondence to 2590 Welton Street, Suite 200, PMB 1916, Denver, CO 80205 with cc: to [legal@zed.dev](mailto:legal@zed.dev).
 
 ### 16.13. Notice to California Residents
 

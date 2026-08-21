@@ -7578,8 +7578,7 @@ impl LspStore {
                                 })
                             };
 
-                            // Skip additional edits which overlap with the primary completion edit
-                            // https://github.com/zed-industries/zed/pull/1871
+                            // Skip additional edits which overlap with the primary completion edit.
                             if !has_overlap {
                                 buffer.edit([(range, text)], None, cx);
                             }

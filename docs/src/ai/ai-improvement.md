@@ -72,7 +72,7 @@ these conditions are met:
 1. You opt in by toggling **Training Data Collection** under the **Privacy**
    section of the Edit Prediction status bar menu.
 2. The project is open source, detected by the presence of a license file. See
-   the [license detection logic](https://github.com/zed-industries/zed/blob/main/crates/edit_prediction/src/license_detection.rs).
+   the [license detection logic](https://github.com/simtropolis/zed/blob/main/crates/edit_prediction/src/license_detection.rs).
 3. The file is not excluded by `edit_predictions.disabled_globs`.
 
 Edit Prediction setup and provider configuration live on the
@@ -128,14 +128,14 @@ data is anonymized and stripped of sensitive information such as access tokens,
 user IDs, and email addresses.
 
 The training dataset is publicly available at
-[huggingface.co/datasets/zed-industries/zeta](https://huggingface.co/datasets/zed-industries/zeta).
+[huggingface.co/datasets/simtropolis/zeta](https://huggingface.co/datasets/simtropolis/zeta).
 
 ### Training Dataset and Model Output {#training-dataset-and-model-output}
 
 Zed uses this training dataset to fine-tune
 [Qwen2.5-Coder-7B](https://huggingface.co/Qwen/Qwen2.5-Coder-7B) and makes the
 resulting model available at
-[huggingface.co/zed-industries/zeta](https://huggingface.co/zed-industries/zeta).
+[huggingface.co/simtropolis/zeta](https://huggingface.co/simtropolis/zeta).
 
 ## Business Controls {#business-controls}
 

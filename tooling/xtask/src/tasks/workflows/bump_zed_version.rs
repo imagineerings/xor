@@ -101,9 +101,7 @@ fn resolve_versions() -> (steps::NamedJob, ResolvedOutputs) {
 
     let job = named::job(
         Job::default()
-            .cond(Expression::new(
-                "github.repository_owner == 'zed-industries'",
-            ))
+            .cond(Expression::new("github.repository_owner == 'simtropolis'"))
             .runs_on(runners::LINUX_XL)
             .add_step(authenticate)
             .add_step(steps::checkout_repo().with_token(&token).with_ref("main"))

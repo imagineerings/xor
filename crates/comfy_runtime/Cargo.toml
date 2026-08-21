@@ -1,0 +1,67 @@
+[package]
+name = "comfy_runtime"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+license = "GPL-3.0-or-later"
+[lints]
+workspace = true
+[lib]
+path = "src/comfy_runtime.rs"
+[features]
+default = []
+signing-tooling = []
+test-support = ["db/test-support"]
+corex = ["dep:comfy_backend_corex"]
+cuda = ["dep:comfy_backend_cuda"]
+directml = ["dep:comfy_backend_directml"]
+metal = ["dep:comfy_backend_metal"]
+mlu = ["dep:comfy_backend_mlu"]
+npu = ["dep:comfy_backend_npu"]
+rocm = ["dep:comfy_backend_rocm"]
+xpu = ["dep:comfy_backend_xpu"]
+[dependencies]
+anyhow.workspace = true
+async-channel.workspace = true
+base64.workspace = true
+chrono.workspace = true
+clock.workspace = true
+comfy_backend_corex = { workspace = true, optional = true }
+comfy_backend_cuda = { workspace = true, optional = true }
+comfy_backend_directml = { workspace = true, optional = true }
+comfy_backend_metal = { workspace = true, optional = true }
+comfy_backend_mlu = { workspace = true, optional = true }
+comfy_backend_npu = { workspace = true, optional = true }
+comfy_backend_rocm = { workspace = true, optional = true }
+comfy_backend_xpu = { workspace = true, optional = true }
+comfy_media.workspace = true
+comfy_model.workspace = true
+comfy_nodes.workspace = true
+comfy_plugin_sdk.workspace = true
+comfy_sampler.workspace = true
+comfy_tensor.workspace = true
+comfy_types.workspace = true
+db.workspace = true
+futures.workspace = true
+parking_lot.workspace = true
+postcard.workspace = true
+ring.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+sha2.workspace = true
+settings_content.workspace = true
+smol.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+url.workspace = true
+util.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }
+db = { workspace = true, features = ["test-support"] }

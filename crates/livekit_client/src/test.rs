@@ -25,6 +25,171 @@ impl std::fmt::Display for TrackSid {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::TestAppContext;
+    use livekit_api::Client as _;
+    use std::{ops::Deref, sync::atomic::AtomicUsize};
+
+    struct TestServerGuard {
+        server: Arc<TestServer>,
+        timestamp_source: Arc<ManualUnixTimestampSource>,
+    }
+
+    impl TestServerGuard {
+        fn advance_timestamp(&self) {
+            self.timestamp_source.advance();
+        }
+    }
+
+    impl Deref for TestServerGuard {
+        type Target = TestServer;
+
+        fn deref(&self) -> &Self::Target {
+            self.server.as_ref()
+        }
+    }
+
+    impl Drop for TestServerGuard {
+        fn drop(&mut self) {
+            self.server.teardown().ok();
+        }
+    }
+
+    fn create_test_server(name: &str, executor: BackgroundExecutor) -> TestServerGuard {
+        static NEXT_SERVER_ID: AtomicUsize = AtomicUsize::new(0);
+        let server_id = NEXT_SERVER_ID.fetch_add(1, SeqCst);
+        let timestamp_source = Arc::new(ManualUnixTimestampSource::new(1_234_567));
+        let server = TestServer::create_with_timestamp_source(
+            format!("http://livekit-{name}-{server_id}.test"),
+            format!("api-key-{server_id}"),
+            format!("secret-key-{server_id}"),
+            executor,
+            timestamp_source.clone(),
+        )
+        .expect("create LiveKit test server");
+        TestServerGuard {
+            server,
+            timestamp_source,
+        }
+    }
+
+    async fn assert_token_was_revoked(server: &TestServer, token: String, cx: &mut TestAppContext) {
+        match Room::connect(server.url.clone(), token, &mut cx.to_async()).await {
+            Ok(_) => panic!("revoked token unexpectedly connected"),
+            Err(error) => {
+                let error = format!("{error:#}");
+                assert!(
+                    error.contains("invalid token: revoked"),
+                    "expected revoked token error, got {error}"
+                );
+            }
+        }
+    }
+
+    #[gpui::test]
+    async fn token_created_after_participant_removal_can_join(
+        executor: BackgroundExecutor,
+        cx: &mut TestAppContext,
+    ) {
+        let server = create_test_server("room-token", executor);
+        server
+            .create_room("room".into())
+            .await
+            .expect("create LiveKit test room");
+        let api_client = server.create_api_client();
+
+        let initial_token = api_client
+            .room_token("room", "participant")
+            .expect("create initial room token");
+        let (initial_room, _) = Room::connect(
+            server.url.clone(),
+            initial_token.clone(),
+            &mut cx.to_async(),
+        )
+        .await
+        .expect("connect with initial room token");
+
+        server.advance_timestamp();
+        api_client
+            .remove_participant("room".into(), "participant".into())
+            .await
+            .expect("remove participant");
+
+        assert_eq!(
+            initial_room.connection_state(),
+            ConnectionState::Disconnected
+        );
+        assert_token_was_revoked(&server, initial_token, cx).await;
+
+        let fresh_token = api_client
+            .room_token("room", "participant")
+            .expect("create fresh room token");
+        let (fresh_room, _) = Room::connect(server.url.clone(), fresh_token, &mut cx.to_async())
+            .await
+            .expect("connect with fresh room token");
+
+        assert_eq!(fresh_room.connection_state(), ConnectionState::Connected);
+    }
+
+    #[gpui::test]
+    async fn guest_token_created_after_permission_update_can_join(
+        executor: BackgroundExecutor,
+        cx: &mut TestAppContext,
+    ) {
+        let server = create_test_server("guest-token", executor);
+        server
+            .create_room("room".into())
+            .await
+            .expect("create LiveKit test room");
+        let api_client = server.create_api_client();
+
+        let initial_token = api_client
+            .guest_token("room", "participant")
+            .expect("create initial guest token");
+        let (initial_room, _) = Room::connect(
+            server.url.clone(),
+            initial_token.clone(),
+            &mut cx.to_async(),
+        )
+        .await
+        .expect("connect with initial guest token");
+
+        server.advance_timestamp();
+        api_client
+            .update_participant(
+                "room".into(),
+                "participant".into(),
+                proto::ParticipantPermission {
+                    can_subscribe: true,
+                    can_publish: true,
+                    can_publish_data: true,
+                    hidden: false,
+                    recorder: false,
+                },
+            )
+            .await
+            .expect("update participant permissions");
+        assert_token_was_revoked(&server, initial_token, cx).await;
+
+        server.disconnect_client("participant".into()).await;
+        assert_eq!(
+            initial_room.connection_state(),
+            ConnectionState::Disconnected
+        );
+
+        let fresh_token = api_client
+            .guest_token("room", "participant")
+            .expect("create fresh guest token");
+        let (fresh_room, _) = Room::connect(server.url.clone(), fresh_token, &mut cx.to_async())
+            .await
+            .expect("connect with fresh guest token");
+
+        assert_eq!(fresh_room.connection_state(), ConnectionState::Connected);
+    }
+}
+
 impl TryFrom<String> for TrackSid {
     type Error = anyhow::Error;
 

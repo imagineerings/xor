@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // ./script/cargo is a transparent wrapper around cargo that:
-// - When running in a clone of `./zed-industries/zed`
+// - When running in a clone of `./simtropolis/zed`
 // - outputs build timings to the ZED_DATA_DIR/build_timings
 // When Zed starts for staff-members it uploads the build timings to Snowflake
 // To use it:
@@ -166,7 +166,7 @@ function initShellAlias() {
   }
 }
 
-function isZedRepo() {
+function isSimRepo() {
   try {
     const result = spawnSync("git", ["remote", "-v"], {
       encoding: "utf-8",
@@ -176,7 +176,7 @@ function isZedRepo() {
     if (result.status !== 0 || !result.stdout) {
       return false;
     }
-    return result.stdout.includes("zed-industries/zed");
+    return result.stdout.includes("simtropolis/zed");
   } catch {
     return false;
   }
@@ -255,7 +255,7 @@ async function main() {
   }
 
   // If not in zed repo, just pass through to cargo
-  if (!isZedRepo()) {
+  if (!isSimRepo()) {
     runCargoPassthrough(args);
     return;
   }

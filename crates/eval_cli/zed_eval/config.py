@@ -38,7 +38,7 @@ DEFAULT_SANDBOX_IDLE_TIMEOUT_SECS = 300
 DEFAULT_OVERRIDE_CPUS = None
 DEFAULT_OVERRIDE_MEMORY_MB = None
 EVAL_BASE_URL_IN_SANDBOX = "http://127.0.0.1:8089/v1"
-JUDGE_PROXY_VERIFIER_IMPORT_PATH = "zed_eval.verifier:ZedJudgeProxyVerifier"
+JUDGE_PROXY_VERIFIER_IMPORT_PATH = "zed_eval.verifier:SimJudgeProxyVerifier"
 
 
 @dataclass(frozen=True)

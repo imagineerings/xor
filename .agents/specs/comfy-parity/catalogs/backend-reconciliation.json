@@ -1,0 +1,82 @@
+{
+  "baseline": {
+    "all_file_count": 949,
+    "all_file_fingerprint_sha256": "21de8fece20d8d5bfa94daaa52d6ccfe2db6726ca0803ca3b383ad164cbd1d5f",
+    "git_metadata": false,
+    "package_version": "0.27.1",
+    "rg_visible_file_count": 884,
+    "rg_visible_fingerprint_sha256": "38fec15d8dadeef9ccd1f677d61c8f36db5e1a2080d445ef5bd8a28ee1e6dea6"
+  },
+  "capability_rows": 107,
+  "config_rows": 153,
+  "external_endpoint_rows": 217,
+  "files": {
+    "config": "backend-config.csv",
+    "external_services": "backend-external-services.csv",
+    "features": "backend-features.csv",
+    "formats": "backend-formats.csv",
+    "inactive_nodes": "backend-inactive-nodes.csv",
+    "models": "backend-models.csv",
+    "nodes": "backend-nodes.csv",
+    "routes": "backend-http-routes.csv",
+    "schemas": "backend-schemas.csv",
+    "source_coverage": "backend-source-coverage.csv",
+    "tests": "backend-tests.csv",
+    "websocket": "backend-websocket-events.csv"
+  },
+  "format_rows": 40,
+  "http": {
+    "catalog_rows": 141,
+    "compatibility_alias_rows": 47,
+    "openapi_only_rows": 21,
+    "openapi_operations": 77,
+    "runtime_decorator_or_static_rows_before_alias": 73,
+    "runtime_effective_rows": 120
+  },
+  "model_rows": 211,
+  "nodes": {
+    "availability": {
+      "active": 432,
+      "cloud/paid": 214,
+      "deprecated/dead": 25,
+      "experimental": 118
+    },
+    "builtin_extra_files": 121,
+    "classification": {
+      "API node": 224,
+      "built-in node": 565
+    },
+    "duplicates": 0,
+    "evidence": {
+      "code-inferred": 766,
+      "test-backed": 23
+    },
+    "inactive_schema_bearing": 12,
+    "registered": 789,
+    "schema_api": {
+      "V1": 135,
+      "V3": 654
+    },
+    "schema_enrichment": {
+      "execution_function_column": true,
+      "explicit_zero_output_contracts": true,
+      "v1_inheritance": "AST-resolved across local and imported Python base classes"
+    },
+    "unresolved": 0
+  },
+  "schema_rows": 1010,
+  "source_coverage_classification": {
+    "documented-only": 14,
+    "generated": 3,
+    "infrastructure-only": 358,
+    "production configuration/data": 45,
+    "production data placeholder": 37,
+    "production data/template": 106,
+    "production source": 288,
+    "test-only": 98
+  },
+  "source_coverage_mapped": 561,
+  "source_coverage_rows": 949,
+  "test_function_rows": 970,
+  "websocket_events": 26
+}

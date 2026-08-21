@@ -1,0 +1,59 @@
+{
+  "baseline": {
+    "package": "comfyui-desktop-2",
+    "version": "1.0.28",
+    "electron": "40.4.1",
+    "source_files": 735
+  },
+  "counts": {
+    "feature_rows": 206,
+    "source_plugins": 6,
+    "current_settings": 27,
+    "discarded_legacy_settings": 4,
+    "settings_catalog_rows": 31,
+    "ipc_contract_rows": 273,
+    "preload_api_members": 299,
+    "menu_actions": 45,
+    "shell_actions": 26,
+    "window_application_webcontents_updater_events": 44,
+    "keybindings_gestures": 19,
+    "persisted_artifacts": 36,
+    "telemetry_event_literals": 139,
+    "telemetry_comfy_desktop_literals": 137,
+    "telemetry_app_literals": 2,
+    "telemetry_tracked_step_bases": 19,
+    "telemetry_derived_failure_literals": 10,
+    "telemetry_datadog_mirrored_names": 23,
+    "telemetry_infrastructure_rows": 4,
+    "feature_flags": 3,
+    "cli_flags": 39,
+    "environment_variables": 35,
+    "renderer_css_custom_properties": 21,
+    "renderer_surface_rows": 43,
+    "renderer_functional_surfaces": 41,
+    "renderer_presentational_infrastructure_surfaces": 2,
+    "renderer_test_backed_surfaces": 10,
+    "renderer_code_inferred_surfaces": 33,
+    "localization_scalar_paths": 1176,
+    "source_coverage_rows": 735,
+    "test_files": 232,
+    "test_suite_or_case_declarations": 3422
+  },
+  "telemetry_availability": {
+    "active": 79,
+    "conditional": 40,
+    "platform-specific": 3,
+    "experimental": 1,
+    "cloud/paid": 11,
+    "infrastructure-only": 4,
+    "developer-only": 0,
+    "deprecated/dead": 1,
+    "uncertain": 0
+  },
+  "telemetry_evidence": {
+    "code-inferred": 139,
+    "observed": 0,
+    "test-backed": 0
+  },
+  "runtime_status": "No Electron runtime or provider emission was performed because the source snapshot lacks installed dependencies."
+}

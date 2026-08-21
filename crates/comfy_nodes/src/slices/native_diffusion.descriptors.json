@@ -1,0 +1,147 @@
+[
+  {
+    "schema_version": 1,
+    "class_type": "CheckpointLoaderSimple",
+    "display_name": "Load Checkpoint",
+    "category": "model/loaders",
+    "description": "",
+    "python_module": "nodes",
+    "search_aliases": ["load checkpoint", "checkpoint loader"],
+    "essentials_category": "Basics",
+    "has_intermediate_output": false,
+    "implementation_version": "native-diffusion-v1",
+    "inputs": [{"name":"ckpt_name","type_name":"STRING","required":true,"choices_from_input_assets":true}],
+    "outputs": [
+      {"name":"model","type_name":"MODEL","required":true},
+      {"name":"clip","type_name":"CLIP","required":true},
+      {"name":"vae","type_name":"VAE","required":true}
+    ],
+    "output_node": false,
+    "effect": "reads_artifact",
+    "cache_by_input_identity": true,
+    "catalog_contract": {
+      "inputs": "@classmethod def INPUT_TYPES(s): return {'required': {'ckpt_name': (folder_paths.get_filename_list('checkpoints'), {'tooltip': 'The name of the checkpoint (model) to load.'})}}",
+      "outputs": "('MODEL', 'CLIP', 'VAE')",
+      "input_is_list": "False",
+      "output_is_list": "False",
+      "lazy_inputs": "False"
+    }
+  },
+  {
+    "schema_version": 1,
+    "class_type": "CLIPTextEncode",
+    "display_name": "CLIP Text Encode (Prompt)",
+    "category": "model/conditioning",
+    "description": "",
+    "python_module": "nodes",
+    "search_aliases": ["prompt", "text encode"],
+    "essentials_category": "Basics",
+    "has_intermediate_output": false,
+    "implementation_version": "native-diffusion-v1",
+    "inputs": [
+      {"name":"text","type_name":"STRING","required":true,"options":{"multiline":true,"dynamicPrompts":true}},
+      {"name":"clip","type_name":"CLIP","required":true}
+    ],
+    "outputs": [{"name":"conditioning","type_name":"CONDITIONING","required":true}],
+    "output_node": false,
+    "effect": "pure",
+    "cache_by_input_identity": true,
+    "catalog_contract": {
+      "inputs": "@classmethod def INPUT_TYPES(s) -> InputTypeDict: return {'required': {'text': (IO.STRING, {'multiline': True, 'dynamicPrompts': True, 'tooltip': 'The text to be encoded.'}), 'clip': (IO.CLIP, {'tooltip': 'The CLIP model used for encoding the text.'})}}",
+      "outputs": "(IO.CONDITIONING,)",
+      "input_is_list": "False",
+      "output_is_list": "False",
+      "lazy_inputs": "False"
+    }
+  },
+  {
+    "schema_version": 1,
+    "class_type": "EmptyLatentImage",
+    "display_name": "Empty Latent Image",
+    "category": "model/latent",
+    "description": "",
+    "python_module": "nodes",
+    "search_aliases": ["empty latent"],
+    "essentials_category": "Basics",
+    "has_intermediate_output": false,
+    "implementation_version": "native-diffusion-v1",
+    "inputs": [
+      {"name":"width","type_name":"INT","required":true,"options":{"default":512,"min":16,"max":16384,"step":8}},
+      {"name":"height","type_name":"INT","required":true,"options":{"default":512,"min":16,"max":16384,"step":8}},
+      {"name":"batch_size","type_name":"INT","required":true,"options":{"default":1,"min":1,"max":4096}}
+    ],
+    "outputs": [{"name":"latent","type_name":"LATENT","required":true}],
+    "output_node": false,
+    "effect": "pure",
+    "cache_by_input_identity": true,
+    "catalog_contract": {
+      "inputs": "@classmethod def INPUT_TYPES(s): return {'required': {'width': ('INT', {'default': 512, 'min': 16, 'max': MAX_RESOLUTION, 'step': 8, 'tooltip': 'The width of the latent images in pixels.'}), 'height': ('INT', {'default': 512, 'min': 16, 'max': MAX_RESOLUTION, 'step': 8, 'tooltip': 'The height of the latent images in pixels.'}), 'batch_size': ('INT', {'default': 1, 'min': 1, 'max': 4096, 'tooltip': 'The number of latent images in the batch.'})}}",
+      "outputs": "('LATENT',)",
+      "input_is_list": "False",
+      "output_is_list": "False",
+      "lazy_inputs": "False"
+    }
+  },
+  {
+    "schema_version": 1,
+    "class_type": "KSampler",
+    "display_name": "KSampler",
+    "category": "model/sampling",
+    "description": "",
+    "python_module": "nodes",
+    "search_aliases": ["sampler", "sample"],
+    "essentials_category": "Basics",
+    "has_intermediate_output": false,
+    "implementation_version": "native-diffusion-v1",
+    "inputs": [
+      {"name":"model","type_name":"MODEL","required":true},
+      {"name":"seed","type_name":"INT","required":true,"options":{"default":0,"min":0}},
+      {"name":"steps","type_name":"INT","required":true,"options":{"default":20,"min":1,"max":10000}},
+      {"name":"cfg","type_name":"FLOAT","required":true,"options":{"default":8.0,"min":0.0,"max":100.0}},
+      {"name":"sampler_name","type_name":"STRING","required":true,"choices":["euler"]},
+      {"name":"scheduler","type_name":"STRING","required":true,"choices":["normal"]},
+      {"name":"positive","type_name":"CONDITIONING","required":true},
+      {"name":"negative","type_name":"CONDITIONING","required":true},
+      {"name":"latent_image","type_name":"LATENT","required":true},
+      {"name":"denoise","type_name":"FLOAT","required":true,"options":{"default":1.0,"min":0.0,"max":1.0}}
+    ],
+    "outputs": [{"name":"latent","type_name":"LATENT","required":true}],
+    "output_node": false,
+    "effect": "pure",
+    "cache_by_input_identity": true,
+    "catalog_contract": {
+      "inputs": "@classmethod def INPUT_TYPES(s): return {'required': {'model': ('MODEL', {'tooltip': 'The model used for denoising the input latent.'}), 'seed': ('INT', {'default': 0, 'min': 0, 'max': 18446744073709551615, 'control_after_generate': True, 'tooltip': 'The random seed used for creating the noise.'}), 'steps': ('INT', {'default': 20, 'min': 1, 'max': 10000, 'tooltip': 'The number of steps used in the denoising process.'}), 'cfg': ('FLOAT', {'default': 8.0, 'min': 0.0, 'max': 100.0, 'step': 0.1, 'round': 0.01, 'tooltip': 'The Classifier-Free Guidance scale balances creativity and adherence to the prompt. Higher values result in images more closely matching the prompt however too high values will negatively impact quality.'}), 'sampler_name': (comfy.samplers.KSampler.SAMPLERS, {'tooltip': 'The algorithm used when sampling, this can affect the quality, speed, and style of the generated output.'}), 'scheduler': (comfy.samplers.KSampler.SCHEDULERS, {'tooltip': 'The scheduler controls how noise is gradually removed to form the image.'}), 'positive': ('CONDITIONING', {'tooltip': 'The conditioning describing the attributes you want to include in the image.'}), 'negative': ('CONDITIONING', {'tooltip': 'The conditioning describing the attributes you want to exclude from the image.'}), 'latent_image': ('LATENT', {'tooltip': 'The latent image to denoise.'}), 'denoise': ('FLOAT', {'default': 1.0, 'min': 0.0, 'max': 1.0, 'step': 0.01, 'tooltip': 'The amount of denoising applied, lower values will maintain the structure of the initial image allowing for image to image sampling.'})}}",
+      "outputs": "('LATENT',)",
+      "input_is_list": "False",
+      "output_is_list": "False",
+      "lazy_inputs": "False"
+    }
+  },
+  {
+    "schema_version": 1,
+    "class_type": "VAEDecode",
+    "display_name": "VAE Decode",
+    "category": "model/latent",
+    "description": "",
+    "python_module": "nodes",
+    "search_aliases": ["decode latent", "vae decode"],
+    "essentials_category": "Basics",
+    "has_intermediate_output": false,
+    "implementation_version": "native-diffusion-v1",
+    "inputs": [
+      {"name":"samples","type_name":"LATENT","required":true},
+      {"name":"vae","type_name":"VAE","required":true}
+    ],
+    "outputs": [{"name":"image","type_name":"IMAGE","required":true}],
+    "output_node": false,
+    "effect": "pure",
+    "cache_by_input_identity": true,
+    "catalog_contract": {
+      "inputs": "@classmethod def INPUT_TYPES(s): return {'required': {'samples': ('LATENT', {'tooltip': 'The latent to be decoded.'}), 'vae': ('VAE', {'tooltip': 'The VAE model used for decoding the latent.'})}}",
+      "outputs": "('IMAGE',)",
+      "input_is_list": "False",
+      "output_is_list": "False",
+      "lazy_inputs": "False"
+    }
+  }
+]

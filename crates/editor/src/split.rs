@@ -5,7 +5,6 @@ use std::{
 
 use buffer_diff::{BufferDiff, BufferDiffSnapshot, DiffHunkStatus};
 use collections::HashMap;
-
 use fs::Fs;
 use gpui::{
     Action, AnyElement, Entity, EventEmitter, Focusable, Font, Pixels, Subscription, WeakEntity,

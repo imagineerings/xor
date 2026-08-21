@@ -14,7 +14,7 @@ on:
 permissions: {}
 jobs:
   determine_bump_type:
-    if: (github.repository_owner == 'zed-industries' || github.repository_owner == 'zed-extensions')
+    if: (github.repository_owner == 'simtropolis' || github.repository_owner == 'zed-extensions')
     runs-on: namespace-profile-2x4-ubuntu-2404
     permissions: {}
     steps:
@@ -47,7 +47,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    uses: zed-industries/zed/.github/workflows/extension_bump.yml@main
+    uses: simtropolis/zed/.github/workflows/extension_bump.yml@main
     secrets:
       app-id: ${{ secrets.ZED_ZIPPY_APP_ID }}
       app-secret: ${{ secrets.ZED_ZIPPY_APP_PRIVATE_KEY }}

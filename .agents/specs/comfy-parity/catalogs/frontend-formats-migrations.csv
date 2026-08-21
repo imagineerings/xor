@@ -1,0 +1,25 @@
+feature_id,format_id,media_or_extension,behavior,source_file,evidence_level
+COMFY-WORKFLOW-022,workflow-json-0.4,.json / embedded workflow,"Schema 0.4 arrays for links; passthrough nodes, groups, extra, models, definitions",src/platform/workflow/validation/schemas/workflowSchema.ts,test-backed
+COMFY-WORKFLOW-023,workflow-json-1,.json / embedded workflow,"Schema 1 object links, graph state, reroutes, recursive subgraphs, UUID identities and revisions",src/platform/workflow/validation/schemas/workflowSchema.ts,test-backed
+COMFY-WORKFLOW-024,api-prompt-json,.json / embedded prompt,"Record of node ID to class_type, inputs, and _meta title",src/platform/workflow/validation/schemas/workflowSchema.ts,test-backed
+COMFY-WORKFLOW-025,png,image/png,"PNG text metadata workflow, prompt, parameters, templates",src/scripts/metadata/png.ts,test-backed
+COMFY-WORKFLOW-026,avif,image/avif,ISOBMFF/EXIF metadata including non-finite JSON handling,src/scripts/metadata/avif.ts,test-backed
+COMFY-WORKFLOW-027,webp,image/webp,WebP EXIF metadata; accepts workflow/Workflow and prompt/Prompt,src/scripts/pnginfo.ts,test-backed
+COMFY-WORKFLOW-028,mp3,audio/mpeg,MP3 metadata workflow/prompt extraction,src/scripts/metadata/mp3.ts,test-backed
+COMFY-WORKFLOW-029,ogg-opus,audio/ogg,Ogg/Opus comments metadata extraction,src/scripts/metadata/ogg.ts,test-backed
+COMFY-WORKFLOW-030,flac,audio/flac | audio/x-flac,FLAC metadata; accepts workflow/Workflow and prompt/Prompt,src/scripts/metadata/flac.ts,test-backed
+COMFY-WORKFLOW-031,webm,video/webm,EBML metadata extraction,src/scripts/metadata/ebml.ts,test-backed
+COMFY-WORKFLOW-032,isobmff-video,.mp4 | .mov | .m4v and MIME variants,ISOBMFF video metadata extraction,src/scripts/metadata/isobmff.ts,test-backed
+COMFY-WORKFLOW-033,svg,image/svg+xml | .svg,SVG metadata extraction,src/scripts/metadata/svg.ts,test-backed
+COMFY-WORKFLOW-034,glb,model/gltf-binary | .glb,GLB binary metadata extraction,src/scripts/metadata/gltf.ts,test-backed
+COMFY-WORKFLOW-035,latent-safetensors,.latent | .safetensors,Latent/safetensors metadata extraction,src/scripts/pnginfo.ts,test-backed
+COMFY-WORKFLOW-036,a1111-parameters,parameters string,A1111 parameters are final fallback after workflow and API prompt,src/scripts/pnginfo.ts,test-backed
+COMFY-GRAPH-016,node-templates,templates array,Legacy/no-reroute and native clipboard template insertion while preserving existing clipboard,src/scripts/app.ts,test-backed
+COMFY-WORKFLOW-037,workflow-drafts-v1-v2,migration,V1 workspace draft blobs and local tab pointers migrate to V2 per-draft localStorage plus per-client sessionStorage; V1 retained until 2026-07-15,src/platform/workflow/persistence/migration/migrateV1toV2.ts,test-backed
+COMFY-GRAPH-017,legacy-reroute-native,migration,Workflow 0.4 legacy reroute nodes can be detected and warned/migrated only when native reroutes are absent,src/utils/migration/migrateReroute.ts,test-backed
+COMFY-GRAPH-018,proxy-widget,migration,Subgraph proxy widgets migrate through quarantine and a deferred flush while preserving hosted values and links,src/core/graph/subgraph/migration/proxyWidgetMigration.ts,test-backed
+COMFY-FRONTEXT-EXT-064,node-def-v1-v2,migration,Node definition schemas migrate legacy V1 inputs to V2 normalized definitions,src/schemas/nodeDef/migration.ts,test-backed
+COMFY-SETTING-015,lod-threshold-font-size,migration,Legacy LowQualityRenderingZoomThreshold migrates to MinFontSizeForLOD without changing visual threshold,src/platform/settings/settingStore.ts,test-backed
+COMFY-WORKFLOW-038,ksampler-widget-values,migration,"On load, sample_ sampler names lose the prefix and boolean control_after_generate becomes randomize/fixed",src/scripts/app.ts,test-backed
+COMFY-GRAPH-019,renderer-layout-scale,migration,LG/Vue/Vue-corrected renderer metadata normalizes layout scale for root and subgraphs,src/renderer/extensions/vueNodes/layout/ensureCorrectLayoutScale.ts,test-backed
+COMFY-WORKFLOW-039,unknown-version-0.4,migration,Workflow version 1 selects schema 1; unknown/old numeric versions validate against 0.4; missing version rejects,src/platform/workflow/validation/schemas/workflowSchema.ts,test-backed

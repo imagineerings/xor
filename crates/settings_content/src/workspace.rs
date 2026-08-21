@@ -10,11 +10,79 @@ use crate::{
     ShowIndentGuides, ShowScrollbar, serialize_optional_f32_with_two_decimal_places,
 };
 
+#[cfg(feature = "rust-tools")]
+#[with_fallible_options]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct CargoPanelSettingsContent {
+    /// Whether the Cargo panel button is visible in the dock.
+    pub button: Option<bool>,
+    /// Default width of the Cargo panel in pixels.
+    pub default_width: Option<f32>,
+    /// Side of the workspace where the Cargo panel is docked.
+    pub dock: Option<DockSide>,
+    /// Whether the Cargo panel opens for new workspaces.
+    pub starts_open: Option<bool>,
+}
+
+#[cfg(feature = "test-explorer")]
+#[with_fallible_options]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct TestsPanelSettingsContent {
+    /// Whether the Tests panel button is visible in the dock.
+    pub button: Option<bool>,
+    /// Default width of the Tests panel in pixels.
+    pub default_width: Option<f32>,
+    /// Side of the workspace where the Tests panel is docked.
+    pub dock: Option<DockSide>,
+    /// Whether the Tests panel opens for new workspaces.
+    pub starts_open: Option<bool>,
+}
+
+#[cfg(feature = "rust-tools")]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct CargoSettingsContent {
+    /// Cargo preset schema version. The first supported version is 1.
+    pub schema_version: Option<u32>,
+    /// Named Cargo presets, merged by stable identifier across settings scopes.
+    #[serde(default)]
+    pub presets: HashMap<String, CargoPresetSettingsContent>,
+}
+
+#[cfg(feature = "rust-tools")]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema, MergeFrom)]
+pub struct CargoPresetSettingsContent {
+    pub label: Option<String>,
+    pub subcommand: Option<String>,
+    pub scope: Option<String>,
+    pub package: Option<String>,
+    pub target_kind: Option<String>,
+    pub target_name: Option<String>,
+    pub profile: Option<String>,
+    pub features: Option<Vec<String>>,
+    pub default_features: Option<bool>,
+    pub target_triple: Option<String>,
+    pub args: Option<Vec<String>>,
+    pub trailing_args: Option<Vec<String>>,
+    pub environment: Option<HashMap<String, String>>,
+    pub working_directory: Option<String>,
+    pub custom_working_directory: Option<String>,
+    pub reveal: Option<String>,
+    pub reveal_target: Option<String>,
+    pub hide: Option<String>,
+    pub save: Option<String>,
+    pub use_new_terminal: Option<bool>,
+    pub allow_concurrent_runs: Option<bool>,
+}
+
 #[with_fallible_options]
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, JsonSchema, MergeFrom)]
 pub struct WorkspaceSettingsContent {
     /// Active pane styling settings.
     pub active_pane_modifiers: Option<ActivePaneModifiers>,
+    /// Selects the primary presentation used for a workspace.
+    ///
+    /// Default: editor
+    pub workspace_presentation: Option<WorkspacePresentation>,
     /// The text rendering mode to use.
     ///
     /// Default: platform_default
@@ -140,6 +208,27 @@ pub struct WorkspaceSettingsContent {
     /// Whether the focused panel follows the mouse location
     /// Default: false
     pub focus_follows_mouse: Option<FocusFollowsMouse>,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    MergeFrom,
+    strum::VariantArray,
+    strum::VariantNames,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspacePresentation {
+    #[default]
+    Editor,
+    Collaborative,
 }
 
 #[with_fallible_options]

@@ -7,7 +7,7 @@ description: "Guide to building zed for macos for Zed development."
 
 ## Repository
 
-Clone the [Zed repository](https://github.com/zed-industries/zed).
+Clone the [Zed repository](https://github.com/simtropolis/zed).
 
 ## Dependencies
 

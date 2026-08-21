@@ -10,7 +10,7 @@ RUN sudo apt-get update && \
     sudo apt-get install -y git openssh-client
 
 # Clone the Zed repository
-RUN git clone https://github.com/zed-industries/zed.git ~/zed
+RUN git clone https://github.com/simtropolis/zed.git ~/zed
 
 # Run the Linux installation script
 WORKDIR /home/runner/zed
