@@ -7891,7 +7891,7 @@ impl Editor {
                 el.bg(status_colors.error_background)
                     .border_color(status_colors.error.opacity(0.6))
                     .pl_2()
-                    .child(Icon::new(IconName::SimPredictError).color(Color::Error))
+                    .child(Icon::new(IconName::ZedPredictError).color(Color::Error))
                     .cursor_default()
                     .hoverable_tooltip(move |_window, cx| {
                         cx.new(|_| MissingEditPredictionKeybindingTooltip).into()
@@ -7974,7 +7974,7 @@ impl Editor {
                         h_flex()
                             .flex_1()
                             .gap_2()
-                            .child(Icon::new(IconName::SimPredict))
+                            .child(Icon::new(IconName::ZedPredict))
                             .child(Label::new("Accept Terms of Service"))
                             .child(div().w_full())
                             .child(
@@ -7995,7 +7995,7 @@ impl Editor {
                 .h_full()
                 .flex_1()
                 .gap_2()
-                .child(Icon::new(IconName::SimPredict))
+                .child(Icon::new(IconName::ZedPredict))
         }
 
         let completion = match &self.active_inline_completion {
@@ -8020,12 +8020,12 @@ impl Editor {
                                     use text::ToPoint as _;
                                     if target.text_anchor.to_point(&snapshot).row > cursor_point.row
                                     {
-                                        Icon::new(IconName::SimPredictDown)
+                                        Icon::new(IconName::ZedPredictDown)
                                     } else {
-                                        Icon::new(IconName::SimPredictUp)
+                                        Icon::new(IconName::ZedPredictUp)
                                     }
                                 }
-                                InlineCompletion::Edit { .. } => Icon::new(IconName::SimPredict),
+                                InlineCompletion::Edit { .. } => Icon::new(IconName::ZedPredict),
                             }))
                             .child(
                                 h_flex()
@@ -8210,9 +8210,9 @@ impl Editor {
                     .flex_1()
                     .child(
                         if target.text_anchor.to_point(&snapshot).row > cursor_point.row {
-                            Icon::new(IconName::SimPredictDown)
+                            Icon::new(IconName::ZedPredictDown)
                         } else {
-                            Icon::new(IconName::SimPredictUp)
+                            Icon::new(IconName::ZedPredictUp)
                         },
                     )
                     .child(Label::new("Jump to Edit")),
@@ -8248,7 +8248,7 @@ impl Editor {
                     render_relative_row_jump("", cursor_point.row, first_edit_row)
                         .into_any_element()
                 } else {
-                    Icon::new(IconName::SimPredict).into_any_element()
+                    Icon::new(IconName::ZedPredict).into_any_element()
                 };
 
                 Some(

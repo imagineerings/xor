@@ -134,7 +134,7 @@ mod tests {
                 root_name: "second-root".to_string(),
                 abs_path: std::path::Path::new("/tmp/second-root").into(),
                 rules_file: Some(RulesFileContext {
-                    path_in_worktree: RelPath::unix("CLAUDE.md").unwrap().into(),
+                    path_in_worktree: RelPath::from_unix_str("CLAUDE.md").unwrap().into(),
                     text: "second-root guidance".to_string(),
                     project_entry_id: 2,
                 }),

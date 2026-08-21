@@ -203,8 +203,8 @@ mod test {
     use serde::Deserialize;
 
     use crate::oci::{
-        TokenResponse, download_oci_tarball, get_deserialized_response,
-        get_deserializable_oci_blob, get_latest_oci_manifest, get_oci_token,
+        TokenResponse, download_oci_tarball, get_deserializable_oci_blob,
+        get_deserialized_response, get_latest_oci_manifest, get_oci_token,
     };
 
     async fn build_test_tarball() -> Vec<u8> {

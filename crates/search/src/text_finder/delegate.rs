@@ -45,8 +45,8 @@ use smol::future::yield_now;
 use text::Anchor;
 use theme_settings::ThemeSettings;
 use ui::{
-    Disclosure, Divider, FluentBuilder,  ListItem, ListItemSpacing, Toggleable,
-    Tooltip, prelude::*, text_for_keystroke,
+    Disclosure, Divider, FluentBuilder, ListItem, ListItemSpacing, Toggleable, Tooltip, prelude::*,
+    text_for_keystroke,
 };
 use util::ResultExt;
 use workspace::SplitDirection;

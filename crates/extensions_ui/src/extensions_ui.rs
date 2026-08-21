@@ -26,7 +26,6 @@ use project::DirectoryLister;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use settings::{Settings, SettingsContent};
-use zed_actions::ExtensionCategoryFilter;
 use strum::IntoEnumIterator as _;
 use theme_settings::ThemeSettings;
 use ui::{
@@ -41,6 +40,7 @@ use workspace::{
     item::{Item, ItemEvent},
     workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError},
 };
+use zed_actions::ExtensionCategoryFilter;
 
 use crate::components::{ExtensionCard, extension_provides_label, remote_extension_status};
 use crate::extension_version_selector::{

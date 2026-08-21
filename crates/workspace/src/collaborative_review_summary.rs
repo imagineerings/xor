@@ -228,7 +228,7 @@ mod tests {
     fn project_path(path: &str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_usize(1),
-            path: RelPath::unix(path)
+            path: RelPath::from_unix_str(path)
                 .expect("test path should be relative")
                 .into(),
         }

@@ -753,7 +753,7 @@ mod tests {
     fn project_path(path: &str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_usize(1),
-            path: Arc::from(RelPath::unix(path).expect("fixture path should be valid")),
+            path: Arc::from(RelPath::from_unix_str(path).expect("fixture path should be valid")),
         }
     }
 

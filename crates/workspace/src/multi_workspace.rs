@@ -11,7 +11,6 @@ use project::{DisableAiSettings, Project};
 use remote::RemoteConnectionOptions;
 use settings::Settings;
 pub use settings::SidebarSide;
-use zed_actions::agents_sidebar::ToggleThreadSwitcher;
 use std::cell::Cell;
 use std::future::Future;
 use std::path::PathBuf;
@@ -19,6 +18,7 @@ use std::rc::Rc;
 use ui::prelude::*;
 use util::ResultExt;
 use util::path_list::PathList;
+use zed_actions::agents_sidebar::ToggleThreadSwitcher;
 
 use agent_settings::AgentSettings;
 use settings::SidebarDockPosition;
@@ -329,7 +329,7 @@ impl MultiWorkspace {
     }
 
     pub fn sidebar_render_state(&self, cx: &App) -> SidebarRenderState {
-        if self.active_workspace.read(cx).workspace_presentation()
+        if self.workspace().read(cx).workspace_presentation()
             == WorkspacePresentation::Collaborative
         {
             return SidebarRenderState {
@@ -1116,9 +1116,7 @@ impl MultiWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Result<Entity<Workspace>>> {
-        if let Some(workspace) =
-            self.workspace_for_paths_excluding(&paths, host.as_ref(), excluding, cx)
-        {
+        if let Some(workspace) = self.workspace_for_paths(&paths, host.as_ref(), cx) {
             self.activate(workspace.clone(), source_workspace, window, cx);
             return Task::ready(Ok(workspace));
         }

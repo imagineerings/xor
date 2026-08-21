@@ -19,8 +19,8 @@ pub enum VectorName {
     ProTrialStamp,
     ProUserStamp,
     StudentStamp,
-    SimLogo,
-    SimXCopilot,
+    ZedLogo,
+    ZedXCopilot,
 }
 
 impl VectorName {
@@ -122,7 +122,7 @@ impl Component for Vector {
                     vec![
                         single_example(
                             "Default",
-                            Vector::square(VectorName::SimLogo, size).into_any_element(),
+                            Vector::square(VectorName::ZedLogo, size).into_any_element(),
                         ),
                         single_example(
                             "Custom Size",
@@ -130,7 +130,7 @@ impl Component for Vector {
                                 .h(rems_from_px(120_f32))
                                 .justify_center()
                                 .child(Vector::new(
-                                    VectorName::SimLogo,
+                                    VectorName::ZedLogo,
                                     rems_from_px(120_f32),
                                     rems_from_px(200_f32),
                                 ))
@@ -143,13 +143,13 @@ impl Component for Vector {
                     vec![
                         single_example(
                             "Accent Color",
-                            Vector::square(VectorName::SimLogo, size)
+                            Vector::square(VectorName::ZedLogo, size)
                                 .color(Color::Accent)
                                 .into_any_element(),
                         ),
                         single_example(
                             "Error Color",
-                            Vector::square(VectorName::SimLogo, size)
+                            Vector::square(VectorName::ZedLogo, size)
                                 .color(Color::Error)
                                 .into_any_element(),
                         ),
@@ -159,7 +159,7 @@ impl Component for Vector {
                     "Different Vectors",
                     vec![single_example(
                         "Zed X Copilot",
-                        Vector::square(VectorName::SimXCopilot, rems_from_px(100_f32))
+                        Vector::square(VectorName::ZedXCopilot, rems_from_px(100_f32))
                             .into_any_element(),
                     )],
                 ),
@@ -170,10 +170,42 @@ impl Component for Vector {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::PathBuf;
+
+    use strum::{IntoEnumIterator as _, ParseError};
+
+    use super::VectorName;
 
     #[test]
-    fn vector_path() {
-        assert_eq!(VectorName::SimLogo.path().as_ref(), "images/zed_logo.svg");
+    fn test_all_vectors_exist() {
+        let asset_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+
+        for vector in VectorName::iter() {
+            let vector_path = asset_path.join(&*vector.path());
+            assert!(
+                vector_path.exists(),
+                "Vector {vector:?} does not exist at {vector_path:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_dangling_vectors() -> Result<(), ParseError> {
+        let images_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/images");
+
+        for entry in std::fs::read_dir(&images_dir).expect("failed to read images directory") {
+            let path = entry.expect("failed to read images directory entry").path();
+            if path.extension().is_none_or(|extension| extension != "svg") {
+                continue;
+            }
+            let file_stem = path
+                .file_stem()
+                .and_then(|file_stem| file_stem.to_str())
+                .expect("vector file name is not valid UTF-8");
+
+            file_stem.parse::<VectorName>()?;
+        }
+
+        Ok(())
     }
 }

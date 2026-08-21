@@ -507,7 +507,20 @@ message Envelope {
     RefreshDocumentColors refresh_document_colors = 474;
     RefreshDocumentLinks refresh_document_links = 475;
     RefreshFoldingRanges refresh_folding_ranges = 476;
-    RefreshDocumentSymbols refresh_document_symbols = 477; // current max
+    RefreshDocumentSymbols refresh_document_symbols = 477;
+    GetCargoWorkspace get_cargo_workspace = 478;
+    CargoWorkspaceResponse cargo_workspace_response = 479;
+    CancelCargoWorkspace cancel_cargo_workspace = 480;
+    GetStructuredExecutionSnapshot get_structured_execution_snapshot = 481;
+    StructuredExecutionSnapshotPage structured_execution_snapshot_page = 482;
+    GetStructuredExecutionEvents get_structured_execution_events = 483;
+    StructuredExecutionEventChunk structured_execution_event_chunk = 484;
+    GetRustTestDiscovery get_rust_test_discovery = 485;
+    CancelRustTestDiscovery cancel_rust_test_discovery = 486;
+    RustTestDiscoveryResponse rust_test_discovery_response = 487;
+    ResolveRustTestAction resolve_rust_test_action = 488;
+    RustTestActionPlanResponse rust_test_action_plan_response = 489;
+    UpdateRustTestRun update_rust_test_run = 490; // current max
   }
 
   reserved 87 to 88;

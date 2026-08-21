@@ -79,7 +79,6 @@ impl BranchDiff {
 
     pub(crate) fn deploy_branch_diff(
         workspace: &mut Workspace,
-        _: &DeployBranchDiff,
         window: &mut Window,
         cx: &mut Context<Workspace>,
     ) {

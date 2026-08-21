@@ -945,17 +945,6 @@ impl ThreadView {
                 },
             ));
 
-                    // Show only issues that haven't been dismissed.
-                    this.skill_loading_issues = event
-                        .issues
-                        .iter()
-                        .filter(|issue| !this.dismissed_skill_loading_issues.contains(issue))
-                        .cloned()
-                        .collect();
-                    cx.notify();
-                },
-            ));
-
             // A "no model selected" error is stale as soon as the thread has a
             // usable model
             if let Some(native_thread) = native_connection.thread(thread.read(cx).session_id(), cx)
@@ -1162,14 +1151,6 @@ impl ThreadView {
             }
             MessageEditorEvent::InputAttempted { .. } => {}
             MessageEditorEvent::Edited => {}
-            MessageEditorEvent::LocalCommandInvoked(command) => match command {
-                PromptLocalCommand::ThumbsUp => {
-                    self.handle_feedback_click(ThreadFeedback::Positive, window, cx)
-                }
-                PromptLocalCommand::ThumbsDown => {
-                    self.handle_feedback_click(ThreadFeedback::Negative, window, cx)
-                }
-            },
         }
     }
 
@@ -1346,17 +1327,6 @@ impl ThreadView {
             ViewEvent::MessageEditorEvent(_editor, MessageEditorEvent::LocalCommandInvoked(_)) => {}
             ViewEvent::MessageEditorEvent(_editor, MessageEditorEvent::Edited) => {}
             ViewEvent::MessageEditorEvent(_editor, MessageEditorEvent::InputAttempted { .. }) => {}
-            ViewEvent::MessageEditorEvent(
-                _editor,
-                MessageEditorEvent::LocalCommandInvoked(command),
-            ) => match command {
-                PromptLocalCommand::ThumbsUp => {
-                    self.handle_feedback_click(ThreadFeedback::Positive, window, cx)
-                }
-                PromptLocalCommand::ThumbsDown => {
-                    self.handle_feedback_click(ThreadFeedback::Negative, window, cx)
-                }
-            },
             ViewEvent::OpenDiffLocation {
                 path,
                 position,

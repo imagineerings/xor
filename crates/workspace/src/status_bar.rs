@@ -572,7 +572,7 @@ impl RenderOnce for CollaborativeParticipantStatus {
             .min_w_0()
             .gap_1()
             .px_1()
-            .child(Icon::new(IconName::SimAgent).size(IconSize::XSmall))
+            .child(Icon::new(IconName::ZedAgent).size(IconSize::XSmall))
             .child(h_flex().gap_1().map(|this| {
                 match self.state {
                     CollaborativeParticipantProviderState::Ready(view_data) => {

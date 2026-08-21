@@ -104,8 +104,8 @@ use crate::onboarding_modal::SimPredictModal;
 use crate::prediction::EditPredictionResult;
 pub use crate::prediction::{EditPrediction, EditPredictionId, EditPredictionInputs};
 pub use language_model::ApiKeyState;
-pub use zed_edit_prediction_delegate::ZedEditPredictionDelegate;
 pub use telemetry_events::EditPredictionRating;
+pub use zed_edit_prediction_delegate::ZedEditPredictionDelegate;
 
 actions!(
     edit_prediction,
@@ -1188,11 +1188,11 @@ impl EditPredictionStore {
                 edit_prediction_types::EditPredictionIconSet::new(IconName::Inception)
             }
             EditPredictionModel::Zeta => {
-                edit_prediction_types::EditPredictionIconSet::new(IconName::SimPredict)
-                    .with_disabled(IconName::SimPredictDisabled)
-                    .with_up(IconName::SimPredictUp)
-                    .with_down(IconName::SimPredictDown)
-                    .with_error(IconName::SimPredictError)
+                edit_prediction_types::EditPredictionIconSet::new(IconName::ZedPredict)
+                    .with_disabled(IconName::ZedPredictDisabled)
+                    .with_up(IconName::ZedPredictUp)
+                    .with_down(IconName::ZedPredictDown)
+                    .with_error(IconName::ZedPredictError)
             }
             EditPredictionModel::Fim { .. } | EditPredictionModel::SweepPrompt => {
                 let settings = &all_language_settings(None, cx).edit_predictions;

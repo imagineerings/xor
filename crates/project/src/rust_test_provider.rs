@@ -2586,14 +2586,14 @@ mod tests {
     fn project_path(path: &str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_usize(1),
-            path: Arc::from(RelPath::unix(path).expect("fixture path should be relative")),
+            path: Arc::from(RelPath::from_unix_str(path).expect("fixture path should be relative")),
         }
     }
 
     fn project_path_in(worktree_id: usize, path: &str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_usize(worktree_id),
-            path: Arc::from(RelPath::unix(path).expect("fixture path should be relative")),
+            path: Arc::from(RelPath::from_unix_str(path).expect("fixture path should be relative")),
         }
     }
 

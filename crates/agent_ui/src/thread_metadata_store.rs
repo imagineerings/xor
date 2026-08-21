@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use agent::{ZED_AGENT_ID, ThreadStore};
+use agent::{ThreadStore, ZED_AGENT_ID};
 use agent_client_protocol::schema::v1 as acp;
 use anyhow::Context as _;
 use chrono::{DateTime, Utc};

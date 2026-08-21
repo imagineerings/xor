@@ -44,8 +44,8 @@ use language_model::{
     LanguageModelId, LanguageModelImage, LanguageModelProviderId, LanguageModelRegistry,
     LanguageModelRequest, LanguageModelRequestMessage, LanguageModelRequestTool,
     LanguageModelToolResult, LanguageModelToolResultContent, LanguageModelToolSchemaFormat,
-    LanguageModelToolUse, LanguageModelToolUseId, MessageContent, Role, ZED_CLOUD_PROVIDER_ID,
-    SelectedModel, Speed, StopReason, TokenUsage,
+    LanguageModelToolUse, LanguageModelToolUseId, MessageContent, Role, SelectedModel, Speed,
+    StopReason, TokenUsage, ZED_CLOUD_PROVIDER_ID,
 };
 use project::{Project, trusted_worktrees::TrustedWorktrees};
 use prompt_store::ProjectContext;
@@ -3151,9 +3151,15 @@ impl Thread {
             while !tool_results.is_empty() {
                 if is_grind_turn {
                     futures::select! {
-                        tool_result = futures::StreamExt::select_next_some(&mut tool_results) => {
+                        (owning_message_ix, tool_result) = futures::StreamExt::select_next_some(&mut tool_results) => {
                             grind_tool_failed |= tool_result.is_error;
-                            Self::process_tool_result(this, event_stream, cx, tool_result)?;
+                            Self::process_tool_result(
+                                this,
+                                event_stream,
+                                cx,
+                                owning_message_ix,
+                                tool_result,
+                            )?;
                         }
                         _ = cancellation_rx.changed().fuse() => {
                             if *cancellation_rx.borrow() {
@@ -3164,7 +3170,13 @@ impl Thread {
                     }
                 } else if let Some((owning_message_ix, tool_result)) = tool_results.next().await {
                     grind_tool_failed |= tool_result.is_error;
-                    Self::process_tool_result(this, event_stream, cx, owning_message_ix, tool_result)?;
+                    Self::process_tool_result(
+                        this,
+                        event_stream,
+                        cx,
+                        owning_message_ix,
+                        tool_result,
+                    )?;
                 }
             }
 

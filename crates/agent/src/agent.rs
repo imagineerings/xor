@@ -8942,7 +8942,7 @@ mod internal_tests {
                     name: "Fake".into(),
                     description: None,
                     icon: Some(acp_thread::AgentModelIcon::Named(
-                        ui::IconName::SimAssistant
+                        ui::IconName::ZedAssistant
                     )),
                     is_latest: false,
                     disabled: None,

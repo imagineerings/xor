@@ -29,7 +29,6 @@ use project::{
 };
 
 use settings::{Settings, SettingsStore};
-use zed_actions::search::ToggleIncludeIgnored;
 use std::{
     borrow::Cow,
     cmp, mem,
@@ -52,6 +51,7 @@ use workspace::{
     ModalView, OpenChannelNotesById, OpenOptions, OpenVisible, SplitDirection, Workspace,
     item::PreviewTabsSettings, notifications::NotifyResultExt, pane,
 };
+use zed_actions::search::ToggleIncludeIgnored;
 
 actions!(
     file_finder,

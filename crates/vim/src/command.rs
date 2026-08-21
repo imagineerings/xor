@@ -20,7 +20,6 @@ use schemars::JsonSchema;
 use search::{BufferSearchBar, SearchOptions};
 use serde::Deserialize;
 use settings::{Settings, SettingsStore};
-use zed_actions::{OpenDocs, RevealTarget};
 use std::{
     iter::Peekable,
     ops::{Deref, Range},
@@ -39,6 +38,7 @@ use util::{
 };
 use workspace::{Item, SaveIntent, Workspace, notifications::NotifyResultExt};
 use workspace::{SplitDirection, notifications::DetachAndPromptErr};
+use zed_actions::{OpenDocs, RevealTarget};
 
 use crate::{
     ToggleMarksView, ToggleRegistersView, Vim, VimSettings,

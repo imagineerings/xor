@@ -695,9 +695,6 @@ pub(crate) fn render_buffer_header(
     let show_open_file_button =
         can_open_excerpts && relative_path.is_some() && (is_selected || header_hovered);
 
-    let show_open_file_button =
-        can_open_excerpts && relative_path.is_some() && (is_selected || header_hovered);
-
     let header = div()
         .id(("buffer-header", buffer_id.to_proto()))
         .on_hover(move |hovered, _window, cx| {

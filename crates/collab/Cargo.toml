@@ -124,7 +124,7 @@ release_channel.workspace = true
 remote = { workspace = true, features = ["test-support"] }
 remote_server.workspace = true
 rpc = { workspace = true, features = ["test-support"] }
-sea-orm = { version = "=1.1.10", features = ["mock", "sqlx-sqlite"] }
+sea-orm = { version = "=1.1.10", features = ["sqlx-sqlite"] }
 serde_json.workspace = true
 secp256k1.workspace = true
 session = { workspace = true, features = ["test-support"] }

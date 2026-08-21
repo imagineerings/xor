@@ -349,7 +349,7 @@ impl ContextMenu {
         })
         .detach();
 
-        f(
+        let mut menu = f(
             Self {
                 builder: None,
                 items: Default::default(),
@@ -438,7 +438,7 @@ impl ContextMenu {
             })
             .detach();
 
-            (builder.clone())(
+            let mut menu = (builder.clone())(
                 Self {
                     builder: Some(builder),
                     items: Default::default(),
@@ -1208,7 +1208,7 @@ impl ContextMenu {
             matches!(
                 item,
                 ContextMenuItem::Entry(ContextMenuEntry {
-                    toggle: Some((_, true)),
+                    toggle: Some((_, true, _)),
                     ..
                 })
             )
@@ -2071,7 +2071,9 @@ impl ContextMenu {
                     .inset(true)
                     .disabled(*disabled)
                     .aria_role(accessibility_role)
-                    .when_some(*toggle, |item, (_, checked)| item.aria_checked(checked))
+                    .when_some(accessibility_checked, |item, checked| {
+                        item.aria_checked(checked)
+                    })
                     .when(is_active_descendant, |item| item.aria_active_descendant())
                     .aria_label(label.clone())
                     .when_some(keyboard_shortcut, |item, keyboard_shortcut| {

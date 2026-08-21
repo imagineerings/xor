@@ -116,10 +116,6 @@ use uuid::Uuid;
 use vim_mode_setting::VimModeSetting;
 use workspace::notifications::{NotificationId, dismiss_app_notification, show_app_notification};
 
-use zed_actions::{
-    About, OpenAccountSettings, OpenBrowser, OpenDocs, OpenServerSettings, OpenSettingsFile,
-    OpenSimUrl, OpenStatusPage, Quit,
-};
 #[cfg(feature = "multiplayer-tools")]
 use workspace::collaborative_composer::CollaborativeComposerRegistration;
 #[cfg(feature = "multiplayer-tools")]
@@ -140,9 +136,8 @@ use workspace::{
 use workspace::{Pane, notifications::DetachAndPromptErr};
 use zed_actions::{
     About, GetMerch, OpenAccountSettings, OpenBrowser, OpenDocs, OpenProjectTasks,
-    OpenServerSettings, OpenSettingsFile, OpenStatusPage, OpenZedUrl, Quit,
+    OpenServerSettings, OpenSettingsFile, OpenSimUrl, OpenStatusPage, Quit,
 };
-
 const DOCS_URL: &str = "https://zed.dev/docs/";
 const STATUS_URL: &str = "https://status.zed.dev";
 const MERCH_URL: &str = "https://merch.zed.dev/";
@@ -3582,59 +3577,17 @@ fn builtin_keymap_assets(
         return Vec::new();
     }
 
-    cx.bind_keys(filter_disabled_ai_bindings(
-        KeymapFile::load_asset(DEFAULT_KEYMAP_PATH, Some(KeybindSource::Default), cx).unwrap(),
-        cx,
-    ));
-
+    let mut assets = vec![(DEFAULT_KEYMAP_PATH, KeybindSource::Default)];
     if let Some(asset_path) = base_keymap.asset_path() {
-        cx.bind_keys(filter_disabled_ai_bindings(
-            KeymapFile::load_asset(asset_path, Some(KeybindSource::Base), cx).unwrap(),
-            cx,
-        ));
+        assets.push((asset_path, KeybindSource::Base));
     }
-
-    if VimModeSetting::get_global(cx).0 || vim_mode_setting::HelixModeSetting::get_global(cx).0 {
-        cx.bind_keys(filter_disabled_ai_bindings(
-            KeymapFile::load_asset(VIM_KEYMAP_PATH, Some(KeybindSource::Vim), cx).unwrap(),
-            cx,
-        ));
+    if vim_enabled {
+        assets.push((VIM_KEYMAP_PATH, KeybindSource::Vim));
     }
     #[cfg(feature = "comfy")]
     assets.push((comfy_ui::DEFAULT_COMFY_KEYMAP_PATH, KeybindSource::Default));
     assets.push((SPECIFIC_OVERRIDES_KEYMAP_PATH, KeybindSource::Default));
     assets
-}
-
-/// Namespaces of actions that are part of an AI feature. When the user opts out
-/// of AI via the `disable_ai` setting, bindings to these actions are dropped so
-/// that lower-precedence editor defaults (e.g. `editor::NewlineBelow` for
-/// `ctrl-enter`) can fire instead of being shadowed by an action whose handler
-/// silently no-ops.
-const AI_ACTION_NAMESPACES: &[&str] = &[
-    "acp::",
-    "agent::",
-    "assistant::",
-    "edit_prediction::",
-    "inline_assistant::",
-    "zeta::",
-];
-
-fn is_ai_keybinding(binding: &KeyBinding) -> bool {
-    let name = binding.action().name();
-    AI_ACTION_NAMESPACES
-        .iter()
-        .any(|namespace| name.starts_with(namespace))
-}
-
-fn filter_disabled_ai_bindings(bindings: Vec<KeyBinding>, cx: &App) -> Vec<KeyBinding> {
-    if !DisableAiSettings::get_global(cx).disable_ai {
-        return bindings;
-    }
-    bindings
-        .into_iter()
-        .filter(|binding| !is_ai_keybinding(binding))
-        .collect()
 }
 
 pub fn open_new_ssh_project_from_project(
@@ -4085,9 +4038,9 @@ mod tests {
         Action, AnyWindowHandle, App, AssetSource, BorrowAppContext, Modifiers, TestAppContext,
         UpdateGlobal, VisualTestContext, WindowHandle, actions, point, px,
     };
-    use http_client::BlockedHttpClient;
     #[cfg(feature = "comfy")]
     use gpui::{KeyContext, Keystroke, Menu, MenuItem};
+    use http_client::BlockedHttpClient;
     use language::LanguageRegistry;
     use languages::{markdown_lang, rust_lang};
     use node_runtime::NodeRuntime;

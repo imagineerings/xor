@@ -43,7 +43,6 @@ impl UpdateVersion {
             AutoUpdateStatus::Checking => AutoUpdateStatus::Downloading {
                 version: Version::new(1, 99, 0),
                 progress: Some(0.5),
-                progress: Some(0.5),
             },
             AutoUpdateStatus::Downloading { .. } => AutoUpdateStatus::Installing {
                 version: Version::new(1, 99, 0),

@@ -802,11 +802,7 @@ pub(super) fn clear_saved_screen(term: &mut Term<SimListener>) {
     }
 }
 
-pub(super) fn shrink_to_used(term: &mut Term<ZedListener>) {
-    term.grid_mut().truncate();
-}
-
-pub(super) fn used_lines(term: &Term<ZedListener>) -> usize {
+pub(super) fn used_lines(term: &Term<SimListener>) -> usize {
     if term.mode().contains(TermMode::ALT_SCREEN) {
         return term.total_lines();
     }

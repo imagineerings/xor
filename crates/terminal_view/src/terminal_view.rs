@@ -22,7 +22,6 @@ use serde::Deserialize;
 use settings::{
     SeedQuerySetting, Settings, SettingsStore, TerminalBell, TerminalBlink, WorkingDirectory,
 };
-use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 use std::{
     any::Any,
     cmp,
@@ -60,6 +59,7 @@ use workspace::{
         Direction, SearchEvent, SearchOptions, SearchToken, SearchableItem, SearchableItemHandle,
     },
 };
+use zed_actions::{agent::AddSelectionToThread, assistant::InlineAssist};
 
 struct ImeState {
     marked_text: String,

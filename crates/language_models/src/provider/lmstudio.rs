@@ -11,9 +11,9 @@ use language_model::{
     LanguageModelToolUse, MessageContent, StopReason, TokenUsage, env_var,
 };
 use language_model::{
-    ConfigurationViewTargetAgent, InlineDescription, LanguageModelId, LanguageModelName,
-    LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
-    LanguageModelProviderState, LanguageModelRequest, ProviderSettingsView, RateLimiter, Role, SubPageProviderSettings,
+    InlineDescription, LanguageModelId, LanguageModelName, LanguageModelProvider,
+    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
+    LanguageModelRequest, ProviderSettingsView, RateLimiter, Role, SubPageProviderSettings,
 };
 use lmstudio::{LMSTUDIO_API_URL, ModelType, get_models};
 
@@ -322,12 +322,6 @@ impl LanguageModelProvider for LmStudioLanguageModelProvider {
             .description(InlineDescription::Text(
                 "Run local LLMs like Llama, Phi, and Qwen with LM Studio.".into(),
             )),
-        ))
-    }
-
-    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
-        Some(InlineDescription::Text(
-            "Run local LLMs like Llama, Phi, and Qwen with LM Studio.".into(),
         ))
     }
 }

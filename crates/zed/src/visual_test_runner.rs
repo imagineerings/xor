@@ -111,7 +111,6 @@ use {
     project_panel::ProjectPanel,
     settings::{NotifyWhenAgentWaiting, PlaySoundWhenAgentDone, Settings as _},
     settings_ui::SettingsWindow,
-    zed_actions::OpenSettingsAt,
     std::{
         any::Any,
         path::{Path, PathBuf},
@@ -121,6 +120,7 @@ use {
     },
     util::ResultExt as _,
     workspace::{AppState, MultiWorkspace, Workspace},
+    zed_actions::OpenSettingsAt,
 };
 
 // All macOS-specific constants grouped together
@@ -1981,7 +1981,7 @@ impl StubAgentServer {
 #[cfg(target_os = "macos")]
 impl AgentServer for StubAgentServer {
     fn logo(&self) -> ui::IconName {
-        ui::IconName::SimAssistant
+        ui::IconName::ZedAssistant
     }
 
     fn agent_id(&self) -> AgentId {
@@ -2950,7 +2950,7 @@ impl gpui::Render for ThreadItemBranchNameTestView {
             .child(
                 container().child(
                     ThreadItem::new("ti-main-branch", "Request for Long Classic Poem")
-                        .icon(IconName::SimAgent)
+                        .icon(IconName::ZedAgent)
                         .timestamp("2d")
                         .worktrees(vec![ThreadItemWorktreeInfo {
                             worktree_name: Some("zed".into()),
@@ -2967,7 +2967,7 @@ impl gpui::Render for ThreadItemBranchNameTestView {
             .child(
                 container().child(
                     ThreadItem::new("ti-main-no-branch", "Simple greeting thread")
-                        .icon(IconName::SimAgent)
+                        .icon(IconName::ZedAgent)
                         .timestamp("3d")
                         .worktrees(vec![ThreadItemWorktreeInfo {
                             worktree_name: Some("zed".into()),
@@ -2999,7 +2999,7 @@ impl gpui::Render for ThreadItemBranchNameTestView {
             .child(
                 container().child(
                     ThreadItem::new("ti-manual-linked", "Robust Git Worktree Rollback")
-                        .icon(IconName::SimAgent)
+                        .icon(IconName::ZedAgent)
                         .timestamp("40m")
                         .worktrees(vec![ThreadItemWorktreeInfo {
                             worktree_name: Some("focal-arrow".into()),
@@ -3054,7 +3054,7 @@ impl gpui::Render for ThreadItemBranchNameTestView {
             .child(
                 container().child(
                     ThreadItem::new("ti-main-full", "Main worktree with everything")
-                        .icon(IconName::SimAgent)
+                        .icon(IconName::ZedAgent)
                         .timestamp("5m")
                         .added(23)
                         .removed(8)

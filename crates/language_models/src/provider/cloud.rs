@@ -284,7 +284,7 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
     }
 
     fn icon(&self) -> IconOrSvg {
-        IconOrSvg::Icon(IconName::AiSim)
+        IconOrSvg::Icon(IconName::AiZed)
     }
 
     fn default_model(&self, cx: &App) -> Option<Arc<dyn LanguageModel>> {
@@ -380,12 +380,12 @@ impl LanguageModelProvider for CloudLanguageModelProvider {
             None
         } else {
             match state.user_store.read(cx).plan() {
-                Some(Plan::ZedPro) => Some("Subscribed to Pro".into()),
-                Some(Plan::ZedProTrial) => Some("Subscribed to Pro Trial".into()),
-                Some(Plan::ZedStudent) => Some("Subscribed to Student".into()),
-                Some(Plan::ZedBusiness) => Some("Subscribed to Business".into()),
-                Some(Plan::ZedVip) => Some("Subscribed to VIP".into()),
-                Some(Plan::ZedFree) | None => None,
+                Some(Plan::SimPro) => Some("Subscribed to Pro".into()),
+                Some(Plan::SimProTrial) => Some("Subscribed to Pro Trial".into()),
+                Some(Plan::SimStudent) => Some("Subscribed to Student".into()),
+                Some(Plan::SimBusiness) => Some("Subscribed to Business".into()),
+                Some(Plan::SimVip) => Some("Subscribed to VIP".into()),
+                Some(Plan::SimFree) | None => None,
             }
         };
 

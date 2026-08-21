@@ -10,7 +10,11 @@ for argument in "$@"; do
         *) filtered_arguments+=("$argument") ;;
     esac
 done
-set -- "${filtered_arguments[@]}"
+if ((${#filtered_arguments[@]})); then
+    set -- "${filtered_arguments[@]}"
+else
+    set --
+fi
 
 if [[ ! " $* " == *" -p "* && ! " $* " == *" --package "* ]]; then
     set -- "$@" --workspace

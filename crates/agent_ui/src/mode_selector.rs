@@ -238,7 +238,7 @@ mod tests {
 
     impl AgentServer for TestAgentServer {
         fn logo(&self) -> IconName {
-            IconName::SimAssistant
+            IconName::ZedAssistant
         }
 
         fn agent_id(&self) -> AgentId {

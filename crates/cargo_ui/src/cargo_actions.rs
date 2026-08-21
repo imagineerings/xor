@@ -413,7 +413,7 @@ mod tests {
     fn path(worktree_id: WorktreeId, path: &'static str) -> ProjectPath {
         ProjectPath {
             worktree_id,
-            path: RelPath::unix(path)
+            path: RelPath::from_unix_str(path)
                 .expect("fixture path should be relative")
                 .into(),
         }

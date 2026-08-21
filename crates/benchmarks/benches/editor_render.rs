@@ -5,8 +5,8 @@ use editor::{
 use gpui::{AppContext as _, BenchAppContext, Focusable as _};
 use rand::{Rng as _, SeedableRng as _, rngs::StdRng};
 use settings::SettingsStore;
-use zed_actions::editor::{MoveDown, MoveUp};
 use util::RandomCharIter;
+use zed_actions::editor::{MoveDown, MoveUp};
 
 #[gpui::bench(
     inputs = multi_cursor_line_counts(),

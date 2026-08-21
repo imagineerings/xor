@@ -1883,7 +1883,7 @@ struct InlineAssistTabBarButton {
 impl RenderOnce for InlineAssistTabBarButton {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let focus_handle = self.focus_handle;
-        IconButton::new("terminal_inline_assistant", IconName::SimAssistant)
+        IconButton::new("terminal_inline_assistant", IconName::ZedAssistant)
             .icon_size(IconSize::Small)
             .on_click({
                 let focus_handle = focus_handle.clone();

@@ -1404,7 +1404,7 @@ mod tests {
     fn project_path(worktree: u64, path: &'static str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_proto(worktree),
-            path: Arc::from(RelPath::unix(path).expect("fixture path should be relative")),
+            path: Arc::from(RelPath::from_unix_str(path).expect("fixture path should be relative")),
         }
     }
 

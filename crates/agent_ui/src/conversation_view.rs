@@ -49,7 +49,6 @@ use crate::{AgentThreadSource, DEFAULT_THREAD_TITLE, resolve_agent_image};
 use lru::LruCache;
 use rope::Point;
 use settings::{NotifyWhenAgentWaiting, Settings as _, SettingsStore};
-use zed_actions::agent::{Chat, ToggleModelSelector};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -74,6 +73,7 @@ use util::{
 use workspace::{
     CollaboratorId, MultiWorkspace, NewTerminal, PathList, Workspace, path_link::sanitize_path_text,
 };
+use zed_actions::agent::{Chat, ToggleModelSelector};
 
 use super::config_options::ConfigOptionsView;
 use super::entry_view_state::EntryViewState;
@@ -1711,7 +1711,7 @@ impl ConversationView {
                         } else {
                             "New message"
                         },
-                        IconName::SimAssistant,
+                        IconName::ZedAssistant,
                         window,
                         cx,
                     );
@@ -6246,7 +6246,7 @@ pub(crate) mod tests {
         C: 'static + AgentConnection + Send + Clone,
     {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::SimAgent
+            ui::IconName::ZedAgent
         }
 
         fn agent_id(&self) -> AgentId {
@@ -6322,7 +6322,7 @@ pub(crate) mod tests {
 
     impl AgentServer for FlakyAgentServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::SimAgent
+            ui::IconName::ZedAgent
         }
 
         fn agent_id(&self) -> AgentId {
@@ -6467,7 +6467,7 @@ pub(crate) mod tests {
 
     impl AgentServer for SessionCreationRequestElicitationServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::SimAgent
+            ui::IconName::ZedAgent
         }
 
         fn agent_id(&self) -> AgentId {
@@ -6595,7 +6595,7 @@ pub(crate) mod tests {
 
     impl AgentServer for ReleaseRequestElicitationServer {
         fn logo(&self) -> ui::IconName {
-            ui::IconName::SimAgent
+            ui::IconName::ZedAgent
         }
 
         fn agent_id(&self) -> AgentId {

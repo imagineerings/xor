@@ -7,12 +7,12 @@ use futures::{Stream, TryFutureExt, stream};
 use gpui::{App, AsyncApp, Context, Entity, Task, TaskExt, Window};
 use http_client::{CustomHeaders, HttpClient};
 use language_model::{
-    ApiKeyState, AuthenticateError, ConfigurationViewTargetAgent, DisabledReason, EnvVar,
-    IconOrSvg, InlineDescription, LanguageModel, LanguageModelCompletionError,
-    LanguageModelCompletionEvent, LanguageModelId, LanguageModelName, LanguageModelProvider,
-    LanguageModelProviderId, LanguageModelProviderName, LanguageModelProviderState,
-    LanguageModelRequest, LanguageModelRequestTool, LanguageModelToolChoice, LanguageModelToolUse,
-    LanguageModelToolUseId, MessageContent,ProviderSettingsView, RateLimiter, Role, StopReason, SubPageProviderSettings, TokenUsage,
+    ApiKeyState, AuthenticateError, DisabledReason, EnvVar, IconOrSvg, InlineDescription,
+    LanguageModel, LanguageModelCompletionError, LanguageModelCompletionEvent, LanguageModelId,
+    LanguageModelName, LanguageModelProvider, LanguageModelProviderId, LanguageModelProviderName,
+    LanguageModelProviderState, LanguageModelRequest, LanguageModelRequestTool,
+    LanguageModelToolChoice, LanguageModelToolUse, LanguageModelToolUseId, MessageContent,
+    ProviderSettingsView, RateLimiter, Role, StopReason, SubPageProviderSettings, TokenUsage,
     env_var,
 };
 use menu;
@@ -346,12 +346,6 @@ impl LanguageModelProvider for OllamaLanguageModelProvider {
             .description(InlineDescription::Text(
                 "Run local models on your machine with Ollama.".into(),
             )),
-        ))
-    }
-
-    fn inline_description(&self, _cx: &App) -> Option<InlineDescription> {
-        Some(InlineDescription::Text(
-            "Run local models on your machine with Ollama.".into(),
         ))
     }
 }

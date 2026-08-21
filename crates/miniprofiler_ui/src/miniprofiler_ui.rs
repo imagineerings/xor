@@ -16,7 +16,6 @@ use gpui::{
 };
 use rpc::{AnyProtoClient, proto};
 use settings::{RegisterSetting, Settings, SettingsContent, SettingsStore};
-use zed_actions::OpenPerformanceProfiler;
 use std::any::TypeId;
 use util::ResultExt;
 use workspace::{
@@ -27,6 +26,7 @@ use workspace::{
         WithScrollbar, h_flex, v_flex,
     },
 };
+use zed_actions::OpenPerformanceProfiler;
 
 const NANOS_PER_MS: u128 = 1_000_000;
 const VISIBLE_WINDOW_NANOS: u128 = 10 * 1_000_000_000;

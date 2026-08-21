@@ -26,9 +26,9 @@
   // 9. "None"
   "base_keymap": "Zed",
   // The name of a font to use for rendering text in the editor
-  // ".SimMono" currently aliases to Lilex
+  // ".ZedMono" currently aliases to Lilex
   // but this may change in the future.
-  "buffer_font_family": ".SimMono",
+  "buffer_font_family": ".ZedMono",
   // Set the buffer text's font fallbacks, this will be merged with
   // the platform's default fallbacks.
   "buffer_font_fallbacks": null,
@@ -54,9 +54,9 @@
   "buffer_line_height": "comfortable",
   // The name of a font to use for rendering text in the UI
   // You can set this to ".SystemUIFont" to use the system font
-  // ".SimSans" currently aliases to "IBM Plex Sans", but this may
+  // ".ZedSans" currently aliases to "IBM Plex Sans", but this may
   // change in the future
-  "ui_font_family": ".SimSans",
+  "ui_font_family": ".ZedSans",
   // Set the UI's font fallbacks, this will be merged with the platform's
   // default font fallbacks.
   "ui_font_fallbacks": null,
@@ -98,10 +98,6 @@
   // Layout mode of the bottom dock. Defaults to "contained"
   //   choices: contained, full, left_aligned, right_aligned
   "bottom_dock_layout": "contained",
-  // The primary workspace presentation. Collaborative uses the same projects,
-  // worktrees, Git state, credentials, and agent sessions as Editor.
-  //   choices: editor, collaborative
-  "workspace_presentation": "editor",
   // The direction that you want to split panes horizontally. Defaults to "down"
   "pane_split_direction_horizontal": "down",
   // The direction that you want to split panes vertically. Defaults to "right"
@@ -1563,11 +1559,10 @@
   "word_diff_enabled": true,
   // Control what info is collected by Zed.
   "telemetry": {
-    // Temporarily disabled by default. Set to true to send debug info like crash reports.
-    "diagnostics": false,
-    // Temporarily disabled by default. Set to true to send anonymized usage data
-    // like what languages you're using Zed with.
-    "metrics": false,
+    // Send debug info like crash reports.
+    "diagnostics": true,
+    // Send anonymized usage data like what languages you're using Zed with.
+    "metrics": true,
     // Allow sending requests to Anthropic models that cannot be offered with
     // Zero Data Retention
     "anthropic_retention": false,
@@ -2023,7 +2018,7 @@
     // "font_size": 15,
     // Set the terminal's font family. If this option is not included,
     // the terminal will default to matching the buffer's font family.
-    // "font_family": ".SimMono",
+    // "font_family": ".ZedMono",
     // Set the terminal's font fallbacks. If this option is not included,
     // the terminal will default to matching the buffer's font fallbacks.
     // This will be merged with the platform's default font fallbacks

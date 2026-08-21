@@ -126,7 +126,7 @@ async fn collaborative_review(cx: &mut TestAppContext) {
                 "lib-file",
                 ProjectPath {
                     worktree_id,
-                    path: RelPath::unix("src/lib.rs")
+                    path: RelPath::from_unix_str("src/lib.rs")
                         .expect("fixture path should be relative")
                         .into(),
                 },
@@ -136,7 +136,7 @@ async fn collaborative_review(cx: &mut TestAppContext) {
                 "main-file",
                 ProjectPath {
                     worktree_id,
-                    path: RelPath::unix("src/main.rs")
+                    path: RelPath::from_unix_str("src/main.rs")
                         .expect("fixture path should be relative")
                         .into(),
                 },
@@ -158,7 +158,7 @@ async fn collaborative_review(cx: &mut TestAppContext) {
             .navigation_target(source, "main-file")
             .expect("a stable file link should resolve its current target")
             .path,
-        RelPath::unix("src/main.rs")
+        RelPath::from_unix_str("src/main.rs")
             .expect("fixture path should be relative")
             .into()
     );

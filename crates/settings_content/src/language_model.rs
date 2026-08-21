@@ -260,18 +260,6 @@ pub enum OpenCodeApiProtocol {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom)]
-pub enum OpenCodeApiProtocol {
-    #[serde(rename = "anthropic")]
-    Anthropic,
-    #[serde(rename = "openai_responses", alias = "open_ai_responses")]
-    OpenAiResponses,
-    #[serde(rename = "openai_chat", alias = "open_ai_chat")]
-    OpenAiChat,
-    #[serde(rename = "google")]
-    Google,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema, MergeFrom)]
 #[serde(rename_all = "snake_case")]
 pub enum OpenCodeModelSubscription {
     Zen,

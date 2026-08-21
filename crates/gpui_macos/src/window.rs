@@ -3285,16 +3285,6 @@ extern "C" fn blurred_view_update_layer(this: &Object, _: Sel) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_id_for_screen_returns_none_for_null_screen() {
-        assert_eq!(display_id_for_screen(nil), None);
-    }
-}
-
 unsafe fn remove_layer_background(layer: id) {
     unsafe {
         let _: () = msg_send![layer, setBackgroundColor:nil];

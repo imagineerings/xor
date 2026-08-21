@@ -361,7 +361,7 @@ mod tests {
                     "lib-file",
                     project::ProjectPath {
                         worktree_id,
-                        path: RelPath::unix("src/lib.rs")
+                        path: RelPath::from_unix_str("src/lib.rs")
                             .expect("fixture path should be relative")
                             .into(),
                     },

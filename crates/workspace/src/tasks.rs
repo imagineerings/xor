@@ -74,9 +74,37 @@ impl Workspace {
             resolved_task,
             omit_history,
             None,
+            None,
             window,
             cx,
         );
+    }
+
+    pub fn schedule_resolved_task_with_structured_handle(
+        &mut self,
+        task_source_kind: TaskSourceKind,
+        resolved_task: ResolvedTask,
+        omit_history: bool,
+        window: &mut Window,
+        cx: &mut Context<Workspace>,
+    ) -> StructuredTaskHandle {
+        let handle = StructuredTaskHandle::new(resolved_task.resolved.id.clone());
+        if let Some(message) =
+            structured_task_connection_error(self.project.read(cx).remote_connection_state(cx))
+        {
+            handle.mark_spawn_error(message, cx);
+            return handle;
+        }
+        self.schedule_resolved_task_internal(
+            task_source_kind,
+            resolved_task,
+            omit_history,
+            Some(handle.clone()),
+            None,
+            window,
+            cx,
+        );
+        handle
     }
 
     pub fn schedule_resolved_task_with_completion(
@@ -92,6 +120,7 @@ impl Workspace {
             task_source_kind,
             resolved_task,
             omit_history,
+            None,
             Some(Box::new(on_complete)),
             window,
             cx,
@@ -103,6 +132,7 @@ impl Workspace {
         task_source_kind: TaskSourceKind,
         resolved_task: ResolvedTask,
         omit_history: bool,
+        structured_handle: Option<StructuredTaskHandle>,
         on_complete: Option<TaskCompletionHandler>,
         window: &mut Window,
         cx: &mut Context<Workspace>,
@@ -183,10 +213,19 @@ impl Workspace {
                             if let Err(error) = workspace.update(cx, |w, cx| {
                                 let id = NotificationId::unique::<ResolvedTask>();
                                 w.show_toast(Toast::new(id, format!("Task spawn failed: {e}")), cx);
-                            });
+                            }) {
+                                log::debug!("Task error toast could not be shown: {error:#}");
+                            }
                             ScheduledTaskResult::SpawnFailed
                         }
                         None => {
+                            if let Some(handle) = structured_handle.as_ref()
+                                && let Err(error) = cx.update(|_, cx| {
+                                    handle.mark_cancelled(handle.state().terminal_id(), false, cx);
+                                })
+                            {
+                                log::debug!("Structured task window closed: {error:#}");
+                            }
                             log::debug!("Task spawn got cancelled");
                             ScheduledTaskResult::Cancelled
                         }
@@ -194,8 +233,17 @@ impl Workspace {
                     if let Some(on_complete) = on_complete {
                         on_complete(result, cx);
                     }
-                } else if let Some(on_complete) = on_complete {
-                    on_complete(ScheduledTaskResult::Cancelled, cx);
+                } else {
+                    if let Some(handle) = structured_handle.as_ref()
+                        && let Err(error) = cx.update(|_, cx| {
+                            handle.mark_cancelled(handle.state().terminal_id(), false, cx);
+                        })
+                    {
+                        log::debug!("Structured task window closed: {error:#}");
+                    }
+                    if let Some(on_complete) = on_complete {
+                        on_complete(ScheduledTaskResult::Cancelled, cx);
+                    }
                 }
             });
             self.scheduled_tasks.push(task);
@@ -395,7 +443,7 @@ mod tests {
     use project::{FakeFs, Project, TaskSourceKind};
     use serde_json::json;
     use std::sync::Arc;
-    use task::{StructuredTaskState, StructuredTerminalId, TaskTemplate};
+    use task::TaskTemplate;
 
     struct Fixture {
         workspace: Entity<Workspace>,

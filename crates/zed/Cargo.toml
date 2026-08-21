@@ -42,6 +42,7 @@ npu = ["comfy", "comfy_runtime/npu"]
 rocm = ["comfy", "comfy_runtime/rocm"]
 xpu = ["comfy", "comfy_runtime/xpu"]
 tracy = ["ztracing/tracy"]
+runtime-shaders = ["gpui_platform/runtime_shaders"]
 # LEAK_BACKTRACE=1 cargo run --features zed/track-project-leak --profile release-fast
 track-project-leak = ["gpui/leak-detection"]
 test-support = [
@@ -167,7 +168,7 @@ image = { workspace = true, optional = true }
 itertools.workspace = true
 semver.workspace = true
 tempfile = { workspace = true, optional = true }
-clock.workspace = true
+clock = { workspace = true, optional = true }
 acp_thread.workspace = true
 action_log = { workspace = true, optional = true }
 agent_servers = { workspace = true, optional = true }
@@ -234,7 +235,6 @@ settings_profile_selector.workspace = true
 settings_ui.workspace = true
 shellexpand.workspace = true
 sidebar.workspace = true
-zed_credentials_provider.workspace = true
 smol.workspace = true
 snippet_provider.workspace = true
 snippets_ui.workspace = true

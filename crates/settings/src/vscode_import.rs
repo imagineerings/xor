@@ -1024,6 +1024,7 @@ impl VsCodeSettings {
         WorkspaceSettingsContent {
             active_pane_modifiers: self.active_pane_modifiers(),
             accessible_mode: None,
+            workspace_presentation: None,
             text_rendering_mode: None,
             autosave: self.read_enum("files.autoSave", |s| match s {
                 "off" => Some(AutosaveSetting::Off),

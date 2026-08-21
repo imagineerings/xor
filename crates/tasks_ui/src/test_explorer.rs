@@ -1697,7 +1697,9 @@ mod tests {
     fn path(value: &str) -> ProjectPath {
         ProjectPath {
             worktree_id: WorktreeId::from_usize(1),
-            path: Arc::from(RelPath::unix(value).expect("fixture path should be relative")),
+            path: Arc::from(
+                RelPath::from_unix_str(value).expect("fixture path should be relative"),
+            ),
         }
     }
 

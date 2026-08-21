@@ -1777,7 +1777,7 @@ impl EditPredictionDelegate for FakeEditPredictionDelegate {
     }
 
     fn icons(&self, _cx: &gpui::App) -> EditPredictionIconSet {
-        EditPredictionIconSet::new(IconName::SimPredict)
+        EditPredictionIconSet::new(IconName::ZedPredict)
     }
 
     fn is_enabled(
@@ -1856,7 +1856,7 @@ impl EditPredictionDelegate for FakeNonZedEditPredictionDelegate {
     }
 
     fn icons(&self, _cx: &gpui::App) -> EditPredictionIconSet {
-        EditPredictionIconSet::new(IconName::SimPredict)
+        EditPredictionIconSet::new(IconName::ZedPredict)
     }
 
     fn is_enabled(

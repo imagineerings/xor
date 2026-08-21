@@ -610,8 +610,8 @@ fn nearest_toolchain_path(
         Some(parent) => parent,
         None => RelPath::empty(),
     };
-    let toml_name = RelPath::unix("rust-toolchain.toml").ok()?;
-    let legacy_name = RelPath::unix("rust-toolchain").ok()?;
+    let toml_name = RelPath::from_unix_str("rust-toolchain.toml").ok()?;
+    let legacy_name = RelPath::from_unix_str("rust-toolchain").ok()?;
     for directory in manifest_directory.ancestors() {
         for name in [toml_name, legacy_name] {
             let path = directory.join(name);
@@ -619,7 +619,7 @@ fn nearest_toolchain_path(
                 .entry_for_path(path.as_ref())
                 .is_some_and(|entry| !entry.is_private && entry.is_file())
             {
-                return Some(path);
+                return Some(path.into());
             }
         }
     }
@@ -1570,7 +1570,7 @@ mod tests {
         let candidate = Candidate {
             project_path: ProjectPath {
                 worktree_id: settings::WorktreeId::from_usize(1),
-                path: Arc::from(RelPath::unix("Cargo.toml").expect("valid fixture path")),
+                path: Arc::from(RelPath::from_unix_str("Cargo.toml").expect("valid fixture path")),
             },
             absolute_path: PathBuf::from("/workspace/Cargo.toml"),
             worktree_root: PathBuf::from("/workspace"),
@@ -1692,7 +1692,9 @@ mod tests {
         candidate.toolchain_text = Some((
             ProjectPath {
                 worktree_id: settings::WorktreeId::from_usize(1),
-                path: Arc::from(RelPath::unix("rust-toolchain.toml").expect("valid fixture path")),
+                path: Arc::from(
+                    RelPath::from_unix_str("rust-toolchain.toml").expect("valid fixture path"),
+                ),
             },
             Task::ready(Ok(include_str!(
                 "../test_data/cargo_workspace/rust-toolchain.toml"
@@ -1783,7 +1785,7 @@ mod tests {
             settings::WorktreeId::from_usize(1),
             PathBuf::from("/workspace"),
             Arc::from([Arc::from(
-                RelPath::unix("private").expect("valid private fixture path"),
+                RelPath::from_unix_str("private").expect("valid private fixture path"),
             )]),
         )];
         assert!(
@@ -1822,7 +1824,9 @@ mod tests {
     fn cargo_workspace_errors_remove_host_paths() {
         let path = ProjectPath {
             worktree_id: settings::WorktreeId::from_usize(1),
-            path: Arc::from(RelPath::unix("member/Cargo.toml").expect("valid fixture path")),
+            path: Arc::from(
+                RelPath::from_unix_str("member/Cargo.toml").expect("valid fixture path"),
+            ),
         };
         let sanitized = sanitize_candidate_error(
             "failed at /host/private/member/Cargo.toml under /host/private",
@@ -1845,12 +1849,12 @@ mod tests {
             "member/.cargo/config",
         ] {
             assert!(is_cargo_workspace_input(
-                RelPath::unix(path).expect("fixture path should be valid")
+                RelPath::from_unix_str(path).expect("fixture path should be valid")
             ));
         }
         for path in ["src/config.toml", ".cargo/notes.txt", "README.md"] {
             assert!(!is_cargo_workspace_input(
-                RelPath::unix(path).expect("fixture path should be valid")
+                RelPath::from_unix_str(path).expect("fixture path should be valid")
             ));
         }
     }

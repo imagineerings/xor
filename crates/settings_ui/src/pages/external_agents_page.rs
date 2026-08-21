@@ -12,7 +12,6 @@ use project::agent_server_store::{AgentId, AgentServerStore, ExternalAgentSource
 use settings::{
     AgentConfigOptionValue, CustomAgentServerSettings, SettingsStore, update_settings_file,
 };
-use zed_actions::OpenBrowser;
 use ui::{
     AiSettingItem, AiSettingItemSource, AiSettingItemStatus, ContextMenu, ContextMenuEntry,
     Divider, PopoverMenu, Tooltip, prelude::*,

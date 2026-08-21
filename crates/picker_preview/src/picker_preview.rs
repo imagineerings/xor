@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use gpui::{
-     AnyElement, App, AppContext as _, Context, Entity, IntoElement, Pixels, StyledText,
-    Task, Window, px,
+    AnyElement, App, AppContext as _, Context, Entity, IntoElement, Pixels, StyledText, Task,
+    Window, px,
 };
 use language::{Bias, Buffer, HighlightedText, HighlightedTextBuilder, ToPoint};
 use picker::{MatchLocation, PreviewBackend, PreviewLayout, PreviewSource, PreviewUpdate};

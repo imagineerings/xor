@@ -123,7 +123,7 @@ impl Render for SimPredictModal {
 
         v_flex()
             .id("edit-prediction-onboarding")
-            .key_context("SimPredictModal")
+            .key_context("ZedPredictModal")
             .relative()
             .w(px(550.))
             .h_full()

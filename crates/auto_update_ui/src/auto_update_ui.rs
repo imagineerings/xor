@@ -14,7 +14,6 @@ use prompt_store::rules_to_skills_migration;
 use release_channel::{AppVersion, ReleaseChannel};
 use semver::Version;
 use serde::Deserialize;
-use zed_actions::ShowUpdateNotification;
 use smol::io::AsyncReadExt;
 use ui::{AnnouncementToast, ListBulletItem, SkillsIllustration, prelude::*};
 use util::{ResultExt as _, maybe};
@@ -26,6 +25,7 @@ use workspace::{
     },
     workspace_error::{ErrorAction, ErrorSeverity, WorkspaceError},
 };
+use zed_actions::ShowUpdateNotification;
 
 actions!(
     auto_update,

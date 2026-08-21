@@ -14,8 +14,8 @@ use language_model::{
 use ordered_float::OrderedFloat;
 use picker::{Picker, PickerDelegate};
 use settings::Settings;
-use zed_actions::agent::OpenSettings;
 use ui::prelude::*;
+use zed_actions::agent::OpenSettings;
 
 use crate::ui::{ModelSelectorFooter, ModelSelectorHeader, ModelSelectorListItem};
 
@@ -666,7 +666,7 @@ mod tests {
                     .any(|(fav_provider, fav_name)| *fav_provider == provider && *fav_name == name);
                 ModelInfo {
                     model: Arc::new(TestLanguageModel::new(name, provider)),
-                    icon: IconOrSvg::Icon(IconName::SimAgent),
+                    icon: IconOrSvg::Icon(IconName::ZedAgent),
                     is_favorite,
                 }
             })
