@@ -9,9 +9,8 @@ use crate::{
 };
 use comfy_tensor::{
     ImageTensor, Layout, MemoryFormatReference, NativeTensorPayload, NativeTensorRole,
-    RetryRngPolicy, RngAlgorithm, RngProfileVersion, RngStream, RngStreamAddress,
+    NumpyRandomState,
     generated_indexing_masking_01::narrow_method_exact_native,
-    generated_random_number_generation_01::randperm_with_context_exact_native,
     generated_storage_dtype_device_01::contiguous_with_context_exact_native,
 };
 use comfy_types::CancellationToken;
@@ -23,8 +22,8 @@ pub const NATIVE_NODE_BINDINGS: NativeNodeBindingsFactory = native_node_bindings
 
 const SHUFFLE_FEATURE_ID: &str = "COMFY-NODE-0621";
 const SHUFFLE_CLASS_TYPE: &str = "ShuffleImageTextDataset";
-const SHUFFLE_IMPLEMENTATION_VERSION: &str = "source-3b27465f-v1";
-const SHUFFLE_CACHE_TOKEN: &str = "shuffle-image-text-dataset-source-3b27465f-v1";
+const SHUFFLE_IMPLEMENTATION_VERSION: &str = "source-3b27465f-v2";
+const SHUFFLE_CACHE_TOKEN: &str = "shuffle-image-text-dataset-source-3b27465f-v2";
 const SHUFFLE_RNG_PHASE: &str = "training-and-data-order";
 const SPLIT_FEATURE_ID: &str = "COMFY-NODE-0631";
 const SPLIT_CLASS_TYPE: &str = "SplitImageToTileList";
@@ -250,55 +249,14 @@ impl NativeNode for ShuffleImageTextDataset {
                     .map_err(|error| handle_failure(error, SHUFFLE_CLASS_TYPE))?;
                 require_image_payload(&payload)?;
             }
-            let compute = context.compute_session().map_err(compute_failure)?;
-            let execution = compute
-                .execution_context(&context)
-                .map_err(compute_failure)?;
-            let address = RngStreamAddress::new(
-                context.prompt_id.0.to_string(),
-                context.attempt_id.0.to_string(),
-                context.node_id.0.clone(),
-                0,
-                SHUFFLE_RNG_PHASE,
-                0,
-                0,
-                RetryRngPolicy::Replay,
-            )
-            .map_err(native_failure)?;
-            let reduced_seed = seed % u64::from(u32::MAX);
-            let transaction = RngStream::new(
-                RngProfileVersion::V2,
-                RngAlgorithm::Mt19937,
-                reduced_seed,
-                address,
-            )
-            .and_then(|stream| stream.begin(None))
-            .map_err(native_failure)?;
-            let count = u64::try_from(images.len())
-                .map_err(|_| invalid_inputs("image list is too large"))?;
-            let permutation = randperm_with_context_exact_native(
-                compute.backend(),
-                count,
-                transaction,
-                &execution,
-            )
-            .map_err(native_failure)?
-            .tensor;
+            let permutation = numpy_permutation(images.len(), seed, &context.cancellation)?;
             let mut shuffled_images = Vec::with_capacity(images.len());
             let mut shuffled_texts = Vec::with_capacity(images.len());
-            for linear in 0..count {
+            for index in permutation {
                 check_cancellation(&context, SHUFFLE_CLASS_TYPE)?;
-                let bytes = permutation
-                    .linear_element_bytes(linear)
-                    .map_err(native_failure)?;
-                let bytes: [u8; 8] = bytes
-                    .try_into()
-                    .map_err(|_| native_failure("randperm produced an invalid I64 element"))?;
-                let index = usize::try_from(i64::from_ne_bytes(bytes))
-                    .map_err(|_| native_failure("randperm produced a negative index"))?;
                 let handle = images
                     .get(index)
-                    .ok_or_else(|| native_failure("randperm index exceeded the image list"))?;
+                    .ok_or_else(|| native_failure("permutation index exceeded the image list"))?;
                 let text = texts.get(index).ok_or_else(|| {
                     invalid_inputs("texts must contain at least one entry for every image")
                 })?;
@@ -419,6 +377,10 @@ impl NativeNode for SplitImageToTileList {
                     }
                 }
             }
+            if let Err(failure) = check_cancellation(&context, SPLIT_CLASS_TYPE) {
+                rollback_published(&context, &published)?;
+                return Err(failure);
+            }
             values_outcome(vec![NativeValue::List {
                 values: published
                     .into_iter()
@@ -452,6 +414,27 @@ fn shuffle_inputs(
     Ok((images, texts, seed))
 }
 
+fn numpy_permutation(
+    length: usize,
+    seed: u64,
+    cancellation: &CancellationToken,
+) -> Result<Vec<usize>, NativeNodeFailure> {
+    let mut permutation = (0..length).collect::<Vec<_>>();
+    let mut random_state = NumpyRandomState::from_seed(seed);
+    for upper in (1..permutation.len()).rev() {
+        cancellation
+            .check()
+            .map_err(|_| interrupted_failure(SHUFFLE_CLASS_TYPE))?;
+        let high_exclusive = u32::try_from(upper + 1)
+            .map_err(|_| invalid_inputs("image list exceeds NumPy's permutation range"))?;
+        let selected = random_state
+            .randint(0, high_exclusive, cancellation)
+            .map_err(native_failure)?;
+        permutation.swap(upper, usize::try_from(selected).map_err(native_failure)?);
+    }
+    Ok(permutation)
+}
+
 fn split_inputs(
     inputs: &BTreeMap<String, NativeValue>,
 ) -> Result<(NativeOpaqueHandle, u64, u64, u64), NativeNodeFailure> {
@@ -481,6 +464,9 @@ fn handle_list(
     let Some(NativeValue::List { values }) = value else {
         return Err(invalid_inputs(format!("{name} must be a list")));
     };
+    if values.len() > MAX_LIST_VALUES {
+        return Err(invalid_inputs(format!("{name} exceeds the native list limit")));
+    }
     values
         .iter()
         .map(|value| match value {
@@ -501,6 +487,9 @@ fn string_list(value: Option<&NativeValue>, name: &str) -> Result<Vec<String>, N
     let Some(NativeValue::List { values }) = value else {
         return Err(invalid_inputs(format!("{name} must be a list")));
     };
+    if values.len() > MAX_LIST_VALUES {
+        return Err(invalid_inputs(format!("{name} exceeds the native list limit")));
+    }
     values
         .iter()
         .map(|value| match value {
@@ -516,6 +505,9 @@ fn integer_list(value: Option<&NativeValue>, name: &str) -> Result<Vec<u64>, Nat
     let Some(NativeValue::List { values }) = value else {
         return Err(invalid_inputs(format!("{name} must be a list")));
     };
+    if values.len() > MAX_LIST_VALUES {
+        return Err(invalid_inputs(format!("{name} exceeds the native list limit")));
+    }
     values
         .iter()
         .map(|value| primitive_u64(value, name))
@@ -969,6 +961,25 @@ mod tests {
             fixture["task_id"],
             "comfy-parity-native-nodes-image-batch-comfy-node-0621"
         );
+        assert_eq!(
+            fixture["nodes"][0]["source_file_sha256"],
+            "3b27465fec391509083bd1837895c09abc489c04d81afae5ffe631abd6a4e772"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn shuffle_matches_numpy_random_state_permutation_oracles()
+    -> Result<(), NativeNodeFailure> {
+        let cancellation = CancellationToken::default();
+        assert_eq!(
+            numpy_permutation(10, 7, &cancellation)?,
+            vec![8, 5, 0, 2, 1, 9, 7, 3, 6, 4]
+        );
+        assert_eq!(
+            numpy_permutation(5, 42, &cancellation)?,
+            vec![1, 4, 2, 0, 3]
+        );
         Ok(())
     }
 
@@ -1081,6 +1092,7 @@ mod tests {
         else {
             return Err("shuffle output cardinality changed".into());
         };
+        let mut actual_permutation = Vec::with_capacity(shuffled_images.len());
         for (image, text) in shuffled_images.iter().zip(shuffled_texts) {
             let NativeValue::Handle { value: image } = image else {
                 return Err("shuffle image output is not a handle".into());
@@ -1095,8 +1107,10 @@ mod tests {
                 .iter()
                 .position(|candidate| candidate == image)
                 .ok_or("shuffle returned an unknown image")?;
+            actual_permutation.push(index);
             assert_eq!(text, &texts[index]);
         }
+        assert_eq!(actual_permutation, vec![1, 4, 2, 0, 3]);
         assert_eq!(execution.store.count()?, 5);
         Ok(())
     }
