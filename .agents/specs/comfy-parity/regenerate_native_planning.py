@@ -104,12 +104,12 @@ _D34_STAGED_FOUNDATION_SENTENCE = (
     "The four shared schema, compute-value, asset/effect, and provider-invocation foundations "
     "serialize before every family leaf because their public contracts and production consumers "
     "are common read/write boundaries; semantic feature mapping still records schema for all 789 "
-    "registered rows, compute values for 575 executable rows, asset/effect services for the 189 "
+    "registered rows, compute values for 565 executable rows, asset/effect services for the 189 "
     "executable rows selected by the conservative media/effect predicate, and provider invocation "
-    "for 214 cloud/paid rows. Registered cloud/paid rows are ProviderRequired; every other "
-    "registered row remains executable even when deprecated, while only rows from the separate "
-    "inactive catalog are unavailable. Deprecation and experimental state are presentation "
-    "metadata and never binding disposition."
+    "for all 224 API-node rows. Registered API nodes are ProviderRequired even when deprecated; "
+    "registered built-in nodes remain executable even when deprecated, while only rows from the "
+    "separate inactive catalog are unavailable. Deprecation and experimental state are presentation "
+    "metadata and never override the provider trust boundary."
 )
 
 _D41_NATIVE_PAYLOAD_OWNERSHIP_SENTENCE = (
@@ -8545,7 +8545,7 @@ def native_node_contracts() -> list[dict[str, object]]:
         feature_id = str(contract["feature_id"])
         expected = (
             "provider_required"
-            if backend_rows[feature_id]["availability"] == "cloud/paid"
+            if backend_rows[feature_id]["classification"] == "API node"
             else "executable"
         )
         disposition = str(contract.get("binding_disposition", ""))
@@ -8554,7 +8554,7 @@ def native_node_contracts() -> list[dict[str, object]]:
                 f"native node contract disposition mismatch: {feature_id}: {disposition} != {expected}"
             )
         disposition_counts[disposition] += 1
-    if disposition_counts != {"executable": 575, "provider_required": 214}:
+    if disposition_counts != {"executable": 565, "provider_required": 224}:
         raise RuntimeError(
             f"native node contract disposition counts changed: {dict(disposition_counts)}"
         )
@@ -8773,6 +8773,470 @@ def native_node_compute_value_foundation_task(dependency: str, compute_dependenc
     )
 
 
+def native_latent_bundle_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-latent-bundle-foundation",
+        "Represent source-exact latent bundles across native nodes and sampling",
+        [4, 6, 7, 31, 34, 36, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        [
+            "VAL-NODE-001",
+            "VAL-LATENT-001",
+            "VAL-TENSOR-001",
+            "VAL-SAMPLER-001",
+            "VAL-CANCEL-001",
+            "VAL-MEMORY-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        "Extend the canonical native compute-value boundary with one sealed latent-bundle payload that preserves source LATENT dictionaries instead of flattening them into a single rank-four tensor. The bundle owns samples of every source-required rank, optional noise masks, batch indices, nested audio/video samples and masks, and bounded typed metadata such as latent type, sample rate, and spatial or temporal downscale ratios. comfy_tensor remains the sole tensor descriptor, storage, workspace, and cancellation owner; comfy_sampler alone consumes noise masks and batch-addressed sampling state; comfy_nodes owns only checked storage, handle, persistence, and plugin projections.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_latent.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_wan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_scail.py",
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/source_type.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+        ],
+        [
+            "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/source_type.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Source-derived fixtures cover rank-three audio and 3D latents, rank-four image latents, rank-five video latents, nested audio/video values, noise masks, batch indices, and exact metadata preservation. Every tensor and optional component is independently validated for dtype, shape, rank, device, and compatible batch geometry; semantic identity and resident accounting include every retained component exactly once. Serialization, cache lookup, persistence, restart, plugin projection, stale handles, cancellation, OOM, and rollback preserve the complete bundle or publish nothing. Sampler tests prove masks and batch indices affect execution through the canonical owner, while repository scans find no second latent dictionary, tensor, workspace, persistence, cache, or sampling-state owner.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "7.4", "31.5", "34.2", "34.6", "36.4", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_tensor", "comfy_nodes", "comfy_sampler", "comfy_runtime", "comfy_plugin_host", "comfy_test_support"],
+    )
+
+
+def native_asset_name_resolution_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-asset-name-resolution-foundation",
+        "Resolve source asset names through the canonical artifact owner",
+        [4, 6, 11, 19, 32, 34, 38, 41, 44],
+        [8, 11, 20, 29, 30, 32, 34, 39, 41],
+        ["VAL-DOMAIN-008", "VAL-NODE-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
+        "Add one attempt-scoped, runtime-injected resolver that maps a source folder category and user-visible filename to an immutable authorized asset reference. It delegates listing, authorization, digest, size, change detection, multi-file selection, and restart recovery to ArtifactIndex and AssetService; node families receive no filesystem path, directory traversal capability, or alternate asset catalog.",
+        [
+            "projects/comfy/ComfyUI/folder_paths.py",
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+            "crates/comfy_runtime/src/artifact_index.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/artifact_index.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/filesystem_asset_recovery.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Exact source folder categories resolve only cataloged names to verified immutable references, including atomic two- and three-file selections. Traversal, aliases outside the category, missing or replaced bytes, digest or size mismatch, denied grants, cancellation, eviction, restart, and concurrent replacement fail before model parsing and leave no handle, cache entry, effect, or durable state. Repository ownership checks prove that ArtifactIndex and AssetService remain the only listing, authorization, and byte-read owners.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["4.4", "6.2", "11.1", "11.2", "11.5", "19.3", "32.2", "34.4", "38.4", "41.3", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_model_resource_execution_foundation_task(
+    dependency: str, asset_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-model-resource-execution-foundation",
+        "Admit and execute source model resources through one native boundary",
+        [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Extend the sealed native model payload and stored-resource boundary to retain every executable source socket role required by the pending loader and consumer leaves, then expose one runtime-injected loader and invocation service over verified asset references. The canonical resources include general diffusion family models, VAE and structured VAE, single/dual/triple and model-specific CLIP tokenizers, audio encoder, upscale and latent-upscale models, ControlNet, GLIGEN, background removal, DA3, MoGe, face detection, PhotoMaker, style model, LoRA model, and model-patch artifacts; each role owns typed execution rather than an opaque identity.",
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_structured.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_structured.rs",
+            "crates/comfy_model/src/controlnet.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Pinned source artifacts load into exact typed resources with architecture detection, model/tokenizer options, normal and bypass adapter semantics, resident allocation accounting, semantic identity, and cancellable bounded invocation. Every promised role can be published, resolved, persisted, restarted, and consumed without a crate cycle; wrong-role, unsupported architecture, malformed weights, partial multi-file loads, OOM, cancellation, stale handles, and invocation failures publish nothing. Source-valid VAE, structured decode, audio encode, upscale, segmentation, geometry, CLIP, ControlNet, patch, and family-model fixtures execute through the same boundary, while no family-local loader or fake resource remains.",
+        [dependency, asset_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "26.2", "28.2", "31.5", "34.2", "34.6", "35.2", "37.5", "38.3", "41.2", "44.1", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_sampler", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_conditioning_control_foundation_task(
+    dependency: str, latent_dependency: str, model_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-conditioning-control-foundation",
+        "Preserve source conditioning metadata and immutable ControlNet rebinding",
+        [4, 6, 7, 31, 34, 35, 36, 37, 38, 41, 44],
+        [8, 20, 25, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-NODE-001", "VAL-SAMPLER-001", "VAL-CANCEL-001", "VAL-MEMORY-001", "VAL-OWNERSHIP-001"],
+        "Add a sealed, sampler-consumed per-entry conditioning metadata map and one canonical immutable ControlNet clone/rebind operation. Metadata admits only cataloged bounded typed keys and tensor/list shapes used by source conditioning nodes; ControlNet rebinding preserves executor identity while replacing hint, strength, timestep window, optional VAE, extra concat or mask, union control type, and predecessor chain. Source-valid zero-size percentage regions and unordered timestep metadata remain representable without weakening sampler validation.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_controlnet.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_wan.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_scail.py",
+            "crates/comfy_model/src/conditioning.rs",
+            "crates/comfy_model/src/controlnet.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/conditioning.rs",
+            "crates/comfy_model/src/controlnet.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Fixtures preserve and consume source keys for concat/reference/audio/video/camera/pose/control metadata, masks, latent bundles, CLIP vision outputs, scalar timing, and StableAudio fields without changing conditioning entry cardinality. ControlNet fixtures prove copy semantics, image layout conversion, VAE identity, union type, extra concat and mask, prior-chain ordering, distinct positive/negative publication, cancellation, rollback, persistence, and stale-handle recovery. Unknown or oversized metadata, incompatible tensors, invalid resource identities, and failed rebinding publish no conditioning or control state, and ownership scans find no string-only or family-local substitute.",
+        [dependency, latent_dependency, model_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "31.5", "34.2", "35.2", "36.4", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_sampler", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_model_transform_foundation_task(
+    dependency: str, model_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-model-transform-foundation",
+        "Clone, merge, patch, and export executable native models",
+        [4, 6, 7, 18, 26, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-SAMPLER-001", "VAL-NODE-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Create one canonical immutable model transformation boundary over retained family resources. It supports keyed state enumeration, source prefix-routed two-model merges, LoRA and hypernetwork application, exact MODEL/CLIP/VAE/LoRA safetensors export, and a serializable execution-hook graph for CFG, post-CFG, attention, context-window, output-block, sampling-profile, ROPE, model-function, and diffusion wrappers. Rebinding returns a new NativeDiffusionPayload while preserving compatible conditioning and patch identities; family leaves only project parameters into this owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_model_merging.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_model_merging_model_specific.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_context_windows.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/patch_graph.rs",
+            "crates/comfy_model/src/patches.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+        ],
+        [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/patch_graph.rs",
+            "crates/comfy_model/src/patches.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Source-derived fixtures prove exact longest-prefix merge ratios, simple and subtract merges, adapter bypass behavior, wrapper and hook ordering, attempt-scoped RNG, context windows, CFG and sampling replacements, and byte-exact safetensors exports with metadata. Transforms preserve family, conditioning, allocation, patch, cache, and persistence identities and are cancellable and atomic; invalid cross-family merges, unavailable keys, incompatible hooks, OOM, cancellation, export failure, and restart publish no model or effect. Repository scans find no leaf-owned patch engine, hook graph, state exporter, or clone/rebind implementation.",
+        [dependency, model_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "26.2", "31.5", "34.2", "35.2", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_sampler", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_model_training_foundation_task(
+    dependency: str, model_dependency: str, model_transform_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-model-training-foundation",
+        "Train retained native LoRA resources through one bounded service",
+        [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 27, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-MODEL-FAMILY-001", "VAL-NODE-001", "VAL-RNG-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Expose one runtime-injected training service over retained diffusion family models and canonical dataset payloads. It owns LoRA adapter initialization or reload, trainable parameter selection, model forward and autograd, optimizer and loss selection, dtype and offload policy, gradient accumulation, seeded sampling, checkpoint cadence, cancellation, and publication of a concrete retained LORA_MODEL plus LOSS_MAP and step count; family leaves only validate and project source options.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_train.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_dataset.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/patches.rs",
+            "crates/comfy_tensor/src/autograd.rs",
+            "crates/comfy_tensor/src/autograd/breadth.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/patches.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_tensor/src/autograd.rs",
+            "crates/comfy_tensor/src/autograd/breadth.rs",
+            "crates/comfy_tensor/src/comfy_tensor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Pinned dataset and tiny-family fixtures cover new and existing LoRA state, AdamW, Adam, SGD, and RMSprop, MSE, L1, Huber, and SmoothL1, gradient accumulation, dtype modes, seeded sampling, loss history, checkpoint boundaries, final trained tensor values, exact LORA_MODEL residency/digest/persistence, and normal versus bypass application. Invalid datasets, incompatible models or adapters, nonfinite loss, OOM, cancellation at every step, checkpoint failure, stale handles, and restart publish no partial model, loss, step, cache, or effect. Ownership checks find no family-local optimizer, autograd loop, training state, or opaque LoRA handle.",
+        [dependency, model_dependency, model_transform_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "18.1", "26.2", "28.2", "31.5", "34.2", "35.2", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_tensor", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_compile_policy_bridge_foundation_task(
+    dependency: str, model_transform_dependency: str
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-compile-policy-bridge-foundation",
+        "Bridge exact model compilation policy into native node services",
+        [4, 6, 7, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 28, 29, 31, 32, 33, 34, 39, 40],
+        ["VAL-NODE-001", "VAL-SAMPLER-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Expose a cycle-free identity-checked native node service whose runtime implementation delegates exactly once to the canonical NativeCompilePolicy and exact compilation wrapper. The service clones and rebinds the model transformation graph with the selected backend and guard policy; no option is accepted and ignored, and node families cannot own compilation, backend selection, guards, or cache identity.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_torch_compile.py",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Inductor and cudagraph source options install distinct exact policy identities on cloned models, guards are enforced, repeated inputs cache through the canonical owner, and unsupported backend, compile failure, cancellation, stale model, and rebind failure publish nothing. Dependency and ownership tests prove the service introduces no comfy_nodes-to-runtime cycle and no identity facade or accepted-but-ignored option.",
+        [dependency, model_transform_dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "31.5", "34.2", "35.2", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_audio_empty_segment_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-audio-empty-segment-foundation",
+        "Represent source-valid zero-sample native audio segments",
+        [4, 6, 7, 31, 34, 36, 37, 38, 41, 44],
+        [8, 20, 25, 26, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Extend the canonical audio payload to admit source-valid waveform tensors whose sample axis is zero while preserving nonzero batch and channel axes, sample rate, semantic digest, residency, persistence, and downstream safety. Every audio consumer must either process the empty segment exactly or return a typed source-compatible unsupported-domain failure before indexing or allocation.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_wandancer.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/comfy_media.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "A canonical one-second waveform sliced beyond its duration produces shape [1,1,0], round-trips through handles, persistence, cache, restart, and list outputs, and is accepted by safe downstream nodes without panic. Zero batch or channel axes, invalid rates, malformed storage, stale handles, OOM, and cancellation still fail atomically; digests distinguish empty segments by full descriptor and rate, and no padded one-sample substitute is introduced.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "31.5", "34.2", "36.4", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
+def native_sampler_payload_algorithm_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sampler-payload-algorithm-foundation",
+        "Admit exact executable sampler algorithms as native payloads",
+        [4, 6, 7, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-SAMPLER-001", "VAL-SAMPLING-FOUNDATION-001", "VAL-NODE-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Replace the Euler-only native sampler payload boundary with a sealed exhaustive algorithm identity and checked invocation contract for every sampler-producing node required by the pending leaves. Admit the already-implemented native algorithms plus source-exact VOID DDIM alpha-space updates, LCM-upscale, and every cataloged option; preserve VOID's no-standard-noise-scaling rule and LMS order 1 through 100. Algorithm parameters, schedules, callback shapes, RNG domains, cancellation, cache identity, and persistence stay owned by comfy_sampler rather than node families.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_void.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_custom_sampler.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_advanced_samplers.py",
+            "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/sampler.rs",
+            "crates/comfy_sampler/src/algorithms",
+            "crates/comfy_nodes/src/stored_payload.rs",
+        ],
+        [
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/sampler.rs",
+            "crates/comfy_sampler/src/algorithms",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        "Pinned scalar and tensor oracles prove Euler, ancestral, DPM, LMS, SA-Solver, SEEDS-2, LCM, LCM-upscale, VOID, and every assigned sampler follows its exact update equation, options, callback contract, schedule interpretation, noise-scaling rule, dtype, and boundary behavior rather than aliasing Euler. LMS orders 1, 4, 5, and 100 and VOID's alpha-space discriminator are covered. Payload digests and persistence distinguish algorithms and parameters; invalid schedules, incompatible model profiles, RNG misuse, OOM, cancellation, and stale handles fail without partial samples or state, and ownership scans find no family-local sampler loop.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "31.5", "34.2", "35.2", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_sampler", "comfy_nodes", "comfy_test_support"],
+    )
+
+
+def native_sampling_profile_guidance_foundation_task(
+    dependency: str,
+    latent_dependency: str,
+    model_dependency: str,
+    model_transform_dependency: str,
+    sampler_dependency: str,
+) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-sampling-profile-guidance-foundation",
+        "Attach exact sampling profiles, guiders, and modifiers to native models",
+        [4, 6, 7, 26, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        ["VAL-SAMPLER-001", "VAL-SAMPLING-FOUNDATION-001", "VAL-NODE-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Attach a sealed immutable sampling policy and ordered modifier chain to every native diffusion model. Profiles cover exact discrete, continuous EDM, continuous V, flow, Stable Cascade, SD3, Flux, LTXV, Cosmos RFlow, and model-family sigma behavior; the model exposes checked percent-to-sigma, sigma-at-timestep, noise scaling, and latent in/out transforms. Guiders include basic, CFG, dual-CFG, and dual-model execution, while modifiers cover stateful APG, CFG override ordering, video CFG schedules, and model-attached guidance hooks without cross-attempt mutable state.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_model_advanced.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_custom_sampler.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_apg.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video_model.py",
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_sampler/src/sampling_profile.rs",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/guidance.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Source-derived fixtures prove exact profile sigma bounds and prediction behavior, model-specific latent transforms and noise scaling, three-branch/two-scale dual CFG, separate negative models, stateful APG reset and projection, nearest-sampler CFG override, and per-batch video CFG schedules. Policy, guider, modifier, model, conditioning, latent-bundle, RNG, cache, resident, persistence, and restart identities remain coupled and deterministic; invalid combinations, missing branches, incompatible models, OOM, cancellation, and stale handles publish no model or sample. Runtime sampling consumes the attached profile rather than hard-coded SD15, and repository scans find no leaf-owned guider or modifier chain.",
+        [
+            dependency,
+            latent_dependency,
+            model_dependency,
+            model_transform_dependency,
+            sampler_dependency,
+        ],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.2", "26.2", "31.5", "34.2", "35.2", "37.3", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_model", "comfy_sampler", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
 def native_node_asset_effect_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-node-asset-effect-foundation",
@@ -8865,6 +9329,80 @@ def native_node_provider_invocation_foundation_task(dependency: str) -> dict[str
         locked=True,
         feature_scoped=True,
         criterion_ids=["4.3", "4.4", "4.5", "6.4", "6.5", "6.6", "12.5", "12.6", "28.3", "28.6", "32.1", "32.2", "32.5", "32.7", "32.8", "34.2", "34.6", "39.2", "39.3", "39.5", "39.6", "40.1", "40.4", "40.6", "41.5", "44.1", "44.2", "44.3"],
+    )
+
+
+def native_partner_provider_components_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-partner-provider-components-foundation",
+        "Provision signed provider components for every cloud node contract",
+        [4, 6, 11, 12, 18, 19, 28, 32, 34, 37, 38, 40, 41, 44],
+        [8, 12, 13, 17, 18, 20, 21, 22, 29, 32, 34, 35, 39, 40, 41],
+        ["VAL-NODE-001", "VAL-PLUGIN-HOST-001", "VAL-WORKER-PLUGIN-001", "VAL-RUNTIME-TRUST-001", "VAL-CANCEL-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
+        "Build reviewed Rust/WASM provider components, manifests, provider-binding claims, and deployment-registry entries for every provider-required node and external-service contract in the pinned catalog. A single authoritative feature-to-vendor namespace map activates each signed vendor component atomically for all of its claims. Components own exact authenticated request, multipart, upload, create, poll, retry, cancellation, bounded incremental response streaming and progress, download, cost-receipt, and typed native materialization behavior; generated node leaves only select an admitted binding and project checked inputs.",
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
+            "projects/comfy/ComfyUI/comfy_api_nodes",
+            "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_worker/src/plugin_runtime.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/comfy_cli.rs",
+        ],
+        [
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/tasks.md",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+            "crates/comfy_plugin_host/provider_components",
+            "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
+            "crates/comfy_worker/src/plugin_runtime.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_types/src/comfy_types.rs",
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/zed.rs",
+            "crates/zed/src/comfy_cli.rs",
+            "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_test_support/tests/plugin_e2e.rs",
+            "crates/comfy_test_support/tests/native_worker_resilience.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "Every one of the 224 provider-required node contracts maps exactly once through an authoritative feature-to-vendor namespace map to a fingerprinted signed component and reviewed provider binding whose endpoint, resolved HTTP method, ordered headers, auth, secret, multipart/upload, cost, retry, poll, bounded streaming/progress, response, and output types match the pinned Python source and external-service ledger; no external-service row retains an unknown method. Each vendor activation is atomic across all of its node and ledger claims, with no placeholder per-node namespace and no extra or missing claim. The provider ABI exposes bounded response heads and incremental binary, text, or NDJSON chunks, cancellation-aware waits, and monotonic rate-limited progress without persisting progress as output or effect. Manifest capabilities exactly cover provider request, upload, and cost grants. Reproducible component artifacts are signed by an admitted public-key authority without checking in or synthesizing a private signing key and are discoverable through the same desktop and headless deployment lifecycle. Hermetic actuator fixtures cover exact methods, paths, headers, multipart fields, success, incremental NDJSON and binary streaming, vendor error, malformed chunks, oversized streams, polling timeout, Retry-After and retry exhaustion, cancellation between chunks, download digest mismatch, cost denial, missing secret, offline mode, worker loss, restart, stale or late progress, and atomic typed materialization; optional live certification is recorded separately and never required for offline tests. No provider row is executable without an admitted component, and no generic echo, opaque task bytes, or descriptor-only facade satisfies closure.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["4.4", "6.4", "11.2", "12.1", "12.2", "12.3", "12.4", "12.5", "12.6", "18.1", "19.3", "28.2", "32.2", "34.4", "37.5", "38.4", "40.2", "41.3", "44.3"],
+        registered_source_edits=["comfy_plugin_host", "comfy_worker", "comfy_runtime", "zed", "comfy_test_support"],
     )
 
 
@@ -13833,6 +14371,40 @@ def native_text_generation_foundation_task(dependency: str) -> dict[str, object]
     )
 
 
+def native_text_generation_node_bridge_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-text-generation-node-bridge",
+        "Bridge generated text nodes to the canonical runtime generator",
+        [4, 6, 7, 18, 28, 31, 34, 37, 38, 41, 44],
+        [8, 18, 20, 25, 28, 29, 31, 32, 34, 39, 40, 41],
+        ["VAL-NODE-001", "VAL-NATIVE-E2E-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
+        "Add a cycle-free identity-checked native node service and request projection for multimodal text generation. comfy_nodes validates and projects leaf inputs only; the runtime implementation delegates exactly once to execute_native_multimodal_text_generation, which remains the sole resource resolution, media preparation, RNG, generation, cache, cancellation, and atomic publication owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_textgen.py",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/executor.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+        ],
+        "TextGenerate and TextGenerateLTX2Prompt reach the canonical generator through one injected service without a comfy_nodes-to-comfy_runtime dependency cycle. Fixtures prove exact template and optional media projection, preparation before RNG, attempt-scoped deterministic RNG, capability failures, cancellation before and after generation, cache identity, stale handles, and atomic scalar publication. Service identity mismatch, missing injection, malformed output, and runtime failure publish nothing, and ownership tests reject any leaf-local resolution, preprocessing, RNG, generation, cache, or publication loop.",
+        dependency,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["6.3", "7.4", "18.1", "28.2", "31.5", "34.2", "37.5", "38.3", "41.2", "44.3"],
+        registered_source_edits=["comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+
+
 def native_media_text_rendering_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-media-text-rendering-foundation",
@@ -13971,8 +14543,19 @@ def native_detection_execution_foundation_task(dependency: str) -> dict[str, obj
 def node_tasks(
     schema_dependency: str,
     compute_dependency: str,
+    latent_dependency: str,
+    asset_name_dependency: str,
+    model_resource_dependency: str,
+    conditioning_dependency: str,
+    model_transform_dependency: str,
+    model_training_dependency: str,
+    compile_policy_dependency: str,
+    audio_empty_segment_dependency: str,
+    sampler_payload_dependency: str,
+    sampling_profile_dependency: str,
     asset_effect_dependency: str,
     provider_dependency: str,
+    provider_component_dependency: str,
     text_regex_dependency: str,
     text_transform_dependency: str,
     text_generation_dependency: str,
@@ -14023,7 +14606,49 @@ def node_tasks(
                 task_dependencies.append(asset_effect_dependency)
                 task_dependencies.append(sdpose_dependency)
             if has_provider:
-                task_dependencies.extend([provider_dependency, sdpose_dependency])
+                task_dependencies.extend(
+                    [provider_dependency, provider_component_dependency, sdpose_dependency]
+                )
+            if category in {"model/conditioning", "model/latent"}:
+                task_dependencies.append(latent_dependency)
+            if category in {
+                "image/background removal",
+                "image/detection",
+                "image/geometry estimation",
+                "image/upscaling",
+                "model/conditioning",
+                "model/latent",
+                "model/loaders",
+                "model/merging",
+                "model/patch",
+                "model/sampling",
+                "model/training",
+                "text",
+            }:
+                task_dependencies.extend(
+                    [asset_name_dependency, model_resource_dependency]
+                )
+            if category == "model/conditioning":
+                task_dependencies.append(conditioning_dependency)
+            if category in {
+                "model/merging",
+                "model/patch",
+                "model/sampling",
+                "model/training",
+            }:
+                task_dependencies.append(model_transform_dependency)
+            if category == "model/training":
+                task_dependencies.append(model_training_dependency)
+            if "COMFY-NODE-0680" in feature_ids:
+                task_dependencies.append(compile_policy_dependency)
+            if {"COMFY-NODE-0762", "COMFY-NODE-0763"}.intersection(feature_ids):
+                task_dependencies.append(audio_empty_segment_dependency)
+            if category == "model/sampling":
+                task_dependencies.extend(
+                    [sampler_payload_dependency, sampling_profile_dependency]
+                )
+            if category == "model/patch":
+                task_dependencies.append(sampling_profile_dependency)
             task_reads = [
                 ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
                 ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
@@ -14041,6 +14666,54 @@ def node_tasks(
                 "crates/comfy_sampler/src/comfy_sampler.rs",
                 "crates/comfy_sampler/src/native_diffusion_payload.rs",
             ]
+            if category in {"model/conditioning", "model/latent"}:
+                task_reads.extend(
+                    [
+                        "crates/comfy_tensor/src/native_node_payload.rs",
+                        "crates/comfy_nodes/src/stored_payload.rs",
+                        "crates/comfy_sampler/src/native_diffusion_payload.rs",
+                    ]
+                )
+            if model_resource_dependency in task_dependencies:
+                task_reads.extend(
+                    [
+                        "crates/comfy_model/src/model_family.rs",
+                        "crates/comfy_model/src/clip.rs",
+                        "crates/comfy_model/src/vae.rs",
+                        "crates/comfy_model/src/vae_structured.rs",
+                        "crates/comfy_runtime/src/artifact_index.rs",
+                    ]
+                )
+            if conditioning_dependency in task_dependencies:
+                task_reads.extend(
+                    [
+                        "crates/comfy_model/src/conditioning.rs",
+                        "crates/comfy_model/src/controlnet.rs",
+                    ]
+                )
+            if model_transform_dependency in task_dependencies:
+                task_reads.extend(
+                    [
+                        "crates/comfy_model/src/patch_graph.rs",
+                        "crates/comfy_model/src/patches.rs",
+                        "crates/comfy_sampler/src/guidance.rs",
+                    ]
+                )
+            if sampling_profile_dependency in task_dependencies:
+                task_reads.extend(
+                    [
+                        "crates/comfy_sampler/src/sampling_profile.rs",
+                        "crates/comfy_sampler/src/native_node_payload.rs",
+                        "crates/comfy_sampler/src/guidance.rs",
+                    ]
+                )
+            if model_training_dependency in task_dependencies:
+                task_reads.extend(
+                    [
+                        "crates/comfy_tensor/src/autograd.rs",
+                        "crates/comfy_tensor/src/autograd/breadth.rs",
+                    ]
+                )
             if has_asset_or_effect:
                 task_reads.extend(
                     [
@@ -14910,14 +15583,58 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     node_compute_foundation = native_node_compute_value_foundation_task(
         str(node_schema_foundation["id"]), compute_integration
     )
-    node_asset_effect_foundation = native_node_asset_effect_foundation_task(
+    latent_bundle_foundation = native_latent_bundle_foundation_task(
         str(node_compute_foundation["id"])
     )
-    node_provider_foundation = native_node_provider_invocation_foundation_task(
+    node_asset_effect_foundation = native_node_asset_effect_foundation_task(
+        str(latent_bundle_foundation["id"])
+    )
+    asset_name_resolution_foundation = native_asset_name_resolution_foundation_task(
         str(node_asset_effect_foundation["id"])
     )
+    model_resource_execution_foundation = native_model_resource_execution_foundation_task(
+        str(node_compute_foundation["id"]),
+        str(asset_name_resolution_foundation["id"]),
+    )
+    conditioning_control_foundation = native_conditioning_control_foundation_task(
+        str(node_compute_foundation["id"]),
+        str(latent_bundle_foundation["id"]),
+        str(model_resource_execution_foundation["id"]),
+    )
+    model_transform_foundation = native_model_transform_foundation_task(
+        str(conditioning_control_foundation["id"]),
+        str(model_resource_execution_foundation["id"]),
+    )
+    model_training_foundation = native_model_training_foundation_task(
+        str(model_transform_foundation["id"]),
+        str(model_resource_execution_foundation["id"]),
+        str(model_transform_foundation["id"]),
+    )
+    sampler_payload_algorithm_foundation = native_sampler_payload_algorithm_foundation_task(
+        str(model_training_foundation["id"])
+    )
+    sampling_profile_guidance_foundation = native_sampling_profile_guidance_foundation_task(
+        str(node_compute_foundation["id"]),
+        str(latent_bundle_foundation["id"]),
+        str(model_resource_execution_foundation["id"]),
+        str(model_transform_foundation["id"]),
+        str(sampler_payload_algorithm_foundation["id"]),
+    )
+    compile_policy_bridge_foundation = native_compile_policy_bridge_foundation_task(
+        str(sampling_profile_guidance_foundation["id"]),
+        str(model_transform_foundation["id"]),
+    )
+    audio_empty_segment_foundation = native_audio_empty_segment_foundation_task(
+        str(compile_policy_bridge_foundation["id"])
+    )
+    node_provider_foundation = native_node_provider_invocation_foundation_task(
+        str(audio_empty_segment_foundation["id"])
+    )
+    partner_provider_components_foundation = native_partner_provider_components_foundation_task(
+        str(node_provider_foundation["id"])
+    )
     comfy_build_boundary = comfy_opt_in_build_boundary_task(
-        str(node_asset_effect_foundation["id"])
+        str(audio_empty_segment_foundation["id"])
     )
     text_regex_foundation = native_text_regex_foundation_task(
         str(comfy_build_boundary["id"])
@@ -15005,9 +15722,18 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     text_generation_foundation = native_text_generation_foundation_task(
         str(gemma_multimodal_generation_foundation["id"])
     )
+    text_generation_node_bridge = native_text_generation_node_bridge_task(
+        str(text_generation_foundation["id"])
+    )
+    partner_provider_components_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(partner_provider_components_foundation["dependencies"])
+            + [str(text_generation_node_bridge["id"])]
+        )
+    )
     sdpose_heatmap_projection_foundation = (
         native_sdpose_heatmap_projection_foundation_task(
-            str(text_generation_foundation["id"])
+            str(text_generation_node_bridge["id"])
         )
     )
     immutable_dense_inference_attention_foundation = (
@@ -15038,6 +15764,12 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     )
     sdpose_foundation = native_sdpose_execution_foundation_task(
         str(sdpose_head_projection_foundation["id"])
+    )
+    partner_provider_components_foundation["dependencies"] = list(
+        dict.fromkeys(
+            list(partner_provider_components_foundation["dependencies"])
+            + [str(sdpose_foundation["id"])]
+        )
     )
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
@@ -15342,11 +16074,22 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     nodes, node_mapping = node_tasks(
         str(node_schema_foundation["id"]),
         str(node_compute_foundation["id"]),
+        str(latent_bundle_foundation["id"]),
+        str(asset_name_resolution_foundation["id"]),
+        str(model_resource_execution_foundation["id"]),
+        str(conditioning_control_foundation["id"]),
+        str(model_transform_foundation["id"]),
+        str(model_training_foundation["id"]),
+        str(compile_policy_bridge_foundation["id"]),
+        str(audio_empty_segment_foundation["id"]),
+        str(sampler_payload_algorithm_foundation["id"]),
+        str(sampling_profile_guidance_foundation["id"]),
         str(node_asset_effect_foundation["id"]),
         str(node_provider_foundation["id"]),
+        str(partner_provider_components_foundation["id"]),
         str(text_regex_foundation["id"]),
         str(text_transform_foundation["id"]),
-        str(text_generation_foundation["id"]),
+        str(text_generation_node_bridge["id"]),
         str(media_text_foundation["id"]),
         str(sdpose_foundation["id"]),
         str(video_foundation["id"]),
@@ -15355,6 +16098,30 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(shader_foundation["id"]),
         str(detection_foundation["id"]),
     )
+    provider_component_writes = tuple(
+        str(path).rstrip("/")
+        for path in partner_provider_components_foundation["writes"]
+    )
+    for node in nodes:
+        node_accesses = tuple(
+            str(path).rstrip("/")
+            for path in (*node["reads"], *node["writes"])
+        )
+        if any(
+            provider_path == node_path
+            or provider_path.startswith(f"{node_path}/")
+            or node_path.startswith(f"{provider_path}/")
+            for provider_path in provider_component_writes
+            for node_path in node_accesses
+        ):
+            node["dependencies"] = list(
+                dict.fromkeys(
+                    [
+                        *node["dependencies"],
+                        str(partner_provider_components_foundation["id"]),
+                    ]
+                )
+            )
     add_native_node_foundation_mapping(
         node_mapping,
         str(node_schema_foundation["id"]),
@@ -15383,7 +16150,17 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             node_runtime_foundation,
             node_schema_foundation,
             node_compute_foundation,
+            latent_bundle_foundation,
             node_asset_effect_foundation,
+            asset_name_resolution_foundation,
+            model_resource_execution_foundation,
+            conditioning_control_foundation,
+            model_transform_foundation,
+            model_training_foundation,
+            compile_policy_bridge_foundation,
+            audio_empty_segment_foundation,
+            sampler_payload_algorithm_foundation,
+            sampling_profile_guidance_foundation,
             comfy_build_boundary,
             text_regex_foundation,
             text_transform_foundation,
@@ -15392,6 +16169,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             structured_link_foundation,
             shader_foundation,
             node_provider_foundation,
+            partner_provider_components_foundation,
             decoder_text_generation_foundation,
             prepared_decoder_generation_foundation,
             qwen_image_preparation_foundation,
@@ -15413,6 +16191,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             gemma_multimodal_resource_foundation,
             gemma_multimodal_generation_foundation,
             text_generation_foundation,
+            text_generation_node_bridge,
             sdpose_heatmap_projection_foundation,
             immutable_dense_inference_attention_foundation,
             sdpose_sd2_capture_foundation,

@@ -1715,11 +1715,20 @@ pub fn prewarm_native_shader_executor() {
 fn register_generated_family_bindings(
     registry: &mut NativeNodeRegistry,
 ) -> Result<(), NativeImageRuntimeError> {
+    let family_bindings = generated_family_node_bindings()?;
+    let family_class_types = family_bindings
+        .iter()
+        .map(|binding| binding.descriptor().class_type.clone())
+        .collect::<BTreeSet<_>>();
+    let provider_bindings = generated_provider_required_bindings()?
+        .into_iter()
+        .filter(|binding| !family_class_types.contains(&binding.descriptor().class_type))
+        .collect::<Vec<_>>();
     registry
-        .register_native_bindings(generated_provider_required_bindings()?)
+        .register_native_bindings(provider_bindings)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     registry
-        .register_native_bindings(generated_family_node_bindings()?)
+        .register_native_bindings(family_bindings)
         .map_err(|error| NativeImageRuntimeError::Registry(error.to_string()))?;
     registry
         .validate_comprehensive_bindings()
@@ -8847,7 +8856,7 @@ mod tests {
             .values()
             .filter(|descriptor| descriptor.catalog_status == CatalogNodeStatus::ProviderRequired)
             .count();
-        assert_eq!(provider_required, 214);
+        assert_eq!(provider_required, 224);
         assert_eq!(
             NodeRegistry::built_in()?
                 .registered()

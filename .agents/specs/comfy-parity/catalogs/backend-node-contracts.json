@@ -21266,10 +21266,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/ByteDance",
       "classification": "API node",
@@ -25684,10 +25684,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/ByteDance",
       "classification": "API node",
@@ -98295,10 +98295,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/BFL",
       "classification": "API node",
@@ -99047,10 +99047,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/BFL",
       "classification": "API node",
@@ -110234,10 +110234,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/Gemini",
       "classification": "API node",
@@ -112698,10 +112698,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/text/Gemini",
       "classification": "API node",
@@ -121475,10 +121475,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/Grok",
       "classification": "API node",
@@ -255910,10 +255910,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/image/OpenAI",
       "classification": "API node",
@@ -258909,10 +258909,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/video/Sora",
       "classification": "API node",
@@ -365302,10 +365302,10 @@
     },
     {
       "availability": "deprecated/dead",
-      "binding_disposition": "executable",
+      "binding_disposition": "provider_required",
       "capability_hints": {
         "asset_or_effect": false,
-        "provider": false
+        "provider": true
       },
       "category": "partner/video/Topaz",
       "classification": "API node",
@@ -446481,11 +446481,11 @@
     "root": "projects/comfy/ComfyUI"
   },
   "summary": {
-    "executable": 575,
+    "executable": 565,
     "normalized_v1": 135,
     "normalized_v3": 654,
     "preserved_schema_contracts": 0,
-    "provider_required": 214,
+    "provider_required": 224,
     "rows": 789
   }
 }

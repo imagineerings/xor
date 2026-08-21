@@ -44,6 +44,7 @@ class ValidationGenerationTests(unittest.TestCase):
         foundation_id = "comfy-parity-native-node-runtime-foundation"
         schema_id = "comfy-parity-native-node-schema-metadata-foundation"
         value_id = "comfy-parity-native-node-compute-value-foundation"
+        latent_bundle_id = "comfy-parity-native-latent-bundle-foundation"
         asset_id = "comfy-parity-native-node-asset-effect-foundation"
         provider_id = "comfy-parity-native-node-provider-invocation-foundation"
         compute_id = "comfy-parity-native-compute-breadth-integration"
@@ -79,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 627)
+        self.assertEqual(len(tasks), 639)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -96,7 +97,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             tasks_by_id[asset_id]["dependencies"],
             [
-                value_id,
+                latent_bundle_id,
                 "comfy-parity-artifact-owner-consolidation",
                 "comfy-parity-execution-output-owner-consolidation",
             ],
@@ -104,7 +105,7 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(
             tasks_by_id[provider_id]["dependencies"],
             [
-                asset_id,
+                "comfy-parity-native-audio-empty-segment-foundation",
                 "comfy-parity-extension-host-plugin-adapter",
                 "comfy-parity-opt-in-product-build-boundary",
                 "comfy-parity-native-shader-execution-foundation",
@@ -352,15 +353,15 @@ class ValidationGenerationTests(unittest.TestCase):
             for identifier in node_ids
         }
         self.assertEqual(sum(schema_id in value for value in dependencies.values()), 102)
-        self.assertEqual(sum(value_id in value for value in dependencies.values()), 84)
-        self.assertEqual(sum(asset_id in value for value in dependencies.values()), 84)
+        self.assertEqual(sum(value_id in value for value in dependencies.values()), 77)
+        self.assertEqual(sum(asset_id in value for value in dependencies.values()), 77)
         self.assertEqual(sum(provider_id in value for value in dependencies.values()), 26)
         self.assertEqual(
             sum(
                 value_id in value and provider_id in value
                 for value in dependencies.values()
             ),
-            8,
+            1,
         )
         self.assertEqual(
             sum(
@@ -374,7 +375,7 @@ class ValidationGenerationTests(unittest.TestCase):
                 provider_id in value and value_id not in value
                 for value in dependencies.values()
             ),
-            18,
+            25,
         )
         mapped_values = {
             identifier: sum(
@@ -384,7 +385,7 @@ class ValidationGenerationTests(unittest.TestCase):
         }
         self.assertEqual(
             mapped_values,
-            {schema_id: 789, value_id: 575, asset_id: 189, provider_id: 214},
+            {schema_id: 789, value_id: 565, asset_id: 189, provider_id: 224},
         )
         self.assertEqual(sorted(tasks_by_id[registry_id]["dependencies"]), node_ids)
 
@@ -401,6 +402,9 @@ class ValidationGenerationTests(unittest.TestCase):
             "comfy-parity-native-decoder-text-generation-foundation"
         )
         text_generation_foundation_id = "comfy-parity-native-text-generation-foundation"
+        text_generation_node_bridge_id = (
+            "comfy-parity-native-text-generation-node-bridge"
+        )
         media_text_foundation_id = "comfy-parity-native-media-text-rendering-foundation"
         sdpose_foundation_id = "comfy-parity-native-sdpose-execution-foundation"
         sdpose_projection_id = (
@@ -2001,7 +2005,11 @@ class ValidationGenerationTests(unittest.TestCase):
             "pre-allocation bounded output",
             tasks_by_id[text_transform_foundation_id]["done"],
         )
-        self.assertIn(text_generation_foundation_id, dependencies[text_generation_id])
+        self.assertIn(text_generation_node_bridge_id, dependencies[text_generation_id])
+        self.assertIn(
+            text_generation_foundation_id,
+            tasks_by_id[text_generation_node_bridge_id]["dependencies"],
+        )
         self.assertIn(
             gemma_generation_id,
             tasks_by_id[text_generation_foundation_id]["dependencies"],
@@ -2346,6 +2354,7 @@ class ValidationGenerationTests(unittest.TestCase):
             qwen_generation_id,
             gemma_generation_id,
             text_generation_foundation_id,
+            text_generation_node_bridge_id,
             media_text_foundation_id,
             structured_link_foundation_id,
             shader_foundation_id,
@@ -2360,7 +2369,8 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertEqual(waves[foundation_id], waves[compute_id] + 1)
         self.assertEqual(waves[schema_id], waves[foundation_id] + 1)
         self.assertEqual(waves[value_id], waves[schema_id] + 1)
-        self.assertEqual(waves[asset_id], waves[value_id] + 1)
+        self.assertEqual(waves[latent_bundle_id], waves[value_id] + 1)
+        self.assertEqual(waves[asset_id], waves[latent_bundle_id] + 1)
         self.assertEqual(
             waves[provider_id],
             waves[shader_foundation_id] + 1,
@@ -2409,7 +2419,11 @@ class ValidationGenerationTests(unittest.TestCase):
             waves[text_generation_foundation_id], waves[gemma_generation_id] + 1
         )
         self.assertEqual(
-            waves[sdpose_projection_id], waves[text_generation_foundation_id] + 1
+            waves[text_generation_node_bridge_id],
+            waves[text_generation_foundation_id] + 1,
+        )
+        self.assertEqual(
+            waves[sdpose_projection_id], waves[text_generation_node_bridge_id] + 1
         )
         self.assertEqual(
             waves[immutable_dense_attention_id], waves[sdpose_projection_id] + 1
@@ -2925,7 +2939,7 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             build_boundary_task["dependencies"],
-            ["comfy-parity-native-node-asset-effect-foundation"],
+            ["comfy-parity-native-audio-empty-segment-foundation"],
         )
         for path in [
             "crates/zed/Cargo.toml",

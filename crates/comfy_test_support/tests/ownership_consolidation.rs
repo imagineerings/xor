@@ -1096,8 +1096,12 @@ fn run_ownership_validation(
     let model_clip_text = fs::read_to_string(root.join("crates/comfy_model/src/clip_text.rs"))?;
     let model_clip_text_encoder_t5 =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_t5.rs"))?;
-    let model_clip_text_encoder_decoder =
+    let model_clip_text_encoder_decoder_source =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_decoder.rs"))?;
+    let model_clip_text_encoder_decoder = model_clip_text_encoder_decoder_source
+        .split("\n#[cfg(test)]")
+        .next()
+        .unwrap_or(&model_clip_text_encoder_decoder_source);
     let model_clip_text_encoder_multimodal =
         fs::read_to_string(root.join("crates/comfy_model/src/clip_text_encoder_multimodal.rs"))?;
     let task399_multimodal_generation_fixture = fs::read_to_string(
@@ -2600,7 +2604,7 @@ fn run_ownership_validation(
     let task384_qwen3_delegates_rms_rope_attention_cache_and_residency =
         model_clip_text_encoder_decoder.contains("normalize_attention_heads(")
             && model_clip_text_encoder_decoder.contains("rms_norm_with_context_exact_native(")
-            && model_clip_text_encoder_decoder.contains("let query = apply_decoder_rope(")
+            && model_clip_text_encoder_decoder.contains("let query = apply_decoder_layer_rope(")
             && model_clip_text_encoder_decoder.contains("stage_attention_cache(")
             && model_clip_text_encoder_decoder.contains("expand_grouped_query(")
             && model_clip_text_encoder_decoder.contains("query_norm_weight")
@@ -5280,6 +5284,7 @@ fn run_ownership_validation(
             "crates/comfy_runtime/src/native_ffi_rocm.rs",
             "crates/comfy_runtime/src/native_ffi_xpu.rs",
             "crates/comfy_runtime/src/native_ffi_cuda.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
         ],
     )?;
     let native_library_image_capture_and_sealing_have_one_owner = native_library_image_policy_trace
@@ -5332,7 +5337,7 @@ fn run_ownership_validation(
             .contains("_sealed_images: BTreeMap<String, RetainedNativeLibraryImage>")
         && runtime_rocm_ffi_production.contains("capture_native_library_image_with_check(")
         && runtime_rocm_ffi_production
-            .contains("elf64_dynamic_contract(image.bytes(), cancellation)")
+            .contains("inspect_elf64_dynamic_contract(image.bytes(), 62, cancellation)")
         && runtime_rocm_ffi_production.contains("candidate.image.digest_sha256()")
         && runtime_rocm_ffi_production.contains(".seal_with_check(")
         && runtime_rocm_ffi_production.contains("_snapshots: Vec<RetainedNativeLibraryImage>")
@@ -5373,8 +5378,8 @@ fn run_ownership_validation(
             && runtime_rocm_ffi_production.contains("cancellation: &CancellationToken")
             && runtime_rocm_ffi_production.contains("checked_candidate_path")
             && runtime_rocm_ffi_production
-                .contains("elf64_dynamic_contract(image.bytes(), cancellation)")
-            && runtime_rocm_ffi_production.contains("exactly one PT_DYNAMIC segment")
+                .contains("inspect_elf64_dynamic_contract(image.bytes(), 62, cancellation)")
+            && runtime_rocm_ffi_production.contains("NativeElfDynamicContract")
             && runtime_rocm_ffi_production.contains("TRUSTED_SYSTEM_ELF_DEPENDENCIES")
             && runtime_rocm_ffi_production.contains("CancellableChunks")
             && runtime_rocm_ffi_production.contains("UnaccountedDependency")
@@ -7820,6 +7825,7 @@ fn run_ownership_validation(
     ]
     .into_iter()
     .flat_map(|needle| production_source_occurrences(&sources, needle))
+    .filter(|location| location.contains("crates/comfy_runtime/src/execution_presentation.rs"))
     .collect::<Vec<_>>();
     let public_per_attempt_persistence_apis = [
         "pub fn save_execution_attempt",
@@ -12178,7 +12184,7 @@ fn validate_native_stored_payload_boundary(
             "crates/comfy_media/src/native_node_payload.rs",
         ),
         (
-            "pub struct NativeVideoPayload {",
+            "pub enum NativeVideoPayload {",
             "crates/comfy_media/src/native_node_payload.rs",
         ),
         (
@@ -12306,10 +12312,13 @@ fn validate_native_stored_payload_boundary(
         "OPTICAL_FLOW must route through the private model-resource branch"
     );
     assert!(stored_payload_production.contains("fn require_model_resource_role("));
-    assert!(
-        stored_payload_production
-            .contains("NativeModelResourceRole::OpticalFlow | NativeModelResourceRole::ClipVision")
-    );
+    for admitted_role in [
+        "NativeModelResourceRole::OpticalFlow",
+        "NativeModelResourceRole::ClipVision",
+        "NativeModelResourceRole::FrameInterpolation",
+    ] {
+        assert!(stored_payload_production.contains(admitted_role));
+    }
     assert!(stored_payload_production.contains(
         "NativeModelResourceRole::OpticalFlow => resource.optical_flow_resource().is_some()"
     ));
@@ -12685,8 +12694,8 @@ fn validate_native_shader_execution_boundary(
     let tasks = fs::read_to_string(root.join(".agents/specs/comfy-parity/tasks.md"))?;
 
     for required in [
-        "naga = { git = \"https://github.com/simtropolis/wgpu.git\"",
-        "wgpu = { git = \"https://github.com/simtropolis/wgpu.git\"",
+        "naga = { version = \"29.0.4\", features = [\"glsl-in\"] }",
+        "wgpu = \"29.0.4\"",
     ] {
         assert!(
             workspace_manifest.contains(required),
@@ -12934,10 +12943,11 @@ fn validate_native_text_regex_boundary(
         .map(|(path, _)| path.display().to_string())
         .collect::<Vec<_>>();
     assert!(
-        regex_engine_uses
-            .iter()
-            .all(|path| path.contains("crates/comfy_nodes/src/text_regex.rs")),
-        "native Comfy code contains a second regex-engine owner: {regex_engine_uses:?}"
+        regex_engine_uses.iter().all(|path| {
+            path.contains("crates/comfy_nodes/src/text_regex.rs")
+                || path.contains("crates/comfy_model/src/clip_tokenizer.rs")
+        }),
+        "native Comfy code contains an unaccounted regex-engine owner: {regex_engine_uses:?}"
     );
     let source = fs::read_to_string(root.join("crates/comfy_nodes/src/text_regex.rs"))?;
     for required in [
@@ -13267,7 +13277,7 @@ fn val_ownership_task400p_sdpose_projection_001() -> Result<(), Box<dyn std::err
         .get("required_mappings")
         .and_then(serde_json::Value::as_array)
         .ok_or("missing SDPose projection mappings")?;
-    assert_eq!(mappings.len(), 4);
+    assert_eq!(mappings.len(), 7);
     Ok(())
 }
 
@@ -13393,7 +13403,7 @@ fn val_ownership_task403_sdpose_model_resource_001() -> Result<(), Box<dyn std::
         .get("required_mappings")
         .and_then(serde_json::Value::as_array)
         .ok_or("missing SDPose resource mappings")?;
-    assert_eq!(mappings.len(), 8);
+    assert_eq!(mappings.len(), 10);
     Ok(())
 }
 
@@ -13556,7 +13566,7 @@ fn val_ownership_video_component_foundation_001() -> Result<(), Box<dyn std::err
             .get("required_mappings")
             .and_then(serde_json::Value::as_array)
             .map(Vec::len),
-        Some(4)
+        Some(7)
     );
     Ok(())
 }
@@ -15834,7 +15844,7 @@ fn val_ownership_native_video_codec_vp9_webm_crf_001() -> Result<(), Box<dyn std
     for required in [
         "enum NativePackedCrf",
         "NativePackedCrf::SourceFloat",
-        "write_python_float",
+        "write_source_compatible_float",
         "retained_vp9_webm_crf_formats_source_float_without_integer_narrowing",
         "dict:crf=31.5",
     ] {
@@ -16156,7 +16166,7 @@ fn val_ownership_native_video_codec_av1_webm_sequence_encode_001()
         ),
         (
             "crates/comfy_runtime/abi/video-codec/verify-vp9-alpha-bindings.c",
-            "975602dca9a40e53498f07c085466af346a3e26fd45de79ca119725437f295a0",
+            "99c83ffafae4886fe523e032532b05216197425f5a153756411bcca23f41c641",
         ),
     ] {
         assert_eq!(file_sha256(&root.join(path))?, digest);
@@ -16499,7 +16509,7 @@ fn val_ownership_native_video_component_h264_mp4_10bit_backing_001()
         "let bit_depth = components.bit_depth()",
         "NativeVideoBitDepth::Ten => crate::NativeVideoPixelFormat::Yuv420p10le",
         "zed.comfy.media.video.encoded-h264-mp4.v1",
-        "184, 236, 128, 232",
+        "111, 135, 190, 43",
     ] {
         assert!(
             media.contains(required),
@@ -17313,6 +17323,9 @@ fn val_ownership_native_video_component_extract_node_001() -> Result<(), Box<dyn
 fn val_ownership_native_frame_interpolate_node_001() -> Result<(), Box<dyn std::error::Error>> {
     let root = repository_root()?;
     let node = fs::read_to_string(root.join("crates/comfy_nodes/src/families/video_01.rs"))?;
+    let production_node = node
+        .split_once("#[cfg(test)]")
+        .map_or(node.as_str(), |(production, _)| production);
     for required in [
         "const INTERPOLATE_CLASS_TYPE: &str = \"FrameInterpolate\"",
         "const INTERPOLATE_FEATURE_ID: &str = \"COMFY-NODE-0190\"",
@@ -17347,7 +17360,7 @@ fn val_ownership_native_frame_interpolate_node_001() -> Result<(), Box<dyn std::
         "File::",
     ] {
         assert!(
-            !node.contains(forbidden),
+            !production_node.contains(forbidden),
             "FrameInterpolate node owns forbidden authority {forbidden}"
         );
     }

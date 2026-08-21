@@ -18,6 +18,8 @@ use comfy_test_support::NativeDiffusionFixture;
 use serde::Serialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
 
 const SEED: u64 = 0x0123_4567_89ab_cdef;
@@ -192,8 +194,26 @@ fn main() -> Result<()> {
 
 fn copy_tokenizer(workspace: &Path, root: &Path) -> Result<()> {
     let source = workspace.join("projects/comfy/ComfyUI/comfy/sd1_tokenizer");
-    fs::copy(source.join("vocab.json"), root.join("vocab.json"))?;
-    fs::copy(source.join("merges.txt"), root.join("merges.txt"))?;
+    let vocabulary = root.join("vocab.json");
+    let merges = root.join("merges.txt");
+    fs::copy(source.join("vocab.json"), &vocabulary)?;
+    fs::copy(source.join("merges.txt"), &merges)?;
+    normalize_fixture_permissions(&vocabulary)?;
+    normalize_fixture_permissions(&merges)?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn normalize_fixture_permissions(path: &Path) -> Result<()> {
+    fs::set_permissions(path, fs::Permissions::from_mode(0o644))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn normalize_fixture_permissions(path: &Path) -> Result<()> {
+    let mut permissions = fs::metadata(path)?.permissions();
+    permissions.set_readonly(false);
+    fs::set_permissions(path, permissions)?;
     Ok(())
 }
 

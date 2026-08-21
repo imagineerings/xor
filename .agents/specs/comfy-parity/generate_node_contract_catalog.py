@@ -1717,7 +1717,7 @@ def build_catalog() -> dict[str, Any]:
         previous = source_digests.setdefault(row["source_file"], digest)
         if previous != digest:
             raise RuntimeError(f"node source digest changed during generation: {path}")
-        provider_required = row["availability"] == "cloud/paid"
+        provider_required = row["classification"] == "API node"
         source_line = int(row["source_line"]) if row["source_line"] else None
         symbol_projection, definition = source_definition(
             source, row["source_symbol"], source_line

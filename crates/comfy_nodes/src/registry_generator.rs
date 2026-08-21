@@ -327,8 +327,8 @@ fn parse_contract_schemas(
         || !valid_sha256(&catalog.source_snapshot.manifest_sha256)
         || catalog.summary.rows != catalog.contracts.len()
         || catalog.summary.rows != 789
-        || catalog.summary.executable != 575
-        || catalog.summary.provider_required != 214
+        || catalog.summary.executable != 565
+        || catalog.summary.provider_required != 224
         || catalog.summary.normalized_v1 != 135
         || catalog.summary.normalized_v3 != 654
         || catalog.summary.preserved_schema_contracts != 0
@@ -361,7 +361,7 @@ fn validate_contract_wire(
     row: usize,
     contract: &NodeContractWire,
 ) -> Result<(), NodeRegistryError> {
-    let expected_provider = contract.availability == "cloud/paid";
+    let expected_provider = contract.classification == "API node";
     if contract.binding_disposition
         != if expected_provider {
             "provider_required"
@@ -790,7 +790,7 @@ fn parse_registered_row(
         zed_status: None,
         parity_gap: None,
         feature_id: row[28].clone(),
-        catalog_status: status_for_availability(&row[6], false),
+        catalog_status: status_for_registration(&row[5], &row[6], false),
     })
 }
 
@@ -836,7 +836,7 @@ fn parse_inactive_row(
         zed_status: Some(row[15].clone()),
         parity_gap: Some(row[16].clone()),
         feature_id: row[17].clone(),
-        catalog_status: status_for_availability(&row[5], true),
+        catalog_status: status_for_registration(&row[4], &row[5], true),
     })
 }
 
@@ -874,11 +874,17 @@ fn validate_common(
     Ok(())
 }
 
-fn status_for_availability(availability: &str, inactive: bool) -> CatalogNodeStatus {
-    if inactive || availability == "deprecated/dead" {
+fn status_for_registration(
+    classification: &str,
+    availability: &str,
+    inactive: bool,
+) -> CatalogNodeStatus {
+    if inactive {
         CatalogNodeStatus::Inactive
-    } else if availability == "cloud/paid" {
+    } else if classification == "API node" {
         CatalogNodeStatus::ProviderRequired
+    } else if availability == "deprecated/dead" {
+        CatalogNodeStatus::Inactive
     } else {
         CatalogNodeStatus::DescriptorOnly
     }
@@ -1425,7 +1431,7 @@ mod tests {
             .values()
             .filter(|descriptor| descriptor.catalog_status == CatalogNodeStatus::ProviderRequired)
             .count();
-        assert_eq!(provider_required, 214);
+        assert_eq!(provider_required, 224);
         Ok(())
     }
 
@@ -1821,10 +1827,10 @@ mod tests {
         for (index, contract) in catalog.contracts.iter().enumerate() {
             let descriptor = registry.registered().get(&contract.node_identifier);
             let schema = registry.source_schema(&contract.node_identifier);
-            let expected_status = if contract.availability == "deprecated/dead" {
-                CatalogNodeStatus::Inactive
-            } else if contract.binding_disposition == "provider_required" {
+            let expected_status = if contract.binding_disposition == "provider_required" {
                 CatalogNodeStatus::ProviderRequired
+            } else if contract.availability == "deprecated/dead" {
+                CatalogNodeStatus::Inactive
             } else {
                 CatalogNodeStatus::DescriptorOnly
             };

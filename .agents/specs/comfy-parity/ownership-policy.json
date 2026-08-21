@@ -9189,7 +9189,7 @@
         {
           "name": "frame-interpolation-resource-projects-owner-and-tensor-residency",
           "path": "crates/comfy_model/src/native_node_payload.rs",
-          "pattern": "NativeModelBackingKind::NativeFrameInterpolationModel[\\s\\S]*resident_tensor_allocations[\\s\\S]*resident_owned_bytes"
+          "pattern": "NativeModelResource::FrameInterpolation \\{ resource \\}[\\s\\S]*resident_tensor_allocations[\\s\\S]*NativeModelBackingKind::NativeFrameInterpolationModel[\\s\\S]*resident_owned_bytes"
         },
         {
           "name": "stored-model-admits-only-concrete-frame-interpolation-resource",
@@ -9294,7 +9294,7 @@
         {
           "name": "frame-interpolate-maps-typed-terminal-failures-and-revokes-late-output",
           "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "FrameInterpolationError::ResourceExhausted[\\s\\S]*frame_interpolation_resource_exhausted[\\s\\S]*rollback_interpolation_output[\\s\\S]*CancellationToken::default\\(\\)[\\s\\S]*revoke"
+          "pattern": "fn rollback_interpolation_output[\\s\\S]*\\.revoke\\([\\s\\S]*CancellationToken::default\\(\\)[\\s\\S]*fn interpolation_model_failure[\\s\\S]*FrameInterpolationError::ResourceExhausted[\\s\\S]*frame_interpolation_resource_exhausted"
         },
         {
           "name": "frame-interpolate-tests-source-descriptor-identity-bypass-real-delegation-and-atomic-rejection",
@@ -9304,7 +9304,7 @@
         {
           "name": "frame-interpolate-fixture-bounds-positive-and-negative-evidence",
           "path": "crates/comfy_test_support/fixtures/nodes/video-comfy-node-0190/fixture.json",
-          "pattern": "COMFY-NODE-0190[\\s\\S]*identity_preserving_bypass[\\s\\S]*retained_frame_interpolation_delegation[\\s\\S]*model_loader_or_checkpoint_acquisition[\\s\\S]*progress_event_parity[\\s\\S]*external_media_publication"
+          "pattern": "COMFY-NODE-0190[\\s\\S]*retained_frame_interpolation_delegation[\\s\\S]*identity_preserving_bypass[\\s\\S]*model_loader_or_checkpoint_acquisition[\\s\\S]*progress_event_parity[\\s\\S]*external_media_publication"
         }
       ],
       "known_open_reasons": [],
@@ -11868,7 +11868,7 @@
         {
           "name": "film-flow-pyramid-synthesis-upsamples-doubles-adds-and-reverses-through-canonical-tensors",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "pub fn film_flow_pyramid_synthesis_with_context_exact_native[\\s\\S]*residual_pyramid\\.last\\(\\)[\\s\\S]*interpolate_bilinear[\\s\\S]*Scalar::Float\\(2\\.0\\)[\\s\\S]*real_add_with_context_exact_native[\\s\\S]*flow_pyramid\\.reverse\\(\\)"
+          "pattern": "pub fn film_flow_pyramid_synthesis_with_context_exact_native[\\s\\S]*residual_pyramid[\\s\\S]*\\.last\\(\\)[\\s\\S]*film_upsample_double_to_residual[\\s\\S]*real_add_with_context_exact_native[\\s\\S]*flow_pyramid\\.reverse\\(\\)[\\s\\S]*fn film_upsample_double_to_residual[\\s\\S]*interpolate_bilinear[\\s\\S]*Scalar::Float\\(2\\.0\\)"
         },
         {
           "name": "film-flow-pyramid-analytic-oracle-proves-values-aliases-immutability-and-cancellation",
@@ -11962,7 +11962,7 @@
         {
           "name": "film-fusion-executes-five-level-nearest-coarse-to-fine-retained-convolution-schedule",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "fn film_fusion_from_weights[\\s\\S]*pyramid\\.len\\(\\) != 5[\\s\\S]*pyramid\\.last\\(\\)[\\s\\S]*for convolution in 0\\.\\.4_usize[\\s\\S]*film_interpolate_nearest[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.0\\.conv[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.2\\.conv[\\s\\S]*fuse\\.output_conv"
+          "pattern": "fn film_fusion_from_weights[\\s\\S]*pyramid\\.len\\(\\) != 5[\\s\\S]*let mut net = pyramid[\\s\\S]*\\.last\\(\\)[\\s\\S]*for convolution in 0\\.\\.4_usize[\\s\\S]*film_interpolate_nearest[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.0\\.conv[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*fuse\\.convs\\.\\{convolution\\}\\.2\\.conv[\\s\\S]*fuse\\.output_conv"
         },
         {
           "name": "film-fusion-delegates-source-nearest-and-padded-convolution-owners",
@@ -11972,7 +11972,7 @@
         {
           "name": "film-fusion-reduced-oracle-proves-values-storage-immutability-and-cancellation",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "film_fusion_executes_nearest_coarse_to_fine_convolution_schedule[\\s\\S]*\\[15\\.0_f32, 30\\.0, 45\\.0\\][\\s\\S]*assert_ne![\\s\\S]*source_bytes[\\s\\S]*film_fusion_from_weights[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
+          "pattern": "film_fusion_executes_nearest_coarse_to_fine_convolution_schedule[\\s\\S]*source_bytes[\\s\\S]*film_fusion_from_weights[\\s\\S]*\\[\\(0_u64, 15\\.0_f32\\), \\(256, 30\\.0\\), \\(512, 45\\.0\\)\\][\\s\\S]*assert_ne![\\s\\S]*zip\\(source_bytes\\)[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0[\\s\\S]*film_fusion_from_weights[\\s\\S]*Cancelled[\\s\\S]*scratch\\.in_use_bytes\\(\\), 0"
         },
         {
           "name": "film-fusion-fixture-separates-reduced-graph-from-production-parity-sequence-codecs-cache-and-publication",
@@ -12065,7 +12065,7 @@
         {
           "name": "film-multi-timestep-scales-warps-aligns-fuses-and-concatenates-in-source-order",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "fn film_synthesize_timesteps_from_pyramids[\\s\\S]*1\\.0_f32 - timestep[\\s\\S]*backward_scaled[\\s\\S]*forward_scaled[\\s\\S]*forward_warped[\\s\\S]*backward_warped[\\s\\S]*&forward_warped, &backward_warped[\\s\\S]*&backward_scaled, &forward_scaled[\\s\\S]*film_fusion_from_weights[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &results, 0, context\\)"
+          "pattern": "fn film_synthesize_timesteps_from_pyramids[\\s\\S]*1\\.0_f32 - timestep[\\s\\S]*backward_scaled[\\s\\S]*forward_scaled[\\s\\S]*forward_warped[\\s\\S]*backward_warped[\\s\\S]*&forward_warped,[\\s\\S]*&backward_warped[\\s\\S]*&backward_scaled,[\\s\\S]*&forward_scaled[\\s\\S]*film_fusion_from_weights[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &results, 0, context\\)"
         },
         {
           "name": "film-multi-timestep-reduced-oracle-proves-values-order-storage-immutability-and-cancellation",
@@ -12233,7 +12233,7 @@
         {
           "name": "film-convolution-oracle-proves-low-precision-padding-and-failure-atomicity",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "film_conv_uses_source_padding_activation_and_failure_atomicity[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*\\[10\\.0_f32, 6\\.0, 7\\.0, 4\\.0\\][\\s\\S]*first \\+ 0\\.4[\\s\\S]*authorize_workspace\\(35\\)[\\s\\S]*scratch.in_use_bytes\\(\\), 0"
+          "pattern": "film_conv_uses_source_padding_activation_and_failure_atomicity[\\s\\S]*DType::F16[\\s\\S]*DType::Bf16[\\s\\S]*\\[10\\.0_f32, 6\\.0, 7\\.0, 4\\.0\\][\\s\\S]*authorize_workspace\\(35\\)[\\s\\S]*constrained_context\\.scratch\\.in_use_bytes\\(\\), 0[\\s\\S]*first \\+ 0\\.4[\\s\\S]*Cancelled[\\s\\S]*cancelled_context\\.scratch\\.in_use_bytes\\(\\), 0"
         },
         {
           "name": "film-convolution-fixture-bounds-equation-only-claims",
@@ -12520,7 +12520,7 @@
         {
           "name": "film-sequence-preserves-endpoint-midpoint-order-and-final-bhwc-clamp",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "pub fn interpolate_film_sequence[\\s\\S]*output_tensors\\.push\\(first_frame\\.clone\\(\\)\\)[\\s\\S]*output_tensors\\.push\\(self\\.film_pair_multi_timestep_from_pyramids[\\s\\S]*output_tensors\\.push\\(second_frame\\)[\\s\\S]*film_finalize_sequence_output[\\s\\S]*fn film_finalize_sequence_output[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*tensor_permute_exact_native[\\s\\S]*clone_with_context_exact_native[\\s\\S]*clamp_with_context_exact_native"
+          "pattern": "pub fn interpolate_film_sequence[\\s\\S]*output_tensors\\.push\\(first_frame\\.clone\\(\\)\\)[\\s\\S]*let midpoints = execute_frame_interpolation_sequence_fallback[\\s\\S]*film_pair_multi_timestep_from_pyramids[\\s\\S]*output_tensors\\.extend\\(midpoints\\)[\\s\\S]*output_tensors\\.push\\(second_frame\\)[\\s\\S]*film_finalize_sequence_output[\\s\\S]*fn film_finalize_sequence_output[\\s\\S]*torch_cat_with_context_exact_native[\\s\\S]*tensor_permute_exact_native[\\s\\S]*clone_with_context_exact_native[\\s\\S]*clamp_with_context_exact_native"
         },
         {
           "name": "film-sequence-reduced-oracle-proves-order-count-storage-immutability-and-cancellation",
@@ -12703,7 +12703,7 @@
         {
           "name": "film-feature-pyramid-concatenates-current-root-and-prior-diagonals-then-releases",
           "path": "crates/comfy_model/src/frame_interpolation.rs",
-          "pattern": "fn compose_film_feature_pyramid[\\s\\S]*for index in 0\\.\\.sub_pyramids\\.len\\(\\)[\\s\\S]*pyramid\\.first\\(\\)[\\s\\S]*for level in 1\\.\\.input_count[\\s\\S]*index\\.checked_sub\\(level\\)[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &inputs, 1[\\s\\S]*released\\.take\\(\\)"
+          "pattern": "fn compose_film_feature_pyramid[\\s\\S]*for index in 0\\.\\.sub_pyramids\\.len\\(\\)[\\s\\S]*pyramid\\.first\\(\\)[\\s\\S]*for level in 1\\.\\.input_count[\\s\\S]*index[\\s\\S]*\\.checked_sub\\(level\\)[\\s\\S]*torch_cat_with_context_exact_native\\(backend, &inputs, 1[\\s\\S]*released\\.take\\(\\)"
         },
         {
           "name": "film-feature-pyramid-reduced-oracle-proves-order-aliases-immutability-and-failure-atomicity",
@@ -13366,7 +13366,7 @@
         {
           "name": "task407-delegates-canonical-vae-lotus-head-and-projection",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "execute_sdpose_image_batch[\\s\\S]*vae\\.encode[\\s\\S]*sample_lotus_sdpose_one_step_euler[\\s\\S]*heatmap_head\\(\\)\\.forward[\\s\\S]*project_sdpose_heatmap_tensor"
+          "pattern": "fn execute_sdpose_image_batch[\\s\\S]*vae[\\s\\S]*\\.encode[\\s\\S]*sample_lotus_sdpose_one_step_euler[\\s\\S]*heatmap_head\\(\\)[\\s\\S]*\\.forward[\\s\\S]*project_sdpose_heatmap_tensor"
         },
         {
           "name": "task407-bbox-rules-are-checked-and-attempt-local",
@@ -13381,7 +13381,7 @@
         {
           "name": "task407-fixture-pins-composition-without-checkpoint-overclaim",
           "path": "crates/comfy_test_support/fixtures/sdpose/execution/manifest.json",
-          "pattern": "code-inferred-reduced-composition[\\s\\S]*rng_draws[\\s\\S]*licensed_checkpoint"
+          "pattern": "code-inferred-reduced-composition[\\s\\S]*licensed_checkpoint[\\s\\S]*rng_draws"
         }
       ],
       "known_open_reasons": [],
@@ -13491,7 +13491,7 @@
         {
           "name": "sdpose-heatmap-decode-is-source-exact-bounded-and-cancellable",
           "path": "crates/comfy_model/src/sdpose.rs",
-          "pattern": "pub fn decode_sdpose_heatmaps[\\s\\S]*gaussian_kernel\\(\\)[\\s\\S]*hessian_xx[\\s\\S]*context.check\\(\\)"
+          "pattern": "pub fn decode_sdpose_heatmaps[\\s\\S]*decode_plane[\\s\\S]*fn decode_plane[\\s\\S]*gaussian_kernel\\(\\)[\\s\\S]*context\\.check\\(\\)[\\s\\S]*hessian_xx"
         },
         {
           "name": "sdpose-openpose-projection-has-exact-source-cardinalities-and-remap",
@@ -13738,7 +13738,7 @@
         {
           "name": "task406-tests-cover-three-dtypes-source-conditioning-streaming-and-rollback",
           "path": "crates/comfy_model/tests/sdpose.rs",
-          "pattern": "sdpose_heatmap_head_executes_retained_transpose_norm_activation_and_projection[\\s\\S]*lotus_conditioning_is_exact_broadcast_and_attempt_local[\\s\\S]*sdpose_tensor_heatmap_projection_streams_one_plane_and_matches_slice_oracle"
+          "pattern": "lotus_conditioning_is_exact_broadcast_and_attempt_local[\\s\\S]*sdpose_tensor_heatmap_projection_streams_one_plane_and_matches_slice_oracle[\\s\\S]*sdpose_heatmap_head_executes_retained_transpose_norm_activation_and_projection"
         }
       ],
       "known_open_reasons": [],
@@ -14674,7 +14674,7 @@
         {
           "name": "video-codec-container-metadata-overlay-is-compiler-and-manifest-verified",
           "path": "crates/comfy_runtime/abi/video-codec/verify-container-metadata-bindings.c",
-          "pattern": "SimAvFormatContextMetadataProjection[\\s\\S]*metadata[\\s\\S]*192[\\s\\S]*200"
+          "pattern": "SimAvFormatContextMetadataProjection[\\s\\S]*metadata[\\s\\S]*200[\\s\\S]*192"
         },
         {
           "name": "video-codec-vp9-alpha-pixel-formats-are-supplementary-and-compiler-verified",
@@ -14886,12 +14886,12 @@
         {
           "name": "av1-webm-encode-preserves-crf-preset-global-header-and-metadata",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativePackedCodecKind::Av1[\\s\\S]*write_python_float[\\s\\S]*c\"preset\"[\\s\\S]*c\"6\"[\\s\\S]*AV_CODEC_FLAG_GLOBAL_HEADER[\\s\\S]*set WebM container metadata"
+          "pattern": "fn av1_webm[\\s\\S]*NativePackedCodecKind::Av1[\\s\\S]*set WebM container metadata[\\s\\S]*AV_CODEC_FLAG_GLOBAL_HEADER[\\s\\S]*NativePackedCrf::SourceFloat[\\s\\S]*write_source_compatible_float[\\s\\S]*c\"preset\"[\\s\\S]*c\"6\""
         },
         {
           "name": "av1-webm-encode-discards-source-alpha-with-bounded-staging",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "source_compatible_av1_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel.get\\(\\.\\.3\\)[\\s\\S]*stage AV1 RGB frame"
+          "pattern": "fn source_compatible_av1_rgb8_frame[\\s\\S]*matches!\\(\\*channels, 3 \\| 4\\)[\\s\\S]*pixel[\\s\\S]*\\.get\\(\\.\\.3\\)[\\s\\S]*stage AV1 RGB frame"
         },
         {
           "name": "av1-webm-tests-profile-metadata-alpha-discard-cancellation-and-retry",
@@ -15435,7 +15435,7 @@
         {
           "name": "ltxv-h264-encode-pins-source-options-and-data-plane",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "video_size[\\s\\S]*pixel_format[\\s\\S]*yuv420p[\\s\\S]*time_base[\\s\\S]*threads[\\s\\S]*crf[\\s\\S]*veryfast[\\s\\S]*sws_scale"
+          "pattern": "fn ltxv_h264[\\s\\S]*yuv420p[\\s\\S]*video_size[\\s\\S]*pixel_format[\\s\\S]*time_base[\\s\\S]*threads[\\s\\S]*crf[\\s\\S]*veryfast[\\s\\S]*sws_scale"
         },
         {
           "name": "ltxv-h264-encode-bounds-drain-cancellation-and-raii",
@@ -15692,7 +15692,7 @@
           "qualified": "comfy_runtime::native_video_codec_ffi::NativeLtxvH264Codec::preprocess_image",
           "role": "canonical_service",
           "symbol": "preprocess_image",
-          "pattern": "pub\\(crate\\) fn preprocess_image\\("
+          "pattern": "impl NativeLtxvH264Codec \\{[\\s\\S]*?pub\\(crate\\) fn preprocess_image\\("
         }
       ],
       "call_symbols": [
@@ -15919,7 +15919,7 @@
         {
           "name": "video-codec-suite-is-retained-by-existing-thread-service",
           "path": "crates/comfy_runtime/src/native_video_codec_service.rs",
-          "pattern": "admit_ltxv_h264[\\s\\S]*admit_video_suite[\\s\\S]*process_ltxv_codec_request\\([\\s\\S]*NativeVideoCodecSuite"
+          "pattern": "admit_ltxv_h264[\\s\\S]*admit_video_suite[\\s\\S]*process_video_codec_request\\(&codec[\\s\\S]*fn process_video_codec_request[\\s\\S]*codec: &NativeVideoCodecSuite"
         },
         {
           "name": "video-codec-suite-tests-success-missing-provider-cancellation-and-retry",
@@ -16022,12 +16022,12 @@
         {
           "name": "vp9-webm-encode-preserves-source-float-crf",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "NativePackedCrf::SourceFloat[\\s\\S]*write_python_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
+          "pattern": "NativePackedCrf::SourceFloat[\\s\\S]*write_source_compatible_float[\\s\\S]*retained_vp9_webm_crf_formats_source_float_without_integer_narrowing[\\s\\S]*dict:crf=31.5"
         },
         {
           "name": "vp9-webm-encode-uses-retained-suite-and-bounded-avio",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "encode_vp9_rgb8_frame[\\s\\S]*vpx_vp9_encoder[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_rgb8_frame_with_check"
+          "pattern": "encode_vp9_rgb8_frame[\\s\\S]*open_bounded_avio_output[\\s\\S]*encode_packed_frame_with_check[\\s\\S]*vpx_vp9_encoder"
         },
         {
           "name": "vp9-webm-encode-pins-source-profile-and-rational-rate",
@@ -16067,7 +16067,7 @@
         {
           "name": "vp9-webm-alpha-profile-is-derived-from-one-checked-channel-mode",
           "path": "crates/comfy_runtime/src/native_video_codec_ffi.rs",
-          "pattern": "vp9_webm_alpha[\\s\\S]*AV_PIXEL_FORMAT_RGBA[\\s\\S]*AV_PIXEL_FORMAT_YUVA420P[\\s\\S]*c\"yuva420p\"[\\s\\S]*source_channels"
+          "pattern": "pub\\(crate\\) fn encode_vp9_webm_batch_with_metadata[\\s\\S]*validate_vp9_image_batch[\\s\\S]*if channels == 3[\\s\\S]*source_compatible_vp9_rgb8_frame[\\s\\S]*source_compatible_vp9_rgba8_frame[\\s\\S]*if channels == 4[\\s\\S]*vp9_webm_alpha[\\s\\S]*AV_PIXEL_FORMAT_RGBA[\\s\\S]*AV_PIXEL_FORMAT_YUVA420P[\\s\\S]*c\"yuva420p\""
         },
         {
           "name": "vp9-webm-alpha-tests-source-bytes-metadata-order-cancellation-and-retry",
@@ -16940,7 +16940,8 @@
           "path": "crates/comfy_media/src/video.rs",
           "qualified": "comfy_media::video::source_rounded_millisecond_frame_rate",
           "role": "canonical",
-          "symbol": "source_rounded_millisecond_frame_rate"
+          "symbol": "source_rounded_millisecond_frame_rate",
+          "pattern": "^pub fn source_rounded_millisecond_frame_rate\\("
         }
       ],
       "call_symbols": [
@@ -16962,7 +16963,7 @@
         {
           "name": "save-webm-preserves-source-metadata-order-and-image-identity",
           "path": "crates/comfy_nodes/src/families/video_01.rs",
-          "pattern": "save_webm_metadata[\\s\\S]*\"prompt\".to_owned\\(\\)[\\s\\S]*for \\(name, value\\) in extra_pnginfo[\\s\\S]*value: input_handle"
+          "pattern": "fn execute_save_webm(?=[\\s\\S]*let input_handle = parsed\\.images\\.clone\\(\\)[\\s\\S]*value: input_handle)(?=[\\s\\S]*fn save_webm_metadata[\\s\\S]*\"prompt\"\\.to_owned\\(\\)[\\s\\S]*for \\(name, value\\) in extra_pnginfo)"
         },
         {
           "name": "save-webm-rolls-back-late-cancellation-and-retries",

@@ -23,8 +23,8 @@ class NodeContractCatalogTests(unittest.TestCase):
     def test_catalog_is_complete_source_fingerprinted_and_deterministic(self) -> None:
         self.assertEqual(self.catalog["schema_version"], 2)
         self.assertEqual(self.catalog["summary"]["rows"], 789)
-        self.assertEqual(self.catalog["summary"]["executable"], 575)
-        self.assertEqual(self.catalog["summary"]["provider_required"], 214)
+        self.assertEqual(self.catalog["summary"]["executable"], 565)
+        self.assertEqual(self.catalog["summary"]["provider_required"], 224)
         self.assertEqual(self.catalog["summary"]["normalized_v3"], 654)
         self.assertEqual(self.catalog["summary"]["normalized_v1"], 135)
         self.assertEqual(self.catalog["summary"]["preserved_schema_contracts"], 0)
@@ -218,7 +218,7 @@ class NodeContractCatalogTests(unittest.TestCase):
         deprecated_provider = self.contracts["COMFY-NODE-0462"]
         self.assertEqual(deprecated_provider["availability"], "deprecated/dead")
         self.assertEqual(deprecated_provider["classification"], "API node")
-        self.assertEqual(deprecated_provider["binding_disposition"], "executable")
+        self.assertEqual(deprecated_provider["binding_disposition"], "provider_required")
 
         deprecated_builtin = self.contracts["COMFY-NODE-0498"]
         self.assertEqual(deprecated_builtin["availability"], "deprecated/dead")
