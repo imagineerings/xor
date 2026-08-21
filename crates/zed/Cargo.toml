@@ -16,6 +16,7 @@ default = []
 multiplayer-tools = [
     "agent_ui/multiplayer-tools",
     "channel/multiplayer-tools",
+    "collab_ui/multiplayer-tools",
     "git_ui/multiplayer-tools",
     "onboarding/multiplayer-tools",
     "sidebar/multiplayer-tools",
