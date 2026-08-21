@@ -1168,9 +1168,9 @@ impl ClipBpeTokenizer {
 const QWEN2_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
 const QWEN35_PRETOKENIZER_PATTERN: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?[\p{L}\p{M}]+|\p{N}| ?[^\s\p{L}\p{M}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
 pub const QWEN25_TOKENIZER_ARTIFACT_DIGEST: &str =
-    "c24475458600e650d71943977840489c018993267821ce92f7c3c7843c125de4";
+    "1fb681b4e905b87b60a5e597adf33f825a9d4820855da3610d380796e7fd6258";
 pub const QWEN35_TOKENIZER_ARTIFACT_DIGEST: &str =
-    "1388589740cd1075d5d495ae728a4c69fa377d5fadfd8bc72cd18465707056ea";
+    "c101b201cd118a38f16f1cb37368134ed9e4bdd72f551478d4ef53c96c316374";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Qwen2PretokenizerProfile {

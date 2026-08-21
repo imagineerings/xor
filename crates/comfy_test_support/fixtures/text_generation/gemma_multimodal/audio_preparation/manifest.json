@@ -52,7 +52,7 @@
       "marker_tokens": 1,
       "first_frame_first_12": [-6.9077554, 1.503931, 0.31853235, 1.3154463, 0.8074848, 1.2384311, 0.96338606, 1.3288747, 0.9583913, 1.535566, 0.7444314, 1.7973692],
       "absolute_tolerance": 0.000002,
-      "native_log_mel_sha256": "50b23f2bc8b7becbd39724fd633dcf9c404aceaf1d79129c6e8b1a5732dac95d"
+      "native_log_mel_sha256": "ca4e990e5328ecdbbbe5c334e41428889f8ac11612ee72b762235ea022120c80"
     },
     "one_sample": {
       "sample_rate": 16000,

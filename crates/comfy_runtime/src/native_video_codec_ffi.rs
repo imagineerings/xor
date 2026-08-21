@@ -5271,10 +5271,24 @@ pub fn load_certified_video_codec_closure(
 }
 
 #[derive(Clone)]
+#[cfg_attr(
+    not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")),
+    allow(
+        dead_code,
+        reason = "the certified symbol projection is consumed only by the admitted Linux loader"
+    )
+)]
 struct VideoCodecBindingLibraryProjection {
     symbols: BTreeMap<String, u64>,
 }
 
+#[cfg_attr(
+    not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")),
+    allow(
+        dead_code,
+        reason = "the certified symbol projection is consumed only by the admitted Linux loader"
+    )
+)]
 struct VideoCodecBindingProjection {
     libraries: BTreeMap<String, VideoCodecBindingLibraryProjection>,
 }
@@ -6161,6 +6175,13 @@ fn video_codec_version_namespace_cstr(identity: &str) -> Option<&'static std::ff
     }
 }
 
+#[cfg_attr(
+    not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")),
+    allow(
+        dead_code,
+        reason = "the retained-library projection is consumed only by the admitted Linux loader"
+    )
+)]
 struct VideoCodecLoadProjection {
     paths: BTreeMap<String, PathBuf>,
     sonames: BTreeMap<String, String>,
@@ -6224,6 +6245,13 @@ impl VideoCodecLoadProjection {
     }
 }
 
+#[cfg_attr(
+    not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")),
+    allow(
+        dead_code,
+        reason = "loaded library metadata is inspected and released only on the admitted Linux target"
+    )
+)]
 struct LoadedVideoCodecLibrary {
     identity: String,
     path: PathBuf,
@@ -6643,15 +6671,6 @@ fn prove_exact_loaded_bindings(
         }
     }
     Ok(())
-}
-
-#[cfg(not(all(target_os = "linux", target_arch = "x86_64", target_env = "gnu")))]
-fn prove_exact_loaded_bindings(
-    _libraries: &[LoadedVideoCodecLibrary],
-    _projection: &VideoCodecLoadProjection,
-    _check_cancellation: &mut impl FnMut() -> Result<(), CancellationError>,
-) -> Result<(), NativeVideoCodecLoadError> {
-    Err(NativeVideoCodecLoadError::UnsupportedTarget)
 }
 
 #[cfg(all(test, target_os = "linux", target_arch = "x86_64", target_env = "gnu"))]

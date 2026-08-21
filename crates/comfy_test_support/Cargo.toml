@@ -59,4 +59,5 @@ comfy_plugin_sdk = { workspace = true, features = ["signing-tooling"] }
 extension_host.workspace = true
 fs = { workspace = true, features = ["test-support"] }
 half.workspace = true
+libc.workspace = true
 tempfile.workspace = true

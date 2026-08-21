@@ -4,10 +4,10 @@
   "generator": "crates/comfy_model/tests/breadth_closure.rs",
   "family_count": 94,
   "inputs": {
-    "backend-models.csv": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33",
+    "backend-models.csv": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d",
     "crates/comfy_model/build.rs": "21af207ec9209270e4dd223f532483e7708f9b0a8008e0295985f14b09ebd6d0",
     "crates/comfy_model/tests/model_families.rs": "3575d0e7f1d902158becdf54e71bb88000bfb41805c9f965b7010211e0744871",
-    "model-families-v1.json": "1001fcf3d9c52b6b1ca6e68a2444ab81d04cac463ba4a852d69cc3dfaa43a5db"
+    "model-families-v1.json": "9eaa157c7b7beb93ee48f64eedca4921da0769263125e5766c52d6b98e0fe07f"
   },
   "rows": [
     {

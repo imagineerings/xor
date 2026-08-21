@@ -1633,7 +1633,7 @@ mod tests {
     #[test]
     fn manifest_rejects_intermediate_symlinks_special_entries_and_non_utf8_entries()
     -> Result<(), Box<dyn std::error::Error>> {
-        use std::os::unix::{fs::symlink, net::UnixListener};
+        use std::{ffi::CString, os::unix::ffi::OsStrExt, os::unix::fs::symlink};
 
         let directory = tempfile::tempdir()?;
         let root = directory.path().canonicalize()?;
@@ -1649,7 +1649,13 @@ mod tests {
         ));
 
         fs::create_dir(root.join("special"))?;
-        let _listener = UnixListener::bind(root.join("special/socket.rs"))?;
+        let fifo_path = root.join("special/source.rs");
+        let fifo_path_c = CString::new(fifo_path.as_os_str().as_bytes())?;
+        // SAFETY: `fifo_path_c` is a live, NUL-terminated path and the mode contains only
+        // permission bits. The temporary directory owns cleanup after the assertion.
+        if unsafe { libc::mkfifo(fifo_path_c.as_ptr(), 0o600) } != 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
         assert!(matches!(
             collect_rust_sources(&root, Path::new("special"), &mut Vec::new()),
             Err(CertificationImplementationManifestError::InvalidContract(_))

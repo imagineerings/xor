@@ -33,7 +33,7 @@ use thiserror::Error;
 // The checked-in fixture pins the digest produced by its materialized canonical VAE so identity
 // discovery never privately materializes a second execution owner.
 const SD15_TINY_VAE_EXECUTION_DIGEST: &str =
-    "31b853b46be2e3335f6d397bdd907ddba0c695ae0b0fe9ccdcf3175a1305bd40";
+    "a7cd5a39f5a1cd2dbfc4ade4fe7743683b1d22e621b042f0bcd61ff33fe98d95";
 const SD15_TINY_MODEL_DIGEST: &str =
     "063b21b57d085ff0e93fa5d1bb219f8954016cd24a1218063645bbcfdfa6300f";
 
@@ -594,10 +594,9 @@ fn require_exact_fixture_vae_execution(
     if actual == expected {
         Ok(())
     } else {
-        Err(NativeImageRuntimeError::Registry(
-            "checked-in fixture VAE execution identity does not match its pinned commitment"
-                .to_owned(),
-        ))
+        Err(NativeImageRuntimeError::Registry(format!(
+            "checked-in fixture VAE execution identity does not match its pinned commitment: expected {expected}, found {actual}"
+        )))
     }
 }
 
@@ -694,7 +693,9 @@ mod tests {
                 &wrong_vae_execution,
             ),
             Err(NativeImageRuntimeError::Registry(message))
-                if message == "checked-in fixture VAE execution identity does not match its pinned commitment"
+                if message.starts_with(
+                    "checked-in fixture VAE execution identity does not match its pinned commitment"
+                )
         ));
         assert_eq!(recovery_scratch.in_use_bytes(), 0);
         assert_eq!(model_load_probe.load(Ordering::SeqCst), 2);

@@ -35,7 +35,7 @@ use comfy_plugin_sdk::{
 use comfy_tensor::CancellationToken;
 use comfy_types::CancellationError;
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(test, target_os = "linux", target_os = "windows"))]
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::{
@@ -5375,7 +5375,6 @@ mod tests {
     use std::{
         collections::BTreeMap,
         fs, io,
-        io::{Read as _, Seek as _, SeekFrom, Write as _},
         net::Ipv4Addr,
         path::{Path, PathBuf},
         str::FromStr,
@@ -7224,7 +7223,7 @@ mod tests {
             ));
         }
 
-        let mut changed_abi = catalog_value.clone();
+        let mut changed_abi = catalog_value;
         let libraries = changed_abi
             .get_mut("libraries")
             .and_then(serde_json::Value::as_array_mut)
@@ -8594,8 +8593,8 @@ mod tests {
                 "rocm_ffi_adapter_consumes_registry_authority_without_self_certification",
                 runtime_rocm_source.contains("cancellation: &CancellationToken")
                     && runtime_rocm_source
-                        .contains("elf64_dynamic_contract(image.bytes(), cancellation)")
-                    && runtime_rocm_source.contains("exactly one PT_DYNAMIC segment")
+                        .contains("inspect_elf64_dynamic_contract(image.bytes(), 62, cancellation)")
+                    && runtime_rocm_source.contains("exactly one PT_DYNAMIC")
                     && runtime_rocm_source.contains("TRUSTED_SYSTEM_ELF_DEPENDENCIES")
                     && runtime_rocm_source.contains("CancellableChunks")
                     && runtime_rocm_source

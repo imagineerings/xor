@@ -4018,6 +4018,7 @@ dependencies = [
  "fs",
  "gpui",
  "half",
+ "libc",
  "postcard",
  "ring",
  "serde",

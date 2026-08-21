@@ -3482,7 +3482,7 @@ mod tests {
     #[test]
     fn recursive_regular_file_listing_rejects_links_and_special_files()
     -> Result<(), Box<dyn std::error::Error>> {
-        use std::{os::unix::fs::symlink, os::unix::net::UnixListener};
+        use std::{ffi::CString, os::unix::ffi::OsStrExt, os::unix::fs::symlink};
 
         let linked_directory = tempfile::tempdir()?;
         let outside = tempfile::NamedTempFile::new()?;
@@ -3497,20 +3497,25 @@ mod tests {
         );
 
         let special_directory = tempfile::tempdir()?;
-        let socket_path = special_directory.path().join("service.socket");
-        let _listener = UnixListener::bind(&socket_path)?;
+        let fifo_path = special_directory.path().join("service.fifo");
+        let fifo_path_c = CString::new(fifo_path.as_os_str().as_bytes())?;
+        // SAFETY: `fifo_path_c` is a live, NUL-terminated path and the mode contains only
+        // permission bits. The temporary directory owns cleanup after the assertion.
+        if unsafe { libc::mkfifo(fifo_path_c.as_ptr(), 0o600) } != 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
         let special_root = ArtifactRoot::canonical(
             "special",
             "package",
             special_directory.path(),
             std::iter::empty::<String>(),
         )?;
-        let canonical_socket_path = special_root.canonical_path().join("service.socket");
+        let canonical_fifo_path = special_root.canonical_path().join("service.fifo");
         assert!(matches!(
             special_root
                 .list_contained_regular_files_recursive(1, &CancellationToken::default()),
             Err(ArtifactIndexError::UnsafePath { path, reason })
-                if path == canonical_socket_path
+                if path == canonical_fifo_path
                     && reason == "contained recursive entry is not a regular file or directory"
         ));
         Ok(())

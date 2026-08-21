@@ -368,6 +368,10 @@ impl NativeOwnedAv1Webm {
 
 struct NativeLtxvCodecThreadInner {
     identity: NativeLtxvCodecThreadIdentity,
+    #[allow(
+        dead_code,
+        reason = "read through the node-service proxy that is installed by the native video adapter"
+    )]
     node_service_identity: NativeLtxvPreprocessServiceIdentity,
     sender: Mutex<Option<mpsc::SyncSender<NativeLtxvCodecThreadRequest>>>,
     runner: Mutex<Option<JoinHandle<()>>>,
@@ -1049,6 +1053,10 @@ impl NativeComponentH264Mp4BackingService for NativeComponentH264Mp4CodecRequest
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "called by the encoded VIDEO backing adapter and its conformance tests"
+)]
 fn checked_component_h264_mp4_backing_result(
     output: NativeOwnedH264Mp4,
     source_video: &NativeVideoPayload,
@@ -1298,6 +1306,10 @@ where
     })
 }
 
+#[allow(
+    dead_code,
+    reason = "called by the LTXV node-service adapter and its conformance tests"
+)]
 fn map_ltxv_node_service_error(
     error: NativeLtxvCodecThreadError,
 ) -> NativeLtxvPreprocessServiceError {
@@ -2183,7 +2195,7 @@ mod tests {
         let h264_limits = NativeH264Mp4SequenceLimits::checked(1024, 256, 1024, 32, 4, 1024)?;
         let events = Arc::new(Mutex::new(Vec::new()));
         let h264_output_storage_ids = Arc::new(Mutex::new(Vec::new()));
-        let actor_backend = backend.clone();
+        let actor_backend = backend;
         let service = start_ltxv_codec_thread({
             let events = events.clone();
             let h264_output_storage_ids = h264_output_storage_ids.clone();
@@ -2549,8 +2561,7 @@ mod tests {
             BTreeMap::from([("prompt".to_owned(), "ten-bit".to_owned())]),
         )?);
         let ten_bit_source_digest = *ten_bit_source_video.semantic_digest_sha256();
-        let ten_bit_request =
-            NativeComponentH264Mp4BackingRequest::checked(ten_bit_source_video.clone())?;
+        let ten_bit_request = NativeComponentH264Mp4BackingRequest::checked(ten_bit_source_video)?;
         let ten_bit_backing = block_on(backing_service.encode_backing(ten_bit_request, &context))?;
         let ten_bit_encoded = ten_bit_backing
             .encoded()
@@ -2606,7 +2617,7 @@ mod tests {
         let same_webm_service =
             NativeWebmCodecRequestService::checked(proxy.clone(), batch_limits, metadata_limits)?;
         let changed_webm_service = NativeWebmCodecRequestService::checked(
-            proxy.clone(),
+            proxy,
             batch_limits,
             crate::NativeVideoContainerMetadataLimits::checked(4, 16, 16, 64)?,
         )?;
@@ -2639,7 +2650,7 @@ mod tests {
         assert!(vp9_result.has_alpha());
 
         let av1_request = NativeWebmEncodeRequest::checked(
-            image.clone(),
+            image,
             NativeVideoCodec::Av1,
             (2997, 125),
             NativeVideoCrf::checked(31.5)?,

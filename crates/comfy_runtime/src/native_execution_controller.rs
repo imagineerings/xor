@@ -2570,6 +2570,10 @@ pub fn resolve_native_multimodal_clip(
     Ok(resolved)
 }
 
+#[allow(
+    clippy::result_large_err,
+    reason = "multimodal preparation errors are mapped immediately to the compact node failure boundary"
+)]
 pub fn execute_native_multimodal_text_generation(
     context: &NodeContext,
     clip_handle: &NativeOpaqueHandle,
