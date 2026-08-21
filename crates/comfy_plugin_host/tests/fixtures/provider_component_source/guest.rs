@@ -111,7 +111,7 @@ impl provider_binding::Guest for ProviderComponent {
         types::ProviderBindingSet {
             schema_version: 1,
             implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
-            bindings_sha256: "cbed6307f899b4a0fca14d8ff4acac6065128e64a6dea945a629b1890b42ec6a"
+            bindings_sha256: "4e25e7bd14a20b225095b06107bd299eaf3b014a916cbbca5bd58f3d3b440031"
                 .to_owned(),
             bindings: vec![types::ProviderBindingClaim {
                 feature_id: "COMFY-NODE-0141".to_owned(),

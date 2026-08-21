@@ -4525,7 +4525,7 @@ fn encode_packed_frames_with_metadata_check(
                 write_decimal(u32::from(value), &mut crf_bytes, &mut cursor)?;
             }
             NativePackedCrf::SourceFloat(value) => {
-                write_python_float(value.value(), &mut crf_bytes)?;
+                write_source_compatible_float(value.value(), &mut crf_bytes)?;
             }
         }
         check_ltxv_native_status(
@@ -5056,7 +5056,7 @@ impl Write for FixedByteWriter<'_> {
     }
 }
 
-fn write_python_float(
+fn write_source_compatible_float(
     value: f64,
     buffer: &mut [u8; 32],
 ) -> Result<(), NativeVideoCodecLtxvEncodeError> {
@@ -9120,7 +9120,7 @@ mod tests {
             let crf = NativeVideoCrf::checked(value)?;
             assert_eq!(crf.bits(), value.to_bits());
             let mut buffer = [0_u8; 32];
-            write_python_float(crf.value(), &mut buffer)?;
+            write_source_compatible_float(crf.value(), &mut buffer)?;
             let rendered = std::ffi::CStr::from_bytes_until_nul(&buffer)?.to_str()?;
             assert_eq!(rendered, expected);
         }

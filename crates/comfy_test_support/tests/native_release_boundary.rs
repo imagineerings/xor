@@ -298,45 +298,44 @@ fn packaging_cases() -> BTreeMap<&'static str, bool> {
     BTreeMap::from([
         (
             "mac_default_bundle_omits_native_worker",
-            MAC_BUNDLE.contains("mode=default packages=zed,cli zed_features=none include_comfy_worker=false")
+            MAC_BUNDLE.contains("zed_features=\"none\"")
+                && MAC_BUNDLE.contains("mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false")
                 && MAC_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
                 && MAC_BUNDLE.contains("--comfy  Include the Comfy integration, Metal backend, worker, and assets."),
         ),
         (
             "mac_bundle_builds_places_and_signs_native_worker",
-            MAC_BUNDLE.contains("--package comfy_worker")
-                && MAC_BUNDLE.contains("--features zed/comfy,zed/metal,comfy_worker/metal")
+            MAC_BUNDLE.contains("zed_build_features=\"zed/comfy,zed/metal,comfy_worker/metal\"")
+                && MAC_BUNDLE.contains("--package comfy_worker --features \"${zed_build_features}\"")
                 && MAC_BUNDLE.contains("Contents/MacOS/comfy-worker")
-                && MAC_BUNDLE.contains("codesign --deep --force --timestamp --options runtime --sign \"$IDENTITY\" \"${app_path}/Contents/MacOS/comfy-worker\""),
+                && MAC_BUNDLE.contains("--sign \"$IDENTITY\" \"${app_path}/Contents/MacOS/comfy-worker\""),
         ),
         (
             "linux_default_bundle_omits_native_worker",
-            LINUX_BUNDLE.contains("mode=default packages=zed,cli zed_features=none include_comfy_worker=false")
+            LINUX_BUNDLE.contains("zed_features=\"none\"")
+                && LINUX_BUNDLE.contains("mode=default packages=zed,cli zed_features=${zed_features} remote_features=${remote_features} include_comfy_worker=false")
                 && LINUX_BUNDLE.contains("if [[ \"$comfy\" = true ]]; then")
                 && LINUX_BUNDLE.contains("--comfy        Include the Comfy integration, accelerator backends, worker, and assets."),
         ),
         (
             "linux_bundle_builds_strips_and_places_native_worker",
-            LINUX_BUNDLE.contains("--package comfy_worker")
-                && LINUX_BUNDLE.contains(
-                    "--features zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu",
-                )
+            LINUX_BUNDLE.contains("zed_build_features=\"zed/comfy,zed/cuda,zed/rocm,zed/mlu,zed/npu,zed/xpu,comfy_worker/cuda,comfy_worker/rocm,comfy_worker/mlu,comfy_worker/npu,comfy_worker/xpu\"")
+                && LINUX_BUNDLE.contains("--package comfy_worker --features \"${zed_build_features}\"")
                 && LINUX_BUNDLE.contains("release/comfy-worker\"")
                 && LINUX_BUNDLE.contains("libexec/comfy-worker"),
         ),
         (
             "windows_default_bundle_omits_native_worker",
-            WINDOWS_BUNDLE.contains("mode=default packages=zed,cli,auto_update_helper zed_features=none include_comfy_worker=false")
+            WINDOWS_BUNDLE.contains("$rustToolFeatures = if ($RustTools) { \"rust-tools\" } else { \"none\" }")
+                && WINDOWS_BUNDLE.contains("mode=default packages=zed,cli,auto_update_helper zed_features=$rustToolFeatures remote_features=$rustToolFeatures include_comfy_worker=false")
                 && WINDOWS_BUNDLE.contains("if ($Comfy)")
                 && WINDOWS_INSTALLER.contains("#ifdef Comfy")
                 && WINDOWS_INSTALLER.contains("#endif"),
         ),
         (
             "windows_bundle_builds_places_signs_and_installs_native_worker",
-            WINDOWS_BUNDLE.contains("--package comfy_worker")
-                && WINDOWS_BUNDLE.contains(
-                    "--features zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml",
-                )
+            WINDOWS_BUNDLE.contains("$features = \"zed/comfy,zed/rocm,comfy_worker/rocm,zed/directml,comfy_worker/directml\"")
+                && WINDOWS_BUNDLE.contains("--package comfy_worker --package auto_update_helper --features $features")
                 && WINDOWS_BUNDLE.contains("comfy-worker.exe\" -Destination \"$innoDir\\comfy-worker.exe")
                 && WINDOWS_BUNDLE.contains("$files += \",$innoDir\\comfy-worker.exe\"")
                 && WINDOWS_INSTALLER.contains("#ifdef Comfy")

@@ -93,7 +93,7 @@ impl TransformKind {
 
     const fn display_name(self) -> &'static str {
         match self {
-            Self::CenterCrop => "Crop Image (Center)",
+            Self::CenterCrop => "CenterCropImages",
             Self::CropByBBoxes => "Crop By Bounding Boxes",
             Self::Crop => "Crop Image (DEPRECATED)",
             Self::CropV2 => "Crop Image",
@@ -101,7 +101,7 @@ impl TransformKind {
             Self::PadForOutpaint => "Pad Image for Outpainting",
             Self::Rotate => "Rotate Image",
             Self::Stitch => "Stitch Images",
-            Self::RandomCrop => "Crop Image (Random)",
+            Self::RandomCrop => "RandomCropImages",
             Self::ResizeAndPad => "Resize And Pad Image",
         }
     }

@@ -1092,7 +1092,7 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
             .provider_binding
             .ok_or("provider binding set is absent")?
             .bindings_sha256,
-        "cbed6307f899b4a0fca14d8ff4acac6065128e64a6dea945a629b1890b42ec6a"
+        "4e25e7bd14a20b225095b06107bd299eaf3b014a916cbbca5bd58f3d3b440031"
     );
     Ok(())
 }

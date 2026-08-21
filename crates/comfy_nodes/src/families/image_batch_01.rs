@@ -97,15 +97,15 @@ impl BatchKind {
     const fn display_name(self) -> &'static str {
         match self {
             Self::BatchImages => "Batch Images",
-            Self::ImageBatch => "ImageBatch",
-            Self::Deduplicate => "Deduplicate Images",
+            Self::ImageBatch => "Batch Images (DEPRECATED)",
+            Self::Deduplicate => "ImageDeduplication",
             Self::FromBatch => "Get Image from Batch",
-            Self::Grid => "Make Image Grid",
+            Self::Grid => "ImageGrid",
             Self::MergeTiles => "Merge List of Tiles to Image",
-            Self::MergeLists => "Merge Image Lists (DEPRECATED)",
+            Self::MergeLists => "MergeImageLists",
             Self::Rebatch => "Rebatch Images",
             Self::Repeat => "Repeat Image Batch",
-            Self::Shuffle => "Shuffle Images List",
+            Self::Shuffle => "ShuffleDataset",
         }
     }
 
