@@ -7,6 +7,7 @@ pub mod channel_metadata;
 pub mod community;
 pub mod custom_emoji;
 pub mod dm;
+pub mod feedback;
 pub mod forum;
 pub mod identity_types;
 pub mod inbox;
@@ -70,6 +71,11 @@ pub use custom_emoji::{
 pub use dm::{
     DirectMessage, DmCommandOutcome, DmError, DmLifecycleState, DmMutation, DmMutationKind,
     DmOpenFields, DmParticipantState, DmRecordFields, MAX_DM_PARTICIPANTS, MIN_DM_PARTICIPANTS,
+};
+pub use feedback::{
+    Feedback, FeedbackBody, FeedbackCategory, FeedbackCommandOutcome, FeedbackCreateFields,
+    FeedbackError, FeedbackRecordFields, FeedbackStatus, FeedbackStatusMutation,
+    FeedbackStatusReason, FeedbackStatusSource, FeedbackStatusView,
 };
 pub use forum::{
     ForumComment, ForumError, ForumMessageInput, ForumPost, ForumPostCursor, ForumPostPage,
