@@ -1,4 +1,5 @@
 pub mod buzz_nips;
+pub mod dm;
 pub mod event;
 pub mod filter;
 pub mod generated_kinds;

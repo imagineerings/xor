@@ -1534,14 +1534,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 20. Port encrypted DMs and visibility projections
 
-  - [ ] 20.1. Implement gift-wrap DM codec and privacy gates
+  - [x] 20.1. Implement gift-wrap DM codec and privacy gates
     - Parse, validate and emit supported encrypted DM envelopes without exposing plaintext to indexing/logging paths.
     - _Requirements: 5.3, 9.1, 19.2_
     - _Capability IDs: CAP-012_
     - _Depends on: 11.9, 12.6_
     - _Reads: projects/buzz/docs/nips/NIP-DV.md, projects/buzz/crates/buzz-db/src/dm.rs_
-    - _Writes: crates/nostr_compat/src/dm.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/nostr_compat/src/{dm,nostr_compat}.rs_
     - _Validation: codec tests cover round trip, wrong recipient, malformed wrap and plaintext redaction_
+    - _Discovered contradiction (2026-08-22): the planned standalone `dm.rs` cannot compile or expose its codec without crate-root registration, and the leaf's required living-documentation evidence adds the specification paths. The named Buzz sources define DM persistence and NIP-DV's gift-wrap privacy relationship but do not implement NIP-44 key custody; Buzz's published compatibility posture supports only the opaque NIP-59 kind-1059 outer envelope. The narrow implementation therefore validates and emits that signed outer envelope, keeps NIP-44 ciphertext opaque and redacted, and supplies filter/result/search gates without claiming encryption, decryption, membership or persistence authority._
+    - _Evidence: 2026-08-22 — added a pure `nostr_compat::dm` boundary that verifies the signed kind-1059 event before inspecting it, requires exactly one canonical `p` recipient, validates canonical bounded NIP-44 v2 ciphertext and round-trips the opaque outer envelope without accepting plaintext or keys. Kindless and gift-wrap-capable filters require exactly one authenticated self-`#p`; parsed results independently reject a different reader; indexing is unconditionally excluded; and custom debug output redacts both the encoded ciphertext and a decoded marker. Five focused codec/privacy tests passed for round trip, wrong recipient across filter/result gates, malformed tags/ciphertext/signature and plaintext/ciphertext redaction. The complete `nostr_compat` package passed 54 library tests, four independent Buzz-NIP integration tests and doc tests; warning-denied release all-target/all-feature Clippy, the collaboration dependency-boundary checker, repository formatting and diff hygiene passed; the canonical feature-spec validator retained 84 acceptance criteria and 385 tasks with advisory warnings only. The external Buzz checkout was linked only temporarily to satisfy the existing compile-time fixture path and was removed after validation._
 
   - [ ] 20.2. Implement DM group lifecycle
     - Add open, participant add/remove, leave and reopen transitions with participant-only authority.
