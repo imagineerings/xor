@@ -1883,7 +1883,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 ## Milestone 4 — projects, Git and review collaboration
 
-- [ ] 24. Bind Zed projects and repositories to NIP-MP metadata
+- [x] 24. Bind Zed projects and repositories to NIP-MP metadata
 
   - [x] 24.1. Define signed project-group metadata
     - Model NIP-MP project identity, visibility and repository coordinates without local filesystem authority.
@@ -1929,7 +1929,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-22): `workspace` already depends on `project`, so importing `workspace::CollaborativeNavigationTarget` into the planned project adapter would create a dependency cycle and a second navigation owner. The stable integration seam is the existing native values those targets consume: `ProjectGroupKey`, repository work directories, `WorktreeId` plus path and canonical community/channel IDs. Compiling and proving the new public adapter also requires project module registration and a focused integration fixture beyond the single planned write file. Workspace remains the sole owner of navigation mutation/history persistence, while this adapter only resolves current signed/persisted bindings against live native entities._
     - _Evidence: 2026-08-22 — added a deterministic read-only project navigation resolver that rejects archived groups, unexpected/duplicate repository bindings and mismatched channel bindings before producing a target. Signed repository coordinates preserve their independent owners and resolve through stable common-Git-directory identity to every matching live checkout; an absent or stale local binding remains an explicit unavailable member. Exact active channel bindings project to canonical community/channel IDs, while absent or inactive channels produce no broken link. Three focused GPUI integration fixtures passed for a stale binding whose clone is missing, a main checkout plus an open linked worktree resolving to two native repository/worktree targets and one active channel, and an archived group that cannot produce navigation. `./script/clippy -p project` passed release all-target/all-feature warning-denied checks; dependency, inventory, specification, formatting and diff gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 24.5. Prove grouping never grants Git authority
+  - [x] 24.5. Prove grouping never grants Git authority
     - Add negative integration tests for push, filesystem and external-host operations by project signers.
     - _Requirements: 6.2, 10.1, 20.3_
     - _Capability IDs: CAP-018, CAP-019, CAP-044_
@@ -1937,6 +1937,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/project/src/collaboration_*.rs, crates/git/**_
     - _Writes: crates/project/tests/project_group_permissions.rs_
     - _Validation: `cargo test -p project project_group_permissions` denies every authority not separately granted_
+    - _Discovered contradiction (2026-08-22): directly invoking native `GitStore::push`, filesystem writes or an HTTP client in a negative grouping test would exercise the already-authorized local Zed owners and could not attribute the operation to the NIP-MP signer. The security property is instead that no signer-derived grouping/navigation value is a capability handle for any of those owners. The regression therefore combines compile-time negative trait assertions against the canonical Git, filesystem and HTTP interfaces with a cross-owner runtime snapshot proving resolution itself performs no file or remote mutation; it adds no parallel authorization policy or test-only denial shim._
+    - _Evidence: 2026-08-22 — added a dedicated integration target that statically rejects `GitRepository`, `Fs` and `HttpClient` implementation on every public project-group, repository, local-repository, worktree and channel navigation target. A runtime fixture signs a project with a key distinct from the member repository owner, resolves the cross-owner binding and proves the protected file bytes and configured external origin remain unchanged. The exact planned command passed 2/2, and `./script/clippy -p project` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 25. Consolidate NIP-34 forge and Git signing/authentication
 
