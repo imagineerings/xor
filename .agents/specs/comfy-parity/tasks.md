@@ -9989,7 +9989,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0057, COMFY-NODE-0704, COMFY-NODE-0706, COMFY-NODE-0707) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 503. Implement native node family: experimental/stable cascade part 1
+- [x] 503. Implement native node family: experimental/stable cascade part 1
   - _id: comfy-parity-native-nodes-experimental-stable-cascade-comfy-node-0638
   - Outcome: The 1 rows assigned to this disjoint `experimental/stable cascade` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 239
@@ -10006,6 +10006,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0638) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
+
+  - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The exact native StableCascade_SuperResolutionControlnet implementation is present in integration commit b7e2d96016 (worker-equivalent f176ac7d89), with canonical VAE encode, source-exact Stage C/Stage B latent shapes, typed handle admission, cancellation, cache dependencies, atomic publication, persistence, and recovery. The focused suite passed 6/6 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but could not create its final temp directory after the shared 38 GiB target cache exhausted disk space. Implementation/fixture SHA-256 are d8f9cebb7d8882a8d929438695148ecfe90c44bd558520609df85457b9d6b84c and 532668a7f2eb0ec895052b06a90b71b2c67db9ce051d1e796be24620e38814fc. Pinned source SHA-256 is c11f471ef730405e43e66fbadca3adcf4bc503b3fb5997ea262fca9da7aaa09a. Native Rust CPU/macOS arm64 was exercised; no accelerator certification is claimed.
 
 - [ ] 504. Implement native node family: image part 1
   - _id: comfy-parity-native-nodes-image-comfy-node-0160
@@ -10081,7 +10083,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0532) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 508. Implement native node family: image/batch part 1
+- [x] 508. Implement native node family: image/batch part 1
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0017
   - Outcome: The 10 rows assigned to this disjoint `image/batch` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 239
@@ -10098,6 +10100,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0017, COMFY-NODE-0241, COMFY-NODE-0249, COMFY-NODE-0251, COMFY-NODE-0252, COMFY-NODE-0255, COMFY-NODE-0405, COMFY-NODE-0506, COMFY-NODE-0535, COMFY-NODE-0620) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
+
+  - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. All ten native image/batch bindings are present in integration commit 33d0f55667, with catalog-authoritative presentation reconciled by 10b350aeb5 and exact NumPy RandomState permutation semantics repaired by 9f9242a268. The merged focused suite passed 5/5, including the NumPy oracle, and comfy_nodes all-targets passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Current implementation/fixture SHA-256 are 43e00008d7e4ec70aab5eb55a1ae5c5073097fe7b8211d0a2c3baa75389b9887 and f35040f9e406b83d86637fe52d232cb190c764daf97787cba926dcd9e0fa2f41. Execution is deterministic native Rust CPU with typed IMAGE handles, cancellation, rollback, persistence, and stale-handle recovery; no accelerator certification is claimed.
 
 - [x] 509. Implement native node family: image/batch part 2
   - _id: comfy-parity-native-nodes-image-batch-comfy-node-0621
@@ -10117,7 +10121,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0621, COMFY-NODE-0631) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-  - _validation_evidence: 2026-08-11 integrated Task392 PASS at 9649563b. ShuffleImageTextDataset and SplitImageToTileList execute exact bounded list/cardinality, addressed V2 MT19937 replay, row-major bankers-rounded tiling, canonical image-payload publication, cancellation, stale-store, and partial-publication rollback behavior. The focused family suite passed 5/5, the final comfy_nodes all-target matrix passed 55/55, the complete comfy_test_support all-target matrix passed, locked two-crate check and warnings-denied all-target/all-feature Clippy passed, and formatting/diff integrity passed. Canonical VAL-NODE-001 passed 808/808 with zero failures/skips at SHA-256 8313d6bcfda423eb3d797bde2c3b9d4113f82e1b694054f13c8d6e3d2f022f; VAL-NODE-REGISTRY-001 passed 6/6 at fecd595b8380ba2a135aadb574c492f3067bcc85cfd6c6841306bde2f5ddf0c2. Implementation/fixture SHA-256 are 33f7a6dd02cd74b2ea9387bf2e84a53341b46edd4e0b2a58fbe2245aee6de61e and adee120730c750b68078187b4cf1a92262786da29abe37db399b4e7bf25c9692. Validated on macOS aarch64 native Rust CPU; no accelerator hardware certification is claimed.
+  - _validation_evidence: 2026-08-22 merged-checkpoint repair reconciliation PASS at d7708e2b1a. Integration commit 9f9242a268 repairs the checked family to use the canonical NumPy RandomState permutation rather than address-hashed generic randperm while preserving exact row-major bankers-rounded tiling, typed publication, cancellation, stale-store recovery, and rollback. The repaired focused suite passed 6/6, the sibling image_batch_01 suite passed 5/5, and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Current implementation/fixture SHA-256 are f64becf35f0c5c6143c5a1ce601b86a1ada7dfacd6c3d0aaff35fec7ee703170 and 7ffaf3e052e02aa99c3f3b076865a18552a74ffddf0756a670f162a7735162a5. Validated on macOS arm64 native Rust CPU; no accelerator certification is claimed.
 
 - [x] 510. Implement native node family: image/color part 1
   - _id: comfy-parity-native-nodes-image-color-comfy-node-0254
@@ -10231,7 +10235,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0129, COMFY-NODE-0130, COMFY-NODE-0131, COMFY-NODE-0449, COMFY-NODE-0450, COMFY-NODE-0451, COMFY-NODE-0452) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
 
-- [ ] 516. Implement native node family: image/mask part 1
+- [x] 516. Implement native node family: image/mask part 1
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0019
   - Outcome: The 10 rows assigned to this disjoint `image/mask` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 239
@@ -10248,6 +10252,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0019, COMFY-NODE-0126, COMFY-NODE-0171, COMFY-NODE-0219, COMFY-NODE-0244, COMFY-NODE-0268, COMFY-NODE-0273, COMFY-NODE-0399, COMFY-NODE-0400, COMFY-NODE-0401) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed.
+
+  - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The ten exact native mask bindings are present in integration commit b756afbe61 (worker-equivalent a6981448c6), covering batching, crop, feather/grow morphology, color/image conversion, inversion, composite, preview effects, cancellation, cache identity, atomic rollback, persistence, and stale-handle recovery. The focused suite passed 5/5 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Implementation/fixture SHA-256 are 3077ae72667cc3becb945ef727202a83eff03465bc38f8604201311958ee450a and c4b0bec85cad1555bf0534b5996f274e4e87ee6419588c111c7876938dec7305. Pinned nodes_mask.py and nodes_post_processing.py SHA-256 are 9ff6c44f6114e36cfd17886a92b6cfb1d824013b43242ea1ee6b86c93a71b7dc and 96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575. Native Rust CPU/macOS arm64 was exercised; no accelerator certification is claimed.
 
 - [x] 517. Implement native node family: image/mask part 2
   - _id: comfy-parity-native-nodes-image-mask-comfy-node-0625
@@ -10269,7 +10275,7 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
 
   - _validation_evidence: 2026-08-11 final-tree Task 408 PASS on native Rust CPU/macOS arm64. Exact source-derived SolidMask, ThresholdMask, and VOIDQuadmaskPreprocess schema, success, bounds, cancellation, handle validation, cache identity, atomic publication, and recovery cases passed 4/4 inside the complete `comfy_nodes --all-targets` matrix; the integrated matrix passed 91/91, the permissioned complete `comfy_test_support --all-targets --no-fail-fast` matrix passed every library and integration target, locked two-crate check exited 0, and warnings-denied release/all-target/all-feature Clippy for comfy_nodes and comfy_test_support exited 0. No Python or external Comfy runtime was used.
 
-- [ ] 518. Implement native node family: image/shader part 1
+- [x] 518. Implement native node family: image/shader part 1
   - _id: comfy-parity-native-nodes-image-shader-comfy-node-0211
   - Outcome: The 1 rows assigned to this disjoint `image/shader` leaf receive exact native descriptors, implementations or native provider implementations, and per-node fixtures; early-slice nodes are reconciled rather than duplicated.
   - Wave: 239
@@ -10286,6 +10292,8 @@ Evidence retained beneath an unchecked task is historical pre-reopen evidence on
   - Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - _Validation: VAL-NODE-001, VAL-NODE-002, VAL-NODE-CLOSURE-001; commands: cargo check -p comfy_nodes -p comfy_test_support; cargo test -p comfy_nodes --all-targets; cargo test -p comfy_test_support --all-targets; ./script/clippy -p comfy_nodes -p comfy_test_support
   - Done when: Every exactly assigned feature row (COMFY-NODE-0211) passes exact schema, success, boundary, list/lazy, validation, cache/change, effect, failure, cancellation, persistence, and recovery checks; no unassigned row is claimed. GLSL compilation, uniforms, multipass MRT execution, readback, diagnostics, cancellation, and intermediate UI values delegate to the injected canonical shader execution service.
+
+  - _validation_evidence: 2026-08-22 merged-checkpoint reconciliation PASS at d7708e2b1a. The exact GLSLShader binding is present in integration commit b91c7a3bf4 (worker-equivalent 12c4484c97), with ordered dynamic inputs, structured combo projection, exact curve LUTs, single delegation to the canonical NativeShaderService, four typed IMAGE outputs, cancellation, diagnostic mapping, transactional previews, rollback, persistence, and stale-handle recovery. The focused suite passed 4/4 and the merged comfy_nodes all-target matrix passed 165/165; formatting passed. The two-crate check reached comfy_test_support without a compiler diagnostic but exhausted disk while creating its final temp directory. Implementation/fixture SHA-256 are 5aa5bbcaec120baa1c57466649ca4231b691f8bb48b3d4612f5ed207e1be1735 and 5b61964191617c1b896d3e0b73b1f1ebedc4b18bf2a36d8f9ff27a2a2ec03ebf. Pinned nodes_glsl.py SHA-256 is fd4725172fe84e5ea3b9274ceddb44fefedaa27815fb6c9bc2689862760bda9c. The canonical service boundary was exercised with deterministic native CPU image payloads on macOS arm64; physical GPU numeric certification is not claimed.
 
 - [ ] 519. Implement native node family: image/transform part 1
   - _id: comfy-parity-native-nodes-image-transform-comfy-node-0047
