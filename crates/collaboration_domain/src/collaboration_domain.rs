@@ -7,6 +7,7 @@ pub mod channel_metadata;
 pub mod community;
 pub mod dm;
 pub mod identity_types;
+pub mod inbox;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
@@ -65,6 +66,10 @@ pub use dm::{
 };
 pub use identity_types::{
     AggregateId, AggregateType, CommunityId, OperationId, PrincipalId, ScopedAggregateId,
+};
+pub use inbox::{
+    InboxCategory, InboxError, InboxItem, InboxItemKey, InboxMessageInput, InboxProjection,
+    InboxScope,
 };
 pub use membership::{
     InviteMembershipProjection, Membership, MembershipCommandOutcome, MembershipCreateFields,

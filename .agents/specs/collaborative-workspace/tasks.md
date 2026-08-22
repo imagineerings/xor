@@ -1804,14 +1804,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 23. Port inbox, pulse, forum, custom emoji and feedback
 
-  - [ ] 23.1. Implement the canonical inbox projection
+  - [x] 23.1. Implement the canonical inbox projection
     - Derive mentions, replies, reminders and activity from message/read records without a second message store.
     - _Requirements: 2.2, 9.1, 9.3_
     - _Capability IDs: CAP-013, CAP-017_
     - _Depends on: 19.3, 19.8, 19.9, 21.1, 21.3_
-    - _Reads: projects/buzz/desktop/src/features/home/**, crates/collaboration_domain/src/{message_aux,read-state,reminder}.rs_
-    - _Writes: crates/collaboration_domain/src/inbox.rs_
+    - _Reads: projects/buzz/desktop/src/features/home/**, crates/collaboration_domain/src/{message,thread,message_marker,read_state,reminder}.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/{collaboration_domain,inbox}.rs_
     - _Validation: projection fixtures cover mention, reminder, read, deletion and duplicate events_
+    - _Discovered contradiction (2026-08-22): the planned `message_aux.rs` and `read-state.rs` paths do not exist; their approved canonical owners are `message.rs`, `thread.rs`/`message_marker.rs` and `read_state.rs`. A standalone `inbox.rs` also cannot compile, expose its projection API or run its fixtures without crate-root registration. The narrow correction updates those read/write paths, registers one pure domain module and keeps the focused fixtures inside it. It adds no message/reminder persistence, protocol parsing, authorization decision, timer, notification or UI owner._
+    - _Evidence: 2026-08-22 — added a bounded tenant-and-owner-scoped inbox projection over borrowed canonical `Message` records, one canonical `ReadState` and owner-readable `Reminder` records. Approved adapters supply stable conversation/read contexts and already-resolved mention/reply relationships; the projection validates their scope and bounds, rejects conflicting identifiers, deduplicates exact records and retains only stable IDs, categories, counts and timestamps. Self-authored and deleted messages never become rows; active external messages group by conversation, select the oldest unread representative and conservatively preserve read-state completeness. Pending reminders enrich an existing target conversation without duplication or become stable standalone rows, while private target/note content is never retained. Focused mention/reply, reminder, read, deletion and duplicate fixtures passed 3/3; the full `collaboration_domain` suite passed 111/111; release all-target/all-feature warning-denied `./script/clippy -p collaboration_domain`, the collaboration dependency boundary, formatting and diff hygiene passed. Inventory and specification validation are recorded in the enclosing checkpoint commit._
 
   - [ ] 23.2. Render native inbox and pulse lists
     - Add filterable, paged GPUI lists over canonical inbox/activity projections.
