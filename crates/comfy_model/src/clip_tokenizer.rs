@@ -363,6 +363,86 @@ pub struct TokenizerConfiguration {
     pub embedding_width: Option<usize>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct NativeTokenizerInvocationOptions {
+    pub minimum_length: Option<usize>,
+    pub minimum_padding: Option<usize>,
+    pub disable_weights: Option<bool>,
+}
+
+impl NativeTokenizerInvocationOptions {
+    fn validate(self) -> Result<Self, NativeTokenizerError> {
+        if self
+            .minimum_length
+            .is_some_and(|length| length == 0 || length > MAX_NATIVE_PROMPT_BYTES)
+            || self
+                .minimum_padding
+                .is_some_and(|padding| padding > MAX_NATIVE_PROMPT_BYTES)
+        {
+            return Err(NativeTokenizerError::InvalidConfiguration(
+                "tokenizer invocation length or padding override is invalid".to_owned(),
+            ));
+        }
+        Ok(self)
+    }
+}
+
+fn hash_tokenizer_configuration(
+    hasher: &mut Sha256,
+    configuration: &TokenizerConfiguration,
+) -> Result<(), NativeTokenizerError> {
+    for value in [
+        configuration.maximum_length,
+        configuration.maximum_word_length,
+    ] {
+        hasher.update(
+            u64::try_from(value)
+                .map_err(|_| NativeTokenizerError::ArithmeticOverflow("tokenizer digest"))?
+                .to_be_bytes(),
+        );
+    }
+    for value in [configuration.minimum_length, configuration.minimum_padding] {
+        match value {
+            Some(value) => {
+                hasher.update([1]);
+                hasher.update(
+                    u64::try_from(value)
+                        .map_err(|_| NativeTokenizerError::ArithmeticOverflow("tokenizer digest"))?
+                        .to_be_bytes(),
+                );
+            }
+            None => hasher.update([0]),
+        }
+    }
+    hasher.update([
+        u8::from(configuration.pad_to_maximum_length),
+        u8::from(configuration.pad_left),
+        u8::from(configuration.disable_weights),
+    ]);
+    for value in [configuration.start_token, configuration.end_token] {
+        match value {
+            Some(value) => {
+                hasher.update([1]);
+                hasher.update(value.to_be_bytes());
+            }
+            None => hasher.update([0]),
+        }
+    }
+    hasher.update(configuration.pad_token.to_be_bytes());
+    match configuration.embedding_width {
+        Some(value) => {
+            hasher.update([1]);
+            hasher.update(
+                u64::try_from(value)
+                    .map_err(|_| NativeTokenizerError::ArithmeticOverflow("tokenizer digest"))?
+                    .to_be_bytes(),
+            );
+        }
+        None => hasher.update([0]),
+    }
+    Ok(())
+}
+
 impl TokenizerConfiguration {
     pub fn checked(self) -> Result<Self, NativeTokenizerError> {
         if self.maximum_length == 0
@@ -2713,8 +2793,8 @@ impl NativePromptTokenizer {
     ) -> Result<String, NativeTokenizerError> {
         cancellation.check()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"zed.comfy.native-prompt-tokenizer.v1");
-        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(b"zed.comfy.native-prompt-tokenizer.v2");
+        hash_tokenizer_configuration(&mut hasher, &self.configuration)?;
         match &self.family {
             NativeTokenizerFamily::ClipBpe(tokenizer) => {
                 hasher.update(b"clip-bpe");
@@ -2722,7 +2802,10 @@ impl NativePromptTokenizer {
             }
             NativeTokenizerFamily::Gemma(tokenizer) => {
                 hasher.update(b"gemma");
-                hasher.update(format!("{:?}", tokenizer.profile()).as_bytes());
+                hasher.update([match tokenizer.profile() {
+                    GemmaTokenizerProfile::Gemma3SentencePiece => 0,
+                    GemmaTokenizerProfile::Gemma4TokenizerJson => 1,
+                }]);
                 hasher.update(tokenizer.artifact_digest().as_bytes());
             }
             NativeTokenizerFamily::Qwen2ByteBpe(tokenizer) => {
@@ -2737,7 +2820,14 @@ impl NativePromptTokenizer {
                     hasher.update([0]);
                     hasher.update(entry.piece.as_bytes());
                     hasher.update(entry.score.to_bits().to_le_bytes());
-                    hasher.update(format!("{:?}", entry.piece_type).as_bytes());
+                    hasher.update([match entry.piece_type {
+                        SentencePieceType::Normal => 0,
+                        SentencePieceType::Unknown => 1,
+                        SentencePieceType::Control => 2,
+                        SentencePieceType::UserDefined => 3,
+                        SentencePieceType::Unused => 4,
+                        SentencePieceType::Byte => 5,
+                    }]);
                 }
             }
         }
@@ -3018,6 +3108,38 @@ impl NativePromptTokenizer {
         text: &str,
         cancellation: &CancellationToken,
     ) -> Result<NativeTokenizedPrompt, NativeTokenizerError> {
+        self.tokenize_with_options(
+            text,
+            NativeTokenizerInvocationOptions::default(),
+            cancellation,
+        )
+    }
+
+    pub fn tokenize_with_options(
+        &self,
+        text: &str,
+        options: NativeTokenizerInvocationOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeTokenizedPrompt, NativeTokenizerError> {
+        let options = options.validate()?;
+        let mut tokenizer = self.clone();
+        if let Some(minimum_length) = options.minimum_length {
+            tokenizer.configuration.minimum_length = Some(minimum_length);
+        }
+        if let Some(minimum_padding) = options.minimum_padding {
+            tokenizer.configuration.minimum_padding = Some(minimum_padding);
+        }
+        if let Some(disable_weights) = options.disable_weights {
+            tokenizer.configuration.disable_weights = disable_weights;
+        }
+        tokenizer.tokenize_effective(text, cancellation)
+    }
+
+    fn tokenize_effective(
+        &self,
+        text: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeTokenizedPrompt, NativeTokenizerError> {
         cancellation.check()?;
         if text.len() > MAX_NATIVE_PROMPT_BYTES {
             return Err(NativeTokenizerError::PromptTooLarge(text.len()));
@@ -3132,6 +3254,25 @@ impl NativePromptTokenizer {
             .map_err(|_| NativeTokenizerError::Allocation("prompt batch"))?;
         for prompt in prompts {
             output.push(self.tokenize(prompt, cancellation)?);
+        }
+        Ok(output)
+    }
+
+    pub fn tokenize_list_with_options(
+        &self,
+        prompts: &[String],
+        options: NativeTokenizerInvocationOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<NativeTokenizedPrompt>, NativeTokenizerError> {
+        if prompts.is_empty() || prompts.len() > MAX_NATIVE_PROMPT_BATCH {
+            return Err(NativeTokenizerError::InvalidBatchSize(prompts.len()));
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(prompts.len())
+            .map_err(|_| NativeTokenizerError::Allocation("prompt batch"))?;
+        for prompt in prompts {
+            output.push(self.tokenize_with_options(prompt, options, cancellation)?);
         }
         Ok(output)
     }

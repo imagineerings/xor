@@ -1,5 +1,5 @@
 use comfy_media::{PngLimits, encode_png_frame};
-use comfy_model::clip::NativeTokenizer;
+use comfy_model::clip::{NativeClipProfile, NativeClipResource, NativeTokenizer};
 use comfy_model::generated_native_diffusion::{
     Sd1Tokenizer, empty_sd15_latent, encode_sd15_prompt,
 };
@@ -29,6 +29,66 @@ const MEMORY_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
 const SEED: u64 = 0x0123_4567_89ab_cdef;
 const FIXTURE_PROMPT_ID: &str = "53494d00-0000-0000-0000-000000003702";
 const FIXTURE_KSAMPLER_NODE_ID: &str = "5";
+
+#[test]
+fn native_clip_transport_preserves_schedule_state_and_restart_identity()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cancellation = CancellationToken::default();
+    let (backend, workspace_authority) = CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+    let context = backend.execution_context(
+        StreamId::DEFAULT,
+        workspace_authority.authorize_workspace(64 * 1024 * 1024)?,
+        &cancellation,
+    );
+    let resource = Arc::new(NativeClipResource::checked(
+        NativeClipProfile::Sd3,
+        true,
+        Vec::new(),
+        Vec::new(),
+        &backend,
+        &context,
+    )?);
+    let outputs = resource.execute(
+        &backend,
+        "unused by the all-missing SD3 source path",
+        &context,
+    )?;
+    assert_eq!(outputs.len(), 1);
+    assert_eq!(
+        outputs[0].conditioning().descriptor().shape(),
+        &[1, 77, 4_096]
+    );
+    assert_eq!(
+        outputs[0]
+            .pooled()
+            .ok_or("SD3 pooled fallback is missing")?
+            .descriptor()
+            .shape(),
+        &[1, 2_048]
+    );
+    assert!(resource.schedule_enabled());
+    let restarted = resource.restart(&backend, &context)?;
+    assert_eq!(
+        restarted.semantic_digest_sha256(),
+        resource.semantic_digest_sha256()
+    );
+
+    let model_payload = Arc::new(NativeModelPayload::native_clip(resource.clone())?);
+    let diffusion = NativeDiffusionPayload::clip(model_payload.clone())?;
+    diffusion.validate()?;
+    assert!(
+        diffusion
+            .clip_payload()
+            .is_some_and(|stored| Arc::ptr_eq(stored, &model_payload))
+    );
+    assert!(
+        diffusion
+            .native_clip_resource()
+            .is_some_and(|stored| Arc::ptr_eq(stored, &resource))
+    );
+    assert!(diffusion.resident_bytes()? > 0);
+    Ok(())
+}
 
 #[test]
 fn native_vae_transport_preserves_the_existing_image_resource()

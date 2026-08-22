@@ -1,6 +1,7 @@
 use comfy_model::{
     NativeModelBackingKind, NativeModelPayload, NativeModelPayloadError, NativeModelResourceRole,
     NativeVae, PatchGraph,
+    clip::NativeClipResource,
     conditioning::{ConditioningError, ConditioningIdentity},
     controlnet::{
         ControlChain, ControlConditioning, ControlIsolation, ControlModelExecutor, ControlNetError,
@@ -1024,6 +1025,18 @@ impl NativeDiffusionPayload {
             NativeDiffusionResource::Vae { vae } => Some(vae),
             NativeDiffusionResource::Model { .. } | NativeDiffusionResource::Clip { .. } => None,
         }
+    }
+
+    pub fn clip_payload(&self) -> Option<&Arc<NativeModelPayload>> {
+        match &self.resource {
+            NativeDiffusionResource::Clip { clip } => Some(clip),
+            NativeDiffusionResource::Model { .. } | NativeDiffusionResource::Vae { .. } => None,
+        }
+    }
+
+    pub fn native_clip_resource(&self) -> Option<&Arc<NativeClipResource>> {
+        self.clip_payload()
+            .and_then(|payload| payload.native_clip_resource())
     }
 
     pub fn resident_bytes(&self) -> Result<usize, NativeDiffusionPayloadError> {

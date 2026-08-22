@@ -17,7 +17,7 @@ use crate::{
     NativeQwenMultimodal, NativeRaftLarge, NativeSdPoseModel, NativeStructuredVae, NativeVae,
     QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256, QWEN_VL_SOURCE_SHA256, QWEN3VL_SOURCE_SHA256,
     QWEN35_SOURCE_SHA256,
-    clip::{LoadedSd1Clip, NativeTokenizer},
+    clip::{LoadedSd1Clip, NativeClipResidentOwnerKind, NativeClipResource, NativeTokenizer},
     clip_vision::NativeClipVision,
     generated_native_diffusion::{Sd1Tokenizer, Sd15TinyModel},
 };
@@ -285,6 +285,9 @@ enum NativeModelResource {
     GemmaMultimodalClip {
         resource: Arc<NativeGemmaMultimodal>,
     },
+    NativeClip {
+        resource: Arc<NativeClipResource>,
+    },
     SdPoseModel {
         resource: Arc<NativeSdPoseModel>,
     },
@@ -310,6 +313,11 @@ pub enum NativeModelBackingKind {
     NativeGemma3VisionProjector,
     NativeGemma4VisionEncoder,
     NativeGemma4AudioEncoder,
+    NativeClipResource,
+    NativeClipComponent,
+    NativeClipTokenizer,
+    NativeClipEncoder,
+    NativeClipMappedWeights,
     NativeSdPoseModel,
     NativeFrameInterpolationModel,
 }
@@ -722,6 +730,44 @@ impl NativeModelPayload {
         })
     }
 
+    pub fn native_clip(resource: Arc<NativeClipResource>) -> Result<Self, NativeModelPayloadError> {
+        let cancellation = CancellationToken::default();
+        resource
+            .validate(&cancellation)
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        let mut artifact_hasher = Sha256::new();
+        artifact_hasher.update(b"zed.comfy.native-clip-artifacts.v1\0");
+        for component in resource.components() {
+            hash_field(&mut artifact_hasher, component.artifact_sha256().as_bytes())?;
+        }
+        let artifact_sha256 = format!("{:x}", artifact_hasher.finalize());
+        let profile = match resource.profile() {
+            crate::clip::NativeClipProfile::Sd1 => "sd1",
+            crate::clip::NativeClipProfile::Sdxl => "sdxl",
+            crate::clip::NativeClipProfile::Sd3 => "sd3",
+            crate::clip::NativeClipProfile::PixArt => "pixart",
+            crate::clip::NativeClipProfile::Lumina => "lumina",
+            crate::clip::NativeClipProfile::HiDream => "hidream",
+            crate::clip::NativeClipProfile::Qwen => "qwen25-image",
+            crate::clip::NativeClipProfile::Gemma => "gemma4",
+        };
+        let identity = NativeModelResourceIdentity::checked(
+            NativeModelResourceRole::Clip,
+            format!("native-clip-{profile}"),
+            "zed-native-clip-resource-v1",
+            artifact_sha256,
+            resource.semantic_digest_sha256(),
+        )?;
+        let backing_bytes = resource
+            .resident_bytes()
+            .map_err(|error| NativeModelPayloadError::ResourceAccounting(error.to_string()))?;
+        Ok(Self {
+            resident_bytes: payload_resident_bytes(&identity, backing_bytes)?,
+            identity,
+            resource: NativeModelResource::NativeClip { resource },
+        })
+    }
+
     pub fn sdpose_model(resource: Arc<NativeSdPoseModel>) -> Result<Self, NativeModelPayloadError> {
         if !resource.is_source_exact_profile() {
             return Err(NativeModelPayloadError::ResourceMismatch(
@@ -1019,6 +1065,48 @@ impl NativeModelPayload {
                 }
                 allocations
             }
+            NativeModelResource::NativeClip { resource } => {
+                let allocations = resource.resident_tensor_allocations().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?;
+                tensor_allocations.extend(allocations.into_iter().map(
+                    |(storage_id, resident_bytes)| NativeModelTensorResidentAllocation {
+                        storage_id,
+                        resident_bytes,
+                    },
+                ));
+                let clip_allocations = resource.resident_owned_allocations().map_err(|error| {
+                    NativeModelPayloadError::ResourceAccounting(error.to_string())
+                })?;
+                let mut backing_allocations = Vec::new();
+                backing_allocations
+                    .try_reserve_exact(clip_allocations.len())
+                    .map_err(|_| NativeModelPayloadError::LengthOverflow)?;
+                for allocation in clip_allocations {
+                    backing_allocations.push(NativeModelResidentAllocation {
+                        kind: match allocation.kind() {
+                            NativeClipResidentOwnerKind::Resource => {
+                                NativeModelBackingKind::NativeClipResource
+                            }
+                            NativeClipResidentOwnerKind::Component => {
+                                NativeModelBackingKind::NativeClipComponent
+                            }
+                            NativeClipResidentOwnerKind::Tokenizer => {
+                                NativeModelBackingKind::NativeClipTokenizer
+                            }
+                            NativeClipResidentOwnerKind::Encoder => {
+                                NativeModelBackingKind::NativeClipEncoder
+                            }
+                            NativeClipResidentOwnerKind::MappedWeights => {
+                                NativeModelBackingKind::NativeClipMappedWeights
+                            }
+                        },
+                        address: allocation.address(),
+                        resident_bytes: allocation.resident_bytes(),
+                    });
+                }
+                backing_allocations
+            }
             NativeModelResource::SdPoseModel { resource } => {
                 tensor_allocations.extend(
                     resource
@@ -1090,6 +1178,7 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. } => None,
         }
@@ -1108,6 +1197,7 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. } => None,
         }
@@ -1124,6 +1214,7 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. } => None,
         }
@@ -1147,6 +1238,7 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. } => None,
         }
@@ -1163,6 +1255,7 @@ impl NativeModelPayload {
             | NativeModelResource::DecoderClip { .. }
             | NativeModelResource::QwenMultimodalClip { .. }
             | NativeModelResource::GemmaMultimodalClip { .. }
+            | NativeModelResource::NativeClip { .. }
             | NativeModelResource::SdPoseModel { .. }
             | NativeModelResource::FrameInterpolation { .. } => None,
         }
@@ -1187,6 +1280,13 @@ impl NativeModelPayload {
     pub fn gemma_multimodal_resource(&self) -> Option<&Arc<NativeGemmaMultimodal>> {
         match &self.resource {
             NativeModelResource::GemmaMultimodalClip { resource } => Some(resource),
+            _ => None,
+        }
+    }
+
+    pub fn native_clip_resource(&self) -> Option<&Arc<NativeClipResource>> {
+        match &self.resource {
+            NativeModelResource::NativeClip { resource } => Some(resource),
             _ => None,
         }
     }
@@ -1228,6 +1328,7 @@ impl NativeModelPayload {
             NativeModelResource::GemmaMultimodalClip { resource } => {
                 Self::gemma_multimodal_clip(resource.clone())?
             }
+            NativeModelResource::NativeClip { resource } => Self::native_clip(resource.clone())?,
             NativeModelResource::SdPoseModel { resource } => {
                 if resource.is_source_exact_profile() {
                     Self::sdpose_model(resource.clone())?

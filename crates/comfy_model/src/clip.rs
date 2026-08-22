@@ -1,12 +1,23 @@
+use crate::clip_text_encoder_composite::{
+    compose_source_hidream, compose_source_sd3, compose_source_sdxl,
+};
+use crate::clip_text_encoder_multimodal::{
+    GemmaConditioningRequest, GemmaPreparedAudio, GemmaPreparedVisual, NativeGemmaMultimodal,
+    NativeQwen25Multimodal, Qwen25ConditioningRequest, Qwen25PreparedImage,
+};
+use crate::clip_tokenizer::{NativeTokenizerInvocationOptions, apply_empty_baseline_token_weights};
 use crate::native_ops::NativeExecutionRequirements;
 use crate::{
-    ArtifactIndex, AttentionError, ClipTextActivation, ClipTextConfiguration, ClipTextError,
+    ArtifactIndex, AttentionError, BidirectionalPooling, BidirectionalTextInput,
+    BidirectionalTextRequest, ClipTextActivation, ClipTextConfiguration, ClipTextError,
     ClipTextInput, ClipTextIntermediate, ClipTextLayerWeights, ClipTextRequest, ClipTextWeights,
-    EmbeddingOptions, HIDREAM_O1_DEEPSTACK_KEY_FRAGMENT, LoadedModel,
+    DecoderPreparedTextRequest, DecoderRopePositions, EmbeddingOptions,
+    HIDREAM_O1_DEEPSTACK_KEY_FRAGMENT, LoadedModel, MappedModelWeights,
     ModelClipTargetCandidateDescriptor, ModelClipTargetDescriptor, ModelFamilyIdentity, ModelProbe,
     ModelStorageDType, ModelStore, ModelStoreError, ModelTokenizerDescriptor, NativeClipText,
-    NativeModule, NativeOpsError, PatchGraph, PatchGraphIdentity, PatchGraphIdentityError,
-    ResolvedModelFamily,
+    NativeDecoderTextEncoder, NativeModule, NativeOpsError, NativePromptTokenizer,
+    NativeT5TextEncoder, NativeTokenValue, PatchGraph, PatchGraphError, PatchGraphIdentity,
+    PatchGraphIdentityError, ResolvedModelFamily,
 };
 use comfy_tensor::{
     BinaryOperation, CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId,
@@ -19,6 +30,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    mem,
     sync::Arc,
 };
 use thiserror::Error;
@@ -3654,8 +3666,2414 @@ impl NativeTextEncoder for Sd1ClipTextEncoder {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeClipProfile {
+    Sd1,
+    Sdxl,
+    Sd3,
+    PixArt,
+    Lumina,
+    HiDream,
+    Qwen,
+    Gemma,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeClipComponentRole {
+    ClipL,
+    ClipG,
+    T5,
+    Llama,
+    Qwen,
+    Gemma,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum NativeClipLayerSelection {
+    Last,
+    Hidden(isize),
+    All,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeClipComponentOptions {
+    tokenizer: NativeTokenizerInvocationOptions,
+    layer: NativeClipLayerSelection,
+    final_layer_norm_intermediate: bool,
+    projected_pooled: bool,
+    attention_mask: bool,
+    zero_out_masked: bool,
+}
+
+impl NativeClipComponentOptions {
+    pub fn checked(
+        tokenizer: NativeTokenizerInvocationOptions,
+        layer: NativeClipLayerSelection,
+        projected_pooled: bool,
+        attention_mask: bool,
+    ) -> Result<Self, ClipError> {
+        Self::checked_source(
+            tokenizer,
+            layer,
+            false,
+            projected_pooled,
+            attention_mask,
+            false,
+        )
+    }
+
+    pub fn checked_source(
+        tokenizer: NativeTokenizerInvocationOptions,
+        layer: NativeClipLayerSelection,
+        final_layer_norm_intermediate: bool,
+        projected_pooled: bool,
+        attention_mask: bool,
+        zero_out_masked: bool,
+    ) -> Result<Self, ClipError> {
+        if zero_out_masked && !attention_mask {
+            return Err(ClipError::InvalidNativeResource(
+                "zeroing masked CLIP outputs requires attention-mask execution".to_owned(),
+            ));
+        }
+        Ok(Self {
+            tokenizer,
+            layer,
+            final_layer_norm_intermediate,
+            projected_pooled,
+            attention_mask,
+            zero_out_masked,
+        })
+    }
+
+    pub const fn tokenizer(&self) -> NativeTokenizerInvocationOptions {
+        self.tokenizer
+    }
+}
+
+#[derive(Clone)]
+pub enum NativeClipEncoder {
+    ClipText(Arc<NativeClipText>),
+    Bidirectional(Arc<NativeT5TextEncoder>),
+    Decoder(Arc<NativeDecoderTextEncoder>),
+    Qwen25(Arc<NativeQwen25Multimodal>),
+    Gemma4(Arc<NativeGemmaMultimodal>),
+}
+
+#[derive(Clone)]
+pub struct NativeClipComponent {
+    role: NativeClipComponentRole,
+    artifact_sha256: String,
+    base_weights: Arc<MappedModelWeights>,
+    tokenizer: Arc<NativePromptTokenizer>,
+    encoder: NativeClipEncoder,
+    options: NativeClipComponentOptions,
+    semantic_digest_sha256: String,
+}
+
+impl NativeClipComponent {
+    pub fn checked_clip_text(
+        role: NativeClipComponentRole,
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder_template: &NativeClipText,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        if !matches!(
+            role,
+            NativeClipComponentRole::ClipL | NativeClipComponentRole::ClipG
+        ) {
+            return Err(ClipError::InvalidNativeResource(
+                "CLIP text owner requires a CLIP-L or CLIP-G role".to_owned(),
+            ));
+        }
+        validate_sha256(
+            "native CLIP component artifact",
+            base_weights.base_artifact_digest(),
+        )?;
+        let encoder =
+            encoder_template.reconstruct_from_mapped_weights(&base_weights, cancellation)?;
+        Self::from_sealed_owner(
+            role,
+            base_weights,
+            tokenizer,
+            NativeClipEncoder::ClipText(Arc::new(encoder)),
+            options,
+            cancellation,
+        )
+    }
+
+    pub fn checked_bidirectional(
+        role: NativeClipComponentRole,
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder_template: &NativeT5TextEncoder,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        if role != NativeClipComponentRole::T5 {
+            return Err(ClipError::InvalidNativeResource(
+                "bidirectional text owner requires the T5 role".to_owned(),
+            ));
+        }
+        validate_sha256(
+            "native CLIP component artifact",
+            base_weights.base_artifact_digest(),
+        )?;
+        let encoder = encoder_template
+            .reconstruct_from_mapped_weights(&base_weights, cancellation)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        Self::from_sealed_owner(
+            role,
+            base_weights,
+            tokenizer,
+            NativeClipEncoder::Bidirectional(Arc::new(encoder)),
+            options,
+            cancellation,
+        )
+    }
+
+    pub fn checked_decoder(
+        role: NativeClipComponentRole,
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder_template: &NativeDecoderTextEncoder,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        if !matches!(
+            role,
+            NativeClipComponentRole::Llama
+                | NativeClipComponentRole::Qwen
+                | NativeClipComponentRole::Gemma
+        ) {
+            return Err(ClipError::InvalidNativeResource(
+                "decoder text owner requires a Llama, Qwen, or Gemma role".to_owned(),
+            ));
+        }
+        validate_sha256(
+            "native CLIP component artifact",
+            base_weights.base_artifact_digest(),
+        )?;
+        let encoder = encoder_template
+            .reconstruct_from_mapped_weights(&base_weights, cancellation)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        Self::from_sealed_owner(
+            role,
+            base_weights,
+            tokenizer,
+            NativeClipEncoder::Decoder(Arc::new(encoder)),
+            options,
+            cancellation,
+        )
+    }
+
+    pub fn checked_qwen25(
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder_template: &NativeQwen25Multimodal,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        if !Arc::ptr_eq(encoder_template.tokenizer(), &tokenizer) {
+            return Err(ClipError::InvalidNativeResource(
+                "Qwen2.5 tokenizer is not its retained multimodal owner".to_owned(),
+            ));
+        }
+        validate_sha256(
+            "native CLIP component artifact",
+            base_weights.base_artifact_digest(),
+        )?;
+        let owner = encoder_template
+            .reconstruct_from_mapped_weights(&base_weights, cancellation)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        Self::from_sealed_owner(
+            NativeClipComponentRole::Qwen,
+            base_weights,
+            tokenizer,
+            NativeClipEncoder::Qwen25(Arc::new(owner)),
+            options,
+            cancellation,
+        )
+    }
+
+    pub fn checked_gemma4(
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder_template: &NativeGemmaMultimodal,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        if !Arc::ptr_eq(encoder_template.tokenizer(), &tokenizer)
+            || !encoder_template.is_source_exact_profile()
+            || encoder_template.gemma4_vision().is_none()
+        {
+            return Err(ClipError::InvalidNativeResource(
+                "Gemma4 tokenizer and retained multimodal owner are incompatible".to_owned(),
+            ));
+        }
+        validate_sha256(
+            "native CLIP component artifact",
+            base_weights.base_artifact_digest(),
+        )?;
+        let owner = encoder_template
+            .reconstruct_from_mapped_weights(&base_weights, cancellation)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        Self::from_sealed_owner(
+            NativeClipComponentRole::Gemma,
+            base_weights,
+            tokenizer,
+            NativeClipEncoder::Gemma4(Arc::new(owner)),
+            options,
+            cancellation,
+        )
+    }
+
+    fn from_sealed_owner(
+        role: NativeClipComponentRole,
+        base_weights: Arc<MappedModelWeights>,
+        tokenizer: Arc<NativePromptTokenizer>,
+        encoder: NativeClipEncoder,
+        options: NativeClipComponentOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipError> {
+        match &encoder {
+            NativeClipEncoder::ClipText(owner) => {
+                if !matches!(
+                    role,
+                    NativeClipComponentRole::ClipL | NativeClipComponentRole::ClipG
+                ) || (options.projected_pooled
+                    && owner.configuration().projection_dimension.is_none())
+                {
+                    return Err(ClipError::InvalidNativeResource(
+                        "CLIP text role or projected-pooling option is incompatible with its owner"
+                            .to_owned(),
+                    ));
+                }
+            }
+            NativeClipEncoder::Bidirectional(owner) => {
+                if role != NativeClipComponentRole::T5
+                    || options.layer == NativeClipLayerSelection::All
+                    || (options.projected_pooled
+                        && owner.configuration().projection_dimension.is_none())
+                {
+                    return Err(ClipError::InvalidNativeResource(
+                        "T5 role, layer, or projected-pooling option is incompatible with its owner".to_owned(),
+                    ));
+                }
+            }
+            NativeClipEncoder::Decoder(_) => {
+                if options.projected_pooled
+                    || options.zero_out_masked
+                    || (options.layer == NativeClipLayerSelection::All
+                        && !matches!(
+                            role,
+                            NativeClipComponentRole::Llama | NativeClipComponentRole::Gemma
+                        ))
+                {
+                    return Err(ClipError::InvalidNativeResource(
+                        "decoder layer or output options are incompatible with its CLIP role"
+                            .to_owned(),
+                    ));
+                }
+            }
+            NativeClipEncoder::Qwen25(_) => {
+                if role != NativeClipComponentRole::Qwen
+                    || options.layer == NativeClipLayerSelection::All
+                    || options.projected_pooled
+                    || options.zero_out_masked
+                    || !options.attention_mask
+                    || options.tokenizer != NativeTokenizerInvocationOptions::default()
+                {
+                    return Err(ClipError::InvalidNativeResource(
+                        "Qwen2.5 CLIP options are incompatible with its multimodal owner"
+                            .to_owned(),
+                    ));
+                }
+            }
+            NativeClipEncoder::Gemma4(_) => {
+                if role != NativeClipComponentRole::Gemma
+                    || options.layer != NativeClipLayerSelection::All
+                    || options.projected_pooled
+                    || options.zero_out_masked
+                    || !options.attention_mask
+                    || options.tokenizer != NativeTokenizerInvocationOptions::default()
+                {
+                    return Err(ClipError::InvalidNativeResource(
+                        "Gemma4 CLIP options are incompatible with its multimodal owner".to_owned(),
+                    ));
+                }
+            }
+        }
+        let mut component = Self {
+            role,
+            artifact_sha256: base_weights.base_artifact_digest().to_owned(),
+            base_weights,
+            tokenizer,
+            encoder,
+            options,
+            semantic_digest_sha256: String::new(),
+        };
+        component.semantic_digest_sha256 = component.project_semantic_digest(cancellation)?;
+        Ok(component)
+    }
+
+    pub const fn role(&self) -> NativeClipComponentRole {
+        self.role
+    }
+
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        &self.semantic_digest_sha256
+    }
+
+    fn materialize(
+        &self,
+        patch: &PatchGraph,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ClipError> {
+        patch
+            .identity()
+            .validate_for_base(self.base_weights.base_artifact_digest())?;
+        let patched = Arc::new(patch.apply(backend, &self.base_weights, context)?);
+        let encoder = match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => NativeClipEncoder::ClipText(Arc::new(
+                owner.reconstruct_from_mapped_weights(&patched, context.cancellation)?,
+            )),
+            NativeClipEncoder::Bidirectional(owner) => NativeClipEncoder::Bidirectional(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&patched, context.cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Decoder(owner) => NativeClipEncoder::Decoder(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&patched, context.cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Qwen25(owner) => NativeClipEncoder::Qwen25(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&patched, context.cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Gemma4(owner) => NativeClipEncoder::Gemma4(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&patched, context.cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+        };
+        let mut component = Self {
+            role: self.role,
+            artifact_sha256: self.artifact_sha256.clone(),
+            base_weights: patched,
+            tokenizer: self.tokenizer.clone(),
+            encoder,
+            options: self.options.clone(),
+            semantic_digest_sha256: String::new(),
+        };
+        component.semantic_digest_sha256 =
+            component.project_semantic_digest(context.cancellation)?;
+        Ok(component)
+    }
+
+    fn restart(&self, cancellation: &CancellationToken) -> Result<Self, ClipError> {
+        let encoder = match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => NativeClipEncoder::ClipText(Arc::new(
+                owner.reconstruct_from_mapped_weights(&self.base_weights, cancellation)?,
+            )),
+            NativeClipEncoder::Bidirectional(owner) => NativeClipEncoder::Bidirectional(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&self.base_weights, cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Decoder(owner) => NativeClipEncoder::Decoder(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&self.base_weights, cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Qwen25(owner) => NativeClipEncoder::Qwen25(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&self.base_weights, cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+            NativeClipEncoder::Gemma4(owner) => NativeClipEncoder::Gemma4(Arc::new(
+                owner
+                    .reconstruct_from_mapped_weights(&self.base_weights, cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            )),
+        };
+        Self::from_sealed_owner(
+            self.role,
+            self.base_weights.clone(),
+            self.tokenizer.clone(),
+            encoder,
+            self.options.clone(),
+            cancellation,
+        )
+    }
+
+    fn project_semantic_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, ClipError> {
+        cancellation.check().map_err(TensorError::from)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.native-clip-component.v2");
+        hasher.update([native_clip_role_tag(self.role)]);
+        hash_clip_bytes(&mut hasher, self.artifact_sha256.as_bytes())?;
+        hash_clip_bytes(&mut hasher, self.base_weights.cache_identity().as_bytes())?;
+        hash_clip_bytes(
+            &mut hasher,
+            self.tokenizer
+                .semantic_digest(cancellation)
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+                .as_bytes(),
+        )?;
+        hash_clip_component_options(&mut hasher, &self.options)?;
+        match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => hash_clip_bytes(
+                &mut hasher,
+                owner.semantic_state_digest(cancellation)?.as_bytes(),
+            )?,
+            NativeClipEncoder::Bidirectional(owner) => hash_clip_bytes(
+                &mut hasher,
+                owner
+                    .semantic_state_digest(cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+                    .as_bytes(),
+            )?,
+            NativeClipEncoder::Decoder(owner) => hash_clip_bytes(
+                &mut hasher,
+                owner
+                    .semantic_state_digest(cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+                    .as_bytes(),
+            )?,
+            NativeClipEncoder::Qwen25(owner) => hash_clip_bytes(
+                &mut hasher,
+                owner
+                    .semantic_state_digest(cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+                    .as_bytes(),
+            )?,
+            NativeClipEncoder::Gemma4(owner) => hash_clip_bytes(
+                &mut hasher,
+                owner
+                    .semantic_state_digest(cancellation)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+                    .as_bytes(),
+            )?,
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, ClipError> {
+        Ok(match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => owner.resident_tensor_allocations(),
+            NativeClipEncoder::Bidirectional(owner) => owner.resident_tensor_allocations(),
+            NativeClipEncoder::Decoder(owner) => owner.resident_tensor_allocations(),
+            NativeClipEncoder::Qwen25(owner) => owner
+                .resident_tensor_allocations()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+            NativeClipEncoder::Gemma4(owner) => owner
+                .resident_tensor_allocations()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+        })
+    }
+
+    fn structural_owned_bytes(&self) -> Result<u64, ClipError> {
+        u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| ClipError::Overflow("native CLIP component residency"))?
+            .checked_add(
+                u64::try_from(self.artifact_sha256.capacity())
+                    .map_err(|_| ClipError::Overflow("native CLIP artifact identity"))?,
+            )
+            .and_then(|bytes| {
+                bytes.checked_add(u64::try_from(self.semantic_digest_sha256.capacity()).ok()?)
+            })
+            .ok_or(ClipError::Overflow("native CLIP component residency"))
+    }
+
+    fn encoder_owned_bytes(&self) -> Result<u64, ClipError> {
+        match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => Ok(owner.resident_owned_bytes()?),
+            NativeClipEncoder::Bidirectional(owner) => owner
+                .resident_owned_bytes()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string())),
+            NativeClipEncoder::Decoder(owner) => owner
+                .resident_owned_bytes()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string())),
+            NativeClipEncoder::Qwen25(owner) => owner
+                .resident_owned_bytes()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string())),
+            NativeClipEncoder::Gemma4(owner) => owner
+                .resident_owned_bytes()
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string())),
+        }
+    }
+
+    fn encoder_identity(&self) -> usize {
+        match &self.encoder {
+            NativeClipEncoder::ClipText(owner) => Arc::as_ptr(owner) as *const () as usize,
+            NativeClipEncoder::Bidirectional(owner) => Arc::as_ptr(owner) as *const () as usize,
+            NativeClipEncoder::Decoder(owner) => Arc::as_ptr(owner) as *const () as usize,
+            NativeClipEncoder::Qwen25(owner) => Arc::as_ptr(owner) as *const () as usize,
+            NativeClipEncoder::Gemma4(owner) => Arc::as_ptr(owner) as *const () as usize,
+        }
+    }
+}
+
+fn mapped_weights_owned_bytes(mapped: &MappedModelWeights) -> Result<u64, ClipError> {
+    let mut bytes = u64::try_from(mem::size_of::<MappedModelWeights>())
+        .map_err(|_| ClipError::Overflow("CLIP mapped weights"))?;
+    for value in [mapped.base_artifact_digest(), mapped.cache_identity()] {
+        bytes = bytes
+            .checked_add(
+                u64::try_from(value.len())
+                    .map_err(|_| ClipError::Overflow("CLIP mapped identity"))?,
+            )
+            .ok_or(ClipError::Overflow("CLIP mapped weights"))?;
+    }
+    for name in mapped.tensors().keys() {
+        bytes = bytes
+            .checked_add(
+                u64::try_from(name.capacity())
+                    .map_err(|_| ClipError::Overflow("CLIP mapped key"))?,
+            )
+            .ok_or(ClipError::Overflow("CLIP mapped weights"))?;
+    }
+    for name in mapped.unexpected_keys() {
+        bytes = bytes
+            .checked_add(
+                u64::try_from(name.capacity())
+                    .map_err(|_| ClipError::Overflow("CLIP unexpected key"))?,
+            )
+            .ok_or(ClipError::Overflow("CLIP mapped weights"))?;
+    }
+    if let Some(binding) = mapped.binding() {
+        for value in [
+            binding.family().feature_id(),
+            binding.family().identifier(),
+            binding.family().architecture_version(),
+            binding.profile_identity(),
+            binding.state_plan_identity(),
+            binding.probe_identity().unwrap_or_default(),
+        ] {
+            bytes = bytes
+                .checked_add(
+                    u64::try_from(value.len())
+                        .map_err(|_| ClipError::Overflow("CLIP mapped binding"))?,
+                )
+                .ok_or(ClipError::Overflow("CLIP mapped weights"))?;
+        }
+    }
+    Ok(bytes)
+}
+
+#[derive(Clone)]
+pub struct NativeClipScheduleSpec {
+    start_percent_bits: u64,
+    end_percent_bits: u64,
+    hook_metadata_json: Vec<u8>,
+    component_patches: Vec<Option<PatchGraph>>,
+}
+
+impl NativeClipScheduleSpec {
+    pub fn checked(
+        start_percent: f64,
+        end_percent: f64,
+        hook_metadata_json: Vec<u8>,
+        component_patches: Vec<Option<PatchGraph>>,
+    ) -> Result<Self, ClipError> {
+        if !start_percent.is_finite()
+            || !end_percent.is_finite()
+            || !(0.0..=1.0).contains(&start_percent)
+            || !(0.0..=1.0).contains(&end_percent)
+            || start_percent >= end_percent
+            || hook_metadata_json.len() > SD1_MAX_PROMPT_BYTES
+            || serde_json::from_slice::<serde_json::Value>(&hook_metadata_json).is_err()
+        {
+            return Err(ClipError::InvalidNativeResource(
+                "CLIP schedule interval or hook metadata is invalid".to_owned(),
+            ));
+        }
+        Ok(Self {
+            start_percent_bits: start_percent.to_bits(),
+            end_percent_bits: end_percent.to_bits(),
+            hook_metadata_json,
+            component_patches,
+        })
+    }
+}
+
+#[derive(Clone)]
+struct NativeClipScheduleWindow {
+    start_percent_bits: u64,
+    end_percent_bits: u64,
+    hook_metadata_json: Vec<u8>,
+    components: Vec<Arc<NativeClipComponent>>,
+    component_patches: Vec<Option<PatchGraph>>,
+    patch_identities: Vec<Option<PatchGraphIdentity>>,
+}
+
+impl NativeClipScheduleWindow {
+    fn materialize(
+        spec: NativeClipScheduleSpec,
+        base: &[Arc<NativeClipComponent>],
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ClipError> {
+        if spec.component_patches.len() != base.len() {
+            return Err(ClipError::InvalidNativeResource(
+                "CLIP schedule patch count differs from component count".to_owned(),
+            ));
+        }
+        let mut components = Vec::new();
+        let mut patch_identities = Vec::new();
+        components
+            .try_reserve_exact(base.len())
+            .map_err(|_| ClipError::Allocation("scheduled CLIP components"))?;
+        patch_identities
+            .try_reserve_exact(base.len())
+            .map_err(|_| ClipError::Allocation("scheduled CLIP patch identities"))?;
+        for (component, patch) in base.iter().zip(&spec.component_patches) {
+            context.check()?;
+            match patch {
+                Some(patch) => {
+                    components.push(Arc::new(component.materialize(patch, backend, context)?));
+                    patch_identities.push(Some(patch.identity()));
+                }
+                None => {
+                    components.push(component.clone());
+                    patch_identities.push(None);
+                }
+            }
+        }
+        Ok(Self {
+            start_percent_bits: spec.start_percent_bits,
+            end_percent_bits: spec.end_percent_bits,
+            hook_metadata_json: spec.hook_metadata_json,
+            components,
+            component_patches: spec.component_patches,
+            patch_identities,
+        })
+    }
+
+    fn start_percent(&self) -> f64 {
+        f64::from_bits(self.start_percent_bits)
+    }
+    fn end_percent(&self) -> f64 {
+        f64::from_bits(self.end_percent_bits)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeClipOutput {
+    conditioning: Tensor,
+    pooled: Option<Tensor>,
+    attention_mask: Option<Tensor>,
+    conditioning_llama3: Option<Tensor>,
+    clip_start_percent_bits: u64,
+    clip_end_percent_bits: u64,
+    hook_metadata_json: Vec<u8>,
+}
+
+impl NativeClipOutput {
+    pub fn conditioning(&self) -> &Tensor {
+        &self.conditioning
+    }
+    pub fn pooled(&self) -> Option<&Tensor> {
+        self.pooled.as_ref()
+    }
+    pub fn attention_mask(&self) -> Option<&Tensor> {
+        self.attention_mask.as_ref()
+    }
+    pub fn conditioning_llama3(&self) -> Option<&Tensor> {
+        self.conditioning_llama3.as_ref()
+    }
+    pub fn clip_start_percent(&self) -> f64 {
+        f64::from_bits(self.clip_start_percent_bits)
+    }
+    pub fn clip_end_percent(&self) -> f64 {
+        f64::from_bits(self.clip_end_percent_bits)
+    }
+    pub fn hook_metadata_json(&self) -> &[u8] {
+        &self.hook_metadata_json
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum NativeClipExecutionRequest<'a> {
+    Text {
+        prompt: &'a str,
+    },
+    Qwen25 {
+        prompt: &'a str,
+        prepared_images: &'a [Qwen25PreparedImage],
+        custom_template: Option<&'a str>,
+    },
+    Gemma {
+        prompt: &'a str,
+        prepared_visuals: &'a [GemmaPreparedVisual],
+        prepared_audio: Option<&'a GemmaPreparedAudio>,
+        use_default_template: bool,
+        thinking: bool,
+    },
+}
+
+impl<'a> NativeClipExecutionRequest<'a> {
+    fn prompt(self) -> &'a str {
+        match self {
+            Self::Text { prompt } | Self::Qwen25 { prompt, .. } | Self::Gemma { prompt, .. } => {
+                prompt
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct NativeClipResource {
+    profile: NativeClipProfile,
+    schedule_enabled: bool,
+    components: Vec<Arc<NativeClipComponent>>,
+    schedule: Vec<NativeClipScheduleWindow>,
+    semantic_digest_sha256: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum NativeClipResidentOwnerKind {
+    Resource,
+    Component,
+    Tokenizer,
+    Encoder,
+    MappedWeights,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeClipResidentAllocation {
+    kind: NativeClipResidentOwnerKind,
+    address: usize,
+    resident_bytes: u64,
+}
+
+impl NativeClipResidentAllocation {
+    pub const fn kind(&self) -> NativeClipResidentOwnerKind {
+        self.kind
+    }
+    pub const fn address(&self) -> usize {
+        self.address
+    }
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+impl NativeClipResource {
+    pub fn checked(
+        profile: NativeClipProfile,
+        schedule_enabled: bool,
+        components: Vec<Arc<NativeClipComponent>>,
+        schedule_specs: Vec<NativeClipScheduleSpec>,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ClipError> {
+        validate_native_clip_component_order(profile, &components)?;
+        let mut schedule = Vec::new();
+        schedule
+            .try_reserve_exact(schedule_specs.len())
+            .map_err(|_| ClipError::Allocation("CLIP schedule"))?;
+        for spec in schedule_specs {
+            let window =
+                NativeClipScheduleWindow::materialize(spec, &components, backend, context)?;
+            if schedule
+                .last()
+                .is_some_and(|previous: &NativeClipScheduleWindow| {
+                    previous.end_percent() > window.start_percent()
+                })
+            {
+                return Err(ClipError::InvalidNativeResource(
+                    "CLIP schedule windows overlap or are out of order".to_owned(),
+                ));
+            }
+            schedule.push(window);
+        }
+        let mut resource = Self {
+            profile,
+            schedule_enabled,
+            components,
+            schedule,
+            semantic_digest_sha256: String::new(),
+        };
+        resource.semantic_digest_sha256 = resource.project_semantic_digest(context.cancellation)?;
+        resource.validate(context.cancellation)?;
+        Ok(resource)
+    }
+
+    pub const fn profile(&self) -> NativeClipProfile {
+        self.profile
+    }
+    pub const fn schedule_enabled(&self) -> bool {
+        self.schedule_enabled
+    }
+    pub fn components(&self) -> &[Arc<NativeClipComponent>] {
+        &self.components
+    }
+    pub fn semantic_digest_sha256(&self) -> &str {
+        &self.semantic_digest_sha256
+    }
+
+    pub fn execute(
+        &self,
+        backend: &CpuBackend,
+        prompt: &str,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<NativeClipOutput>, ClipError> {
+        self.execute_request(
+            backend,
+            NativeClipExecutionRequest::Text { prompt },
+            context,
+        )
+    }
+
+    pub fn execute_request(
+        &self,
+        backend: &CpuBackend,
+        request: NativeClipExecutionRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Vec<NativeClipOutput>, ClipError> {
+        self.validate(context.cancellation)?;
+        if self.schedule_enabled && !self.schedule.is_empty() {
+            let mut outputs = Vec::new();
+            outputs
+                .try_reserve_exact(self.schedule.len())
+                .map_err(|_| ClipError::Allocation("scheduled CLIP outputs"))?;
+            for window in &self.schedule {
+                context.check()?;
+                outputs.push(execute_native_clip_profile(
+                    self.profile,
+                    &window.components,
+                    backend,
+                    request,
+                    window.start_percent(),
+                    window.end_percent(),
+                    &window.hook_metadata_json,
+                    context,
+                )?);
+            }
+            return Ok(outputs);
+        }
+        execute_native_clip_profile(
+            self.profile,
+            &self.components,
+            backend,
+            request,
+            0.0,
+            1.0,
+            &[],
+            context,
+        )
+        .map(|output| vec![output])
+    }
+
+    pub fn validate(&self, cancellation: &CancellationToken) -> Result<(), ClipError> {
+        cancellation.check().map_err(TensorError::from)?;
+        validate_native_clip_component_order(self.profile, &self.components)?;
+        if self.semantic_digest_sha256 != self.project_semantic_digest(cancellation)? {
+            return Err(ClipError::InvalidNativeResource(
+                "CLIP resource semantic identity drifted".to_owned(),
+            ));
+        }
+        self.resident_tensor_allocations()?;
+        Ok(())
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, ClipError> {
+        let mut allocations = Vec::new();
+        for component in self.components.iter().chain(
+            self.schedule
+                .iter()
+                .flat_map(|window| window.components.iter()),
+        ) {
+            for (storage_id, bytes) in component.resident_tensor_allocations()? {
+                if let Some((_, existing)) = allocations
+                    .iter()
+                    .find(|(candidate, _)| *candidate == storage_id)
+                {
+                    if *existing != bytes {
+                        return Err(ClipError::InvalidNativeResource(
+                            "shared CLIP storage changed resident size".to_owned(),
+                        ));
+                    }
+                } else {
+                    allocations.push((storage_id, bytes));
+                }
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipError> {
+        let bytes = self.resident_owned_allocations()?.into_iter().try_fold(
+            0_u64,
+            |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(ClipError::Overflow("CLIP resource residency"))
+            },
+        )?;
+        self.resident_tensor_allocations()?
+            .into_iter()
+            .try_fold(bytes, |total, (_, allocation)| {
+                total
+                    .checked_add(allocation)
+                    .ok_or(ClipError::Overflow("CLIP resource residency"))
+            })
+    }
+
+    pub fn resident_owned_allocations(
+        &self,
+    ) -> Result<Vec<NativeClipResidentAllocation>, ClipError> {
+        let mut allocations = Vec::new();
+        let scheduled_component_count =
+            self.schedule.iter().try_fold(0_usize, |total, window| {
+                total
+                    .checked_add(window.components.len())
+                    .ok_or(ClipError::Overflow("CLIP resident owners"))
+            })?;
+        let owner_bound = self
+            .components
+            .len()
+            .checked_add(scheduled_component_count)
+            .and_then(|value| value.checked_mul(4))
+            .and_then(|value| value.checked_add(1))
+            .ok_or(ClipError::Overflow("CLIP resident owners"))?;
+        allocations
+            .try_reserve_exact(owner_bound)
+            .map_err(|_| ClipError::Allocation("CLIP resident owners"))?;
+        allocations.push(NativeClipResidentAllocation {
+            kind: NativeClipResidentOwnerKind::Resource,
+            address: self as *const Self as usize,
+            resident_bytes: self.structural_owned_bytes()?,
+        });
+        let mut component_owners = BTreeSet::new();
+        let mut tokenizer_owners = BTreeSet::new();
+        let mut encoder_owners = BTreeSet::new();
+        let mut mapped_owners = BTreeSet::new();
+        for component in self.components.iter().chain(
+            self.schedule
+                .iter()
+                .flat_map(|window| window.components.iter()),
+        ) {
+            if component_owners.insert(Arc::as_ptr(component) as usize) {
+                allocations.push(NativeClipResidentAllocation {
+                    kind: NativeClipResidentOwnerKind::Component,
+                    address: Arc::as_ptr(component) as usize,
+                    resident_bytes: component.structural_owned_bytes()?,
+                });
+            }
+            if tokenizer_owners.insert(Arc::as_ptr(&component.tokenizer) as usize) {
+                allocations.push(NativeClipResidentAllocation {
+                    kind: NativeClipResidentOwnerKind::Tokenizer,
+                    address: Arc::as_ptr(&component.tokenizer) as usize,
+                    resident_bytes: component
+                        .tokenizer
+                        .resident_bytes()
+                        .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+                });
+            }
+            if encoder_owners.insert(component.encoder_identity()) {
+                allocations.push(NativeClipResidentAllocation {
+                    kind: NativeClipResidentOwnerKind::Encoder,
+                    address: component.encoder_identity(),
+                    resident_bytes: component.encoder_owned_bytes()?,
+                });
+            }
+            if mapped_owners.insert(Arc::as_ptr(&component.base_weights) as usize) {
+                allocations.push(NativeClipResidentAllocation {
+                    kind: NativeClipResidentOwnerKind::MappedWeights,
+                    address: Arc::as_ptr(&component.base_weights) as usize,
+                    resident_bytes: mapped_weights_owned_bytes(&component.base_weights)?,
+                });
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn restart(
+        &self,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, ClipError> {
+        let mut components = Vec::new();
+        components
+            .try_reserve_exact(self.components.len())
+            .map_err(|_| ClipError::Allocation("restarted CLIP components"))?;
+        for component in &self.components {
+            context.check()?;
+            components.push(Arc::new(component.restart(context.cancellation)?));
+        }
+        let mut specs = Vec::new();
+        specs
+            .try_reserve_exact(self.schedule.len())
+            .map_err(|_| ClipError::Allocation("restarted CLIP schedule"))?;
+        for window in &self.schedule {
+            specs.push(NativeClipScheduleSpec {
+                start_percent_bits: window.start_percent_bits,
+                end_percent_bits: window.end_percent_bits,
+                hook_metadata_json: window.hook_metadata_json.clone(),
+                component_patches: window.component_patches.clone(),
+            });
+        }
+        Self::checked(
+            self.profile,
+            self.schedule_enabled,
+            components,
+            specs,
+            backend,
+            context,
+        )
+    }
+
+    fn structural_owned_bytes(&self) -> Result<u64, ClipError> {
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| ClipError::Overflow("CLIP resource residency"))?;
+        for allocation in [
+            self.semantic_digest_sha256.capacity(),
+            self.components
+                .capacity()
+                .checked_mul(mem::size_of::<Arc<NativeClipComponent>>())
+                .ok_or(ClipError::Overflow("CLIP component vector"))?,
+            self.schedule
+                .capacity()
+                .checked_mul(mem::size_of::<NativeClipScheduleWindow>())
+                .ok_or(ClipError::Overflow("CLIP schedule vector"))?,
+        ] {
+            bytes = bytes
+                .checked_add(
+                    u64::try_from(allocation)
+                        .map_err(|_| ClipError::Overflow("CLIP resource residency"))?,
+                )
+                .ok_or(ClipError::Overflow("CLIP resource residency"))?;
+        }
+        for window in &self.schedule {
+            for allocation in [
+                window.hook_metadata_json.capacity(),
+                window
+                    .components
+                    .capacity()
+                    .checked_mul(mem::size_of::<Arc<NativeClipComponent>>())
+                    .ok_or(ClipError::Overflow("CLIP scheduled components"))?,
+                window
+                    .component_patches
+                    .capacity()
+                    .checked_mul(mem::size_of::<Option<PatchGraph>>())
+                    .ok_or(ClipError::Overflow("CLIP scheduled patches"))?,
+                window
+                    .patch_identities
+                    .capacity()
+                    .checked_mul(mem::size_of::<Option<PatchGraphIdentity>>())
+                    .ok_or(ClipError::Overflow("CLIP patch identities"))?,
+            ] {
+                bytes = bytes
+                    .checked_add(
+                        u64::try_from(allocation)
+                            .map_err(|_| ClipError::Overflow("CLIP schedule residency"))?,
+                    )
+                    .ok_or(ClipError::Overflow("CLIP schedule residency"))?;
+            }
+            for patch in window.component_patches.iter().flatten() {
+                let patch_owned = patch
+                    .resident_bytes()?
+                    .checked_sub(
+                        u64::try_from(mem::size_of::<PatchGraph>())
+                            .map_err(|_| ClipError::Overflow("CLIP patch residency"))?,
+                    )
+                    .ok_or(ClipError::Overflow("CLIP patch residency"))?;
+                bytes = bytes
+                    .checked_add(patch_owned)
+                    .ok_or(ClipError::Overflow("CLIP patch residency"))?;
+            }
+            for identity in window.patch_identities.iter().flatten() {
+                bytes = bytes
+                    .checked_add(
+                        identity
+                            .owned_resident_bytes()
+                            .ok_or(ClipError::Overflow("CLIP patch identity residency"))?,
+                    )
+                    .ok_or(ClipError::Overflow("CLIP patch identity residency"))?;
+            }
+        }
+        Ok(bytes)
+    }
+
+    fn project_semantic_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, ClipError> {
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.native-clip-resource.v2");
+        hasher.update([
+            native_clip_profile_tag(self.profile),
+            u8::from(self.schedule_enabled),
+        ]);
+        for component in &self.components {
+            hash_clip_bytes(&mut hasher, component.semantic_digest_sha256.as_bytes())?;
+        }
+        for window in &self.schedule {
+            hasher.update(window.start_percent_bits.to_be_bytes());
+            hasher.update(window.end_percent_bits.to_be_bytes());
+            hash_clip_bytes(&mut hasher, &window.hook_metadata_json)?;
+            for identity in &window.patch_identities {
+                match identity {
+                    Some(identity) => {
+                        hasher.update([1]);
+                        hash_clip_bytes(&mut hasher, identity.ordered_digest.as_bytes())?;
+                    }
+                    None => hasher.update([0]),
+                }
+            }
+            for component in &window.components {
+                hash_clip_bytes(&mut hasher, component.semantic_digest_sha256.as_bytes())?;
+            }
+        }
+        cancellation.check().map_err(TensorError::from)?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+}
+
+fn validate_native_clip_component_order(
+    profile: NativeClipProfile,
+    components: &[Arc<NativeClipComponent>],
+) -> Result<(), ClipError> {
+    let expected: &[NativeClipComponentRole] = match profile {
+        NativeClipProfile::Sd1 => &[NativeClipComponentRole::ClipL],
+        NativeClipProfile::Sdxl => &[
+            NativeClipComponentRole::ClipL,
+            NativeClipComponentRole::ClipG,
+        ],
+        NativeClipProfile::Sd3 => &[
+            NativeClipComponentRole::ClipL,
+            NativeClipComponentRole::ClipG,
+            NativeClipComponentRole::T5,
+        ],
+        NativeClipProfile::PixArt => &[NativeClipComponentRole::T5],
+        NativeClipProfile::Lumina | NativeClipProfile::Gemma => &[NativeClipComponentRole::Gemma],
+        NativeClipProfile::HiDream => &[
+            NativeClipComponentRole::ClipL,
+            NativeClipComponentRole::ClipG,
+            NativeClipComponentRole::T5,
+            NativeClipComponentRole::Llama,
+        ],
+        NativeClipProfile::Qwen => &[NativeClipComponentRole::Qwen],
+    };
+    let roles = components
+        .iter()
+        .map(|component| component.role)
+        .collect::<Vec<_>>();
+    let valid = if matches!(profile, NativeClipProfile::Sd3 | NativeClipProfile::HiDream) {
+        roles
+            .iter()
+            .try_fold(0_usize, |offset, role| {
+                expected[offset..]
+                    .iter()
+                    .position(|candidate| candidate == role)
+                    .map(|position| offset + position + 1)
+            })
+            .is_some()
+    } else {
+        roles == expected
+    };
+    if !valid {
+        return Err(ClipError::InvalidNativeResource(
+            "native CLIP component order is invalid".to_owned(),
+        ));
+    }
+    for component in components {
+        let owner_matches = match (profile, component.role, &component.encoder) {
+            (
+                NativeClipProfile::Sd1,
+                NativeClipComponentRole::ClipL,
+                NativeClipEncoder::ClipText(_),
+            )
+            | (
+                NativeClipProfile::Sdxl | NativeClipProfile::Sd3,
+                NativeClipComponentRole::ClipL | NativeClipComponentRole::ClipG,
+                NativeClipEncoder::ClipText(_),
+            )
+            | (
+                NativeClipProfile::Sd3 | NativeClipProfile::PixArt | NativeClipProfile::HiDream,
+                NativeClipComponentRole::T5,
+                NativeClipEncoder::Bidirectional(_),
+            )
+            | (
+                NativeClipProfile::Lumina,
+                NativeClipComponentRole::Gemma,
+                NativeClipEncoder::Decoder(_),
+            )
+            | (
+                NativeClipProfile::HiDream,
+                NativeClipComponentRole::Llama,
+                NativeClipEncoder::Decoder(_),
+            )
+            | (
+                NativeClipProfile::Qwen,
+                NativeClipComponentRole::Qwen,
+                NativeClipEncoder::Qwen25(_),
+            )
+            | (
+                NativeClipProfile::Gemma,
+                NativeClipComponentRole::Gemma,
+                NativeClipEncoder::Gemma4(_),
+            ) => true,
+            _ => false,
+        };
+        if !owner_matches {
+            return Err(ClipError::InvalidNativeResource(
+                "native CLIP profile retained the wrong concrete component owner".to_owned(),
+            ));
+        }
+        if !native_clip_component_matches_source_profile(profile, component) {
+            return Err(ClipError::InvalidNativeResource(
+                "native CLIP component options, dimensions, or tokenizer differ from the source profile"
+                    .to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn native_clip_component_matches_source_profile(
+    profile: NativeClipProfile,
+    component: &NativeClipComponent,
+) -> bool {
+    let tokenizer = component.tokenizer.configuration();
+    let options = &component.options;
+    let width = match &component.encoder {
+        NativeClipEncoder::ClipText(owner) => owner.configuration().hidden_size,
+        NativeClipEncoder::Bidirectional(owner) => owner.configuration().hidden_size,
+        NativeClipEncoder::Decoder(owner) => owner.configuration().hidden_size,
+        NativeClipEncoder::Qwen25(owner) => owner.decoder().configuration().hidden_size,
+        NativeClipEncoder::Gemma4(owner) => owner.decoder().configuration().hidden_size,
+    };
+    if tokenizer.embedding_width != Some(width) {
+        return false;
+    }
+    let clip_fixed = |expected_width, layer, final_norm, projected| {
+        width == expected_width
+            && options.layer == layer
+            && options.final_layer_norm_intermediate == final_norm
+            && options.projected_pooled == projected
+            && !options.attention_mask
+            && !options.zero_out_masked
+            && tokenizer.maximum_length == 77
+            && tokenizer.pad_to_maximum_length
+            && !tokenizer.pad_left
+            && tokenizer.start_token == Some(49_406)
+            && tokenizer.end_token == Some(49_407)
+    };
+    let t5 = |minimum_length, maximum_length, attention_mask| {
+        width == 4_096
+            && options.layer == NativeClipLayerSelection::Last
+            && !options.final_layer_norm_intermediate
+            && !options.projected_pooled
+            && options.attention_mask == attention_mask
+            && !options.zero_out_masked
+            && tokenizer.minimum_length == Some(minimum_length)
+            && tokenizer.maximum_length == maximum_length
+            && !tokenizer.pad_to_maximum_length
+            && !tokenizer.pad_left
+            && tokenizer.start_token.is_none()
+            && tokenizer.end_token == Some(1)
+            && tokenizer.pad_token == 0
+    };
+    match (profile, component.role) {
+        (NativeClipProfile::Sd1, NativeClipComponentRole::ClipL) => {
+            options.layer == NativeClipLayerSelection::Last
+                && options.final_layer_norm_intermediate
+                && !options.projected_pooled
+                && !options.attention_mask
+                && !options.zero_out_masked
+                && tokenizer.maximum_length == 77
+                && tokenizer.pad_to_maximum_length
+                && !tokenizer.pad_left
+                && tokenizer.start_token == Some(49_406)
+                && tokenizer.end_token == Some(49_407)
+        }
+        (NativeClipProfile::Sdxl, NativeClipComponentRole::ClipL)
+        | (NativeClipProfile::Sd3, NativeClipComponentRole::ClipL) => {
+            clip_fixed(768, NativeClipLayerSelection::Hidden(-2), false, false)
+        }
+        (NativeClipProfile::Sdxl, NativeClipComponentRole::ClipG)
+        | (NativeClipProfile::Sd3, NativeClipComponentRole::ClipG) => {
+            clip_fixed(1_280, NativeClipLayerSelection::Hidden(-2), false, true)
+                && tokenizer.pad_token == 0
+        }
+        (NativeClipProfile::Sd3, NativeClipComponentRole::T5) => {
+            t5(77, tokenizer.maximum_length, options.attention_mask)
+        }
+        (NativeClipProfile::PixArt, NativeClipComponentRole::T5) => {
+            t5(1, tokenizer.maximum_length, false)
+        }
+        (NativeClipProfile::Lumina, NativeClipComponentRole::Gemma) => {
+            matches!(width, 2_304 | 2_560)
+                && options.layer == NativeClipLayerSelection::Hidden(-2)
+                && !options.final_layer_norm_intermediate
+                && !options.projected_pooled
+                && options.attention_mask
+                && !options.zero_out_masked
+                && tokenizer.minimum_length == Some(1)
+                && !tokenizer.pad_to_maximum_length
+                && !tokenizer.pad_left
+                && tokenizer.start_token == Some(2)
+                && tokenizer.end_token.is_none()
+                && tokenizer.pad_token == 0
+                && tokenizer.disable_weights == (width == 2_560)
+        }
+        (NativeClipProfile::HiDream, NativeClipComponentRole::ClipL) => {
+            clip_fixed(768, NativeClipLayerSelection::Last, true, false)
+        }
+        (NativeClipProfile::HiDream, NativeClipComponentRole::ClipG) => {
+            clip_fixed(1_280, NativeClipLayerSelection::Hidden(-2), false, true)
+                && tokenizer.pad_token == 0
+        }
+        (NativeClipProfile::HiDream, NativeClipComponentRole::T5) => t5(128, 128, true),
+        (NativeClipProfile::HiDream, NativeClipComponentRole::Llama) => {
+            width == 4_096
+                && options.layer == NativeClipLayerSelection::All
+                && !options.final_layer_norm_intermediate
+                && !options.projected_pooled
+                && options.attention_mask
+                && !options.zero_out_masked
+                && tokenizer.minimum_length == Some(128)
+                && !tokenizer.pad_to_maximum_length
+                && !tokenizer.pad_left
+                && tokenizer.start_token == Some(128_000)
+                && tokenizer.end_token.is_none()
+                && tokenizer.pad_token == 128_009
+        }
+        (NativeClipProfile::Qwen, NativeClipComponentRole::Qwen) => {
+            width == 3_584
+                && options.layer == NativeClipLayerSelection::Last
+                && !options.final_layer_norm_intermediate
+                && !options.projected_pooled
+                && options.attention_mask
+                && !options.zero_out_masked
+                && tokenizer.minimum_length == Some(1)
+                && !tokenizer.pad_to_maximum_length
+                && !tokenizer.pad_left
+                && tokenizer.start_token.is_none()
+                && tokenizer.end_token.is_none()
+                && tokenizer.pad_token == 151_643
+        }
+        (NativeClipProfile::Gemma, NativeClipComponentRole::Gemma) => {
+            options.layer == NativeClipLayerSelection::All
+                && !options.final_layer_norm_intermediate
+                && !options.projected_pooled
+                && options.attention_mask
+                && !options.zero_out_masked
+                && tokenizer.minimum_length == Some(1)
+                && !tokenizer.pad_to_maximum_length
+                && tokenizer.pad_left
+                && tokenizer.start_token == Some(2)
+                && tokenizer.end_token.is_none()
+                && tokenizer.pad_token == 0
+                && tokenizer.disable_weights
+        }
+        _ => false,
+    }
+}
+
+fn execute_native_clip_profile(
+    profile: NativeClipProfile,
+    components: &[Arc<NativeClipComponent>],
+    backend: &CpuBackend,
+    request: NativeClipExecutionRequest<'_>,
+    start_percent: f64,
+    end_percent: f64,
+    hook_metadata_json: &[u8],
+    context: &ExecutionContext<'_>,
+) -> Result<NativeClipOutput, ClipError> {
+    validate_native_clip_component_order(profile, components)?;
+    if profile == NativeClipProfile::Qwen {
+        let component = components.first().ok_or_else(|| {
+            ClipError::InvalidNativeResource("Qwen2.5 CLIP component is missing".to_owned())
+        })?;
+        let NativeClipEncoder::Qwen25(owner) = &component.encoder else {
+            return Err(ClipError::InvalidNativeResource(
+                "Qwen2.5 CLIP does not retain its multimodal owner".to_owned(),
+            ));
+        };
+        let (prompt, prepared_images, custom_template) = match request {
+            NativeClipExecutionRequest::Text { prompt } => (prompt, &[][..], None),
+            NativeClipExecutionRequest::Qwen25 {
+                prompt,
+                prepared_images,
+                custom_template,
+            } => (prompt, prepared_images, custom_template),
+            NativeClipExecutionRequest::Gemma { .. } => {
+                return Err(ClipError::InvalidNativeResource(
+                    "Gemma modalities cannot be routed to Qwen2.5 CLIP".to_owned(),
+                ));
+            }
+        };
+        let capture_layer = match component.options.layer {
+            NativeClipLayerSelection::Last => None,
+            NativeClipLayerSelection::Hidden(layer) => Some(layer),
+            NativeClipLayerSelection::All => {
+                return Err(ClipError::InvalidNativeResource(
+                    "Qwen2.5 does not admit all-layer conditioning".to_owned(),
+                ));
+            }
+        };
+        let output = owner
+            .encode_conditioning(
+                backend,
+                Qwen25ConditioningRequest {
+                    prompt,
+                    prepared_images,
+                    custom_template,
+                    capture_layer,
+                },
+                context,
+            )
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        return Ok(NativeClipOutput {
+            conditioning: output.hidden().clone(),
+            pooled: None,
+            attention_mask: output.attention_mask().cloned(),
+            conditioning_llama3: None,
+            clip_start_percent_bits: start_percent.to_bits(),
+            clip_end_percent_bits: end_percent.to_bits(),
+            hook_metadata_json: hook_metadata_json.to_vec(),
+        });
+    }
+    if profile == NativeClipProfile::Gemma {
+        let component = components.first().ok_or_else(|| {
+            ClipError::InvalidNativeResource("Gemma4 CLIP component is missing".to_owned())
+        })?;
+        let NativeClipEncoder::Gemma4(owner) = &component.encoder else {
+            return Err(ClipError::InvalidNativeResource(
+                "Gemma4 CLIP does not retain its multimodal owner".to_owned(),
+            ));
+        };
+        let (prompt, prepared_visuals, prepared_audio, use_default_template, thinking) =
+            match request {
+                NativeClipExecutionRequest::Text { prompt } => {
+                    (prompt, &[][..], None, false, false)
+                }
+                NativeClipExecutionRequest::Gemma {
+                    prompt,
+                    prepared_visuals,
+                    prepared_audio,
+                    use_default_template,
+                    thinking,
+                } => (
+                    prompt,
+                    prepared_visuals,
+                    prepared_audio,
+                    use_default_template,
+                    thinking,
+                ),
+                NativeClipExecutionRequest::Qwen25 { .. } => {
+                    return Err(ClipError::InvalidNativeResource(
+                        "Qwen2.5 modalities cannot be routed to Gemma4 CLIP".to_owned(),
+                    ));
+                }
+            };
+        let output = owner
+            .encode_conditioning(
+                backend,
+                GemmaConditioningRequest {
+                    prompt,
+                    prepared_visuals,
+                    prepared_audio,
+                    use_default_template,
+                    thinking,
+                },
+                context,
+            )
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        return Ok(NativeClipOutput {
+            conditioning: output.hidden().clone(),
+            pooled: None,
+            attention_mask: Some(output.attention_mask().clone()),
+            conditioning_llama3: None,
+            clip_start_percent_bits: start_percent.to_bits(),
+            clip_end_percent_bits: end_percent.to_bits(),
+            hook_metadata_json: hook_metadata_json.to_vec(),
+        });
+    }
+    if matches!(
+        request,
+        NativeClipExecutionRequest::Qwen25 { .. } | NativeClipExecutionRequest::Gemma { .. }
+    ) {
+        return Err(ClipError::InvalidNativeResource(
+            "multimodal inputs cannot be routed to another CLIP profile".to_owned(),
+        ));
+    }
+    let prompt = request.prompt();
+    let mut encoded = Vec::new();
+    encoded
+        .try_reserve_exact(components.len())
+        .map_err(|_| ClipError::Allocation("native CLIP component outputs"))?;
+    for component in components {
+        let (hidden, pooled, attention_mask) =
+            execute_clip_text_component(profile, component, backend, prompt, context)?;
+        encoded.push(NativeClipComponentEncoding {
+            role: component.role,
+            hidden,
+            pooled,
+            attention_mask,
+        });
+    }
+    let (conditioning, pooled, attention_mask, conditioning_llama3) =
+        compose_native_clip_profile(profile, &encoded, backend, context)?;
+    Ok(NativeClipOutput {
+        conditioning,
+        pooled,
+        attention_mask,
+        conditioning_llama3,
+        clip_start_percent_bits: start_percent.to_bits(),
+        clip_end_percent_bits: end_percent.to_bits(),
+        hook_metadata_json: hook_metadata_json.to_vec(),
+    })
+}
+
+struct NativeClipComponentEncoding {
+    role: NativeClipComponentRole,
+    hidden: Tensor,
+    pooled: Option<Tensor>,
+    attention_mask: Option<Tensor>,
+}
+
+fn compose_native_clip_profile(
+    profile: NativeClipProfile,
+    encoded: &[NativeClipComponentEncoding],
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<(Tensor, Option<Tensor>, Option<Tensor>, Option<Tensor>), ClipError> {
+    let find = |role| encoded.iter().find(|component| component.role == role);
+    match profile {
+        NativeClipProfile::Sd1
+        | NativeClipProfile::PixArt
+        | NativeClipProfile::Lumina
+        | NativeClipProfile::Qwen
+        | NativeClipProfile::Gemma => {
+            let component = encoded.first().ok_or_else(|| {
+                ClipError::InvalidNativeResource("native CLIP component is missing".to_owned())
+            })?;
+            Ok((
+                component.hidden.clone(),
+                component.pooled.clone(),
+                component.attention_mask.clone(),
+                None,
+            ))
+        }
+        NativeClipProfile::Sdxl => {
+            let clip_l = find(NativeClipComponentRole::ClipL).ok_or_else(|| {
+                ClipError::InvalidNativeResource("SDXL CLIP-L output is missing".to_owned())
+            })?;
+            let clip_g = find(NativeClipComponentRole::ClipG).ok_or_else(|| {
+                ClipError::InvalidNativeResource("SDXL CLIP-G output is missing".to_owned())
+            })?;
+            let pooled = clip_g.pooled.clone().ok_or_else(|| {
+                ClipError::InvalidNativeResource(
+                    "SDXL projected CLIP-G pooled output is missing".to_owned(),
+                )
+            })?;
+            let output =
+                compose_source_sdxl(backend, &clip_l.hidden, &clip_g.hidden, &pooled, context)
+                    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+            Ok((
+                output.hidden,
+                Some(output.pooled),
+                None,
+                output.conditioning_llama3,
+            ))
+        }
+        NativeClipProfile::Sd3 => compose_sd3(encoded, backend, context),
+        NativeClipProfile::HiDream => {
+            let t5 = find(NativeClipComponentRole::T5);
+            let output = compose_source_hidream(
+                backend,
+                find(NativeClipComponentRole::ClipL)
+                    .and_then(|component| component.pooled.as_ref()),
+                find(NativeClipComponentRole::ClipG)
+                    .and_then(|component| component.pooled.as_ref()),
+                t5.map(|component| &component.hidden),
+                find(NativeClipComponentRole::Llama).map(|component| &component.hidden),
+                context,
+            )
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+            Ok((
+                output.hidden,
+                Some(output.pooled),
+                t5.and_then(|component| component.attention_mask.clone()),
+                output.conditioning_llama3,
+            ))
+        }
+    }
+}
+
+fn compose_sd3(
+    encoded: &[NativeClipComponentEncoding],
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<(Tensor, Option<Tensor>, Option<Tensor>, Option<Tensor>), ClipError> {
+    let clip_l = encoded
+        .iter()
+        .find(|component| component.role == NativeClipComponentRole::ClipL);
+    let clip_g = encoded
+        .iter()
+        .find(|component| component.role == NativeClipComponentRole::ClipG);
+    let t5 = encoded
+        .iter()
+        .find(|component| component.role == NativeClipComponentRole::T5);
+    let output = compose_source_sd3(
+        backend,
+        clip_l.and_then(|component| {
+            component
+                .pooled
+                .as_ref()
+                .map(|pooled| (&component.hidden, pooled))
+        }),
+        clip_g.and_then(|component| {
+            component
+                .pooled
+                .as_ref()
+                .map(|pooled| (&component.hidden, pooled))
+        }),
+        t5.map(|component| &component.hidden),
+        context,
+    )
+    .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+    Ok((
+        output.hidden,
+        Some(output.pooled),
+        t5.and_then(|component| component.attention_mask.clone()),
+        output.conditioning_llama3,
+    ))
+}
+
+fn execute_clip_text_component(
+    profile: NativeClipProfile,
+    component: &NativeClipComponent,
+    backend: &CpuBackend,
+    prompt: &str,
+    context: &ExecutionContext<'_>,
+) -> Result<(Tensor, Option<Tensor>, Option<Tensor>), ClipError> {
+    let tokenized = component
+        .tokenizer
+        .tokenize_with_options(prompt, component.options.tokenizer, context.cancellation)
+        .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+    let sections = tokenized.sections();
+    let tokens = sections
+        .iter()
+        .map(|section| section.tokens().len())
+        .max()
+        .ok_or_else(|| {
+            ClipError::InvalidNativeResource("CLIP tokenizer returned no sections".to_owned())
+        })?;
+    let hidden_width = component
+        .tokenizer
+        .configuration()
+        .embedding_width
+        .ok_or_else(|| {
+            ClipError::InvalidNativeResource("CLIP tokenizer has no embedding width".to_owned())
+        })?;
+    let has_weights = sections
+        .iter()
+        .any(|section| section.tokens().iter().any(|token| token.weight() != 1.0));
+    let rows = sections
+        .len()
+        .checked_add(usize::from(has_weights))
+        .ok_or(ClipError::Overflow("CLIP token rows"))?;
+    let mut token_values = Vec::new();
+    let mut section_weights = Vec::new();
+    let mut num_tokens = Vec::new();
+    let mut overrides = Vec::<(usize, usize, Arc<[f32]>)>::new();
+    for allocation in [
+        token_values.try_reserve_exact(rows),
+        section_weights.try_reserve_exact(sections.len()),
+        num_tokens.try_reserve_exact(rows),
+        overrides.try_reserve_exact(
+            sections
+                .len()
+                .checked_mul(tokens)
+                .ok_or(ClipError::Overflow("textual-inversion overrides"))?,
+        ),
+    ] {
+        allocation.map_err(|_| ClipError::Allocation("CLIP token projection"))?;
+    }
+    for (row, section) in sections.iter().enumerate() {
+        let mut values = Vec::new();
+        let mut weights = Vec::new();
+        values
+            .try_reserve_exact(tokens)
+            .map_err(|_| ClipError::Allocation("CLIP token row"))?;
+        weights
+            .try_reserve_exact(tokens)
+            .map_err(|_| ClipError::Allocation("CLIP token weights"))?;
+        for (position, token) in section.tokens().iter().enumerate() {
+            match token.value() {
+                NativeTokenValue::Token(value) => values.push(i64::from(*value)),
+                NativeTokenValue::Embedding {
+                    values: embedding, ..
+                } => {
+                    if embedding.len() != hidden_width {
+                        return Err(ClipError::InvalidNativeResource(
+                            "textual-inversion width differs from the encoder".to_owned(),
+                        ));
+                    }
+                    values.push(i64::from(component.tokenizer.configuration().pad_token));
+                    overrides.push((row, position, embedding.clone()));
+                }
+            }
+            weights.push(token.weight());
+        }
+        let pooled_count = component
+            .tokenizer
+            .configuration()
+            .end_token
+            .and_then(|end| {
+                section.tokens().iter().position(
+                    |token| matches!(token.value(), NativeTokenValue::Token(value) if *value == end),
+                )
+            })
+            .and_then(|position| position.checked_add(1))
+            .unwrap_or(section.tokens().len());
+        num_tokens.push(pooled_count);
+        values
+            .try_reserve_exact(tokens.saturating_sub(values.len()))
+            .map_err(|_| ClipError::Allocation("CLIP token padding"))?;
+        weights
+            .try_reserve_exact(tokens.saturating_sub(weights.len()))
+            .map_err(|_| ClipError::Allocation("CLIP weight padding"))?;
+        values.resize(
+            tokens,
+            i64::from(component.tokenizer.configuration().pad_token),
+        );
+        weights.resize(tokens, 1.0);
+        token_values.push(values);
+        section_weights.push(weights);
+    }
+    if has_weights {
+        let empty_end =
+            native_clip_empty_baseline_end(profile, component.tokenizer.configuration().end_token);
+        let empty_tokens = NativePromptTokenizer::empty_token_ids(
+            component.tokenizer.configuration().start_token,
+            empty_end,
+            component.tokenizer.configuration().pad_token,
+            tokens,
+        )
+        .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+        let mut projected_empty_tokens = Vec::new();
+        projected_empty_tokens
+            .try_reserve_exact(empty_tokens.len())
+            .map_err(|_| ClipError::Allocation("CLIP empty token row"))?;
+        projected_empty_tokens.extend(empty_tokens.into_iter().map(i64::from));
+        token_values.push(projected_empty_tokens);
+        let empty_token_count =
+            usize::from(component.tokenizer.configuration().start_token.is_some())
+                .checked_add(usize::from(empty_end.is_some()))
+                .ok_or(ClipError::Overflow("CLIP empty token count"))?;
+        num_tokens.push(if profile == NativeClipProfile::PixArt {
+            empty_token_count
+        } else {
+            empty_token_count.max(1)
+        });
+    }
+    let flattened_capacity = rows
+        .checked_mul(tokens)
+        .ok_or(ClipError::Overflow("CLIP flattened tokens"))?;
+    let mut flattened = Vec::new();
+    flattened
+        .try_reserve_exact(flattened_capacity)
+        .map_err(|_| ClipError::Allocation("CLIP flattened tokens"))?;
+    flattened.extend(token_values.iter().flatten().copied());
+    let token_tensor = tensor_from_i64_clip(
+        backend,
+        &[
+            u64::try_from(rows).map_err(|_| ClipError::Overflow("CLIP rows"))?,
+            u64::try_from(tokens).map_err(|_| ClipError::Overflow("CLIP tokens"))?,
+        ],
+        &flattened,
+        context,
+    )?;
+    let embeddings = match &component.encoder {
+        NativeClipEncoder::ClipText(owner) => {
+            owner.embed_tokens(backend, &token_tensor, context)?
+        }
+        NativeClipEncoder::Bidirectional(owner) => owner
+            .embed_tokens(backend, &token_tensor, context)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+        NativeClipEncoder::Decoder(owner) => owner
+            .embed_tokens(backend, &token_tensor, context)
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?,
+        NativeClipEncoder::Qwen25(_) | NativeClipEncoder::Gemma4(_) => {
+            return Err(ClipError::InvalidNativeResource(
+                "multimodal execution bypassed its checked request".to_owned(),
+            ));
+        }
+    };
+    let mut embedding_values = tensor_to_f32(backend, &embeddings, context)?;
+    for (row, position, replacement) in overrides {
+        let start = row
+            .checked_mul(tokens)
+            .and_then(|value| value.checked_add(position))
+            .and_then(|value| value.checked_mul(hidden_width))
+            .ok_or(ClipError::Overflow("textual-inversion offset"))?;
+        let end = start
+            .checked_add(hidden_width)
+            .ok_or(ClipError::Overflow("textual-inversion end"))?;
+        embedding_values
+            .get_mut(start..end)
+            .ok_or_else(|| {
+                ClipError::InvalidNativeResource("textual-inversion offset is invalid".to_owned())
+            })?
+            .copy_from_slice(&replacement);
+    }
+    let embeddings = tensor_from_f32(
+        backend,
+        &[
+            u64::try_from(rows).map_err(|_| ClipError::Overflow("CLIP rows"))?,
+            u64::try_from(tokens).map_err(|_| ClipError::Overflow("CLIP tokens"))?,
+            u64::try_from(hidden_width).map_err(|_| ClipError::Overflow("CLIP width"))?,
+        ],
+        &embedding_values,
+        context,
+    )?;
+    let mut mask_values = Vec::new();
+    mask_values
+        .try_reserve_exact(
+            rows.checked_mul(tokens)
+                .ok_or(ClipError::Overflow("CLIP attention mask"))?,
+        )
+        .map_err(|_| ClipError::Allocation("CLIP attention mask"))?;
+    for count in &num_tokens {
+        mask_values.extend((0..tokens).map(|position| i64::from(position < *count)));
+    }
+    let attention_mask = tensor_from_i64_clip(
+        backend,
+        &[
+            u64::try_from(rows).map_err(|_| ClipError::Overflow("CLIP mask rows"))?,
+            u64::try_from(tokens).map_err(|_| ClipError::Overflow("CLIP mask tokens"))?,
+        ],
+        &mask_values,
+        context,
+    )?;
+    let (hidden, pooled_tensor) = match &component.encoder {
+        NativeClipEncoder::ClipText(owner) => {
+            let intermediate = match component.options.layer {
+                NativeClipLayerSelection::Last => ClipTextIntermediate::None,
+                NativeClipLayerSelection::Hidden(layer) => ClipTextIntermediate::Layer(layer),
+                NativeClipLayerSelection::All => ClipTextIntermediate::All,
+            };
+            let output = owner.forward(
+                backend,
+                ClipTextRequest {
+                    input: ClipTextInput::Embeddings(&embeddings),
+                    attention_mask: component.options.attention_mask.then_some(&attention_mask),
+                    num_tokens: Some(&num_tokens),
+                    intermediate: intermediate.clone(),
+                    final_layer_norm_intermediate: component.options.final_layer_norm_intermediate,
+                    project_pooled: component.options.projected_pooled,
+                    zero_out_masked: component.options.zero_out_masked,
+                },
+                context,
+            )?;
+            let hidden = if matches!(intermediate, ClipTextIntermediate::None) {
+                output.last_hidden_state().clone()
+            } else {
+                output
+                    .intermediate()
+                    .ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "CLIP intermediate output is missing".to_owned(),
+                        )
+                    })?
+                    .clone()
+            };
+            let pooled = if component.options.projected_pooled {
+                output.projected_pooled().cloned()
+            } else {
+                Some(output.pooled().clone())
+            };
+            (hidden, pooled)
+        }
+        NativeClipEncoder::Bidirectional(owner) => {
+            let intermediate_layer = match component.options.layer {
+                NativeClipLayerSelection::Last => None,
+                NativeClipLayerSelection::Hidden(layer) => Some(layer),
+                NativeClipLayerSelection::All => {
+                    return Err(ClipError::InvalidNativeResource(
+                        "bidirectional text owner admits one selected layer".to_owned(),
+                    ));
+                }
+            };
+            let output = owner
+                .forward(
+                    backend,
+                    BidirectionalTextRequest {
+                        input: BidirectionalTextInput::Embeddings(&embeddings),
+                        attention_mask: component.options.attention_mask.then_some(&attention_mask),
+                        token_type_ids: None,
+                        intermediate_layer,
+                        final_norm_intermediate: component.options.final_layer_norm_intermediate,
+                        pooling: BidirectionalPooling::FirstToken,
+                        project_pooled: component.options.projected_pooled,
+                    },
+                    context,
+                )
+                .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+            let hidden = if intermediate_layer.is_some() {
+                output
+                    .intermediate()
+                    .ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "bidirectional intermediate output is missing".to_owned(),
+                        )
+                    })?
+                    .clone()
+            } else {
+                output.last_hidden_state().clone()
+            };
+            let pooled = if component.options.projected_pooled {
+                output.projected_pooled().cloned()
+            } else {
+                output.pooled().cloned()
+            };
+            (hidden, pooled)
+        }
+        NativeClipEncoder::Decoder(owner) => {
+            let capture_layer = match component.options.layer {
+                NativeClipLayerSelection::Last | NativeClipLayerSelection::All => None,
+                NativeClipLayerSelection::Hidden(layer) => Some(layer),
+            };
+            let mut positions = Vec::new();
+            positions
+                .try_reserve_exact(tokens)
+                .map_err(|_| ClipError::Allocation("CLIP decoder positions"))?;
+            positions.extend(0..tokens);
+            let request = DecoderPreparedTextRequest {
+                embeddings: &embeddings,
+                attention_mask: component.options.attention_mask.then_some(&attention_mask),
+                rope_positions: DecoderRopePositions::Scalar(&positions),
+                causal_positions: &positions,
+                cache: None,
+                capture_layer,
+                deepstack: None,
+                initial_input_ids: Some(&flattened),
+            };
+            let output = if component.options.layer == NativeClipLayerSelection::All {
+                owner.forward_prepared_all_layers(backend, request, context)
+            } else {
+                owner.forward_prepared(backend, request, context)
+            }
+            .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+            let hidden = match component.options.layer {
+                NativeClipLayerSelection::All => output
+                    .all_intermediate()
+                    .ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "decoder all-layer output is missing".to_owned(),
+                        )
+                    })?
+                    .clone(),
+                NativeClipLayerSelection::Hidden(_) => output
+                    .intermediate()
+                    .ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "decoder intermediate output is missing".to_owned(),
+                        )
+                    })?
+                    .clone(),
+                NativeClipLayerSelection::Last => output.last_hidden_state().clone(),
+            };
+            (hidden, None)
+        }
+        NativeClipEncoder::Qwen25(_) | NativeClipEncoder::Gemma4(_) => {
+            return Err(ClipError::InvalidNativeResource(
+                "multimodal execution bypassed its checked request".to_owned(),
+            ));
+        }
+    };
+    if component.options.layer == NativeClipLayerSelection::All {
+        let hidden = collapse_all_decoder_sections(
+            backend,
+            &hidden,
+            sections.len(),
+            tokens,
+            hidden_width,
+            &section_weights,
+            has_weights,
+            context,
+        )?;
+        let attention_mask = component
+            .options
+            .attention_mask
+            .then(|| {
+                collapse_clip_attention_mask(
+                    backend,
+                    &attention_mask,
+                    sections.len(),
+                    tokens,
+                    context,
+                )
+            })
+            .transpose()?;
+        return Ok((hidden, None, attention_mask));
+    }
+    let hidden_values = tensor_to_f32(backend, &hidden, context)?;
+    let row_values = tokens
+        .checked_mul(hidden_width)
+        .ok_or(ClipError::Overflow("CLIP hidden row"))?;
+    let mut encoded_sections = Vec::new();
+    encoded_sections
+        .try_reserve_exact(sections.len())
+        .map_err(|_| ClipError::Allocation("CLIP encoded sections"))?;
+    for values in hidden_values.chunks_exact(row_values).take(sections.len()) {
+        let mut section = Vec::new();
+        section
+            .try_reserve_exact(values.len())
+            .map_err(|_| ClipError::Allocation("CLIP encoded section"))?;
+        section.extend_from_slice(values);
+        encoded_sections.push(section);
+    }
+    if has_weights {
+        let empty = hidden_values
+            .get(
+                sections
+                    .len()
+                    .checked_mul(row_values)
+                    .ok_or(ClipError::Overflow("CLIP empty row"))?
+                    ..rows
+                        .checked_mul(row_values)
+                        .ok_or(ClipError::Overflow("CLIP empty end"))?,
+            )
+            .ok_or_else(|| {
+                ClipError::InvalidNativeResource("CLIP empty baseline is missing".to_owned())
+            })?;
+        encoded_sections = apply_empty_baseline_token_weights(
+            &encoded_sections,
+            empty,
+            &section_weights,
+            hidden_width,
+        )
+        .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?;
+    }
+    let conditioning_capacity = sections
+        .len()
+        .checked_mul(row_values)
+        .ok_or(ClipError::Overflow("CLIP conditioning values"))?;
+    let mut conditioning_values = Vec::new();
+    conditioning_values
+        .try_reserve_exact(conditioning_capacity)
+        .map_err(|_| ClipError::Allocation("CLIP conditioning values"))?;
+    conditioning_values.extend(encoded_sections.into_iter().flatten());
+    let conditioning = tensor_from_f32(
+        backend,
+        &[
+            1,
+            u64::try_from(
+                sections
+                    .len()
+                    .checked_mul(tokens)
+                    .ok_or(ClipError::Overflow("CLIP output tokens"))?,
+            )
+            .map_err(|_| ClipError::Overflow("CLIP output tokens"))?,
+            u64::try_from(hidden_width).map_err(|_| ClipError::Overflow("CLIP output width"))?,
+        ],
+        &conditioning_values,
+        context,
+    )?;
+    let pooled = pooled_tensor
+        .as_ref()
+        .map(|tensor| first_tensor_row(backend, tensor, context))
+        .transpose()?;
+    let attention_mask = component
+        .options
+        .attention_mask
+        .then(|| {
+            collapse_clip_attention_mask(backend, &attention_mask, sections.len(), tokens, context)
+        })
+        .transpose()?;
+    Ok((conditioning, pooled, attention_mask))
+}
+
+fn native_clip_empty_baseline_end(profile: NativeClipProfile, end: Option<u32>) -> Option<u32> {
+    (profile != NativeClipProfile::PixArt)
+        .then_some(end)
+        .flatten()
+}
+
+fn collapse_all_decoder_sections(
+    backend: &CpuBackend,
+    hidden: &Tensor,
+    sections: usize,
+    tokens: usize,
+    width: usize,
+    section_weights: &[Vec<f32>],
+    has_weights: bool,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ClipError> {
+    let shape = hidden.descriptor().shape();
+    let rows = sections
+        .checked_add(usize::from(has_weights))
+        .ok_or(ClipError::Overflow("decoder rows"))?;
+    if shape.len() != 4
+        || shape[0] != u64::try_from(rows).map_err(|_| ClipError::Overflow("decoder sections"))?
+        || shape[2] != u64::try_from(tokens).map_err(|_| ClipError::Overflow("decoder tokens"))?
+        || shape[3] != u64::try_from(width).map_err(|_| ClipError::Overflow("decoder width"))?
+    {
+        return Err(ClipError::InvalidNativeResource(
+            "decoder all-layer output shape changed".to_owned(),
+        ));
+    }
+    let layers = usize::try_from(shape[1]).map_err(|_| ClipError::Overflow("decoder layers"))?;
+    let mut source = tensor_to_f32(backend, hidden, context)?.to_vec();
+    let row = tokens
+        .checked_mul(width)
+        .ok_or(ClipError::Overflow("decoder layer row"))?;
+    let section_stride = layers
+        .checked_mul(row)
+        .ok_or(ClipError::Overflow("decoder section stride"))?;
+    if has_weights {
+        let empty_start = sections
+            .checked_mul(section_stride)
+            .ok_or(ClipError::Overflow("decoder empty baseline"))?;
+        for (section, weights) in section_weights.iter().enumerate() {
+            for layer in 0..layers {
+                let weight = *weights.get(layer).ok_or_else(|| {
+                    ClipError::InvalidNativeResource(
+                        "all-layer token weights do not cover every captured layer".to_owned(),
+                    )
+                })?;
+                let start = section
+                    .checked_mul(section_stride)
+                    .and_then(|value| value.checked_add(layer.checked_mul(row)?))
+                    .ok_or(ClipError::Overflow("decoder weighted layer"))?;
+                let empty = empty_start
+                    .checked_add(
+                        layer
+                            .checked_mul(row)
+                            .ok_or(ClipError::Overflow("decoder empty layer"))?,
+                    )
+                    .ok_or(ClipError::Overflow("decoder empty layer"))?;
+                for offset in 0..row {
+                    let baseline = *source.get(empty + offset).ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "decoder empty baseline is missing".to_owned(),
+                        )
+                    })?;
+                    let value = source.get_mut(start + offset).ok_or_else(|| {
+                        ClipError::InvalidNativeResource(
+                            "decoder weighted layer is missing".to_owned(),
+                        )
+                    })?;
+                    *value = (*value - baseline) * weight + baseline;
+                }
+            }
+        }
+    }
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(
+            sections
+                .checked_mul(section_stride)
+                .ok_or(ClipError::Overflow("decoder all-layer output"))?,
+        )
+        .map_err(|_| ClipError::Allocation("decoder all-layer output"))?;
+    for layer in 0..layers {
+        for section in 0..sections {
+            let start = section
+                .checked_mul(section_stride)
+                .and_then(|value| value.checked_add(layer.checked_mul(row)?))
+                .ok_or(ClipError::Overflow("decoder all-layer offset"))?;
+            values.extend_from_slice(source.get(start..start + row).ok_or_else(|| {
+                ClipError::InvalidNativeResource("decoder all-layer row is missing".to_owned())
+            })?);
+        }
+    }
+    Ok(tensor_from_f32(
+        backend,
+        &[
+            1,
+            shape[1],
+            u64::try_from(
+                sections
+                    .checked_mul(tokens)
+                    .ok_or(ClipError::Overflow("decoder output tokens"))?,
+            )
+            .map_err(|_| ClipError::Overflow("decoder output tokens"))?,
+            shape[3],
+        ],
+        &values,
+        context,
+    )?)
+}
+
+fn collapse_clip_attention_mask(
+    backend: &CpuBackend,
+    mask: &Tensor,
+    sections: usize,
+    tokens: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ClipError> {
+    let values = tensor_to_f32(backend, mask, context)?;
+    let retained = sections
+        .checked_mul(tokens)
+        .ok_or(ClipError::Overflow("CLIP attention mask"))?;
+    let values = values.get(..retained).ok_or_else(|| {
+        ClipError::InvalidNativeResource("CLIP attention mask omits source sections".to_owned())
+    })?;
+    Ok(tensor_from_f32(
+        backend,
+        &[
+            1,
+            u64::try_from(retained).map_err(|_| ClipError::Overflow("CLIP attention mask"))?,
+        ],
+        values,
+        context,
+    )?)
+}
+
+fn first_tensor_row(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ClipError> {
+    let shape = tensor.descriptor().shape();
+    if shape.len() != 2 || shape[0] == 0 {
+        return Err(ClipError::InvalidNativeResource(
+            "CLIP pooled tensor shape is invalid".to_owned(),
+        ));
+    }
+    let width = usize::try_from(shape[1]).map_err(|_| ClipError::Overflow("CLIP pooled width"))?;
+    let values = tensor_to_f32(backend, tensor, context)?;
+    let first = values
+        .get(..width)
+        .ok_or_else(|| ClipError::InvalidNativeResource("CLIP pooled row is missing".to_owned()))?;
+    Ok(tensor_from_f32(backend, &[1, shape[1]], first, context)?)
+}
+
+fn tensor_from_i64_clip(
+    backend: &CpuBackend,
+    shape: &[u64],
+    values: &[i64],
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, ClipError> {
+    let descriptor =
+        TensorDescriptor::contiguous(shape.to_vec(), DType::I64, DeviceId::CPU, context.stream)?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(
+            values
+                .len()
+                .checked_mul(mem::size_of::<i64>())
+                .ok_or(ClipError::Overflow("CLIP token bytes"))?,
+        )
+        .map_err(|_| ClipError::Allocation("CLIP token bytes"))?;
+    for value in values {
+        bytes.extend_from_slice(&value.to_ne_bytes());
+    }
+    let (tensor, _) = backend.upload_bytes(descriptor, &bytes, context)?;
+    Ok(tensor)
+}
+
+fn native_clip_profile_tag(profile: NativeClipProfile) -> u8 {
+    match profile {
+        NativeClipProfile::Sd1 => 0,
+        NativeClipProfile::Sdxl => 1,
+        NativeClipProfile::Sd3 => 2,
+        NativeClipProfile::PixArt => 3,
+        NativeClipProfile::Lumina => 4,
+        NativeClipProfile::HiDream => 5,
+        NativeClipProfile::Qwen => 6,
+        NativeClipProfile::Gemma => 7,
+    }
+}
+fn native_clip_role_tag(role: NativeClipComponentRole) -> u8 {
+    match role {
+        NativeClipComponentRole::ClipL => 0,
+        NativeClipComponentRole::ClipG => 1,
+        NativeClipComponentRole::T5 => 2,
+        NativeClipComponentRole::Llama => 3,
+        NativeClipComponentRole::Qwen => 4,
+        NativeClipComponentRole::Gemma => 5,
+    }
+}
+
+fn hash_clip_component_options(
+    hasher: &mut Sha256,
+    options: &NativeClipComponentOptions,
+) -> Result<(), ClipError> {
+    for value in [
+        options.tokenizer.minimum_length,
+        options.tokenizer.minimum_padding,
+    ] {
+        match value {
+            Some(value) => {
+                hasher.update([1]);
+                hasher.update(
+                    u64::try_from(value)
+                        .map_err(|_| ClipError::Overflow("CLIP option digest"))?
+                        .to_be_bytes(),
+                );
+            }
+            None => hasher.update([0]),
+        }
+    }
+    match options.tokenizer.disable_weights {
+        Some(value) => hasher.update([1, u8::from(value)]),
+        None => hasher.update([0]),
+    }
+    match &options.layer {
+        NativeClipLayerSelection::Last => hasher.update([0]),
+        NativeClipLayerSelection::Hidden(layer) => {
+            hasher.update([1]);
+            hasher.update(
+                i64::try_from(*layer)
+                    .map_err(|_| ClipError::Overflow("CLIP layer digest"))?
+                    .to_be_bytes(),
+            );
+        }
+        NativeClipLayerSelection::All => hasher.update([2]),
+    }
+    hasher.update([
+        u8::from(options.final_layer_norm_intermediate),
+        u8::from(options.projected_pooled),
+        u8::from(options.attention_mask),
+        u8::from(options.zero_out_masked),
+    ]);
+    Ok(())
+}
+
+fn hash_clip_bytes(hasher: &mut Sha256, bytes: &[u8]) -> Result<(), ClipError> {
+    hasher.update(
+        u64::try_from(bytes.len())
+            .map_err(|_| ClipError::Overflow("CLIP digest field"))?
+            .to_be_bytes(),
+    );
+    hasher.update(bytes);
+    Ok(())
+}
+
 #[derive(Debug, Error)]
 pub enum ClipError {
+    #[error("invalid native CLIP resource: {0}")]
+    InvalidNativeResource(String),
+    #[error("native CLIP owner failed: {0}")]
+    NativeResourceOwner(String),
     #[error("invalid tokenizer identity: {0}")]
     InvalidTokenizerIdentity(String),
     #[error("native tokenizer error: {0}")]
@@ -3807,6 +6225,8 @@ pub enum ClipError {
     NativeModule(#[from] NativeOpsError),
     #[error(transparent)]
     TextTransformer(#[from] ClipTextError),
+    #[error(transparent)]
+    PatchGraph(#[from] PatchGraphError),
 }
 
 fn validate_sha256(kind: &'static str, digest: &str) -> Result<(), ClipError> {
@@ -4375,8 +6795,10 @@ fn u64_from_usize(value: usize) -> Result<u64, ClipError> {
 mod tests {
     use super::*;
     use crate::{
-        ArtifactKey, ArtifactRoot, ModelClipTargetCandidateDescriptor, ModelParsedFacts,
-        ModelParsedTensorFact, ParserLimits,
+        ArtifactKey, ArtifactRoot, ClipBpeTokenizer, ModelClipTargetCandidateDescriptor,
+        ModelParsedFacts, ModelParsedTensorFact, NativeModelBackingKind, NativeModelPayload,
+        NativeTokenizerFamily, ParserLimits, PatchApplication, PatchKind, PatchOperation,
+        PatchTarget, TokenizerConfiguration,
     };
     use comfy_tensor::{CpuWorkspaceAuthority, StreamId};
     use comfy_types::DeviceKind;
@@ -5462,6 +7884,327 @@ mod tests {
             cancellation,
         };
         Ok(tensor_from_f32(backend, shape, &values, &context)?)
+    }
+
+    fn mapped_clip_text_weights(digest: &str, weights: &ClipTextWeights) -> MappedModelWeights {
+        let mut tensors = BTreeMap::from([
+            (
+                "token_embedding.weight".to_owned(),
+                weights.token_embedding.clone(),
+            ),
+            (
+                "position_embedding.weight".to_owned(),
+                weights.position_embedding.clone(),
+            ),
+            (
+                "final_layer_norm.weight".to_owned(),
+                weights.final_layer_norm_weight.clone(),
+            ),
+            (
+                "final_layer_norm.bias".to_owned(),
+                weights.final_layer_norm_bias.clone(),
+            ),
+        ]);
+        for (index, layer) in weights.layers.iter().enumerate() {
+            let prefix = format!("layers.{index}");
+            for (name, tensor) in [
+                ("layer_norm_1.weight", &layer.layer_norm_1_weight),
+                ("layer_norm_1.bias", &layer.layer_norm_1_bias),
+                ("query.weight", &layer.query_weight),
+                ("query.bias", &layer.query_bias),
+                ("key.weight", &layer.key_weight),
+                ("key.bias", &layer.key_bias),
+                ("value.weight", &layer.value_weight),
+                ("value.bias", &layer.value_bias),
+                ("output.weight", &layer.output_weight),
+                ("output.bias", &layer.output_bias),
+                ("layer_norm_2.weight", &layer.layer_norm_2_weight),
+                ("layer_norm_2.bias", &layer.layer_norm_2_bias),
+                ("feed_forward_1.weight", &layer.feed_forward_1_weight),
+                ("feed_forward_1.bias", &layer.feed_forward_1_bias),
+                ("feed_forward_2.weight", &layer.feed_forward_2_weight),
+                ("feed_forward_2.bias", &layer.feed_forward_2_bias),
+            ] {
+                tensors.insert(format!("{prefix}.{name}"), tensor.clone());
+            }
+        }
+        MappedModelWeights::from_parts(digest.to_owned(), tensors, Vec::new())
+    }
+
+    fn native_sd1_resource_fixture(
+        schedule_enabled: bool,
+        schedule: Vec<NativeClipScheduleSpec>,
+    ) -> Result<
+        (
+            NativeClipResource,
+            CpuBackend,
+            CpuWorkspaceAuthority,
+            CancellationToken,
+        ),
+        Box<dyn std::error::Error>,
+    > {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(64 * 1024 * 1024)?;
+        let mut embeddings = vec![0.0; SD1_VOCABULARY_SIZE * 2];
+        for (index, values) in embeddings.chunks_exact_mut(2).enumerate() {
+            let value = (index % 97) as f32 / 97.0;
+            values.copy_from_slice(&[value, 1.0 - value]);
+        }
+        let weights = ClipTextWeights {
+            token_embedding: tensor(
+                &backend,
+                &authority,
+                &[SD1_VOCABULARY_SIZE as u64, 2],
+                embeddings,
+                &cancellation,
+            )?,
+            position_embedding: tensor(
+                &backend,
+                &authority,
+                &[SD1_CONTEXT_LENGTH as u64, 2],
+                vec![0.0; SD1_CONTEXT_LENGTH * 2],
+                &cancellation,
+            )?,
+            layers: vec![layer(&backend, &authority, &cancellation)?],
+            final_layer_norm_weight: tensor(
+                &backend,
+                &authority,
+                &[2],
+                vec![1.0, 1.0],
+                &cancellation,
+            )?,
+            final_layer_norm_bias: tensor(
+                &backend,
+                &authority,
+                &[2],
+                vec![0.0, 0.0],
+                &cancellation,
+            )?,
+        };
+        let configuration = ClipTextConfiguration {
+            dtype: DType::F32,
+            device: DeviceId::CPU,
+            vocabulary_size: SD1_VOCABULARY_SIZE,
+            max_position_embeddings: SD1_CONTEXT_LENGTH,
+            hidden_size: 2,
+            intermediate_size: 4,
+            attention_heads: 1,
+            layer_count: 1,
+            eos_token_id: SD1_END_TOKEN,
+            activation: ClipTextActivation::QuickGelu,
+            projection_dimension: None,
+        };
+        let template = NativeClipText::new(configuration, weights.clone(), None)?;
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .ok_or("workspace root is unavailable")?;
+        let fixture = root.join("crates/comfy_test_support/fixtures/models/sd15-tiny-v1");
+        let tokenizer = NativePromptTokenizer::checked(
+            NativeTokenizerFamily::ClipBpe(ClipBpeTokenizer::from_json_and_merges(
+                ModelTokenizerDescriptor::checked("comfy.sd1.tokenizer")?,
+                &fs::read_to_string(fixture.join("vocab.json"))?,
+                &fs::read_to_string(fixture.join("merges.txt"))?,
+            )?),
+            TokenizerConfiguration {
+                maximum_length: SD1_CONTEXT_LENGTH,
+                minimum_length: None,
+                minimum_padding: None,
+                pad_to_maximum_length: true,
+                pad_left: false,
+                start_token: Some(SD1_START_TOKEN),
+                end_token: Some(SD1_END_TOKEN),
+                pad_token: SD1_END_TOKEN,
+                maximum_word_length: 8,
+                disable_weights: false,
+                embedding_width: Some(2),
+            },
+            BTreeMap::new(),
+        )?;
+        let digest = "a".repeat(64);
+        let component = NativeClipComponent::checked_clip_text(
+            NativeClipComponentRole::ClipL,
+            Arc::new(mapped_clip_text_weights(&digest, &weights)),
+            Arc::new(tokenizer),
+            &template,
+            NativeClipComponentOptions::checked_source(
+                NativeTokenizerInvocationOptions::default(),
+                NativeClipLayerSelection::Last,
+                true,
+                false,
+                false,
+                false,
+            )?,
+            &cancellation,
+        )?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(32 * 1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let resource = NativeClipResource::checked(
+            NativeClipProfile::Sd1,
+            schedule_enabled,
+            vec![Arc::new(component)],
+            schedule,
+            &backend,
+            &context,
+        )?;
+        Ok((resource, backend, authority, cancellation))
+    }
+
+    #[test]
+    fn native_sd1_schedule_applies_patch_before_each_owner_encode()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let digest = "a".repeat(64);
+        let patch = PatchGraph::checked(
+            digest,
+            vec![PatchOperation {
+                identifier: "scheduled-final-norm".to_owned(),
+                kind: PatchKind::DenseDiff,
+                scale: 1.0,
+                targets: vec![PatchTarget {
+                    key: "final_layer_norm.bias".to_owned(),
+                    expected_shape: vec![2],
+                    values: vec![0.25, -0.25],
+                    application: PatchApplication::Add,
+                }],
+            }],
+        )?;
+        let window = NativeClipScheduleSpec::checked(
+            0.0,
+            1.0,
+            br#"{"hook":"fixture"}"#.to_vec(),
+            vec![Some(patch)],
+        )?;
+        let (scheduled, backend, authority, cancellation) =
+            native_sd1_resource_fixture(true, vec![window])?;
+        let (base, _, _, _) = native_sd1_resource_fixture(false, Vec::new())?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(32 * 1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let scheduled_outputs = scheduled.execute(&backend, "a test", &context)?;
+        let base_outputs = base.execute(&backend, "a test", &context)?;
+        assert_eq!(scheduled_outputs.len(), 1);
+        assert_eq!(scheduled_outputs[0].clip_start_percent(), 0.0);
+        assert_eq!(scheduled_outputs[0].clip_end_percent(), 1.0);
+        assert_eq!(
+            scheduled_outputs[0].hook_metadata_json(),
+            br#"{"hook":"fixture"}"#
+        );
+        let scheduled_values =
+            tensor_to_f32(&backend, scheduled_outputs[0].conditioning(), &context)?;
+        let base_values = tensor_to_f32(&backend, base_outputs[0].conditioning(), &context)?;
+        assert!(
+            scheduled_values
+                .iter()
+                .zip(base_values.iter())
+                .any(|(scheduled, base)| scheduled.to_bits() != base.to_bits())
+        );
+        scheduled.validate(&cancellation)?;
+        assert!(scheduled.resident_bytes()? > base.resident_bytes()?);
+        let restarted = scheduled.restart(&backend, &context)?;
+        assert_eq!(
+            restarted.semantic_digest_sha256(),
+            scheduled.semantic_digest_sha256()
+        );
+        assert!(!Arc::ptr_eq(
+            &restarted.components()[0],
+            &scheduled.components()[0]
+        ));
+        let restarted_outputs = restarted.execute(&backend, "a test", &context)?;
+        assert_eq!(restarted_outputs.len(), scheduled_outputs.len());
+        assert_eq!(
+            &*tensor_to_f32(&backend, restarted_outputs[0].conditioning(), &context)?,
+            &*scheduled_values
+        );
+        let resident_kinds = scheduled
+            .resident_owned_allocations()?
+            .into_iter()
+            .map(|allocation| allocation.kind())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(resident_kinds.len(), 5);
+        let payload = NativeModelPayload::native_clip(Arc::new(scheduled))?;
+        let payload_parts = payload.resident_parts()?;
+        assert_eq!(payload_parts.resident_bytes()?, payload.resident_bytes());
+        let backing_kinds = payload_parts
+            .backing_allocations()
+            .iter()
+            .map(|allocation| allocation.kind())
+            .collect::<BTreeSet<_>>();
+        assert!(backing_kinds.contains(&NativeModelBackingKind::NativeClipResource));
+        assert!(backing_kinds.contains(&NativeModelBackingKind::NativeClipComponent));
+        assert!(backing_kinds.contains(&NativeModelBackingKind::NativeClipTokenizer));
+        assert!(backing_kinds.contains(&NativeModelBackingKind::NativeClipEncoder));
+        assert!(backing_kinds.contains(&NativeModelBackingKind::NativeClipMappedWeights));
+        Ok(())
+    }
+
+    #[test]
+    fn native_clip_profile_contract_rejects_source_option_drift()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (resource, backend, authority, cancellation) =
+            native_sd1_resource_fixture(false, Vec::new())?;
+        let mut component = resource.components()[0].as_ref().clone();
+        component.options.final_layer_norm_intermediate = false;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(32 * 1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        assert!(matches!(
+            NativeClipResource::checked(
+                NativeClipProfile::Sd1,
+                false,
+                vec![Arc::new(component)],
+                Vec::new(),
+                &backend,
+                &context,
+            ),
+            Err(ClipError::InvalidNativeResource(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn native_pixart_empty_baseline_is_pad_only_and_weighted_masks_exclude_it()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let pad_token = 9_u32;
+        let empty_tokens = NativePromptTokenizer::empty_token_ids(
+            None,
+            native_clip_empty_baseline_end(NativeClipProfile::PixArt, Some(1)),
+            pad_token,
+            4,
+        )?;
+        assert_eq!(empty_tokens, vec![pad_token; 4]);
+
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024)?;
+        let mask = tensor(
+            &backend,
+            &authority,
+            &[3, 4],
+            vec![1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 9.0, 9.0, 9.0, 9.0],
+            &cancellation,
+        )?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let collapsed = collapse_clip_attention_mask(&backend, &mask, 2, 4, &context)?;
+        assert_eq!(collapsed.descriptor().shape(), [1, 8]);
+        assert_eq!(
+            &*tensor_to_f32(&backend, &collapsed, &context)?,
+            &[1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+        );
+        Ok(())
     }
 
     #[test]

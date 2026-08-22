@@ -6,9 +6,10 @@ use crate::{
     run_decoder_text_owner,
 };
 use comfy_tensor::{
-    CpuBackend, DecodedScalar, DeviceId, ExecutionContext, RngError, RngTransaction, Tensor,
-    TensorError,
+    CpuBackend, CpuWorkspaceVec, DecodedScalar, DeviceId, ExecutionContext, RngError,
+    RngTransaction, Tensor, TensorError,
     generated_indexing_masking_01::{IndexingMaskingPartOneError, narrow_method_exact_native},
+    generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32},
     generated_shape_layout_transform_02::{
         ShapeLayoutTransformPartTwoError, torch_cat_with_context_exact_native,
     },
@@ -1584,10 +1585,19 @@ pub struct CompositeConditioningOutput {
     pub pooled: Option<Tensor>,
 }
 
+#[derive(Clone, Debug)]
+pub struct SourceClipCompositionOutput {
+    pub hidden: Tensor,
+    pub pooled: Tensor,
+    pub conditioning_llama3: Option<Tensor>,
+}
+
 #[derive(Debug, Error)]
 pub enum CompositeTextEncoderError {
     #[error(transparent)]
     Tensor(#[from] TensorError),
+    #[error(transparent)]
+    NativeTensor(#[from] NativeDiffusionTensorError),
     #[error(transparent)]
     Shape(#[from] ShapeLayoutTransformPartTwoError),
     #[error(transparent)]
@@ -1604,6 +1614,231 @@ pub enum CompositeTextEncoderError {
     Overflow(&'static str),
     #[error("composite text-encoder execution was cancelled")]
     Cancelled,
+}
+
+pub fn compose_source_sdxl(
+    backend: &CpuBackend,
+    clip_l: &Tensor,
+    clip_g: &Tensor,
+    projected_clip_g_pooled: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<SourceClipCompositionOutput, CompositeTextEncoderError> {
+    let hidden = concatenate_source_clip_hidden(backend, clip_l, clip_g, context)?;
+    require_pooled_width(projected_clip_g_pooled, None)?;
+    Ok(SourceClipCompositionOutput {
+        hidden,
+        pooled: projected_clip_g_pooled.clone(),
+        conditioning_llama3: None,
+    })
+}
+
+pub fn compose_source_sd3(
+    backend: &CpuBackend,
+    clip_l: Option<(&Tensor, &Tensor)>,
+    clip_g: Option<(&Tensor, &Tensor)>,
+    t5: Option<&Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<SourceClipCompositionOutput, CompositeTextEncoderError> {
+    let lg = match (clip_l, clip_g) {
+        (Some((left, _)), Some((right, _))) => Some(concatenate_source_clip_hidden(
+            backend, left, right, context,
+        )?),
+        (Some((left, _)), None) => Some(pad_source_features(backend, left, 0, 1_280, context)?),
+        (None, Some((right, _))) => Some(pad_source_features(backend, right, 768, 0, context)?),
+        (None, None) => None,
+    };
+    let hidden = match (lg, t5) {
+        (Some(lg), Some(t5)) => {
+            let lg = pad_source_features(backend, &lg, 0, 2_048, context)?;
+            require_hidden_width(t5, 4_096)?;
+            torch_cat_with_context_exact_native(backend, &[lg, t5.clone()], -2, context)?
+        }
+        (Some(lg), None) => pad_source_features(backend, &lg, 0, 2_048, context)?,
+        (None, Some(t5)) => {
+            require_hidden_width(t5, 4_096)?;
+            t5.clone()
+        }
+        (None, None) => zero_source_tensor(backend, &[1, 77, 4_096], context)?,
+    };
+    let pooled_l = match clip_l {
+        Some((_, pooled)) => {
+            require_pooled_width(pooled, Some(768))?;
+            pooled.clone()
+        }
+        None => zero_source_tensor(backend, &[1, 768], context)?,
+    };
+    let pooled_g = match clip_g {
+        Some((_, pooled)) => {
+            require_pooled_width(pooled, Some(1_280))?;
+            pooled.clone()
+        }
+        None => zero_source_tensor(backend, &[1, 1_280], context)?,
+    };
+    let pooled = torch_cat_with_context_exact_native(backend, &[pooled_l, pooled_g], -1, context)?;
+    Ok(SourceClipCompositionOutput {
+        hidden,
+        pooled,
+        conditioning_llama3: None,
+    })
+}
+
+pub fn compose_source_hidream(
+    backend: &CpuBackend,
+    clip_l_pooled: Option<&Tensor>,
+    clip_g_pooled: Option<&Tensor>,
+    t5: Option<&Tensor>,
+    llama_all_layers: Option<&Tensor>,
+    context: &ExecutionContext<'_>,
+) -> Result<SourceClipCompositionOutput, CompositeTextEncoderError> {
+    let hidden = match t5 {
+        Some(t5) => {
+            require_hidden_width(t5, 4_096)?;
+            t5.clone()
+        }
+        None => zero_source_tensor(backend, &[1, 128, 4_096], context)?,
+    };
+    let pooled_l = match clip_l_pooled {
+        Some(pooled) => {
+            require_pooled_width(pooled, Some(768))?;
+            pooled.clone()
+        }
+        None => zero_source_tensor(backend, &[1, 768], context)?,
+    };
+    let pooled_g = match clip_g_pooled {
+        Some(pooled) => {
+            require_pooled_width(pooled, Some(1_280))?;
+            pooled.clone()
+        }
+        None => zero_source_tensor(backend, &[1, 1_280], context)?,
+    };
+    let pooled = torch_cat_with_context_exact_native(backend, &[pooled_l, pooled_g], -1, context)?;
+    let conditioning_llama3 = match llama_all_layers {
+        Some(llama) => {
+            let shape = llama.descriptor().shape();
+            if shape.len() != 4 || shape[0] != 1 || shape[1] < 2 || shape[3] != 4_096 {
+                return Err(CompositeTextEncoderError::InvalidInput(
+                    "HiDream Llama all-layer output must be [1, layers+1, tokens, 4096]",
+                ));
+            }
+            narrow_method_exact_native(llama, 1, 1, shape[1] - 1, context.cancellation)?
+        }
+        None => zero_source_tensor(backend, &[1, 32, 1, 4_096], context)?,
+    };
+    Ok(SourceClipCompositionOutput {
+        hidden,
+        pooled,
+        conditioning_llama3: Some(conditioning_llama3),
+    })
+}
+
+fn concatenate_source_clip_hidden(
+    backend: &CpuBackend,
+    left: &Tensor,
+    right: &Tensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, CompositeTextEncoderError> {
+    let left_shape = require_rank_three_hidden(left)?;
+    let right_shape = require_rank_three_hidden(right)?;
+    if left_shape[0] != right_shape[0] {
+        return Err(CompositeTextEncoderError::InvalidInput(
+            "CLIP hidden batches differ",
+        ));
+    }
+    let tokens = left_shape[1].min(right_shape[1]);
+    let left = narrow_method_exact_native(left, 1, 0, tokens, context.cancellation)?;
+    let right = narrow_method_exact_native(right, 1, 0, tokens, context.cancellation)?;
+    Ok(torch_cat_with_context_exact_native(
+        backend,
+        &[left, right],
+        -1,
+        context,
+    )?)
+}
+
+fn pad_source_features(
+    backend: &CpuBackend,
+    tensor: &Tensor,
+    left: u64,
+    right: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, CompositeTextEncoderError> {
+    require_rank_three_hidden(tensor)?;
+    if left == 0 && right == 0 {
+        return Ok(tensor.clone());
+    }
+    Ok(functional_pad_with_context_exact_native(
+        backend,
+        tensor,
+        &[
+            i64::try_from(left)
+                .map_err(|_| CompositeTextEncoderError::Overflow("CLIP left padding"))?,
+            i64::try_from(right)
+                .map_err(|_| CompositeTextEncoderError::Overflow("CLIP right padding"))?,
+        ],
+        FunctionalPadMode::Constant,
+        Some(DecodedScalar::Signed(0)),
+        context,
+    )?)
+}
+
+fn zero_source_tensor(
+    backend: &CpuBackend,
+    shape: &[u64],
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, CompositeTextEncoderError> {
+    let elements = shape.iter().try_fold(1_usize, |elements, dimension| {
+        elements
+            .checked_mul(
+                usize::try_from(*dimension)
+                    .map_err(|_| CompositeTextEncoderError::Overflow("zero tensor shape"))?,
+            )
+            .ok_or(CompositeTextEncoderError::Overflow("zero tensor elements"))
+    })?;
+    context.check()?;
+    let mut values: CpuWorkspaceVec<f32> = backend.workspace_vec(context, elements)?;
+    for index in 0..elements {
+        if index.is_multiple_of(4_096) {
+            context.check()?;
+        }
+        values.try_push(0.0)?;
+    }
+    Ok(tensor_from_f32(backend, shape, &values, context)?)
+}
+
+fn require_rank_three_hidden(tensor: &Tensor) -> Result<&[u64], CompositeTextEncoderError> {
+    let shape = tensor.descriptor().shape();
+    if shape.len() != 3 || shape[0] == 0 || shape[1] == 0 || shape[2] == 0 {
+        return Err(CompositeTextEncoderError::InvalidInput(
+            "CLIP hidden tensor must be nonempty rank three",
+        ));
+    }
+    Ok(shape)
+}
+
+fn require_hidden_width(tensor: &Tensor, width: u64) -> Result<(), CompositeTextEncoderError> {
+    if require_rank_three_hidden(tensor)?[2] != width {
+        return Err(CompositeTextEncoderError::InvalidInput(
+            "CLIP hidden feature width is invalid",
+        ));
+    }
+    Ok(())
+}
+
+fn require_pooled_width(
+    tensor: &Tensor,
+    width: Option<u64>,
+) -> Result<(), CompositeTextEncoderError> {
+    let shape = tensor.descriptor().shape();
+    if shape.len() != 2
+        || shape[0] != 1
+        || shape[1] == 0
+        || width.is_some_and(|width| shape[1] != width)
+    {
+        return Err(CompositeTextEncoderError::InvalidInput(
+            "CLIP pooled tensor shape is invalid",
+        ));
+    }
+    Ok(())
 }
 
 impl From<comfy_types::CancellationError> for CompositeTextEncoderError {
@@ -2442,4 +2677,113 @@ pub fn generate_audio_codes(
     context.cancellation.check()?;
     *transaction = working;
     Ok(output)
+}
+
+#[cfg(test)]
+mod source_clip_composition_tests {
+    use super::*;
+    use comfy_tensor::generated_native_diffusion::tensor_to_f32;
+    use comfy_tensor::{CancellationToken, CpuWorkspaceAuthority, StreamId};
+
+    fn tensor(
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+        shape: &[u64],
+        value: f32,
+    ) -> Result<Tensor, Box<dyn std::error::Error>> {
+        let elements = shape.iter().try_fold(1_usize, |total, dimension| {
+            total.checked_mul(usize::try_from(*dimension).ok()?)
+        });
+        let elements = elements.ok_or("test tensor shape overflowed")?;
+        Ok(tensor_from_f32(
+            backend,
+            shape,
+            &vec![value; elements],
+            context,
+        )?)
+    }
+
+    #[test]
+    fn source_sdxl_truncates_tokens_and_concatenates_l_before_g()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(8 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(8 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let clip_l = tensor(&backend, &context, &[1, 3, 2], 1.0)?;
+        let clip_g = tensor(&backend, &context, &[1, 2, 3], 2.0)?;
+        let pooled = tensor(&backend, &context, &[1, 3], 4.0)?;
+        let output = compose_source_sdxl(&backend, &clip_l, &clip_g, &pooled, &context)?;
+        assert_eq!(output.hidden.descriptor().shape(), &[1, 2, 5]);
+        let hidden = tensor_to_f32(&backend, &output.hidden, &context)?;
+        assert_eq!(
+            &*hidden,
+            &[1.0, 1.0, 2.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0, 2.0]
+        );
+        assert_eq!(output.pooled.descriptor().shape(), &[1, 3]);
+        Ok(())
+    }
+
+    #[test]
+    fn source_sd3_preserves_missing_role_offsets_and_zero_fallbacks()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(16 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(16 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let clip_g = tensor(&backend, &context, &[1, 2, 1_280], 2.0)?;
+        let pooled_g = tensor(&backend, &context, &[1, 1_280], 3.0)?;
+        let g_only =
+            compose_source_sd3(&backend, None, Some((&clip_g, &pooled_g)), None, &context)?;
+        assert_eq!(g_only.hidden.descriptor().shape(), &[1, 2, 4_096]);
+        let hidden = tensor_to_f32(&backend, &g_only.hidden, &context)?;
+        assert!(hidden[..768].iter().all(|value| *value == 0.0));
+        assert!(hidden[768..2_048].iter().all(|value| *value == 2.0));
+        assert_eq!(g_only.pooled.descriptor().shape(), &[1, 2_048]);
+
+        let t5 = tensor(&backend, &context, &[1, 4, 4_096], 5.0)?;
+        let t5_only = compose_source_sd3(&backend, None, None, Some(&t5), &context)?;
+        assert_eq!(t5_only.hidden.descriptor().shape(), &[1, 4, 4_096]);
+        assert!(
+            tensor_to_f32(&backend, &t5_only.pooled, &context)?
+                .iter()
+                .all(|value| *value == 0.0)
+        );
+
+        let empty = compose_source_sd3(&backend, None, None, None, &context)?;
+        assert_eq!(empty.hidden.descriptor().shape(), &[1, 77, 4_096]);
+        assert_eq!(empty.pooled.descriptor().shape(), &[1, 2_048]);
+        Ok(())
+    }
+
+    #[test]
+    fn source_hidream_trims_the_pre_layer_capture_axis() -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(16 * 1024 * 1024)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(16 * 1024 * 1024)?,
+            &cancellation,
+        );
+        let llama = tensor(&backend, &context, &[1, 3, 1, 4_096], 7.0)?;
+        let output = compose_source_hidream(&backend, None, None, None, Some(&llama), &context)?;
+        assert_eq!(output.hidden.descriptor().shape(), &[1, 128, 4_096]);
+        assert_eq!(output.pooled.descriptor().shape(), &[1, 2_048]);
+        assert_eq!(
+            output
+                .conditioning_llama3
+                .as_ref()
+                .ok_or("missing Llama conditioning")?
+                .descriptor()
+                .shape(),
+            &[1, 2, 1, 4_096]
+        );
+        Ok(())
+    }
 }

@@ -1,18 +1,20 @@
 use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
-    AttentionRequest, EmbeddingOptions, GeluApproximation, NativeExecutionRequirements,
-    NativeModule, NativeOpsError, NativePromptTokenizer, NativeTokenizedPrompt,
-    scaled_dot_product_attention_with_context,
+    AttentionRequest, EmbeddingOptions, GeluApproximation, MappedModelWeights,
+    NativeExecutionRequirements, NativeModule, NativeOpsError, NativePromptTokenizer,
+    NativeTokenizedPrompt, scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
-    BinaryOperation, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Layout,
-    LinearAlgebraOperation, OperationSupport, ReductionOperation, StreamId, Tensor, TensorError,
-    UnaryOperation,
+    BinaryOperation, CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId,
+    ExecutionContext, Layout, LinearAlgebraOperation, OperationSupport, ReductionOperation,
+    StorageId, StreamId, Tensor, TensorError, UnaryOperation,
     generated_activation_normalization_functional_01::{
         FunctionalError, rms_norm_with_context_exact_native,
     },
     generated_native_diffusion::{NativeDiffusionTensorError, add, tensor_from_f32, tensor_to_f32},
 };
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeSet, mem};
 use thiserror::Error;
 
 pub const T5_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/t5.py";
@@ -46,6 +48,19 @@ pub const T5_BIDIRECTIONAL_CATALOG_SYMBOLS: [&str; 19] = [
     "T5Stack",
     "T5",
 ];
+
+fn hash_bidirectional_bytes(
+    hasher: &mut Sha256,
+    bytes: &[u8],
+) -> Result<(), BidirectionalTextError> {
+    hasher.update(
+        u64::try_from(bytes.len())
+            .map_err(|_| BidirectionalTextError::Overflow("bidirectional digest field"))?
+            .to_be_bytes(),
+    );
+    hasher.update(bytes);
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BidirectionalTextArchitecture {
@@ -433,6 +448,393 @@ impl NativeT5TextEncoder {
         &self.configuration
     }
 
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, BidirectionalTextError> {
+        cancellation.check().map_err(TensorError::from)?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(BidirectionalTextError::InvalidConfiguration(
+                "bidirectional mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut consumed = BTreeSet::new();
+        let required = |name: &str,
+                        consumed: &mut BTreeSet<String>|
+         -> Result<Tensor, BidirectionalTextError> {
+            let tensor = mapped.tensors().get(name).cloned().ok_or(
+                BidirectionalTextError::InvalidConfiguration(
+                    "bidirectional mapped weight is missing",
+                ),
+            )?;
+            consumed.insert(name.to_owned());
+            Ok(tensor)
+        };
+        let optional = |name: &str,
+                        present: bool,
+                        consumed: &mut BTreeSet<String>|
+         -> Result<Option<Tensor>, BidirectionalTextError> {
+            if present {
+                required(name, consumed).map(Some)
+            } else {
+                Ok(None)
+            }
+        };
+        let mut layers = Vec::new();
+        layers.try_reserve_exact(self.layers.len()).map_err(|_| {
+            BidirectionalTextError::Allocation("reconstructed bidirectional layers")
+        })?;
+        for (index, layer) in self.layers.iter().enumerate() {
+            cancellation.check().map_err(TensorError::from)?;
+            let prefix = format!("layers.{index}");
+            let attention_layer_norm = matches!(layer.attention_norm, NativeNorm::Layer(_));
+            let feed_forward_layer_norm = matches!(layer.feed_forward_norm, NativeNorm::Layer(_));
+            let (_, query_bias) = layer.query.dense_parameters()?;
+            let (_, key_bias) = layer.key.dense_parameters()?;
+            let (_, value_bias) = layer.value.dense_parameters()?;
+            let (_, attention_output_bias) = layer.attention_output.dense_parameters()?;
+            let (_, feed_forward_input_bias) = layer.feed_forward_input.dense_parameters()?;
+            let (_, feed_forward_output_bias) = layer.feed_forward_output.dense_parameters()?;
+            let gate_bias = layer
+                .feed_forward_gate
+                .as_ref()
+                .map(NativeModule::dense_parameters)
+                .transpose()?
+                .and_then(|(_, bias)| bias);
+            layers.push(BidirectionalLayerWeights {
+                attention_norm_weight: required(
+                    &format!("{prefix}.attention_norm.weight"),
+                    &mut consumed,
+                )?,
+                attention_norm_bias: optional(
+                    &format!("{prefix}.attention_norm.bias"),
+                    attention_layer_norm,
+                    &mut consumed,
+                )?,
+                query_weight: required(&format!("{prefix}.query.weight"), &mut consumed)?,
+                query_bias: optional(
+                    &format!("{prefix}.query.bias"),
+                    query_bias.is_some(),
+                    &mut consumed,
+                )?,
+                key_weight: required(&format!("{prefix}.key.weight"), &mut consumed)?,
+                key_bias: optional(
+                    &format!("{prefix}.key.bias"),
+                    key_bias.is_some(),
+                    &mut consumed,
+                )?,
+                value_weight: required(&format!("{prefix}.value.weight"), &mut consumed)?,
+                value_bias: optional(
+                    &format!("{prefix}.value.bias"),
+                    value_bias.is_some(),
+                    &mut consumed,
+                )?,
+                attention_output_weight: required(
+                    &format!("{prefix}.attention_output.weight"),
+                    &mut consumed,
+                )?,
+                attention_output_bias: optional(
+                    &format!("{prefix}.attention_output.bias"),
+                    attention_output_bias.is_some(),
+                    &mut consumed,
+                )?,
+                feed_forward_norm_weight: required(
+                    &format!("{prefix}.feed_forward_norm.weight"),
+                    &mut consumed,
+                )?,
+                feed_forward_norm_bias: optional(
+                    &format!("{prefix}.feed_forward_norm.bias"),
+                    feed_forward_layer_norm,
+                    &mut consumed,
+                )?,
+                feed_forward_input_weight: required(
+                    &format!("{prefix}.feed_forward_input.weight"),
+                    &mut consumed,
+                )?,
+                feed_forward_input_bias: optional(
+                    &format!("{prefix}.feed_forward_input.bias"),
+                    feed_forward_input_bias.is_some(),
+                    &mut consumed,
+                )?,
+                feed_forward_gate_weight: optional(
+                    &format!("{prefix}.feed_forward_gate.weight"),
+                    layer.feed_forward_gate.is_some(),
+                    &mut consumed,
+                )?,
+                feed_forward_gate_bias: optional(
+                    &format!("{prefix}.feed_forward_gate.bias"),
+                    gate_bias.is_some(),
+                    &mut consumed,
+                )?,
+                feed_forward_output_weight: required(
+                    &format!("{prefix}.feed_forward_output.weight"),
+                    &mut consumed,
+                )?,
+                feed_forward_output_bias: optional(
+                    &format!("{prefix}.feed_forward_output.bias"),
+                    feed_forward_output_bias.is_some(),
+                    &mut consumed,
+                )?,
+                relative_attention_bias: optional(
+                    &format!("{prefix}.relative_attention_bias"),
+                    layer.relative_attention_bias.is_some(),
+                    &mut consumed,
+                )?,
+            });
+        }
+        let embedding_layer_norm = matches!(self.embedding_norm, Some(NativeNorm::Layer(_)));
+        let projection_bias = self
+            .projection
+            .as_ref()
+            .map(NativeModule::dense_parameters)
+            .transpose()?
+            .and_then(|(_, bias)| bias);
+        let weights = BidirectionalTextWeights {
+            token_embedding: required("token_embedding.weight", &mut consumed)?,
+            position_embedding: optional(
+                "position_embedding.weight",
+                self.position_embedding.is_some(),
+                &mut consumed,
+            )?,
+            token_type_embedding: optional(
+                "token_type_embedding.weight",
+                self.token_type_embedding.is_some(),
+                &mut consumed,
+            )?,
+            embedding_norm_weight: optional(
+                "embedding_norm.weight",
+                self.embedding_norm.is_some(),
+                &mut consumed,
+            )?,
+            embedding_norm_bias: optional(
+                "embedding_norm.bias",
+                embedding_layer_norm,
+                &mut consumed,
+            )?,
+            layers,
+            final_norm_weight: optional(
+                "final_norm.weight",
+                self.final_norm.is_some(),
+                &mut consumed,
+            )?,
+            projection_weight: optional(
+                "projection.weight",
+                self.projection.is_some(),
+                &mut consumed,
+            )?,
+            projection_bias: optional("projection.bias", projection_bias.is_some(), &mut consumed)?,
+        };
+        if consumed.len() != mapped.tensors().len() {
+            return Err(BidirectionalTextError::InvalidConfiguration(
+                "bidirectional mapped weights contain unconsumed parameters",
+            ));
+        }
+        let reconstructed = Self::new(self.configuration.clone(), weights)?;
+        reconstructed.semantic_state_digest(cancellation)?;
+        Ok(reconstructed)
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, BidirectionalTextError> {
+        cancellation.check().map_err(TensorError::from)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.native-bidirectional-text.v2\0f32\0cpu");
+        hasher.update([match self.configuration.architecture {
+            BidirectionalTextArchitecture::T5 => 0,
+            BidirectionalTextArchitecture::Bert => 1,
+        }]);
+        for value in [
+            self.configuration.vocabulary_size,
+            self.configuration.maximum_tokens,
+            self.configuration.type_vocabulary_size,
+            self.configuration.hidden_size,
+            self.configuration.attention_inner_size,
+            self.configuration.feed_forward_size,
+            self.configuration.attention_heads,
+            self.configuration.layer_count,
+            self.configuration.relative_attention_buckets,
+            self.configuration.relative_attention_max_distance,
+        ] {
+            hasher.update(
+                u64::try_from(value)
+                    .map_err(|_| BidirectionalTextError::Overflow("bidirectional digest"))?
+                    .to_be_bytes(),
+            );
+        }
+        hasher.update(self.configuration.normalization_epsilon_bits.to_be_bytes());
+        hasher.update([
+            u8::from(self.configuration.gated_feed_forward),
+            match self.configuration.activation {
+                BidirectionalFeedForwardActivation::Relu => 0,
+                BidirectionalFeedForwardActivation::Gelu => 1,
+                BidirectionalFeedForwardActivation::GeluTanh => 2,
+            },
+            u8::from(self.configuration.relative_attention),
+        ]);
+        match self.configuration.projection_dimension {
+            Some(value) => {
+                hasher.update([1]);
+                hasher.update(
+                    u64::try_from(value)
+                        .map_err(|_| {
+                            BidirectionalTextError::Overflow("bidirectional projection digest")
+                        })?
+                        .to_be_bytes(),
+                );
+            }
+            None => hasher.update([0]),
+        }
+        for (name, module) in self.named_modules() {
+            cancellation.check().map_err(TensorError::from)?;
+            hash_bidirectional_bytes(&mut hasher, name.as_bytes())?;
+            hash_bidirectional_bytes(
+                &mut hasher,
+                module.semantic_state_digest(cancellation)?.as_bytes(),
+            )?;
+        }
+        for (name, tensor) in self.normalization_tensors() {
+            cancellation.check().map_err(TensorError::from)?;
+            hash_bidirectional_bytes(&mut hasher, name.as_bytes())?;
+            hash_bidirectional_bytes(&mut hasher, tensor.contiguous_bytes()?)?;
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, BidirectionalTextError> {
+        self.resident_tensor_allocations().into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |total, (_, allocation)| {
+                total
+                    .checked_add(allocation)
+                    .ok_or(BidirectionalTextError::Overflow("bidirectional residency"))
+            },
+        )
+    }
+    pub fn resident_owned_bytes(&self) -> Result<u64, BidirectionalTextError> {
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| BidirectionalTextError::Overflow("bidirectional residency"))?;
+        bytes = bytes
+            .checked_add(
+                u64::try_from(
+                    self.layers
+                        .capacity()
+                        .checked_mul(mem::size_of::<NativeBidirectionalLayer>())
+                        .ok_or(BidirectionalTextError::Overflow("bidirectional layers"))?,
+                )
+                .map_err(|_| BidirectionalTextError::Overflow("bidirectional layers"))?,
+            )
+            .ok_or(BidirectionalTextError::Overflow("bidirectional residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, allocation)| {
+                    total
+                        .checked_add(allocation)
+                        .ok_or(BidirectionalTextError::Overflow(
+                            "bidirectional tensor residency",
+                        ))
+                },
+            )?;
+            bytes = bytes
+                .checked_add(
+                    module
+                        .resident_storage_bytes()?
+                        .checked_sub(tensor_bytes)
+                        .ok_or(BidirectionalTextError::Overflow(
+                            "bidirectional module residency",
+                        ))?,
+                )
+                .ok_or(BidirectionalTextError::Overflow("bidirectional residency"))?;
+        }
+        Ok(bytes)
+    }
+    pub fn resident_tensor_allocations(&self) -> Vec<(StorageId, u64)> {
+        let mut allocations = Vec::new();
+        let mut insert = |allocation: (StorageId, u64)| {
+            if !allocations
+                .iter()
+                .any(|(existing, _)| *existing == allocation.0)
+            {
+                allocations.push(allocation);
+            }
+        };
+        for (_, module) in self.named_modules() {
+            for allocation in module.resident_tensor_allocations() {
+                insert(allocation);
+            }
+        }
+        for (_, tensor) in self.normalization_tensors() {
+            insert((tensor.storage_id(), tensor.storage_byte_len()));
+        }
+        allocations
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![("token_embedding".to_owned(), &self.token_embedding)];
+        for (name, module) in [
+            ("position_embedding", self.position_embedding.as_ref()),
+            ("token_type_embedding", self.token_type_embedding.as_ref()),
+            ("projection", self.projection.as_ref()),
+        ] {
+            if let Some(module) = module {
+                modules.push((name.to_owned(), module));
+            }
+        }
+        if let Some(NativeNorm::Layer(module)) = &self.embedding_norm {
+            modules.push(("embedding_norm".to_owned(), module));
+        }
+        if let Some(NativeNorm::Layer(module)) = &self.final_norm {
+            modules.push(("final_norm".to_owned(), module));
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            let prefix = format!("layers.{index}");
+            for (suffix, module) in [
+                ("query", &layer.query),
+                ("key", &layer.key),
+                ("value", &layer.value),
+                ("attention_output", &layer.attention_output),
+                ("feed_forward_input", &layer.feed_forward_input),
+                ("feed_forward_output", &layer.feed_forward_output),
+            ] {
+                modules.push((format!("{prefix}.{suffix}"), module));
+            }
+            if let Some(module) = &layer.feed_forward_gate {
+                modules.push((format!("{prefix}.feed_forward_gate"), module));
+            }
+            if let NativeNorm::Layer(module) = &layer.attention_norm {
+                modules.push((format!("{prefix}.attention_norm"), module));
+            }
+            if let NativeNorm::Layer(module) = &layer.feed_forward_norm {
+                modules.push((format!("{prefix}.feed_forward_norm"), module));
+            }
+        }
+        modules
+    }
+    fn normalization_tensors(&self) -> Vec<(String, &Tensor)> {
+        let mut tensors = Vec::new();
+        if let Some(NativeNorm::Rms { weight, .. }) = &self.embedding_norm {
+            tensors.push(("embedding_norm.weight".to_owned(), weight));
+        }
+        if let Some(NativeNorm::Rms { weight, .. }) = &self.final_norm {
+            tensors.push(("final_norm.weight".to_owned(), weight));
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            if let NativeNorm::Rms { weight, .. } = &layer.attention_norm {
+                tensors.push((format!("layers.{index}.attention_norm.weight"), weight));
+            }
+            if let NativeNorm::Rms { weight, .. } = &layer.feed_forward_norm {
+                tensors.push((format!("layers.{index}.feed_forward_norm.weight"), weight));
+            }
+            if let Some(relative) = &layer.relative_attention_bias {
+                tensors.push((format!("layers.{index}.relative_attention_bias"), relative));
+            }
+        }
+        tensors
+    }
+
     pub fn execution_requirements(&self) -> NativeExecutionRequirements {
         let mut requirements = NativeExecutionRequirements::new();
         for module in [
@@ -534,6 +936,27 @@ impl NativeT5TextEncoder {
             context,
         )?;
         Ok(())
+    }
+
+    pub fn embed_tokens(
+        &self,
+        backend: &CpuBackend,
+        tokens: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, BidirectionalTextError> {
+        self.admit_execution_target(backend, context)?;
+        let request = BidirectionalTextRequest {
+            input: BidirectionalTextInput::Tokens(tokens),
+            attention_mask: None,
+            token_type_ids: None,
+            intermediate_layer: None,
+            final_norm_intermediate: false,
+            pooling: BidirectionalPooling::None,
+            project_pooled: false,
+        };
+        validate_input(&self.configuration, &request, context)?;
+        let mut token_embedding = self.token_embedding.clone();
+        Ok(token_embedding.forward_with_context(backend, tokens, context)?)
     }
 
     pub fn forward(

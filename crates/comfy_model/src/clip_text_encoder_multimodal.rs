@@ -7,8 +7,8 @@ use crate::{
     DecoderPreparedGenerationPrompt, DecoderRopePositions, DecoderTextConfiguration,
     DecoderTextError, DecoderTextOutput, DecoderTextRequest, GeluApproximation,
     Gemma3DecoderProfile, Gemma4DecoderProfile, GemmaTokenizerProfile, LLAMA_SOURCE_SHA256,
-    NativeClipText, NativeClipVision, NativeDecoderTextEncoder, NativeModule, NativeOpsError,
-    NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
+    MappedModelWeights, NativeClipText, NativeClipVision, NativeDecoderTextEncoder, NativeModule,
+    NativeOpsError, NativePromptTokenizer, NativeT5TextEncoder, NativeTextGenerationRequest,
     NativeTextGenerationResult, NativeTokenizerError, QWEN25_TOKENIZER_ARTIFACT_DIGEST,
     QWEN35_SOURCE_SHA256, QWEN35_TOKENIZER_ARTIFACT_DIGEST, Qwen2PretokenizerProfile,
     SD1_CLIP_SOURCE_SHA256, SPIECE_TOKENIZER_SOURCE_SHA256, decoder_profile_fact,
@@ -36,8 +36,14 @@ use comfy_tensor::{
     },
     generated_spectral_transform_01::{SpectralTransformError, fftn_with_context_exact_native},
 };
+use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{fmt::Write as _, mem, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write as _,
+    mem,
+    sync::Arc,
+};
 use thiserror::Error;
 
 pub const IDEOGRAM4_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/ideogram4.py";
@@ -518,13 +524,13 @@ pub struct GemmaPreparedAudio {
     resampled_samples: usize,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Gemma3VisionProfile {
     FourBVision,
     TwelveB,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Gemma3VisionConfiguration {
     pub source_profile: Option<Gemma3VisionProfile>,
     pub vision_hidden_size: usize,
@@ -608,14 +614,14 @@ pub struct Gemma3VisionProjection {
     pub tokens_per_image: usize,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Gemma4VisionProfile {
     E2B,
     E4B,
     ThirtyOneB,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Gemma4VisionConfiguration {
     pub profile: Gemma4VisionProfile,
     pub hidden_size: usize,
@@ -803,14 +809,14 @@ pub struct Gemma4VisionProjection {
     pub kind: GemmaPreparedVisualKind,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Gemma4AudioProfile {
     E2B,
     E4B,
     ThirtyOneB,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Gemma4AudioConfiguration {
     pub profile: Gemma4AudioProfile,
     pub mel_bins: usize,
@@ -1277,6 +1283,68 @@ pub struct QwenVisionWeights {
 }
 
 #[derive(Clone, Debug)]
+pub struct Qwen25VisionBlockWeights {
+    pub normalization_one_weight: Tensor,
+    pub query_key_value_weight: Tensor,
+    pub query_key_value_bias: Tensor,
+    pub attention_output_weight: Tensor,
+    pub attention_output_bias: Tensor,
+    pub normalization_two_weight: Tensor,
+    pub feed_forward_gate_weight: Tensor,
+    pub feed_forward_gate_bias: Tensor,
+    pub feed_forward_up_weight: Tensor,
+    pub feed_forward_up_bias: Tensor,
+    pub feed_forward_down_weight: Tensor,
+    pub feed_forward_down_bias: Tensor,
+}
+
+#[derive(Clone, Debug)]
+pub struct Qwen25VisionWeights {
+    pub patch_weight: Tensor,
+    pub blocks: Vec<Qwen25VisionBlockWeights>,
+    pub merger_normalization_weight: Tensor,
+    pub merger_first_weight: Tensor,
+    pub merger_first_bias: Tensor,
+    pub merger_second_weight: Tensor,
+    pub merger_second_bias: Tensor,
+}
+
+#[derive(Clone, Debug)]
+struct NativeQwen25VisionBlock {
+    normalization_one_weight: Tensor,
+    query_key_value: NativeModule,
+    attention_output: NativeModule,
+    normalization_two_weight: Tensor,
+    feed_forward_gate: NativeModule,
+    feed_forward_up: NativeModule,
+    feed_forward_down: NativeModule,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeQwen25VisionEncoder {
+    patch_projection: NativeModule,
+    blocks: Vec<NativeQwen25VisionBlock>,
+    merger_normalization_weight: Tensor,
+    merger_first: NativeModule,
+    merger_second: NativeModule,
+    stream: StreamId,
+}
+
+#[derive(Clone, Debug)]
+pub struct Qwen25PreparedImage {
+    patches: Tensor,
+    grid_thw: [usize; 3],
+    merged_tokens: usize,
+}
+
+#[derive(Clone)]
+pub struct NativeQwen25Multimodal {
+    tokenizer: Arc<NativePromptTokenizer>,
+    decoder: Arc<NativeDecoderTextEncoder>,
+    vision: Arc<NativeQwen25VisionEncoder>,
+}
+
+#[derive(Clone, Debug)]
 struct NativeQwenVisionBlock {
     normalization_one: NativeModule,
     query_key_value: NativeModule,
@@ -1324,6 +1392,53 @@ pub struct QwenMultimodalGenerationRequest<'a> {
     pub text: NativeTextGenerationRequest<'a>,
     pub prepared_images: &'a [Qwen3VlPreparedImage],
     pub transaction: &'a RngTransaction,
+}
+
+pub struct Qwen25ConditioningRequest<'a> {
+    pub prompt: &'a str,
+    pub prepared_images: &'a [Qwen25PreparedImage],
+    pub custom_template: Option<&'a str>,
+    pub capture_layer: Option<isize>,
+}
+
+#[derive(Clone, Debug)]
+pub struct QwenConditioningOutput {
+    hidden: Tensor,
+    attention_mask: Option<Tensor>,
+}
+
+pub struct GemmaConditioningRequest<'a> {
+    pub prompt: &'a str,
+    pub prepared_visuals: &'a [GemmaPreparedVisual],
+    pub prepared_audio: Option<&'a GemmaPreparedAudio>,
+    pub use_default_template: bool,
+    pub thinking: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct GemmaConditioningOutput {
+    hidden: Tensor,
+    attention_mask: Tensor,
+}
+
+impl GemmaConditioningOutput {
+    pub fn hidden(&self) -> &Tensor {
+        &self.hidden
+    }
+
+    pub fn attention_mask(&self) -> &Tensor {
+        &self.attention_mask
+    }
+}
+
+impl QwenConditioningOutput {
+    pub fn hidden(&self) -> &Tensor {
+        &self.hidden
+    }
+
+    pub fn attention_mask(&self) -> Option<&Tensor> {
+        self.attention_mask.as_ref()
+    }
 }
 
 pub struct GemmaMultimodalGenerationRequest<'a> {
@@ -1886,7 +2001,7 @@ impl NativeGemma3VisionProjector {
         hasher.update(b"zed.comfy.gemma3-vision-projector.v1");
         hasher.update(LLAMA_SOURCE_SHA256.as_bytes());
         hasher.update(GEMMA3_MULTIMODAL_SOURCE_SHA256.as_bytes());
-        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(canonical_multimodal_bytes(&self.configuration)?);
         hasher.update(self.vision.semantic_digest_sha256().as_bytes());
         for tensor in [&self.normalization_weight, &self.input_projection_weight] {
             cancellation.check()?;
@@ -2860,6 +2975,193 @@ pub fn prepare_qwen3vl_images(
     prepare_qwen_images(backend, images, QwenVisionFamily::Qwen3Vl8B, context)
 }
 
+pub fn prepare_qwen25_images(
+    backend: &CpuBackend,
+    images: &ImageTensor,
+    context: &ExecutionContext<'_>,
+) -> Result<Vec<Qwen25PreparedImage>, MultimodalTextError> {
+    context.check()?;
+    let (batch, height, width, channels) = images.dimensions()?;
+    if batch == 0 || channels != 3 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen2.5 images must be a nonempty RGB batch",
+        ));
+    }
+    let (target_height, target_width) = qwen25_target_dimensions(height, width)?;
+    let source = images.as_f32_slice()?;
+    let image_elements = usize::try_from(
+        height
+            .checked_mul(width)
+            .and_then(|value| value.checked_mul(3))
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 source image"))?,
+    )
+    .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 source image"))?;
+    let mut prepared = Vec::new();
+    prepared
+        .try_reserve_exact(u64_to_usize(batch, "Qwen2.5 image batch")?)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 image batch"))?;
+    for batch_index in 0..u64_to_usize(batch, "Qwen2.5 image batch")? {
+        context.check()?;
+        let start = batch_index
+            .checked_mul(image_elements)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 image offset"))?;
+        let end = start
+            .checked_add(image_elements)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 image end"))?;
+        let singleton = ImageTensor::from_f32(
+            backend,
+            context,
+            1,
+            height,
+            width,
+            3,
+            source
+                .get(start..end)
+                .ok_or(MultimodalTextError::InvalidInput(
+                    "Qwen2.5 image storage is incomplete",
+                ))?,
+        )?;
+        let resized = singleton.resize(
+            target_width,
+            target_height,
+            ResizeMode::Bilinear,
+            ResizeCrop::Disabled,
+            backend,
+            context,
+        )?;
+        prepared.push(prepare_qwen25_resized_image(
+            backend,
+            &resized,
+            target_height,
+            target_width,
+            context,
+        )?);
+    }
+    Ok(prepared)
+}
+
+fn qwen25_target_dimensions(height: u64, width: u64) -> Result<(u64, u64), MultimodalTextError> {
+    if height == 0 || width == 0 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen2.5 images require nonzero dimensions",
+        ));
+    }
+    let factor = 28;
+    let mut target_height = round_to_factor(height, factor)?;
+    let mut target_width = round_to_factor(width, factor)?;
+    let rounded = target_height
+        .checked_mul(target_width)
+        .ok_or(MultimodalTextError::Overflow("Qwen2.5 pixels"))?;
+    let source = height
+        .checked_mul(width)
+        .ok_or(MultimodalTextError::Overflow("Qwen2.5 source pixels"))?;
+    if rounded > 12_845_056 {
+        let beta = ((source as f64) / 12_845_056_f64).sqrt();
+        target_height = floor_scaled_to_factor(height, beta, factor)?;
+        target_width = floor_scaled_to_factor(width, beta, factor)?;
+    } else if rounded < 3_136 {
+        let beta = (3_136_f64 / source as f64).sqrt();
+        target_height = ceil_scaled_to_factor(height, beta, factor)?;
+        target_width = ceil_scaled_to_factor(width, beta, factor)?;
+    }
+    Ok((target_height, target_width))
+}
+
+fn prepare_qwen25_resized_image(
+    backend: &CpuBackend,
+    image: &ImageTensor,
+    height: u64,
+    width: u64,
+    context: &ExecutionContext<'_>,
+) -> Result<Qwen25PreparedImage, MultimodalTextError> {
+    context.check()?;
+    if image.dimensions()? != (1, height, width, 3)
+        || !height.is_multiple_of(28)
+        || !width.is_multiple_of(28)
+    {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen2.5 resized image geometry is invalid",
+        ));
+    }
+    let grid_height = u64_to_usize(height / 14, "Qwen2.5 grid height")?;
+    let grid_width = u64_to_usize(width / 14, "Qwen2.5 grid width")?;
+    let merged_height = grid_height / 2;
+    let merged_width = grid_width / 2;
+    let patch_count = grid_height
+        .checked_mul(grid_width)
+        .ok_or(MultimodalTextError::Overflow("Qwen2.5 patches"))?;
+    let patch_width = 3 * 2 * 14 * 14;
+    let mut patches = backend.workspace_vec(
+        context,
+        patch_count
+            .checked_mul(patch_width)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 patch storage"))?,
+    )?;
+    let values = image.as_f32_slice()?;
+    let height = u64_to_usize(height, "Qwen2.5 height")?;
+    let width = u64_to_usize(width, "Qwen2.5 width")?;
+    let mean = [0.481_454_66_f32, 0.457_827_5, 0.408_210_73];
+    let deviation = [0.268_629_54_f32, 0.261_302_6, 0.275_777_1];
+    for block_y in 0..merged_height {
+        for block_x in 0..merged_width {
+            context.check()?;
+            for merge_y in 0..2 {
+                for merge_x in 0..2 {
+                    let patch_y = block_y * 2 + merge_y;
+                    let patch_x = block_x * 2 + merge_x;
+                    for channel in 0..3 {
+                        for _temporal in 0..2 {
+                            for local_y in 0..14 {
+                                for local_x in 0..14 {
+                                    let y = patch_y * 14 + local_y;
+                                    let x = patch_x * 14 + local_x;
+                                    let index = y
+                                        .checked_mul(width)
+                                        .and_then(|value| value.checked_add(x))
+                                        .and_then(|value| value.checked_mul(3))
+                                        .and_then(|value| value.checked_add(channel))
+                                        .ok_or(MultimodalTextError::Overflow("Qwen2.5 pixel"))?;
+                                    let value = *values.get(index).ok_or(
+                                        MultimodalTextError::InvalidInput(
+                                            "Qwen2.5 resized pixels are incomplete",
+                                        ),
+                                    )?;
+                                    if !value.is_finite() {
+                                        return Err(MultimodalTextError::InvalidInput(
+                                            "Qwen2.5 pixels must be finite",
+                                        ));
+                                    }
+                                    patches
+                                        .try_push((value - mean[channel]) / deviation[channel])?;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if patches.len() != patch_count * patch_width || height != grid_height * 14 {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen2.5 patch packing is incomplete",
+        ));
+    }
+    let descriptor = TensorDescriptor::contiguous(
+        vec![usize_to_u64(patch_count, "Qwen2.5 patches")?, 3, 2, 14, 14],
+        DType::F32,
+        DeviceId::CPU,
+        context.stream,
+    )?;
+    let patches = backend.upload_f32(descriptor, &patches, context)?.0;
+    Ok(Qwen25PreparedImage {
+        patches,
+        grid_thw: [1, grid_height, grid_width],
+        merged_tokens: merged_height
+            .checked_mul(merged_width)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 merged tokens"))?,
+    })
+}
+
 pub fn prepare_qwen_images(
     backend: &CpuBackend,
     images: &ImageTensor,
@@ -3112,6 +3414,48 @@ impl NativeGemma4VisionEncoder {
 
     pub fn semantic_state_digest_sha256(&self) -> &str {
         &self.semantic_state_digest_sha256
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut reconstructed = self.clone();
+        let mut consumed = BTreeSet::new();
+        reload_multimodal_module(
+            &mut reconstructed.patch_projection,
+            "patch_projection",
+            mapped,
+            &mut consumed,
+        )?;
+        reconstructed.position_embedding =
+            take_multimodal_tensor(mapped, "position_embedding", &mut consumed)?;
+        reload_multimodal_module(
+            &mut reconstructed.projector,
+            "projector",
+            mapped,
+            &mut consumed,
+        )?;
+        for (index, block) in reconstructed.blocks.iter_mut().enumerate() {
+            cancellation.check()?;
+            reload_gemma4_vision_block(block, &format!("blocks.{index}"), mapped, &mut consumed)?;
+        }
+        if consumed.len() != mapped.tensors().len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 vision mapped weights contain unconsumed parameters",
+            ));
+        }
+        reconstructed.semantic_state_digest_sha256 =
+            reconstructed.project_semantic_state_digest(cancellation)?;
+        reconstructed.validate(cancellation)?;
+        Ok(reconstructed)
     }
 
     pub fn validate(
@@ -3384,7 +3728,7 @@ impl NativeGemma4VisionEncoder {
         let mut hasher = Sha256::new();
         hasher.update(b"zed.comfy.gemma4-vision.v1");
         hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
-        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(canonical_multimodal_bytes(&self.configuration)?);
         hasher.update(self.position_embedding.contiguous_bytes()?);
         for (name, module) in self.named_modules() {
             cancellation.check()?;
@@ -3522,6 +3866,66 @@ impl NativeGemma4AudioEncoder {
 
     pub fn semantic_state_digest_sha256(&self) -> &str {
         &self.semantic_state_digest_sha256
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut reconstructed = self.clone();
+        let mut consumed = BTreeSet::new();
+        reconstructed.first_convolution_weight =
+            take_multimodal_tensor(mapped, "first_convolution.weight", &mut consumed)?;
+        reconstructed.first_convolution_normalization_weight = take_multimodal_tensor(
+            mapped,
+            "first_convolution.normalization.weight",
+            &mut consumed,
+        )?;
+        reconstructed.second_convolution_weight =
+            take_multimodal_tensor(mapped, "second_convolution.weight", &mut consumed)?;
+        reconstructed.second_convolution_normalization_weight = take_multimodal_tensor(
+            mapped,
+            "second_convolution.normalization.weight",
+            &mut consumed,
+        )?;
+        reload_multimodal_module(
+            &mut reconstructed.subsample_projection,
+            "subsample_projection",
+            mapped,
+            &mut consumed,
+        )?;
+        reload_multimodal_module(
+            &mut reconstructed.encoder_output,
+            "encoder_output",
+            mapped,
+            &mut consumed,
+        )?;
+        reload_multimodal_module(
+            &mut reconstructed.projector,
+            "projector",
+            mapped,
+            &mut consumed,
+        )?;
+        for (index, block) in reconstructed.blocks.iter_mut().enumerate() {
+            cancellation.check()?;
+            reload_gemma4_audio_block(block, &format!("blocks.{index}"), mapped, &mut consumed)?;
+        }
+        if consumed.len() != mapped.tensors().len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 audio mapped weights contain unconsumed parameters",
+            ));
+        }
+        reconstructed.semantic_state_digest_sha256 =
+            reconstructed.project_semantic_state_digest(cancellation)?;
+        reconstructed.validate(cancellation)?;
+        Ok(reconstructed)
     }
 
     pub fn validate(
@@ -3745,7 +4149,7 @@ impl NativeGemma4AudioEncoder {
         let mut hasher = Sha256::new();
         hasher.update(b"zed.comfy.gemma4-audio.v1");
         hasher.update(GEMMA4_MULTIMODAL_SOURCE_SHA256.as_bytes());
-        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        hasher.update(canonical_multimodal_bytes(&self.configuration)?);
         for (name, module) in self.named_modules() {
             cancellation.check()?;
             hasher.update(name.as_bytes());
@@ -3941,6 +4345,424 @@ impl NativeGemma4AudioFeedForward {
     }
 }
 
+impl NativeQwen25VisionEncoder {
+    pub fn new(weights: Qwen25VisionWeights) -> Result<Self, MultimodalTextError> {
+        if weights.blocks.len() != 32 {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 vision requires exactly 32 blocks",
+            ));
+        }
+        let stream = weights.patch_weight.descriptor().stream();
+        let mut patch_projection = NativeModule::linear(
+            "qwen25_vision.patch_projection",
+            3 * 2 * 14 * 14,
+            1_280,
+            false,
+            false,
+        )?;
+        patch_projection.load_dense_parameters(weights.patch_weight, None)?;
+        let mut blocks = Vec::new();
+        blocks
+            .try_reserve_exact(32)
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 vision blocks"))?;
+        for (index, weights) in weights.blocks.into_iter().enumerate() {
+            blocks.push(NativeQwen25VisionBlock {
+                normalization_one_weight: weights.normalization_one_weight,
+                query_key_value: qwen_linear_module(
+                    &format!("qwen25_vision.blocks.{index}.qkv"),
+                    1_280,
+                    3 * 1_280,
+                    weights.query_key_value_weight,
+                    Some(weights.query_key_value_bias),
+                    stream,
+                )?,
+                attention_output: qwen_linear_module(
+                    &format!("qwen25_vision.blocks.{index}.attention_output"),
+                    1_280,
+                    1_280,
+                    weights.attention_output_weight,
+                    Some(weights.attention_output_bias),
+                    stream,
+                )?,
+                normalization_two_weight: weights.normalization_two_weight,
+                feed_forward_gate: qwen_linear_module(
+                    &format!("qwen25_vision.blocks.{index}.feed_forward_gate"),
+                    1_280,
+                    3_420,
+                    weights.feed_forward_gate_weight,
+                    Some(weights.feed_forward_gate_bias),
+                    stream,
+                )?,
+                feed_forward_up: qwen_linear_module(
+                    &format!("qwen25_vision.blocks.{index}.feed_forward_up"),
+                    1_280,
+                    3_420,
+                    weights.feed_forward_up_weight,
+                    Some(weights.feed_forward_up_bias),
+                    stream,
+                )?,
+                feed_forward_down: qwen_linear_module(
+                    &format!("qwen25_vision.blocks.{index}.feed_forward_down"),
+                    3_420,
+                    1_280,
+                    weights.feed_forward_down_weight,
+                    Some(weights.feed_forward_down_bias),
+                    stream,
+                )?,
+            });
+        }
+        let mut merger_first =
+            NativeModule::linear("qwen25_vision.merger.first", 5_120, 5_120, true, false)?;
+        merger_first
+            .load_dense_parameters(weights.merger_first_weight, Some(weights.merger_first_bias))?;
+        let mut merger_second =
+            NativeModule::linear("qwen25_vision.merger.second", 5_120, 3_584, true, false)?;
+        merger_second.load_dense_parameters(
+            weights.merger_second_weight,
+            Some(weights.merger_second_bias),
+        )?;
+        let owner = Self {
+            patch_projection,
+            blocks,
+            merger_normalization_weight: weights.merger_normalization_weight,
+            merger_first,
+            merger_second,
+            stream,
+        };
+        owner.validate(&comfy_types::CancellationToken::default())?;
+        Ok(owner)
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 vision mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut reconstructed = self.clone();
+        let mut consumed = BTreeSet::new();
+        reload_multimodal_module(
+            &mut reconstructed.patch_projection,
+            "patch_projection",
+            mapped,
+            &mut consumed,
+        )?;
+        for (index, block) in reconstructed.blocks.iter_mut().enumerate() {
+            let prefix = format!("blocks.{index}");
+            block.normalization_one_weight = take_multimodal_tensor(
+                mapped,
+                &format!("{prefix}.normalization_one.weight"),
+                &mut consumed,
+            )?;
+            reload_multimodal_module(
+                &mut block.query_key_value,
+                &format!("{prefix}.query_key_value"),
+                mapped,
+                &mut consumed,
+            )?;
+            reload_multimodal_module(
+                &mut block.attention_output,
+                &format!("{prefix}.attention_output"),
+                mapped,
+                &mut consumed,
+            )?;
+            block.normalization_two_weight = take_multimodal_tensor(
+                mapped,
+                &format!("{prefix}.normalization_two.weight"),
+                &mut consumed,
+            )?;
+            reload_multimodal_module(
+                &mut block.feed_forward_gate,
+                &format!("{prefix}.feed_forward_gate"),
+                mapped,
+                &mut consumed,
+            )?;
+            reload_multimodal_module(
+                &mut block.feed_forward_up,
+                &format!("{prefix}.feed_forward_up"),
+                mapped,
+                &mut consumed,
+            )?;
+            reload_multimodal_module(
+                &mut block.feed_forward_down,
+                &format!("{prefix}.feed_forward_down"),
+                mapped,
+                &mut consumed,
+            )?;
+        }
+        reconstructed.merger_normalization_weight =
+            take_multimodal_tensor(mapped, "merger.normalization.weight", &mut consumed)?;
+        reload_multimodal_module(
+            &mut reconstructed.merger_first,
+            "merger.first",
+            mapped,
+            &mut consumed,
+        )?;
+        reload_multimodal_module(
+            &mut reconstructed.merger_second,
+            "merger.second",
+            mapped,
+            &mut consumed,
+        )?;
+        if consumed.len() != mapped.tensors().len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 vision mapped weights contain unconsumed parameters",
+            ));
+        }
+        reconstructed.validate(cancellation)?;
+        Ok(reconstructed)
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        if self.blocks.len() != 32
+            || self
+                .named_tensors()
+                .iter()
+                .any(|tensor| tensor.descriptor().stream() != self.stream)
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 vision retained state is invalid",
+            ));
+        }
+        self.semantic_state_digest(cancellation)?;
+        Ok(())
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        cancellation.check()?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.qwen25-vision.v1\0hidden=1280\0output=3584\0intermediate=3420\0layers=32\0heads=16\0patch=14\0temporal=2\0merge=2");
+        for (name, module) in self.named_modules() {
+            cancellation.check()?;
+            hasher.update(
+                u64::try_from(name.len())
+                    .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 digest"))?
+                    .to_be_bytes(),
+            );
+            hasher.update(name.as_bytes());
+            hasher.update(module.semantic_state_digest(cancellation)?.as_bytes());
+        }
+        for tensor in self.named_tensors() {
+            hasher.update(tensor.contiguous_bytes()?);
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Vec<(comfy_tensor::StorageId, u64)> {
+        let mut allocations = Vec::new();
+        for (_, module) in self.named_modules() {
+            for allocation in module.resident_tensor_allocations() {
+                if !allocations.iter().any(|(id, _)| *id == allocation.0) {
+                    allocations.push(allocation);
+                }
+            }
+        }
+        for tensor in self.named_tensors() {
+            if !allocations.iter().any(|(id, _)| *id == tensor.storage_id()) {
+                allocations.push((tensor.storage_id(), tensor.storage_byte_len()));
+            }
+        }
+        allocations
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 vision residency"))?;
+        bytes = bytes
+            .checked_add(
+                u64::try_from(
+                    self.blocks
+                        .capacity()
+                        .checked_mul(mem::size_of::<NativeQwen25VisionBlock>())
+                        .ok_or(MultimodalTextError::Overflow("Qwen2.5 blocks"))?,
+                )
+                .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 blocks"))?,
+            )
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 vision residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensors = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, value)| {
+                    total
+                        .checked_add(value)
+                        .ok_or(MultimodalTextError::Overflow("Qwen2.5 module tensors"))
+                },
+            )?;
+            bytes = bytes
+                .checked_add(
+                    module
+                        .resident_storage_bytes()?
+                        .checked_sub(tensors)
+                        .ok_or(MultimodalTextError::Overflow("Qwen2.5 module projection"))?,
+                )
+                .ok_or(MultimodalTextError::Overflow("Qwen2.5 vision residency"))?;
+        }
+        Ok(bytes)
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![
+            ("patch_projection".to_owned(), &self.patch_projection),
+            ("merger.first".to_owned(), &self.merger_first),
+            ("merger.second".to_owned(), &self.merger_second),
+        ];
+        for (index, block) in self.blocks.iter().enumerate() {
+            for (suffix, module) in [
+                ("query_key_value", &block.query_key_value),
+                ("attention_output", &block.attention_output),
+                ("feed_forward_gate", &block.feed_forward_gate),
+                ("feed_forward_up", &block.feed_forward_up),
+                ("feed_forward_down", &block.feed_forward_down),
+            ] {
+                modules.push((format!("blocks.{index}.{suffix}"), module));
+            }
+        }
+        modules
+    }
+
+    fn named_tensors(&self) -> Vec<&Tensor> {
+        let mut tensors = vec![&self.merger_normalization_weight];
+        for block in &self.blocks {
+            tensors.push(&block.normalization_one_weight);
+            tensors.push(&block.normalization_two_weight);
+        }
+        tensors
+    }
+
+    pub fn project(
+        &self,
+        backend: &CpuBackend,
+        prepared: &Qwen25PreparedImage,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let shape = prepared.patches.descriptor().shape();
+        if shape.len() != 5 || shape[1..] != [3, 2, 14, 14] {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 prepared patches have invalid geometry",
+            ));
+        }
+        let patch_count = u64_to_usize(shape[0], "Qwen2.5 patches")?;
+        let flattened = qwen_tensor(
+            backend,
+            &[patch_count, 3 * 2 * 14 * 14],
+            &tensor_to_f32(backend, &prepared.patches, context)?,
+            context,
+        )?;
+        let mut projection = self.patch_projection.clone();
+        let mut hidden = projection.forward_with_context(backend, &flattened, context)?;
+        for block in &self.blocks {
+            hidden = block.forward(backend, &hidden, prepared.grid_thw, context)?;
+        }
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            &hidden,
+            &self.merger_normalization_weight,
+            patch_count,
+            1_280,
+            1.0e-6,
+            context,
+        )?;
+        let values = tensor_to_f32(backend, &normalized, context)?;
+        let merged = qwen_tensor(backend, &[prepared.merged_tokens, 5_120], &values, context)?;
+        let mut first = self.merger_first.clone();
+        let first = first.forward_with_context(backend, &merged, context)?;
+        let mut values = tensor_to_f32(backend, &first, context)?;
+        for value in values.iter_mut() {
+            *value = 0.5
+                * *value
+                * (1.0
+                    + std::f32::consts::FRAC_2_SQRT_PI
+                        .mul_add(*value + 0.044_715 * *value * *value * *value, 0.0)
+                        .tanh());
+        }
+        let activated = qwen_tensor(backend, &[prepared.merged_tokens, 5_120], &values, context)?;
+        let mut second = self.merger_second.clone();
+        Ok(second.forward_with_context(backend, &activated, context)?)
+    }
+}
+
+impl NativeQwen25VisionBlock {
+    fn forward(
+        &self,
+        backend: &CpuBackend,
+        input: &Tensor,
+        grid_thw: [usize; 3],
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, MultimodalTextError> {
+        let tokens = grid_thw[0]
+            .checked_mul(grid_thw[1])
+            .and_then(|value| value.checked_mul(grid_thw[2]))
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 vision tokens"))?;
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            input,
+            &self.normalization_one_weight,
+            tokens,
+            1_280,
+            1.0e-6,
+            context,
+        )?;
+        let mut qkv = self.query_key_value.clone();
+        let qkv = qkv.forward_with_context(backend, &normalized, context)?;
+        let attention = qwen_vision_attention(
+            backend,
+            &tensor_to_f32(backend, &qkv, context)?,
+            grid_thw,
+            1_280,
+            16,
+            context,
+        )?;
+        let attention = qwen_tensor(backend, &[tokens, 1_280], &attention, context)?;
+        let mut output = self.attention_output.clone();
+        let hidden = qwen_add_tensors(
+            backend,
+            input,
+            &output.forward_with_context(backend, &attention, context)?,
+            context,
+        )?;
+        let normalized = gemma4_weighted_rms_norm(
+            backend,
+            &hidden,
+            &self.normalization_two_weight,
+            tokens,
+            1_280,
+            1.0e-6,
+            context,
+        )?;
+        let mut gate = self.feed_forward_gate.clone();
+        let mut up = self.feed_forward_up.clone();
+        let gate = gate.forward_with_context(backend, &normalized, context)?;
+        let up = up.forward_with_context(backend, &normalized, context)?;
+        let mut gate_values = tensor_to_f32(backend, &gate, context)?;
+        let up_values = tensor_to_f32(backend, &up, context)?;
+        for (gate, up) in gate_values.iter_mut().zip(up_values.iter()) {
+            *gate = *gate / (1.0 + (-*gate).exp()) * *up;
+        }
+        let gated = qwen_tensor(backend, &[tokens, 3_420], &gate_values, context)?;
+        let mut down = self.feed_forward_down.clone();
+        qwen_add_tensors(
+            backend,
+            &hidden,
+            &down.forward_with_context(backend, &gated, context)?,
+            context,
+        )
+    }
+}
+
 impl NativeQwenVisionEncoder {
     pub fn new(
         configuration: QwenVisionConfiguration,
@@ -4011,6 +4833,59 @@ impl NativeQwenVisionEncoder {
 
     pub fn configuration(&self) -> &QwenVisionConfiguration {
         &self.configuration
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen vision mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut reconstructed = self.clone();
+        let mut consumed = BTreeSet::new();
+        reload_multimodal_module(
+            &mut reconstructed.patch_projection,
+            "patch_projection",
+            mapped,
+            &mut consumed,
+        )?;
+        reconstructed.position_embedding =
+            take_multimodal_tensor(mapped, "position_embedding", &mut consumed)?;
+        for (index, block) in reconstructed.blocks.iter_mut().enumerate() {
+            cancellation.check()?;
+            let prefix = format!("blocks.{index}");
+            for (suffix, module) in [
+                ("normalization_one", &mut block.normalization_one),
+                ("query_key_value", &mut block.query_key_value),
+                ("attention_output", &mut block.attention_output),
+                ("normalization_two", &mut block.normalization_two),
+                ("feed_forward_up", &mut block.feed_forward_up),
+                ("feed_forward_down", &mut block.feed_forward_down),
+            ] {
+                reload_multimodal_module(
+                    module,
+                    &format!("{prefix}.{suffix}"),
+                    mapped,
+                    &mut consumed,
+                )?;
+            }
+        }
+        reload_qwen_merger(&mut reconstructed.merger, "merger", mapped, &mut consumed)?;
+        for (index, merger) in reconstructed.deepstack_mergers.iter_mut().enumerate() {
+            reload_qwen_merger(merger, &format!("deepstack.{index}"), mapped, &mut consumed)?;
+        }
+        if consumed.len() != mapped.tensors().len() {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen vision mapped weights contain unconsumed parameters",
+            ));
+        }
+        reconstructed.semantic_state_digest(cancellation)?;
+        Ok(reconstructed)
     }
 
     pub fn execution_stream(&self) -> StreamId {
@@ -4238,7 +5113,7 @@ pub struct NativeQwenMultimodal {
     vision: Arc<NativeQwenVisionEncoder>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum GemmaMultimodalFamily {
     Gemma3FourBVision,
     Gemma3TwelveB,
@@ -4430,6 +5305,30 @@ impl NativeQwenMultimodal {
 
     pub fn family(&self) -> QwenVisionFamily {
         self.vision.configuration().family
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        let (decoder_weights, vision_weights) = split_multimodal_weights(mapped)?;
+        let decoder = Arc::new(
+            self.decoder
+                .reconstruct_from_mapped_weights(&decoder_weights, cancellation)?,
+        );
+        let vision = Arc::new(
+            self.vision
+                .reconstruct_from_mapped_weights(&vision_weights, cancellation)?,
+        );
+        let reconstructed = Self {
+            tokenizer: self.tokenizer.clone(),
+            decoder,
+            vision,
+        };
+        reconstructed.validate(cancellation)?;
+        Ok(reconstructed)
     }
 
     pub fn tokenizer(&self) -> &Arc<NativePromptTokenizer> {
@@ -4751,6 +5650,420 @@ impl NativeQwenMultimodal {
     }
 }
 
+impl NativeQwen25Multimodal {
+    pub fn new(
+        tokenizer: Arc<NativePromptTokenizer>,
+        decoder: Arc<NativeDecoderTextEncoder>,
+        vision: Arc<NativeQwen25VisionEncoder>,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        let owner = Self {
+            tokenizer,
+            decoder,
+            vision,
+        };
+        owner.validate(cancellation)?;
+        Ok(owner)
+    }
+
+    pub fn tokenizer(&self) -> &Arc<NativePromptTokenizer> {
+        &self.tokenizer
+    }
+    pub fn decoder(&self) -> &Arc<NativeDecoderTextEncoder> {
+        &self.decoder
+    }
+    pub fn vision(&self) -> &Arc<NativeQwen25VisionEncoder> {
+        &self.vision
+    }
+
+    pub fn validate(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<(), MultimodalTextError> {
+        cancellation.check()?;
+        let tokenizer = self.tokenizer.configuration();
+        let decoder = self.decoder.configuration();
+        if self.tokenizer.qwen2_profile() != Some(Qwen2PretokenizerProfile::Qwen2)
+            || self.tokenizer.qwen2_artifact_digest() != Some(QWEN25_TOKENIZER_ARTIFACT_DIGEST)
+            || tokenizer.pad_token != 151_643
+            || tokenizer.start_token.is_some()
+            || tokenizer.end_token.is_some()
+            || tokenizer.minimum_length != Some(1)
+            || tokenizer.pad_to_maximum_length
+            || tokenizer.embedding_width != Some(3_584)
+            || decoder.vocabulary_size != 152_064
+            || decoder.hidden_size != 3_584
+            || decoder.feed_forward_size != 18_944
+            || decoder.layer_kinds.len() != 28
+            || decoder.attention_heads != 28
+            || decoder.key_value_heads != 4
+            || decoder.head_dimension != 128
+            || decoder.maximum_tokens != 128_000
+            || self.decoder.execution_stream() != self.vision.stream
+        {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 multimodal owners do not match the pinned profile",
+            ));
+        }
+        self.vision.validate(cancellation)?;
+        Ok(())
+    }
+
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        let (decoder, vision) = split_multimodal_weights(mapped)?;
+        Self::new(
+            self.tokenizer.clone(),
+            Arc::new(
+                self.decoder
+                    .reconstruct_from_mapped_weights(&decoder, cancellation)?,
+            ),
+            Arc::new(
+                self.vision
+                    .reconstruct_from_mapped_weights(&vision, cancellation)?,
+            ),
+            cancellation,
+        )
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<String, MultimodalTextError> {
+        self.validate(cancellation)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.qwen25-image-resource.v1");
+        hasher.update(self.tokenizer.semantic_digest(cancellation)?.as_bytes());
+        hasher.update(self.decoder.semantic_state_digest(cancellation)?.as_bytes());
+        hasher.update(self.vision.semantic_state_digest(cancellation)?.as_bytes());
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, MultimodalTextError> {
+        u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 multimodal residency"))
+    }
+
+    pub fn resident_tensor_allocations(
+        &self,
+    ) -> Result<Vec<(comfy_tensor::StorageId, u64)>, MultimodalTextError> {
+        let mut allocations = self.decoder.resident_tensor_allocations();
+        for allocation in self.vision.resident_tensor_allocations() {
+            if let Some((_, bytes)) = allocations.iter().find(|(id, _)| *id == allocation.0) {
+                if *bytes != allocation.1 {
+                    return Err(MultimodalTextError::InvalidInput(
+                        "Qwen2.5 aliased storage changed size",
+                    ));
+                }
+            } else {
+                allocations.push(allocation);
+            }
+        }
+        Ok(allocations)
+    }
+
+    pub fn encode_conditioning(
+        &self,
+        backend: &CpuBackend,
+        request: Qwen25ConditioningRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<QwenConditioningOutput, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let formatted = format_qwen25_image_conditioning_prompt(
+            request.prompt,
+            !request.prepared_images.is_empty(),
+            request.custom_template,
+        )?;
+        let tokens = self
+            .tokenizer
+            .encode_numeric(&formatted, context.cancellation)?
+            .into_iter();
+        let mut projected_tokens = Vec::new();
+        projected_tokens
+            .try_reserve_exact(tokens.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 prompt tokens"))?;
+        projected_tokens.extend(tokens.map(i64::from));
+        let mut image_layout = Vec::new();
+        image_layout
+            .try_reserve_exact(request.prepared_images.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 image layout"))?;
+        image_layout.extend(
+            request
+                .prepared_images
+                .iter()
+                .map(|image| (image.grid_thw, image.merged_tokens)),
+        );
+        let marker_plan =
+            plan_qwen25_marker_layout(&projected_tokens, &image_layout, context.cancellation)?;
+        let text_embeddings =
+            self.decoder
+                .embed_token_values(backend, &marker_plan.expanded_tokens, context)?;
+        let mut projections = Vec::new();
+        projections
+            .try_reserve_exact(marker_plan.spans.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 vision projections"))?;
+        for image in request.prepared_images.iter().take(marker_plan.spans.len()) {
+            context.cancellation.check()?;
+            projections.push(self.vision.project(backend, image, context)?);
+        }
+        let mut image_embeddings = Vec::new();
+        image_embeddings
+            .try_reserve_exact(projections.len())
+            .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 image embeddings"))?;
+        for (span, projection) in marker_plan.spans.iter().zip(&projections) {
+            image_embeddings.push(MultimodalImageEmbedding {
+                span: *span,
+                embedding: projection,
+                deepstack: &[],
+            });
+        }
+        let embeddings =
+            join_multimodal_embeddings(backend, &text_embeddings, &image_embeddings, context)?;
+        let position_values = if !marker_plan.spans.is_empty() {
+            let values = qwen2vl_mrope_position_ids(
+                marker_plan.expanded_tokens.len(),
+                &marker_plan.spans,
+                context.cancellation,
+            )?
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen2.5 image positions are missing",
+            ))?;
+            vec![values.temporal, values.height, values.width]
+        } else {
+            vec![sequential_positions(marker_plan.expanded_tokens.len())?]
+        };
+        let causal = decoder_causal_positions(marker_plan.expanded_tokens.len())?;
+        let mut position_axes = Vec::new();
+        if position_values.len() > 1 {
+            position_axes
+                .try_reserve_exact(position_values.len())
+                .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 position axes"))?;
+            for axis in &position_values {
+                position_axes.push(
+                    axis.iter()
+                        .map(|value| {
+                            usize::try_from(*value).map_err(|_| {
+                                MultimodalTextError::InvalidInput("Qwen2.5 position is negative")
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+            }
+        }
+        let rope_positions = if position_axes.is_empty() {
+            DecoderRopePositions::Scalar(&causal)
+        } else {
+            DecoderRopePositions::Multidimensional(&position_axes)
+        };
+        let output = self.decoder.forward_prepared(
+            backend,
+            crate::DecoderPreparedTextRequest {
+                embeddings: &embeddings,
+                attention_mask: None,
+                rope_positions,
+                causal_positions: &causal,
+                cache: None,
+                capture_layer: request.capture_layer,
+                deepstack: None,
+                initial_input_ids: None,
+            },
+            context,
+        )?;
+        let hidden = request
+            .capture_layer
+            .and_then(|_| output.intermediate())
+            .unwrap_or(output.last_hidden_state());
+        let trim = qwen_conditioning_prefix_trim(&projected_tokens)?;
+        let remaining = hidden
+            .descriptor()
+            .shape()
+            .get(1)
+            .copied()
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen2.5 hidden tokens are missing",
+            ))?
+            .checked_sub(
+                u64::try_from(trim).map_err(|_| MultimodalTextError::Overflow("Qwen2.5 trim"))?,
+            )
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Qwen2.5 trim removes every token",
+            ))?;
+        let hidden = narrow_method_exact_native(
+            hidden,
+            1,
+            i64::try_from(trim).map_err(|_| MultimodalTextError::Overflow("Qwen2.5 trim"))?,
+            remaining,
+            context.cancellation,
+        )?;
+        let trimmed_tokens =
+            marker_plan
+                .expanded_tokens
+                .get(trim..)
+                .ok_or(MultimodalTextError::InvalidInput(
+                    "Qwen2.5 attention-mask trim is invalid",
+                ))?;
+        let attention_mask = if trimmed_tokens.iter().all(|token| *token != 151_643) {
+            None
+        } else {
+            let mut mask = backend.workspace_vec(context, trimmed_tokens.len())?;
+            for token in trimmed_tokens {
+                mask.try_push(if *token == 151_643 { 0.0 } else { 1.0 })?;
+            }
+            Some(qwen_tensor(
+                backend,
+                &[1, trimmed_tokens.len()],
+                &mask,
+                context,
+            )?)
+        };
+        Ok(QwenConditioningOutput {
+            hidden,
+            attention_mask,
+        })
+    }
+}
+
+struct Qwen25MarkerPlan {
+    expanded_tokens: Vec<i64>,
+    spans: Vec<MultimodalSpan>,
+}
+
+fn plan_qwen25_marker_layout(
+    tokens: &[i64],
+    images: &[([usize; 3], usize)],
+    cancellation: &comfy_types::CancellationToken,
+) -> Result<Qwen25MarkerPlan, MultimodalTextError> {
+    cancellation.check()?;
+    let mapped_images = tokens
+        .iter()
+        .filter(|token| **token == 151_655)
+        .count()
+        .min(images.len());
+    let mut expanded_length = tokens.len();
+    let mut length_image_index = 0_usize;
+    for token in tokens {
+        if *token != 151_655 || length_image_index >= mapped_images {
+            continue;
+        }
+        expanded_length = expanded_length
+            .checked_add(images[length_image_index].1.saturating_sub(1))
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 expanded prompt"))?;
+        length_image_index = length_image_index
+            .checked_add(1)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 image index"))?;
+    }
+    let mut expanded_tokens = Vec::new();
+    expanded_tokens
+        .try_reserve_exact(expanded_length)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 expanded prompt"))?;
+    let mut spans = Vec::new();
+    spans
+        .try_reserve_exact(mapped_images)
+        .map_err(|_| MultimodalTextError::Overflow("Qwen2.5 marker spans"))?;
+    let mut image_index = 0_usize;
+    for (token_index, token) in tokens.iter().copied().enumerate() {
+        if token_index.is_multiple_of(256) {
+            cancellation.check()?;
+        }
+        let Some((grid_thw, merged_tokens)) = images.get(image_index) else {
+            expanded_tokens.push(token);
+            continue;
+        };
+        if token != 151_655 {
+            expanded_tokens.push(token);
+            continue;
+        }
+        if *merged_tokens == 0 {
+            return Err(MultimodalTextError::InvalidInput(
+                "Qwen2.5 prepared image has no merged tokens",
+            ));
+        }
+        let start = expanded_tokens.len();
+        expanded_tokens.extend(std::iter::repeat_n(token, *merged_tokens));
+        spans.push(MultimodalSpan {
+            start,
+            size: *merged_tokens,
+            grid_thw: *grid_thw,
+        });
+        image_index = image_index
+            .checked_add(1)
+            .ok_or(MultimodalTextError::Overflow("Qwen2.5 image index"))?;
+    }
+    if expanded_tokens.is_empty() {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen2.5 expanded prompt cannot be empty",
+        ));
+    }
+    cancellation.check()?;
+    Ok(Qwen25MarkerPlan {
+        expanded_tokens,
+        spans,
+    })
+}
+
+fn format_qwen25_image_conditioning_prompt(
+    prompt: &str,
+    has_images: bool,
+    custom_template: Option<&str>,
+) -> Result<String, MultimodalTextError> {
+    if prompt.starts_with("<|im_start|>") || prompt.starts_with("<|start_header_id|>") {
+        return Ok(prompt.to_owned());
+    }
+    let template = custom_template.unwrap_or(if has_images {
+        "<|im_start|>system\nDescribe the key features of the input image (color, shape, size, texture, objects, background), then explain how the user's text instruction should alter or modify the image. Generate a new image that meets the user's requirements while maintaining consistency with the original input where appropriate.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>{}<|im_end|>\n<|im_start|>assistant\n"
+    } else {
+        "<|im_start|>system\nDescribe the image by detailing the color, shape, size, texture, quantity, text, spatial relationships of the objects and background:<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n"
+    });
+    let (prefix, suffix) = template
+        .split_once("{}")
+        .ok_or(MultimodalTextError::InvalidInput(
+            "Qwen conditioning template must contain exactly one prompt placeholder",
+        ))?;
+    if suffix.contains("{}") {
+        return Err(MultimodalTextError::InvalidInput(
+            "Qwen conditioning template contains multiple prompt placeholders",
+        ));
+    }
+    let mut formatted = String::new();
+    formatted
+        .try_reserve_exact(
+            prefix
+                .len()
+                .checked_add(prompt.len())
+                .and_then(|length| length.checked_add(suffix.len()))
+                .ok_or(MultimodalTextError::Overflow("Qwen conditioning template"))?,
+        )
+        .map_err(|_| MultimodalTextError::Overflow("Qwen conditioning template"))?;
+    formatted.push_str(prefix);
+    formatted.push_str(prompt);
+    formatted.push_str(suffix);
+    Ok(formatted)
+}
+
+fn qwen_conditioning_prefix_trim(tokens: &[i64]) -> Result<usize, MultimodalTextError> {
+    let mut template_end = None;
+    let mut count = 0;
+    for (index, token) in tokens.iter().copied().enumerate() {
+        if token == 151_644 && count < 2 {
+            template_end = Some(index);
+            count += 1;
+        }
+    }
+    let mut template_end = template_end.ok_or(MultimodalTextError::InvalidInput(
+        "Qwen conditioning template has no second conversation marker",
+    ))?;
+    if tokens.get(template_end + 1) == Some(&872) && tokens.get(template_end + 2) == Some(&198) {
+        template_end = template_end
+            .checked_add(3)
+            .ok_or(MultimodalTextError::Overflow("Qwen conditioning prefix"))?;
+    }
+    Ok(template_end)
+}
+
 impl GemmaMultimodalFamily {
     pub const fn tokenizer_profile(self) -> GemmaTokenizerProfile {
         match self {
@@ -4963,6 +6276,47 @@ impl NativeGemmaMultimodal {
         self.audio.as_ref()
     }
 
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &comfy_types::CancellationToken,
+    ) -> Result<Self, MultimodalTextError> {
+        cancellation.check()?;
+        let NativeGemmaVisionResource::Gemma4(vision) = &self.vision else {
+            return Err(MultimodalTextError::InvalidInput(
+                "scheduled CLIP reconstruction is pinned to the Gemma4 multimodal owner",
+            ));
+        };
+        let (decoder_weights, vision_weights, audio_weights) =
+            split_gemma4_multimodal_weights(mapped, self.audio.is_some())?;
+        let decoder = Arc::new(
+            self.decoder
+                .reconstruct_from_mapped_weights(&decoder_weights, cancellation)?,
+        );
+        let vision =
+            Arc::new(vision.reconstruct_from_mapped_weights(&vision_weights, cancellation)?);
+        let audio = match (&self.audio, audio_weights) {
+            (Some(owner), Some(weights)) => Some(Arc::new(
+                owner.reconstruct_from_mapped_weights(&weights, cancellation)?,
+            )),
+            (None, None) => None,
+            _ => {
+                return Err(MultimodalTextError::InvalidInput(
+                    "Gemma4 scheduled weights and retained audio capability disagree",
+                ));
+            }
+        };
+        Self::checked(
+            self.family,
+            self.tokenizer.clone(),
+            decoder,
+            NativeGemmaVisionResource::Gemma4(vision),
+            audio,
+            self.is_source_exact_profile(),
+            cancellation,
+        )
+    }
+
     pub fn is_source_exact_profile(&self) -> bool {
         let decoder_exact = self.decoder.configuration() == &self.family.decoder_configuration();
         let vision_exact = match (&self.vision, self.family) {
@@ -5157,7 +6511,7 @@ impl NativeGemmaMultimodal {
         let mut hasher = Sha256::new();
         hasher.update(b"zed.comfy.gemma-multimodal-resource.v1");
         hasher.update(b"standard-comfy-text-generation-adapter");
-        hasher.update(format!("{:?}", self.family).as_bytes());
+        hasher.update(canonical_multimodal_bytes(&self.family)?);
         hasher.update(QWEN_MULTIMODAL_ROUTING_SOURCE_SHA256.as_bytes());
         hasher.update(LLAMA_SOURCE_SHA256.as_bytes());
         hasher.update(SD1_CLIP_SOURCE_SHA256.as_bytes());
@@ -5255,6 +6609,180 @@ impl NativeGemmaMultimodal {
                         "Gemma multimodal tensor residency",
                     ))
             })
+    }
+
+    pub fn encode_conditioning(
+        &self,
+        backend: &CpuBackend,
+        request: GemmaConditioningRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<GemmaConditioningOutput, MultimodalTextError> {
+        context.check()?;
+        self.validate(context.cancellation)?;
+        let formatted_prompt = format_gemma_multimodal_prompt(
+            self.family,
+            request.prompt,
+            request.prepared_visuals,
+            request.prepared_audio,
+            request.use_default_template,
+            request.thinking,
+            context.cancellation,
+        )?;
+        let prompt_tokens = self
+            .tokenizer
+            .encode_numeric(&formatted_prompt, context.cancellation)?
+            .into_iter()
+            .map(i64::from)
+            .collect::<Vec<_>>();
+        let mut media = Vec::new();
+        media
+            .try_reserve_exact(
+                request
+                    .prepared_visuals
+                    .len()
+                    .checked_add(usize::from(request.prepared_audio.is_some()))
+                    .ok_or(MultimodalTextError::Overflow(
+                        "Gemma conditioning projected media",
+                    ))?,
+            )
+            .map_err(|_| MultimodalTextError::Overflow("Gemma conditioning projected media"))?;
+        match self.family {
+            GemmaMultimodalFamily::Gemma3FourBVision | GemmaMultimodalFamily::Gemma3TwelveB => {
+                let vision = self
+                    .gemma3_vision()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma3 conditioning requires its retained vision owner",
+                    ))?;
+                for prepared in request.prepared_visuals {
+                    context.check()?;
+                    let (embedding, tokens) = flatten_gemma3_projection(
+                        backend,
+                        vision.project(backend, prepared, context)?,
+                        context,
+                    )?;
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(crate::GEMMA3_IMAGE_TOKEN),
+                        source_markers: 1,
+                        tokens,
+                        embedding,
+                    });
+                }
+            }
+            GemmaMultimodalFamily::Gemma4E2B
+            | GemmaMultimodalFamily::Gemma4E4B
+            | GemmaMultimodalFamily::Gemma4ThirtyOneB => {
+                let vision = self
+                    .gemma4_vision()
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma4 conditioning requires its retained vision owner",
+                    ))?;
+                for prepared in request.prepared_visuals {
+                    context.check()?;
+                    let projection = vision.project(backend, prepared, context)?;
+                    let marker = match projection.kind {
+                        GemmaPreparedVisualKind::Gemma4Image => crate::GEMMA4_IMAGE_TOKEN,
+                        GemmaPreparedVisualKind::Gemma4VideoFrame => crate::GEMMA4_VIDEO_TOKEN,
+                        GemmaPreparedVisualKind::Gemma3Image => {
+                            return Err(MultimodalTextError::InvalidInput(
+                                "Gemma4 conditioning cannot consume Gemma3 visual projection",
+                            ));
+                        }
+                    };
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(marker),
+                        source_markers: 1,
+                        tokens: projection.tokens,
+                        embedding: projection.embedding,
+                    });
+                }
+                if let Some(prepared_audio) = request.prepared_audio {
+                    let audio = self
+                        .audio
+                        .as_ref()
+                        .ok_or(MultimodalTextError::InvalidInput(
+                            "Gemma family does not admit audio conditioning",
+                        ))?;
+                    let projection = audio.project(backend, prepared_audio, context)?;
+                    media.push(GemmaProjectedMedia {
+                        marker: i64::from(crate::GEMMA4_AUDIO_TOKEN),
+                        source_markers: prepared_audio.marker_tokens(),
+                        tokens: projection.tokens,
+                        embedding: projection.embedding,
+                    });
+                }
+            }
+        }
+        let marker_plan =
+            plan_gemma_markers(&prompt_tokens, &media, self.family, context.cancellation)?;
+        if marker_plan.expanded_tokens.len() > self.decoder.configuration().maximum_tokens {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma conditioning exceeds the decoder token limit",
+            ));
+        }
+        let text_embeddings =
+            self.decoder
+                .embed_token_values(backend, &marker_plan.expanded_tokens, context)?;
+        let mut projected_embeddings = Vec::new();
+        projected_embeddings
+            .try_reserve_exact(marker_plan.entries.len())
+            .map_err(|_| MultimodalTextError::Overflow("Gemma conditioning media"))?;
+        for entry in &marker_plan.entries {
+            let projected =
+                media
+                    .get(entry.media_index)
+                    .ok_or(MultimodalTextError::InvalidInput(
+                        "Gemma conditioning marker projection is unavailable",
+                    ))?;
+            projected_embeddings.push(MultimodalImageEmbedding {
+                span: entry.span,
+                embedding: &projected.embedding,
+                deepstack: &[],
+            });
+        }
+        let embeddings =
+            join_multimodal_embeddings(backend, &text_embeddings, &projected_embeddings, context)?;
+        let causal_positions = decoder_causal_positions(marker_plan.expanded_tokens.len())?;
+        let gemma4 = matches!(
+            self.family,
+            GemmaMultimodalFamily::Gemma4E2B
+                | GemmaMultimodalFamily::Gemma4E4B
+                | GemmaMultimodalFamily::Gemma4ThirtyOneB
+        );
+        let output = self.decoder.forward_prepared_all_layers(
+            backend,
+            crate::DecoderPreparedTextRequest {
+                embeddings: &embeddings,
+                attention_mask: None,
+                rope_positions: DecoderRopePositions::Scalar(&causal_positions),
+                causal_positions: &causal_positions,
+                cache: None,
+                capture_layer: None,
+                deepstack: None,
+                initial_input_ids: gemma4.then_some(marker_plan.expanded_tokens.as_slice()),
+            },
+            context,
+        )?;
+        let hidden = output
+            .all_intermediate()
+            .ok_or(MultimodalTextError::InvalidInput(
+                "Gemma conditioning all-layer output is missing",
+            ))?
+            .clone();
+        let mut mask_values = backend.workspace_vec(context, marker_plan.expanded_tokens.len())?;
+        for _ in 0..marker_plan.expanded_tokens.len() {
+            mask_values.try_push(1.0)?;
+        }
+        let attention_mask = qwen_tensor(
+            backend,
+            &[1, marker_plan.expanded_tokens.len()],
+            &mask_values,
+            context,
+        )?;
+        context.check()?;
+        Ok(GemmaConditioningOutput {
+            hidden,
+            attention_mask,
+        })
     }
 
     pub fn generate(
@@ -7443,6 +8971,328 @@ fn qwen_linear_module(
     Ok(module)
 }
 
+fn split_multimodal_weights(
+    mapped: &MappedModelWeights,
+) -> Result<(MappedModelWeights, MappedModelWeights), MultimodalTextError> {
+    if !mapped.unexpected_keys().is_empty() {
+        return Err(MultimodalTextError::InvalidInput(
+            "multimodal mapped weights contain unexpected parameters",
+        ));
+    }
+    let mut decoder = BTreeMap::new();
+    let mut vision = BTreeMap::new();
+    for (name, tensor) in mapped.tensors() {
+        if let Some(name) = name.strip_prefix("decoder.") {
+            decoder.insert(name.to_owned(), tensor.clone());
+        } else if let Some(name) = name.strip_prefix("vision.") {
+            vision.insert(name.to_owned(), tensor.clone());
+        } else {
+            return Err(MultimodalTextError::InvalidInput(
+                "multimodal mapped weight has no canonical owner prefix",
+            ));
+        }
+    }
+    if decoder.is_empty() || vision.is_empty() {
+        return Err(MultimodalTextError::InvalidInput(
+            "multimodal mapped weights omit a canonical owner",
+        ));
+    }
+    Ok((
+        MappedModelWeights::from_parts(
+            mapped.base_artifact_digest().to_owned(),
+            decoder,
+            Vec::new(),
+        ),
+        MappedModelWeights::from_parts(
+            mapped.base_artifact_digest().to_owned(),
+            vision,
+            Vec::new(),
+        ),
+    ))
+}
+
+fn canonical_multimodal_bytes(value: &impl Serialize) -> Result<Vec<u8>, MultimodalTextError> {
+    serde_json::to_vec(value).map_err(|_| {
+        MultimodalTextError::InvalidInput(
+            "multimodal configuration cannot be canonically serialized",
+        )
+    })
+}
+
+fn split_gemma4_multimodal_weights(
+    mapped: &MappedModelWeights,
+    audio_required: bool,
+) -> Result<
+    (
+        MappedModelWeights,
+        MappedModelWeights,
+        Option<MappedModelWeights>,
+    ),
+    MultimodalTextError,
+> {
+    if !mapped.unexpected_keys().is_empty() {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 mapped weights contain unexpected parameters",
+        ));
+    }
+    let mut decoder = BTreeMap::new();
+    let mut vision = BTreeMap::new();
+    let mut audio = BTreeMap::new();
+    for (name, tensor) in mapped.tensors() {
+        if let Some(name) = name.strip_prefix("decoder.") {
+            decoder.insert(name.to_owned(), tensor.clone());
+        } else if let Some(name) = name.strip_prefix("vision.") {
+            vision.insert(name.to_owned(), tensor.clone());
+        } else if let Some(name) = name.strip_prefix("audio.") {
+            audio.insert(name.to_owned(), tensor.clone());
+        } else {
+            return Err(MultimodalTextError::InvalidInput(
+                "Gemma4 mapped weight has no canonical owner prefix",
+            ));
+        }
+    }
+    if decoder.is_empty() || vision.is_empty() || audio_required != !audio.is_empty() {
+        return Err(MultimodalTextError::InvalidInput(
+            "Gemma4 mapped weights omit or add a canonical retained owner",
+        ));
+    }
+    let artifact = mapped.base_artifact_digest().to_owned();
+    Ok((
+        MappedModelWeights::from_parts(artifact.clone(), decoder, Vec::new()),
+        MappedModelWeights::from_parts(artifact.clone(), vision, Vec::new()),
+        (!audio.is_empty()).then(|| MappedModelWeights::from_parts(artifact, audio, Vec::new())),
+    ))
+}
+
+fn take_multimodal_tensor(
+    mapped: &MappedModelWeights,
+    name: &str,
+    consumed: &mut BTreeSet<String>,
+) -> Result<Tensor, MultimodalTextError> {
+    let tensor = mapped
+        .tensors()
+        .get(name)
+        .cloned()
+        .ok_or(MultimodalTextError::InvalidInput(
+            "multimodal mapped weight is missing",
+        ))?;
+    consumed.insert(name.to_owned());
+    Ok(tensor)
+}
+
+fn reload_multimodal_module(
+    module: &mut NativeModule,
+    name: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    let (_, existing_bias) = module.dense_parameters()?;
+    let weight = take_multimodal_tensor(mapped, &format!("{name}.weight"), consumed)?;
+    let bias = if existing_bias.is_some() {
+        Some(take_multimodal_tensor(
+            mapped,
+            &format!("{name}.bias"),
+            consumed,
+        )?)
+    } else {
+        None
+    };
+    module.load_dense_parameters(weight, bias)?;
+    Ok(())
+}
+
+fn reload_gemma4_clipped_linear(
+    linear: &mut NativeGemma4ClippedLinear,
+    prefix: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    reload_multimodal_module(&mut linear.linear, prefix, mapped, consumed)?;
+    linear.input_minimum =
+        take_multimodal_tensor(mapped, &format!("{prefix}.input_minimum"), consumed)?;
+    linear.input_maximum =
+        take_multimodal_tensor(mapped, &format!("{prefix}.input_maximum"), consumed)?;
+    linear.output_minimum =
+        take_multimodal_tensor(mapped, &format!("{prefix}.output_minimum"), consumed)?;
+    linear.output_maximum =
+        take_multimodal_tensor(mapped, &format!("{prefix}.output_maximum"), consumed)?;
+    Ok(())
+}
+
+fn reload_gemma4_vision_block(
+    block: &mut NativeGemma4VisionBlock,
+    prefix: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    block.input_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.input_normalization.weight"),
+        consumed,
+    )?;
+    block.query_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.query_normalization.weight"),
+        consumed,
+    )?;
+    block.key_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.key_normalization.weight"),
+        consumed,
+    )?;
+    block.post_attention_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.post_attention_normalization.weight"),
+        consumed,
+    )?;
+    block.pre_feed_forward_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.pre_feed_forward_normalization.weight"),
+        consumed,
+    )?;
+    block.post_feed_forward_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.post_feed_forward_normalization.weight"),
+        consumed,
+    )?;
+    for (suffix, linear) in [
+        ("query", &mut block.query),
+        ("key", &mut block.key),
+        ("value", &mut block.value),
+        ("attention_output", &mut block.attention_output),
+        ("feed_forward_gate", &mut block.feed_forward_gate),
+        ("feed_forward_up", &mut block.feed_forward_up),
+        ("feed_forward_down", &mut block.feed_forward_down),
+    ] {
+        reload_gemma4_clipped_linear(linear, &format!("{prefix}.{suffix}"), mapped, consumed)?;
+    }
+    Ok(())
+}
+
+fn reload_gemma4_audio_feed_forward(
+    feed_forward: &mut NativeGemma4AudioFeedForward,
+    prefix: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    feed_forward.pre_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.pre_normalization.weight"),
+        consumed,
+    )?;
+    feed_forward.post_normalization_weight = take_multimodal_tensor(
+        mapped,
+        &format!("{prefix}.post_normalization.weight"),
+        consumed,
+    )?;
+    reload_gemma4_clipped_linear(
+        &mut feed_forward.first,
+        &format!("{prefix}.first"),
+        mapped,
+        consumed,
+    )?;
+    reload_gemma4_clipped_linear(
+        &mut feed_forward.second,
+        &format!("{prefix}.second"),
+        mapped,
+        consumed,
+    )?;
+    Ok(())
+}
+
+fn reload_gemma4_audio_block(
+    block: &mut NativeGemma4AudioBlock,
+    prefix: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    reload_gemma4_audio_feed_forward(
+        &mut block.feed_forward_one,
+        &format!("{prefix}.ff1"),
+        mapped,
+        consumed,
+    )?;
+    reload_gemma4_audio_feed_forward(
+        &mut block.feed_forward_two,
+        &format!("{prefix}.ff2"),
+        mapped,
+        consumed,
+    )?;
+    for (suffix, linear) in [
+        ("query", &mut block.query),
+        ("key", &mut block.key),
+        ("value", &mut block.value),
+        ("attention_output", &mut block.attention_output),
+        ("convolution_start", &mut block.convolution_start),
+        ("convolution_end", &mut block.convolution_end),
+    ] {
+        reload_gemma4_clipped_linear(linear, &format!("{prefix}.{suffix}"), mapped, consumed)?;
+    }
+    reload_multimodal_module(
+        &mut block.relative_key_projection,
+        &format!("{prefix}.relative_key_projection"),
+        mapped,
+        consumed,
+    )?;
+    for (suffix, target) in [
+        ("attention_scale", &mut block.attention_scale),
+        (
+            "pre_attention_normalization.weight",
+            &mut block.pre_attention_normalization_weight,
+        ),
+        (
+            "post_attention_normalization.weight",
+            &mut block.post_attention_normalization_weight,
+        ),
+        (
+            "convolution_pre_normalization.weight",
+            &mut block.convolution_pre_normalization_weight,
+        ),
+        (
+            "depthwise_convolution.weight",
+            &mut block.depthwise_convolution_weight,
+        ),
+        (
+            "convolution_normalization.weight",
+            &mut block.convolution_normalization_weight,
+        ),
+        (
+            "output_normalization.weight",
+            &mut block.output_normalization_weight,
+        ),
+    ] {
+        *target = take_multimodal_tensor(mapped, &format!("{prefix}.{suffix}"), consumed)?;
+    }
+    Ok(())
+}
+
+fn reload_qwen_merger(
+    merger: &mut NativeQwenVisionMerger,
+    prefix: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), MultimodalTextError> {
+    reload_multimodal_module(
+        &mut merger.normalization,
+        &format!("{prefix}.normalization"),
+        mapped,
+        consumed,
+    )?;
+    reload_multimodal_module(
+        &mut merger.first,
+        &format!("{prefix}.first"),
+        mapped,
+        consumed,
+    )?;
+    reload_multimodal_module(
+        &mut merger.second,
+        &format!("{prefix}.second"),
+        mapped,
+        consumed,
+    )?;
+    Ok(())
+}
+
 fn qwen_layer_norm_module(
     name: &str,
     width: usize,
@@ -8592,4 +10442,40 @@ fn u64_to_usize(value: u64, name: &'static str) -> Result<usize, MultimodalTextE
 
 fn u64_to_i64(value: u64, name: &'static str) -> Result<i64, MultimodalTextError> {
     i64::try_from(value).map_err(|_| MultimodalTextError::Overflow(name))
+}
+
+#[cfg(test)]
+mod native_qwen25_conditioning_tests {
+    use super::*;
+
+    #[test]
+    fn qwen25_markers_map_successive_images_and_leave_unmatched_inputs_source_exact()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let cancellation = comfy_types::CancellationToken::default();
+        let plan = plan_qwen25_marker_layout(
+            &[10, 151_655, 20, 151_655, 151_655, 30],
+            &[
+                ([1, 2, 2], 2),
+                ([1, 4, 2], 3),
+                ([1, 6, 2], 1),
+                ([1, 8, 2], 9),
+            ],
+            &cancellation,
+        )?;
+        assert_eq!(
+            plan.expanded_tokens,
+            [
+                10, 151_655, 151_655, 20, 151_655, 151_655, 151_655, 151_655, 30
+            ]
+        );
+        assert_eq!(plan.spans.len(), 3);
+        assert_eq!((plan.spans[0].start, plan.spans[0].size), (1, 2));
+        assert_eq!((plan.spans[1].start, plan.spans[1].size), (4, 3));
+        assert_eq!((plan.spans[2].start, plan.spans[2].size), (7, 1));
+
+        let unmatched = plan_qwen25_marker_layout(&[151_655, 7], &[], &cancellation)?;
+        assert_eq!(unmatched.expanded_tokens, [151_655, 7]);
+        assert!(unmatched.spans.is_empty());
+        Ok(())
+    }
 }

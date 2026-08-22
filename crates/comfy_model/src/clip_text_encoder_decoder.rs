@@ -1,7 +1,8 @@
 use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
-    AttentionRequest, EmbeddingOptions, NativeExecutionRequirements, NativeModule, NativeOpsError,
-    NativePromptTokenizer, NativeTokenizedPrompt, scaled_dot_product_attention_with_context,
+    AttentionRequest, EmbeddingOptions, MappedModelWeights, NativeExecutionRequirements,
+    NativeModule, NativeOpsError, NativePromptTokenizer, NativeTokenizedPrompt,
+    scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
     BinaryOperation, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Layout,
@@ -17,8 +18,9 @@ use comfy_tensor::{
     generated_native_diffusion::{NativeDiffusionTensorError, add, tensor_from_f32, tensor_to_f32},
 };
 use comfy_types::CancellationToken;
+use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeSet};
 use thiserror::Error;
 
 pub const LLAMA_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/text_encoders/llama.py";
@@ -168,7 +170,7 @@ pub const DECODER_TEXT_ENCODER_CATALOG_SYMBOLS: [&str; 127] = [
     "te",
 ];
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum DecoderArchitecture {
     Llama,
     Gemma,
@@ -176,14 +178,14 @@ pub enum DecoderArchitecture {
     Qwen35,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum DecoderLayerKind {
     FullAttention,
     SlidingAttention,
     LinearAttention,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum DecoderActivation {
     Silu,
     GeluTanh,
@@ -1017,7 +1019,7 @@ pub fn decoder_symbol_behavior(symbol: &str) -> Option<DecoderSymbolBehavior> {
     })
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub enum RopeScaling {
     None,
     Linear {
@@ -1030,7 +1032,7 @@ pub enum RopeScaling {
     },
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DecoderRopeConfiguration {
     pub theta: f32,
     pub rotary_dimension: usize,
@@ -1038,25 +1040,25 @@ pub struct DecoderRopeConfiguration {
     pub scaling: RopeScaling,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Gemma3DecoderProfile {
     FourBVision,
     TwelveB,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Gemma4DecoderProfile {
     E2B,
     E4B,
     ThirtyOneB,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Gemma3DecoderConfiguration {
     pub local_rope: DecoderRopeConfiguration,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Gemma4DecoderConfiguration {
     pub source_profile: Option<Gemma4DecoderProfile>,
     pub local_rope: DecoderRopeConfiguration,
@@ -1068,7 +1070,7 @@ pub struct Gemma4DecoderConfiguration {
     pub double_wide_mlp: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DecoderTextConfiguration {
     pub architecture: DecoderArchitecture,
     pub dtype: DType,
@@ -1097,7 +1099,7 @@ pub struct DecoderTextConfiguration {
     pub stop_tokens: Vec<i64>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Qwen35LinearConfiguration {
     pub key_heads: usize,
     pub value_heads: usize,
@@ -1729,6 +1731,7 @@ struct ValidatedPreparedDeepstack {
 pub struct DecoderTextOutput {
     last_hidden_state: Tensor,
     intermediate: Option<Tensor>,
+    all_intermediate: Option<Tensor>,
     logits: Tensor,
     cache: DecoderKvState,
 }
@@ -1740,6 +1743,10 @@ impl DecoderTextOutput {
 
     pub fn intermediate(&self) -> Option<&Tensor> {
         self.intermediate.as_ref()
+    }
+
+    pub fn all_intermediate(&self) -> Option<&Tensor> {
+        self.all_intermediate.as_ref()
     }
 
     pub fn logits(&self) -> &Tensor {
@@ -2109,6 +2116,224 @@ impl NativeDecoderTextEncoder {
         self.stream
     }
 
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, DecoderTextError> {
+        cancellation.check()?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "decoder mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut reconstructed = self.clone();
+        let mut consumed = BTreeSet::new();
+        reload_decoder_module(
+            &mut reconstructed.token_embedding,
+            "token_embedding",
+            mapped,
+            &mut consumed,
+        )?;
+        if reconstructed.configuration.tied_output_head {
+            let weight = mapped
+                .tensors()
+                .get("token_embedding.weight")
+                .cloned()
+                .ok_or(DecoderTextError::InvalidConfiguration(
+                    "decoder mapped token embedding is missing",
+                ))?;
+            reconstructed
+                .output_head
+                .load_dense_parameters(weight, None)?;
+        } else {
+            reload_decoder_module(
+                &mut reconstructed.output_head,
+                "output_head",
+                mapped,
+                &mut consumed,
+            )?;
+        }
+        reconstructed.final_norm_weight =
+            take_decoder_tensor(mapped, "final_norm_weight", &mut consumed)?;
+        if let Some(per_layer) = &mut reconstructed.gemma4_per_layer {
+            reload_decoder_module(
+                &mut per_layer.token_embedding,
+                "gemma4_per_layer.token_embedding",
+                mapped,
+                &mut consumed,
+            )?;
+            reload_decoder_module(
+                &mut per_layer.model_projection,
+                "gemma4_per_layer.model_projection",
+                mapped,
+                &mut consumed,
+            )?;
+            per_layer.projection_norm_weight = take_decoder_tensor(
+                mapped,
+                "gemma4_per_layer.projection_norm_weight",
+                &mut consumed,
+            )?;
+        }
+        for (index, layer) in reconstructed.layers.iter_mut().enumerate() {
+            cancellation.check()?;
+            let prefix = format!("layers.{index}");
+            match &mut layer.attention {
+                NativeDecoderAttention::DotProduct {
+                    query,
+                    key,
+                    value,
+                    query_norm_weight,
+                    key_norm_weight,
+                    output,
+                    ..
+                } => {
+                    reload_decoder_module(
+                        query,
+                        &format!("{prefix}.query"),
+                        mapped,
+                        &mut consumed,
+                    )?;
+                    reload_decoder_module(key, &format!("{prefix}.key"), mapped, &mut consumed)?;
+                    reload_decoder_module(
+                        value,
+                        &format!("{prefix}.value"),
+                        mapped,
+                        &mut consumed,
+                    )?;
+                    reload_decoder_module(
+                        output,
+                        &format!("{prefix}.attention_output"),
+                        mapped,
+                        &mut consumed,
+                    )?;
+                    if query_norm_weight.is_some() {
+                        *query_norm_weight = Some(take_decoder_tensor(
+                            mapped,
+                            &format!("{prefix}.query_norm_weight"),
+                            &mut consumed,
+                        )?);
+                    }
+                    if key_norm_weight.is_some() {
+                        *key_norm_weight = Some(take_decoder_tensor(
+                            mapped,
+                            &format!("{prefix}.key_norm_weight"),
+                            &mut consumed,
+                        )?);
+                    }
+                }
+                NativeDecoderAttention::Qwen35Linear {
+                    mixed_query_key_value,
+                    gate,
+                    beta,
+                    alpha,
+                    output,
+                    time_bias,
+                    log_decay,
+                    convolution_weight,
+                    normalization_weight,
+                } => {
+                    for (suffix, module) in [
+                        ("mixed_query_key_value", mixed_query_key_value),
+                        ("linear_gate", gate),
+                        ("linear_beta", beta),
+                        ("linear_alpha", alpha),
+                        ("attention_output", output),
+                    ] {
+                        reload_decoder_module(
+                            module,
+                            &format!("{prefix}.{suffix}"),
+                            mapped,
+                            &mut consumed,
+                        )?;
+                    }
+                    *time_bias =
+                        take_decoder_tensor(mapped, &format!("{prefix}.time_bias"), &mut consumed)?;
+                    *log_decay =
+                        take_decoder_tensor(mapped, &format!("{prefix}.log_decay"), &mut consumed)?;
+                    *convolution_weight = take_decoder_tensor(
+                        mapped,
+                        &format!("{prefix}.convolution_weight"),
+                        &mut consumed,
+                    )?;
+                    *normalization_weight = take_decoder_tensor(
+                        mapped,
+                        &format!("{prefix}.linear_norm_weight"),
+                        &mut consumed,
+                    )?;
+                }
+            }
+            for (suffix, module) in [
+                ("feed_forward_gate", &mut layer.feed_forward_gate),
+                ("feed_forward_up", &mut layer.feed_forward_up),
+                ("feed_forward_down", &mut layer.feed_forward_down),
+            ] {
+                reload_decoder_module(
+                    module,
+                    &format!("{prefix}.{suffix}"),
+                    mapped,
+                    &mut consumed,
+                )?;
+            }
+            layer.attention_norm_weight = take_decoder_tensor(
+                mapped,
+                &format!("{prefix}.attention_norm_weight"),
+                &mut consumed,
+            )?;
+            layer.feed_forward_norm_weight = take_decoder_tensor(
+                mapped,
+                &format!("{prefix}.feed_forward_norm_weight"),
+                &mut consumed,
+            )?;
+            replace_optional_decoder_tensor(
+                &mut layer.post_attention_norm_weight,
+                mapped,
+                &format!("{prefix}.post_attention_norm_weight"),
+                &mut consumed,
+            )?;
+            replace_optional_decoder_tensor(
+                &mut layer.post_feed_forward_norm_weight,
+                mapped,
+                &format!("{prefix}.post_feed_forward_norm_weight"),
+                &mut consumed,
+            )?;
+            replace_optional_decoder_tensor(
+                &mut layer.attention_sink,
+                mapped,
+                &format!("{prefix}.attention_sink"),
+                &mut consumed,
+            )?;
+            if let Some(per_layer) = &mut layer.gemma4_layer_input {
+                reload_decoder_module(
+                    &mut per_layer.gate,
+                    &format!("{prefix}.per_layer_input_gate"),
+                    mapped,
+                    &mut consumed,
+                )?;
+                reload_decoder_module(
+                    &mut per_layer.projection,
+                    &format!("{prefix}.per_layer_projection"),
+                    mapped,
+                    &mut consumed,
+                )?;
+                per_layer.post_norm_weight = take_decoder_tensor(
+                    mapped,
+                    &format!("{prefix}.post_per_layer_input_norm_weight"),
+                    &mut consumed,
+                )?;
+                per_layer.layer_scalar =
+                    take_decoder_tensor(mapped, &format!("{prefix}.layer_scalar"), &mut consumed)?;
+            }
+        }
+        if consumed.len() != mapped.tensors().len() {
+            return Err(DecoderTextError::InvalidConfiguration(
+                "decoder mapped weights contain unconsumed parameters",
+            ));
+        }
+        reconstructed.semantic_state_digest(cancellation)?;
+        Ok(reconstructed)
+    }
+
     pub fn semantic_state_digest(
         &self,
         cancellation: &CancellationToken,
@@ -2116,7 +2341,12 @@ impl NativeDecoderTextEncoder {
         cancellation.check()?;
         let mut hasher = Sha256::new();
         hasher.update(b"zed.comfy.native-decoder-text.v1");
-        hasher.update(format!("{:?}", self.configuration).as_bytes());
+        let configuration = serde_json::to_vec(&self.configuration).map_err(|_| {
+            DecoderTextError::InvalidConfiguration(
+                "decoder configuration cannot be canonically serialized",
+            )
+        })?;
+        hasher.update(configuration);
         for (name, module) in self.named_modules() {
             cancellation.check()?;
             hasher.update([0]);
@@ -2507,6 +2737,7 @@ impl NativeDecoderTextEncoder {
             batch,
             query_tokens,
             project_last_token_only,
+            false,
             context,
         )
     }
@@ -2628,6 +2859,47 @@ impl NativeDecoderTextEncoder {
             batch,
             query_tokens,
             project_last_token_only,
+            false,
+            context,
+        )
+    }
+
+    pub fn forward_prepared_all_layers(
+        &self,
+        backend: &CpuBackend,
+        request: DecoderPreparedTextRequest<'_>,
+        context: &ExecutionContext<'_>,
+    ) -> Result<DecoderTextOutput, DecoderTextError> {
+        self.admit_execution_target(backend, context)?;
+        let (batch, query_tokens) =
+            self.validate_prepared_embeddings(request.embeddings, context)?;
+        let positions = validate_prepared_positions(
+            request.rope_positions,
+            request.causal_positions,
+            query_tokens,
+            request.cache,
+            &self.configuration.rope,
+        )?;
+        let deepstack = self.validate_prepared_deepstack(
+            backend,
+            request.deepstack,
+            query_tokens,
+            request.cache,
+            context,
+        )?;
+        self.forward_hidden(
+            backend,
+            request.embeddings.clone(),
+            request.attention_mask,
+            &positions,
+            request.cache,
+            None,
+            deepstack.as_ref(),
+            request.initial_input_ids,
+            batch,
+            query_tokens,
+            false,
+            true,
             context,
         )
     }
@@ -2665,6 +2937,7 @@ impl NativeDecoderTextEncoder {
         batch: usize,
         query_tokens: usize,
         project_last_token_only: bool,
+        capture_all_layers: bool,
         context: &ExecutionContext<'_>,
     ) -> Result<DecoderTextOutput, DecoderTextError> {
         let mut staged_cache = match cache {
@@ -2675,6 +2948,17 @@ impl NativeDecoderTextEncoder {
             .map(|layer| resolve_layer(layer, self.layers.len()))
             .transpose()?;
         let mut intermediate = None;
+        let mut all_intermediate = capture_all_layers.then(Vec::new);
+        if let Some(captures) = &mut all_intermediate {
+            captures
+                .try_reserve_exact(
+                    self.layers
+                        .len()
+                        .checked_add(1)
+                        .ok_or(DecoderTextError::Overflow("decoder all-layer capture"))?,
+                )
+                .map_err(|_| DecoderTextError::Allocation("decoder all-layer capture"))?;
+        }
         let per_layer_inputs = self.prepare_gemma4_layer_inputs(
             backend,
             &hidden,
@@ -2699,6 +2983,9 @@ impl NativeDecoderTextEncoder {
         let mut shared_global = None;
         for (layer_index, layer) in self.layers.iter().enumerate() {
             context.check()?;
+            if let Some(captures) = &mut all_intermediate {
+                captures.push(hidden.clone());
+            }
             let shared = if layer_index >= shared_boundary {
                 match layer.kind {
                     DecoderLayerKind::SlidingAttention => shared_sliding.as_ref(),
@@ -2764,6 +3051,9 @@ impl NativeDecoderTextEncoder {
             self.configuration.norm_weight_offset(),
             context,
         )?;
+        if let Some(captures) = &mut all_intermediate {
+            captures.push(last_hidden_state.clone());
+        }
         let logits_hidden = if project_last_token_only && query_tokens > 1 {
             narrow_method_exact_native(
                 &last_hidden_state,
@@ -2785,9 +3075,22 @@ impl NativeDecoderTextEncoder {
             context,
         )?;
         context.check()?;
+        let all_intermediate = all_intermediate
+            .map(|captures| {
+                stack_decoder_layers(
+                    backend,
+                    &captures,
+                    batch,
+                    query_tokens,
+                    self.configuration.hidden_size,
+                    context,
+                )
+            })
+            .transpose()?;
         Ok(DecoderTextOutput {
             last_hidden_state,
             intermediate,
+            all_intermediate,
             logits,
             cache: staged_cache,
         })
@@ -5746,6 +6049,112 @@ fn linear_module(
     let mut module = NativeModule::linear(name, input, output, false, false)?;
     module.load_dense_parameters(weight, None)?;
     Ok(module)
+}
+
+fn take_decoder_tensor(
+    mapped: &MappedModelWeights,
+    name: &str,
+    consumed: &mut BTreeSet<String>,
+) -> Result<Tensor, DecoderTextError> {
+    let tensor =
+        mapped
+            .tensors()
+            .get(name)
+            .cloned()
+            .ok_or(DecoderTextError::InvalidConfiguration(
+                "decoder mapped weight is missing",
+            ))?;
+    consumed.insert(name.to_owned());
+    Ok(tensor)
+}
+
+fn stack_decoder_layers(
+    backend: &CpuBackend,
+    layers: &[Tensor],
+    batch: usize,
+    tokens: usize,
+    hidden: usize,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, DecoderTextError> {
+    if layers.is_empty() {
+        return Err(DecoderTextError::InvalidInput(
+            "decoder all-layer capture is empty",
+        ));
+    }
+    let row = tokens
+        .checked_mul(hidden)
+        .ok_or(DecoderTextError::Overflow("decoder layer row"))?;
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(
+            batch
+                .checked_mul(layers.len())
+                .and_then(|value| value.checked_mul(row))
+                .ok_or(DecoderTextError::Overflow("decoder all-layer capture"))?,
+        )
+        .map_err(|_| DecoderTextError::Allocation("decoder all-layer capture"))?;
+    let values = layers
+        .iter()
+        .map(|layer| tensor_to_f32(backend, layer, context))
+        .collect::<Result<Vec<_>, _>>()?;
+    for batch_index in 0..batch {
+        let start = batch_index
+            .checked_mul(row)
+            .ok_or(DecoderTextError::Overflow("decoder layer batch"))?;
+        let end = start
+            .checked_add(row)
+            .ok_or(DecoderTextError::Overflow("decoder layer batch"))?;
+        for layer in &values {
+            projected.extend_from_slice(layer.get(start..end).ok_or(
+                DecoderTextError::InvalidInput("decoder layer capture shape changed"),
+            )?);
+        }
+    }
+    tensor_from_f32(
+        backend,
+        &[
+            usize_to_u64(batch, "decoder layer batch")?,
+            usize_to_u64(layers.len(), "decoder layers")?,
+            usize_to_u64(tokens, "decoder layer tokens")?,
+            usize_to_u64(hidden, "decoder layer hidden")?,
+        ],
+        &projected,
+        context,
+    )
+    .map_err(DecoderTextError::from)
+}
+
+fn replace_optional_decoder_tensor(
+    target: &mut Option<Tensor>,
+    mapped: &MappedModelWeights,
+    name: &str,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), DecoderTextError> {
+    if target.is_some() {
+        *target = Some(take_decoder_tensor(mapped, name, consumed)?);
+    }
+    Ok(())
+}
+
+fn reload_decoder_module(
+    module: &mut NativeModule,
+    name: &str,
+    mapped: &MappedModelWeights,
+    consumed: &mut BTreeSet<String>,
+) -> Result<(), DecoderTextError> {
+    let (_, existing_bias) = module.dense_parameters()?;
+    let weight = take_decoder_tensor(mapped, &format!("{name}.weight"), consumed)?;
+    let bias = if existing_bias.is_some() {
+        Some(take_decoder_tensor(
+            mapped,
+            &format!("{name}.bias"),
+            consumed,
+        )?)
+    } else {
+        None
+    };
+    module.load_dense_parameters(weight, bias)?;
+    Ok(())
 }
 
 fn require_parameter(tensor: &Tensor, stream: StreamId) -> Result<(), DecoderTextError> {

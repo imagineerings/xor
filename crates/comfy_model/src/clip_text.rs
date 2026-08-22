@@ -1,12 +1,13 @@
 use crate::{
     AttentionBackend, AttentionError, AttentionFallbackPolicy, AttentionMask, AttentionMaskShape,
-    AttentionRequest, EmbeddingOptions, GeluApproximation, NativeExecutionRequirements,
-    NativeModule, NativeOpsError, scaled_dot_product_attention_with_context,
+    AttentionRequest, EmbeddingOptions, GeluApproximation, MappedModelWeights,
+    NativeExecutionRequirements, NativeModule, NativeOpsError,
+    scaled_dot_product_attention_with_context,
 };
 use comfy_tensor::{
-    BinaryOperation, CpuBackend, CpuWorkspaceVec, DType, DeviceId, ExecutionContext, Layout,
-    LinearAlgebraOperation, OperationSupport, ReductionOperation, StreamId, Tensor, TensorBackend,
-    TensorDescriptor, TensorError, UnaryOperation,
+    BinaryOperation, CancellationToken, CpuBackend, CpuWorkspaceVec, DType, DeviceId,
+    ExecutionContext, Layout, LinearAlgebraOperation, OperationSupport, ReductionOperation,
+    StorageId, StreamId, Tensor, TensorBackend, TensorDescriptor, TensorError, UnaryOperation,
     generated_native_diffusion::{
         NativeDiffusionTensorError, add, quick_gelu, tensor_from_f32, tensor_to_f32,
     },
@@ -14,6 +15,8 @@ use comfy_tensor::{
         ShapeLayoutTransformPartTwoError, torch_stack_with_context_exact_native,
     },
 };
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeSet, mem};
 use thiserror::Error;
 
 pub const CLIP_TEXT_SOURCE_PATH: &str = "projects/comfy/ComfyUI/comfy/clip_model.py";
@@ -34,6 +37,16 @@ pub const CLIP_TEXT_CATALOG_SYMBOLS: [&str; 10] = [
     "SD1CheckpointClipModel",
     "SD1ClipModel",
 ];
+
+fn hash_bytes(hasher: &mut Sha256, bytes: &[u8]) -> Result<(), ClipTextError> {
+    hasher.update(
+        u64::try_from(bytes.len())
+            .map_err(|_| ClipTextError::Overflow("CLIP text digest field"))?
+            .to_be_bytes(),
+    );
+    hasher.update(bytes);
+    Ok(())
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClipTextActivation {
@@ -275,6 +288,231 @@ impl NativeClipText {
         &self.configuration
     }
 
+    pub fn reconstruct_from_mapped_weights(
+        &self,
+        mapped: &MappedModelWeights,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ClipTextError> {
+        cancellation.check().map_err(TensorError::from)?;
+        if !mapped.unexpected_keys().is_empty() {
+            return Err(ClipTextError::InvalidConfiguration(
+                "CLIP text mapped weights contain unexpected parameters",
+            ));
+        }
+        let mut consumed = BTreeSet::new();
+        let tensor =
+            |name: &str, consumed: &mut BTreeSet<String>| -> Result<Tensor, ClipTextError> {
+                let tensor = mapped.tensors().get(name).cloned().ok_or(
+                    ClipTextError::InvalidConfiguration("CLIP text mapped weight is missing"),
+                )?;
+                consumed.insert(name.to_owned());
+                Ok(tensor)
+            };
+        let mut layers = Vec::new();
+        layers
+            .try_reserve_exact(self.configuration.layer_count)
+            .map_err(|_| ClipTextError::Allocation("CLIP text reconstructed layers"))?;
+        for index in 0..self.configuration.layer_count {
+            cancellation.check().map_err(TensorError::from)?;
+            let prefix = format!("layers.{index}");
+            layers.push(ClipTextLayerWeights {
+                layer_norm_1_weight: tensor(
+                    &format!("{prefix}.layer_norm_1.weight"),
+                    &mut consumed,
+                )?,
+                layer_norm_1_bias: tensor(&format!("{prefix}.layer_norm_1.bias"), &mut consumed)?,
+                query_weight: tensor(&format!("{prefix}.query.weight"), &mut consumed)?,
+                query_bias: tensor(&format!("{prefix}.query.bias"), &mut consumed)?,
+                key_weight: tensor(&format!("{prefix}.key.weight"), &mut consumed)?,
+                key_bias: tensor(&format!("{prefix}.key.bias"), &mut consumed)?,
+                value_weight: tensor(&format!("{prefix}.value.weight"), &mut consumed)?,
+                value_bias: tensor(&format!("{prefix}.value.bias"), &mut consumed)?,
+                output_weight: tensor(&format!("{prefix}.output.weight"), &mut consumed)?,
+                output_bias: tensor(&format!("{prefix}.output.bias"), &mut consumed)?,
+                layer_norm_2_weight: tensor(
+                    &format!("{prefix}.layer_norm_2.weight"),
+                    &mut consumed,
+                )?,
+                layer_norm_2_bias: tensor(&format!("{prefix}.layer_norm_2.bias"), &mut consumed)?,
+                feed_forward_1_weight: tensor(
+                    &format!("{prefix}.feed_forward_1.weight"),
+                    &mut consumed,
+                )?,
+                feed_forward_1_bias: tensor(
+                    &format!("{prefix}.feed_forward_1.bias"),
+                    &mut consumed,
+                )?,
+                feed_forward_2_weight: tensor(
+                    &format!("{prefix}.feed_forward_2.weight"),
+                    &mut consumed,
+                )?,
+                feed_forward_2_bias: tensor(
+                    &format!("{prefix}.feed_forward_2.bias"),
+                    &mut consumed,
+                )?,
+            });
+        }
+        let weights = ClipTextWeights {
+            token_embedding: tensor("token_embedding.weight", &mut consumed)?,
+            position_embedding: tensor("position_embedding.weight", &mut consumed)?,
+            layers,
+            final_layer_norm_weight: tensor("final_layer_norm.weight", &mut consumed)?,
+            final_layer_norm_bias: tensor("final_layer_norm.bias", &mut consumed)?,
+        };
+        let projection = if self.configuration.projection_dimension.is_some() {
+            Some(tensor("text_projection.weight", &mut consumed)?)
+        } else {
+            None
+        };
+        if consumed.len() != mapped.tensors().len() {
+            return Err(ClipTextError::InvalidConfiguration(
+                "CLIP text mapped weights contain unconsumed parameters",
+            ));
+        }
+        let reconstructed = Self::new(self.configuration.clone(), weights, projection)?;
+        reconstructed.semantic_state_digest(cancellation)?;
+        cancellation.check().map_err(TensorError::from)?;
+        Ok(reconstructed)
+    }
+
+    pub fn semantic_state_digest(
+        &self,
+        cancellation: &CancellationToken,
+    ) -> Result<String, ClipTextError> {
+        cancellation.check().map_err(TensorError::from)?;
+        let mut hasher = Sha256::new();
+        hasher.update(b"zed.comfy.native-clip-text.v2\0f32\0cpu");
+        for value in [
+            self.configuration.vocabulary_size,
+            self.configuration.max_position_embeddings,
+            self.configuration.hidden_size,
+            self.configuration.intermediate_size,
+            self.configuration.attention_heads,
+            self.configuration.layer_count,
+        ] {
+            hasher.update(
+                u64::try_from(value)
+                    .map_err(|_| ClipTextError::Overflow("CLIP text digest"))?
+                    .to_be_bytes(),
+            );
+        }
+        hasher.update(self.configuration.eos_token_id.to_be_bytes());
+        hasher.update([match self.configuration.activation {
+            ClipTextActivation::QuickGelu => 0,
+            ClipTextActivation::Gelu => 1,
+            ClipTextActivation::GeluTanh => 2,
+        }]);
+        match self.configuration.projection_dimension {
+            Some(value) => {
+                hasher.update([1]);
+                hasher.update(
+                    u64::try_from(value)
+                        .map_err(|_| ClipTextError::Overflow("CLIP projection digest"))?
+                        .to_be_bytes(),
+                );
+            }
+            None => hasher.update([0]),
+        }
+        for (name, module) in self.named_modules() {
+            cancellation.check().map_err(TensorError::from)?;
+            hash_bytes(&mut hasher, name.as_bytes())?;
+            hash_bytes(
+                &mut hasher,
+                module.semantic_state_digest(cancellation)?.as_bytes(),
+            )?;
+        }
+        cancellation.check().map_err(TensorError::from)?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, ClipTextError> {
+        self.resident_tensor_allocations().into_iter().try_fold(
+            self.resident_owned_bytes()?,
+            |bytes, (_, allocation)| {
+                bytes
+                    .checked_add(allocation)
+                    .ok_or(ClipTextError::Overflow("CLIP text residency"))
+            },
+        )
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, ClipTextError> {
+        let mut bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| ClipTextError::Overflow("CLIP text residency"))?;
+        bytes = bytes
+            .checked_add(
+                u64::try_from(
+                    self.layers
+                        .capacity()
+                        .checked_mul(mem::size_of::<ClipTextLayer>())
+                        .ok_or(ClipTextError::Overflow("CLIP text layers"))?,
+                )
+                .map_err(|_| ClipTextError::Overflow("CLIP text layers"))?,
+            )
+            .ok_or(ClipTextError::Overflow("CLIP text residency"))?;
+        for (_, module) in self.named_modules() {
+            let tensor_bytes = module.resident_tensor_allocations().into_iter().try_fold(
+                0_u64,
+                |total, (_, allocation)| {
+                    total
+                        .checked_add(allocation)
+                        .ok_or(ClipTextError::Overflow("CLIP text tensor residency"))
+                },
+            )?;
+            bytes = bytes
+                .checked_add(
+                    module
+                        .resident_storage_bytes()?
+                        .checked_sub(tensor_bytes)
+                        .ok_or(ClipTextError::Overflow("CLIP text module residency"))?,
+                )
+                .ok_or(ClipTextError::Overflow("CLIP text module residency"))?;
+        }
+        Ok(bytes)
+    }
+
+    pub fn resident_tensor_allocations(&self) -> Vec<(StorageId, u64)> {
+        let mut allocations = Vec::new();
+        for (_, module) in self.named_modules() {
+            for allocation in module.resident_tensor_allocations() {
+                if !allocations
+                    .iter()
+                    .any(|(existing, _)| *existing == allocation.0)
+                {
+                    allocations.push(allocation);
+                }
+            }
+        }
+        allocations
+    }
+
+    fn named_modules(&self) -> Vec<(String, &NativeModule)> {
+        let mut modules = vec![
+            ("token_embedding".to_owned(), &self.token_embedding),
+            ("position_embedding".to_owned(), &self.position_embedding),
+            ("final_layer_norm".to_owned(), &self.final_layer_norm),
+        ];
+        if let Some(module) = &self.text_projection {
+            modules.push(("text_projection".to_owned(), module));
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            let prefix = format!("layers.{index}");
+            for (suffix, module) in [
+                ("layer_norm_1", &layer.layer_norm_1),
+                ("query", &layer.query),
+                ("key", &layer.key),
+                ("value", &layer.value),
+                ("output", &layer.output),
+                ("layer_norm_2", &layer.layer_norm_2),
+                ("feed_forward_1", &layer.feed_forward_1),
+                ("feed_forward_2", &layer.feed_forward_2),
+            ] {
+                modules.push((format!("{prefix}.{suffix}"), module));
+            }
+        }
+        modules
+    }
+
     pub fn admit_execution_target(
         &self,
         backend: &CpuBackend,
@@ -381,6 +619,27 @@ impl NativeClipText {
             OperationSupport::wait_event(),
         ]);
         requirements
+    }
+
+    pub fn embed_tokens(
+        &self,
+        backend: &CpuBackend,
+        tokens: &Tensor,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Tensor, ClipTextError> {
+        self.admit_execution_target(backend, context)?;
+        let request = ClipTextRequest {
+            input: ClipTextInput::Tokens(tokens),
+            attention_mask: None,
+            num_tokens: None,
+            intermediate: ClipTextIntermediate::None,
+            final_layer_norm_intermediate: false,
+            project_pooled: false,
+            zero_out_masked: false,
+        };
+        validate_input(backend, &self.configuration, &request, context)?;
+        let mut token_embedding = self.token_embedding.clone();
+        Ok(token_embedding.forward_with_context(backend, tokens, context)?)
     }
 
     pub fn forward(
