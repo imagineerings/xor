@@ -1659,14 +1659,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 22. Integrate search, native notifications and NIP-PL push
 
-  - [ ] 22.1. Project authorized collaboration content into search
+  - [x] 22.1. Project authorized collaboration content into search
     - Consume authoritative outbox records and update only policy-approved search documents.
     - _Requirements: 9.4, 15.2_
     - _Capability IDs: CAP-015, CAP-030_
     - _Depends on: 16.4, 19.1, 20.3_
-    - _Reads: crates/collab/src/db/collaboration/outbox.rs, crates/collab/migrations/collaboration_search.sql_
-    - _Writes: crates/collab/src/search/indexer.rs_
+    - _Reads: crates/collab/src/db/collaboration/outbox.rs, crates/collab/migrations/20260820000500_collaboration_search.up.sql, projects/buzz/crates/buzz-search/**_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collab/src/search.rs, crates/collab/src/search/indexer.rs, crates/collab/tests/collaboration_search_indexer.rs_
     - _Validation: indexer tests cover edit/delete/retention, DM exclusion and idempotent replay_
+    - _Discovered contradiction (2026-08-22): the planned `collaboration_search.sql` path is stale; Task 16.4 already established the reversible timestamped search migration and prohibited duplicating signed-event transcript content into a second projection. The narrow correction consumes only a strict canonical-document outbox topic into that existing table and includes the minimal module registration, focused integration target and living-spec trace needed to compile and verify the new indexer. Signed-event search remains generated on immutable event authority, and delivery scheduling remains owned by the existing outbox/fan-out adapters._
+    - _Evidence: 2026-08-22 — added a PostgreSQL-only search indexer that resolves the exact authoritative outbox sequence under transaction-local tenant RLS, rejects malformed or unsupported projection contracts and ignores unrelated topics. A closed version-one payload accepts bounded community-visible canonical documents or content-free excluded tombstones for delete, retention expiry, restricted visibility and direct-message cases. The durable outbox sequence fences each document update and its big-endian projection cursor; conditional upserts suppress duplicate and delayed replay, preserve deletion floors and commit a clean `collaboration_search` checkpoint atomically with each accepted change. Four focused integration tests cover ordered edits, delete and retention tombstones, direct-message exclusion without private content and idempotent replay without a second checkpoint. The collab library check, Rust formatting, diff hygiene, Buzz inventory validation through the supplied external checkout and canonical spec validation passed. The required all-target release Clippy wrapper remains blocked before this leaf by the pre-existing unused `EmptyView` and `AppContext` imports in `crates/language_model/src/fake_provider.rs`._
 
   - [ ] 22.2. Implement collaboration search queries
     - Query authorized community, channel, member, project and message result classes with freshness metadata.
