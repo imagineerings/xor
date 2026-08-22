@@ -104,6 +104,7 @@ const SEARCH_DOCUMENT_CONTRACT_VERSION: u16 = 1;
 pub enum SearchDocumentType {
     Profile,
     Community,
+    Channel,
     Project,
     Repository,
     Task,
@@ -117,6 +118,7 @@ impl SearchDocumentType {
         match self {
             Self::Profile => "profile",
             Self::Community => "community",
+            Self::Channel => "channel",
             Self::Project => "project",
             Self::Repository => "repository",
             Self::Task => "task",
