@@ -8157,6 +8157,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "git_sign_nostr"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "git_credential_nostr",
+ "libc",
+ "nostr",
+ "nostr_compat",
+ "secp256k1",
+ "serde_json",
+ "zeroize",
+]
+
+[[package]]
 name = "git_ui"
 version = "0.1.0"
 dependencies = [

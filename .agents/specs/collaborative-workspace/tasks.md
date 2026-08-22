@@ -2028,7 +2028,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: crates/collab/tests/git_conformance.rs_
     - _Validation: `cargo test -p collab git_conformance` passes old/new server and external-provider cases_
 
-  - [ ] 25.9. Port the Nostr commit and tag signing helper
+  - [x] 25.9. Port the Nostr commit and tag signing helper
     - Adapt commit/tag signing and verification to canonical key storage with compatible Git contracts.
     - _Requirements: 7.2, 10.2, 16.4_
     - _Capability IDs: CAP-009, CAP-019, CAP-038_
@@ -2036,6 +2036,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/git-sign-nostr/**, crates/zed_credentials_provider/**_
     - _Writes: tools/git_sign_nostr/Cargo.toml, tools/git_sign_nostr/src/*_
     - _Validation: helper tests cover sign/verify, locked keyring, altered object, redaction and exact exit codes_
+    - _Discovered contradiction (2026-08-23): like Git's credential helper, the signing program runs outside GPUI and cannot call the `AsyncApp`-bound `CredentialsProvider` directly. The planned new-tool-only write set also omits workspace/lockfile registration and the minimal public read access needed to reuse Task 25.7's exact platform storage adapter instead of cloning a second set of keychain layouts. The narrow correction registers the helper, exposes only the already-held credential username and zeroizing secret slices and depends on the existing read-only adapter; it adds no credential mutation, environment secret, plaintext keyfile, identity-lifecycle or trust-root authority._
+    - _Evidence: 2026-08-23 — added a bounded Git x509 signing backend that accepts the compatible `--status-fd`, `-bsau` and `--verify <file> -` contracts and uses the canonical `nostr_compat` NIP-GS codec for the domain-separated hash, exact compact envelope, three-line armor and verification. Signing resolves one configured canonical protected record, requires its raw 32-byte key to derive both the stored public-key username and Git's requested hex/npub key ID, verifies any configured NIP-OA owner attestation before signing and erases the secret/keypair guards on every return path. Verification reads only a bounded regular signature file, never touches protected storage, emits exact `GOODSIG`/`VALIDSIG`/advisory trust/owner-notation status on success and `BADSIG` for an altered object. Invocation/I/O exits 1, locked/unavailable storage exits 2, a missing credential exits 3, invalid/signing material exits 4 and failed cryptographic verification exits 5; diagnostics are fixed and secret-, identifier- and key-free. Five focused release tests passed canonical sign/verify, locked storage, altered object, redaction and every exit class; warning-denied all-target/all-feature Clippy passed. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [x] 25.10. Implement hosted repository registry and permission checks
     - Read/write hosted repository records and evaluate explicit grants before object or HTTP access.
