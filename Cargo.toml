@@ -269,6 +269,12 @@ members = [
     "crates/ztracing_macro",
 
     #
+    # Services
+    #
+
+    "services/push_gateway",
+
+    #
     # Extensions
     #
 
@@ -328,6 +334,7 @@ cloud_api_types = { path = "crates/cloud_api_types" }
 cloud_llm_client = { path = "crates/cloud_llm_client" }
 collab = { path = "crates/collab" }
 collaboration_domain = { path = "crates/collaboration_domain" }
+push_gateway = { path = "services/push_gateway" }
 nostr_compat = { path = "crates/nostr_compat" }
 collab_ui = { path = "crates/collab_ui" }
 collections = { path = "crates/collections", version = "0.1.0" }
