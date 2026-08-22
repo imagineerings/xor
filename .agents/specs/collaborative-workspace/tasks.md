@@ -1942,7 +1942,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 25. Consolidate NIP-34 forge and Git signing/authentication
 
-  - [ ] 25.1. Implement NIP-34 repository and ref codecs
+  - [x] 25.1. Implement NIP-34 repository and ref codecs
     - Encode and validate repository announcements, state, refs and status events under ADR-003.
     - _Requirements: 5.1, 10.2_
     - _Capability IDs: CAP-019_
@@ -1950,6 +1950,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/decisions/adr-003-git-authority.md, projects/buzz/crates/buzz-core/src/git.rs_
     - _Writes: crates/nostr_compat/src/nip34_repository.rs_
     - _Validation: golden fixtures round-trip refs, clone URLs, maintainers and malformed coordinates_
+    - _Discovered contradiction (2026-08-22): the approved Buzz read path `projects/buzz/crates/buzz-core/src/git.rs` does not exist. The registered Git kind constants remain in `buzz-core/src/kind.rs`, while the actual repository announcement, coordinate and status builders plus their validation fixtures live in `buzz-sdk/src/builders.rs`; Buzz has no repository-state builder. The port therefore reads those actual sources and the canonical NIP-34 grammar without changing the task's approved ownership or introducing a second Git/ref authority._
+    - _Evidence: 2026-08-22 — added a pure `nostr_compat` codec for kind-30617 repository announcements, exact kind-30617 coordinates and subordinate references, kind-30618 repository ref state and kinds 1630–1633 status events. Frozen vectors round-trip multi-value web/clone/relay tags, maintainers, SHA-1 refs, symbolic HEAD, opaque future tags, repository/status coordinates and applied/merged references; negative vectors reject malformed coordinates, unsafe refs and status-only metadata on the wrong kind. The full crate suite passed 59 unit and four integration tests, and `./script/clippy -p nostr_compat` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 25.2. Implement NIP-34 patch, PR and issue codecs
     - Encode and validate patches, pull requests, issues, comments and status references.

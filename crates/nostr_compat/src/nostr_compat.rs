@@ -4,6 +4,7 @@ pub mod event;
 pub mod filter;
 pub mod generated_kinds;
 pub mod head;
+pub mod nip34_repository;
 pub mod verification;
 
 pub use event::{CanonicalEvent, EventCodecError, EventId, PublicKey};
