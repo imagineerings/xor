@@ -167,6 +167,64 @@ WHERE community_id = $1
   AND claim_id = $3
   AND claim_expires_at >= to_timestamp($6::double precision / 1000)
 "#;
+const REVALIDATE_WAKE_SQL: &str = r#"
+SELECT EXISTS (
+    SELECT 1
+    FROM public.collaboration_push_wake_jobs AS job
+    JOIN public.collaboration_push_leases AS lease
+      ON lease.community_id = job.community_id
+     AND lease.owner_principal_id = job.owner_principal_id
+     AND lease.installation_id = job.installation_id
+     AND lease.active
+     AND lease.endpoint_enabled
+     AND lease.generation = job.lease_generation
+     AND lease.endpoint_generation = job.endpoint_generation
+     AND lease.capability_reference = job.capability_reference
+     AND lease.expires_at = job.expires_at
+    WHERE job.community_id = $1
+      AND job.wake_id = $2
+      AND job.state = 'leased'
+      AND job.claim_id = $3
+      AND job.claim_expires_at >= to_timestamp($4::double precision / 1000)
+      AND job.expires_at >= to_timestamp($4::double precision / 1000)
+) AS authorized
+"#;
+const RETRY_WAKE_SQL: &str = r#"
+UPDATE public.collaboration_push_wake_jobs
+SET state = 'pending',
+    available_at = to_timestamp($4::double precision / 1000),
+    claim_id = NULL,
+    claim_expires_at = NULL
+WHERE community_id = $1
+  AND wake_id = $2
+  AND state = 'leased'
+  AND claim_id = $3
+  AND claim_expires_at >= to_timestamp($5::double precision / 1000)
+  AND expires_at >= to_timestamp($4::double precision / 1000)
+"#;
+const DISABLE_WAKE_ENDPOINT_SQL: &str = r#"
+UPDATE public.collaboration_push_leases AS lease
+SET endpoint_enabled = false,
+    endpoint_disabled_at = to_timestamp($4::double precision / 1000),
+    updated_at = GREATEST(
+        lease.updated_at,
+        to_timestamp($4::double precision / 1000)
+    )
+FROM public.collaboration_push_wake_jobs AS job
+WHERE job.community_id = $1
+  AND job.wake_id = $2
+  AND job.state = 'leased'
+  AND job.claim_id = $3
+  AND job.claim_expires_at >= to_timestamp($5::double precision / 1000)
+  AND lease.community_id = job.community_id
+  AND lease.owner_principal_id = job.owner_principal_id
+  AND lease.installation_id = job.installation_id
+  AND lease.active
+  AND lease.endpoint_enabled
+  AND lease.generation = job.lease_generation
+  AND lease.endpoint_generation = job.endpoint_generation
+  AND lease.capability_reference = job.capability_reference
+"#;
 
 pub const MAX_PUSH_CLAIM_BATCH: u32 = 100;
 pub const MAX_PUSH_CLAIM_MILLIS: u64 = 5 * 60 * 1_000;
@@ -705,6 +763,129 @@ impl PushOutboxRepository {
         completed_at_millis: u64,
     ) -> Result<(), PushOutboxError> {
         require_tenant(tenant, wake.community_id)?;
+        self.complete_claim(
+            tenant,
+            wake.wake_id,
+            wake.claim_id,
+            outcome,
+            completed_at_millis,
+        )
+        .await
+    }
+
+    pub async fn revalidate_claim(
+        &self,
+        tenant: &TenantContext,
+        wake_id: Uuid,
+        claim_id: Uuid,
+        now_millis: u64,
+    ) -> Result<bool, PushOutboxError> {
+        validate_claim_identity(wake_id, claim_id)?;
+        validate_millis(now_millis)?;
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            let row = transaction
+                .query_one(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    REVALIDATE_WAKE_SQL,
+                    [
+                        tenant.community_id().as_uuid().into(),
+                        wake_id.into(),
+                        claim_id.into(),
+                        millis_i64(now_millis)?.into(),
+                    ],
+                ))
+                .await
+                .map_err(PushOutboxError::Unavailable)?
+                .ok_or(PushOutboxError::InvalidRecord)?;
+            row_value(&row, "authorized")
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub async fn retry_claim(
+        &self,
+        tenant: &TenantContext,
+        wake_id: Uuid,
+        claim_id: Uuid,
+        available_at_millis: u64,
+        now_millis: u64,
+    ) -> Result<(), PushOutboxError> {
+        validate_claim_identity(wake_id, claim_id)?;
+        validate_millis(available_at_millis)?;
+        validate_millis(now_millis)?;
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            let retried = transaction
+                .execute(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    RETRY_WAKE_SQL,
+                    [
+                        tenant.community_id().as_uuid().into(),
+                        wake_id.into(),
+                        claim_id.into(),
+                        millis_i64(available_at_millis)?.into(),
+                        millis_i64(now_millis)?.into(),
+                    ],
+                ))
+                .await
+                .map_err(PushOutboxError::Unavailable)?;
+            if retried.rows_affected() == 1 {
+                Ok(())
+            } else {
+                Err(PushOutboxError::ClaimLost)
+            }
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub async fn disable_claimed_endpoint(
+        &self,
+        tenant: &TenantContext,
+        wake_id: Uuid,
+        claim_id: Uuid,
+        disabled_at_millis: u64,
+        now_millis: u64,
+    ) -> Result<bool, PushOutboxError> {
+        validate_claim_identity(wake_id, claim_id)?;
+        validate_millis(disabled_at_millis)?;
+        validate_millis(now_millis)?;
+        let transaction = self.begin().await?;
+        let result = async {
+            set_tenant(&transaction, tenant.community_id()).await?;
+            let disabled = transaction
+                .execute(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    DISABLE_WAKE_ENDPOINT_SQL,
+                    [
+                        tenant.community_id().as_uuid().into(),
+                        wake_id.into(),
+                        claim_id.into(),
+                        millis_i64(disabled_at_millis)?.into(),
+                        millis_i64(now_millis)?.into(),
+                    ],
+                ))
+                .await
+                .map_err(PushOutboxError::Unavailable)?;
+            Ok(disabled.rows_affected() == 1)
+        }
+        .await;
+        finish_transaction(transaction, result).await
+    }
+
+    pub async fn complete_claim(
+        &self,
+        tenant: &TenantContext,
+        wake_id: Uuid,
+        claim_id: Uuid,
+        outcome: PushWakeTerminalOutcome,
+        completed_at_millis: u64,
+    ) -> Result<(), PushOutboxError> {
+        validate_claim_identity(wake_id, claim_id)?;
         validate_millis(completed_at_millis)?;
         let transaction = self.begin().await?;
         let result = async {
@@ -716,8 +897,8 @@ impl PushOutboxRepository {
                     COMPLETE_WAKE_SQL,
                     [
                         tenant.community_id().as_uuid().into(),
-                        wake.wake_id.into(),
-                        wake.claim_id.into(),
+                        wake_id.into(),
+                        claim_id.into(),
                         state.to_owned().into(),
                         terminal_outcome.to_owned().into(),
                         millis_i64(completed_at_millis)?.into(),
@@ -783,6 +964,13 @@ fn require_tenant(
 ) -> Result<(), PushOutboxError> {
     if tenant.community_id() != community_id {
         return Err(PushOutboxError::TenantBoundaryViolation);
+    }
+    Ok(())
+}
+
+fn validate_claim_identity(wake_id: Uuid, claim_id: Uuid) -> Result<(), PushOutboxError> {
+    if wake_id.is_nil() || claim_id.is_nil() {
+        return Err(PushOutboxError::InvalidClaim);
     }
     Ok(())
 }

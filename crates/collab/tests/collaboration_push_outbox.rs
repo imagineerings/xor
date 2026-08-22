@@ -493,6 +493,50 @@ async fn push_wake_enqueue_returns_the_existing_exact_job_for_a_duplicate() {
 }
 
 #[tokio::test]
+async fn push_executor_claim_operations_revalidate_retry_and_disable_exact_authority() {
+    let tenant = tenant(1);
+    let wake_id = Uuid::from_u128(10);
+    let claim_id = Uuid::from_u128(20);
+    let authorized_row: BTreeMap<String, SeaValue> =
+        BTreeMap::from([("authorized".into(), true.into())]);
+    let database = MockDatabase::new(DatabaseBackend::Postgres)
+        .append_exec_results([success(), success(), success(), success(), success()])
+        .append_query_results([vec![authorized_row]])
+        .into_connection();
+    let repository = PushOutboxRepository::new(database).expect("Postgres repository");
+
+    assert!(
+        repository
+            .revalidate_claim(&tenant, wake_id, claim_id, 1_000)
+            .await
+            .expect("revalidate claim")
+    );
+    repository
+        .retry_claim(&tenant, wake_id, claim_id, 2_000, 1_000)
+        .await
+        .expect("release retry");
+    assert!(
+        repository
+            .disable_claimed_endpoint(&tenant, wake_id, claim_id, 900, 1_000)
+            .await
+            .expect("disable exact endpoint")
+    );
+
+    let log = format!("{:#?}", repository.into_connection().into_transaction_log());
+    assert!(
+        log.contains("lease.generation = job.lease_generation"),
+        "{log}"
+    );
+    assert!(log.contains("claim_expires_at >="), "{log}");
+    assert!(log.contains("SET state = 'pending'"), "{log}");
+    assert!(log.contains("SET endpoint_enabled = false"), "{log}");
+    assert!(
+        log.contains("lease.endpoint_generation = job.endpoint_generation"),
+        "{log}"
+    );
+}
+
+#[tokio::test]
 async fn push_outbox_rejects_foreign_tenants_before_writes_and_on_defensive_reads() {
     let local_tenant = tenant(1);
     let foreign_lease = PushLease::activate(address(community(2)), activation(1, 5_000), 1_000)

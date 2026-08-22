@@ -15345,6 +15345,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "push_gateway"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "collab",
+ "collaboration_domain",
+ "thiserror 2.0.17",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,22 @@
+[package]
+name = "push_gateway"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+license = "GPL-3.0-or-later"
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/push_gateway.rs"
+
+[dependencies]
+async-trait.workspace = true
+collab.workspace = true
+collaboration_domain.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
