@@ -10,6 +10,7 @@ pub mod identity;
 pub mod messages;
 pub mod migration;
 pub mod nostr;
+pub mod presence;
 pub mod pubsub;
 pub mod rpc;
 pub mod search;
