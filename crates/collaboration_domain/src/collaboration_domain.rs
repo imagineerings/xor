@@ -10,6 +10,7 @@ pub mod identity_types;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
+pub mod presence;
 pub mod principal;
 pub mod profile;
 pub mod provenance;
@@ -75,6 +76,11 @@ pub use message::{
 pub use message_marker::{
     MarkerCommandOutcome, MarkerError, MarkerMutation, MarkerMutationKind, MarkerRecordFields,
     MarkerView, MessageMarkers,
+};
+pub use presence::{
+    MAX_ROOM_PRESENCE_TTL_MILLIS, MAX_SIGNED_PRESENCE_TTL_MILLIS, PresenceError,
+    PresenceMutationOutcome, PresenceProjection, PresenceSnapshot, PresenceSources, PresenceStatus,
+    PresenceSubject, RoomPresenceObservation, RoomPresenceSourceId, SignedPresenceObservation,
 };
 pub use principal::{
     ActiveBindingIdentity, AuthenticatedPrincipal, AuthenticatedPrincipalKind, AuthorizationScope,
