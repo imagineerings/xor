@@ -4256,116 +4256,19 @@ fn native_clip_multimodal_owned_allocation(
     }
 }
 
-fn mapped_weights_structural_owned_bytes(mapped: &MappedModelWeights) -> Result<u64, ClipError> {
-    let mut bytes = u64::try_from(mem::size_of::<MappedModelWeights>())
-        .map_err(|_| ClipError::Overflow("CLIP mapped weights"))?;
-    for value in [mapped.base_artifact_digest(), mapped.cache_identity()] {
-        bytes = bytes
-            .checked_add(
-                u64::try_from(value.len())
-                    .map_err(|_| ClipError::Overflow("CLIP mapped identity"))?,
-            )
-            .ok_or(ClipError::Overflow("CLIP mapped weights"))?;
-    }
-    Ok(bytes)
-}
-
-fn mapped_tensor_map_owned_bytes(map: &BTreeMap<String, Tensor>) -> Result<u64, ClipError> {
-    let mut bytes = u64::try_from(
-        mem::size_of_val(map)
-            .checked_add(mem::size_of::<usize>() * 2)
-            .ok_or(ClipError::Overflow("CLIP mapped tensor map"))?,
-    )
-    .map_err(|_| ClipError::Overflow("CLIP mapped tensor map"))?;
-    for name in map.keys() {
-        bytes = bytes
-            .checked_add(
-                u64::try_from(mem::size_of::<(String, Tensor)>())
-                    .map_err(|_| ClipError::Overflow("CLIP mapped tensor entry"))?,
-            )
-            .and_then(|value| value.checked_add(u64::try_from(name.capacity()).ok()?))
-            .ok_or(ClipError::Overflow("CLIP mapped tensor map"))?;
-    }
-    Ok(bytes)
-}
-
-fn mapped_unexpected_keys_owned_bytes(mapped: &MappedModelWeights) -> Result<u64, ClipError> {
-    let mut bytes = u64::try_from(mem::size_of::<usize>() * 2)
-        .map_err(|_| ClipError::Overflow("CLIP unexpected-key slice"))?;
-    for name in mapped.unexpected_keys() {
-        bytes = bytes
-            .checked_add(
-                u64::try_from(mem::size_of::<String>())
-                    .map_err(|_| ClipError::Overflow("CLIP unexpected-key entry"))?,
-            )
-            .and_then(|value| value.checked_add(u64::try_from(name.capacity()).ok()?))
-            .ok_or(ClipError::Overflow("CLIP unexpected-key slice"))?;
-    }
-    Ok(bytes)
-}
-
-fn mapped_binding_owned_bytes(mapped: &MappedModelWeights) -> Result<u64, ClipError> {
-    let binding = mapped.binding().ok_or_else(|| {
-        ClipError::InvalidNativeResource("CLIP mapped binding is unavailable".to_owned())
-    })?;
-    let mut bytes = u64::try_from(
-        mem::size_of_val(binding)
-            .checked_add(mem::size_of::<usize>() * 2)
-            .ok_or(ClipError::Overflow("CLIP mapped binding"))?,
-    )
-    .map_err(|_| ClipError::Overflow("CLIP mapped binding"))?;
-    for value in [
-        binding.family().feature_id(),
-        binding.family().identifier(),
-        binding.family().architecture_version(),
-        binding.profile_identity(),
-        binding.state_plan_identity(),
-        binding.probe_identity().unwrap_or_default(),
-    ] {
-        bytes = bytes
-            .checked_add(
-                u64::try_from(value.len())
-                    .map_err(|_| ClipError::Overflow("CLIP mapped binding"))?,
-            )
-            .ok_or(ClipError::Overflow("CLIP mapped binding"))?;
-    }
-    Ok(bytes)
-}
-
 fn mapped_weights_owned_allocations(
     mapped: &Arc<MappedModelWeights>,
 ) -> Result<Vec<NativeClipResidentAllocation>, ClipError> {
-    let mut allocations = vec![NativeClipResidentAllocation {
-        kind: NativeClipResidentOwnerKind::MappedWeights,
-        address: Arc::as_ptr(mapped) as usize,
-        resident_bytes: mapped_weights_structural_owned_bytes(mapped)?,
-    }];
-    let mut maps = BTreeSet::new();
-    for map in [mapped.unpatched_tensors(), mapped.tensors()] {
-        let address = map as *const BTreeMap<String, Tensor> as usize;
-        if maps.insert(address) {
-            allocations.push(NativeClipResidentAllocation {
-                kind: NativeClipResidentOwnerKind::MappedWeights,
-                address,
-                resident_bytes: mapped_tensor_map_owned_bytes(map)?,
-            });
-        }
-    }
-    if !mapped.unexpected_keys().is_empty() {
-        allocations.push(NativeClipResidentAllocation {
+    Ok(mapped
+        .resident_owned_allocations()
+        .map_err(|error| ClipError::NativeResourceOwner(error.to_string()))?
+        .into_iter()
+        .map(|allocation| NativeClipResidentAllocation {
             kind: NativeClipResidentOwnerKind::MappedWeights,
-            address: mapped.unexpected_keys().as_ptr() as usize,
-            resident_bytes: mapped_unexpected_keys_owned_bytes(mapped)?,
-        });
-    }
-    if let Some(binding) = mapped.binding() {
-        allocations.push(NativeClipResidentAllocation {
-            kind: NativeClipResidentOwnerKind::MappedWeights,
-            address: binding as *const _ as usize,
-            resident_bytes: mapped_binding_owned_bytes(mapped)?,
-        });
-    }
-    Ok(allocations)
+            address: allocation.address(),
+            resident_bytes: allocation.resident_bytes(),
+        })
+        .collect())
 }
 
 #[derive(Clone)]
@@ -5100,12 +5003,14 @@ fn native_clip_source_contract(
             && options.attention_mask == attention_mask
             && !options.zero_out_masked
             && tokenizer.minimum_length == Some(minimum_length)
+            && tokenizer.minimum_padding.is_none()
             && tokenizer.maximum_length == maximum_length
             && !tokenizer.pad_to_maximum_length
             && !tokenizer.pad_left
             && tokenizer.start_token.is_none()
             && tokenizer.end_token == Some(1)
             && tokenizer.pad_token == 0
+            && !tokenizer.disable_weights
     };
     match (profile, role) {
         (NativeClipProfile::Sd1, NativeClipComponentRole::ClipL) => {
@@ -5173,12 +5078,14 @@ fn native_clip_source_contract(
                 && options.attention_mask
                 && !options.zero_out_masked
                 && tokenizer.minimum_length == Some(128)
+                && tokenizer.minimum_padding.is_none()
                 && tokenizer.maximum_length == SOURCE_UNBOUNDED_TOKENIZER_MAXIMUM_LENGTH
                 && !tokenizer.pad_to_maximum_length
                 && !tokenizer.pad_left
                 && tokenizer.start_token == Some(128_000)
                 && tokenizer.end_token.is_none()
                 && tokenizer.pad_token == 128_009
+                && !tokenizer.disable_weights
         }
         (NativeClipProfile::Qwen, NativeClipComponentRole::Qwen) => {
             width == 3_584
@@ -8402,6 +8309,24 @@ mod tests {
             &t5_tokenizer,
         ));
         t5_tokenizer.maximum_length = SOURCE_UNBOUNDED_TOKENIZER_MAXIMUM_LENGTH;
+        t5_tokenizer.minimum_padding = Some(1);
+        assert!(!native_clip_source_contract(
+            NativeClipProfile::Sd3,
+            NativeClipComponentRole::T5,
+            4_096,
+            &t5_options,
+            &t5_tokenizer,
+        ));
+        t5_tokenizer.minimum_padding = None;
+        t5_tokenizer.disable_weights = true;
+        assert!(!native_clip_source_contract(
+            NativeClipProfile::Sd3,
+            NativeClipComponentRole::T5,
+            4_096,
+            &t5_options,
+            &t5_tokenizer,
+        ));
+        t5_tokenizer.disable_weights = false;
         t5_tokenizer.minimum_length = Some(1);
         assert!(native_clip_source_contract(
             NativeClipProfile::PixArt,
@@ -8484,6 +8409,24 @@ mod tests {
             &llama_options,
             &decoder_tokenizer,
         ));
+        decoder_tokenizer.maximum_length = SOURCE_UNBOUNDED_TOKENIZER_MAXIMUM_LENGTH;
+        decoder_tokenizer.minimum_padding = Some(1);
+        assert!(!native_clip_source_contract(
+            NativeClipProfile::HiDream,
+            NativeClipComponentRole::Llama,
+            4_096,
+            &llama_options,
+            &decoder_tokenizer,
+        ));
+        decoder_tokenizer.minimum_padding = None;
+        decoder_tokenizer.disable_weights = true;
+        assert!(!native_clip_source_contract(
+            NativeClipProfile::HiDream,
+            NativeClipComponentRole::Llama,
+            4_096,
+            &llama_options,
+            &decoder_tokenizer,
+        ));
         Ok(())
     }
 
@@ -8504,6 +8447,14 @@ mod tests {
         let alias = mapped.clone();
         assert_eq!(allocations.len(), 3);
         assert_eq!(allocations, mapped_weights_owned_allocations(&alias)?);
+        assert_eq!(
+            allocations.iter().try_fold(0_u64, |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes())
+                    .ok_or("mapped allocation total overflow")
+            })?,
+            mapped.resident_owned_bytes()?
+        );
         assert_eq!(
             allocations
                 .iter()

@@ -52,6 +52,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    mem,
     sync::Arc,
 };
 use thiserror::Error;
@@ -4563,6 +4564,35 @@ pub struct ModelFamilyWeightBinding {
     probe_identity: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum MappedModelWeightsResidentOwnerKind {
+    Resource,
+    TensorMap,
+    UnexpectedKeys,
+    Binding,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MappedModelWeightsResidentAllocation {
+    kind: MappedModelWeightsResidentOwnerKind,
+    address: usize,
+    resident_bytes: u64,
+}
+
+impl MappedModelWeightsResidentAllocation {
+    pub const fn kind(&self) -> MappedModelWeightsResidentOwnerKind {
+        self.kind
+    }
+
+    pub const fn address(&self) -> usize {
+        self.address
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
 impl ModelFamilyWeightBinding {
     pub fn family(&self) -> &ModelFamilyIdentity {
         &self.family
@@ -4620,6 +4650,55 @@ impl MappedModelWeights {
     }
     pub fn unexpected_keys(&self) -> &[String] {
         &self.unexpected_keys
+    }
+
+    pub fn resident_owned_allocations(
+        &self,
+    ) -> Result<Vec<MappedModelWeightsResidentAllocation>, ModelFamilyError> {
+        let mut allocations = Vec::new();
+        allocations
+            .try_reserve_exact(5)
+            .map_err(|_| ModelFamilyError::MemoryOverflow)?;
+        allocations.push(MappedModelWeightsResidentAllocation {
+            kind: MappedModelWeightsResidentOwnerKind::Resource,
+            address: self as *const Self as usize,
+            resident_bytes: mapped_weights_resource_owned_bytes(self)?,
+        });
+        allocations.push(MappedModelWeightsResidentAllocation {
+            kind: MappedModelWeightsResidentOwnerKind::TensorMap,
+            address: Arc::as_ptr(&self.unpatched_tensors) as usize,
+            resident_bytes: mapped_tensor_map_conservative_owned_bytes(&self.unpatched_tensors)?,
+        });
+        if !Arc::ptr_eq(&self.unpatched_tensors, &self.tensors) {
+            allocations.push(MappedModelWeightsResidentAllocation {
+                kind: MappedModelWeightsResidentOwnerKind::TensorMap,
+                address: Arc::as_ptr(&self.tensors) as usize,
+                resident_bytes: mapped_tensor_map_conservative_owned_bytes(&self.tensors)?,
+            });
+        }
+        allocations.push(MappedModelWeightsResidentAllocation {
+            kind: MappedModelWeightsResidentOwnerKind::UnexpectedKeys,
+            address: Arc::as_ptr(&self.unexpected_keys) as *const () as usize,
+            resident_bytes: mapped_unexpected_keys_owned_bytes(&self.unexpected_keys)?,
+        });
+        if let Some(binding) = &self.binding {
+            allocations.push(MappedModelWeightsResidentAllocation {
+                kind: MappedModelWeightsResidentOwnerKind::Binding,
+                address: Arc::as_ptr(binding) as usize,
+                resident_bytes: mapped_binding_owned_bytes(binding)?,
+            });
+        }
+        Ok(allocations)
+    }
+
+    pub fn resident_owned_bytes(&self) -> Result<u64, ModelFamilyError> {
+        self.resident_owned_allocations()?
+            .into_iter()
+            .try_fold(0_u64, |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            })
     }
 
     pub(crate) fn from_parts(
@@ -4687,6 +4766,94 @@ impl MappedModelWeights {
         self.binding = Some(Arc::new(binding));
         Ok(self)
     }
+}
+
+fn mapped_weights_resource_owned_bytes(
+    weights: &MappedModelWeights,
+) -> Result<u64, ModelFamilyError> {
+    let bytes = mem::size_of::<MappedModelWeights>()
+        .checked_add(weights.base_artifact_digest.capacity())
+        .and_then(|bytes| bytes.checked_add(weights.cache_identity.capacity()))
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    u64::try_from(bytes).map_err(|_| ModelFamilyError::MemoryOverflow)
+}
+
+fn mapped_tensor_map_conservative_owned_bytes(
+    tensors: &Arc<BTreeMap<String, Tensor>>,
+) -> Result<u64, ModelFamilyError> {
+    // BTreeMap does not expose node capacity. Charging one full internal node per retained
+    // entry is the stable conservative bound for Rust's order-six B-tree representation.
+    const BTREE_NODE_KEY_CAPACITY: usize = 11;
+    const BTREE_NODE_EDGE_CAPACITY: usize = BTREE_NODE_KEY_CAPACITY + 1;
+    const BTREE_NODE_HEADER_WORDS: usize = 3;
+
+    let arc_and_map = (mem::size_of::<usize>() * 2)
+        .checked_add(mem::size_of::<BTreeMap<String, Tensor>>())
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    let node_bytes = (mem::size_of::<String>() + mem::size_of::<Tensor>())
+        .checked_mul(BTREE_NODE_KEY_CAPACITY)
+        .and_then(|bytes| bytes.checked_add(mem::size_of::<usize>() * BTREE_NODE_EDGE_CAPACITY))
+        .and_then(|bytes| bytes.checked_add(mem::size_of::<usize>() * BTREE_NODE_HEADER_WORDS))
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    let node_capacity = if tensors.is_empty() {
+        0
+    } else {
+        node_bytes
+            .checked_mul(tensors.len())
+            .ok_or(ModelFamilyError::MemoryOverflow)?
+    };
+    let key_capacity = tensors.keys().try_fold(0_usize, |bytes, key| {
+        bytes
+            .checked_add(key.capacity())
+            .ok_or(ModelFamilyError::MemoryOverflow)
+    })?;
+    let bytes = arc_and_map
+        .checked_add(node_capacity)
+        .and_then(|bytes| bytes.checked_add(key_capacity))
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    u64::try_from(bytes).map_err(|_| ModelFamilyError::MemoryOverflow)
+}
+
+fn mapped_unexpected_keys_owned_bytes(
+    unexpected_keys: &Arc<[String]>,
+) -> Result<u64, ModelFamilyError> {
+    let string_storage = mem::size_of::<String>()
+        .checked_mul(unexpected_keys.len())
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    let string_capacity = unexpected_keys.iter().try_fold(0_usize, |bytes, key| {
+        bytes
+            .checked_add(key.capacity())
+            .ok_or(ModelFamilyError::MemoryOverflow)
+    })?;
+    let bytes = (mem::size_of::<usize>() * 2)
+        .checked_add(string_storage)
+        .and_then(|bytes| bytes.checked_add(string_capacity))
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    u64::try_from(bytes).map_err(|_| ModelFamilyError::MemoryOverflow)
+}
+
+fn mapped_binding_owned_bytes(binding: &ModelFamilyWeightBinding) -> Result<u64, ModelFamilyError> {
+    let family_strings = binding
+        .family
+        .owned_resident_bytes()
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    let binding_strings = binding
+        .profile_identity
+        .capacity()
+        .checked_add(binding.state_plan_identity.capacity())
+        .and_then(|bytes| {
+            bytes.checked_add(binding.probe_identity.as_ref().map_or(0, String::capacity))
+        })
+        .ok_or(ModelFamilyError::MemoryOverflow)?;
+    u64::try_from(
+        (mem::size_of::<usize>() * 2)
+            .checked_add(mem::size_of::<ModelFamilyWeightBinding>())
+            .and_then(|bytes| bytes.checked_add(binding_strings))
+            .ok_or(ModelFamilyError::MemoryOverflow)?,
+    )
+    .map_err(|_| ModelFamilyError::MemoryOverflow)?
+    .checked_add(family_strings)
+    .ok_or(ModelFamilyError::MemoryOverflow)
 }
 
 pub fn map_model_weights(
@@ -7246,6 +7413,67 @@ mod model_probe_tests {
             shape: shape.to_vec(),
             storage_dtype: storage_dtype.to_owned(),
         }
+    }
+
+    #[test]
+    fn mapped_weights_residency_preserves_aliases_and_exact_owner_total()
+    -> Result<(), ModelFamilyError> {
+        let mapped = MappedModelWeights::from_parts(
+            "a".repeat(64),
+            BTreeMap::new(),
+            vec![String::from("unexpected.with.capacity")],
+        )
+        .bind(ModelFamilyWeightBinding {
+            family: ModelFamilyIdentity::new("COMFY-MODEL-9999", "fixture", "v1")?,
+            profile_identity: String::from("fixture-profile"),
+            state_plan_identity: String::from("fixture-state-plan"),
+            probe_identity: Some(String::from("fixture-probe")),
+        })?;
+        let allocations = mapped.resident_owned_allocations()?;
+        assert_eq!(allocations.len(), 4);
+        assert_eq!(
+            allocations.iter().try_fold(0_u64, |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes())
+                    .ok_or(ModelFamilyError::MemoryOverflow)
+            })?,
+            mapped.resident_owned_bytes()?
+        );
+        assert_eq!(
+            allocations
+                .iter()
+                .map(MappedModelWeightsResidentAllocation::address)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            allocations.len()
+        );
+        let alias = mapped.clone();
+        let alias_allocations = alias.resident_owned_allocations()?;
+        let (resource, retained) = allocations
+            .split_first()
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        let (alias_resource, alias_retained) = alias_allocations
+            .split_first()
+            .ok_or(ModelFamilyError::MemoryOverflow)?;
+        assert_ne!(resource.address(), alias_resource.address());
+        assert_eq!(retained, alias_retained);
+
+        let patched = mapped.with_tensors_preserving_identity(BTreeMap::new());
+        let patched_allocations = patched.resident_owned_allocations()?;
+        assert_eq!(patched_allocations.len(), 5);
+        let shared_addresses = allocations
+            .iter()
+            .map(MappedModelWeightsResidentAllocation::address)
+            .collect::<BTreeSet<_>>()
+            .intersection(
+                &patched_allocations
+                    .iter()
+                    .map(MappedModelWeightsResidentAllocation::address)
+                    .collect(),
+            )
+            .count();
+        assert_eq!(shared_addresses, 3);
+        Ok(())
     }
 
     #[test]
