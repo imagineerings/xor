@@ -14,7 +14,12 @@ doctest = false
 
 [features]
 default = []
-multiplayer-tools = ["dep:agent_ui", "dep:chrono", "agent_ui/multiplayer-tools"]
+multiplayer-tools = [
+    "dep:agent_ui",
+    "dep:chrono",
+    "dep:collaboration_domain",
+    "agent_ui/multiplayer-tools",
+]
 test-support = [
     "call/test-support",
     "client/test-support",
@@ -35,6 +40,7 @@ anyhow.workspace = true
 call.workspace = true
 channel.workspace = true
 chrono = { workspace = true, optional = true }
+collaboration_domain = { workspace = true, optional = true }
 client.workspace = true
 collections.workspace = true
 db.workspace = true
@@ -68,6 +74,7 @@ zed_actions.workspace = true
 call = { workspace = true, features = ["test-support"] }
 client = { workspace = true, features = ["test-support"] }
 collections = { workspace = true, features = ["test-support"] }
+db = { workspace = true, features = ["test-support"] }
 editor = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
 notifications = { workspace = true, features = ["test-support"] }
@@ -77,5 +84,6 @@ rpc = { workspace = true, features = ["test-support"] }
 settings = { workspace = true, features = ["test-support"] }
 
 util = { workspace = true, features = ["test-support"] }
+uuid.workspace = true
 
 workspace = { workspace = true, features = ["test-support"] }

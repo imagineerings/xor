@@ -10,10 +10,13 @@ pub mod identity_types;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
+pub mod presence;
 pub mod principal;
 pub mod profile;
 pub mod provenance;
 pub mod reaction;
+pub mod read_state;
+pub mod reminder;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
@@ -74,6 +77,11 @@ pub use message_marker::{
     MarkerCommandOutcome, MarkerError, MarkerMutation, MarkerMutationKind, MarkerRecordFields,
     MarkerView, MessageMarkers,
 };
+pub use presence::{
+    MAX_ROOM_PRESENCE_TTL_MILLIS, MAX_SIGNED_PRESENCE_TTL_MILLIS, PresenceError,
+    PresenceMutationOutcome, PresenceProjection, PresenceSnapshot, PresenceSources, PresenceStatus,
+    PresenceSubject, RoomPresenceObservation, RoomPresenceSourceId, SignedPresenceObservation,
+};
 pub use principal::{
     ActiveBindingIdentity, AuthenticatedPrincipal, AuthenticatedPrincipalKind, AuthorizationScope,
     NostrAuthenticationMethod, PrincipalError, PrincipalScopes, TokenId,
@@ -91,6 +99,16 @@ pub use provenance::{
 pub use reaction::{
     ActiveReaction, ReactionCommandOutcome, ReactionError, ReactionGroup, ReactionMutation,
     ReactionMutationKind, ReactionRecordFields, ReactionSet, ReactionValue,
+};
+pub use read_state::{
+    ManualUnreadRegister, ManualUnreadState, OwnerReadStateReplica, ReadContextId, ReadState,
+    ReadStateCompleteness, ReadStateError, ReadStateScope,
+};
+pub use reminder::{
+    OwnerReminderReplica, Reminder, ReminderCommandOutcome, ReminderContent, ReminderDismissal,
+    ReminderDueOutcome, ReminderError, ReminderHandled, ReminderHandledReason, ReminderHead,
+    ReminderId, ReminderLifecycle, ReminderRecordFields, ReminderRetention, ReminderScope,
+    ReminderTarget, ReminderTargetStatus,
 };
 pub use scheduled_message::{
     DueClaim, ScheduleCommandOutcome, ScheduleError, ScheduleMutation, ScheduleMutationKind,

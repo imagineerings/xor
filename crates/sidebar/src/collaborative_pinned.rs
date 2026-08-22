@@ -13,7 +13,9 @@ use crate::collaborative_navigation::{
     CollaborativeNavigationProjection, CollaborativeNavigationRow, CollaborativeNavigationSourceId,
 };
 use crate::{
-    collaborative_projects::activate_project_target, collaborative_tasks::activate_thread_target,
+    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
+    collaborative_projects::activate_project_target,
+    collaborative_tasks::activate_thread_target,
 };
 
 const MAX_RECENT_WORK_ROWS: usize = 8;
@@ -124,6 +126,7 @@ pub(crate) struct CollaborativePinned {
 
 impl CollaborativePinned {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
+        observe_collaborative_awareness(cx);
         if let Some(thread_store) = ThreadMetadataStore::try_global(cx) {
             cx.observe(&thread_store, |_, _, cx| cx.notify()).detach();
         }
@@ -299,6 +302,7 @@ impl Render for CollaborativePinned {
                             )
                         })
                         .children(projection.navigation.rows().iter().map(|row| {
+                            let awareness = render_collaborative_awareness(row, cx);
                             let Some(target) = Self::target(row) else {
                                 return Label::new("Pinned target is unavailable")
                                     .size(LabelSize::Small)
@@ -316,6 +320,7 @@ impl Render for CollaborativePinned {
                                         .size(LabelSize::Small)
                                         .truncate(),
                                 )
+                                .when_some(awareness, |this, awareness| this.child(awareness))
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.activate(target.clone(), window, cx);
                                 }))
