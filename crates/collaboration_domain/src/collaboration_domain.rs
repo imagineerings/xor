@@ -6,6 +6,7 @@ pub mod channel_invite;
 pub mod channel_metadata;
 pub mod community;
 pub mod dm;
+pub mod forum;
 pub mod identity_types;
 pub mod inbox;
 pub mod membership;
@@ -63,6 +64,11 @@ pub use community::{
 pub use dm::{
     DirectMessage, DmCommandOutcome, DmError, DmLifecycleState, DmMutation, DmMutationKind,
     DmOpenFields, DmParticipantState, DmRecordFields, MAX_DM_PARTICIPANTS, MIN_DM_PARTICIPANTS,
+};
+pub use forum::{
+    ForumComment, ForumError, ForumMessageInput, ForumPost, ForumPostCursor, ForumPostPage,
+    ForumProjection, ForumThreadPage, ForumVote, ForumVoteDirection, ForumVoteSummary,
+    MAX_FORUM_MESSAGES, MAX_FORUM_POST_PAGE_ROWS, MAX_FORUM_VOTES,
 };
 pub use identity_types::{
     AggregateId, AggregateType, CommunityId, OperationId, PrincipalId, ScopedAggregateId,
