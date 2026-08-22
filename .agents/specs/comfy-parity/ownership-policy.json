@@ -757,6 +757,11 @@
         "AssetService",
         "NativeAssetReference",
         "NativeAssetReadRequest",
+        "NativeAssetNameListRequest",
+        "NativeAssetNameList",
+        "NativeAssetNameResolutionRequest",
+        "NativeAssetNameResolution",
+        "NativeNamedAssetReference",
         "NativeAssetResolver",
         "NativeAssetResolverRegistry",
         "RuntimeNativeAssetResolver"
@@ -768,6 +773,7 @@
         "API and GPUI views consume the same SharedAssetService with sealed AuthorizedCapabilities and never grant themselves capabilities",
         "AssetPluginCapabilityServices is a least-privilege broker over that shared service and delegates authorization and verified reads to AssetService",
         "NativeAssetResolverRegistry seals authorized AssetIdentity values behind attempt-scoped NativeAssetReference tokens; native nodes receive only the opaque reference and bounded NativeAssetResolver interface, never paths or grants",
+        "NativeAssetResolverRegistry resolves source folder categories and ordered one-to-three filename selections from one authorized ArtifactIndex snapshot, validates every member before atomically sealing references, and preserves source root and alias order without exposing paths",
         "SubgraphBlueprintLibrary is a focused graph-to-asset adapter that delegates authorization, exact transactional writes, verified reads, enumeration, containment, rollback, indexing, and persistence to AssetService; its GPUI catalog is a refreshed bounded derived projection, not a second index",
         "the legacy model-list wire projection intentionally de-duplicates relative names for Comfy compatibility while the experimental model-list DTO carries stable opaque root IDs and never host paths"
       ],
@@ -789,6 +795,36 @@
           "qualified": "comfy_nodes::NativeAssetReadRequest",
           "role": "boundary_dto",
           "symbol": "NativeAssetReadRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetNameListRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetNameListRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetNameList",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetNameList"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetNameResolutionRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetNameResolutionRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeAssetNameResolution",
+          "role": "boundary_dto",
+          "symbol": "NativeAssetNameResolution"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "qualified": "comfy_nodes::NativeNamedAssetReference",
+          "role": "boundary_dto",
+          "symbol": "NativeNamedAssetReference"
         },
         {
           "path": "crates/comfy_nodes/src/execution.rs",
@@ -844,6 +880,11 @@
         "AssetIdentity",
         "NativeAssetReference",
         "NativeAssetReadRequest",
+        "NativeAssetNameListRequest",
+        "NativeAssetNameList",
+        "NativeAssetNameResolutionRequest",
+        "NativeAssetNameResolution",
+        "NativeNamedAssetReference",
         "NativeAssetResolver",
         "NativeAssetResolverRegistry",
         "RuntimeNativeAssetResolver",
@@ -882,6 +923,11 @@
           "pattern": "NativeAssetResolverRegistry[\\s\\S]*NativeAssetReference::checked[\\s\\S]*RuntimeNativeAssetResolver[\\s\\S]*impl NativeAssetResolver for RuntimeNativeAssetResolver[\\s\\S]*read_verified"
         },
         {
+          "name": "native-source-asset-name-resolution-delegates-to-canonical-index",
+          "path": "crates/comfy_runtime/src/assets.rs",
+          "pattern": "resolve_names_for_node[\\s\\S]*NativeAssetReference::checked[\\s\\S]*fn list_source_asset_names[\\s\\S]*scan_namespaces[\\s\\S]*fn resolve_source_asset_names[\\s\\S]*root_ids_in_resolution_order"
+        },
+        {
           "name": "native-output-reference-to-asset-identity",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "\\.to_reference\\(\\)"
@@ -899,23 +945,37 @@
         "comfy-parity-artifact-owner-consolidation",
         "comfy-parity-authoritative-domain-ownership",
         "comfy-parity-pre-breadth-ownership-closure",
-        "comfy-parity-native-node-asset-effect-foundation"
+        "comfy-parity-native-node-asset-effect-foundation",
+        "comfy-parity-native-asset-name-resolution-foundation"
       ],
       "production_consumers": [
         "comfy_ui output and asset surfaces",
         "comfy_api asset routes",
         "OutputCommitter",
-        "SubgraphBlueprintLibrary and its derived GPUI catalog"
+        "SubgraphBlueprintLibrary and its derived GPUI catalog",
+        "native node families that consume source folder-category names"
       ],
       "requirements": [
+        "Requirement 4",
+        "Requirement 6",
         "Requirement 11",
         "Requirement 19",
         "Requirement 28",
-        "Requirement 41"
+        "Requirement 32",
+        "Requirement 34",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
       ],
       "design": [
+        "D8",
         "D11",
+        "D20",
+        "D29",
         "D30",
+        "D32",
+        "D34",
+        "D39",
         "D41"
       ],
       "validation": [
@@ -925,7 +985,7 @@
         "VAL-OWNERSHIP-DOMAIN-001",
         "VAL-OWNERSHIP-001"
       ],
-      "decision_reason": "AssetService alone owns asset authorization, mutation, metadata, tags, and asset-specific persistence; it delegates byte identity, secure roots, and filesystem indexing to ArtifactRoot and ArtifactIndex. NativeAssetResolverRegistry is the sole attempt-scoped adapter that seals AssetIdentity and authority behind opaque NativeAssetReference values, delegates bounded reads back to AssetService, and retires all references when an attempt ends. Profile startup creates one shared handle consumed by desktop, CLI, API, controller, plugin, output, and model adapters."
+      "decision_reason": "AssetService alone owns asset authorization, mutation, metadata, tags, source-category listing and selection, and asset-specific persistence; it delegates byte identity, secure roots, filesystem indexing, and change detection to ArtifactRoot and ArtifactIndex. NativeAssetResolverRegistry is the sole attempt-scoped adapter that resolves ordered source names, seals every selection atomically behind opaque NativeAssetReference values, delegates bounded reads back to AssetService, and retires all references when an attempt ends. Profile startup creates one shared handle consumed by desktop, CLI, API, controller, plugin, output, model, and native-node adapters."
     },
     {
       "concern": "attention_kernel_mechanics",

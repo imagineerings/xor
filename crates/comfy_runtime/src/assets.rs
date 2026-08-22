@@ -16,7 +16,9 @@ use comfy_model::{
     validate_native_vae_backend_target,
 };
 use comfy_nodes::{
-    NativeAssetReadRequest, NativeAssetReference, NativeAssetResolver, NativeAssetServiceError,
+    NativeAssetNameList, NativeAssetNameListRequest, NativeAssetNameResolution,
+    NativeAssetNameResolutionRequest, NativeAssetReadRequest, NativeAssetReference,
+    NativeAssetResolver, NativeAssetServiceError, NativeNamedAssetReference,
     NativeNodeServiceIdentity, NativeResolvedAsset,
 };
 use comfy_tensor::{CancellationToken, CpuBackend, ExecutionContext, Tensor};
@@ -40,6 +42,94 @@ pub const ASSET_SERVICE_SCHEMA_VERSION: u32 = 2;
 pub const DEFAULT_MAX_ASSET_INDEX_BYTES: usize = 64 * 1024 * 1024;
 pub const DEFAULT_MAX_ASSET_RECORDS: usize = 100_000;
 const ASSET_INDEX_FILENAME: &str = ".zed-asset-index.json";
+
+const SOURCE_MODEL_EXTENSIONS: &[&str] = &[
+    ".bin",
+    ".ckpt",
+    ".pkl",
+    ".pt",
+    ".pt2",
+    ".pth",
+    ".safetensors",
+    ".sft",
+];
+
+#[derive(Clone, Copy)]
+struct SourceAssetFolderSpec {
+    namespace: AssetNamespace,
+    prefixes: &'static [&'static str],
+    extensions: &'static [&'static str],
+}
+
+fn source_asset_folder_spec(category: &str) -> Option<SourceAssetFolderSpec> {
+    let model = |prefixes| SourceAssetFolderSpec {
+        namespace: AssetNamespace::Model,
+        prefixes,
+        extensions: SOURCE_MODEL_EXTENSIONS,
+    };
+    match category {
+        "input" => Some(SourceAssetFolderSpec {
+            namespace: AssetNamespace::Input,
+            prefixes: &[""],
+            extensions: &[],
+        }),
+        "output" => Some(SourceAssetFolderSpec {
+            namespace: AssetNamespace::Output,
+            prefixes: &[""],
+            extensions: &[],
+        }),
+        "temp" | "temporary" => Some(SourceAssetFolderSpec {
+            namespace: AssetNamespace::Temporary,
+            prefixes: &[""],
+            extensions: &[],
+        }),
+        "checkpoints" => Some(model(&["checkpoints"])),
+        "configs" => Some(SourceAssetFolderSpec {
+            namespace: AssetNamespace::Model,
+            prefixes: &["configs"],
+            extensions: &[".yaml"],
+        }),
+        "loras" => Some(model(&["loras"])),
+        "vae" => Some(model(&["vae"])),
+        "text_encoders" | "clip" => Some(model(&["text_encoders", "clip"])),
+        "diffusion_models" | "unet" => Some(model(&["unet", "diffusion_models"])),
+        "clip_vision" => Some(model(&["clip_vision"])),
+        "style_models" => Some(model(&["style_models"])),
+        "embeddings" => Some(model(&["embeddings"])),
+        "vae_approx" => Some(model(&["vae_approx"])),
+        "controlnet" => Some(model(&["controlnet", "t2i_adapter"])),
+        "gligen" => Some(model(&["gligen"])),
+        "upscale_models" => Some(model(&["upscale_models"])),
+        "latent_upscale_models" => Some(model(&["latent_upscale_models"])),
+        "hypernetworks" => Some(model(&["hypernetworks"])),
+        "photomaker" => Some(model(&["photomaker"])),
+        "classifiers" => Some(SourceAssetFolderSpec {
+            namespace: AssetNamespace::Model,
+            prefixes: &["classifiers"],
+            extensions: &[""],
+        }),
+        "model_patches" => Some(model(&["model_patches"])),
+        "audio_encoders" => Some(model(&["audio_encoders"])),
+        "background_removal" => Some(model(&["background_removal"])),
+        "frame_interpolation" => Some(model(&["frame_interpolation"])),
+        "geometry_estimation" => Some(model(&["geometry_estimation"])),
+        "optical_flow" => Some(model(&["optical_flow"])),
+        "detection" => Some(model(&["detection"])),
+        _ => None,
+    }
+}
+
+fn source_asset_name_has_supported_extension(name: &str, extensions: &[&str]) -> bool {
+    if extensions.is_empty() {
+        return true;
+    }
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| format!(".{}", extension.to_ascii_lowercase()))
+        .unwrap_or_default();
+    extensions.contains(&extension.as_str())
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -209,6 +299,7 @@ impl AssetIdentity {
 pub struct AssetRoots {
     pub profile_id: String,
     roots: BTreeMap<(AssetNamespace, String), ArtifactRoot>,
+    root_order: Vec<(AssetNamespace, String)>,
 }
 
 impl AssetRoots {
@@ -221,6 +312,7 @@ impl AssetRoots {
             return Err(AssetError::InvalidProfile(profile_id));
         }
         let mut typed_roots = BTreeMap::new();
+        let mut root_order = Vec::new();
         let mut canonical_index = ArtifactIndex::default();
         for (namespace, path) in roots {
             let root = ArtifactRoot::canonical(
@@ -239,10 +331,12 @@ impl AssetRoots {
             {
                 return Err(AssetError::DuplicateNamespace(namespace));
             }
+            root_order.push((namespace, namespace.locator_type().to_owned()));
         }
         Ok(Self {
             profile_id,
             roots: typed_roots,
+            root_order,
         })
     }
 
@@ -307,8 +401,19 @@ impl AssetRoots {
         canonical_index
             .add_root(root.clone())
             .map_err(map_artifact_error)?;
-        self.roots.insert((namespace, root_id), root);
+        self.roots.insert((namespace, root_id.clone()), root);
+        self.root_order.push((namespace, root_id));
         Ok(())
+    }
+
+    fn root_ids_in_resolution_order(
+        &self,
+        namespace: AssetNamespace,
+    ) -> impl Iterator<Item = &str> {
+        self.root_order
+            .iter()
+            .filter(move |(candidate, _)| *candidate == namespace)
+            .map(|(_, root_id)| root_id.as_str())
     }
 
     pub fn identity(
@@ -690,6 +795,14 @@ struct NativeAssetResolutionRecord {
     sha256: String,
 }
 
+#[derive(Clone, Debug)]
+struct SourceAssetResolutionRecord {
+    name: String,
+    identity: AssetIdentity,
+    byte_length: u64,
+    sha256: String,
+}
+
 pub struct NativeAssetResolverRegistry {
     assets: SharedAssetService,
     authorization: AuthorizedCapabilities,
@@ -777,6 +890,108 @@ impl NativeAssetResolverRegistry {
         Ok(reference)
     }
 
+    fn list_names_for_node(
+        &self,
+        folder_category: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<String>, NativeAssetServiceError> {
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+        self.assets
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .list_source_asset_names(folder_category, &self.authorization, cancellation)
+            .map_err(map_native_asset_error)
+    }
+
+    fn resolve_names_for_node(
+        &self,
+        service_identity: &NativeNodeServiceIdentity,
+        request: &NativeAssetNameResolutionRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeAssetNameResolution, NativeAssetServiceError> {
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+        let resolved = self
+            .assets
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .resolve_source_asset_names(
+                request.folder_category(),
+                request.names(),
+                &self.authorization,
+                cancellation,
+            )
+            .map_err(map_native_asset_error)?;
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+
+        let mut prepared = Vec::new();
+        prepared
+            .try_reserve_exact(resolved.len())
+            .map_err(|_| NativeAssetServiceError::TooLarge)?;
+        for asset in resolved {
+            let mut hasher = Sha256::new();
+            hasher.update(b"zed.comfy.native-asset-reference.v1");
+            hasher.update(service_identity.service_id().as_bytes());
+            hasher.update(asset.identity.profile_id.as_bytes());
+            hasher.update(asset.identity.namespace.locator_type().as_bytes());
+            if let Some(root_id) = &asset.identity.root_id {
+                hasher.update(root_id.as_bytes());
+            }
+            hasher.update(asset.identity.relative_path.as_os_str().as_encoded_bytes());
+            hasher.update(request.source_type_id().as_bytes());
+            hasher.update(asset.byte_length.to_le_bytes());
+            hasher.update(asset.sha256.as_bytes());
+            let digest = hasher.finalize();
+            let mut reference_bytes = [0_u8; 16];
+            reference_bytes.copy_from_slice(&digest[..16]);
+            let reference_id = Uuid::from_bytes(reference_bytes);
+            let reference = NativeAssetReference::checked(
+                service_identity.service_id(),
+                reference_id,
+                request.source_type_id().to_owned(),
+                asset.byte_length,
+                asset.sha256.clone(),
+            )?;
+            let record = NativeAssetResolutionRecord {
+                service_id: service_identity.service_id(),
+                attempt_id: service_identity.attempt_id(),
+                identity: asset.identity,
+                source_type_id: request.source_type_id().to_owned(),
+                byte_length: asset.byte_length,
+                sha256: asset.sha256,
+            };
+            prepared.push((asset.name, reference_id, reference, record));
+        }
+
+        let mut references = self
+            .references
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?;
+        for (_, reference_id, _, record) in &prepared {
+            if let Some(existing) = references.get(reference_id)
+                && existing != record
+            {
+                return Err(NativeAssetServiceError::InvalidReference);
+            }
+        }
+        if cancellation.is_cancelled() {
+            return Err(NativeAssetServiceError::Cancelled);
+        }
+        for (_, reference_id, _, record) in &prepared {
+            references.insert(*reference_id, record.clone());
+        }
+        let assets = prepared
+            .into_iter()
+            .map(|(name, _, reference, _)| NativeNamedAssetReference::checked(name, reference))
+            .collect::<Result<Vec<_>, _>>()?;
+        NativeAssetNameResolution::checked(request.folder_category().to_owned(), assets)
+    }
+
     pub fn retire_attempt(&self, attempt_id: comfy_types::AttemptId) {
         if let Ok(mut references) = self.references.lock() {
             references.retain(|_, record| record.attempt_id != attempt_id);
@@ -814,6 +1029,26 @@ struct RuntimeNativeAssetResolver {
 impl NativeAssetResolver for RuntimeNativeAssetResolver {
     fn identity(&self) -> &NativeNodeServiceIdentity {
         &self.identity
+    }
+
+    fn list_names(
+        &self,
+        request: &NativeAssetNameListRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeAssetNameList, NativeAssetServiceError> {
+        let names = self
+            .registry
+            .list_names_for_node(request.folder_category(), cancellation)?;
+        NativeAssetNameList::checked(request.folder_category().to_owned(), names)
+    }
+
+    fn resolve_names(
+        &self,
+        request: &NativeAssetNameResolutionRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeAssetNameResolution, NativeAssetServiceError> {
+        self.registry
+            .resolve_names_for_node(&self.identity, request, cancellation)
     }
 
     fn read_verified(
@@ -870,6 +1105,11 @@ fn map_native_asset_error(error: AssetError) -> NativeAssetServiceError {
             NativeAssetServiceError::PermissionDenied
         }
         AssetError::Missing(_) | AssetError::UnknownAsset(_) => NativeAssetServiceError::Missing,
+        AssetError::UnknownSourceAsset { .. } => NativeAssetServiceError::Missing,
+        AssetError::UnsupportedSourceFolderCategory(_) => {
+            NativeAssetServiceError::InvalidFolderCategory
+        }
+        AssetError::InvalidSourceAssetName(_) => NativeAssetServiceError::InvalidAssetName,
         AssetError::TooLarge { .. } | AssetError::AllocationFailed => {
             NativeAssetServiceError::TooLarge
         }
@@ -1524,6 +1764,93 @@ impl AssetService {
         let artifact = self.artifact_index.record(&key)?;
         let enrichment = self.enrichments.get(identity)?;
         Some(project_asset_record(artifact, enrichment))
+    }
+
+    fn list_source_asset_names(
+        &mut self,
+        folder_category: &str,
+        authorization: &AuthorizedCapabilities,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<String>, AssetError> {
+        let spec = source_asset_folder_spec(folder_category).ok_or_else(|| {
+            AssetError::UnsupportedSourceFolderCategory(folder_category.to_owned())
+        })?;
+        self.scan_namespaces(&[spec.namespace], authorization, cancellation)?;
+        check_cancelled(cancellation)?;
+        let mut names = BTreeSet::new();
+        for root_id in self.roots.root_ids_in_resolution_order(spec.namespace) {
+            for prefix in spec.prefixes {
+                let prefix = Path::new(prefix);
+                for artifact in self.artifact_index.records().filter(|artifact| {
+                    artifact.key.root_id == root_id
+                        && artifact.availability == CanonicalArtifactAvailability::Present
+                }) {
+                    let Ok(name) = artifact.key.relative_path.strip_prefix(prefix) else {
+                        continue;
+                    };
+                    let Some(name) = name.to_str() else {
+                        continue;
+                    };
+                    if !name.is_empty()
+                        && source_asset_name_has_supported_extension(name, spec.extensions)
+                    {
+                        names.insert(name.replace(std::path::MAIN_SEPARATOR, "/"));
+                    }
+                }
+            }
+        }
+        Ok(names.into_iter().collect())
+    }
+
+    fn resolve_source_asset_names(
+        &mut self,
+        folder_category: &str,
+        names: &[String],
+        authorization: &AuthorizedCapabilities,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<SourceAssetResolutionRecord>, AssetError> {
+        let spec = source_asset_folder_spec(folder_category).ok_or_else(|| {
+            AssetError::UnsupportedSourceFolderCategory(folder_category.to_owned())
+        })?;
+        self.scan_namespaces(&[spec.namespace], authorization, cancellation)?;
+        let mut resolved = Vec::new();
+        resolved
+            .try_reserve_exact(names.len())
+            .map_err(|_| AssetError::AllocationFailed)?;
+        for name in names {
+            check_cancelled(cancellation)?;
+            if !source_asset_name_has_supported_extension(name, spec.extensions) {
+                return Err(AssetError::InvalidSourceAssetName(name.clone()));
+            }
+            let mut selected = None;
+            'roots: for root_id in self.roots.root_ids_in_resolution_order(spec.namespace) {
+                for prefix in spec.prefixes {
+                    let identity = self.roots.identity_in_root(
+                        spec.namespace,
+                        root_id,
+                        Path::new(prefix).join(name),
+                    )?;
+                    let Some(record) = self.record(&identity) else {
+                        continue;
+                    };
+                    if record.availability != AssetAvailability::Missing {
+                        selected = Some(SourceAssetResolutionRecord {
+                            name: name.clone(),
+                            identity,
+                            byte_length: record.byte_size,
+                            sha256: record.sha256,
+                        });
+                        break 'roots;
+                    }
+                }
+            }
+            resolved.push(selected.ok_or_else(|| AssetError::UnknownSourceAsset {
+                folder_category: folder_category.to_owned(),
+                name: name.clone(),
+            })?);
+        }
+        check_cancelled(cancellation)?;
+        Ok(resolved)
     }
 
     pub fn write_exact(
@@ -2291,6 +2618,15 @@ pub enum AssetError {
     UnsafePath { path: PathBuf, reason: String },
     #[error("asset filename {0:?} is invalid")]
     InvalidFilename(String),
+    #[error("source asset folder category {0:?} is unsupported")]
+    UnsupportedSourceFolderCategory(String),
+    #[error("source asset name {0:?} is invalid for its folder category")]
+    InvalidSourceAssetName(String),
+    #[error("source asset {name:?} is not indexed in folder category {folder_category:?}")]
+    UnknownSourceAsset {
+        folder_category: String,
+        name: String,
+    },
     #[error("asset {0:?} is missing")]
     Missing(AssetIdentity),
     #[error("asset {0:?} is not indexed")]
@@ -2981,6 +3317,195 @@ mod tests {
                 .read_verified(&request, &cancelled),
             Err(NativeAssetServiceError::Cancelled)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn native_asset_resolver_lists_and_atomically_seals_source_names()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_directory, mut service, authorization) = service()?;
+        let model_root = service
+            .roots()
+            .test_root_path(AssetNamespace::Model)?
+            .to_path_buf();
+        fs::create_dir_all(model_root.join("text_encoders/nested"))?;
+        fs::create_dir_all(model_root.join("clip"))?;
+        fs::create_dir_all(model_root.join("checkpoints"))?;
+        fs::write(model_root.join("text_encoders/alpha.safetensors"), b"alpha")?;
+        fs::write(model_root.join("text_encoders/nested/beta.ckpt"), b"beta")?;
+        fs::write(model_root.join("clip/gamma.pt"), b"gamma")?;
+        fs::write(
+            model_root.join("checkpoints/alpha.safetensors"),
+            b"wrong-category",
+        )?;
+        service.upload(
+            upload("visible.png", b"input-image"),
+            &authorization,
+            &CancellationToken::default(),
+        )?;
+
+        let assets = Arc::new(Mutex::new(service));
+        let registry = NativeAssetResolverRegistry::new(assets.clone(), authorization.clone());
+        let attempt_id = AttemptId(Uuid::from_u128(0xa561));
+        let node_identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0xa562),
+            attempt_id,
+            NodeId::from("asset-name-node"),
+        )?;
+        let resolver = registry.node_service(node_identity.clone());
+        let cancellation = CancellationToken::default();
+
+        let listed = resolver.list_names(
+            &NativeAssetNameListRequest::checked("text_encoders")?,
+            &cancellation,
+        )?;
+        assert_eq!(
+            listed.names(),
+            ["alpha.safetensors", "gamma.pt", "nested/beta.ckpt"]
+        );
+        let alias_listed =
+            resolver.list_names(&NativeAssetNameListRequest::checked("clip")?, &cancellation)?;
+        assert_eq!(alias_listed.names(), listed.names());
+        let input_names = resolver.list_names(
+            &NativeAssetNameListRequest::checked("input")?,
+            &cancellation,
+        )?;
+        assert_eq!(input_names.names(), ["day one/日本語/visible.png"]);
+        assert!(matches!(
+            resolver.list_names(
+                &NativeAssetNameListRequest::checked("custom_nodes")?,
+                &cancellation,
+            ),
+            Err(NativeAssetServiceError::InvalidFolderCategory)
+        ));
+
+        let names = vec![
+            "nested/beta.ckpt".to_owned(),
+            "alpha.safetensors".to_owned(),
+            "gamma.pt".to_owned(),
+        ];
+        let resolution = resolver.resolve_names(
+            &NativeAssetNameResolutionRequest::checked("text_encoders", names.clone(), "CLIP")?,
+            &cancellation,
+        )?;
+        assert_eq!(
+            resolution
+                .assets()
+                .iter()
+                .map(NativeNamedAssetReference::name)
+                .collect::<Vec<_>>(),
+            names.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+        let bytes = resolution
+            .assets()
+            .iter()
+            .map(|asset| {
+                resolver
+                    .read_verified(
+                        &NativeAssetReadRequest::checked(asset.reference().clone(), 1024)?,
+                        &cancellation,
+                    )
+                    .map(|resolved| resolved.bytes().to_vec())
+            })
+            .collect::<Result<Vec<_>, NativeAssetServiceError>>()?;
+        assert_eq!(
+            bytes,
+            [b"beta".to_vec(), b"alpha".to_vec(), b"gamma".to_vec()]
+        );
+
+        let reference_count = registry
+            .references
+            .lock()
+            .map_err(|_| NativeAssetServiceError::Rejected)?
+            .len();
+        assert!(matches!(
+            resolver.resolve_names(
+                &NativeAssetNameResolutionRequest::checked(
+                    "text_encoders",
+                    vec!["alpha.safetensors".to_owned(), "missing.pt".to_owned()],
+                    "CLIP",
+                )?,
+                &cancellation,
+            ),
+            Err(NativeAssetServiceError::Missing)
+        ));
+        let cancelled = CancellationToken::default();
+        assert!(cancelled.cancel());
+        assert!(matches!(
+            resolver.resolve_names(
+                &NativeAssetNameResolutionRequest::checked(
+                    "text_encoders",
+                    vec!["alpha.safetensors".to_owned()],
+                    "CLIP",
+                )?,
+                &cancelled,
+            ),
+            Err(NativeAssetServiceError::Cancelled)
+        ));
+        assert_eq!(
+            registry
+                .references
+                .lock()
+                .map_err(|_| NativeAssetServiceError::Rejected)?
+                .len(),
+            reference_count
+        );
+        assert!(matches!(
+            NativeAssetNameResolutionRequest::checked(
+                "text_encoders",
+                vec!["../alpha.safetensors".to_owned()],
+                "CLIP",
+            ),
+            Err(NativeAssetServiceError::InvalidAssetName)
+        ));
+        assert!(matches!(
+            resolver.resolve_names(
+                &NativeAssetNameResolutionRequest::checked(
+                    "checkpoints",
+                    vec!["nested/beta.ckpt".to_owned()],
+                    "MODEL",
+                )?,
+                &cancellation,
+            ),
+            Err(NativeAssetServiceError::Missing)
+        ));
+
+        fs::write(
+            model_root.join("text_encoders/nested/beta.ckpt"),
+            b"changed",
+        )?;
+        let changed_request =
+            NativeAssetReadRequest::checked(resolution.assets()[0].reference().clone(), 1024)?;
+        assert!(matches!(
+            resolver.read_verified(&changed_request, &cancellation),
+            Err(NativeAssetServiceError::ChangedDuringRead)
+        ));
+
+        let denied = NativeAssetResolverRegistry::new(assets.clone(), denied_authorization()?);
+        assert!(matches!(
+            denied.node_service(node_identity.clone()).list_names(
+                &NativeAssetNameListRequest::checked("text_encoders")?,
+                &cancellation,
+            ),
+            Err(NativeAssetServiceError::PermissionDenied)
+        ));
+
+        registry.retire_attempt(attempt_id);
+        assert!(matches!(
+            resolver.read_verified(&changed_request, &cancellation),
+            Err(NativeAssetServiceError::InvalidReference)
+        ));
+        let restarted = NativeAssetResolverRegistry::new(assets, authorization);
+        let restarted_resolver = restarted.node_service(node_identity);
+        let restarted_resolution = restarted_resolver.resolve_names(
+            &NativeAssetNameResolutionRequest::checked(
+                "text_encoders",
+                vec!["nested/beta.ckpt".to_owned()],
+                "CLIP",
+            )?,
+            &cancellation,
+        )?;
+        assert_eq!(restarted_resolution.assets().len(), 1);
         Ok(())
     }
 

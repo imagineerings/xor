@@ -39,6 +39,10 @@ const MAX_VALUE_DEPTH: usize = 32;
 const MAX_LIST_VALUES: usize = 1_000_000;
 const MAX_PORTS: usize = 65_536;
 const MAX_TYPE_UNION_MEMBERS: usize = 128;
+const MAX_NATIVE_ASSET_FOLDER_CATEGORY_BYTES: usize = 128;
+const MAX_NATIVE_ASSET_NAME_BYTES: usize = 16 * 1024;
+const MAX_NATIVE_ASSET_NAME_SELECTIONS: usize = 3;
+const MAX_NATIVE_ASSET_NAME_LIST_ENTRIES: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1239,6 +1243,193 @@ pub struct NativeAssetReadRequest {
     maximum_bytes: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetNameListRequest {
+    folder_category: String,
+}
+
+impl NativeAssetNameListRequest {
+    pub fn checked(folder_category: impl Into<String>) -> Result<Self, NativeAssetServiceError> {
+        let folder_category = folder_category.into();
+        validate_native_asset_folder_category(&folder_category)?;
+        Ok(Self { folder_category })
+    }
+
+    pub fn folder_category(&self) -> &str {
+        &self.folder_category
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetNameList {
+    folder_category: String,
+    names: Vec<String>,
+}
+
+impl NativeAssetNameList {
+    pub fn checked(
+        folder_category: impl Into<String>,
+        names: Vec<String>,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let folder_category = folder_category.into();
+        validate_native_asset_folder_category(&folder_category)?;
+        if names.len() > MAX_NATIVE_ASSET_NAME_LIST_ENTRIES {
+            return Err(NativeAssetServiceError::TooLarge);
+        }
+        let mut previous = None;
+        for name in &names {
+            validate_native_asset_name(name)?;
+            if previous.is_some_and(|previous: &String| previous >= name) {
+                return Err(NativeAssetServiceError::InvalidRequest);
+            }
+            previous = Some(name);
+        }
+        Ok(Self {
+            folder_category,
+            names,
+        })
+    }
+
+    pub fn folder_category(&self) -> &str {
+        &self.folder_category
+    }
+
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetNameResolutionRequest {
+    folder_category: String,
+    names: Vec<String>,
+    source_type_id: String,
+}
+
+impl NativeAssetNameResolutionRequest {
+    pub fn checked(
+        folder_category: impl Into<String>,
+        names: Vec<String>,
+        source_type_id: impl Into<String>,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let folder_category = folder_category.into();
+        let source_type_id = source_type_id.into();
+        validate_native_asset_folder_category(&folder_category)?;
+        if names.is_empty() || names.len() > MAX_NATIVE_ASSET_NAME_SELECTIONS {
+            return Err(NativeAssetServiceError::InvalidRequest);
+        }
+        for name in &names {
+            validate_native_asset_name(name)?;
+        }
+        if validate_identifier("native asset source type", &source_type_id).is_err() {
+            return Err(NativeAssetServiceError::InvalidRequest);
+        }
+        Ok(Self {
+            folder_category,
+            names,
+            source_type_id,
+        })
+    }
+
+    pub fn folder_category(&self) -> &str {
+        &self.folder_category
+    }
+
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    pub fn source_type_id(&self) -> &str {
+        &self.source_type_id
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeNamedAssetReference {
+    name: String,
+    reference: NativeAssetReference,
+}
+
+impl NativeNamedAssetReference {
+    pub fn checked(
+        name: impl Into<String>,
+        reference: NativeAssetReference,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let name = name.into();
+        validate_native_asset_name(&name)?;
+        Ok(Self { name, reference })
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub const fn reference(&self) -> &NativeAssetReference {
+        &self.reference
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeAssetNameResolution {
+    folder_category: String,
+    assets: Vec<NativeNamedAssetReference>,
+}
+
+impl NativeAssetNameResolution {
+    pub fn checked(
+        folder_category: impl Into<String>,
+        assets: Vec<NativeNamedAssetReference>,
+    ) -> Result<Self, NativeAssetServiceError> {
+        let folder_category = folder_category.into();
+        validate_native_asset_folder_category(&folder_category)?;
+        if assets.is_empty() || assets.len() > MAX_NATIVE_ASSET_NAME_SELECTIONS {
+            return Err(NativeAssetServiceError::InvalidRequest);
+        }
+        Ok(Self {
+            folder_category,
+            assets,
+        })
+    }
+
+    pub fn folder_category(&self) -> &str {
+        &self.folder_category
+    }
+
+    pub fn assets(&self) -> &[NativeNamedAssetReference] {
+        &self.assets
+    }
+}
+
+fn validate_native_asset_folder_category(
+    folder_category: &str,
+) -> Result<(), NativeAssetServiceError> {
+    if folder_category.is_empty()
+        || folder_category.len() > MAX_NATIVE_ASSET_FOLDER_CATEGORY_BYTES
+        || !folder_category
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+    {
+        return Err(NativeAssetServiceError::InvalidFolderCategory);
+    }
+    Ok(())
+}
+
+fn validate_native_asset_name(name: &str) -> Result<(), NativeAssetServiceError> {
+    if name.is_empty()
+        || name.len() > MAX_NATIVE_ASSET_NAME_BYTES
+        || name.starts_with('/')
+        || name.ends_with('/')
+        || name.contains('\\')
+        || name.chars().any(char::is_control)
+        || name
+            .split('/')
+            .any(|component| component.is_empty() || matches!(component, "." | ".."))
+    {
+        return Err(NativeAssetServiceError::InvalidAssetName);
+    }
+    Ok(())
+}
+
 impl NativeAssetReadRequest {
     pub fn checked(
         reference: NativeAssetReference,
@@ -1325,6 +1516,10 @@ pub enum NativeAssetServiceError {
     InvalidReference,
     #[error("native asset read request is invalid")]
     InvalidRequest,
+    #[error("native asset folder category is invalid or unsupported")]
+    InvalidFolderCategory,
+    #[error("native asset name is invalid")]
+    InvalidAssetName,
     #[error("native asset permission was denied")]
     PermissionDenied,
     #[error("native asset is missing")]
@@ -1341,6 +1536,18 @@ pub enum NativeAssetServiceError {
 
 pub trait NativeAssetResolver: Send + Sync + fmt::Debug {
     fn identity(&self) -> &NativeNodeServiceIdentity;
+
+    fn list_names(
+        &self,
+        request: &NativeAssetNameListRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeAssetNameList, NativeAssetServiceError>;
+
+    fn resolve_names(
+        &self,
+        request: &NativeAssetNameResolutionRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<NativeAssetNameResolution, NativeAssetServiceError>;
 
     fn read_verified(
         &self,

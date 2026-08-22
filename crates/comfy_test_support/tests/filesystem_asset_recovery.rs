@@ -243,9 +243,14 @@ fn val_recovery_005_filesystem_and_asset_recovery() -> Result<(), Box<dyn std::e
         source_occurrences(&sources, &["pub struct ", "AssetService", " {"].concat());
     let output_committer_definitions =
         source_occurrences(&sources, &["pub struct ", "OutputCommitter", " {"].concat());
+    let node_execution =
+        fs::read_to_string(repository.join("crates/comfy_nodes/src/execution.rs"))?;
+    let asset_name_request_definitions = node_execution
+        .matches("pub struct NativeAssetNameResolutionRequest {")
+        .count();
     let runtime_assets = fs::read_to_string(repository.join("crates/comfy_runtime/src/assets.rs"))?;
     let runtime_assets_production = runtime_assets
-        .split_once("#[cfg(test)]")
+        .split_once("\n#[cfg(test)]\nmod tests")
         .map_or(runtime_assets.as_str(), |(production, _)| production);
     let artifact_owner =
         fs::read_to_string(repository.join("crates/comfy_model/src/artifact_index.rs"))?;
@@ -274,6 +279,8 @@ fn val_recovery_005_filesystem_and_asset_recovery() -> Result<(), Box<dyn std::e
         "artifact_root_is_single_owner": artifact_root_definitions.len() == 1 && artifact_root_definitions[0].contains("crates/comfy_model/src/artifact_index.rs"),
         "artifact_index_is_single_owner": artifact_index_definitions.len() == 1 && artifact_index_definitions[0].contains("crates/comfy_model/src/artifact_index.rs"),
         "asset_adapters_are_single_definitions": asset_roots_definitions.len() == 1 && asset_service_definitions.len() == 1 && asset_roots_definitions[0].contains("crates/comfy_runtime/src/assets.rs") && asset_service_definitions[0].contains("crates/comfy_runtime/src/assets.rs"),
+        "source_asset_name_request_is_one_path_free_node_contract": asset_name_request_definitions == 1 && !node_execution.contains("PathBuf") && !node_execution.contains("std::path"),
+        "artifact_service_owns_source_name_listing_and_resolution": runtime_assets_production.contains("fn list_source_asset_names(") && runtime_assets_production.contains("fn resolve_source_asset_names(") && runtime_assets_production.matches("self.scan_namespaces(&[spec.namespace]").count() == 2 && runtime_assets_production.contains("root_ids_in_resolution_order"),
         "asset_service_owns_only_enrichment": runtime_assets_production.contains("artifact_index: ArtifactIndex") && runtime_assets_production.contains("enrichments: BTreeMap<AssetIdentity, AssetEnrichment>") && !runtime_assets_production.contains("struct AssetRoot {") && !runtime_assets_production.contains("records: BTreeMap<AssetIdentity, AssetRecord>") && !runtime_assets_production.contains("fn scan_root(") && !runtime_assets_production.contains("fn stable_file_sha256(") && !runtime_assets_production.contains("fs::canonicalize(") && !runtime_assets_production.contains("fs::symlink_metadata(") && !runtime_assets_production.contains("fs::read_dir("),
         "artifact_owner_performs_security_and_indexing": artifact_owner.contains("pub fn resolve_for_create_with_parents") && artifact_owner.contains("pub fn refresh_selected") && artifact_owner.contains("pub fn open_verified") && artifact_owner.contains("fn scan_root(") && artifact_owner.contains("fn hash_stable_capability_file(") && artifact_owner.contains("pub fn move_verified_contained_file_to("),
         "typed_root_is_absent": source_occurrences(&sources, &["struct ", "TypedRoot", " {"].concat()).is_empty(),
@@ -307,6 +314,7 @@ fn val_recovery_005_filesystem_and_asset_recovery() -> Result<(), Box<dyn std::e
             "asset_roots_adapter": asset_roots_definitions.len(),
             "asset_service_adapter": asset_service_definitions.len(),
             "output_committer": output_committer_definitions.len(),
+            "source_asset_name_request": asset_name_request_definitions,
         },
         "repository_rust_sources": sources.len(),
         "summary": {"passed": case_count, "failed": 0, "skipped": 0},

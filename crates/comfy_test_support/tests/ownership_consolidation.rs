@@ -11990,6 +11990,8 @@ fn validate_native_stored_payload_boundary(
             for capability in [
                 "NativeAssetReference",
                 "NativeAssetReadRequest",
+                "NativeAssetNameListRequest",
+                "NativeAssetNameResolutionRequest",
                 "NativeNodeComputeSession",
                 "NativeNodeServices",
                 "NativePreparedEffectRequest",
@@ -12011,6 +12013,10 @@ fn validate_native_stored_payload_boundary(
     assert!(resolved_payload_constructors[0].contains("crates/comfy_runtime/src/executor.rs"));
 
     let owner_definitions = [
+        (
+            "pub struct NativeAssetNameResolutionRequest {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
         (
             "pub struct NativeAssetReference {",
             "crates/comfy_nodes/src/execution.rs",
