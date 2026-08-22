@@ -48,6 +48,7 @@ circular-buffer.workspace = true
 cargo_metadata = { workspace = true, optional = true }
 client.workspace = true
 clock.workspace = true
+collaboration_domain.workspace = true
 collections.workspace = true
 context_server.workspace = true
 credentials_provider.workspace = true

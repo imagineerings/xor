@@ -2,6 +2,7 @@
 
 mod agent_registry_store;
 mod bookmark_store;
+mod collaboration_repository;
 mod color_extractor;
 mod context_server_store;
 mod debugger;

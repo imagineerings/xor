@@ -15146,6 +15146,7 @@ dependencies = [
  "circular-buffer",
  "client",
  "clock",
+ "collaboration_domain",
  "collections",
  "context_server",
  "credentials_provider",
