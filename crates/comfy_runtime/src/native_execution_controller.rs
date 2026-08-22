@@ -53,13 +53,15 @@ use comfy_nodes::{
     NativeComponentH264Mp4BackingService, NativeDynamicInputDescriptor, NativeHandleKind,
     NativeHandleStoreError, NativeHandleType, NativeImageDescriptor, NativeImageDescriptorError,
     NativeImageEffect, NativeInputDescriptor, NativeInputRequirement, NativeLtxvPreprocessService,
+    NativeMultimodalTextGenerationRequest as NativeNodeMultimodalTextGenerationRequest,
     NativeNodeBinding, NativeNodeBindingDisposition, NativeNodeContractError,
     NativeNodePresentation, NativeOpaqueHandle, NativeOutputDescriptor, NativeOutputSchemaMetadata,
     NativePortCardinality, NativePrimitive, NativePrimitiveType, NativeResolvedPayload,
-    NativeStoredModelPayload, NativeStoredPayload, NativeTypeUnion, NativeValue, NativeValueType,
-    NativeWebmEncodeService, NodeDescriptor, NodeRegistry, PortDescriptor,
-    generated_family_node_bindings, native_diffusion_descriptors, native_image_descriptors,
-    native_source_type_projection, native_text_generation_transaction,
+    NativeStoredModelPayload, NativeStoredPayload, NativeTextGenerationService,
+    NativeTextGenerationServiceError, NativeTextGenerationServiceOutput, NativeTypeUnion,
+    NativeValue, NativeValueType, NativeWebmEncodeService, NodeDescriptor, NodeRegistry,
+    PortDescriptor, generated_family_node_bindings, native_diffusion_descriptors,
+    native_image_descriptors, native_source_type_projection, native_text_generation_transaction,
     native_value_type_for_output_schema, native_value_types_for_input_schema,
 };
 use comfy_nodes::{
@@ -2724,6 +2726,64 @@ pub fn execute_native_multimodal_text_generation(
     };
     context.cancellation.check().map_err(cancellation_failure)?;
     Ok(result)
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeRuntimeTextGenerationService {
+    identity: NativeNodeServiceIdentity,
+}
+
+impl NativeRuntimeTextGenerationService {
+    pub fn new(identity: NativeNodeServiceIdentity) -> Self {
+        Self { identity }
+    }
+}
+
+impl NativeTextGenerationService for NativeRuntimeTextGenerationService {
+    fn identity(&self) -> &NativeNodeServiceIdentity {
+        &self.identity
+    }
+
+    fn generate(
+        &self,
+        context: &NodeContext,
+        request: &NativeNodeMultimodalTextGenerationRequest,
+    ) -> Result<NativeTextGenerationServiceOutput, NativeTextGenerationServiceError> {
+        let result = execute_native_multimodal_text_generation(
+            context,
+            request.clip(),
+            request.image(),
+            request.video(),
+            request.audio(),
+            request.seed(),
+            NativeMultimodalTextGenerationRequest {
+                text: NativeTextGenerationRequest {
+                    formatted_prompt: request.formatted_prompt(),
+                    maximum_new_tokens: request.maximum_new_tokens(),
+                    do_sample: request.do_sample(),
+                    temperature_bits: request.temperature_bits(),
+                    top_k: request.top_k(),
+                    top_p_bits: request.top_p_bits(),
+                    minimum_p_bits: request.minimum_p_bits(),
+                    repetition_penalty_bits: request.repetition_penalty_bits(),
+                    presence_penalty_bits: request.presence_penalty_bits(),
+                },
+                use_default_template: request.use_default_template(),
+                thinking: request.thinking(),
+            },
+        )
+        .map_err(|error| match error.kind {
+            NodeFailureKind::Interrupted => NativeTextGenerationServiceError::Cancelled,
+            NodeFailureKind::Failure => {
+                NativeTextGenerationServiceError::Execution(error.to_string())
+            }
+        })?;
+        NativeTextGenerationServiceOutput::checked(
+            result.text,
+            result.generated_tokens.len(),
+            request.maximum_new_tokens(),
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -7824,6 +7884,56 @@ mod tests {
         .err()
         .ok_or("IMAGE handle unexpectedly resolved as a multimodal CLIP")?;
         assert_eq!(error.kind, NodeFailureKind::Failure);
+        assert_eq!(generation.len(), 1);
+        assert_eq!(generation.resident_bytes(), resident_bytes);
+
+        let service_identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x3992),
+            attempt_id,
+            context.node_id.clone(),
+        )?;
+        let services = comfy_nodes::NativeNodeServices::checked(None, None, None)?
+            .with_text_generation(Arc::new(NativeRuntimeTextGenerationService::new(
+                service_identity,
+            )))?;
+        let service_context = NodeContext::new_with_services(
+            context.prompt_id,
+            attempt_id,
+            context.node_id.clone(),
+            cancellation.clone(),
+            workspace_authority.authorize_workspace(1 << 20)?,
+            store.clone(),
+            services,
+        )?;
+        let missing_clip = NativeOpaqueHandle::new(
+            NativeHandleType::new(NativeHandleKind::Clip, "CLIP")?,
+            wrong_clip.store_identity(),
+            "missing-clip",
+            1,
+            Some("f".repeat(64)),
+        )?;
+        let service_request = NativeNodeMultimodalTextGenerationRequest::checked(
+            missing_clip,
+            None,
+            None,
+            None,
+            "test",
+            1,
+            false,
+            1.0_f32.to_bits(),
+            50,
+            1.0_f32.to_bits(),
+            0.0_f32.to_bits(),
+            1.0_f32.to_bits(),
+            0.0_f32.to_bits(),
+            7,
+            true,
+            false,
+        )?;
+        assert!(matches!(
+            service_context.execute_multimodal_text_generation(&service_request),
+            Err(NativeTextGenerationServiceError::Execution(_))
+        ));
         assert_eq!(generation.len(), 1);
         assert_eq!(generation.resident_bytes(), resident_bytes);
 

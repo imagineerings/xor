@@ -11994,6 +11994,8 @@ fn validate_native_stored_payload_boundary(
                 "NativeAssetNameResolutionRequest",
                 "NativeNodeComputeSession",
                 "NativeNodeServices",
+                "NativeMultimodalTextGenerationRequest",
+                "NativeTextGenerationService",
                 "NativePreparedEffectRequest",
             ] {
                 assert!(
@@ -12036,6 +12038,18 @@ fn validate_native_stored_payload_boundary(
         (
             "pub struct NativeNodeServices {",
             "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativeMultimodalTextGenerationRequest {",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub trait NativeTextGenerationService:",
+            "crates/comfy_nodes/src/execution.rs",
+        ),
+        (
+            "pub struct NativeRuntimeTextGenerationService {",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
         ),
         (
             "pub struct NativePreparedEffectRequest {",

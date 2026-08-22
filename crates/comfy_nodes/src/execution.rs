@@ -31,6 +31,7 @@ pub const LEGACY_NATIVE_NODE_CONTRACT_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_OPAQUE_HANDLE_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_STRUCTURED_VALUE_SCHEMA_VERSION: u16 = 1;
 pub const NATIVE_TEXT_GENERATION_RNG_PHASE: &str = "native-text-generation";
+pub const NATIVE_TEXT_GENERATION_MAX_NEW_TOKENS: usize = 32_768;
 
 const MAX_IDENTIFIER_BYTES: usize = 4_096;
 const MAX_TEXT_BYTES: usize = 1024 * 1024;
@@ -2346,6 +2347,267 @@ impl NativeNodeComputeSession {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeMultimodalTextGenerationRequest {
+    clip: NativeOpaqueHandle,
+    image: Option<NativeOpaqueHandle>,
+    video: Option<NativeOpaqueHandle>,
+    audio: Option<NativeOpaqueHandle>,
+    formatted_prompt: String,
+    maximum_new_tokens: usize,
+    do_sample: bool,
+    temperature_bits: u32,
+    top_k: usize,
+    top_p_bits: u32,
+    minimum_p_bits: u32,
+    repetition_penalty_bits: u32,
+    presence_penalty_bits: u32,
+    seed: u64,
+    use_default_template: bool,
+    thinking: bool,
+}
+
+impl NativeMultimodalTextGenerationRequest {
+    #[allow(clippy::too_many_arguments)]
+    pub fn checked(
+        clip: NativeOpaqueHandle,
+        image: Option<NativeOpaqueHandle>,
+        video: Option<NativeOpaqueHandle>,
+        audio: Option<NativeOpaqueHandle>,
+        formatted_prompt: impl Into<String>,
+        maximum_new_tokens: usize,
+        do_sample: bool,
+        temperature_bits: u32,
+        top_k: usize,
+        top_p_bits: u32,
+        minimum_p_bits: u32,
+        repetition_penalty_bits: u32,
+        presence_penalty_bits: u32,
+        seed: u64,
+        use_default_template: bool,
+        thinking: bool,
+    ) -> Result<Self, NativeTextGenerationServiceError> {
+        let request = Self {
+            clip,
+            image,
+            video,
+            audio,
+            formatted_prompt: formatted_prompt.into(),
+            maximum_new_tokens,
+            do_sample,
+            temperature_bits,
+            top_k,
+            top_p_bits,
+            minimum_p_bits,
+            repetition_penalty_bits,
+            presence_penalty_bits,
+            seed,
+            use_default_template,
+            thinking,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub fn clip(&self) -> &NativeOpaqueHandle {
+        &self.clip
+    }
+
+    pub fn image(&self) -> Option<&NativeOpaqueHandle> {
+        self.image.as_ref()
+    }
+
+    pub fn video(&self) -> Option<&NativeOpaqueHandle> {
+        self.video.as_ref()
+    }
+
+    pub fn audio(&self) -> Option<&NativeOpaqueHandle> {
+        self.audio.as_ref()
+    }
+
+    pub fn formatted_prompt(&self) -> &str {
+        &self.formatted_prompt
+    }
+
+    pub const fn maximum_new_tokens(&self) -> usize {
+        self.maximum_new_tokens
+    }
+
+    pub const fn do_sample(&self) -> bool {
+        self.do_sample
+    }
+
+    pub const fn temperature_bits(&self) -> u32 {
+        self.temperature_bits
+    }
+
+    pub const fn top_k(&self) -> usize {
+        self.top_k
+    }
+
+    pub const fn top_p_bits(&self) -> u32 {
+        self.top_p_bits
+    }
+
+    pub const fn minimum_p_bits(&self) -> u32 {
+        self.minimum_p_bits
+    }
+
+    pub const fn repetition_penalty_bits(&self) -> u32 {
+        self.repetition_penalty_bits
+    }
+
+    pub const fn presence_penalty_bits(&self) -> u32 {
+        self.presence_penalty_bits
+    }
+
+    pub const fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    pub const fn use_default_template(&self) -> bool {
+        self.use_default_template
+    }
+
+    pub const fn thinking(&self) -> bool {
+        self.thinking
+    }
+
+    pub fn validate(&self) -> Result<(), NativeTextGenerationServiceError> {
+        validate_text(
+            "native text generation prompt",
+            &self.formatted_prompt,
+            MAX_TEXT_BYTES,
+            true,
+        )
+        .map_err(|_| NativeTextGenerationServiceError::InvalidRequest)?;
+        if !(1..=NATIVE_TEXT_GENERATION_MAX_NEW_TOKENS).contains(&self.maximum_new_tokens)
+            || self.top_k > 1_000
+        {
+            return Err(NativeTextGenerationServiceError::InvalidRequest);
+        }
+        let temperature = f32::from_bits(self.temperature_bits);
+        let top_p = f32::from_bits(self.top_p_bits);
+        let minimum_p = f32::from_bits(self.minimum_p_bits);
+        let repetition_penalty = f32::from_bits(self.repetition_penalty_bits);
+        let presence_penalty = f32::from_bits(self.presence_penalty_bits);
+        if !temperature.is_finite()
+            || !(0.0..=2.0).contains(&temperature)
+            || !top_p.is_finite()
+            || !(0.0..=1.0).contains(&top_p)
+            || !minimum_p.is_finite()
+            || !(0.0..=1.0).contains(&minimum_p)
+            || !repetition_penalty.is_finite()
+            || !(0.0..=5.0).contains(&repetition_penalty)
+            || !presence_penalty.is_finite()
+            || !(0.0..=5.0).contains(&presence_penalty)
+            || (self.do_sample && temperature < 0.01)
+        {
+            return Err(NativeTextGenerationServiceError::InvalidRequest);
+        }
+
+        let expected_clip = NativeHandleType::new(NativeHandleKind::Clip, "CLIP")
+            .map_err(|_| NativeTextGenerationServiceError::InvalidRequest)?;
+        let expected_image = NativeHandleType::new(NativeHandleKind::Image, "IMAGE")
+            .map_err(|_| NativeTextGenerationServiceError::InvalidRequest)?;
+        let expected_audio = NativeHandleType::new(NativeHandleKind::Audio, "AUDIO")
+            .map_err(|_| NativeTextGenerationServiceError::InvalidRequest)?;
+        if self.clip.handle_type() != &expected_clip
+            || self
+                .image
+                .as_ref()
+                .is_some_and(|handle| handle.handle_type() != &expected_image)
+            || self
+                .video
+                .as_ref()
+                .is_some_and(|handle| handle.handle_type() != &expected_image)
+            || self
+                .audio
+                .as_ref()
+                .is_some_and(|handle| handle.handle_type() != &expected_audio)
+        {
+            return Err(NativeTextGenerationServiceError::InvalidRequest);
+        }
+        let store_identity = self.clip.store_identity();
+        if self
+            .image
+            .iter()
+            .chain(self.video.iter())
+            .chain(self.audio.iter())
+            .any(|handle| handle.store_identity() != store_identity)
+        {
+            return Err(NativeTextGenerationServiceError::InvalidRequest);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeTextGenerationServiceOutput {
+    text: String,
+    generated_token_count: usize,
+}
+
+impl NativeTextGenerationServiceOutput {
+    pub fn checked(
+        text: impl Into<String>,
+        generated_token_count: usize,
+        maximum_new_tokens: usize,
+    ) -> Result<Self, NativeTextGenerationServiceError> {
+        let output = Self {
+            text: text.into(),
+            generated_token_count,
+        };
+        validate_text(
+            "native text generation result",
+            &output.text,
+            MAX_TEXT_BYTES,
+            true,
+        )
+        .map_err(|_| NativeTextGenerationServiceError::InvalidOutput)?;
+        if generated_token_count > maximum_new_tokens {
+            return Err(NativeTextGenerationServiceError::InvalidOutput);
+        }
+        Ok(output)
+    }
+
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    pub const fn generated_token_count(&self) -> usize {
+        self.generated_token_count
+    }
+
+    pub fn into_text(self) -> String {
+        self.text
+    }
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+pub enum NativeTextGenerationServiceError {
+    #[error("native text generation service is unavailable")]
+    Unavailable,
+    #[error("native text generation request was cancelled")]
+    Cancelled,
+    #[error("native text generation request is invalid")]
+    InvalidRequest,
+    #[error("native text generation service returned an invalid output")]
+    InvalidOutput,
+    #[error("native text generation failed: {0}")]
+    Execution(String),
+}
+
+pub trait NativeTextGenerationService: Send + Sync + fmt::Debug {
+    fn identity(&self) -> &NativeNodeServiceIdentity;
+
+    fn generate(
+        &self,
+        context: &NativeNodeContext,
+        request: &NativeMultimodalTextGenerationRequest,
+    ) -> Result<NativeTextGenerationServiceOutput, NativeTextGenerationServiceError>;
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct NativeNodeServices {
     assets: Option<Arc<dyn NativeAssetResolver>>,
@@ -2355,6 +2617,7 @@ pub struct NativeNodeServices {
     ltxv_preprocess: Option<Arc<dyn NativeLtxvPreprocessService>>,
     webm_encode: Option<Arc<dyn NativeWebmEncodeService>>,
     component_h264_mp4_backing: Option<Arc<dyn NativeComponentH264Mp4BackingService>>,
+    text_generation: Option<Arc<dyn NativeTextGenerationService>>,
     provider_execution: Option<NativeProviderExecutionIdentity>,
 }
 
@@ -2410,6 +2673,7 @@ impl NativeNodeServices {
             ltxv_preprocess: None,
             webm_encode: None,
             component_h264_mp4_backing: None,
+            text_generation: None,
             provider_execution: None,
         })
     }
@@ -2449,6 +2713,17 @@ impl NativeNodeServices {
             service.identity().configuration_sha256().to_owned(),
         )?;
         self.component_h264_mp4_backing = Some(service);
+        Ok(self)
+    }
+
+    pub fn with_text_generation(
+        mut self,
+        service: Arc<dyn NativeTextGenerationService>,
+    ) -> Result<Self, NativeNodeContractError> {
+        if service.identity().service_id().is_nil() {
+            return Err(NativeNodeContractError::InvalidNodeServiceIdentity);
+        }
+        self.text_generation = Some(service);
         Ok(self)
     }
 
@@ -2576,6 +2851,33 @@ impl NativeNodeContext {
             .component_h264_mp4_backing
             .as_deref()
             .ok_or(NativeComponentH264Mp4BackingServiceError::Unavailable)
+    }
+
+    pub fn execute_multimodal_text_generation(
+        &self,
+        request: &NativeMultimodalTextGenerationRequest,
+    ) -> Result<NativeTextGenerationServiceOutput, NativeTextGenerationServiceError> {
+        self.cancellation
+            .check()
+            .map_err(|_| NativeTextGenerationServiceError::Cancelled)?;
+        request.validate()?;
+        let service = self
+            .services
+            .text_generation
+            .as_deref()
+            .ok_or(NativeTextGenerationServiceError::Unavailable)?;
+        if !service.identity().matches(self.attempt_id, &self.node_id) {
+            return Err(NativeTextGenerationServiceError::InvalidRequest);
+        }
+        let output = service.generate(self, request)?;
+        self.cancellation
+            .check()
+            .map_err(|_| NativeTextGenerationServiceError::Cancelled)?;
+        NativeTextGenerationServiceOutput::checked(
+            output.text,
+            output.generated_token_count,
+            request.maximum_new_tokens,
+        )
     }
 
     pub fn execute_shader(
@@ -2798,6 +3100,12 @@ impl NativeNodeContext {
                     .compute
                     .as_ref()
                     .map(NativeNodeComputeSession::identity),
+            )
+            .chain(
+                self.services
+                    .text_generation
+                    .as_deref()
+                    .map(NativeTextGenerationService::identity),
             )
         {
             if !identity.matches(self.attempt_id, &self.node_id) {
@@ -3405,6 +3713,42 @@ mod tests {
         next_ordinal: AtomicU64,
         prepared: Mutex<Vec<NativePreparedEffectRequest>>,
         rolled_back: Mutex<Vec<Uuid>>,
+    }
+
+    #[derive(Debug)]
+    struct TestTextGenerationService {
+        identity: NativeNodeServiceIdentity,
+        calls: Arc<AtomicU64>,
+        cancellation_after_generate: Option<CancellationToken>,
+        return_invalid_output: bool,
+    }
+
+    impl NativeTextGenerationService for TestTextGenerationService {
+        fn identity(&self) -> &NativeNodeServiceIdentity {
+            &self.identity
+        }
+
+        fn generate(
+            &self,
+            _context: &NativeNodeContext,
+            request: &NativeMultimodalTextGenerationRequest,
+        ) -> Result<NativeTextGenerationServiceOutput, NativeTextGenerationServiceError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(cancellation) = &self.cancellation_after_generate {
+                cancellation.cancel();
+            }
+            if self.return_invalid_output {
+                return Ok(NativeTextGenerationServiceOutput {
+                    text: "invalid".to_owned(),
+                    generated_token_count: request.maximum_new_tokens() + 1,
+                });
+            }
+            NativeTextGenerationServiceOutput::checked(
+                format!("generated:{}", request.formatted_prompt()),
+                1,
+                request.maximum_new_tokens(),
+            )
+        }
     }
 
     #[test]
@@ -4356,6 +4700,194 @@ mod tests {
             native_text_generation_transaction(&make_context(cancellation)?, 42),
             Err(RngError::Cancelled)
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn text_generation_service_is_attempt_bound_and_validates_typed_projection()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (_backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let prompt_id = PromptId(Uuid::from_u128(0x701));
+        let attempt_id = AttemptId(Uuid::from_u128(0x702));
+        let node_id = NodeId::from("text-generation");
+        let handle_store_identity = store_identity(0x703, 0x704)?;
+        let handle_store = Arc::new(TestHandleStore::new(handle_store_identity, attempt_id));
+        let handle = |kind, type_id, identifier| {
+            NativeOpaqueHandle::new(
+                NativeHandleType::new(kind, type_id)?,
+                handle_store_identity,
+                identifier,
+                1,
+                Some("a".repeat(64)),
+            )
+        };
+        let request = NativeMultimodalTextGenerationRequest::checked(
+            handle(NativeHandleKind::Clip, "CLIP", "clip")?,
+            Some(handle(NativeHandleKind::Image, "IMAGE", "image")?),
+            None,
+            Some(handle(NativeHandleKind::Audio, "AUDIO", "audio")?),
+            "hello",
+            8,
+            true,
+            0.7_f32.to_bits(),
+            64,
+            0.95_f32.to_bits(),
+            0.05_f32.to_bits(),
+            1.05_f32.to_bits(),
+            0.0_f32.to_bits(),
+            42,
+            true,
+            false,
+        )?;
+        let identity = NativeNodeServiceIdentity::checked(
+            Uuid::from_u128(0x705),
+            attempt_id,
+            node_id.clone(),
+        )?;
+        let calls = Arc::new(AtomicU64::new(0));
+        let services = NativeNodeServices::checked(None, None, None)?.with_text_generation(
+            Arc::new(TestTextGenerationService {
+                identity,
+                calls: calls.clone(),
+                cancellation_after_generate: None,
+                return_invalid_output: false,
+            }),
+        )?;
+        let context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            node_id.clone(),
+            CancellationToken::default(),
+            authority.authorize_workspace(1024)?,
+            handle_store.clone(),
+            services,
+        )?;
+        let output = context.execute_multimodal_text_generation(&request)?;
+        assert_eq!(output.text(), "generated:hello");
+        assert_eq!(output.generated_token_count(), 1);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let foreign = NativeOpaqueHandle::new(
+            NativeHandleType::new(NativeHandleKind::Image, "IMAGE")?,
+            store_identity(0x706, 0x707)?,
+            "foreign-image",
+            1,
+            Some("b".repeat(64)),
+        )?;
+        assert!(matches!(
+            NativeMultimodalTextGenerationRequest::checked(
+                request.clip().clone(),
+                Some(foreign),
+                None,
+                None,
+                "hello",
+                8,
+                false,
+                1.0_f32.to_bits(),
+                50,
+                1.0_f32.to_bits(),
+                0.0_f32.to_bits(),
+                1.0_f32.to_bits(),
+                0.0_f32.to_bits(),
+                0,
+                true,
+                false,
+            ),
+            Err(NativeTextGenerationServiceError::InvalidRequest)
+        ));
+
+        let mismatched_services = NativeNodeServices::checked(None, None, None)?
+            .with_text_generation(Arc::new(TestTextGenerationService {
+                identity: NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x708),
+                    AttemptId(Uuid::from_u128(0x709)),
+                    node_id,
+                )?,
+                calls,
+                cancellation_after_generate: None,
+                return_invalid_output: false,
+            }))?;
+        assert!(matches!(
+            NativeNodeContext::new_with_services(
+                prompt_id,
+                attempt_id,
+                NodeId::from("text-generation"),
+                CancellationToken::default(),
+                authority.authorize_workspace(1024)?,
+                handle_store,
+                mismatched_services,
+            ),
+            Err(NativeNodeContractError::InvalidNodeServiceIdentity)
+        ));
+
+        let unavailable_context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            NodeId::from("text-generation"),
+            CancellationToken::default(),
+            authority.authorize_workspace(1024)?,
+            Arc::new(TestHandleStore::new(handle_store_identity, attempt_id)),
+            NativeNodeServices::checked(None, None, None)?,
+        )?;
+        assert_eq!(
+            unavailable_context.execute_multimodal_text_generation(&request),
+            Err(NativeTextGenerationServiceError::Unavailable)
+        );
+
+        let invalid_calls = Arc::new(AtomicU64::new(0));
+        let invalid_services = NativeNodeServices::checked(None, None, None)?
+            .with_text_generation(Arc::new(TestTextGenerationService {
+                identity: NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x70a),
+                    attempt_id,
+                    NodeId::from("text-generation"),
+                )?,
+                calls: invalid_calls.clone(),
+                cancellation_after_generate: None,
+                return_invalid_output: true,
+            }))?;
+        let invalid_context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            NodeId::from("text-generation"),
+            CancellationToken::default(),
+            authority.authorize_workspace(1024)?,
+            Arc::new(TestHandleStore::new(handle_store_identity, attempt_id)),
+            invalid_services,
+        )?;
+        assert_eq!(
+            invalid_context.execute_multimodal_text_generation(&request),
+            Err(NativeTextGenerationServiceError::InvalidOutput)
+        );
+        assert_eq!(invalid_calls.load(Ordering::SeqCst), 1);
+
+        let cancellation = CancellationToken::default();
+        let cancelled_calls = Arc::new(AtomicU64::new(0));
+        let cancelled_services = NativeNodeServices::checked(None, None, None)?
+            .with_text_generation(Arc::new(TestTextGenerationService {
+                identity: NativeNodeServiceIdentity::checked(
+                    Uuid::from_u128(0x70b),
+                    attempt_id,
+                    NodeId::from("text-generation"),
+                )?,
+                calls: cancelled_calls.clone(),
+                cancellation_after_generate: Some(cancellation.clone()),
+                return_invalid_output: false,
+            }))?;
+        let cancelled_context = NativeNodeContext::new_with_services(
+            prompt_id,
+            attempt_id,
+            NodeId::from("text-generation"),
+            cancellation,
+            authority.authorize_workspace(1024)?,
+            Arc::new(TestHandleStore::new(handle_store_identity, attempt_id)),
+            cancelled_services,
+        )?;
+        assert_eq!(
+            cancelled_context.execute_multimodal_text_generation(&request),
+            Err(NativeTextGenerationServiceError::Cancelled)
+        );
+        assert_eq!(cancelled_calls.load(Ordering::SeqCst), 1);
         Ok(())
     }
 

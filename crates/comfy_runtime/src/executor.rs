@@ -1,4 +1,5 @@
 use crate::assets::{AssetIdentity, NativeAssetResolverRegistry};
+use crate::native_execution_controller::NativeRuntimeTextGenerationService;
 use crate::{
     AttemptEvent, AttemptEventKind, AttemptState, CacheEntry, CacheKey, CompiledNode, CompiledPlan,
     EventBusError, ExecutionEventBus, InputBinding, NativeCache, PromptCompileError,
@@ -2692,7 +2693,7 @@ impl ExecutionEngine {
             .as_ref()
             .map(|backend| {
                 NativeNodeComputeSession::checked(
-                    service_identity,
+                    service_identity.clone(),
                     backend.clone(),
                     StreamId::DEFAULT,
                     &self.scratch,
@@ -2703,6 +2704,16 @@ impl ExecutionEngine {
         let mut services =
             NativeNodeServices::checked(asset_resolver, Some(effect_service.clone()), compute)
                 .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        if matches!(
+            node.class_type.as_str(),
+            "TextGenerate" | "TextGenerateLTX2Prompt"
+        ) {
+            services = services
+                .with_text_generation(Arc::new(NativeRuntimeTextGenerationService::new(
+                    service_identity.clone(),
+                )))
+                .map_err(|error| ExecutionError::Effect(error.to_string()))?;
+        }
         if let Some(shader) = &self.shader_executor {
             services = services.with_shader(shader.clone());
         }

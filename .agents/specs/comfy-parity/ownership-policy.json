@@ -18660,29 +18660,54 @@
       "concern": "native_vision_text_transformer_text_media_runtime_generation_adapter",
       "canonical_owner": "comfy_runtime::native_execution_controller::execute_native_multimodal_text_generation",
       "owner_files": [
+        "crates/comfy_nodes/src/execution.rs",
         "crates/comfy_runtime/src/native_execution_controller.rs"
       ],
       "owner_symbols": [
         "execute_native_multimodal_text_generation",
         "resolve_native_multimodal_clip",
         "NativeMultimodalTextGenerationRequest",
-        "NativeMultimodalClipResource"
+        "NativeMultimodalClipResource",
+        "NativeTextGenerationService",
+        "NativeRuntimeTextGenerationService"
       ],
       "allowed_adapters": [
         "NativeStoredModelPayload and the handle store remain the sole sealed CLIP, IMAGE, and AUDIO handle validation, lease, residency, wrong-store, wrong-generation, type, and digest owners",
         "Canonical Qwen and Gemma preparation functions remain the sole bounded image, video-frame, timestamp, audio-resample, feature, marker-plan, mask, position, and deepstack owners",
         "NativeQwenMultimodal::generate and NativeGemmaMultimodal::generate remain the sole retained family projection, marker replacement, prepared-decoder delegation, stop, and generated-text cleanup owners",
         "comfy_nodes::native_text_generation_transaction remains the sole prompt-attempt-node-addressed Philox replay transaction opener",
+        "comfy_nodes::NativeTextGenerationService owns only the checked attempt-local handle and sampling projection; the runtime service delegates exactly once to the canonical adapter and returns only bounded scalar text",
         "The executor remains the sole demanded-input cache identity, handle checkpoint, output publication, rollback, restart eviction, and persistence owner",
         "Later TextGenerate node leaves may project workflow sampling and optional inputs into this adapter but cannot resolve resources, preprocess media, open RNG, generate, cache, or publish independently"
       ],
       "definitions": [
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "^pub struct NativeMultimodalTextGenerationRequest \\{",
+          "qualified": "comfy_nodes::execution::NativeMultimodalTextGenerationRequest",
+          "role": "boundary_dto",
+          "symbol": "NativeMultimodalTextGenerationRequest"
+        },
+        {
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "^pub trait NativeTextGenerationService: Send \\+ Sync \\+ fmt::Debug \\{",
+          "qualified": "comfy_nodes::execution::NativeTextGenerationService",
+          "role": "adapter",
+          "symbol": "NativeTextGenerationService"
+        },
         {
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
           "pattern": "^pub struct NativeMultimodalTextGenerationRequest<'a> \\{",
           "qualified": "comfy_runtime::native_execution_controller::NativeMultimodalTextGenerationRequest",
           "role": "adapter",
           "symbol": "NativeMultimodalTextGenerationRequest"
+        },
+        {
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "^pub struct NativeRuntimeTextGenerationService \\{",
+          "qualified": "comfy_runtime::native_execution_controller::NativeRuntimeTextGenerationService",
+          "role": "adapter",
+          "symbol": "NativeRuntimeTextGenerationService"
         }
       ],
       "call_symbols": [
@@ -18726,11 +18751,27 @@
           "name": "multimodal-runtime-fixture-pins-source-dependencies-and-atomic-boundary",
           "path": "crates/comfy_test_support/fixtures/text_generation/multimodal/manifest.json",
           "pattern": "comfy-parity-native-text-generation-foundation[\\s\\S]*VIDEO takes precedence over IMAGE[\\s\\S]*transaction opens after handle validation and media preparation[\\s\\S]*never publishes handles, cache state, KV, prepared media, or partial text"
+        },
+        {
+          "name": "multimodal-node-service-is-attempt-bound-and-cycle-free",
+          "path": "crates/comfy_nodes/src/execution.rs",
+          "pattern": "NativeTextGenerationService[\\s\\S]*NativeNodeServiceIdentity[\\s\\S]*execute_multimodal_text_generation[\\s\\S]*service\\.generate"
+        },
+        {
+          "name": "multimodal-runtime-service-delegates-exactly-once",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "impl NativeTextGenerationService for NativeRuntimeTextGenerationService[\\s\\S]*execute_native_multimodal_text_generation\\([\\s\\S]*NativeTextGenerationServiceOutput::checked"
+        },
+        {
+          "name": "multimodal-runtime-injects-only-generated-text-leaves",
+          "path": "crates/comfy_runtime/src/executor.rs",
+          "pattern": "TextGenerate[\\s\\S]*TextGenerateLTX2Prompt[\\s\\S]*with_text_generation[\\s\\S]*NativeRuntimeTextGenerationService"
         }
       ],
       "known_open_reasons": [],
       "consolidation_tasks": [
-        "comfy-parity-native-text-generation-foundation"
+        "comfy-parity-native-text-generation-foundation",
+        "comfy-parity-native-text-generation-node-bridge"
       ],
       "production_consumers": [
         "TextGenerate and TextGenerateLTX2Prompt native node leaves",
