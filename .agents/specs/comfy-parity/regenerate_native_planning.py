@@ -8898,8 +8898,307 @@ def native_asset_name_resolution_foundation_task(dependency: str) -> dict[str, o
     )
 
 
-def native_model_resource_execution_foundation_task(
+def native_model_resource_precursor_task(
+    identifier: str,
+    title: str,
+    outcome: str,
+    reads: list[str],
+    writes: list[str],
+    done: str,
+    dependencies: list[str],
+) -> dict[str, object]:
+    return task(
+        identifier,
+        title,
+        [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
+        [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
+        [
+            "VAL-MODEL-FAMILY-001",
+            "VAL-NODE-001",
+            "VAL-MEMORY-001",
+            "VAL-CANCEL-001",
+            "VAL-OWNERSHIP-001",
+        ],
+        outcome,
+        reads,
+        writes,
+        done,
+        dependencies,
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=[
+            "6.3",
+            "7.2",
+            "18.1",
+            "26.2",
+            "28.2",
+            "31.5",
+            "34.2",
+            "34.6",
+            "35.2",
+            "37.5",
+            "38.3",
+            "41.2",
+            "44.1",
+            "44.3",
+        ],
+        registered_source_edits=[
+            "comfy_model",
+            "comfy_sampler",
+            "comfy_nodes",
+            "comfy_runtime",
+            "comfy_test_support",
+        ],
+    )
+
+
+def native_model_resource_precursor_tasks(
     dependency: str, asset_dependency: str
+) -> list[dict[str, object]]:
+    common_model_writes = ["crates/comfy_model/src/native_node_payload.rs"]
+    tasks: list[dict[str, object]] = []
+
+    def append(
+        identifier: str,
+        title: str,
+        outcome: str,
+        reads: list[str],
+        writes: list[str],
+        done: str,
+    ) -> None:
+        previous = str(tasks[-1]["id"]) if tasks else None
+        dependencies = (
+            [previous]
+            if previous is not None
+            else [
+                dependency,
+                asset_dependency,
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ]
+        )
+        tasks.append(
+            native_model_resource_precursor_task(
+                identifier,
+                title,
+                outcome,
+                reads,
+                list(dict.fromkeys(writes + common_model_writes)),
+                done,
+                dependencies,
+            )
+        )
+
+    append(
+        "comfy-parity-native-family-model-resource-foundation",
+        "Retain executable native family models",
+        "Bridge the existing resolved family registry, mapped weights, and NativeFamilyModel execution into one concrete MODEL resource. Bind family, artifact, mapped-state, patch, conditioning, execution, residency, and semantic identities without retaining a reduced SD15-only accessor or a second model store.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+        ],
+        "Resolved tiny fixtures from multiple registered families map and execute through a retained NativeFamilyModel, publish a canonical MODEL payload with compatible conditioning and patch identities, charge aliased tensor storage once, and survive cache, persistence, eviction, and restart. Wrong family, probe, state plan, dtype, device, patch, conditioning, OOM, cancellation, and stale handles fail atomically; the reduced SD15 fixture remains compatible through the same model boundary.",
+    )
+    append(
+        "comfy-parity-native-clip-resource-foundation",
+        "Retain executable native CLIP resources",
+        "Retain exact single, dual, triple, quadruple, and model-specific CLIP tokenizer and encoder compositions behind one concrete CLIP resource, including source tokenizer options and scheduled encoding state. Reuse the canonical text-encoder owners and preserve component order rather than flattening every CLIP to SD1.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/clip_text_encoder_composite.rs",
+            "crates/comfy_model/src/clip_text_encoder_t5.rs",
+        ],
+        [
+            "crates/comfy_model/src/clip.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+        ],
+        "Pinned SD1, SDXL, SD3, PixArt, Lumina, HiDream, Qwen, and Gemma fixtures retain exact ordered tokenizer and encoder components, source options, pooled and scheduled outputs, digest, residency, persistence, and restart behavior. Missing files, incompatible component families, invalid options, malformed vocabularies or weights, OOM, cancellation, and stale handles publish no CLIP resource.",
+    )
+    append(
+        "comfy-parity-native-vae-resource-foundation",
+        "Retain executable native VAE resources",
+        "Preserve the existing NativeVae carrier and add retained NativeStructuredVae backing, semantic identity, residency, validation, and typed structured decode while keeping NativeDiffusionPayload::vae as the sole VAE handle transport. Structured execution is never projected through model_resource admission or an opaque identity.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_triposplat.py",
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_model/src/vae_structured.rs",
+        ],
+        [
+            "crates/comfy_model/src/vae.rs",
+            "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
+        ],
+        "Existing image, video, audio, and pixel-space VAE transport remains compatible, while source-derived Hunyuan-shape and Tripo-splat fixtures retain executable state and exact structured output kind through the same VAE role. Wrong boundary or structured variant, malformed state, alias drift, OOM, cancellation, and stale handles fail before publication; direct VAE model_resource admission remains rejected.",
+    )
+    append(
+        "comfy-parity-native-audio-encoder-resource-foundation",
+        "Retain executable native audio encoders",
+        "Implement and retain the source AUDIO_ENCODER architectures and checked waveform/sample-rate invocation behind one concrete native resource, producing the existing canonical AudioEncoderOutput values without substituting CLIP-internal audio encoders.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_audio_encoder.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/audio_encoder.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Pinned source audio-encoder fixtures detect, load, retain, invoke, persist, and restart with exact waveform layout, sample-rate handling, output tensors, digest, and residency. Unsupported architecture, invalid audio, malformed weights, OOM, cancellation, and stale handles publish no encoder or output.",
+    )
+    append(
+        "comfy-parity-native-upscale-model-resource-foundation",
+        "Retain executable native image upscale models",
+        "Implement a concrete architecture-validated UPSCALE_MODEL resource with bounded cancellable tiled inference, source scale identity, device lifecycle, and OOM tile fallback. The resource owns neural execution and never substitutes an image resize.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_upscale_model.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/upscale_model.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Pinned supported image-model fixtures load and execute exact scale, tile ordering, overlap, output clamp, fallback, digest, residency, cache, persistence, and restart behavior. Unsupported architecture, multi-input descriptors, malformed weights, OOM after bounded fallback, cancellation, and stale handles publish no model or image.",
+    )
+    append(
+        "comfy-parity-native-latent-upscale-model-resource-foundation",
+        "Retain executable native latent upscale models",
+        "Implement the source LATENT_UPSCALE_MODEL variants as concrete retained resources with exact latent normalization, resampling, shape, and model invocation behavior.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_hunyuan.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_nodes/src/stored_payload.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "All pinned latent-upscale variants load and execute exact normalization, output shape, digest, residency, cache, persistence, and restart behavior. Unsupported variant, incompatible latent or VAE state, malformed weights, OOM, cancellation, and stale handles publish no resource or latent.",
+    )
+    append(
+        "comfy-parity-native-background-removal-resource-foundation",
+        "Retain executable native background-removal models",
+        "Implement the source BACKGROUND_REMOVAL architecture as a retained native resource with exact image preprocessing, bounded inference, mask projection, and cancellation rather than a fabricated segmentation mask.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_bg_removal.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/background_removal.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Pinned BiRefNet fixtures load and execute exact preprocessing, output mask geometry and range, batch order, digest, residency, cache, persistence, and restart behavior. Unsupported variants, malformed weights or images, OOM, cancellation, and stale handles publish no model, mask, or image.",
+    )
+    append(
+        "comfy-parity-native-depth-anything-3-resource-foundation",
+        "Retain executable Depth Anything 3 models",
+        "Bind the existing Depth Anything 3 family detection and state plans to a concrete DA3_MODEL resource with source-exact preprocessing, inference, geometry normalization, and typed output ownership.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_depth_anything_3.py",
+            "crates/comfy_model/src/families/depthanything3_comfy_model_0075.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/depth_anything_3.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Pinned DA3 backbone and head fixtures detect, load, execute, normalize, persist, and restart with exact geometry, camera, depth, confidence, digest, and residency. Ambiguous or unsupported architecture, malformed weights or images, OOM, cancellation, and stale handles publish no model or geometry.",
+    )
+    append(
+        "comfy-parity-native-moge-resource-foundation",
+        "Retain executable MoGe models",
+        "Implement a concrete MOGE_MODEL resource and typed MoGe geometry owner with source-exact image preprocessing, disparity, points, normals, mask, intrinsics, triangulation inputs, and bounded inference.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_moge.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/moge.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Pinned MoGe fixtures load and execute exact disparity, point, normal, mask, intrinsics, geometry identity, residency, cache, persistence, and restart behavior. Unsupported architecture, malformed weights or images, invalid triangulation bounds, OOM, cancellation, and stale handles publish no model or geometry.",
+    )
+    append(
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+        "Retain executable GLIGEN, PhotoMaker, and style resources",
+        "Implement concrete retained GLIGEN, PHOTOMAKER, and STYLE_MODEL resources with their exact conditioning or get_cond invocation contracts, typed state, and bounded execution. These resources remain distinct roles even when they share lower tensor and model-loading machinery.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_photomaker.py",
+            "crates/comfy_model/src/native_node_payload.rs",
+        ],
+        [
+            "crates/comfy_model/src/conditioning_resources.rs",
+            "crates/comfy_model/src/comfy_model.rs",
+            "crates/comfy_test_support/tests/native_conditioning_integration.rs",
+        ],
+        "Pinned GLIGEN, PhotoMaker, and style fixtures load, retain, invoke, persist, and restart with exact role, conditioning inputs and outputs, adapter state, digest, and residency. Cross-role use, unsupported architecture, malformed weights or inputs, OOM, cancellation, and stale handles publish no resource or conditioning state.",
+    )
+    append(
+        "comfy-parity-native-model-resource-service-foundation",
+        "Load native model resources through one runtime service",
+        "Expose one cycle-free identity-checked NativeNodeServices loader and invocation contract over canonical asset-name resolution, AssetService, ArtifactIndex, and ModelStore. It resolves ordered one-to-three source assets, delegates to the typed resource owners, and returns complete validated resources without publishing handles or duplicating parsing, caching, path, or authorization authority.",
+        [
+            "projects/comfy/ComfyUI/nodes.py",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/assets.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+        ],
+        "Every supported single, paired, and triple source loader selection resolves one authorized immutable asset snapshot and delegates exactly once to the matching typed resource owner. Wrong category, changed bytes, partial selection, unsupported architecture, malformed weights, denied grants, OOM, cancellation, service replacement, and restart publish no resource, handle, cache entry, effect, or durable success; repository scans find no family-local loader or second ModelStore.",
+    )
+    ordered_ids = [
+        "comfy-parity-native-vae-resource-foundation",
+        "comfy-parity-native-clip-resource-foundation",
+        "comfy-parity-native-family-model-resource-foundation",
+        "comfy-parity-native-audio-encoder-resource-foundation",
+        "comfy-parity-native-upscale-model-resource-foundation",
+        "comfy-parity-native-latent-upscale-model-resource-foundation",
+        "comfy-parity-native-background-removal-resource-foundation",
+        "comfy-parity-native-depth-anything-3-resource-foundation",
+        "comfy-parity-native-moge-resource-foundation",
+        "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+        "comfy-parity-native-model-resource-service-foundation",
+    ]
+    tasks_by_id = {str(item["id"]): item for item in tasks}
+    ordered = [tasks_by_id[identifier] for identifier in ordered_ids]
+    for index, item in enumerate(ordered):
+        item["dependencies"] = (
+            [str(ordered[index - 1]["id"])]
+            if index > 0
+            else [
+                dependency,
+                asset_dependency,
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ]
+        )
+    return ordered
+
+
+def native_model_resource_execution_foundation_task(
+    dependency: str
 ) -> dict[str, object]:
     return task(
         "comfy-parity-native-model-resource-execution-foundation",
@@ -8907,7 +9206,7 @@ def native_model_resource_execution_foundation_task(
         [4, 6, 7, 18, 26, 28, 31, 34, 35, 37, 38, 41, 44],
         [8, 20, 25, 26, 28, 29, 31, 32, 33, 34, 39, 41],
         ["VAL-MODEL-FAMILY-001", "VAL-NODE-001", "VAL-MEMORY-001", "VAL-CANCEL-001", "VAL-OWNERSHIP-001"],
-        "Extend the sealed native model payload and stored-resource boundary to retain every executable source socket role required by the pending loader and consumer leaves, then expose one runtime-injected loader and invocation service over verified asset references. The canonical resources include general diffusion family models, VAE and structured VAE, single/dual/triple and model-specific CLIP tokenizers, audio encoder, upscale and latent-upscale models, ControlNet, GLIGEN, background removal, DA3, MoGe, face detection, PhotoMaker, style model, LoRA model, and model-patch artifacts; each role owns typed execution rather than an opaque identity.",
+        "Integrate the typed resource prerequisites through the single native handle-store boundary. MODEL, CLIP, and VAE retain their canonical NativeDiffusionPayload transport; auxiliary model roles use checked NativeStoredModelPayload admission; the runtime loader service returns complete typed resources and the node boundary alone stages and publishes handles. Existing ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection owners remain canonical, while LoRA and executable model-patch resources remain assigned to the model-transform foundation.",
         [
             ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
             "projects/comfy/ComfyUI/nodes.py",
@@ -8926,29 +9225,16 @@ def native_model_resource_execution_foundation_task(
             "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
-            "crates/comfy_model/src/native_node_payload.rs",
-            "crates/comfy_model/src/model_family.rs",
-            "crates/comfy_model/src/clip.rs",
-            "crates/comfy_model/src/vae.rs",
-            "crates/comfy_model/src/vae_structured.rs",
-            "crates/comfy_model/src/controlnet.rs",
-            "crates/comfy_model/src/comfy_model.rs",
-            "crates/comfy_sampler/src/native_diffusion_payload.rs",
-            "crates/comfy_sampler/src/comfy_sampler.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
-            "crates/comfy_nodes/src/execution.rs",
-            "crates/comfy_nodes/src/comfy_nodes.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_runtime/src/cache.rs",
-            "crates/comfy_runtime/src/comfy_runtime.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
-            "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "Pinned source artifacts load into exact typed resources with architecture detection, model/tokenizer options, normal and bypass adapter semantics, resident allocation accounting, semantic identity, and cancellable bounded invocation. Every promised role can be published, resolved, persisted, restarted, and consumed without a crate cycle; wrong-role, unsupported architecture, malformed weights, partial multi-file loads, OOM, cancellation, stale handles, and invocation failures publish nothing. Source-valid VAE, structured decode, audio encode, upscale, segmentation, geometry, CLIP, ControlNet, patch, and family-model fixtures execute through the same boundary, while no family-local loader or fake resource remains.",
-        [dependency, asset_dependency],
+        "All prerequisite resources plus the already canonical ControlNet, optical-flow, CLIP-vision, frame-interpolation, and face-detection resources can be published, resolved, leased, cached, persisted, restarted, and consumed through exactly one role-correct handle boundary without a crate cycle. MODEL, CLIP, and VAE use only NativeDiffusionPayload transport; auxiliary roles use only explicit concrete stored admission. Wrong-role, unsupported architecture, malformed weights, partial multi-file loads, OOM, cancellation, stale handles, service replacement, and invocation failures publish nothing, and repository scans find no family-local loader, fake resource, second store, or duplicate execution owner.",
+        dependency,
         locked=True,
         feature_scoped=True,
         criterion_ids=["6.3", "7.2", "18.1", "26.2", "28.2", "31.5", "34.2", "34.6", "35.2", "37.5", "38.3", "41.2", "44.1", "44.3"],
@@ -15618,9 +15904,12 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     asset_name_resolution_foundation = native_asset_name_resolution_foundation_task(
         str(node_asset_effect_foundation["id"])
     )
-    model_resource_execution_foundation = native_model_resource_execution_foundation_task(
+    model_resource_precursors = native_model_resource_precursor_tasks(
         str(node_compute_foundation["id"]),
         str(asset_name_resolution_foundation["id"]),
+    )
+    model_resource_execution_foundation = native_model_resource_execution_foundation_task(
+        str(model_resource_precursors[-1]["id"])
     )
     conditioning_control_foundation = native_conditioning_control_foundation_task(
         str(node_compute_foundation["id"]),
@@ -16179,6 +16468,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             latent_bundle_foundation,
             node_asset_effect_foundation,
             asset_name_resolution_foundation,
+            *model_resource_precursors,
             model_resource_execution_foundation,
             conditioning_control_foundation,
             model_transform_foundation,

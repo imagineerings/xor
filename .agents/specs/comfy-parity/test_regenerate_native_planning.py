@@ -80,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 639)
+        self.assertEqual(len(tasks), 650)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -93,6 +93,50 @@ class ValidationGenerationTests(unittest.TestCase):
                 compute_id,
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
+        )
+        model_resource_phases = [
+            "comfy-parity-native-vae-resource-foundation",
+            "comfy-parity-native-clip-resource-foundation",
+            "comfy-parity-native-family-model-resource-foundation",
+            "comfy-parity-native-audio-encoder-resource-foundation",
+            "comfy-parity-native-upscale-model-resource-foundation",
+            "comfy-parity-native-latent-upscale-model-resource-foundation",
+            "comfy-parity-native-background-removal-resource-foundation",
+            "comfy-parity-native-depth-anything-3-resource-foundation",
+            "comfy-parity-native-moge-resource-foundation",
+            "comfy-parity-native-conditioning-auxiliary-resource-foundation",
+            "comfy-parity-native-model-resource-service-foundation",
+        ]
+        self.assertEqual(
+            tasks_by_id[model_resource_phases[0]]["dependencies"],
+            [
+                value_id,
+                "comfy-parity-native-asset-name-resolution-foundation",
+                "comfy-parity-model-detection-any-of-key-selector-consolidation",
+            ],
+        )
+        for previous, current in zip(
+            model_resource_phases, model_resource_phases[1:]
+        ):
+            dependencies = tasks_by_id[current]["dependencies"]
+            self.assertEqual(dependencies[0], previous)
+            self.assertTrue(
+                set(dependencies[1:]).issubset(
+                    {
+                        "comfy-parity-model-detection-any-of-key-selector-consolidation"
+                    }
+                )
+            )
+        model_resource_dependencies = tasks_by_id[
+            "comfy-parity-native-model-resource-execution-foundation"
+        ]["dependencies"]
+        self.assertEqual(model_resource_dependencies[0], model_resource_phases[-1])
+        self.assertTrue(
+            set(model_resource_dependencies[1:]).issubset(
+                {
+                    "comfy-parity-model-detection-any-of-key-selector-consolidation"
+                }
+            )
         )
         self.assertEqual(
             tasks_by_id[asset_id]["dependencies"],
