@@ -6,6 +6,8 @@ pub mod dm_view;
 #[cfg(feature = "multiplayer-tools")]
 pub mod draft_store;
 #[cfg(feature = "multiplayer-tools")]
+pub mod inbox_pulse;
+#[cfg(feature = "multiplayer-tools")]
 pub mod message_reconciliation;
 #[cfg(feature = "multiplayer-tools")]
 pub mod message_timeline;
