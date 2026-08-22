@@ -240,9 +240,9 @@ fn val_workflow_ownership_001() -> Result<(), Box<dyn std::error::Error>> {
             "embedded_metadata_is_single_owner",
             metadata_definitions.len() == 1
                 && metadata_definitions[0].contains("crates/comfy_media/src/metadata.rs")
-                && source_occurrences(&sources, "fn parse_svg(").len() == 1
-                && source_occurrences(&sources, "fn parse_glb(").len() == 1
-                && source_occurrences(&sources, "fn write_glb(").len() == 1,
+                && source_occurrences(&sources, "fn parse_svg(bytes:").len() == 1
+                && source_occurrences(&sources, "fn parse_glb(bytes:").len() == 1
+                && source_occurrences(&sources, "fn write_glb(bytes:").len() == 1,
         ),
         (
             "embedded_metadata_preserves_no_execute_semantics",
