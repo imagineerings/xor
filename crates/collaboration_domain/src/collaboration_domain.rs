@@ -15,6 +15,7 @@ pub mod presence;
 pub mod principal;
 pub mod profile;
 pub mod provenance;
+pub mod push_lease;
 pub mod reaction;
 pub mod read_state;
 pub mod reminder;
@@ -102,6 +103,11 @@ pub use profile::{
 pub use provenance::{
     AggregateVersion, IntegrityAlgorithm, IntegrityReference, Provenance, SourceRecordId,
     SourceSystem,
+};
+pub use push_lease::{
+    PushCapabilityReference, PushEndpointGeneration, PushInstallationId, PushLease,
+    PushLeaseActivation, PushLeaseAddress, PushLeaseError, PushLeaseGeneration,
+    PushLeaseRecordFields, PushLeaseState, PushWake, PushWakePayload, PushWakeRequest,
 };
 pub use reaction::{
     ActiveReaction, ReactionCommandOutcome, ReactionError, ReactionGroup, ReactionMutation,
