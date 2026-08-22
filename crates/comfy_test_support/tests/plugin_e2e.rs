@@ -346,7 +346,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         bindings: vec![ProviderBindingClaim {
             feature_id: "COMFY-NODE-0141".to_owned(),
             node_id: "ElevenLabsAudioIsolation".to_owned(),
-            contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+            contract_sha256: "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
                 .to_owned(),
             transport_schema: "zed:comfy-provider-transport@1".parse()?,
             materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
