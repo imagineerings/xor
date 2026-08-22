@@ -15,8 +15,6 @@ use gpui::{
     Anchor, AnyView, App, Context, Decorations, Entity, FocusHandle, Focusable, IntoElement,
     ParentElement, Render, Role, SharedString, Styled, Subscription, WeakEntity, Window,
 };
-#[cfg(feature = "multiplayer-tools")]
-use gpui::{FocusHandle, Role};
 use project::Project;
 use settings::{SettingsContent, update_settings_file};
 use std::{any::TypeId, sync::Arc};

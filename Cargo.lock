@@ -3633,9 +3633,11 @@ dependencies = [
 name = "collab_ui"
 version = "0.1.0"
 dependencies = [
+ "agent_ui",
  "anyhow",
  "call",
  "channel",
+ "chrono",
  "client",
  "collections",
  "db",

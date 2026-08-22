@@ -14,7 +14,7 @@ doctest = false
 
 [features]
 default = []
-multiplayer-tools = []
+multiplayer-tools = ["dep:agent_ui", "dep:chrono", "agent_ui/multiplayer-tools"]
 test-support = [
     "call/test-support",
     "client/test-support",
@@ -30,9 +30,11 @@ test-support = [
 ]
 
 [dependencies]
+agent_ui = { workspace = true, optional = true }
 anyhow.workspace = true
 call.workspace = true
 channel.workspace = true
+chrono = { workspace = true, optional = true }
 client.workspace = true
 collections.workspace = true
 db.workspace = true

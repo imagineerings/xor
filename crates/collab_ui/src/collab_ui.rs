@@ -3,6 +3,8 @@ pub mod channel_view;
 pub mod collab_panel;
 #[cfg(feature = "multiplayer-tools")]
 pub mod message_reconciliation;
+#[cfg(feature = "multiplayer-tools")]
+pub mod message_timeline;
 pub mod notifications;
 mod panel_settings;
 
