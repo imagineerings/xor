@@ -158,6 +158,18 @@ class ValidationGenerationTests(unittest.TestCase):
         execution_id = "comfy-parity-native-model-resource-execution-foundation"
         stored_payload = "crates/comfy_nodes/src/stored_payload.rs"
         self.assertNotIn(stored_payload, tasks_by_id[audio_id]["writes"])
+        for required_read in [
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/attention.rs",
+            "crates/comfy_tensor/src/ops/reduction_01.rs",
+            "crates/comfy_tensor/src/ops/shape_layout_transform_03.rs",
+            "crates/comfy_tensor/src/ops/indexing_masking_01.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_02.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_05.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_11.rs",
+            "crates/comfy_tensor/src/ops/elementwise_or_runtime_operation_18.rs",
+        ]:
+            self.assertIn(required_read, tasks_by_id[audio_id]["reads"])
         self.assertNotIn(stored_payload, tasks_by_id[latent_upscale_id]["writes"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["reads"])
         self.assertIn(stored_payload, tasks_by_id[execution_id]["writes"])
