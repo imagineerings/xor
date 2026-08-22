@@ -23,7 +23,7 @@ use std::{
 
 const FIXTURE_PATH: &str =
     "crates/comfy_test_support/fixtures/numeric_formats/comfy_numeric_formats_v1.json";
-const FIXTURE_SHA256: &str = "f77d8a23ab23cbf344d0cc3f2be07459c34cdf548b2b51277bb509d905cfc208";
+const FIXTURE_SHA256: &str = "bbff973273e82a722f57ed3db5a3ff14c7dc5bcf47e673aae01b69638d01a5e6";
 
 fn run_attention(
     request: AttentionRequest,

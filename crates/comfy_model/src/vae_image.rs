@@ -3460,7 +3460,7 @@ mod tests {
 
     #[test]
     fn image_vae_cancellation_remains_typed() {
-        let cancellation = CancellationToken::default();
+        let cancellation: CancellationToken = Default::default();
         cancellation.cancel();
         assert!(matches!(
             check_image_vae_cancellation(&cancellation),
