@@ -5,6 +5,7 @@ pub mod channel;
 pub mod channel_invite;
 pub mod channel_metadata;
 pub mod community;
+pub mod custom_emoji;
 pub mod dm;
 pub mod forum;
 pub mod identity_types;
@@ -60,6 +61,11 @@ pub use community::{
     Community, CommunityCommandContext, CommunityCommandOutcome, CommunityCreateFields,
     CommunityError, CommunityHost, CommunityIcon, CommunityIconUpdate, CommunityJoinPolicy,
     CommunityLifecycleState, CommunityRecordFields, CommunityUpdate, JoinPolicyVersion,
+};
+pub use custom_emoji::{
+    CustomEmoji, CustomEmojiAsset, CustomEmojiError, CustomEmojiPalette, CustomEmojiPaletteEntry,
+    CustomEmojiResolutionSource, CustomEmojiSetRecord, CustomEmojiShortcode,
+    ReactionCustomEmojiTag, ResolvedReactionGroup, ResolvedReactionPresentation,
 };
 pub use dm::{
     DirectMessage, DmCommandOutcome, DmError, DmLifecycleState, DmMutation, DmMutationKind,
