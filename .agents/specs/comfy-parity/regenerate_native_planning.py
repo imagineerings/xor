@@ -8994,14 +8994,23 @@ def native_model_resource_precursor_tasks(
         "Bridge the existing resolved family registry, mapped weights, and NativeFamilyModel execution into one concrete MODEL resource. Bind family, artifact, mapped-state, patch, conditioning, execution, residency, and semantic identities without retaining a reduced SD15-only accessor or a second model store.",
         [
             "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/model_base.py",
+            "projects/comfy/ComfyUI/comfy/model_patcher.py",
+            "projects/comfy/ComfyUI/comfy/supported_models.py",
+            "projects/comfy/ComfyUI/comfy/model_detection.py",
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/native_node_payload.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
             "crates/comfy_model/src/model_family.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
+            "crates/comfy_sampler/src/native_node_payload.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
         ],
         "Resolved tiny fixtures from multiple registered families map and execute through a retained NativeFamilyModel, publish a canonical MODEL payload with compatible conditioning and patch identities, charge aliased tensor storage once, and survive cache, persistence, eviction, and restart. Wrong family, probe, state plan, dtype, device, patch, conditioning, OOM, cancellation, and stale handles fail atomically; the reduced SD15 fixture remains compatible through the same model boundary.",
@@ -9009,21 +9018,47 @@ def native_model_resource_precursor_tasks(
     append(
         "comfy-parity-native-clip-resource-foundation",
         "Retain executable native CLIP resources",
-        "Retain exact single, dual, triple, quadruple, and model-specific CLIP tokenizer and encoder compositions behind one concrete CLIP resource, including source tokenizer options and scheduled encoding state. Reuse the canonical text-encoder owners and preserve component order rather than flattening every CLIP to SD1.",
+        "Retain exact single, dual, triple, quadruple, and model-specific CLIP tokenizer and encoder compositions behind one concrete CLIP resource, including source tokenizer options and scheduled encoding state. Reuse the canonical text-encoder owners and preserve component order rather than flattening every CLIP to SD1. NativeClipText and NativeT5TextEncoder expose cancellation-checked reconstruction, semantic-state, and alias-aware residency projections; clip.rs remains the one owner of ordered tokenizer options, layer selection, schedule enablement, keyframe windows, applied PatchGraph state, and scheduled output metadata.",
         [
             "projects/comfy/ComfyUI/nodes.py",
+            "projects/comfy/ComfyUI/comfy/sd.py",
+            "projects/comfy/ComfyUI/comfy/sd1_clip.py",
+            "projects/comfy/ComfyUI/comfy/sdxl_clip.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/sd3_clip.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/pixart_t5.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/lumina2.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/hidream.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/qwen_image.py",
+            "projects/comfy/ComfyUI/comfy/text_encoders/gemma4.py",
+            "projects/comfy/ComfyUI/comfy_extras/nodes_cond.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_sd3.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_hidream.py",
             "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/clip_text.rs",
             "crates/comfy_model/src/clip_text_encoder_composite.rs",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             "crates/comfy_model/src/clip_text_encoder_t5.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/conditioning.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/model_store.rs",
+            "crates/comfy_model/src/native_ops.rs",
+            "crates/comfy_model/src/patch_graph.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
         ],
         [
             "crates/comfy_model/src/clip.rs",
+            "crates/comfy_model/src/clip_text.rs",
+            "crates/comfy_model/src/clip_text_encoder_composite.rs",
+            "crates/comfy_model/src/clip_text_encoder_decoder.rs",
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/src/clip_text_encoder_t5.rs",
+            "crates/comfy_model/src/clip_tokenizer.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
         ],
-        "Pinned SD1, SDXL, SD3, PixArt, Lumina, HiDream, Qwen, and Gemma fixtures retain exact ordered tokenizer and encoder components, source options, pooled and scheduled outputs, digest, residency, persistence, and restart behavior. Missing files, incompatible component families, invalid options, malformed vocabularies or weights, OOM, cancellation, and stale handles publish no CLIP resource.",
+        "Pinned SD1, SDXL, SD3, PixArt, Lumina, HiDream, Qwen, and Gemma fixtures retain exact ordered tokenizer and encoder components, source options, pooled and scheduled outputs, digest, residency, persistence, and restart behavior. Every typed text-encoder owner reconstructs from checked named MappedModelWeights; schedule windows are private materializations derived by applying each exact PatchGraph to retained base weights before reconstruction and encoding. Scheduled fixtures preserve clone semantics, independent schedule enablement, ordered keyframe windows, clip start/end metadata, and exact hook metadata without caller-supplied patched components or an identity-only patch binding. Missing files, incompatible component families, invalid options, malformed vocabularies or weights, patch or schedule drift, OOM, cancellation, and stale handles publish no CLIP resource.",
     )
     append(
         "comfy-parity-native-vae-resource-foundation",
@@ -9644,72 +9679,392 @@ def native_node_provider_invocation_foundation_task(dependency: str) -> dict[str
     )
 
 
-def native_partner_provider_components_foundation_task(dependency: str) -> dict[str, object]:
+PROVIDER_VENDOR_SPECS: tuple[tuple[str, int, int, tuple[str, ...]], ...] = (
+    ("anthropic", 1, 1, ()),
+    ("beeble", 2, 3, ()),
+    ("bfl", 10, 9, ()),
+    ("bria", 6, 6, ()),
+    ("bytedance", 14, 12, ("byteplus", "byteplus-seedance2", "seedance")),
+    ("elevenlabs", 8, 9, ()),
+    ("gemini", 8, 4, ("vertexai",)),
+    ("grok", 7, 7, ("xai",)),
+    ("hitpaw", 2, 3, ()),
+    ("hunyuan3d", 6, 10, ("tencent",)),
+    ("ideogram", 2, 3, ()),
+    ("kling", 25, 29, ()),
+    ("krea", 2, 6, ()),
+    ("ltxv", 2, 2, ("ltx",)),
+    ("luma", 15, 7, ("luma_2",)),
+    ("magnific", 5, 15, ("freepik",)),
+    ("meshy", 7, 18, ()),
+    ("minimax", 3, 3, ()),
+    ("openai", 8, 7, ()),
+    ("openrouter", 1, 1, ()),
+    ("pixverse", 4, 6, ()),
+    ("quiver", 2, 2, ()),
+    ("recraft", 18, 9, ()),
+    ("reve", 3, 3, ()),
+    ("rodin", 7, 3, ()),
+    ("runway", 7, 4, ()),
+    ("sonilo", 2, 2, ()),
+    ("topaz", 3, 9, ()),
+    ("tripo", 12, 4, ()),
+    ("veo2", 3, 3, ()),
+    ("vidu", 13, 7, ()),
+    ("wan", 14, 5, ()),
+    ("wavespeed", 2, 5, ()),
+)
+
+
+def provider_vendor_component_task(
+    vendor: str,
+    node_count: int,
+    route_count: int,
+    aliases: tuple[str, ...],
+    dependency: str,
+) -> dict[str, object]:
+    namespace = f"zed.comfy.provider.{vendor}"
+    alias_text = ", ".join(aliases) if aliases else "none"
     return task(
-        "comfy-parity-native-partner-provider-components-foundation",
-        "Provision signed provider components for every cloud node contract",
-        [4, 6, 11, 12, 18, 19, 28, 32, 34, 37, 38, 40, 41, 44],
-        [8, 12, 13, 17, 18, 20, 21, 22, 29, 32, 34, 35, 39, 40, 41],
-        ["VAL-NODE-001", "VAL-PLUGIN-HOST-001", "VAL-WORKER-PLUGIN-001", "VAL-RUNTIME-TRUST-001", "VAL-CANCEL-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
-        "Build reviewed Rust/WASM provider components, manifests, provider-binding claims, and deployment-registry entries for every provider-required node and external-service contract in the pinned catalog. A single authoritative feature-to-vendor namespace map activates each signed vendor component atomically for all of its claims. Components own exact authenticated request, multipart, upload, create, poll, retry, cancellation, bounded incremental response streaming and progress, download, cost-receipt, and typed native materialization behavior; generated node leaves only select an admitted binding and project checked inputs.",
+        f"comfy-parity-provider-component-{vendor}",
+        f"Implement the {vendor} provider component",
+        [4, 6, 12, 18, 28, 32, 34, 37, 40, 41, 44],
+        [8, 12, 17, 18, 20, 28, 32, 34, 39, 40, 41],
+        [
+            "VAL-NODE-001",
+            "VAL-PLUGIN-HOST-001",
+            "VAL-WORKER-PLUGIN-001",
+            "VAL-RUNTIME-TRUST-001",
+            "VAL-CANCEL-001",
+            "VAL-RECOVERY-005",
+            "VAL-OWNERSHIP-001",
+        ],
+        f"Implement the complete hermetic Rust/WASM provider component for `{namespace}`. Its exact generated claim set contains {node_count} provider-required node contracts and {route_count} current external-service rows, normalizes only the reviewed aliases ({alias_text}), and implements every source-derived method, path, ordered header, authentication, multipart/upload, cost, retry, poll, stream, progress, download, and typed materialization field without a generic provider fallback.",
+        [
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            "projects/comfy/ComfyUI/comfy_api_nodes",
+            "crates/comfy_plugin_host/provider_components/src/common",
+            "crates/comfy_test_support/tests/provider_component_conformance.rs",
+        ],
+        [
+            f"crates/comfy_plugin_host/provider_components/src/vendors/{vendor}.rs",
+            f"crates/comfy_test_support/fixtures/providers/{vendor}",
+        ],
+        f"The generic non-network conformance harness proves all {node_count} node claims and {route_count} route claims exactly once for `{namespace}` with no extra or missing claim; source-fingerprinted success, error, auth, cost, upload, retry, polling, streaming, cancellation, malformed/oversized response, download, worker-loss, restart, and typed atomic materialization fixtures pass. The reproducible unsigned component and signing payload contain no credential, live paid call, production private key, fake result, or ignored source field.",
+        [dependency],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=[
+            "4.4",
+            "6.4",
+            "12.1",
+            "12.2",
+            "12.5",
+            "18.1",
+            "28.2",
+            "32.2",
+            "34.4",
+            "37.5",
+            "40.2",
+            "41.3",
+            "44.3",
+        ],
+        registered_source_edits=["comfy_plugin_host", "comfy_test_support"],
+    )
+
+
+def provider_component_foundation_tasks(
+    provider_dependency: str,
+    text_generation_dependency: str,
+    sdpose_dependency: str,
+) -> list[dict[str, object]]:
+    shared: list[dict[str, object]] = []
+
+    def append_shared(
+        identifier: str,
+        title: str,
+        outcome: str,
+        reads: list[str],
+        writes: list[str],
+        done: str,
+        registered_source_edits: list[str],
+        dependencies: list[str] | None = None,
+    ) -> None:
+        dependency = [str(shared[-1]["id"])] if shared else [
+            provider_dependency,
+            text_generation_dependency,
+            sdpose_dependency,
+        ]
+        shared.append(
+            task(
+                identifier,
+                title,
+                [4, 6, 12, 18, 28, 32, 34, 37, 38, 40, 41, 44],
+                [8, 12, 13, 17, 18, 20, 21, 22, 29, 32, 34, 35, 39, 40, 41],
+                [
+                    "VAL-NODE-001",
+                    "VAL-PLUGIN-HOST-001",
+                    "VAL-WORKER-PLUGIN-001",
+                    "VAL-RUNTIME-TRUST-001",
+                    "VAL-CANCEL-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ],
+                outcome,
+                reads,
+                writes,
+                done,
+                dependency if dependencies is None else dependencies,
+                locked=True,
+                feature_scoped=True,
+                criterion_ids=[
+                    "4.4",
+                    "6.4",
+                    "12.1",
+                    "12.2",
+                    "12.5",
+                    "18.1",
+                    "28.2",
+                    "32.2",
+                    "34.4",
+                    "37.5",
+                    "40.2",
+                    "41.3",
+                    "44.3",
+                ],
+                registered_source_edits=registered_source_edits,
+            )
+        )
+
+    append_shared(
+        "comfy-parity-provider-contract-catalog-closure",
+        "Close provider routes and vendor namespaces",
+        "Generate one source-fingerprinted provider component contract catalog from the 224 provider-required nodes and current 217 external-service rows. Resolve every currently UNKNOWN HTTP method from pinned source, map every node and route exactly once to one of 33 logical vendor namespaces, preserve reviewed aliases, and require explicit source evidence before any future route or tombstone addition.",
         [
             ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
             ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
             ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
             "projects/comfy/ComfyUI/comfy_api_nodes",
-            "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
-            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
-            "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
-            "crates/comfy_plugin_host/src/component_host.rs",
-            "crates/comfy_plugin_host/src/capabilities.rs",
-            "crates/comfy_plugin_host/src/private_worker.rs",
-            "crates/comfy_worker/src/plugin_runtime.rs",
-            "crates/comfy_types/src/worker_protocol.rs",
-            "crates/comfy_runtime/src/plugin_services.rs",
-            "crates/comfy_runtime/src/provider_materialization.rs",
-            "crates/comfy_runtime/src/native_execution_controller.rs",
-            "crates/comfy_runtime/src/execution_presentation.rs",
-            "crates/zed/src/zed.rs",
-            "crates/zed/src/comfy_cli.rs",
         ],
         [
-            ".agents/specs/comfy-parity/regenerate_native_planning.py",
-            ".agents/specs/comfy-parity/tasks.md",
-            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
-            "crates/comfy_plugin_host/provider_components",
+            ".agents/specs/comfy-parity/generate_provider_component_catalog.py",
+            ".agents/specs/comfy-parity/test_generate_provider_component_catalog.py",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
+            ".agents/specs/comfy-parity/regenerate_all.py",
+        ],
+        "Generation is byte-stable and starts from exactly 224 provider nodes, 33 vendors, 217 route rows, and 61 unresolved methods. The resulting catalog has zero UNKNOWN executable methods, one vendor and namespace per node and route, no `comfy-node-*` namespace, no duplicate or missing claim, and no unsupported synthetic row. Every added route or tombstone carries source path, symbol, line, source SHA-256, and explicit disposition.",
+        [],
+    )
+    append_shared(
+        "comfy-parity-provider-namespace-binding-projection",
+        "Project authoritative provider namespaces",
+        "Compile the checked provider component catalog into one comfy_nodes projection and make generated bindings plus runtime activation consume that sole namespace owner. Replace per-node placeholder and legacy `comfy-api` namespaces without runtime string rewriting or mixed-vendor activation.",
+        [
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            "crates/comfy_nodes/src/registry_generator.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_nodes/src/provider_contracts.rs",
+            "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/tests/provider_contracts.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        "All 224 bindings project exactly `zed.comfy.provider.<vendor>` from the checked catalog, completed provider leaves consume the same projection, and activation is atomic per complete namespace. Missing, duplicate, mixed, stale, placeholder, or mismatched claims leave descriptors provider-required and make zero request.",
+        ["comfy_nodes", "comfy_runtime"],
+    )
+    append_shared(
+        "comfy-parity-provider-streaming-component-abi-v2",
+        "Version the streaming provider component ABI",
+        "Add a v2 provider WIT and manifest schema for exact HTTP methods, ordered bounded headers, request streaming, response heads and incremental binary/text/NDJSON chunks, cancellation-aware waits, uploads, host cost requests, and monotonic progress. Preserve the existing v1 ABI and schema unchanged as an independently tested compatibility surface.",
+        [
             "crates/comfy_plugin_sdk/wit/comfy-plugin.wit",
-            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
             "crates/comfy_plugin_sdk/schema/plugin-manifest-v1.schema.json",
-            "crates/comfy_plugin_host/src/capabilities.rs",
-            "crates/comfy_plugin_host/src/private_worker.rs",
-            "crates/comfy_plugin_host/src/component_host.rs",
-            "crates/comfy_plugin_host/src/registry_adapter.rs",
-            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
-            "crates/comfy_worker/src/plugin_runtime.rs",
-            "crates/comfy_worker/src/comfy_worker.rs",
-            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+        ],
+        [
+            "crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit",
+            "crates/comfy_plugin_sdk/schema/plugin-manifest-v2.schema.json",
+            "crates/comfy_plugin_sdk/src/comfy_plugin_sdk.rs",
+            "crates/comfy_plugin_sdk/src/type_ids.rs",
+        ],
+        "V1 fixtures remain byte-compatible. V2 DTOs enforce invocation-scoped generation-checked handles, method/header/body/chunk/line/aggregate bounds, ordered terminal state, upload and cost parity between WIT and JSON schema, cancellation-aware waits, and monotonic bounded progress without paths, secrets, native handles, or accepted-but-ignored fields.",
+        ["comfy_plugin_sdk"],
+    )
+    append_shared(
+        "comfy-parity-provider-worker-stream-protocol",
+        "Transport provider streams over the worker protocol",
+        "Extend the private worker protocol with bounded response heads, chunks, waits, progress, stream and session identities, preserving strict version rejection and keeping native handles, paths, and secret bytes outside the wire.",
+        [
+            "crates/comfy_types/src/worker_protocol.rs",
+            "crates/comfy_plugin_sdk/wit/comfy-provider-plugin-v2.wit",
+        ],
+        [
             "crates/comfy_types/src/worker_protocol.rs",
             "crates/comfy_types/src/comfy_types.rs",
+        ],
+        "Malformed lengths, out-of-order chunks, duplicate terminal frames, stale generations, foreign sessions, late progress, cancellation, and restart fail typed. Valid response-head/chunk/wait/progress sequences round-trip within cumulative bounds without buffering the complete provider response or changing prior protocol discriminants.",
+        ["comfy_types"],
+    )
+    append_shared(
+        "comfy-parity-provider-runtime-stream-progress-foundation",
+        "Own provider streams, receipts, and progress",
+        "Make the runtime the sole authorized provider stream/session owner. Bind provider, method, endpoint, headers, secret reference, body digest, component and binding generations, accepted cost, request ordinal, response head, chunk digest, and idempotency; project monotonic attempt-local progress without persisting it as an output or effect.",
+        [
             "crates/comfy_runtime/src/plugin_services.rs",
             "crates/comfy_runtime/src/provider_materialization.rs",
-            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_runtime/src/execution_presentation.rs",
+            "crates/comfy_runtime/src/queue_history.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/trust.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/plugin_services.rs",
+            "crates/comfy_runtime/src/provider_materialization.rs",
             "crates/comfy_runtime/src/execution_presentation.rs",
             "crates/comfy_runtime/src/queue_history.rs",
             "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/trust.rs",
             "crates/comfy_runtime/src/comfy_runtime.rs",
-            "crates/zed/src/comfy_plugin_services.rs",
-            "crates/zed/src/zed.rs",
-            "crates/zed/src/comfy_cli.rs",
+        ],
+        "Authorization precedes actuation, quotas are cumulative, Retry-After is bounded, progress is monotonic and rate-limited, and stale or late events are ignored with diagnostics. Denial, timeout, malformed/oversized streams, cancellation, digest mismatch, worker loss, and restart revoke the stream and receipts atomically; canonical typed materialization publishes all outputs or none.",
+        ["comfy_runtime"],
+    )
+    append_shared(
+        "comfy-parity-provider-component-host-stream-adapter",
+        "Adapt streaming providers through the component host",
+        "Adapt the v2 WIT to runtime-owned provider sessions with a per-invocation checked stream table and complete capability validation before actuation. Retain v1 compatibility and keep component-host state distinct from provider authorization, materialization, and durable execution state.",
+        [
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+        ],
+        [
+            "crates/comfy_plugin_host/src/capabilities.rs",
+            "crates/comfy_plugin_host/src/private_worker.rs",
+            "crates/comfy_plugin_host/src/component_host.rs",
+            "crates/comfy_plugin_host/src/registry_adapter.rs",
+            "crates/comfy_plugin_host/src/comfy_plugin_host.rs",
             "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source",
+        ],
+        "Component contract tests prove exact grant checks before every request/upload/cost/stream operation, generation-scoped handle revocation, bounded response streaming and progress, traps, cancellation, and atomic output proposals. Missing or extra manifest claims, undeclared operations, stale handles, and worker loss cannot actuate or publish.",
+        ["comfy_plugin_host"],
+    )
+    append_shared(
+        "comfy-parity-provider-worker-stream-bridge",
+        "Bridge provider streams through the private worker",
+        "Multiplex provider request, response, progress, cancellation, and terminal state over the private worker without requiring whole-response buffering. Revoke all attempt-local streams on cancellation, worker loss, replacement, or generation change.",
+        [
+            "crates/comfy_worker/src/plugin_runtime.rs",
+            "crates/comfy_worker/src/supervisor.rs",
+            "crates/comfy_types/src/worker_protocol.rs",
+        ],
+        [
+            "crates/comfy_worker/src/plugin_runtime.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_worker/src/supervisor.rs",
             "crates/comfy_worker/tests/ipc_framing.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+        ],
+        "IPC tests prove interleaved bounded sessions, strict sequence and generation checks, backpressure, cancellation between chunks, late progress rejection, worker crash/restart cleanup, and clean retry without duplicated request, receipt, output, or effect.",
+        ["comfy_worker", "comfy_runtime"],
+    )
+    append_shared(
+        "comfy-parity-provider-deployment-lifecycle",
+        "Deploy identical provider registries in desktop and headless modes",
+        "Install and replace signed provider component snapshots through one deployment lifecycle shared by desktop and headless execution. Offline, disabled, missing, stale, and rejected deployments retain provider-required descriptors and expose deterministic diagnostics without fallback.",
+        [
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/comfy_cli.rs",
+            "crates/comfy_api/src/headless.rs",
+        ],
+        [
+            "crates/zed/src/comfy_plugin_services.rs",
+            "crates/zed/src/comfy_cli.rs",
+            "crates/zed/src/zed.rs",
+            "crates/comfy_api/src/services.rs",
+            "crates/comfy_api/src/headless.rs",
+            "crates/comfy_api/src/comfy_api.rs",
+        ],
+        "Desktop and headless hosts admit the same signed snapshot and namespace generations, replace a namespace atomically, invalidate stale sessions/cache identities, and surface identical offline or rejected-deployment diagnostics. Neither mode invents a provider, signer, secret, cost acceptance, or network fallback.",
+        ["zed", "comfy_api"],
+    )
+    append_shared(
+        "comfy-parity-provider-hermetic-component-harness",
+        "Build the hermetic provider component harness",
+        "Create one reviewed nested provider-component workspace, shared bounded transport/materializer helpers, and an auto-discovering non-network conformance harness. Vendor leaves add only disjoint Rust modules and fixtures; they never touch a shared manifest, lockfile, registry, runtime, or test implementation.",
+        [
+            "crates/comfy_plugin_host/tests/component_contract.rs",
             "crates/comfy_test_support/tests/plugin_e2e.rs",
-            "crates/comfy_test_support/tests/native_worker_resilience.rs",
-            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+        ],
+        [
+            "crates/comfy_plugin_host/provider_components/Cargo.toml",
+            "crates/comfy_plugin_host/provider_components/Cargo.lock",
+            "crates/comfy_plugin_host/provider_components/build.rs",
+            "crates/comfy_plugin_host/provider_components/src/lib.rs",
+            "crates/comfy_plugin_host/provider_components/src/common",
+            "crates/comfy_plugin_host/provider_components/tests/conformance.rs",
+            "crates/comfy_test_support/fixtures/providers/common",
+            "crates/comfy_test_support/tests/provider_component_conformance.rs",
+        ],
+        "The locked nested build is reproducible and auto-discovers vendor modules and fixtures without shared edits. Scripted actuators assert exact method, path, ordered headers, multipart, body, chunk, retry, poll, cost, cancellation, worker-loss, progress, and typed materialization behavior with zero network; malformed or oversized inputs fail before mutation.",
+        ["comfy_plugin_host", "comfy_test_support"],
+    )
+
+    vendor_tasks = [
+        provider_vendor_component_task(vendor, nodes, routes, aliases, str(shared[-1]["id"]))
+        for vendor, nodes, routes, aliases in PROVIDER_VENDOR_SPECS
+    ]
+    authority_gate = task(
+        "comfy-parity-provider-signed-deployment-registry-user-authority-gate",
+        "Admit externally signed provider deployments",
+        [12, 32, 40, 44],
+        [17, 20, 32, 39, 40, 41],
+        ["VAL-RUNTIME-TRUST-001", "VAL-PLUGIN-HOST-001", "VAL-OWNERSHIP-001"],
+        "Obtain user-approved public verification-key configuration, detached signatures over the exact reproducible component and manifest digests, and a signed deployment-registry record for all 33 complete vendor namespaces. This is an external user-authority gate: repository code may import and verify supplied public artifacts but never generate, request, persist, infer, or check in the production private signing key.",
+        [
+            "crates/comfy_plugin_host/provider_components/src/vendors",
+            "crates/comfy_test_support/fixtures/providers",
+            "crates/comfy_runtime/src/trust.rs",
+        ],
+        [],
+        "All 33 detached signatures verify against explicitly admitted public key IDs and bind exact component, manifest, namespace, node-claim, route-claim, transport, and materializer digests. Test-only deterministic keys remain fixture-scoped and cannot satisfy this gate; live paid provider calls remain optional and non-blocking.",
+        [str(item["id"]) for item in vendor_tasks],
+        locked=True,
+        feature_scoped=True,
+        criterion_ids=["12.5", "32.2", "40.2", "44.3"],
+    )
+    final = native_partner_provider_components_foundation_task(str(authority_gate["id"]))
+    return [*shared, *vendor_tasks, authority_gate, final]
+
+
+def native_partner_provider_components_foundation_task(dependency: str) -> dict[str, object]:
+    return task(
+        "comfy-parity-native-partner-provider-components-foundation",
+        "Close signed provider component coverage",
+        [4, 6, 11, 12, 18, 19, 28, 32, 34, 37, 38, 40, 41, 44],
+        [8, 12, 13, 17, 18, 20, 21, 22, 29, 32, 34, 35, 39, 40, 41],
+        ["VAL-NODE-001", "VAL-PLUGIN-HOST-001", "VAL-WORKER-PLUGIN-001", "VAL-RUNTIME-TRUST-001", "VAL-CANCEL-001", "VAL-RECOVERY-005", "VAL-OWNERSHIP-001"],
+        "Close the complete provider component implementation after the authoritative catalog, namespace projection, streaming ABI/protocol/runtime/host/worker/deployment foundations, all 33 hermetic vendor components, and the external signed-registry authority gate are complete. This task owns only final validation and authoritative ownership evidence, not another provider transport, namespace map, component registry, materializer, trust store, or deployment owner.",
+        [
+            ".agents/specs/comfy-parity/catalogs/backend-nodes.csv",
+            ".agents/specs/comfy-parity/catalogs/backend-node-contracts.json",
+            ".agents/specs/comfy-parity/catalogs/backend-external-services.csv",
+            "projects/comfy/ComfyUI/comfy_api_nodes",
+            ".agents/specs/comfy-parity/catalogs/provider-component-contracts.json",
+            "crates/comfy_plugin_host/provider_components",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_test_support/tests/provider_component_conformance.rs",
+        ],
+        [
+            "crates/comfy_test_support/tests/provider_component_closure.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
         ],
-        "Every one of the 224 provider-required node contracts maps exactly once through an authoritative feature-to-vendor namespace map to a fingerprinted signed component and reviewed provider binding whose endpoint, resolved HTTP method, ordered headers, auth, secret, multipart/upload, cost, retry, poll, bounded streaming/progress, response, and output types match the pinned Python source and external-service ledger; no external-service row retains an unknown method. Each vendor activation is atomic across all of its node and ledger claims, with no placeholder per-node namespace and no extra or missing claim. The provider ABI exposes bounded response heads and incremental binary, text, or NDJSON chunks, cancellation-aware waits, and monotonic rate-limited progress without persisting progress as output or effect. Manifest capabilities exactly cover provider request, upload, and cost grants. Reproducible component artifacts are signed by an admitted public-key authority without checking in or synthesizing a private signing key and are discoverable through the same desktop and headless deployment lifecycle. Hermetic actuator fixtures cover exact methods, paths, headers, multipart fields, success, incremental NDJSON and binary streaming, vendor error, malformed chunks, oversized streams, polling timeout, Retry-After and retry exhaustion, cancellation between chunks, download digest mismatch, cost denial, missing secret, offline mode, worker loss, restart, stale or late progress, and atomic typed materialization; optional live certification is recorded separately and never required for offline tests. No provider row is executable without an admitted component, and no generic echo, opaque task bytes, or descriptor-only facade satisfies closure.",
+        "Final closure proves exactly 224 provider-required nodes, 33 signed vendor namespaces, and every source-fingerprinted external-service route from the generated catalog with zero UNKNOWN executable method, placeholder namespace, missing or extra claim, private key, generic echo, opaque task facade, live-network test requirement, or descriptor-only activation. Full SDK, protocol, runtime, host, worker, desktop/headless, vendor conformance, cancellation, recovery, trust, ownership, and strict regeneration suites pass, while absent signatures, public trust anchors, secrets, costs, networks, or providers remain safely provider-required.",
         dependency,
         locked=True,
         feature_scoped=True,
@@ -12612,6 +12967,201 @@ def native_video_component_h264_mp4_10bit_backing_foundation_task(
     )
 
 
+def native_video_execution_precursor_tasks(
+    dependency: str,
+) -> list[dict[str, object]]:
+    tasks: list[dict[str, object]] = []
+
+    def append(
+        identifier: str,
+        title: str,
+        outcome: str,
+        reads: list[str],
+        writes: list[str],
+        done: str,
+        criterion_ids: list[str],
+        registered_source_edits: list[str],
+    ) -> None:
+        previous = dependency if not tasks else str(tasks[-1]["id"])
+        tasks.append(
+            task(
+                identifier,
+                title,
+                [11, 18, 26, 28, 31, 34, 36, 37, 41, 44],
+                [11, 18, 25, 26, 28, 31, 34, 36, 41],
+                [
+                    "VAL-MEDIA-001",
+                    "VAL-NATIVE-E2E-001",
+                    "VAL-RUNTIME-TRUST-001",
+                    "VAL-CANCEL-001",
+                    "VAL-MEMORY-001",
+                    "VAL-RECOVERY-005",
+                    "VAL-OWNERSHIP-001",
+                ],
+                outcome,
+                reads,
+                writes,
+                done,
+                [previous],
+                locked=True,
+                criterion_ids=criterion_ids,
+                registered_source_edits=registered_source_edits,
+            )
+        )
+
+    append(
+        "comfy-parity-native-video-codec-general-abi-foundation",
+        "Review the general native video codec ABI",
+        "Extend the existing reviewed FFmpeg 7.1 ABI beyond its encode and LTXV subset with the exact bounded demux, general decode, seek, remux, rotation, AAC resampling, alignment, and pre-conversion padding/filter declarations required by the pinned video source. Preserve every existing H.264 and WebM ABI identity and admit no library or availability claim from declarations alone.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_ffi_elf.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/abi/video-codec",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_runtime/abi/video-codec/ffmpeg-7.1-x86_64-gnu-general-video-v1.json",
+            "crates/comfy_runtime/abi/video-codec/verify-general-video-bindings.c",
+            "crates/comfy_test_support/fixtures/video/codec-general-video-abi/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Official FFmpeg 7.1 header and archive fingerprints plus warning-denied C verification prove every required symbol, version namespace, checked struct prefix, seek/remux/decode/AAC/filter declaration, and retained-library dependency. Existing codec identities remain frozen; absent, mismatched, or incomplete declarations fail before any library load, and the task makes no codec-availability claim.",
+        ["28.2", "31.5", "31.6", "34.4", "36.4", "41.3", "44.3"],
+        ["comfy_runtime", "comfy_test_support"],
+    )
+    append(
+        "comfy-parity-native-video-codec-package-bootstrap-foundation",
+        "Bootstrap the signed native video codec package",
+        "Add one explicit runtime-profile codec package authority, independently of compute backend selection, and use it to verify the canonical signed FFmpeg package and dependency closure before starting the sole thread-affine codec actor inside the worker. Inject the existing LTXV, WebM, and H.264 service ports through the normal executor configuration and bind the package identity into cache configuration without a downloader or private signing key.",
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/settings.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/trust.rs",
+            "crates/comfy_worker/src/comfy_worker_main.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_package.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/settings.rs",
+            "crates/comfy_runtime/src/runtime_supervisor.rs",
+            "crates/comfy_runtime/src/comfy_runtime.rs",
+            "crates/settings_content/src/settings_content.rs",
+            "crates/comfy_worker/src/comfy_worker_main.rs",
+            "crates/comfy_worker/src/comfy_worker.rs",
+            "crates/comfy_test_support/fixtures/video/codec-package-bootstrap/manifest.json",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "CPU and accelerator worker launches carry the same independent codec authority. Valid signed Linux packages reach the retained actor from production startup; missing, tampered, symlinked, incomplete, wrong-target, unlicensed, or signer-mismatched packages fail before executor construction. Shutdown releases thread-affine state on its owner thread, service identity changes invalidate cache configuration, and fixture keys never become production trust roots.",
+        ["18.1", "28.6", "31.5", "37.5", "41.3", "41.5", "44.3"],
+        ["comfy_runtime", "comfy_worker", "comfy_test_support"],
+    )
+    append(
+        "comfy-parity-native-video-demux-decode-foundation",
+        "Demux and decode sealed native video bytes",
+        "Implement bounded in-memory MP4/H.264 and WebM VP9 or AV1 demux and full-sequence decode through the retained codec actor. Select the first video stream and last decodable audio stream, retain typed diagnostics for skipped unsupported streams, recover exact rate, depth, alpha, metadata, rotation, and AAC samples, and reproduce the source pre-conversion pad/smear/crop behavior without paths or subprocesses.",
+        [
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_media/src/video.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_test_support/fixtures/video/general-demux-decode",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "Golden 8/10-bit MP4, VP9-alpha WebM, AV1 WebM, AAC, rotation, odd-width, truncated, malformed, and missing-stream fixtures prove average-rate fallback, bounded packet/frame loops, source-exact padding/filter order, float-planar resampling, seek windows, and typed diagnostics. Cancellation and exhaustion at every demux, decode, filter, conversion, and resample boundary publish nothing and retry cleanly.",
+        ["26.2", "28.2", "31.5", "34.4", "36.4", "41.2", "44.1"],
+        ["comfy_media", "comfy_runtime", "comfy_test_support"],
+    )
+    append(
+        "comfy-parity-native-video-source-slice-materialization-foundation",
+        "Retain sealed video sources and immutable slice views",
+        "Generalize canonical encoded VIDEO beyond the fixed H.264 profile while keeping its existing semantic identity byte-stable. Retain sealed bytes and checked probe identity, never a path; add alias-aware immutable trim views with source-exact negative start, nested composition, zero-duration-to-EOF, and strict-duration rules; and extend canonical worker asset collection and decode materialization for LoadVideo and encoded GetVideoComponents without a second asset owner.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+        ],
+        [
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/fixtures/video/source-slice-materialization",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "No path survives prompt compilation. Content replacement, probe changes, and trim changes alter semantic identity; stale references fail closed. Nested and negative slices, zero duration, strict overflow, alias residency, cancellation, cache retry, persistence, and restart recovery are deterministic. Encoded GetVideoComponents uses the canonical decoder while already materialized component VIDEO retains its existing zero-copy path.",
+        ["11.4", "18.1", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1"],
+        ["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+    append(
+        "comfy-parity-native-video-save-remux-audio-effects-foundation",
+        "Save, remux, and publish native video outputs",
+        "Implement source-exact SaveVideo remux and transcode policy over sealed VIDEO. Packet-copy only when container, codec, depth, and no-trim constraints match; otherwise materialize and encode MP4/H.264 at the retained depth, map AAC layouts and exact sample caps, merge source and explicit metadata under the global suppression policy, and delegate nested-prefix preparation, commit, rollback, recovery, and UI projection to the existing output committer.",
+        [
+            "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
+            "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_runtime/src/output_committer.rs",
+        ],
+        [
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
+            "crates/comfy_media/src/video.rs",
+            "crates/comfy_media/src/native_node_payload.rs",
+            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_runtime/src/executor.rs",
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            "crates/comfy_test_support/fixtures/video/save-remux-audio-effects",
+            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/ownership_consolidation.rs",
+            ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
+        ],
+        "The remux/transcode decision matrix, unsupported-stream handling, source-versus-explicit metadata precedence, metadata suppression, mono/stereo/5.1/fallback layout, ceil-derived AAC sample cap, float-planar PTS/flush behavior, and 8/10-bit round trips match source-derived fixtures. Every cancellation, trailer, codec, effect, collision, and recovery failure publishes no partial output; the returned VIDEO aliases the canonical checked source semantics.",
+        ["18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1"],
+        ["comfy_media", "comfy_nodes", "comfy_runtime", "comfy_test_support"],
+    )
+    return tasks
+
+
 def native_video_execution_foundation_task(dependency: str) -> dict[str, object]:
     return task(
         "comfy-parity-native-video-execution-foundation",
@@ -12627,40 +13177,35 @@ def native_video_execution_foundation_task(dependency: str) -> dict[str, object]
             "VAL-RECOVERY-005",
             "VAL-OWNERSHIP-001",
         ],
-        "One canonical native video foundation owns bounded demux, decode, encode, bit-depth metadata, slicing, preview/save effects, and admitted frame-interpolation execution. It supplies source-exact H.264/MP4 compression for LTXV preprocessing and the AV1/VP9 WebM plus ordinary video paths without Python, subprocesses, paths in payloads, or metadata-only model facades.",
+        "Close the canonical native video foundation after the reviewed codec ABI, signed package bootstrap, full demux/decode, sealed source and slice representation, and save/remux/audio/effect phases are complete. Reuse the separately owned concrete frame-interpolation model loader and existing FrameInterpolate execution; this task is validation and ownership closure, not a second codec, model loader, node registry, output committer, or payload owner.",
         [
             "projects/comfy/ComfyUI/comfy_extras/nodes_video.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_frame_interpolation.py",
             "projects/comfy/ComfyUI/comfy_extras/nodes_lt.py",
             "projects/comfy/ComfyUI/comfy_api/latest/_input/video_types.py",
             "projects/comfy/ComfyUI/comfy_api/latest/_input_impl/video_types.py",
+            "crates/comfy_runtime/src/native_video_codec_abi.rs",
+            "crates/comfy_runtime/src/native_video_codec_ffi.rs",
+            "crates/comfy_runtime/src/native_video_codec_service.rs",
             "crates/comfy_media/src/native_node_payload.rs",
-            "crates/comfy_nodes/src/execution.rs",
+            "crates/comfy_model/src/frame_interpolation.rs",
+            "crates/comfy_nodes/src/families/video_01.rs",
             "crates/comfy_runtime/src/output_committer.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
         ],
         [
-            "Cargo.toml",
-            "Cargo.lock",
-            "crates/comfy_media/Cargo.toml",
-            "crates/comfy_media/src/video.rs",
-            "crates/comfy_media/src/native_node_payload.rs",
-            "crates/comfy_media/src/comfy_media.rs",
-            "crates/comfy_model/src/frame_interpolation.rs",
-            "crates/comfy_model/src/native_node_payload.rs",
-            "crates/comfy_model/src/comfy_model.rs",
-            "crates/comfy_nodes/src/execution.rs",
-            "crates/comfy_nodes/src/stored_payload.rs",
-            "crates/comfy_nodes/src/comfy_nodes.rs",
-            "crates/comfy_runtime/src/executor.rs",
-            "crates/comfy_runtime/src/output_committer.rs",
-            "crates/comfy_runtime/src/native_execution_controller.rs",
-            "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/tests/native_video_foundation.rs",
+            "crates/comfy_test_support/fixtures/video/native-video-foundation",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
+            ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/regenerate_native_planning.py",
+            ".agents/specs/comfy-parity/test_regenerate_native_planning.py",
         ],
-        "Source-derived fixtures prove 8/10-bit component identity, checked frame-rate/audio/alpha relationships, lossless slicing metadata, bounded H.264/MP4 and AV1/VP9 WebM codec behavior, exact LTXV compression round-trips, safe nested output prefixes, prepared preview/save rollback and recovery, concrete FILM/RIFE model admission and interpolation, cancellation at bounded codec/model phases, alias-aware residency, and zero partial publication.",
-        [dependency],
+        "Cross-phase fixtures prove production-reachable signed Linux codec startup; source-exact 8/10-bit H.264/MP4 and VP9/AV1 WebM decode/encode; AAC, alpha, rotation, metadata, slicing, remux, LTXV, preview/save, rollback, recovery, cancellation, alias-aware residency, and zero partial publication. Concrete FILM/RIFE publication is imported from the model-loader node owner and its execution from the existing video node adapter. Missing target packages remain explicit unavailable release gates; no fixture key, absent package, or unsupported platform is promoted to production availability.",
+        [
+            dependency,
+            "comfy-parity-native-nodes-model-loaders-comfy-node-0012",
+        ],
         locked=True,
         criterion_ids=["11.4", "18.1", "26.2", "28.2", "31.5", "36.4", "37.5", "41.2", "44.1", "44.3"],
     )
@@ -15945,9 +16490,6 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     node_provider_foundation = native_node_provider_invocation_foundation_task(
         str(audio_empty_segment_foundation["id"])
     )
-    partner_provider_components_foundation = native_partner_provider_components_foundation_task(
-        str(node_provider_foundation["id"])
-    )
     comfy_build_boundary = comfy_opt_in_build_boundary_task(
         str(audio_empty_segment_foundation["id"])
     )
@@ -16040,12 +16582,6 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     text_generation_node_bridge = native_text_generation_node_bridge_task(
         str(text_generation_foundation["id"])
     )
-    partner_provider_components_foundation["dependencies"] = list(
-        dict.fromkeys(
-            list(partner_provider_components_foundation["dependencies"])
-            + [str(text_generation_node_bridge["id"])]
-        )
-    )
     sdpose_heatmap_projection_foundation = (
         native_sdpose_heatmap_projection_foundation_task(
             str(text_generation_node_bridge["id"])
@@ -16080,12 +16616,12 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
     sdpose_foundation = native_sdpose_execution_foundation_task(
         str(sdpose_head_projection_foundation["id"])
     )
-    partner_provider_components_foundation["dependencies"] = list(
-        dict.fromkeys(
-            list(partner_provider_components_foundation["dependencies"])
-            + [str(sdpose_foundation["id"])]
-        )
+    provider_component_tasks = provider_component_foundation_tasks(
+        str(node_provider_foundation["id"]),
+        str(text_generation_node_bridge["id"]),
+        str(sdpose_foundation["id"]),
     )
+    partner_provider_components_foundation = provider_component_tasks[-1]
     media_text_foundation = native_media_text_rendering_foundation_task(
         "comfy-parity-native-nodes-image-detection-comfy-node-0136"
     )
@@ -16374,8 +16910,11 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             str(video_codec_h264_mp4_10bit_thread_bridge_foundation["id"])
         )
     )
-    video_foundation = native_video_execution_foundation_task(
+    video_execution_precursors = native_video_execution_precursor_tasks(
         str(video_component_h264_mp4_10bit_backing_foundation["id"])
+    )
+    video_foundation = native_video_execution_foundation_task(
+        str(video_execution_precursors[-1]["id"])
     )
     detection_foundation = native_detection_execution_foundation_task(
         str(video_foundation["id"])
@@ -16413,30 +16952,6 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         str(shader_foundation["id"]),
         str(detection_foundation["id"]),
     )
-    provider_component_writes = tuple(
-        str(path).rstrip("/")
-        for path in partner_provider_components_foundation["writes"]
-    )
-    for node in nodes:
-        node_accesses = tuple(
-            str(path).rstrip("/")
-            for path in (*node["reads"], *node["writes"])
-        )
-        if any(
-            provider_path == node_path
-            or provider_path.startswith(f"{node_path}/")
-            or node_path.startswith(f"{provider_path}/")
-            for provider_path in provider_component_writes
-            for node_path in node_accesses
-        ):
-            node["dependencies"] = list(
-                dict.fromkeys(
-                    [
-                        *node["dependencies"],
-                        str(partner_provider_components_foundation["id"]),
-                    ]
-                )
-            )
     add_native_node_foundation_mapping(
         node_mapping,
         str(node_schema_foundation["id"]),
@@ -16485,7 +17000,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
             structured_link_foundation,
             shader_foundation,
             node_provider_foundation,
-            partner_provider_components_foundation,
+            *provider_component_tasks,
             decoder_text_generation_foundation,
             prepared_decoder_generation_foundation,
             qwen_image_preparation_foundation,
@@ -16584,6 +17099,7 @@ def all_tasks() -> tuple[list[dict[str, object]], dict[str, list[str]]]:
         video_codec_h264_mp4_10bit_sequence_encode_foundation,
         video_codec_h264_mp4_10bit_thread_bridge_foundation,
         video_component_h264_mp4_10bit_backing_foundation,
+        *video_execution_precursors,
         video_foundation,
         detection_foundation,
         ]
@@ -20259,7 +20775,7 @@ def write_tasks(tasks: list[dict[str, object]], criteria: dict[int, list[str]]) 
         designs = ", ".join(f"D{value}" for value in item["designs"])
         validations = ", ".join(str(value) for value in item["validations"])
         reads = ", ".join(str(value) for value in item["reads"])
-        writes = ", ".join(str(value) for value in item["writes"])
+        writes = ", ".join(str(value) for value in item["writes"]) or "none"
         dependencies = [str(value) for value in item["dependencies"]]
         dependency = ", ".join(dependencies) if dependencies else "none"
         validation_command = f"{validations}; commands: {task_validation_commands(item)}"

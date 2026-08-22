@@ -80,7 +80,7 @@ class ValidationGenerationTests(unittest.TestCase):
             if identifier.startswith("comfy-parity-native-nodes-")
         )
 
-        self.assertEqual(len(tasks), 650)
+        self.assertEqual(len(tasks), 698)
         self.assertEqual(len(node_ids), 102)
         self.assertEqual(tasks_by_id[foundation_id]["dependencies"], [compute_id])
         for identifier in (schema_id, value_id, asset_id, provider_id):
@@ -115,6 +115,162 @@ class ValidationGenerationTests(unittest.TestCase):
                 "comfy-parity-model-detection-any-of-key-selector-consolidation",
             ],
         )
+        clip_task = tasks_by_id["comfy-parity-native-clip-resource-foundation"]
+        self.assertIn("crates/comfy_model/src/clip_tokenizer.rs", clip_task["writes"])
+        self.assertIn(
+            "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
+            clip_task["writes"],
+        )
+        family_task = tasks_by_id[
+            "comfy-parity-native-family-model-resource-foundation"
+        ]
+        self.assertIn(
+            "crates/comfy_sampler/src/native_node_payload.rs", family_task["writes"]
+        )
+        self.assertIn(
+            "crates/comfy_runtime/src/native_execution_controller.rs",
+            family_task["writes"],
+        )
+        video_phases = [
+            "comfy-parity-native-video-codec-general-abi-foundation",
+            "comfy-parity-native-video-codec-package-bootstrap-foundation",
+            "comfy-parity-native-video-demux-decode-foundation",
+            "comfy-parity-native-video-source-slice-materialization-foundation",
+            "comfy-parity-native-video-save-remux-audio-effects-foundation",
+        ]
+        self.assertEqual(
+            tasks_by_id[video_phases[0]]["dependencies"],
+            ["comfy-parity-native-video-component-h264-mp4-10bit-backing-foundation"],
+        )
+        for previous, current in zip(video_phases, video_phases[1:]):
+            self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
+        video_closure = tasks_by_id["comfy-parity-native-video-execution-foundation"]
+        self.assertEqual(
+            video_closure["dependencies"],
+            [
+                video_phases[-1],
+                "comfy-parity-native-nodes-model-loaders-comfy-node-0012",
+            ],
+        )
+        self.assertNotIn("Cargo.toml", video_closure["writes"])
+        self.assertNotIn(
+            "crates/comfy_runtime/src/output_committer.rs", video_closure["writes"]
+        )
+        provider_shared_ids = [
+            "comfy-parity-provider-contract-catalog-closure",
+            "comfy-parity-provider-namespace-binding-projection",
+            "comfy-parity-provider-streaming-component-abi-v2",
+            "comfy-parity-provider-worker-stream-protocol",
+            "comfy-parity-provider-runtime-stream-progress-foundation",
+            "comfy-parity-provider-component-host-stream-adapter",
+            "comfy-parity-provider-worker-stream-bridge",
+            "comfy-parity-provider-deployment-lifecycle",
+            "comfy-parity-provider-hermetic-component-harness",
+        ]
+        provider_vendor_ids = [
+            f"comfy-parity-provider-component-{vendor}"
+            for vendor, _, _, _ in planning.PROVIDER_VENDOR_SPECS
+        ]
+        provider_gate_id = (
+            "comfy-parity-provider-signed-deployment-registry-user-authority-gate"
+        )
+        provider_closure_id = (
+            "comfy-parity-native-partner-provider-components-foundation"
+        )
+        self.assertEqual(len(provider_shared_ids), 9)
+        self.assertEqual(len(provider_vendor_ids), 33)
+        self.assertEqual(len(set(provider_vendor_ids)), 33)
+        self.assertEqual(
+            sum(nodes for _, nodes, _, _ in planning.PROVIDER_VENDOR_SPECS), 224
+        )
+        self.assertEqual(
+            sum(routes for _, _, routes, _ in planning.PROVIDER_VENDOR_SPECS), 217
+        )
+        self.assertEqual(
+            sum(
+                contract["binding_disposition"] == "provider_required"
+                for contract in planning.native_node_contracts()
+            ),
+            224,
+        )
+        self.assertEqual(
+            tasks_by_id[provider_shared_ids[0]]["dependencies"],
+            [
+                provider_id,
+                "comfy-parity-native-text-generation-node-bridge",
+                "comfy-parity-native-sdpose-execution-foundation",
+            ],
+        )
+        for previous, current in zip(provider_shared_ids, provider_shared_ids[1:]):
+            self.assertEqual(tasks_by_id[current]["dependencies"], [previous])
+        for identifier in provider_vendor_ids:
+            self.assertEqual(
+                tasks_by_id[identifier]["dependencies"], [provider_shared_ids[-1]]
+            )
+            self.assertIn(
+                "zed.comfy.provider.", tasks_by_id[identifier]["outcome"]
+            )
+            self.assertNotIn("comfy-node-", tasks_by_id[identifier]["outcome"])
+        vendor_write_sets = [
+            set(tasks_by_id[identifier]["writes"]) for identifier in provider_vendor_ids
+        ]
+        for index, writes in enumerate(vendor_write_sets):
+            for other in vendor_write_sets[index + 1 :]:
+                self.assertTrue(writes.isdisjoint(other))
+        self.assertEqual(
+            set(tasks_by_id[provider_gate_id]["dependencies"]), set(provider_vendor_ids)
+        )
+        self.assertEqual(tasks_by_id[provider_gate_id]["writes"], [])
+        self.assertEqual(
+            tasks_by_id[provider_closure_id]["dependencies"], [provider_gate_id]
+        )
+        self.assertEqual(
+            [
+                identifier
+                for identifier, item in tasks_by_id.items()
+                if provider_closure_id in item["dependencies"]
+            ],
+            [
+                "comfy-parity-native-nodes-partner-three-d-comfy-node-0408",
+                "comfy-parity-native-nodes-partner-three-d-comfy-node-0552",
+                "comfy-parity-native-nodes-partner-three-d-comfy-node-0686",
+                "comfy-parity-native-nodes-partner-three-d-comfy-node-0699",
+                "comfy-parity-native-nodes-partner-audio-comfy-node-0040",
+                "comfy-parity-native-nodes-partner-audio-comfy-node-0627",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0020",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0179",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0199",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0304",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0394",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0511",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0521",
+                "comfy-parity-native-nodes-partner-image-comfy-node-0677",
+                "comfy-parity-native-nodes-partner-text-comfy-node-0041",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0021",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0038",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0222",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0287",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0298",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0383",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0465",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0562",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0732",
+                "comfy-parity-native-nodes-partner-video-comfy-node-0752",
+            ],
+        )
+        for item in [
+            *(tasks_by_id[identifier] for identifier in provider_shared_ids),
+            *(tasks_by_id[identifier] for identifier in provider_vendor_ids),
+            tasks_by_id[provider_gate_id],
+            tasks_by_id[provider_closure_id],
+        ]:
+            paths = [str(path).casefold() for path in (*item["reads"], *item["writes"])]
+            self.assertFalse(any("private-key" in path or "signing-key" in path for path in paths))
+        catalog_outcome = tasks_by_id[provider_shared_ids[0]]["outcome"]
+        catalog_done = tasks_by_id[provider_shared_ids[0]]["done"]
+        self.assertIn("current 217 external-service rows", catalog_outcome)
+        self.assertIn("61 unresolved methods", catalog_done)
+        self.assertIn("zero UNKNOWN", catalog_done)
         for previous, current in zip(
             model_resource_phases, model_resource_phases[1:]
         ):
@@ -838,7 +994,9 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_component_h264_mp4_10bit_backing_foundation_id,
-            tasks_by_id[video_foundation_id]["dependencies"],
+            tasks_by_id[
+                "comfy-parity-native-video-codec-general-abi-foundation"
+            ]["dependencies"],
         )
         codec_certification = tasks_by_id[video_codec_ffi_certification_foundation_id]
         self.assertIn("crates/comfy_runtime/src/trust.rs", codec_certification["writes"])
@@ -1576,7 +1734,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             tasks_by_id[video_foundation_id]["dependencies"],
-            [video_component_h264_mp4_10bit_backing_foundation_id],
+            [
+                "comfy-parity-native-video-save-remux-audio-effects-foundation",
+                "comfy-parity-native-nodes-model-loaders-comfy-node-0012",
+            ],
         )
         self.assertNotIn("Cargo.toml", codec_callable_symbols["writes"])
         self.assertNotIn("Cargo.lock", codec_callable_symbols["writes"])
@@ -1940,7 +2101,10 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             tasks_by_id[video_foundation_id]["dependencies"],
-            [video_component_h264_mp4_10bit_backing_foundation_id],
+            [
+                "comfy-parity-native-video-save-remux-audio-effects-foundation",
+                "comfy-parity-native-nodes-model-loaders-comfy-node-0012",
+            ],
         )
         self.assertIn(
             frame_interpolate_node_foundation_id,
@@ -1978,7 +2142,9 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertIn(
             video_component_h264_mp4_10bit_backing_foundation_id,
-            tasks_by_id[video_foundation_id]["dependencies"],
+            tasks_by_id[
+                "comfy-parity-native-video-codec-general-abi-foundation"
+            ]["dependencies"],
         )
         self.assertTrue(tasks_by_id[rife_sequence_execution_foundation_id]["locked"])
         self.assertTrue(tasks_by_id[film_tensor_average_pool_foundation_id]["locked"])
@@ -2355,9 +2521,15 @@ class ValidationGenerationTests(unittest.TestCase):
         self.assertIn(video_foundation_id, dependencies[video_preprocessor_id])
         self.assertIn(
             "crates/comfy_media/src/video.rs",
-            tasks_by_id[video_foundation_id]["writes"],
+            tasks_by_id["comfy-parity-native-video-demux-decode-foundation"][
+                "writes"
+            ],
         )
         self.assertIn(
+            "crates/comfy_model/src/frame_interpolation.rs",
+            tasks_by_id[video_foundation_id]["reads"],
+        )
+        self.assertNotIn(
             "crates/comfy_model/src/frame_interpolation.rs",
             tasks_by_id[video_foundation_id]["writes"],
         )
@@ -2721,7 +2893,8 @@ class ValidationGenerationTests(unittest.TestCase):
         )
         self.assertEqual(
             waves[video_foundation_id],
-            waves[video_component_h264_mp4_10bit_backing_foundation_id] + 1,
+            waves["comfy-parity-native-video-save-remux-audio-effects-foundation"]
+            + 1,
         )
         self.assertEqual(
             waves[frame_interpolation_sequence_fallback_foundation_id],
