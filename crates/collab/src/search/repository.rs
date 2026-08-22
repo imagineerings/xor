@@ -4,7 +4,7 @@ use collaboration_domain::{
     AuthorizationResourceKind, AuthorizationScope, CommunityMembership, Provenance, SourceRecordId,
     SourceSystem, TenantContext, authorize,
 };
-use nostr_compat::EventId;
+use nostr_compat::{EventId, PublicKey};
 use sea_orm::{
     ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbBackend, DbErr,
     QueryResult, Statement, TransactionTrait,
@@ -54,6 +54,7 @@ WITH search_query AS (
            encode(event.event_id, 'hex') AS source_record_id,
            encode(event.event_id, 'hex') AS source_version,
            event.event_id,
+           event.author_public_key,
            event.kind AS event_kind,
            NULL::text AS document_type,
            event.event_created_at::text AS observed_at_millis,
@@ -72,6 +73,7 @@ WITH search_query AS (
            document.source_record_id,
            document.source_version,
            NULL::bytea AS event_id,
+           NULL::bytea AS author_public_key,
            NULL::integer AS event_kind,
            document.document_type,
            floor(extract(epoch FROM document.source_observed_at) * 1000)::bigint::text
@@ -90,6 +92,7 @@ SELECT record_type,
        source_record_id,
        source_version,
        event_id,
+       author_public_key,
        event_kind,
        document_type,
        observed_at_millis,
@@ -193,6 +196,7 @@ pub struct CollaborationSearchHit {
 pub enum SearchRecordReference {
     SignedEvent {
         event_id: EventId,
+        author_public_key: PublicKey,
         kind: u16,
     },
     CanonicalDocument {
@@ -368,12 +372,20 @@ fn search_hit_from_row(row: QueryResult) -> Result<CollaborationSearchHit, Searc
                 row.try_get("", "event_id")
                     .map_err(|_| SearchRepositoryError::InvalidRecord)?,
             )?;
+            let author_public_key = fixed_public_key(
+                row.try_get("", "author_public_key")
+                    .map_err(|_| SearchRepositoryError::InvalidRecord)?,
+            )?;
             let kind = row
                 .try_get::<i32>("", "event_kind")
                 .ok()
                 .and_then(|kind| u16::try_from(kind).ok())
                 .ok_or(SearchRepositoryError::InvalidRecord)?;
-            SearchRecordReference::SignedEvent { event_id, kind }
+            SearchRecordReference::SignedEvent {
+                event_id,
+                author_public_key,
+                kind,
+            }
         }
         "canonical_document" => {
             let source_system = source_system_from_database(
@@ -398,6 +410,7 @@ fn search_hit_from_row(row: QueryResult) -> Result<CollaborationSearchHit, Searc
                 document_type.as_str(),
                 "profile"
                     | "community"
+                    | "channel"
                     | "project"
                     | "repository"
                     | "task"
@@ -458,6 +471,13 @@ fn fixed_event_id(bytes: Vec<u8>) -> Result<EventId, SearchRepositoryError> {
         .try_into()
         .map_err(|_| SearchRepositoryError::InvalidRecord)?;
     Ok(EventId::from_bytes(bytes))
+}
+
+fn fixed_public_key(bytes: Vec<u8>) -> Result<PublicKey, SearchRepositoryError> {
+    let bytes: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| SearchRepositoryError::InvalidRecord)?;
+    Ok(PublicKey::from_bytes(bytes))
 }
 
 fn source_system_from_database(value: &str) -> Result<SourceSystem, SearchRepositoryError> {

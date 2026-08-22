@@ -79,6 +79,7 @@ fn event_row(rank: f32) -> BTreeMap<String, SeaValue> {
         ("source_record_id".into(), "01".repeat(32).into()),
         ("source_version".into(), "01".repeat(32).into()),
         ("event_id".into(), vec![1_u8; 32].into()),
+        ("author_public_key".into(), vec![2_u8; 32].into()),
         ("event_kind".into(), 9_i32.into()),
         (
             "observed_at_millis".into(),

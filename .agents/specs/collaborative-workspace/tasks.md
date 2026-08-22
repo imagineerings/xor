@@ -1659,41 +1659,49 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 22. Integrate search, native notifications and NIP-PL push
 
-  - [ ] 22.1. Project authorized collaboration content into search
+  - [x] 22.1. Project authorized collaboration content into search
     - Consume authoritative outbox records and update only policy-approved search documents.
     - _Requirements: 9.4, 15.2_
     - _Capability IDs: CAP-015, CAP-030_
     - _Depends on: 16.4, 19.1, 20.3_
-    - _Reads: crates/collab/src/db/collaboration/outbox.rs, crates/collab/migrations/collaboration_search.sql_
-    - _Writes: crates/collab/src/search/indexer.rs_
+    - _Reads: crates/collab/src/db/collaboration/outbox.rs, crates/collab/migrations/20260820000500_collaboration_search.up.sql, projects/buzz/crates/buzz-search/**_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collab/src/search.rs, crates/collab/src/search/indexer.rs, crates/collab/tests/collaboration_search_indexer.rs_
     - _Validation: indexer tests cover edit/delete/retention, DM exclusion and idempotent replay_
+    - _Discovered contradiction (2026-08-22): the planned `collaboration_search.sql` path is stale; Task 16.4 already established the reversible timestamped search migration and prohibited duplicating signed-event transcript content into a second projection. The narrow correction consumes only a strict canonical-document outbox topic into that existing table and includes the minimal module registration, focused integration target and living-spec trace needed to compile and verify the new indexer. Signed-event search remains generated on immutable event authority, and delivery scheduling remains owned by the existing outbox/fan-out adapters._
+    - _Evidence: 2026-08-22 — added a PostgreSQL-only search indexer that resolves the exact authoritative outbox sequence under transaction-local tenant RLS, rejects malformed or unsupported projection contracts and ignores unrelated topics. A closed version-one payload accepts bounded community-visible canonical documents or content-free excluded tombstones for delete, retention expiry, restricted visibility and direct-message cases. The durable outbox sequence fences each document update and its big-endian projection cursor; conditional upserts suppress duplicate and delayed replay, preserve deletion floors and commit a clean `collaboration_search` checkpoint atomically with each accepted change. Four focused integration tests cover ordered edits, delete and retention tombstones, direct-message exclusion without private content and idempotent replay without a second checkpoint. The collab library check, Rust formatting, diff hygiene, Buzz inventory validation through the supplied external checkout and canonical spec validation passed. The required all-target release Clippy wrapper remains blocked before this leaf by the pre-existing unused `EmptyView` and `AppContext` imports in `crates/language_model/src/fake_provider.rs`._
 
-  - [ ] 22.2. Implement collaboration search queries
+  - [x] 22.2. Implement collaboration search queries
     - Query authorized community, channel, member, project and message result classes with freshness metadata.
     - _Requirements: 6.3, 9.4_
     - _Capability IDs: CAP-015_
     - _Depends on: 16.5, 22.1_
     - _Reads: crates/collab/src/search/{repository,indexer}.rs_
-    - _Writes: crates/collab/src/search/query.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collab/migrations/20260822000100_collaboration_search_channels.{up,down}.sql, crates/collab/src/search.rs, crates/collab/src/search/{query,repository,indexer}.rs, crates/collab/tests/{collaboration_search_query,collaboration_search_repository}.rs_
     - _Validation: query tests apply policy before rank/limit and return stable result identities_
+    - _Discovered contradiction (2026-08-22): Task 16.4's canonical-document schema and Task 22.1's strict outbox contract omitted `channel`, so a query-only facade could declare but never return one of this leaf's required result classes. Signed profile hits also lacked the author key needed for a stable replaceable-member identity. The narrow correction adds one reversible derived-projection constraint extension, admits channel documents through the existing strict indexer contract and carries the already-authoritative event author through repository references; it does not create a channel, profile or message authority or copy indexed content into results._
+    - _Evidence: 2026-08-22 — added a typed query facade over the existing policy-first repository for community, channel, member, project, message and additional canonical resource classes. Canonical identities bind class plus source system/record while deliberately ignoring source version, replaceable signed profiles bind the author public key and messages bind the immutable event ID; results retain only refetch references, rank, observation time, page and current/lagging/unavailable projection freshness. A reversible derived-schema extension admits channel documents, with rollback temporarily relaxing owner bypass only long enough to remove rebuildable channel rows before restoring forced RLS and the prior constraint. Three focused query tests prove denied requests perform zero database work, visibility policy precedes rank and limit, all five required classes are returned, canonical/member identity survives version/event replacement and freshness is preserved. Adjacent repository and indexer suites passed 4/4 each, and the collab library check, warning-denied focused library Clippy, Rust formatting, dependency boundary, Buzz inventory, diff hygiene and canonical spec gates passed. The required all-target release Clippy wrapper remains blocked before this leaf by pre-existing unused `EmptyView` and `AppContext` imports in `crates/language_model/src/fake_provider.rs`._
 
-  - [ ] 22.3. Compose collaboration results in native search UI
+  - [x] 22.3. Compose collaboration results in native search UI
     - Add typed collaboration groups alongside existing file/project search with scope and freshness labels.
     - _Requirements: 4.4, 9.4_
     - _Capability IDs: CAP-015, CAP-036_
     - _Depends on: 22.2_
     - _Reads: crates/search/src/**, crates/collab/src/search/query.rs_
-    - _Writes: crates/search/src/collaboration_search.rs_
-    - _Validation: `cargo test -p search collaboration_search` covers keyboard flow, empty, stale and unauthorized results_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/search/src/search.rs, crates/search/src/collaboration_search.rs, crates/search/tests/collaboration_search.rs_
+    - _Validation: `cargo test -p search --test collaboration_search -- --nocapture` covers keyboard flow, empty, stale and unauthorized results_
+    - _Discovered contradiction (2026-08-22): a standalone source file cannot compile, expose its GPUI boundary or run the named scenarios without crate-root registration and an integration target. Making desktop `search` depend directly on server-oriented `collab` would also pull persistence and infrastructure dependencies across the approved boundary. The narrow correction keeps canonical refetch, authorization and query execution in the upper collaboration adapter and accepts only reference-safe presentation rows; native search owns grouping and interaction but no collaboration authority or content store. The generic crate-filter command is blocked before selecting this leaf's tests by two pre-existing `tests` modules in `crates/search/src/text_finder/delegate.rs`, so the exact isolated target proves this leaf without modifying unrelated code._
+    - _Evidence: 2026-08-22 — added a native GPUI collaboration-search view that stably groups existing file/project rows with typed community, channel, member, collaborative-project, message, repository, task, agent, workflow and media rows. Authorized presentation state renders an explicit community scope and current, lagging or unavailable freshness; empty and unauthorized states expose no collaboration rows, with malformed cross-class inputs filtered closed. Next/previous actions wrap through the combined result order, confirmation emits the stable native or collaboration identity and refresh preserves selection across label/version changes. Four focused tests passed, and the keyboard flow passed 20 deterministic GPUI scheduler seeds. The search library check, warning-denied focused library Clippy, Rust formatting, dependency boundary, Buzz inventory, diff hygiene and canonical spec gates passed. The required all-target release Clippy wrapper remains blocked before this leaf's test target by the pre-existing duplicate `tests` module in `crates/search/src/text_finder/delegate.rs`._
 
-  - [ ] 22.4. Define notification eligibility and deduplication policy
+  - [x] 22.4. Define notification eligibility and deduplication policy
     - Decide native/push eligibility from mentions, membership, mute, read state, device permissions and stable source IDs.
     - _Requirements: 9.5_
     - _Capability IDs: CAP-016_
     - _Depends on: 18.3, 21.1_
     - _Reads: projects/buzz/desktop/src/features/notifications/**, crates/notifications/**_
-    - _Writes: crates/collaboration_domain/src/notification_policy.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/collaboration_domain.rs, crates/collaboration_domain/src/notification_policy.rs_
     - _Validation: policy table tests cover self, mute, read, duplicate, revoked and private events_
+    - _Discovered contradiction (2026-08-22): the planned standalone policy file cannot compile or expose its domain API without crate-root registration, and Buzz's bounded local-storage seen set cannot be adopted as canonical cross-device deduplication authority. The narrow correction defines a pure stable-key policy with a caller-supplied delivered lookup; native and later durable push adapters retain their approved storage and record only successful deliveries. The policy accepts current typed membership/privacy/read/permission snapshots and owns no content, persistence, transport or permission prompt._
+    - _Evidence: 2026-08-22 — added a content-free notification candidate and stable delivery identity keyed by community, canonical source system/record, recipient and native/push surface. Common gates require current active community and applicable channel membership bound to the exact tenant, recipient and channel, then require private participation, suppress self-authored and already-read work and fail closed when read state is unavailable. Personal mute suppresses ordinary activity while preserving Buzz's mention override only after access checks. Native and push permissions resolve independently across granted, disabled, denied, revoked and unsupported states; a caller-supplied canonical lookup suppresses only the already-delivered surface, and source records are redacted from diagnostics. Six focused tests passed, including a policy table for self, mute, read, duplicate, revoked and private events plus stable-source identity and permission behavior; the full collaboration-domain suite passed 102/102. The library check, required all-target release Clippy wrapper with warnings denied, Rust formatting, diff hygiene, collaboration dependency boundary, Buzz inventory and canonical spec validation passed. Commit: enclosing checkpoint commit, reported after creation._
 
   - [ ] 22.5. Dispatch native desktop notifications
     - Convert eligible records to existing native notifications and navigate safely to canonical entities.

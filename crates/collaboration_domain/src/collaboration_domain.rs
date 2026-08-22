@@ -10,6 +10,7 @@ pub mod identity_types;
 pub mod membership;
 pub mod message;
 pub mod message_marker;
+pub mod notification_policy;
 pub mod presence;
 pub mod principal;
 pub mod profile;
@@ -76,6 +77,12 @@ pub use message::{
 pub use message_marker::{
     MarkerCommandOutcome, MarkerError, MarkerMutation, MarkerMutationKind, MarkerRecordFields,
     MarkerView, MessageMarkers,
+};
+pub use notification_policy::{
+    NotificationCandidate, NotificationDecision, NotificationDeliveryId,
+    NotificationDevicePermissions, NotificationMembership, NotificationPermission,
+    NotificationPrivacy, NotificationReadState, NotificationReason, NotificationSourceId,
+    NotificationSuppression, NotificationSurface, NotificationSurfaceDecision, decide_notification,
 };
 pub use presence::{
     MAX_ROOM_PRESENCE_TTL_MILLIS, MAX_SIGNED_PRESENCE_TTL_MILLIS, PresenceError,
