@@ -8119,6 +8119,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "git_credential_nostr"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "core-foundation 0.10.0",
+ "core-foundation-sys",
+ "nostr",
+ "oo7",
+ "serde_json",
+ "smol",
+ "thiserror 2.0.17",
+ "windows 0.61.3",
+ "zeroize",
+]
+
+[[package]]
 name = "git_hosting_providers"
 version = "0.1.0"
 dependencies = [
