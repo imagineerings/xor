@@ -14,6 +14,7 @@ pub mod principal;
 pub mod profile;
 pub mod provenance;
 pub mod reaction;
+pub mod read_state;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
@@ -91,6 +92,10 @@ pub use provenance::{
 pub use reaction::{
     ActiveReaction, ReactionCommandOutcome, ReactionError, ReactionGroup, ReactionMutation,
     ReactionMutationKind, ReactionRecordFields, ReactionSet, ReactionValue,
+};
+pub use read_state::{
+    ManualUnreadRegister, ManualUnreadState, OwnerReadStateReplica, ReadContextId, ReadState,
+    ReadStateCompleteness, ReadStateError, ReadStateScope,
 };
 pub use scheduled_message::{
     DueClaim, ScheduleCommandOutcome, ScheduleError, ScheduleMutation, ScheduleMutationKind,

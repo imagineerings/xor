@@ -1591,14 +1591,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 21. Merge read state, reminders, drafts, presence and typing
 
-  - [ ] 21.1. Implement encrypted read and manual-unread state
+  - [x] 21.1. Implement encrypted read and manual-unread state
     - Merge cross-device frontiers and manual overrides under NIP-RS ordering and privacy rules.
     - _Requirements: 9.3_
     - _Capability IDs: CAP-013_
     - _Depends on: 11.9, 19.5_
     - _Reads: projects/buzz/docs/nips/NIP-RS.md, crates/channel/src/**_
-    - _Writes: crates/collaboration_domain/src/read_state.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, Cargo.lock, crates/collaboration_domain/Cargo.toml, crates/collaboration_domain/src/{collaboration_domain,read_state}.rs_
     - _Validation: property tests cover monotonic frontier, override, tombstone and concurrent devices_
+    - _Discovered contradiction (2026-08-22): the planned standalone domain file cannot compile, expose its public aggregate or run genuine property tests without crate-root registration and the workspace's existing test-only `proptest` dependency, so the narrow write set includes those manifest/lock/root changes and living-spec trace. NIP-44 encryption/decryption, encrypted wire parsing, relay full-state enumeration/fencing, persistence and key custody remain with their approved adapter and service owners; the domain accepts only explicitly owner-bound decrypted replicas and does not add a second codec or crypto implementation._
+    - _Evidence: 2026-08-22 — added a community-and-owner-scoped read-state aggregate whose debug surfaces redact contexts and whose reads, mutations and replica joins reject foreign principals or communities. Owner-decrypted replicas normalize duplicate frontiers/registers by componentwise maximum, require manual overrides to remain co-located with their frontiers and enforce the NIP-RS context bounds. Complete-load state advances monotone channel/thread/message frontiers, folds optional parent frontiers, applies clear-wins manual-unread actions, preserves natural frontier progress when counters are exhausted, and emits only live triples or permanent counter-floor tombstones; potentially incomplete loads remain readable but cannot mutate or publish. Four generated property families cover frontier monotonicity, override semilattice laws, tombstone resurrection resistance and concurrent-device delivery order, with focused unit cases for completeness, privacy, hierarchy, canonical publication, exhaustion and debug redaction. Eight focused tests and the full 85-test collaboration-domain suite passed, as did warning-denied release all-target/all-feature Clippy, the focused crate check, Rust formatting, dependency-boundary and inventory validation, spec validation and diff hygiene. Commit: enclosing leaf commit, reported after creation._
 
   - [ ] 21.2. Persist local drafts without server authority
     - Key drafts by canonical community/channel/thread identity and retain them through offline/restart transitions.
