@@ -5,6 +5,7 @@ pub mod channel;
 pub mod channel_invite;
 pub mod channel_metadata;
 pub mod community;
+pub mod dm;
 pub mod identity_types;
 pub mod membership;
 pub mod message;
@@ -52,6 +53,10 @@ pub use community::{
     Community, CommunityCommandContext, CommunityCommandOutcome, CommunityCreateFields,
     CommunityError, CommunityHost, CommunityIcon, CommunityIconUpdate, CommunityJoinPolicy,
     CommunityLifecycleState, CommunityRecordFields, CommunityUpdate, JoinPolicyVersion,
+};
+pub use dm::{
+    DirectMessage, DmCommandOutcome, DmError, DmLifecycleState, DmMutation, DmMutationKind,
+    DmOpenFields, DmParticipantState, DmRecordFields, MAX_DM_PARTICIPANTS, MIN_DM_PARTICIPANTS,
 };
 pub use identity_types::{
     AggregateId, AggregateType, CommunityId, OperationId, PrincipalId, ScopedAggregateId,

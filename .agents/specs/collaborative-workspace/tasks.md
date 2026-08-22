@@ -1534,23 +1534,27 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 20. Port encrypted DMs and visibility projections
 
-  - [ ] 20.1. Implement gift-wrap DM codec and privacy gates
+  - [x] 20.1. Implement gift-wrap DM codec and privacy gates
     - Parse, validate and emit supported encrypted DM envelopes without exposing plaintext to indexing/logging paths.
     - _Requirements: 5.3, 9.1, 19.2_
     - _Capability IDs: CAP-012_
     - _Depends on: 11.9, 12.6_
     - _Reads: projects/buzz/docs/nips/NIP-DV.md, projects/buzz/crates/buzz-db/src/dm.rs_
-    - _Writes: crates/nostr_compat/src/dm.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/nostr_compat/src/{dm,nostr_compat}.rs_
     - _Validation: codec tests cover round trip, wrong recipient, malformed wrap and plaintext redaction_
+    - _Discovered contradiction (2026-08-22): the planned standalone `dm.rs` cannot compile or expose its codec without crate-root registration, and the leaf's required living-documentation evidence adds the specification paths. The named Buzz sources define DM persistence and NIP-DV's gift-wrap privacy relationship but do not implement NIP-44 key custody; Buzz's published compatibility posture supports only the opaque NIP-59 kind-1059 outer envelope. The narrow implementation therefore validates and emits that signed outer envelope, keeps NIP-44 ciphertext opaque and redacted, and supplies filter/result/search gates without claiming encryption, decryption, membership or persistence authority._
+    - _Evidence: 2026-08-22 — added a pure `nostr_compat::dm` boundary that verifies the signed kind-1059 event before inspecting it, requires exactly one canonical `p` recipient, validates canonical bounded NIP-44 v2 ciphertext and round-trips the opaque outer envelope without accepting plaintext or keys. Kindless and gift-wrap-capable filters require exactly one authenticated self-`#p`; parsed results independently reject a different reader; indexing is unconditionally excluded; and custom debug output redacts both the encoded ciphertext and a decoded marker. Five focused codec/privacy tests passed for round trip, wrong recipient across filter/result gates, malformed tags/ciphertext/signature and plaintext/ciphertext redaction. The complete `nostr_compat` package passed 54 library tests, four independent Buzz-NIP integration tests and doc tests; warning-denied release all-target/all-feature Clippy, the collaboration dependency-boundary checker, repository formatting and diff hygiene passed; the canonical feature-spec validator retained 84 acceptance criteria and 385 tasks with advisory warnings only. The external Buzz checkout was linked only temporarily to satisfy the existing compile-time fixture path and was removed after validation._
 
-  - [ ] 20.2. Implement DM group lifecycle
+  - [x] 20.2. Implement DM group lifecycle
     - Add open, participant add/remove, leave and reopen transitions with participant-only authority.
     - _Requirements: 6.2, 9.1_
     - _Capability IDs: CAP-010, CAP-012_
     - _Depends on: 18.3, 20.1_
     - _Reads: projects/buzz/crates/buzz-db/src/dm.rs, crates/collaboration_domain/src/membership.rs_
-    - _Writes: crates/collaboration_domain/src/dm.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/{collaboration_domain,dm}.rs_
     - _Validation: state tests cover legal membership changes, stale versions and outsider denial_
+    - _Discovered contradiction (2026-08-22): the planned standalone `dm.rs` cannot compile, expose its aggregate or run focused tests without crate-root registration, and the living-documentation requirement adds the specification paths. Buzz persists each changed participant set as a new immutable compatibility channel, while the approved leaf explicitly requires canonical add/remove/leave/reopen transitions. The canonical aggregate therefore retains versioned participant history without mutating Buzz source rows; the later protocol/service adapter remains responsible for mapping compatible participant-set representations, and Task 20.3 separately owns per-viewer hide/reopen presentation state._
+    - _Evidence: 2026-08-22 — added a UI- and I/O-free `DirectMessage` aggregate with two-to-nine-member open validation, active/left/removed participant states, open/closed lifecycle derivation and a bounded immutable mutation history. Initial open passes the common community write policy and requires the authenticated subject in the participant set; add, remove and leave pass the common channel policy plus an exact active-participant check; self-removal is forced through leave; a voluntary leaver may reopen under current community authorization, while an involuntarily removed participant cannot self-rejoin. Applied commands advance exactly one version, stale or denied commands leave state byte-for-byte unchanged, and hydration rejects noncontiguous, illegal or state-divergent history. Five focused tests passed for legal add/remove/leave/reopen transitions, contiguous versions and hydration, stale-command atomicity, outsider/removed-participant denial, participant bounds, self-removal, idempotent active-add behavior and persisted-state/history divergence. The complete collaboration-domain suite passed 77/77; warning-denied release all-target/all-feature Clippy, the collaboration dependency-boundary checker, repository formatting and diff hygiene passed; the canonical feature-spec validator retained 84 acceptance criteria and 385 tasks with advisory warnings only._
 
   - [ ] 20.3. Persist per-viewer DM visibility
     - Store relay-signed hide/reopen state separately from message deletion and enforce it before counts/results.
