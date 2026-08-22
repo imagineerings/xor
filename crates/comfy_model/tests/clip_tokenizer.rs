@@ -27,11 +27,11 @@ use std::{
 const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     (
         "crates/comfy_model/src/clip.rs",
-        "82150391c0c32d64137fcd1b66e2323bca4f7110160dc1895bb03fe70172d7b5",
+        "5b352acd5c5d7b545082d238a7edbbf22d1eb50b95ada014be475fc4ad3ef0f8",
     ),
     (
         "crates/comfy_model/src/clip_tokenizer.rs",
-        "39b1c42deae3d97400b2696f6d58e0893a9f29ccad7a8769b887c279c3fdfc13",
+        "ebd3ec384e2d7a1a7334530f05ffa2726ed2b255f0c97e5019147fb6173ba8ee",
     ),
     (
         "crates/comfy_model/src/formats.rs",

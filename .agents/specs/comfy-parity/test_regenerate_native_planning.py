@@ -121,6 +121,10 @@ class ValidationGenerationTests(unittest.TestCase):
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             clip_task["writes"],
         )
+        self.assertIn("crates/comfy_model/src/model_family.rs", clip_task["writes"])
+        self.assertIn(
+            "crates/comfy_model/src/native_node_payload.rs", clip_task["writes"]
+        )
         family_task = tasks_by_id[
             "comfy-parity-native-family-model-resource-foundation"
         ]

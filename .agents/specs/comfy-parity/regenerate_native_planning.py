@@ -9055,10 +9055,12 @@ def native_model_resource_precursor_tasks(
             "crates/comfy_model/src/clip_text_encoder_multimodal.rs",
             "crates/comfy_model/src/clip_text_encoder_t5.rs",
             "crates/comfy_model/src/clip_tokenizer.rs",
+            "crates/comfy_model/src/model_family.rs",
+            "crates/comfy_model/src/native_node_payload.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
         ],
-        "Pinned SD1, SDXL, SD3, PixArt, Lumina, HiDream, Qwen, and Gemma fixtures retain exact ordered tokenizer and encoder components, source options, pooled and scheduled outputs, digest, residency, persistence, and restart behavior. Every typed text-encoder owner reconstructs from checked named MappedModelWeights; schedule windows are private materializations derived by applying each exact PatchGraph to retained base weights before reconstruction and encoding. Scheduled fixtures preserve clone semantics, independent schedule enablement, ordered keyframe windows, clip start/end metadata, and exact hook metadata without caller-supplied patched components or an identity-only patch binding. Missing files, incompatible component families, invalid options, malformed vocabularies or weights, patch or schedule drift, OOM, cancellation, and stale handles publish no CLIP resource.",
+        "Pinned SD1, SDXL, SD3, PixArt, Lumina, HiDream, Qwen, and Gemma fixtures retain exact ordered tokenizer and encoder components, source options, pooled and scheduled outputs, digest, residency, persistence, and restart behavior. Every typed text-encoder owner reconstructs from checked named MappedModelWeights; the canonical MappedModelWeights owner exposes stable alias-aware allocation parts for its retained tensor maps, unexpected-key slice, binding, strings, and structural storage so CLIP residency never guesses BTreeMap layout or capacity. Schedule windows are private materializations derived by applying each exact PatchGraph to retained base weights before reconstruction and encoding. Scheduled fixtures preserve clone semantics, independent schedule enablement, ordered keyframe windows, clip start/end metadata, and exact hook metadata without caller-supplied patched components or an identity-only patch binding. Missing files, incompatible component families, invalid options, malformed vocabularies or weights, patch or schedule drift, OOM, cancellation, and stale handles publish no CLIP resource.",
     )
     append(
         "comfy-parity-native-vae-resource-foundation",
