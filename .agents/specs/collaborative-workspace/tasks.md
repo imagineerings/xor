@@ -1885,14 +1885,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 - [ ] 24. Bind Zed projects and repositories to NIP-MP metadata
 
-  - [ ] 24.1. Define signed project-group metadata
+  - [x] 24.1. Define signed project-group metadata
     - Model NIP-MP project identity, visibility and repository coordinates without local filesystem authority.
     - _Requirements: 10.1_
     - _Capability IDs: CAP-018_
     - _Depends on: 11.10, 18.2_
-    - _Reads: projects/buzz/docs/nips/NIP-MP.md, crates/project/src/project.rs_
-    - _Writes: crates/collaboration_domain/src/project_group.rs_
+    - _Reads: projects/buzz/docs/nips/NIP-MP.md, crates/nostr_compat/src/buzz_nips/project_workflow.rs, crates/project/src/project.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collaboration_domain/src/{collaboration_domain,project_group}.rs_
     - _Validation: domain tests cover multi-repository, cross-owner, visibility and invalid coordinate cases_
+    - _Discovered contradiction (2026-08-22): Task 11.10 already installed the signed NIP-MP event parser and exact wire grammar in `nostr_compat`, so duplicating signature/event/tag parsing in the domain would create a second protocol owner. The narrow domain boundary instead consumes adapter-verified signed metadata, while a standalone module requires crate-root registration and living-spec trace to compile and expose it. NIP-MP is explicitly global-only and permits unresolved cross-owner coordinates, whereas Zed's existing `Project` owns local worktrees and filesystem state; the model therefore retains signed global container metadata without a community, local path or repository authority and leaves tenant persistence/binding to Task 24.3._
+    - _Evidence: 2026-08-22 — added a pure signed project-group model whose stable identity is the Nostr signer plus bounded nonempty slug and whose source retains the signed event identity/time. Bounded name/description/channel metadata, exact unlisted-only visibility and zero-member groups match NIP-MP. Up to 64 NIP-34 coordinates preserve each repository owner, verbatim colon-bearing discriminator and opaque relay hint, sort deterministically and reject duplicate identity even with different hints; malformed kind, owner grammar, empty discriminator and oversized values fail closed. Cross-owner fixtures prove the project signer remains distinct from each member owner, and the public model exposes no local filesystem, worktree, remote, push or permission authority. Three focused fixtures and the full 126-test domain suite passed, as did release all-target/all-feature warning-denied Clippy. Dependency, inventory, specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 24.2. Add stable collaboration repository identity
     - Map local repository identity to hosted coordinates and preserve remotes/worktrees as Zed-owned state.

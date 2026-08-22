@@ -18,6 +18,7 @@ pub mod notification_policy;
 pub mod presence;
 pub mod principal;
 pub mod profile;
+pub mod project_group;
 pub mod provenance;
 pub mod push_lease;
 pub mod reaction;
@@ -122,6 +123,11 @@ pub use profile::{
     OwnerAttestationEvidence, ProfileError, ProfileKind, ProfileMetadata, ProfileRecordFields,
     ProfileStatus, ProfileStatusKind, RelayArchiveRecord, RelayArchiveStatus, SocialList,
     SocialListKind, SocialReference, validate_profile_update,
+};
+pub use project_group::{
+    ProjectChannelReference, ProjectDescription, ProjectDisplayName, ProjectGroup,
+    ProjectGroupError, ProjectGroupIdentity, ProjectGroupRecordFields, ProjectSlug,
+    ProjectVisibility, RepositoryCoordinate,
 };
 pub use provenance::{
     AggregateVersion, IntegrityAlgorithm, IntegrityReference, Provenance, SourceRecordId,
