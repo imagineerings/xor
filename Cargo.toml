@@ -288,6 +288,7 @@ members = [
     #
 
     "tools/git_credential_nostr",
+    "tools/git_sign_nostr",
     "tooling/compliance",
     "tooling/perf",
     "tooling/xtask",

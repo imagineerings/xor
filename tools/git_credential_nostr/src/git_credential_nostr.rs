@@ -33,11 +33,11 @@ impl StoredCredential {
         Self { username, secret }
     }
 
-    fn username(&self) -> &str {
+    pub fn username(&self) -> &str {
         &self.username
     }
 
-    fn secret(&self) -> &[u8] {
+    pub fn secret(&self) -> &[u8] {
         &self.secret
     }
 }
