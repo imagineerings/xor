@@ -3639,6 +3639,7 @@ dependencies = [
  "channel",
  "chrono",
  "client",
+ "collaboration_domain",
  "collections",
  "db",
  "editor",
@@ -3664,6 +3665,7 @@ dependencies = [
  "title_bar",
  "ui",
  "util",
+ "uuid",
  "workspace",
  "zed_actions",
 ]
