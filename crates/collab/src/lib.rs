@@ -6,6 +6,7 @@ pub mod entities;
 pub mod env;
 pub mod executor;
 pub mod freshness;
+pub mod git;
 pub mod identity;
 pub mod messages;
 pub mod migration;

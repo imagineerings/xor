@@ -2029,7 +2029,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: tools/git_sign_nostr/Cargo.toml, tools/git_sign_nostr/src/*_
     - _Validation: helper tests cover sign/verify, locked keyring, altered object, redaction and exact exit codes_
 
-  - [ ] 25.10. Implement hosted repository registry and permission checks
+  - [x] 25.10. Implement hosted repository registry and permission checks
     - Read/write hosted repository records and evaluate explicit grants before object or HTTP access.
     - _Requirements: 6.2, 10.2_
     - _Capability IDs: CAP-005, CAP-019_
@@ -2037,6 +2037,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/migrations/collaboration_git.sql, crates/collaboration_domain/src/authorization.rs_
     - _Writes: crates/collab/src/git/repository_registry.rs_
     - _Validation: repository tests cover tenant, permission, rename, archive and external-host coexistence_
+    - _Discovered contradiction (2026-08-22): Task 25.3 established the approved Git schema as the timestamped reversible `20260822000400_collaboration_git.{up,down}.sql` pair, so the unversioned migration read path does not exist. The planned nested implementation file also cannot compile without Zed's required non-`mod.rs` module root, and the runtime behaviors cannot be proven by that production file alone. The narrow correction reads the canonical migration pair, adds `crates/collab/src/git.rs` plus the existing library export and adds one focused integration target; it introduces no object storage, HTTP or credential behavior owned by later leaves._
+    - _Evidence: 2026-08-22 — added a PostgreSQL hosted repository registry that admits only exact repository-shaped `git:read`, `git:write` or `git:admin` requests allowed by the common authorization policy, resolves scoped tokens to their canonical subject and performs the active-grant check in the same tenant-bound transaction as each read or mutation. Creation atomically installs the creator's explicit admin grant; permission hierarchy, active-member grant/regrant, revocation, optimistic rename and atomic archive are closed operations, while external-provider records retain independent authority without a storage handle or credential. Two focused tests passed pre-I/O tenant/scope denial and the full live lifecycle; an isolated PostgreSQL 14 run under a non-bypass RLS login proved exact permission denial, stable-ID rename, stale-version rejection, grant revocation, archive denial and Sim-hosted/external-provider coexistence. Warning-denied release Clippy passed for the focused target with dependencies excluded; the known unchanged `language_model/src/fake_provider.rs` imports remain the full-script baseline blocker recorded in Task 25.3. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 26. Implement branch-as-channel linkage
 
