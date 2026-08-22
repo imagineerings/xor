@@ -1953,7 +1953,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-22): the approved Buzz read path `projects/buzz/crates/buzz-core/src/git.rs` does not exist. The registered Git kind constants remain in `buzz-core/src/kind.rs`, while the actual repository announcement, coordinate and status builders plus their validation fixtures live in `buzz-sdk/src/builders.rs`; Buzz has no repository-state builder. The port therefore reads those actual sources and the canonical NIP-34 grammar without changing the task's approved ownership or introducing a second Git/ref authority._
     - _Evidence: 2026-08-22 — added a pure `nostr_compat` codec for kind-30617 repository announcements, exact kind-30617 coordinates and subordinate references, kind-30618 repository ref state and kinds 1630–1633 status events. Frozen vectors round-trip multi-value web/clone/relay tags, maintainers, SHA-1 refs, symbolic HEAD, opaque future tags, repository/status coordinates and applied/merged references; negative vectors reject malformed coordinates, unsafe refs and status-only metadata on the wrong kind. The full crate suite passed 59 unit and four integration tests, and `./script/clippy -p nostr_compat` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 25.2. Implement NIP-34 patch, PR and issue codecs
+  - [x] 25.2. Implement NIP-34 patch, PR and issue codecs
     - Encode and validate patches, pull requests, issues, comments and status references.
     - _Requirements: 5.1, 10.2_
     - _Capability IDs: CAP-019, CAP-020_
@@ -1961,8 +1961,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-core/src/git.rs, projects/buzz/docs/nips/NIP-GS.md_
     - _Writes: crates/nostr_compat/src/nip34_collaboration.rs_
     - _Validation: golden fixtures cover patch series, revisions, issue links and invalid ancestry_
+    - _Discovered contradiction (2026-08-22): `projects/buzz/crates/buzz-core/src/git.rs` does not exist, and the listed NIP-GS document specifies local commit/tag signing rather than NIP-34 forge events. The actual Buzz patch, issue, status, pull-request and PR-update builders plus their tests live in `buzz-sdk/src/builders.rs`; Buzz has no Git-scoped NIP-22 comment builder. The port therefore uses those real builders with canonical NIP-34/NIP-22 grammars, while leaving NIP-GS execution to its separately planned signing-helper leaf 25.9._
+    - _Evidence: 2026-08-22 — added pure kind-1617 patch, kind-1618 pull-request, kind-1619 update, kind-1621 issue and Git-scoped kind-1111 comment codecs over the canonical repository coordinate/object-ID types. Frozen vectors round-trip patch roots and revisions, SHA-1/SHA-256 commit metadata, PR fetch locations/branch/channel/base, PR-update roots, issues, top-level and nested comment links and bounded future tags. Negative vectors reject conflicting patch ancestry, mismatched comment roots, missing repository-owner links and stale status targets; status linkage checks exact root, author recipient and optional repository identity without deciding authorization. The full crate suite passed 64 unit and four integration tests, and `./script/clippy -p nostr_compat` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 25.3. Add hosted repository and permission schema
+  - [x] 25.3. Add hosted repository and permission schema
     - Create hosted coordinates, storage handles and explicit read/write/admin grant tables under ADR-003.
     - _Requirements: 6.2, 10.2_
     - _Capability IDs: CAP-005, CAP-019_
@@ -1970,6 +1972,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: projects/buzz/crates/buzz-relay/src/git/**, crates/git_hosting_providers/**_
     - _Writes: crates/collab/migrations/collaboration_git.sql_
     - _Validation: migration tests cover tenant fences, grant uniqueness, archive and rollback_
+    - _Discovered contradiction (2026-08-22): the planned unversioned `collaboration_git.sql` path is incompatible with the existing SQLx reversible-migration authority, whose immutable history requires a unique timestamped `.up.sql`/`.down.sql` pair. The write set also omitted the focused integration fixture needed to execute tenant RLS, uniqueness and rollback rather than inspect SQL text. The narrow correction adds `20260822000400_collaboration_git.{up,down}.sql` and one migration-only test target; it changes no runtime repository or authorization behavior reserved for Task 25.10._
+    - _Evidence: 2026-08-22 — added community-fenced hosted repository, opaque Zed-hosted storage-handle and exact read/write/admin grant tables under ADR-003. Stable repository IDs preserve rename identity; kind-30617 owner/discriminator uniqueness, one complete Sim-hosted-or-external authority tuple, explicit grantor/grantee memberships, optimistic versions, lifecycle timestamps and non-cascading rollback are enforced without project/channel authority, credentials, remotes or local paths. Four focused static/checksum tests passed, and an isolated PostgreSQL 14 run passed the live non-bypass-RLS scenario for cross-tenant invisibility and insert denial, exact grant uniqueness, valid revoke/archive transitions and complete rollback. Warning-denied release Clippy passed for the focused target with dependencies excluded; the full crate script remains blocked by two pre-existing unused imports in `language_model/src/fake_provider.rs`, which this task did not modify. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 25.4. Implement content-addressed Git object storage adapter
     - Read/write objects and refs with tenant/repository fencing, atomic ref updates and integrity verification.
@@ -2025,7 +2029,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: tools/git_sign_nostr/Cargo.toml, tools/git_sign_nostr/src/*_
     - _Validation: helper tests cover sign/verify, locked keyring, altered object, redaction and exact exit codes_
 
-  - [ ] 25.10. Implement hosted repository registry and permission checks
+  - [x] 25.10. Implement hosted repository registry and permission checks
     - Read/write hosted repository records and evaluate explicit grants before object or HTTP access.
     - _Requirements: 6.2, 10.2_
     - _Capability IDs: CAP-005, CAP-019_
@@ -2033,6 +2037,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/collab/migrations/collaboration_git.sql, crates/collaboration_domain/src/authorization.rs_
     - _Writes: crates/collab/src/git/repository_registry.rs_
     - _Validation: repository tests cover tenant, permission, rename, archive and external-host coexistence_
+    - _Discovered contradiction (2026-08-22): Task 25.3 established the approved Git schema as the timestamped reversible `20260822000400_collaboration_git.{up,down}.sql` pair, so the unversioned migration read path does not exist. The planned nested implementation file also cannot compile without Zed's required non-`mod.rs` module root, and the runtime behaviors cannot be proven by that production file alone. The narrow correction reads the canonical migration pair, adds `crates/collab/src/git.rs` plus the existing library export and adds one focused integration target; it introduces no object storage, HTTP or credential behavior owned by later leaves._
+    - _Evidence: 2026-08-22 — added a PostgreSQL hosted repository registry that admits only exact repository-shaped `git:read`, `git:write` or `git:admin` requests allowed by the common authorization policy, resolves scoped tokens to their canonical subject and performs the active-grant check in the same tenant-bound transaction as each read or mutation. Creation atomically installs the creator's explicit admin grant; permission hierarchy, active-member grant/regrant, revocation, optimistic rename and atomic archive are closed operations, while external-provider records retain independent authority without a storage handle or credential. Two focused tests passed pre-I/O tenant/scope denial and the full live lifecycle; an isolated PostgreSQL 14 run under a non-bypass RLS login proved exact permission denial, stable-ID rename, stale-version rejection, grant revocation, archive denial and Sim-hosted/external-provider coexistence. Warning-denied release Clippy passed for the focused target with dependencies excluded; the known unchanged `language_model/src/fake_provider.rs` imports remain the full-script baseline blocker recorded in Task 25.3. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 26. Implement branch-as-channel linkage
 
