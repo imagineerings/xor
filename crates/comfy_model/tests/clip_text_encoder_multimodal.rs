@@ -916,17 +916,20 @@ fn reduced_gemma4_decoder(
 }
 
 fn qwen25_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
+    let tokenizer_configuration = fs::read_to_string(workspace()?.join(
+        "projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json",
+    ))?;
+    let vocabulary = fs::read_to_string(
+        workspace()?.join("projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"),
+    )?;
+    let merges = fs::read_to_string(
+        workspace()?.join("projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"),
+    )?;
     let family = Qwen2BpeTokenizer::from_artifacts(
         Qwen2PretokenizerProfile::Qwen2,
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
-        ),
+        &tokenizer_configuration,
+        &vocabulary,
+        &merges,
         &CancellationToken::default(),
     )?;
     Ok(Arc::new(NativePromptTokenizer::checked(
@@ -949,17 +952,20 @@ fn qwen25_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error
 }
 
 fn qwen35_prompt_tokenizer() -> Result<Arc<NativePromptTokenizer>, Box<dyn Error>> {
+    let tokenizer_configuration = fs::read_to_string(workspace()?.join(
+        "projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json",
+    ))?;
+    let vocabulary = fs::read_to_string(
+        workspace()?.join("projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"),
+    )?;
+    let merges = fs::read_to_string(
+        workspace()?.join("projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"),
+    )?;
     let family = Qwen2BpeTokenizer::from_artifacts(
         Qwen2PretokenizerProfile::Qwen35Declared,
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
-        ),
+        &tokenizer_configuration,
+        &vocabulary,
+        &merges,
         &CancellationToken::default(),
     )?;
     Ok(Arc::new(NativePromptTokenizer::checked(

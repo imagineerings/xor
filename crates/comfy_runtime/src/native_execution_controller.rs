@@ -72,23 +72,24 @@ use comfy_sampler::{
     DiscreteSamplingProfile, GUIDANCE_ADAPTER_ID, GuidanceDenoiser, GuidanceError,
     GuidanceEvaluation, GuidanceOptions, GuidanceResult, INITIAL_NOISE_PHASE_ID,
     NativeConditioningPayload as PortableConditioningPayload,
-    NativeControlExecution as PortableControlExecution, NativeDiffusionPayload, NoiseError,
+    NativeControlExecution as PortableControlExecution, NativeDiffusionPayload,
+    NativeLatentNoiseGeneration, NativeLatentSamplingInput, NativeNoisePayload, NoiseError,
     NoiseRequest, SamplingError, SamplingPlan, SamplingProfile, SamplingProfileError,
     SchedulerError, execute_guidance,
     generated_native_diffusion::{LotusSdPoseSamplingError, sample_lotus_sdpose_one_step_euler},
     generated_native_diffusion::{
-        NativeDiffusionSamplerError, checked_native_diffusion_plan, normal_noise, normal_sigmas,
-        sample_euler, scale_initial_noise, scale_model_input, sd15_interpret_prediction,
-        sd15_model_time,
+        NativeDiffusionSamplerError, checked_native_diffusion_plan, normal_sigmas, sample_euler,
+        scale_initial_noise, scale_model_input, sd15_interpret_prediction, sd15_model_time,
     },
 };
 #[cfg(test)]
 use comfy_tensor::TensorDescriptor;
 use comfy_tensor::{
     BackendCapabilityMatrix, CancellationToken, CpuBackend, CpuWorkspaceAuthority, DType, DeviceId,
-    ExecutionContext, ImageTensor, Layout, MemoryFormatReference, NativeShaderExecutor,
-    NativeTensorPayload, NativeTensorRole, ResizeCrop, ResizeMode, RngCompatibilityError, RngError,
-    ScratchReservation, StreamId, TensorError, WgpuNativeShaderExecutor,
+    ExecutionContext, ImageTensor, Layout, MemoryFormatReference, NativeLatentBundle,
+    NativeLatentMetadata, NativeLatentSamples, NativeShaderExecutor, NativeTensorPayload,
+    NativeTensorRole, ResizeCrop, ResizeMode, RngCompatibilityError, RngError, ScratchReservation,
+    StreamId, TensorError, WgpuNativeShaderExecutor,
 };
 use comfy_tensor::{
     Tensor,
@@ -177,7 +178,6 @@ pub enum NativeTensorKind {
     Image,
     Mask,
     Conditioning,
-    Latent,
 }
 
 #[derive(Clone)]
@@ -2352,7 +2352,6 @@ fn native_tensor_role(kind: NativeTensorKind) -> NativeTensorRole {
         NativeTensorKind::Image => NativeTensorRole::Image,
         NativeTensorKind::Mask => NativeTensorRole::Mask,
         NativeTensorKind::Conditioning => NativeTensorRole::Conditioning,
-        NativeTensorKind::Latent => NativeTensorRole::Latent,
     }
 }
 
@@ -2363,7 +2362,6 @@ fn native_tensor_handle_type(
         NativeTensorKind::Image => (NativeHandleKind::Image, "IMAGE"),
         NativeTensorKind::Mask => (NativeHandleKind::Mask, "MASK"),
         NativeTensorKind::Conditioning => (NativeHandleKind::Conditioning, "CONDITIONING"),
-        NativeTensorKind::Latent => (NativeHandleKind::Latent, "LATENT"),
     };
     Ok(NativeHandleType::new(kind, type_id)?)
 }
@@ -3360,17 +3358,17 @@ fn resolve_image(
     })
 }
 
-fn publish_tensor(
+fn publish_latent_bundle(
     context: &NodeContext,
-    kind: NativeTensorKind,
-    tensor: Tensor,
+    bundle: NativeLatentBundle,
 ) -> Result<NativeValue, NodeFailure> {
-    let payload = NativeTensorPayload::from_tensor(native_tensor_role(kind), tensor)
-        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
+    bundle
+        .validate_retained()
+        .map_err(|error| classified_diffusion_failure(error))?;
     let handle = context
         .handle_store()
         .publish(
-            NativeStoredPayload::Tensor(Arc::new(payload)),
+            NativeStoredPayload::Latent(Arc::new(bundle)),
             &context.cancellation,
         )
         .map_err(|error| runtime_failure(error.into()))?;
@@ -3420,30 +3418,28 @@ fn resolve_conditioning(
     })
 }
 
-fn resolve_tensor(
+fn resolve_latent_bundle(
     context: &NodeContext,
     inputs: &BTreeMap<String, NativeValue>,
     name: &str,
-    expected_kind: NativeTensorKind,
-) -> Result<ResolvedNative<Tensor>, NodeFailure> {
+) -> Result<ResolvedNative<Arc<NativeLatentBundle>>, NodeFailure> {
     let handle = required_opaque_handle(inputs, name)?;
-    let expected_type = native_tensor_handle_type(expected_kind).map_err(runtime_failure)?;
+    let expected_type = NativeHandleType::new(NativeHandleKind::Latent, "LATENT")
+        .map_err(|error| invalid_diffusion_input(&error.to_string()))?;
     let stored = context
         .handle_store()
         .resolve(handle, &expected_type, &context.cancellation)
         .map_err(|error| runtime_failure(error.into()))?;
-    let NativeStoredPayload::Tensor(payload) = stored.as_ref() else {
+    let NativeStoredPayload::Latent(payload) = stored.as_ref() else {
         return Err(invalid_diffusion_input(
-            "native tensor handle stored an image object",
+            "native LATENT handle stored a non-latent payload",
         ));
     };
-    if payload.role() != native_tensor_role(expected_kind) || payload.image().is_some() {
-        return Err(runtime_failure(NativeImageRuntimeError::Handle(
-            "raw tensor handle kind or schema is invalid".to_owned(),
-        )));
-    }
+    payload
+        .validate_retained()
+        .map_err(classified_diffusion_failure)?;
     Ok(ResolvedNative {
-        value: payload.tensor().clone(),
+        value: payload.clone(),
         _resolved_payload: stored,
     })
 }
@@ -3833,8 +3829,12 @@ impl NativeNode for EmptyLatentNode {
                 &tensor_context,
             )
             .map_err(native_diffusion_model_failure)?;
+            let metadata = NativeLatentMetadata::checked(None, None, Some(8), None)
+                .map_err(classified_diffusion_failure)?;
+            let latent = NativeLatentBundle::single(latent, None, None, metadata, &tensor_context)
+                .map_err(classified_diffusion_failure)?;
             tensor_context.check().map_err(tensor_failure)?;
-            let output = publish_tensor(&context, NativeTensorKind::Latent, latent)?;
+            let output = publish_latent_bundle(&context, latent)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: None,
@@ -3906,13 +3906,21 @@ impl NativeNode for KSamplerNode {
             .map_err(native_diffusion_sampler_failure)?;
             let positive = resolve_conditioning(&context, &inputs, "positive")?;
             let negative = resolve_conditioning(&context, &inputs, "negative")?;
-            let latent =
-                resolve_tensor(&context, &inputs, "latent_image", NativeTensorKind::Latent)?;
-            let stream = NoiseRequest::native_diffusion(
+            let latent = resolve_latent_bundle(&context, &inputs, "latent_image")?;
+            let sampling_input = NativeLatentSamplingInput::checked(&latent, &tensor_context)
+                .map_err(classified_diffusion_failure)?;
+            let latent_samples = sampling_input.samples().tensor().ok_or_else(|| {
+                invalid_diffusion_input("native SD15 KSampler requires a single latent tensor")
+            })?;
+            if latent_samples.descriptor().shape().len() != 4 {
+                return Err(invalid_diffusion_input(
+                    "native SD15 KSampler requires a rank-four latent tensor",
+                ));
+            }
+            let noise_request = NoiseRequest::native_diffusion(
                 context.prompt_id.0.to_string(),
                 context.node_id.0.clone(),
             )
-            .and_then(|request| request.stream(plan.seed(), comfy_tensor::DeviceId::CPU))
             .map_err(noise_failure)?;
             let sigmas = normal_sigmas(
                 &self.state.backend,
@@ -3922,13 +3930,24 @@ impl NativeNode for KSamplerNode {
                 plan.denoise(),
             )
             .map_err(native_diffusion_sampler_failure)?;
-            let noise = normal_noise(
-                &self.state.backend,
-                latent.descriptor().shape(),
-                &stream,
-                &tensor_context,
-            )
-            .map_err(native_diffusion_sampler_failure)?;
+            let noise_payload =
+                NativeNoisePayload::random(plan.seed()).map_err(classified_diffusion_failure)?;
+            let noise = match sampling_input
+                .generate_noise(
+                    &noise_payload,
+                    &self.state.backend,
+                    &noise_request,
+                    &tensor_context,
+                )
+                .map_err(classified_diffusion_failure)?
+            {
+                NativeLatentNoiseGeneration::Tensor(noise) => noise,
+                NativeLatentNoiseGeneration::AudioVideo { .. } => {
+                    return Err(invalid_diffusion_input(
+                        "native SD15 KSampler cannot sample a nested audio/video latent",
+                    ));
+                }
+            };
             let initial_sigma = sigmas
                 .first()
                 .copied()
@@ -3936,7 +3955,7 @@ impl NativeNode for KSamplerNode {
             let initial = scale_initial_noise(
                 &self.state.backend,
                 &noise.noise,
-                &latent,
+                latent_samples,
                 initial_sigma,
                 &tensor_context,
             )
@@ -3955,9 +3974,29 @@ impl NativeNode for KSamplerNode {
                 &sigmas,
                 &tensor_context,
                 |latent, sigma, _step| {
+                    let masked_latent = match sampling_input.masked_model_input(
+                        &NativeLatentSamples::Tensor(latent.clone()),
+                        &NativeLatentNoiseGeneration::Tensor(noise.clone()),
+                        sigma,
+                        &self.state.backend,
+                        &tensor_context,
+                    ) {
+                        Ok(NativeLatentSamples::Tensor(masked_latent)) => masked_latent,
+                        Ok(NativeLatentSamples::AudioVideo { .. }) => {
+                            let message =
+                                "native SD15 KSampler produced a nested masked latent".to_owned();
+                            typed_denoiser_failure = Some(invalid_diffusion_input(&message));
+                            return Err(message);
+                        }
+                        Err(error) => {
+                            let message = error.to_string();
+                            typed_denoiser_failure = Some(classified_diffusion_failure(error));
+                            return Err(message);
+                        }
+                    };
                     let model_input = match scale_model_input(
                         &self.state.backend,
-                        latent,
+                        &masked_latent,
                         sigma,
                         &tensor_context,
                     ) {
@@ -3985,11 +4024,29 @@ impl NativeNode for KSamplerNode {
                     match sd15_interpret_prediction(
                         &self.state.backend,
                         prediction.guided(),
-                        latent,
+                        &masked_latent,
                         sigma,
                         &tensor_context,
                     ) {
-                        Ok(prediction) => Ok(prediction),
+                        Ok(prediction) => match sampling_input.masked_denoised(
+                            &NativeLatentSamples::Tensor(prediction),
+                            &self.state.backend,
+                            &tensor_context,
+                        ) {
+                            Ok(NativeLatentSamples::Tensor(prediction)) => Ok(prediction),
+                            Ok(NativeLatentSamples::AudioVideo { .. }) => {
+                                let message =
+                                    "native SD15 KSampler produced nested denoised samples"
+                                        .to_owned();
+                                typed_denoiser_failure = Some(invalid_diffusion_input(&message));
+                                Err(message)
+                            }
+                            Err(error) => {
+                                let message = error.to_string();
+                                typed_denoiser_failure = Some(classified_diffusion_failure(error));
+                                Err(message)
+                            }
+                        },
                         Err(error) => {
                             let message = error.to_string();
                             typed_denoiser_failure = Some(native_diffusion_sampler_failure(error));
@@ -4035,7 +4092,10 @@ impl NativeNode for KSamplerNode {
                 "latent_sha256": latent_sha256,
             });
             tensor_context.check().map_err(tensor_failure)?;
-            let output = publish_tensor(&context, NativeTensorKind::Latent, final_latent)?;
+            let final_latent = sampling_input
+                .finish(NativeLatentSamples::Tensor(final_latent), &tensor_context)
+                .map_err(classified_diffusion_failure)?;
+            let output = publish_latent_bundle(&context, final_latent)?;
             Ok(NodeOutcome::Values {
                 outputs: vec![output],
                 ui: Some(ui),
@@ -4086,7 +4146,15 @@ impl NativeNode for VaeDecodeNode {
             let vae = payload.model_payload().vae().ok_or_else(|| {
                 invalid_diffusion_input("native VAE handle has no canonical VAE resource")
             })?;
-            let latent = resolve_tensor(&context, &inputs, "samples", NativeTensorKind::Latent)?;
+            let latent = resolve_latent_bundle(&context, &inputs, "samples")?;
+            let latent = latent.samples().tensor().ok_or_else(|| {
+                invalid_diffusion_input("native SD15 VAE requires a single latent tensor")
+            })?;
+            if latent.descriptor().shape().len() != 4 {
+                return Err(invalid_diffusion_input(
+                    "native SD15 VAE requires a rank-four latent tensor",
+                ));
+            }
             let decoded = vae
                 .decode(self.state.backend.as_ref(), &latent, &tensor_context)
                 .map_err(vae_failure)?;

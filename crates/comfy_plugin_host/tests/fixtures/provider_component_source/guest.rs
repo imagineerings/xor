@@ -111,13 +111,13 @@ impl provider_binding::Guest for ProviderComponent {
         types::ProviderBindingSet {
             schema_version: 1,
             implementation_namespace: "zed.comfy.provider.comfy-node-0141".to_owned(),
-            bindings_sha256: "4e25e7bd14a20b225095b06107bd299eaf3b014a916cbbca5bd58f3d3b440031"
+            bindings_sha256: "6edd3643bc5577d66f7bd6765e970142448aab383476e1fc7d084c00ae988ae8"
                 .to_owned(),
             bindings: vec![types::ProviderBindingClaim {
                 feature_id: "COMFY-NODE-0141".to_owned(),
                 node_id: "ElevenLabsAudioIsolation".to_owned(),
                 contract_sha256:
-                    "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+                    "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
                         .to_owned(),
                 transport_schema: "zed:comfy-provider-transport@1".to_owned(),
                 materializer_schema: "zed:comfy-provider-materializer@1".to_owned(),

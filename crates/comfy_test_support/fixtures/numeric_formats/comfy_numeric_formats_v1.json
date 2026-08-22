@@ -6,7 +6,7 @@
     "projects/comfy/ComfyUI/comfy/utils.py": "8b8805ca837e20c922a846854156d10e214654f69df96be90969522f9def2bdb",
     "projects/comfy/ComfyUI/comfy/ldm/modules/attention.py": "436e1d91f8d5d84c5667e051cdf3ab2f91d8db25b66d88a084c89a202de0579e",
     "projects/comfy/ComfyUI/comfy/ldm/modules/sub_quadratic_attention.py": "c804fbbda0fbc6404999be734d3c33b868375959736f8e21ad417782ab0638a0",
-    ".agents/specs/comfy-parity/catalogs/backend-models.csv": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33"
+    ".agents/specs/comfy-parity/catalogs/backend-models.csv": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d"
   },
   "catalog_feature_ids": [
     "COMFY-MODEL-0001",

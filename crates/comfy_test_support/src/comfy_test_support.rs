@@ -25,7 +25,13 @@ pub fn rust_source_before_test_module(source: &str) -> &str {
     let mut offset = 0;
     let mut lines = source.split_inclusive('\n').peekable();
     while let Some(line) = lines.next() {
-        if line.trim() == "#[cfg(test)]"
+        let configuration = line.trim();
+        let is_test_configuration = configuration.starts_with("#[cfg(")
+            && configuration.ends_with(")]")
+            && configuration
+                .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+                .any(|token| token == "test");
+        if is_test_configuration
             && lines
                 .peek()
                 .is_some_and(|next| next.trim_start().starts_with("mod tests"))
@@ -62,6 +68,12 @@ mod tests {
         assert_eq!(
             rust_source_before_test_module("#[cfg(test)]\nfn helper() {}\nfn production() {}\n"),
             "#[cfg(test)]\nfn helper() {}\nfn production() {}\n"
+        );
+        assert_eq!(
+            rust_source_before_test_module(
+                "fn production() {}\n#[cfg(all(test, target_os = \"linux\"))]\nmod tests {}\n",
+            ),
+            "fn production() {}\n"
         );
     }
 }

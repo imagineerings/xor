@@ -290,6 +290,9 @@ fn adapter_delegates_foundational_ownership_without_absorbing_other_vision_model
 -> Result<(), Box<dyn Error>> {
     let source =
         fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/clip_vision.rs"))?;
+    let source = source
+        .split_once("\n#[cfg(test)]\n")
+        .map_or(source.as_str(), |(production, _)| production);
     assert!(source.contains("NativeExecutionRequirements"));
     assert!(source.contains("ExecutionContext"));
     assert!(source.contains("resize_with_context_exact_native"));
@@ -311,7 +314,13 @@ fn adapter_delegates_foundational_ownership_without_absorbing_other_vision_model
             "CLIP vision adapter must delegate {delegated}"
         );
     }
-    assert_eq!(source.matches("pub struct NativeClipVision").count(), 1);
+    assert_eq!(
+        source
+            .lines()
+            .filter(|line| line.trim() == "pub struct NativeClipVision {")
+            .count(),
+        1
+    );
     for forbidden in [
         "struct CancellationToken",
         "struct CpuBackend",

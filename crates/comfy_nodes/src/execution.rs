@@ -1058,7 +1058,13 @@ pub enum NativeHandleStoreError {
     #[error("native handle contract is invalid: {0}")]
     InvalidHandle(#[from] NativeNodeContractError),
     #[error("native stored payload is invalid: {0}")]
-    InvalidPayload(#[from] NativeStoredPayloadError),
+    InvalidPayload(#[source] Box<NativeStoredPayloadError>),
+}
+
+impl From<NativeStoredPayloadError> for NativeHandleStoreError {
+    fn from(error: NativeStoredPayloadError) -> Self {
+        Self::InvalidPayload(Box::new(error))
+    }
 }
 
 pub trait NativeResolvedPayloadRetention: fmt::Debug + Send + Sync {}

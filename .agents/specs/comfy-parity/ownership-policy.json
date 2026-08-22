@@ -9664,6 +9664,127 @@
       "decision_reason": "comfy_runtime::trust owns native-library path safety, bounds, stable identity, cancellable capture, SHA-256, Linux memfd sealing, Windows non-reparse read-locked snapshots, loader-path projection, and retained File lifetime exactly once. MLU, NPU, ROCm, and XPU adapters consume immutable bytes and digests, apply only backend-specific ABI or dependency policy, obtain certificates from NativeFfiRegistry, and retain the canonical image without repeating filesystem, digest, seal, snapshot, or lifetime behavior."
     },
     {
+      "concern": "native_managed_latent_bundle_and_sampling_state",
+      "canonical_owner": "comfy_tensor::NativeLatentBundle and comfy_sampler::NativeLatentSamplingInput",
+      "owner_files": [
+        "crates/comfy_tensor/src/native_node_payload.rs",
+        "crates/comfy_sampler/src/native_diffusion_payload.rs"
+      ],
+      "owner_symbols": [
+        "NativeLatentBundle",
+        "NativeLatentSamples",
+        "NativeLatentNoiseMask",
+        "NativeLatentMetadata",
+        "NativeLatentSamplingInput"
+      ],
+      "allowed_adapters": [
+        "NativeStoredPayload::Latent owns only checked handle-store, generation, lease, digest, and residency admission and rejects legacy raw LATENT tensors",
+        "the native runtime resolves and publishes the sealed bundle and delegates batch-addressed noise and mask application to NativeLatentSamplingInput",
+        "family nodes may construct source-exact bundles from canonical tensors but cannot create another latent dictionary, mask consumer, batch-addressed RNG owner, or persistence format",
+        "the plugin adapter rejects latent bundles before mutation until the SDK has a lossless nested bundle representation"
+      ],
+      "definitions": [
+        {
+          "path": "crates/comfy_tensor/src/native_node_payload.rs",
+          "qualified": "comfy_tensor::NativeLatentBundle",
+          "role": "canonical",
+          "symbol": "NativeLatentBundle",
+          "pattern": "^pub struct NativeLatentBundle \\{"
+        },
+        {
+          "path": "crates/comfy_sampler/src/native_diffusion_payload.rs",
+          "qualified": "comfy_sampler::NativeLatentSamplingInput",
+          "role": "canonical",
+          "symbol": "NativeLatentSamplingInput",
+          "pattern": "^pub struct NativeLatentSamplingInput"
+        }
+      ],
+      "call_symbols": [
+        "NativeLatentBundle",
+        "NativeLatentSamples",
+        "NativeLatentNoiseMask",
+        "NativeLatentMetadata",
+        "NativeLatentSamplingInput"
+      ],
+      "required_mappings": [
+        {
+          "name": "task370-bundle-seals-ranks-nested-values-masks-indices-metadata-and-residency",
+          "path": "crates/comfy_tensor/src/native_node_payload.rs",
+          "pattern": "pub struct NativeLatentMetadata[\\s\\S]*pub enum NativeLatentSamples[\\s\\S]*AudioVideo[\\s\\S]*pub enum NativeLatentNoiseMask[\\s\\S]*pub struct NativeLatentBundle[\\s\\S]*resident_parts[\\s\\S]*validate_samples"
+        },
+        {
+          "name": "task370-store-has-one-latent-owner-and-rejects-legacy-tensors",
+          "path": "crates/comfy_nodes/src/stored_payload.rs",
+          "pattern": "Latent\\(Arc<NativeLatentBundle>\\)[\\s\\S]*NativeTensorRole::Conditioning \\| NativeTensorRole::Latent[\\s\\S]*NonCanonicalTensorRole"
+        },
+        {
+          "name": "task370-sampler-alone-consumes-batch-indices-and-masks",
+          "path": "crates/comfy_sampler/src/native_diffusion_payload.rs",
+          "pattern": "pub struct NativeLatentSamplingInput[\\s\\S]*NativeNoisePayload[\\s\\S]*\\.generate\\([\\s\\S]*self\\.bundle\\.batch_indices\\(\\)[\\s\\S]*pub fn masked_model_input[\\s\\S]*pub fn masked_denoised[\\s\\S]*DropDownscaleRatios"
+        },
+        {
+          "name": "task370-runtime-producers-and-consumers-use-the-bundle",
+          "path": "crates/comfy_runtime/src/native_execution_controller.rs",
+          "pattern": "fn publish_latent_bundle[\\s\\S]*fn resolve_latent_bundle[\\s\\S]*NativeLatentSamplingInput::checked[\\s\\S]*masked_model_input[\\s\\S]*masked_denoised[\\s\\S]*\\.finish\\("
+        },
+        {
+          "name": "task370-stable-cascade-migrates-from-legacy-latent-tensors",
+          "path": "crates/comfy_nodes/src/families/experimental_stable_cascade_01.rs",
+          "pattern": "NativeLatentBundle::single[\\s\\S]*NativeStoredPayload::Latent"
+        },
+        {
+          "name": "task370-plugin-rejects-lossy-latent-projection-before-mutation",
+          "path": "crates/comfy_plugin_host/src/registry_adapter.rs",
+          "pattern": "NativeStoredPayload::Latent\\(_\\)[\\s\\S]*Err\\(unmaterialized_plugin_input[\\s\\S]*latent_bundle_input_rejection_preserves_the_canonical_store_entry"
+        }
+      ],
+      "known_open_reasons": [],
+      "consolidation_tasks": [
+        "comfy-parity-native-latent-bundle-foundation"
+      ],
+      "production_consumers": [
+        "native latent-producing node families",
+        "native diffusion KSampler",
+        "native VAE decoding",
+        "native handle persistence and cache leases"
+      ],
+      "requirements": [
+        "Requirement 6",
+        "Requirement 7",
+        "Requirement 31",
+        "Requirement 34",
+        "Requirement 36",
+        "Requirement 37",
+        "Requirement 38",
+        "Requirement 41",
+        "Requirement 44"
+      ],
+      "design": [
+        "D8",
+        "D20",
+        "D25",
+        "D26",
+        "D28",
+        "D29",
+        "D31",
+        "D32",
+        "D33",
+        "D34",
+        "D39",
+        "D41"
+      ],
+      "validation": [
+        "VAL-NODE-001",
+        "VAL-LATENT-001",
+        "VAL-TENSOR-001",
+        "VAL-SAMPLER-001",
+        "VAL-CANCEL-001",
+        "VAL-MEMORY-001",
+        "VAL-OWNERSHIP-001"
+      ],
+      "decision_reason": "NativeLatentBundle is the sole source-dictionary value owner for rank-three, rank-four, rank-five, and ordered nested audio/video samples, optional masks, ordered batch indices, exact typed metadata, semantic digest, and alias-aware residency. NativeLatentSamplingInput is the sole mask and batch-addressed sampling adapter and delegates tensor math, workspace, cancellation, and RNG generation to their canonical owners. Nodes, runtime, persistence, cache, and plugins may only store, resolve, publish, or truthfully reject this sealed value."
+    },
+    {
       "concern": "native_model_controlnet_domain",
       "canonical_owner": "comfy_model::controlnet",
       "owner_files": [
@@ -28891,7 +29012,7 @@
         {
           "name": "runtime-ksampler-is-a-focused-domain-adapter",
           "path": "crates/comfy_runtime/src/native_execution_controller.rs",
-          "pattern": "checked_native_diffusion_plan[\\s\\S]*NoiseRequest::native_diffusion[\\s\\S]*normal_sigmas[\\s\\S]*normal_noise[\\s\\S]*scale_initial_noise[\\s\\S]*sample_euler[\\s\\S]*scale_model_input"
+          "pattern": "checked_native_diffusion_plan[\\s\\S]*NativeLatentSamplingInput::checked[\\s\\S]*NoiseRequest::native_diffusion[\\s\\S]*normal_sigmas[\\s\\S]*generate_noise[\\s\\S]*scale_initial_noise[\\s\\S]*sample_euler[\\s\\S]*masked_model_input[\\s\\S]*scale_model_input[\\s\\S]*masked_denoised[\\s\\S]*finish"
         },
         {
           "name": "foundation-tests-cover-security-and-state-boundaries",

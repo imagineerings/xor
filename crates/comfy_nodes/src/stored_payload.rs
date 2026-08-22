@@ -18,7 +18,9 @@ use comfy_sampler::{
     NativeDiffusionResidentAllocationId, NativeGuiderConditioningSets, NativeGuiderPayload,
     NativeNoisePayload, NativeSamplerPayload,
 };
-use comfy_tensor::{NativeTensorPayload, NativeTensorRole};
+use comfy_tensor::{
+    NativeLatentBundle, NativeLatentBundleError, NativeTensorPayload, NativeTensorRole,
+};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error;
@@ -287,6 +289,7 @@ fn model_resource_is_concrete(resource: &NativeModelPayload) -> bool {
 #[derive(Clone)]
 pub enum NativeStoredPayload {
     Tensor(Arc<NativeTensorPayload>),
+    Latent(Arc<NativeLatentBundle>),
     Model(Arc<NativeStoredModelPayload>),
     Control(Arc<NativeControlPayload>),
     Conditioning(Arc<ConditioningSet>),
@@ -315,6 +318,7 @@ pub enum NativeStoredPayload {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum NativeResidentPayloadKind {
+    Latent,
     Model,
     Control,
     Noise,
@@ -453,10 +457,14 @@ impl NativeStoredPayload {
         match self {
             Self::Tensor(payload) => {
                 payload.validate()?;
-                if payload.role() == NativeTensorRole::Conditioning {
+                if matches!(
+                    payload.role(),
+                    NativeTensorRole::Conditioning | NativeTensorRole::Latent
+                ) {
                     return Err(NativeStoredPayloadError::NonCanonicalTensorRole);
                 }
             }
+            Self::Latent(payload) => payload.validate_retained()?,
             Self::Model(payload) => payload.validate()?,
             Self::Control(payload) => payload.validate()?,
             Self::Conditioning(payload) => payload.validate()?,
@@ -493,6 +501,7 @@ impl NativeStoredPayload {
     pub fn handle_type(&self) -> Result<NativeHandleType, NativeStoredPayloadError> {
         let source_type = match self {
             Self::Tensor(payload) => payload.handle_type_id(),
+            Self::Latent(_) => "LATENT",
             Self::Model(payload) => return payload.handle_type(),
             Self::Control(payload) => payload.role().source_type_id(),
             Self::Conditioning(_) => "CONDITIONING",
@@ -526,6 +535,7 @@ impl NativeStoredPayload {
     pub fn digest_sha256(&self) -> String {
         match self {
             Self::Tensor(payload) => payload.projection().content_digest().to_owned(),
+            Self::Latent(payload) => payload.semantic_digest_sha256().to_owned(),
             Self::Model(payload) => payload.digest_sha256().to_owned(),
             Self::Control(payload) => payload.digest_sha256().to_owned(),
             Self::Conditioning(payload) => payload.digest().to_owned(),
@@ -556,6 +566,8 @@ impl NativeStoredPayload {
     pub fn resident_bytes(&self) -> Result<usize, NativeStoredPayloadError> {
         match self {
             Self::Tensor(payload) => usize::try_from(payload.projection().resident_bytes())
+                .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
+            Self::Latent(payload) => usize::try_from(payload.projection().resident_bytes())
                 .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow),
             Self::Model(payload) => payload.resident_bytes(),
             Self::Control(payload) => Ok(payload.resident_bytes()?),
@@ -610,6 +622,7 @@ impl NativeStoredPayload {
             Self::Tensor(payload) => {
                 NativePayloadResidency::checked(0, [tensor_storage_allocation(payload)?])?
             }
+            Self::Latent(payload) => latent_residency(payload)?,
             Self::Model(payload) => match &payload.resource {
                 NativeStoredModelResource::Diffusion(diffusion) => {
                     stored_diffusion_residency(payload, diffusion)?
@@ -787,6 +800,21 @@ fn tensor_storage_allocation(
         resident_bytes: usize::try_from(payload.projection().resident_bytes())
             .map_err(|_| NativeStoredPayloadError::ResidentBytesOverflow)?,
     })
+}
+
+fn latent_residency(
+    payload: &Arc<NativeLatentBundle>,
+) -> Result<NativePayloadResidency, NativeStoredPayloadError> {
+    let parts = payload.resident_parts()?;
+    tensor_backed_arc_residency(
+        NativeResidentPayloadKind::Latent,
+        payload,
+        parts.owned_bytes(),
+        parts
+            .tensor_allocations()
+            .iter()
+            .map(|allocation| (allocation.storage_id().get(), allocation.resident_bytes())),
+    )
 }
 
 fn conditioning_allocations(
@@ -1084,6 +1112,8 @@ pub enum NativeStoredPayloadError {
     #[error(transparent)]
     Sampler(#[from] comfy_sampler::NativeSamplerPayloadError),
     #[error(transparent)]
+    Latent(#[from] NativeLatentBundleError),
+    #[error(transparent)]
     Media(#[from] comfy_media::NativeMediaPayloadError),
     #[error(transparent)]
     Conditioning(#[from] ConditioningError),
@@ -1155,7 +1185,8 @@ mod tests {
     };
     use comfy_sampler::NativeDiffusionPayloadError;
     use comfy_tensor::{
-        CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, StreamId, Tensor,
+        CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, NativeLatentBundle,
+        NativeLatentMetadata, NativeTensorPayload, NativeTensorRole, StreamId, Tensor,
         TensorDescriptor,
     };
     use std::{collections::BTreeSet, error::Error};
@@ -1249,6 +1280,44 @@ mod tests {
                 &context,
             )?
             .0)
+    }
+
+    #[test]
+    fn latent_bundle_is_the_only_stored_latent_owner_and_deduplicates_aliases()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let samples = clip_tensor(&backend, &authority, &cancellation, vec![1, 1, 2, 2], 1.0)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(1024 * 1024)?,
+            &cancellation,
+        );
+        let bundle = Arc::new(NativeLatentBundle::single(
+            samples.clone(),
+            Some(samples.clone()),
+            Some(vec![4]),
+            NativeLatentMetadata::checked(None, None, Some(8), None)?,
+            &context,
+        )?);
+        let payload = NativeStoredPayload::Latent(bundle.clone());
+        payload.validate()?;
+        assert_eq!(payload.handle_type()?.kind, NativeHandleKind::Latent);
+        assert_eq!(payload.handle_type()?.type_id, "LATENT");
+        assert_eq!(payload.digest_sha256(), bundle.semantic_digest_sha256());
+        let residency = payload.residency()?;
+        assert_eq!(tensor_storage_ids(&residency).len(), 1);
+        assert_eq!(residency.resident_bytes()?, payload.resident_bytes()?);
+
+        let legacy = NativeStoredPayload::Tensor(Arc::new(NativeTensorPayload::from_tensor(
+            NativeTensorRole::Latent,
+            samples,
+        )?));
+        assert!(matches!(
+            legacy.validate(),
+            Err(NativeStoredPayloadError::NonCanonicalTensorRole)
+        ));
+        Ok(())
     }
 
     fn tiny_clip_vision() -> Result<Arc<NativeClipVision>, Box<dyn Error>> {

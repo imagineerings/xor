@@ -513,6 +513,21 @@ def validate_later_task_writes() -> None:
             "Cargo.lock",
             "crates/comfy_tensor/Cargo.toml",
         },
+        "comfy-parity-native-latent-bundle-foundation": {
+            "Cargo.toml",
+        },
+        "comfy-parity-native-qwen2-tokenizer-foundation": {
+            "Cargo.toml",
+            "Cargo.lock",
+            "crates/comfy_model/Cargo.toml",
+        },
+        "comfy-parity-native-sdpose-heatmap-projection-foundation": {
+            "Cargo.lock",
+            "crates/comfy_model/Cargo.toml",
+        },
+        "comfy-parity-native-frame-interpolate-node-foundation": {
+            "crates/comfy_nodes/Cargo.toml",
+        },
     }
     violations = []
     for block in blocks[owner_index + 1 :]:

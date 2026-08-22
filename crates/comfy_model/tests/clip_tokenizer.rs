@@ -31,7 +31,7 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_model/src/clip_tokenizer.rs",
-        "bd0ec6cafdb9f7e70da15fa7ce5390cd4c6e017d65a1866a61fdaf5507c83141",
+        "39b1c42deae3d97400b2696f6d58e0893a9f29ccad7a8769b887c279c3fdfc13",
     ),
     (
         "crates/comfy_model/src/formats.rs",
@@ -47,11 +47,11 @@ const TOKENIZER_IMPLEMENTATION_CLOSURE: [(&str, &str); 7] = [
     ),
     (
         "crates/comfy_runtime/src/native_execution_controller.rs",
-        "870f116d02054fc2c4055b7c22de62fc1487ea016916a946110bc492c7ab55da",
+        "181e09bcfe4fe7d6baeda951fc4c1831352064b91bb4320d49fb968510f40809",
     ),
     (
         "crates/comfy_test_support/src/native_diffusion_fixture.rs",
-        "dfa227c69146fd3566e3f9aa58c226bdce2094a7db27ec36ce67959ac9a561b0",
+        "58b793629c3bf39f8ea044ccdaa04d2dd0aeee7e976ca75788fd345f9730905d",
     ),
 ];
 
@@ -422,36 +422,42 @@ fn qwen_configuration(maximum_length: usize, pad_token: u32) -> TokenizerConfigu
     }
 }
 
-fn qwen25_tokenizer() -> Result<Qwen2BpeTokenizer, NativeTokenizerError> {
-    Qwen2BpeTokenizer::from_artifacts(
-        Qwen2PretokenizerProfile::Qwen2,
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
-        ),
-        &CancellationToken::default(),
-    )
+fn qwen_artifacts(profile: &str) -> Result<(String, String, String), Box<dyn std::error::Error>> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("workspace root is unavailable")?
+        .join("projects/comfy/ComfyUI/comfy/text_encoders")
+        .join(profile);
+    Ok((
+        fs::read_to_string(root.join("tokenizer_config.json"))?,
+        fs::read_to_string(root.join("vocab.json"))?,
+        fs::read_to_string(root.join("merges.txt"))?,
+    ))
 }
 
-fn qwen35_tokenizer() -> Result<Qwen2BpeTokenizer, NativeTokenizerError> {
+fn qwen25_tokenizer() -> Result<Qwen2BpeTokenizer, Box<dyn std::error::Error>> {
+    let (configuration, vocabulary, merges) = qwen_artifacts("qwen25_tokenizer")?;
     Qwen2BpeTokenizer::from_artifacts(
-        Qwen2PretokenizerProfile::Qwen35Declared,
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
-        ),
-        include_str!(
-            "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
-        ),
+        Qwen2PretokenizerProfile::Qwen2,
+        &configuration,
+        &vocabulary,
+        &merges,
         &CancellationToken::default(),
     )
+    .map_err(Into::into)
+}
+
+fn qwen35_tokenizer() -> Result<Qwen2BpeTokenizer, Box<dyn std::error::Error>> {
+    let (configuration, vocabulary, merges) = qwen_artifacts("qwen35_tokenizer")?;
+    Qwen2BpeTokenizer::from_artifacts(
+        Qwen2PretokenizerProfile::Qwen35Declared,
+        &configuration,
+        &vocabulary,
+        &merges,
+        &CancellationToken::default(),
+    )
+    .map_err(Into::into)
 }
 
 fn numeric_tokens(prompt: &comfy_model::NativeTokenizedPrompt) -> Vec<Vec<u32>> {
@@ -1047,32 +1053,22 @@ fn qwen2_fixture_manifest_pins_source_artifacts_and_provenance()
     let profiles = manifest["profiles"].as_array().ok_or("profiles")?;
     assert_eq!(profiles.len(), 2);
     let roots = [
-        (
-            "qwen25",
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json").as_slice(),
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json").as_slice(),
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt").as_slice(),
-        ),
-        (
-            "qwen35",
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json").as_slice(),
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json").as_slice(),
-            include_bytes!("../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt").as_slice(),
-        ),
+        ("qwen25", qwen_artifacts("qwen25_tokenizer")?),
+        ("qwen35", qwen_artifacts("qwen35_tokenizer")?),
     ];
-    for (profile, (name, configuration, vocabulary, merges)) in profiles.iter().zip(roots) {
+    for (profile, (name, (configuration, vocabulary, merges))) in profiles.iter().zip(roots) {
         assert_eq!(profile["name"], name);
         assert_eq!(
             profile["configuration_sha256"],
-            format!("{:x}", Sha256::digest(configuration))
+            format!("{:x}", Sha256::digest(configuration.as_bytes()))
         );
         assert_eq!(
             profile["vocabulary_sha256"],
-            format!("{:x}", Sha256::digest(vocabulary))
+            format!("{:x}", Sha256::digest(vocabulary.as_bytes()))
         );
         assert_eq!(
             profile["merges_sha256"],
-            format!("{:x}", Sha256::digest(merges))
+            format!("{:x}", Sha256::digest(merges.as_bytes()))
         );
     }
     Ok(())
@@ -1080,20 +1076,16 @@ fn qwen2_fixture_manifest_pins_source_artifacts_and_provenance()
 
 #[test]
 fn qwen2_artifact_admission_and_cancellation_are_typed() -> Result<(), Box<dyn std::error::Error>> {
+    let (qwen25_configuration, qwen25_vocabulary, qwen25_merges) =
+        qwen_artifacts("qwen25_tokenizer")?;
     let cancelled = CancellationToken::default();
     cancelled.cancel();
     assert!(matches!(
         Qwen2BpeTokenizer::from_artifacts(
             Qwen2PretokenizerProfile::Qwen2,
-            include_str!(
-                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/tokenizer_config.json"
-            ),
-            include_str!(
-                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/vocab.json"
-            ),
-            include_str!(
-                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen25_tokenizer/merges.txt"
-            ),
+            &qwen25_configuration,
+            &qwen25_vocabulary,
+            &qwen25_merges,
             &cancelled,
         ),
         Err(NativeTokenizerError::Cancellation(_))
@@ -1110,19 +1102,14 @@ fn qwen2_artifact_admission_and_cancellation_are_typed() -> Result<(), Box<dyn s
         ),
         Err(NativeTokenizerError::InvalidVocabulary)
     ));
-    let qwen35_configuration = include_str!(
-        "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json"
-    );
+    let (qwen35_configuration, qwen35_vocabulary, qwen35_merges) =
+        qwen_artifacts("qwen35_tokenizer")?;
     assert!(matches!(
         Qwen2BpeTokenizer::from_artifacts(
             Qwen2PretokenizerProfile::Qwen2,
-            qwen35_configuration,
-            include_str!(
-                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/vocab.json"
-            ),
-            include_str!(
-                "../../../projects/comfy/ComfyUI/comfy/text_encoders/qwen35_tokenizer/merges.txt"
-            ),
+            &qwen35_configuration,
+            &qwen35_vocabulary,
+            &qwen35_merges,
             &cancellation,
         ),
         Err(NativeTokenizerError::InvalidTokenizerConfiguration(_))

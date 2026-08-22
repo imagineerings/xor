@@ -135,62 +135,62 @@ fn typed_reference_evidence_is_exact_and_hash_sealed() -> Result<(), Box<dyn std
         (
             "cudnn_benchmark.json",
             "BooleanCapabilityReference::CudnnBenchmark",
-            "87b64815c48ac9497080ca46a8b569f7033b27e09df866a3c3877cc9d2c2536c",
+            "74922f7a1790cc3a72ec843b5eb299cd0a1bce5c9b2b904c2974d35b57a72b1b",
         ),
         (
             "torch_complex64.json",
             "DType::Complex64",
-            "3b3f8a174b4d2de5247ea6416ae20dfbc60e4098339541c64dfdf9a2af2feec1",
+            "a5509bbc0dcb00e0b6012ded3504b3f1baaa9d051c352c8c8724000282b4fa0f",
         ),
         (
             "torch_float.json",
             "DType::F32",
-            "8e6e1965ca17f8b62321bb67d9888c97f2dbcf4ef3bcdbb1c12436df739c64ed",
+            "14cf499b4d0c047da2b0f1a6deb18d66de5ad62dede60665ca3737915ba547c4",
         ),
         (
             "torch_float8_e4m3fn.json",
             "DType::Float8E4m3Fn",
-            "2cf3d51f9a47e6bf1d2b1ba295804d16a9d8a5d195d7900c12635490f93a83ce",
+            "7b38c5004b2f2407aca8e95e5bf6ddb6a0f37f3ac914137d90cab4417428871c",
         ),
         (
             "torch_float8_e5m2fnuz.json",
             "DType::Float8E5m2Fnuz",
-            "39225299abc0b1182bc0a5a89b03749b1e36330239e365d6cd3a7ba0c2199f69",
+            "4197168e5d437a39ca01ee221d365c4a19223ef06fd34eb59d4627ab93b0817a",
         ),
         (
             "torch_int16.json",
             "DType::I16",
-            "c92e79f2486d30ee1f1f3985a050bbba2640f93eddd50ef1ad9dca3bd8bec653",
+            "70408a51c8f67cf51d21ad82a5d522c6f8f7e2e9e8659278a23919fd6de943e0",
         ),
         (
             "torch_nn_hardswish.json",
             "FunctionReference::Hardswish",
-            "f5b5d457c30a416ac6e9b372f47b5d750e02fd685305be66d8869ecb8a019f80",
+            "fb88bfaf07908313cf7f137e6329f2cace2a71cfa1200140a29fdbfa1262fb6e",
         ),
         (
             "torch_nn_selu.json",
             "FunctionReference::Selu",
-            "cd436dafafd1008af3c0baefb030f9113cf9274cb26af0c1e81d6d90dc3edc21",
+            "1eb1a772a52bde6dac53b7f4bfa515ef86d930a54b1a7a8f1577e370cdaab4fe",
         ),
         (
             "xpu_total_memory.json",
             "DevicePropertyReference::XpuTotalMemory",
-            "b1da1ff94d1817fc71b53aca020f9b4837851de55bbdd108682a10c1cc30a716",
+            "c361fc22bb3aaf59c964c29a76df2c774339aebade40e1eb45ec5597284da3d5",
         ),
         (
             "interpolation_nearest.json",
             "EnumVariantReference::InterpolationNearest",
-            "f2fcad6e61e9137c56c13cb927e27c20a49619dc884e910878624b66bfdcbcf1",
+            "f7b71f81b8342d794ee11edc1d71ac06e14a6803eb962e90002f195b992c15fc",
         ),
         (
             "functional_interpolation_bicubic.json",
             "EnumVariantReference::FunctionalInterpolationBicubic",
-            "08ebad1dbd740d370dcd0df6e6d1d1bbbc70055752103bfd5deae8c5ffda4827",
+            "ef358e6427472ea68489f1b7de6178cb9a96638955b3713496fdf3745282ebd7",
         ),
         (
             "xformers_module_version.json",
             "VersionValueReference::XformersModule",
-            "9edd779a2933d9bff85ee21c020d558ef2e60d437035f321b1de35333df68135",
+            "34d0aa21ee10ab6c36cd056e40b3d9317c4c9acec6893a912ae89ac7d1dcfd33",
         ),
     ] {
         let fixture_path = fixture_directory.join(file_name);

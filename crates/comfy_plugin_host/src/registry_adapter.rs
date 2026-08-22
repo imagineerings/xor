@@ -996,7 +996,8 @@ fn plugin_value_from_stored(
             hex_digest(stored.semantic_digest_sha256()),
             registry,
         ),
-        NativeStoredPayload::Conditioning(_)
+        NativeStoredPayload::Latent(_)
+        | NativeStoredPayload::Conditioning(_)
         | NativeStoredPayload::Noise(_)
         | NativeStoredPayload::BoundingBox(_)
         | NativeStoredPayload::FaceLandmarks(_)
@@ -1637,7 +1638,10 @@ mod tests {
         ApiVersion, ArtifactValue, DType, DeviceId, PortSerialization, StreamId, TensorDescriptor,
     };
     use comfy_runtime::{AttemptId, NativeHandleStoreGeneration, PromptId};
-    use comfy_tensor::{CancellationToken, CpuBackend, CpuWorkspaceAuthority, Tensor};
+    use comfy_tensor::{
+        CancellationToken, CpuBackend, CpuWorkspaceAuthority, NativeLatentBundle,
+        NativeLatentMetadata, Tensor,
+    };
     use comfy_types::NodeId;
     use std::error::Error;
 
@@ -2090,6 +2094,72 @@ mod tests {
     }
 
     #[test]
+    fn latent_bundle_input_rejection_preserves_the_canonical_store_entry()
+    -> Result<(), Box<dyn Error>> {
+        let registry = TypeRegistry::built_in()?;
+        let port = input_port(&registry, "LATENT", PortSerialization::Handle)?;
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let samples =
+            clip_vision_output_tensor(&backend, &authority, &cancellation, vec![1, 4, 2, 2], 1.0)?;
+        let context = backend.execution_context(
+            StreamId::DEFAULT,
+            authority.authorize_workspace(1024 * 1024)?,
+            &cancellation,
+        );
+        let bundle = Arc::new(NativeLatentBundle::single(
+            samples,
+            None,
+            Some(vec![7]),
+            NativeLatentMetadata::checked(None, None, Some(8), None)?,
+            &context,
+        )?);
+        let payload = NativeStoredPayload::Latent(bundle.clone());
+        let payload_bytes = payload.resident_bytes()?;
+        let generation = NativeHandleStoreGeneration::with_capacities(1, payload_bytes)?;
+        let attempt_id = AttemptId(Uuid::from_u128(0x301));
+        let store = generation.handle_store_for_attempt(attempt_id);
+        let handle = store.publish(payload, &cancellation)?;
+        let expected_type = NativeHandleType::new(NativeHandleKind::Latent, "LATENT")?;
+        assert_eq!(handle.handle_type(), &expected_type);
+        let before_len = generation.len();
+        let before_resident_bytes = generation.resident_bytes();
+        let node_context = NativeNodeContext::new(
+            PromptId(Uuid::from_u128(0x401)),
+            attempt_id,
+            NodeId::from("latent-bundle-plugin-input"),
+            cancellation.clone(),
+            authority.authorize_workspace(0)?,
+            store.clone(),
+        )?;
+
+        let failure = plugin_value(
+            &port,
+            NativeValue::Handle {
+                value: handle.clone(),
+            },
+            &registry,
+            "profile-a",
+            &node_context,
+        )
+        .expect_err("LATENT bundle has no lossless plugin SDK representation");
+        assert_eq!(failure.code, "unmaterialized_plugin_payload");
+        assert_eq!(generation.len(), before_len);
+        assert_eq!(generation.resident_bytes(), before_resident_bytes);
+
+        let resolved = store.resolve(&handle, &expected_type, &cancellation)?;
+        let NativeStoredPayload::Latent(resolved_bundle) = resolved.as_ref() else {
+            return Err("resolved LATENT changed stored payload variant".into());
+        };
+        assert!(Arc::ptr_eq(resolved_bundle, &bundle));
+        assert_eq!(
+            resolved_bundle.semantic_digest_sha256(),
+            bundle.semantic_digest_sha256()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn explicit_stored_variants_are_exhaustively_projected_or_rejected()
     -> Result<(), Box<dyn Error>> {
         let source = include_str!("registry_adapter.rs");
@@ -2117,6 +2187,7 @@ mod tests {
             );
         }
         for rejected in [
+            "NativeStoredPayload::Latent(_)",
             "NativeStoredPayload::Conditioning(_)",
             "NativeStoredPayload::Noise(_)",
             "NativeStoredPayload::BoundingBox(_)",

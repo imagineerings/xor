@@ -11,14 +11,372 @@ use comfy_model::{
     },
 };
 use comfy_tensor::{
-    CpuBackend, ExecutionContext, Tensor,
-    generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32},
+    CpuBackend, ExecutionContext, NativeLatentBundle, NativeLatentBundleError,
+    NativeLatentMetadataRetention, NativeLatentNoiseMask, NativeLatentSamples, Tensor,
+    generated_native_diffusion::{NativeDiffusionTensorError, tensor_from_f32, tensor_to_f32},
 };
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error;
 
 use crate::GUIDANCE_ADAPTER_ID;
+use crate::{NativeNoiseGeneration, NativeNoisePayload, NativeSamplerPayloadError, NoiseRequest};
+
+#[derive(Clone, Debug)]
+pub enum NativeLatentNoiseGeneration {
+    Tensor(NativeNoiseGeneration),
+    AudioVideo {
+        video: NativeNoiseGeneration,
+        audio: NativeNoiseGeneration,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeLatentSamplingInput {
+    bundle: NativeLatentBundle,
+}
+
+impl NativeLatentSamplingInput {
+    pub fn checked(
+        bundle: &NativeLatentBundle,
+        context: &ExecutionContext<'_>,
+    ) -> Result<Self, NativeDiffusionPayloadError> {
+        bundle.validate(context)?;
+        Ok(Self {
+            bundle: bundle.clone(),
+        })
+    }
+
+    pub fn samples(&self) -> &NativeLatentSamples {
+        self.bundle.samples()
+    }
+
+    pub fn noise_mask(&self) -> Option<&NativeLatentNoiseMask> {
+        self.bundle.noise_mask()
+    }
+
+    pub fn batch_indices(&self) -> Option<&[u64]> {
+        self.bundle.batch_indices()
+    }
+
+    pub fn generate_noise(
+        &self,
+        noise: &NativeNoisePayload,
+        backend: &CpuBackend,
+        request: &NoiseRequest,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeLatentNoiseGeneration, NativeDiffusionPayloadError> {
+        context.check()?;
+        Ok(match self.bundle.samples() {
+            NativeLatentSamples::Tensor(samples) => {
+                NativeLatentNoiseGeneration::Tensor(noise.generate(
+                    backend,
+                    samples,
+                    self.bundle.batch_indices(),
+                    request,
+                    context,
+                )?)
+            }
+            NativeLatentSamples::AudioVideo { video, audio } => {
+                NativeLatentNoiseGeneration::AudioVideo {
+                    video: noise.generate(
+                        backend,
+                        video,
+                        self.bundle.batch_indices(),
+                        request,
+                        context,
+                    )?,
+                    audio: noise.generate(
+                        backend,
+                        audio,
+                        self.bundle.batch_indices(),
+                        request,
+                        context,
+                    )?,
+                }
+            }
+        })
+    }
+
+    pub fn masked_model_input(
+        &self,
+        current: &NativeLatentSamples,
+        noise: &NativeLatentNoiseGeneration,
+        sigma: f32,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeLatentSamples, NativeDiffusionPayloadError> {
+        if !sigma.is_finite() || sigma < 0.0 {
+            return Err(NativeDiffusionPayloadError::Invalid(
+                "native latent sampling sigma must be finite and nonnegative".to_owned(),
+            ));
+        }
+        match (
+            self.bundle.samples(),
+            current,
+            noise,
+            self.bundle.noise_mask(),
+        ) {
+            (
+                NativeLatentSamples::Tensor(original),
+                NativeLatentSamples::Tensor(current),
+                NativeLatentNoiseGeneration::Tensor(noise),
+                mask,
+            ) => Ok(NativeLatentSamples::Tensor(masked_model_component(
+                original,
+                current,
+                &noise.noise,
+                mask.and_then(NativeLatentNoiseMask::tensor),
+                sigma,
+                backend,
+                context,
+            )?)),
+            (
+                NativeLatentSamples::AudioVideo {
+                    video: original_video,
+                    audio: original_audio,
+                },
+                NativeLatentSamples::AudioVideo {
+                    video: current_video,
+                    audio: current_audio,
+                },
+                NativeLatentNoiseGeneration::AudioVideo {
+                    video: video_noise,
+                    audio: audio_noise,
+                },
+                mask,
+            ) => {
+                let (video_mask, audio_mask) = match mask {
+                    Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
+                        (Some(video), Some(audio))
+                    }
+                    None => (None, None),
+                    Some(NativeLatentNoiseMask::Tensor(_)) => {
+                        return Err(NativeDiffusionPayloadError::LatentStructureMismatch);
+                    }
+                };
+                Ok(NativeLatentSamples::AudioVideo {
+                    video: masked_model_component(
+                        original_video,
+                        current_video,
+                        &video_noise.noise,
+                        video_mask,
+                        sigma,
+                        backend,
+                        context,
+                    )?,
+                    audio: masked_model_component(
+                        original_audio,
+                        current_audio,
+                        &audio_noise.noise,
+                        audio_mask,
+                        sigma,
+                        backend,
+                        context,
+                    )?,
+                })
+            }
+            _ => Err(NativeDiffusionPayloadError::LatentStructureMismatch),
+        }
+    }
+
+    pub fn masked_denoised(
+        &self,
+        denoised: &NativeLatentSamples,
+        backend: &CpuBackend,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeLatentSamples, NativeDiffusionPayloadError> {
+        match (self.bundle.samples(), denoised, self.bundle.noise_mask()) {
+            (
+                NativeLatentSamples::Tensor(original),
+                NativeLatentSamples::Tensor(denoised),
+                mask,
+            ) => Ok(NativeLatentSamples::Tensor(masked_denoised_component(
+                original,
+                denoised,
+                mask.and_then(NativeLatentNoiseMask::tensor),
+                backend,
+                context,
+            )?)),
+            (
+                NativeLatentSamples::AudioVideo {
+                    video: original_video,
+                    audio: original_audio,
+                },
+                NativeLatentSamples::AudioVideo {
+                    video: denoised_video,
+                    audio: denoised_audio,
+                },
+                mask,
+            ) => {
+                let (video_mask, audio_mask) = match mask {
+                    Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
+                        (Some(video), Some(audio))
+                    }
+                    None => (None, None),
+                    Some(NativeLatentNoiseMask::Tensor(_)) => {
+                        return Err(NativeDiffusionPayloadError::LatentStructureMismatch);
+                    }
+                };
+                Ok(NativeLatentSamples::AudioVideo {
+                    video: masked_denoised_component(
+                        original_video,
+                        denoised_video,
+                        video_mask,
+                        backend,
+                        context,
+                    )?,
+                    audio: masked_denoised_component(
+                        original_audio,
+                        denoised_audio,
+                        audio_mask,
+                        backend,
+                        context,
+                    )?,
+                })
+            }
+            _ => Err(NativeDiffusionPayloadError::LatentStructureMismatch),
+        }
+    }
+
+    pub fn finish(
+        &self,
+        samples: NativeLatentSamples,
+        context: &ExecutionContext<'_>,
+    ) -> Result<NativeLatentBundle, NativeDiffusionPayloadError> {
+        Ok(self.bundle.replaced_samples(
+            samples,
+            NativeLatentMetadataRetention::DropDownscaleRatios,
+            context,
+        )?)
+    }
+}
+
+fn masked_model_component(
+    original: &Tensor,
+    current: &Tensor,
+    noise: &Tensor,
+    mask: Option<&Tensor>,
+    sigma: f32,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionPayloadError> {
+    require_same_latent_descriptor(original, current)?;
+    require_same_latent_descriptor(original, noise)?;
+    let Some(mask) = mask else {
+        return Ok(current.clone());
+    };
+    let original_values = tensor_to_f32(backend, original, context)?;
+    let current_values = tensor_to_f32(backend, current, context)?;
+    let noise_values = tensor_to_f32(backend, noise, context)?;
+    let mask_values = tensor_to_f32(backend, mask, context)?;
+    let mut output = backend.workspace_vec(context, current_values.len())?;
+    for index in 0..current_values.len() {
+        if index % 4096 == 0 {
+            context.check()?;
+        }
+        let mask_value = broadcast_mask_value(
+            index,
+            original.descriptor().shape(),
+            mask.descriptor().shape(),
+            &mask_values,
+        )?;
+        let preserved = original_values[index] + noise_values[index] * sigma;
+        output.try_push(current_values[index] * mask_value + preserved * (1.0 - mask_value))?;
+    }
+    Ok(tensor_from_f32(
+        backend,
+        original.descriptor().shape(),
+        &output,
+        context,
+    )?)
+}
+
+fn masked_denoised_component(
+    original: &Tensor,
+    denoised: &Tensor,
+    mask: Option<&Tensor>,
+    backend: &CpuBackend,
+    context: &ExecutionContext<'_>,
+) -> Result<Tensor, NativeDiffusionPayloadError> {
+    require_same_latent_descriptor(original, denoised)?;
+    let Some(mask) = mask else {
+        return Ok(denoised.clone());
+    };
+    let original_values = tensor_to_f32(backend, original, context)?;
+    let denoised_values = tensor_to_f32(backend, denoised, context)?;
+    let mask_values = tensor_to_f32(backend, mask, context)?;
+    let mut output = backend.workspace_vec(context, denoised_values.len())?;
+    for index in 0..denoised_values.len() {
+        if index % 4096 == 0 {
+            context.check()?;
+        }
+        let mask_value = broadcast_mask_value(
+            index,
+            original.descriptor().shape(),
+            mask.descriptor().shape(),
+            &mask_values,
+        )?;
+        output.try_push(
+            denoised_values[index] * mask_value + original_values[index] * (1.0 - mask_value),
+        )?;
+    }
+    Ok(tensor_from_f32(
+        backend,
+        original.descriptor().shape(),
+        &output,
+        context,
+    )?)
+}
+
+fn require_same_latent_descriptor(
+    expected: &Tensor,
+    actual: &Tensor,
+) -> Result<(), NativeDiffusionPayloadError> {
+    if expected.descriptor() != actual.descriptor() {
+        return Err(NativeDiffusionPayloadError::LatentStructureMismatch);
+    }
+    Ok(())
+}
+
+fn broadcast_mask_value(
+    mut output_index: usize,
+    sample_shape: &[u64],
+    mask_shape: &[u64],
+    mask_values: &[f32],
+) -> Result<f32, NativeDiffusionPayloadError> {
+    if sample_shape.len() != mask_shape.len() {
+        return Err(NativeDiffusionPayloadError::LatentStructureMismatch);
+    }
+    let mut mask_index = 0_usize;
+    let mut mask_stride = 1_usize;
+    for (sample_dimension, mask_dimension) in sample_shape.iter().zip(mask_shape).rev() {
+        let sample_dimension = usize::try_from(*sample_dimension)
+            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+        let mask_dimension = usize::try_from(*mask_dimension)
+            .map_err(|_| NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+        if sample_dimension == 0 || (mask_dimension != 1 && mask_dimension != sample_dimension) {
+            return Err(NativeDiffusionPayloadError::LatentStructureMismatch);
+        }
+        let coordinate = output_index % sample_dimension;
+        output_index /= sample_dimension;
+        let mask_coordinate = if mask_dimension == 1 { 0 } else { coordinate };
+        mask_index = mask_index
+            .checked_add(
+                mask_coordinate
+                    .checked_mul(mask_stride)
+                    .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?,
+            )
+            .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+        mask_stride = mask_stride
+            .checked_mul(mask_dimension)
+            .ok_or(NativeDiffusionPayloadError::ResidentBytesOverflow)?;
+    }
+    mask_values
+        .get(mask_index)
+        .copied()
+        .ok_or(NativeDiffusionPayloadError::LatentStructureMismatch)
+}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum NativeDiffusionResidentAllocationId {
@@ -713,11 +1071,21 @@ impl NativeDiffusionPayload {
 #[derive(Debug, Error)]
 pub enum NativeDiffusionPayloadError {
     #[error(transparent)]
+    Tensor(#[from] comfy_tensor::TensorError),
+    #[error(transparent)]
+    TensorKernel(#[from] NativeDiffusionTensorError),
+    #[error(transparent)]
+    Latent(#[from] NativeLatentBundleError),
+    #[error(transparent)]
+    SamplerPayload(#[from] NativeSamplerPayloadError),
+    #[error(transparent)]
     Model(#[from] NativeModelPayloadError),
     #[error(transparent)]
     Conditioning(#[from] ConditioningError),
     #[error("native diffusion payload role does not match its concrete resource")]
     RoleMismatch,
+    #[error("native latent samples, masks, or generated noise have incompatible structure")]
+    LatentStructureMismatch,
     #[error("native diffusion payload is invalid: {0}")]
     Invalid(String),
     #[error("native diffusion payload resident byte accounting overflowed")]
@@ -836,8 +1204,9 @@ mod tests {
         },
     };
     use comfy_tensor::{
-        CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, StreamId,
-        generated_native_diffusion::tensor_from_f32,
+        CancellationToken, CpuWorkspaceAuthority, DType, DeviceId, NativeLatentMetadata,
+        NativeLatentType, StreamId,
+        generated_native_diffusion::{tensor_from_f32, tensor_to_f32},
     };
     use std::{
         error::Error,
@@ -851,6 +1220,106 @@ mod tests {
 
     struct MutableIdentityExecutor {
         changed: AtomicBool,
+    }
+
+    #[test]
+    fn latent_sampling_uses_ordered_batch_indices_and_preserves_repetitions()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let samples = tensor_from_f32(&backend, &[3, 1, 2], &[0.0; 6], &context)?;
+        let bundle = NativeLatentBundle::single(
+            samples,
+            None,
+            Some(vec![2, 0, 2]),
+            NativeLatentMetadata::default(),
+            &context,
+        )?;
+        let sampling = NativeLatentSamplingInput::checked(&bundle, &context)?;
+        let request = NoiseRequest::native_diffusion("prompt", "node")?;
+        let generation = sampling.generate_noise(
+            &NativeNoisePayload::random(17)?,
+            &backend,
+            &request,
+            &context,
+        )?;
+        let NativeLatentNoiseGeneration::Tensor(generation) = generation else {
+            return Err("single latent generated nested noise".into());
+        };
+        let values = tensor_to_f32(&backend, &generation.noise, &context)?;
+        assert_eq!(&values[0..2], &values[4..6]);
+        assert_ne!(&values[0..2], &values[2..4]);
+        Ok(())
+    }
+
+    #[test]
+    fn latent_sampling_masks_model_input_and_denoised_output_at_canonical_owner()
+    -> Result<(), Box<dyn Error>> {
+        let cancellation = CancellationToken::default();
+        let (backend, authority) = CpuWorkspaceAuthority::create_backend(1024 * 1024)?;
+        let context = ExecutionContext {
+            stream: StreamId::DEFAULT,
+            scratch: authority.authorize_workspace(1024 * 1024)?,
+            rng_phase: None,
+            cancellation: &cancellation,
+        };
+        let original = tensor_from_f32(&backend, &[1, 1, 2], &[10.0, 20.0], &context)?;
+        let mask = tensor_from_f32(&backend, &[1, 1, 2], &[0.0, 1.0], &context)?;
+        let bundle = NativeLatentBundle::single(
+            original,
+            Some(mask),
+            Some(vec![5]),
+            NativeLatentMetadata::checked(
+                Some(NativeLatentType::Audio),
+                Some(48_000),
+                Some(8),
+                Some(4),
+            )?,
+            &context,
+        )?;
+        let sampling = NativeLatentSamplingInput::checked(&bundle, &context)?;
+        let current = tensor_from_f32(&backend, &[1, 1, 2], &[100.0, 200.0], &context)?;
+        let noise = tensor_from_f32(&backend, &[1, 1, 2], &[1.0, 2.0], &context)?;
+        let masked = sampling.masked_model_input(
+            &NativeLatentSamples::Tensor(current),
+            &NativeLatentNoiseGeneration::Tensor(NativeNoiseGeneration {
+                noise,
+                before: None,
+                after: None,
+            }),
+            2.0,
+            &backend,
+            &context,
+        )?;
+        let masked = masked.tensor().ok_or("masked samples are nested")?;
+        assert_eq!(&*tensor_to_f32(&backend, masked, &context)?, &[12.0, 200.0]);
+
+        let denoised = tensor_from_f32(&backend, &[1, 1, 2], &[300.0, 400.0], &context)?;
+        let denoised =
+            sampling.masked_denoised(&NativeLatentSamples::Tensor(denoised), &backend, &context)?;
+        let denoised = denoised.tensor().ok_or("denoised samples are nested")?;
+        assert_eq!(
+            &*tensor_to_f32(&backend, denoised, &context)?,
+            &[10.0, 400.0]
+        );
+
+        let finished = sampling.finish(NativeLatentSamples::Tensor(denoised.clone()), &context)?;
+        assert_eq!(finished.batch_indices(), Some([5].as_slice()));
+        assert!(finished.noise_mask().is_some());
+        assert_eq!(
+            finished.metadata().latent_type(),
+            Some(NativeLatentType::Audio)
+        );
+        assert_eq!(finished.metadata().sample_rate(), Some(48_000));
+        assert_eq!(finished.metadata().spatial_downscale_ratio(), None);
+        assert_eq!(finished.metadata().temporal_downscale_ratio(), None);
+        Ok(())
     }
 
     impl ControlModelExecutor for MutableIdentityExecutor {

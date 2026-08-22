@@ -1448,7 +1448,7 @@ mod tests {
                 return Err(NativeHandleStoreError::DigestMismatch);
             }
             NativeResolvedPayload::checked(payload, Arc::new(TestRetention))
-                .map_err(NativeHandleStoreError::InvalidPayload)
+                .map_err(NativeHandleStoreError::from)
         }
 
         fn publish(

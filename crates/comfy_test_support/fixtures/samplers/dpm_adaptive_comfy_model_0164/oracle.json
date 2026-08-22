@@ -8,7 +8,7 @@
     "wrapper_sha256": "d882256ae9baa1d23f1367ab2ec3b021fdc15fe39ce4cb49ea2c1ee10026a649",
     "equation_path": "projects/comfy/ComfyUI/comfy/k_diffusion/sampling.py",
     "equation_sha256": "cc5f944efd85c566484c3999beb74e8c19c894f2a50ca574d090c3a46ac6bd06",
-    "catalog_sha256": "9ce79963ec723037fca84eaf73d8760fc83155f8bbc2ddd66a53aaf4e8a82c33"
+    "catalog_sha256": "c3aef7d751586a15fe6add4991e106558e1e7c112fe4267b2ab1d343d9551a8d"
   },
   "tolerance": 0.001,
   "seed": 356,

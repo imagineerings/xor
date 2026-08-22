@@ -23,62 +23,62 @@ const EXPECTED: [(&str, &str, &str); 12] = [
     (
         "COMFY-TENSOR-OP-A56F89536902",
         "zed.native.einops.rearrange-0.8.1.v1",
-        "9fbbde89b35613cd94421fb8a6464542d946ec40a517663e7183473ea801959d",
+        "9bafab422eb1354410d95f78028ead95bfe02a2daf4add34c24ee64383cafb57",
     ),
     (
         "COMFY-TENSOR-OP-4F9C05E204D4",
         "zed.native.kornia.rgb-to-lab-0.8.2-f32.v1",
-        "62601ee4f38d75c9494e10c16e32e0a666aa76a6f750ef47a6c1aa166e7a9da0",
+        "c22f18e744100498d454b5685c3db93833a99a507b0b229e0566787954237282",
     ),
     (
         "COMFY-TENSOR-OP-A555F803F554",
         "zed.native.kornia.rgb-to-ycbcr-0.8.2-f32.v1",
-        "7261afd10d510b782e77235480a2e603be8b97bd72ec14f17cd705ac75f52dd7",
+        "e7fd03c2efddb28aa2b31927f68a8284f8b92d8bad64709a741c1daabefcf01b",
     ),
     (
         "COMFY-TENSOR-OP-9EF1D9EB674A",
         "zed.native.kornia.ycbcr-to-rgb-0.8.2-f32.v1",
-        "6ff4fa8ff87c096af3bd75afd8681f8d5a3b8d51e0ed240b8b10e9ab152dbd0f",
+        "40dd5be07be5e2dadf765a020e6f7545d099745a1b13bb6ad69433c5958a0431",
     ),
     (
         "COMFY-TENSOR-OP-A551C36699B7",
         "zed.native.kornia.canny-0.8.2-f32.v1",
-        "e71b92be3beddf73aa314b238da7656ae1e89517a86e01a55033ed6e91b49156",
+        "f1743d72fa7f052da4518119f761e26a816a1ba2e853b73d1f8ac46cbce07355",
     ),
     (
         "COMFY-TENSOR-OP-AF5C2820E4C3",
         "zed.native.kornia.morphology-dilation-0.8.2-flat-geodesic.v1",
-        "7019329d959a699fb3dcd368d2f959bbd88b1c2d84482f0eefa045102dde6cdb",
+        "6e792c9f07c0605d904a594bdf8bd901494be284e44b2cb36d0fb85c4b09f955",
     ),
     (
         "COMFY-TENSOR-OP-9236C1C08976",
         "zed.native.kornia.morphology-erosion-0.8.2-flat-geodesic.v1",
-        "3bf748576b53bfb6d5a56c225bfa7725a3049dd414c8e939f6d259ba7b2b418f",
+        "09e67b197903b382fd28d0a205dc84976915fe5791420d962ecfa7c9f1c75d28",
     ),
     (
         "COMFY-TENSOR-OP-AC69F309A190",
         "zed.native.kornia.morphology-top-hat-0.8.2-flat-geodesic.v1",
-        "7bde9a0bfcd6521c0788ae0d02b33bb0d1be2a3cd8b31657240cd448fbe702c9",
+        "99fe87033c381a54c7c529acedb3867e1c5701e35332fec7467a0341a09de9db",
     ),
     (
         "COMFY-TENSOR-OP-638DE6179D46",
         "zed.native.torchvision.efficientnet-v2-s-0.27.v1",
-        "7c3ba3a770a9d1eaa4a1184eb78e955dd8117476c90830c157d73e8f2d189999",
+        "502bbef57f261367bb5474639f00d843426dd3055b725d506ddd523ebf5ce9ad",
     ),
     (
         "COMFY-TENSOR-OP-852D8E9DBC9C",
         "zed.native.torchvision.raft-large-0.27.v1",
-        "53147794c771878de08ab379beebeb54cc52caa7c11f9e9ea9fe2809f0563931",
+        "cb38210ef8317c99369bf4f7d9a83f26f05792a4ea2cfaa0c6b742986d689d60",
     ),
     (
         "COMFY-TENSOR-OP-9E730487CA71",
         "zed.native.torchvision.deform-conv2d-0.27-f32.v1",
-        "5d099e5597608f27ce8e8e5e5f1580b1445418c3d2c71b263dfd529b1a860114",
+        "2430bb96846c9a4f999b1e304997b7c9cf810884498308b73e7da5fa65c1cd8b",
     ),
     (
         "COMFY-TENSOR-OP-B7926028DA57",
         "zed.native.torchvision.to-pil-image-0.27-rgb8-boundary.v1",
-        "5f287104cedb74eaacf7da30c492c2127d6a4fe56c8216bb607f2b42d0aced80",
+        "7894d7a0047778b0b28721c047c2b2f704197bff24c6f3a5bd473bebd6a6f5e0",
     ),
 ];
 

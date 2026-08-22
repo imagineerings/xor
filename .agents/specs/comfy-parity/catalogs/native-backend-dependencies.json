@@ -12,12 +12,12 @@
   },
   "lockfile": {
     "path": "Cargo.lock",
-    "sha256": "82880820c440db47c14b6f3566ee1778e4c24d5809f97f80fe96ae53bca12879"
+    "sha256": "cda96299490e2340d286be56de350effd153a5bf8ae0d9d2622bef15cb6294a4"
   },
   "packages": {
     "anyhow": {
       "declared_requirement": "1.0.86",
-      "resolved_version": "1.0.103",
+      "resolved_version": "1.0.102",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "workspace_features": []
     },
@@ -56,7 +56,7 @@
     },
     "serde_json": {
       "declared_requirement": "1.0.144",
-      "resolved_version": "1.0.150",
+      "resolved_version": "1.0.145",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "workspace_features": [
         "preserve_order",
@@ -65,7 +65,7 @@
     },
     "thiserror": {
       "declared_requirement": "2.0.12",
-      "resolved_version": "2.0.18",
+      "resolved_version": "2.0.17",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "workspace_features": []
     },
@@ -74,11 +74,13 @@
       "resolved_version": "0.61.3",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
       "workspace_features": [
+        "Data_Xml_Dom",
         "Foundation_Numerics",
         "Globalization_DateTimeFormatting",
         "Storage_Search",
         "Storage_Streams",
         "System_Threading",
+        "UI_Notifications",
         "UI_ViewManagement",
         "Wdk_System_SystemServices",
         "Win32_Foundation",
@@ -102,6 +104,7 @@
         "Win32_Security_Cryptography",
         "Win32_Security_WinTrust",
         "Win32_Storage_FileSystem",
+        "Win32_Storage_Packaging_Appx",
         "Win32_System_Com",
         "Win32_System_Com_StructuredStorage",
         "Win32_System_Console",

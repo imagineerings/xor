@@ -8,11 +8,13 @@ use crate::{
     NativeTypeUnion, NativeValue, NativeValueType, built_in_source_schema,
 };
 use comfy_tensor::{
-    ImageTensor, Layout, MemoryFormatReference, NativeTensorPayload, NativeTensorRole,
-    generated_native_diffusion::tensor_from_f32,
+    ImageTensor, Layout, MemoryFormatReference, NativeLatentBundle, NativeLatentMetadata,
+    NativeTensorPayload, NativeTensorRole, generated_native_diffusion::tensor_from_f32,
     generated_shape_layout_transform_02::torch_movedim_exact_native,
     generated_storage_dtype_device_01::contiguous_with_context_exact_native,
 };
+#[cfg(test)]
+use comfy_tensor::NativeLatentSamples;
 use futures::future::BoxFuture;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -242,6 +244,22 @@ impl NativeNode for StableCascadeSuperResolutionControlnet {
                 .map_err(|error| tensor_failure(&context, error))?;
             let stage_b = zero_tensor(compute.backend(), &stage_b_shape, &execution)
                 .map_err(|error| tensor_failure(&context, error))?;
+            let stage_c = NativeLatentBundle::single(
+                stage_c,
+                None,
+                None,
+                NativeLatentMetadata::default(),
+                &execution,
+            )
+            .map_err(|error| tensor_failure(&context, error.to_string()))?;
+            let stage_b = NativeLatentBundle::single(
+                stage_b,
+                None,
+                None,
+                NativeLatentMetadata::default(),
+                &execution,
+            )
+            .map_err(|error| tensor_failure(&context, error.to_string()))?;
             check_cancellation(&context)?;
 
             let payloads = [
@@ -249,14 +267,8 @@ impl NativeNode for StableCascadeSuperResolutionControlnet {
                     NativeTensorPayload::from_image(NativeTensorRole::Image, controlnet_input)
                         .map_err(|error| tensor_failure(&context, error.to_string()))?,
                 )),
-                NativeStoredPayload::Tensor(Arc::new(
-                    NativeTensorPayload::from_tensor(NativeTensorRole::Latent, stage_c)
-                        .map_err(|error| tensor_failure(&context, error.to_string()))?,
-                )),
-                NativeStoredPayload::Tensor(Arc::new(
-                    NativeTensorPayload::from_tensor(NativeTensorRole::Latent, stage_b)
-                        .map_err(|error| tensor_failure(&context, error.to_string()))?,
-                )),
+                NativeStoredPayload::Latent(Arc::new(stage_c)),
+                NativeStoredPayload::Latent(Arc::new(stage_b)),
             ];
             let outputs = publish_outputs(&context, payloads)?;
             let outcome = NativeNodeOutcome::Values {
@@ -1088,18 +1100,20 @@ mod tests {
             let resolved = harness
                 .store
                 .resolve(handle, &latent_type()?, &cancellation)?;
-            let NativeStoredPayload::Tensor(payload) = resolved.as_ref() else {
-                return Err("Stable Cascade latent output is not a native tensor".into());
+            let NativeStoredPayload::Latent(payload) = resolved.as_ref() else {
+                return Err("Stable Cascade latent output is not a native latent bundle".into());
             };
-            assert_eq!(payload.role(), NativeTensorRole::Latent);
-            assert_eq!(payload.tensor().descriptor().shape(), expected_shape);
+            let NativeLatentSamples::Tensor(samples) = payload.samples() else {
+                return Err("Stable Cascade latent output is unexpectedly nested".into());
+            };
+            assert_eq!(samples.descriptor().shape(), expected_shape);
             let execution = harness.backend.execution_context(
                 StreamId::DEFAULT,
                 harness.workspace.authorize_workspace(2 * 1024 * 1024 * 1024)?,
                 &cancellation,
             );
             assert!(
-                tensor_to_f32(&harness.backend, payload.tensor(), &execution)?
+                tensor_to_f32(&harness.backend, samples, &execution)?
                     .iter()
                     .all(|value| *value == 0.0)
             );

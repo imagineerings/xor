@@ -469,13 +469,13 @@ fn authoritative_sampling_owners_have_no_competing_production_definitions()
         .find("let prediction = match guidance.execute(")
         .ok_or("KSampler does not call canonical guidance")?;
     let publication_position = ksampler
-        .find("publish_tensor(&context, NativeTensorKind::Latent, final_latent)")
+        .find("publish_latent_bundle(&context, final_latent)")
         .ok_or("KSampler final latent publication is unavailable")?;
     assert!(guidance_position < publication_position);
     assert!(ksampler[guidance_position..publication_position].contains(".execute("));
     assert_eq!(
         ksampler
-            .matches("publish_tensor(&context, NativeTensorKind::Latent, final_latent)")
+            .matches("publish_latent_bundle(&context, final_latent)")
             .count(),
         1
     );

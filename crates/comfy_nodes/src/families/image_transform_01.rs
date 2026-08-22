@@ -960,7 +960,7 @@ fn rotate_image(
     execution: &comfy_tensor::ExecutionContext<'_>,
 ) -> Result<ImageTensor, NativeNodeFailure> {
     let (batch, height, width, channels) = image.dimensions().map_err(native_failure)?;
-    let (output_height, output_width) = if turns % 2 == 0 {
+    let (output_height, output_width) = if turns.is_multiple_of(2) {
         (height, width)
     } else {
         (width, height)
@@ -1885,7 +1885,7 @@ fn publish_image_and_mask(
     if let Err(failure) = check_cancellation(context, TransformKind::PadForOutpaint.class_type()) {
         rollback_handles(
             context,
-            &[image_handle.clone(), mask_handle.clone()],
+            &[image_handle, mask_handle],
             TransformKind::PadForOutpaint,
         )?;
         return Err(failure);
@@ -1901,7 +1901,7 @@ fn publish_image_and_mask(
     if outcome.is_err() {
         rollback_handles(
             context,
-            &[image_handle.clone(), mask_handle.clone()],
+            &[image_handle, mask_handle],
             TransformKind::PadForOutpaint,
         )?;
     }

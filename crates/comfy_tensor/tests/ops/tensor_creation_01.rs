@@ -1137,52 +1137,52 @@ fn all_ten_resolutions_are_unique_runtime_sealed_and_fixture_backed()
         (
             ARANGE_OPERATION_ID,
             "arange.json",
-            "545b475b61ad9127e5afed8773f2ae45d9920d7a04db202173b80de70bd99499",
+            "b4ae28c242c7cae3a7371934bca2faab25e402cf8a4d52adca367cc56dd3cddd",
         ),
         (
             AS_TENSOR_OPERATION_ID,
             "as_tensor.json",
-            "c4ee9b98c297cfcd5112d572da78bb1d5e7aef2b80aec3f98a68a4c5ccfe90bc",
+            "232ab61bc27db5f02f5daa181d71a37e8ad23f48c7f62d80774cddcd988488b5",
         ),
         (
             EMPTY_OPERATION_ID,
             "empty.json",
-            "31eedb1c4ee5960f6933acf568fb8163e07090e996dc81c70502f278d985cde5",
+            "eba5348b19ad2079ee6607477db875189dc197b6793a3613c0226f6282f3601d",
         ),
         (
             EYE_OPERATION_ID,
             "eye.json",
-            "b83e2fe8aad0bd04880aa86b29df2a325b1a06934645c0c106d05603c82ffc99",
+            "924df8a84bb2891654a46f1f11e5a96dc1ede54bb782c8df65bee770102dacac",
         ),
         (
             FROM_NUMPY_OPERATION_ID,
             "from_numpy.json",
-            "5e7bbd2874f2c7ebab487054fa64aca8456ec4fc9461b79765960200dc5a6624",
+            "e3ff781868acad4eab1ab45461f7e3ecea14079e278d912c3bf1dff0ff5ad846",
         ),
         (
             FULL_OPERATION_ID,
             "full.json",
-            "7432dda9dfcdca0ce0020022fae317891d9ece8b102aa88024438540408ae227",
+            "3cfa23106bc5f824d0e941657493b08a8d379cad0c6bfb20f96fde08d2288cb2",
         ),
         (
             LINSPACE_OPERATION_ID,
             "linspace.json",
-            "5b858c015071847d915fc5d7cf2de1da26be7df762ac9ef99c432a4e13e174b0",
+            "ebfc64825e3ff7da77ec9a9bd480bc6e7e7c3ffee0bf9b21d00361ecc5a9625e",
         ),
         (
             ONES_OPERATION_ID,
             "ones.json",
-            "10a460e469661337928e7028135253205de0ed75351f48a0395e20478aa04c7e",
+            "d7f803a4928a4c66b77ebb2bffdc41ab3587c71a3b7c5e75e3105313b6aee184",
         ),
         (
             TENSOR_OPERATION_ID,
             "tensor.json",
-            "87c8f52f79d548ff681dd7420e88a2857a992a5057aa7eb592bb6c87136d44db",
+            "e92b3bf42aafca511e6d4007304641b4409a3fd60023e9e5edff3d1e60a3be6e",
         ),
         (
             ZEROS_OPERATION_ID,
             "zeros.json",
-            "86cad92ca05c48023f94292c0f106ac5ad92c6fc4061da0a6f00c94e408465e2",
+            "ad8cf0dca20a572f10f2377eb9d6ffd86d63a42430ab251455b78e58179608f5",
         ),
     ];
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

@@ -396,18 +396,18 @@ fn cancellation_precedes_all_shape_validation_and_publication()
 fn all_exact_contracts_are_build_sealed_to_distinct_runtime_fixtures()
 -> Result<(), Box<dyn std::error::Error>> {
     let expected = [
-        ("COMFY-TENSOR-OP-0C2E0712DA68", "torch_repeat_interleave.json", "84b24f30f0b0b1aefb368e128a16ffcd880ba5d587e4d161f9742c57a2b39b3a"),
-        ("COMFY-TENSOR-OP-17E7C823A86F", "tensor_unsqueeze.json", "f2de2de77480b9fa9d349674270e7be579887f884ceaf9ed1fe8d930fda7c8d6"),
-        ("COMFY-TENSOR-OP-25362A66A957", "tensor_expand_as.json", "5d0f64b9b9d00a2da59ecb9b43afe263caf476071306d9b5c97ea8627b70e65f"),
-        ("COMFY-TENSOR-OP-3D13DA91C9F3", "tensor_expand.json", "bc81a0a28a435a4a28d9e7edf5276cf0fecc6bcee16a75d8d34a07071cdcd47b"),
-        ("COMFY-TENSOR-OP-3E6301EB6AA6", "tensor_repeat_interleave.json", "862704fe9c791394baf13575131b58885b8245774e55e9c03216d2bdb7e55704"),
-        ("COMFY-TENSOR-OP-3E9A0E130935", "torch_unsqueeze.json", "62255ce6f5ec3e7770d4f702ecbbb59c7d6476038a5193d41c6db6726ae29406"),
-        ("COMFY-TENSOR-OP-47B154B1D223", "torch_chunk.json", "4079d4531c598041052a01daad18d4b0475ead0fdd89d82edb73169711245357"),
-        ("COMFY-TENSOR-OP-5380FDF9E668", "tensor_view.json", "3b1130a82a1dd45075bc3fb5a6a5af096b9d5c9267e680869fecfc406d8e47dc"),
-        ("COMFY-TENSOR-OP-5A4B8BBBFD81", "tensor_chunk.json", "e993b80c337aa65e218a602bde50dc8270997de18c0f50e4cb20729f0856b29e"),
-        ("COMFY-TENSOR-OP-67D2FDD707E0", "tensor_flatten.json", "bc520ef02e159deb24e772bda7642e9cba3988c1364293ca073761b66e44666b"),
-        ("COMFY-TENSOR-OP-71DB8F99EAAC", "einops_repeat.json", "158c87a3850b220fc65402bab95cd18db4c7c69e0728f176843edf2015b3e4cb"),
-        ("COMFY-TENSOR-OP-73D179A8CEB9", "tensor_movedim.json", "b611d45a63bb8c764957543880888bdcdd27ee2566b5606f4e3e09e6f9b0688d"),
+        ("COMFY-TENSOR-OP-0C2E0712DA68", "torch_repeat_interleave.json", "84b976ca3d1d375d84eb73e2ff8845b2fc0d2d80d53b651cf1d450632055ffa6"),
+        ("COMFY-TENSOR-OP-17E7C823A86F", "tensor_unsqueeze.json", "08d02403e18d95597e919e2a95ce12c34412774c00cefed4b26b3b66950d02aa"),
+        ("COMFY-TENSOR-OP-25362A66A957", "tensor_expand_as.json", "29a86c4d45df833e165fc1332d5bc04df14a5dc0df56662782518c9005614c6a"),
+        ("COMFY-TENSOR-OP-3D13DA91C9F3", "tensor_expand.json", "0f39d4f58f4e5420fe921da5cd57f34b51cdbeea9d387c299bf7e910c1a7863f"),
+        ("COMFY-TENSOR-OP-3E6301EB6AA6", "tensor_repeat_interleave.json", "b9b464137e583aaf0e48682176ced785560077bcf68ec871430f657274c28d79"),
+        ("COMFY-TENSOR-OP-3E9A0E130935", "torch_unsqueeze.json", "a7e99dd9faf53d3a763f7a8e774e5bb12e079191c3e5dc45e90dc7dcd99f852c"),
+        ("COMFY-TENSOR-OP-47B154B1D223", "torch_chunk.json", "9ac46855af3970a6bc45d9d4fbf4de14f44d1e363b4f6184513b5c7a52a4cf1c"),
+        ("COMFY-TENSOR-OP-5380FDF9E668", "tensor_view.json", "5c238f1689e8aeab586c95aad522159e1f296e824632a6da06ad74e6bd1d4f90"),
+        ("COMFY-TENSOR-OP-5A4B8BBBFD81", "tensor_chunk.json", "d4ba3ab03cf6f3e5c80aef26f424777fdc7ec53d5e571d69c552276fc75da3c5"),
+        ("COMFY-TENSOR-OP-67D2FDD707E0", "tensor_flatten.json", "6118e65459c71abac9ad762c6a1c5f12a8018ad35af1555e4fcfae7a51bd9f39"),
+        ("COMFY-TENSOR-OP-71DB8F99EAAC", "einops_repeat.json", "567544b1017baf74f5335a03af15a1ee788e0dabc4f4074c136f0937af606f8e"),
+        ("COMFY-TENSOR-OP-73D179A8CEB9", "tensor_movedim.json", "dcef471212dca303e3da6b1f894326fc828b97dc6b51d21f753aecd54399acc6"),
     ];
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()

@@ -1638,9 +1638,7 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             || record.value.digest_sha256() != record.digest_sha256
             || residency != record.residency
         {
-            return Err(NativeHandleStoreError::InvalidPayload(
-                comfy_nodes::NativeStoredPayloadError::ProjectionChanged,
-            ));
+            return Err(comfy_nodes::NativeStoredPayloadError::ProjectionChanged.into());
         }
         record.resolved_roots = record.resolved_roots.checked_add(1).ok_or_else(|| {
             NativeHandleStoreError::Rejected(
@@ -1688,9 +1686,9 @@ impl NativeHandleStore for RuntimeNativeHandleStoreSession {
             match data.allocations.get(allocation.id()) {
                 Some(stored) => {
                     if stored.resident_bytes != allocation.resident_bytes() {
-                        return Err(NativeHandleStoreError::InvalidPayload(
-                            comfy_nodes::NativeStoredPayloadError::ResidentAllocationChanged,
-                        ));
+                        return Err(
+                            comfy_nodes::NativeStoredPayloadError::ResidentAllocationChanged.into(),
+                        );
                     }
                     stored.handle_references.checked_add(1).ok_or_else(|| {
                         NativeHandleStoreError::Rejected(
@@ -3748,6 +3746,7 @@ pub(crate) mod tests {
             })
     }
 
+    #[allow(clippy::result_large_err)]
     fn stored_test_payload(
         abi_bytes: Vec<u8>,
     ) -> Result<NativeStoredPayload, comfy_nodes::NativeStoredPayloadError> {

@@ -274,7 +274,7 @@ fn provider_manifest(component_digest: String) -> Result<PluginManifest, Box<dyn
         bindings: vec![ProviderBindingClaim {
             feature_id: "COMFY-NODE-0141".to_owned(),
             node_id: "ElevenLabsAudioIsolation".to_owned(),
-            contract_sha256: "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+            contract_sha256: "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
                 .to_owned(),
             transport_schema: "zed:comfy-provider-transport@1".parse()?,
             materializer_schema: "zed:comfy-provider-materializer@1".parse()?,
@@ -1084,7 +1084,7 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
         .ok_or("paid provider contract is absent")?;
     assert_eq!(
         contract,
-        "97306d7b3c5926c30cfe3c06bb3266be95fba702af3649322784a94ee1d48448"
+        "48dd482033f7ca2bb6baa83e9a9cde25c8e7f896a15acd31821d37451423106b"
     );
     let manifest = provider_manifest("0".repeat(64))?;
     assert_eq!(
@@ -1092,7 +1092,7 @@ fn provider_fixture_contract_matches_the_generated_paid_descriptor() -> Result<(
             .provider_binding
             .ok_or("provider binding set is absent")?
             .bindings_sha256,
-        "4e25e7bd14a20b225095b06107bd299eaf3b014a916cbbca5bd58f3d3b440031"
+        "6edd3643bc5577d66f7bd6765e970142448aab383476e1fc7d084c00ae988ae8"
     );
     Ok(())
 }

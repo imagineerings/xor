@@ -190,7 +190,7 @@ fn typed_reference_evidence_is_exact_distinct_and_hash_sealed()
             "torch.__path__",
             "namespace",
             "NamespaceReference::TorchPackagePath",
-            "a4b2d93b90aaa03fcd7b19454a21af16583ef2038605b5240c2265e99a248026",
+            "3d4870d04350ef4e49af136c15c9a427c6c61475b52c4151f1693abbe5de9196",
         ),
         (
             "torch_bfloat16.json",
@@ -198,7 +198,7 @@ fn typed_reference_evidence_is_exact_distinct_and_hash_sealed()
             "torch.bfloat16",
             "dtype",
             "DType::Bf16",
-            "4b05c9b5056526fb1c867d813861272e292987fe78d5399ef1fce3d9fd5b79f7",
+            "7b9a0c250223ba56394c83dba92711f50b68a61dc8fcb97d57e098fd3d2a5c40",
         ),
         (
             "torch_preserve_format.json",
@@ -206,7 +206,7 @@ fn typed_reference_evidence_is_exact_distinct_and_hash_sealed()
             "torch.preserve_format",
             "layout-or-memory-format",
             "MemoryFormatReference::PreserveFormat",
-            "038b4b7bc0766b403d2585fddf1bf7f4d3fa8ee96bbfd1b18fba3a2b1c310de1",
+            "2d6d61c097abb099e6fce5ccfc93240c343c3c7f93ec8f55aaa5954ca54decb0",
         ),
         (
             "torch_uint16.json",
@@ -214,7 +214,7 @@ fn typed_reference_evidence_is_exact_distinct_and_hash_sealed()
             "torch.uint16",
             "dtype",
             "DType::U16",
-            "4c04fcf4e1271da87a93fdb6f84395f89faf7592026521c11e1a09636611f318",
+            "e421cf814f4fb6caa7928f3c47cca7a44162e8f9e157a4eb08cf098f7f9bf17c",
         ),
     ] {
         let fixture_path = fixture_directory.join(file_name);

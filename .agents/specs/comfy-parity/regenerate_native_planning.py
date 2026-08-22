@@ -8635,6 +8635,7 @@ def native_node_runtime_foundation_task(dependency: str) -> dict[str, object]:
             "crates/comfy_ui/src/execution_tests.rs",
             "crates/zed/src/zed.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/src/comfy_test_support.rs",
             "crates/comfy_test_support/tests/native_diffusion_foundation.rs",
             "crates/comfy_test_support/tests/native_image_e2e.rs",
             "crates/comfy_test_support/tests/native_release_boundary.rs",
@@ -8806,22 +8807,50 @@ def native_latent_bundle_foundation_task(dependency: str) -> dict[str, object]:
             "crates/comfy_plugin_host/src/registry_adapter.rs",
         ],
         [
+            "Cargo.toml",
             "crates/comfy_tensor/src/native_node_payload.rs",
+            "crates/comfy_tensor/tests/external_tensor_kernel_02.rs",
+            "crates/comfy_tensor/tests/external_tensor_kernel_03.rs",
+            "crates/comfy_tensor/tests/ops/shape_layout_transform_01.rs",
+            "crates/comfy_tensor/tests/ops/tensor_creation_01.rs",
+            "crates/comfy_tensor/tests/ops/value_or_constant_contract_05.rs",
+            "crates/comfy_tensor/tests/ops/value_or_constant_contract_06.rs",
             "crates/comfy_nodes/src/source_type.rs",
             "crates/comfy_nodes/src/stored_payload.rs",
             "crates/comfy_nodes/src/execution.rs",
             "crates/comfy_nodes/src/comfy_nodes.rs",
+            "crates/comfy_nodes/src/families/image_color_01.rs",
+            "crates/comfy_nodes/src/families/image_transform_01.rs",
+            "crates/comfy_nodes/src/families/image_transform_02.rs",
+            "crates/comfy_nodes/src/families/experimental_stable_cascade_01.rs",
+            "crates/comfy_model/tests/clip_text_encoder_multimodal.rs",
+            "crates/comfy_model/tests/clip_tokenizer.rs",
+            "crates/comfy_model/tests/clip_vision.rs",
             "crates/comfy_sampler/src/native_diffusion_payload.rs",
             "crates/comfy_sampler/src/comfy_sampler.rs",
+            "crates/comfy_sampler/tests/breadth_closure.rs",
+            "crates/comfy_sampler/tests/ownership.rs",
+            "crates/comfy_sampler/tests/algorithms/deis_comfy_model_0161.rs",
             "crates/comfy_runtime/src/cache.rs",
+            "crates/comfy_runtime/src/executor.rs",
             "crates/comfy_runtime/src/native_execution_controller.rs",
             "crates/comfy_plugin_host/src/registry_adapter.rs",
             "crates/comfy_plugin_host/tests/component_contract.rs",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component",
+            "crates/comfy_plugin_host/tests/fixtures/provider_component_source/guest.rs",
             "crates/comfy_test_support/tests/native_node_family_e2e.rs",
+            "crates/comfy_test_support/fixtures/tensor_operations/value_or_constant_contract_05",
+            "crates/comfy_test_support/fixtures/tensor_operations/value_or_constant_contract_06",
+            "crates/comfy_test_support/fixtures/samplers",
+            "crates/comfy_test_support/fixtures/schedulers",
+            "crates/comfy_test_support/fixtures/numeric_formats/comfy_numeric_formats_v1.json",
             "crates/comfy_test_support/tests/native_conditioning_integration.rs",
             "crates/comfy_test_support/tests/ownership_consolidation.rs",
             ".agents/specs/comfy-parity/ownership-policy.json",
             ".agents/specs/comfy-parity/catalogs/authoritative-ownership.csv",
+            ".agents/specs/comfy-parity/catalogs/native-compute-closure.json",
+            ".agents/specs/comfy-parity/catalogs/native-backend-dependencies.json",
+            ".agents/specs/comfy-parity/validate_backend_dependencies.py",
         ],
         "Source-derived fixtures cover rank-three audio and 3D latents, rank-four image latents, rank-five video latents, nested audio/video values, noise masks, batch indices, and exact metadata preservation. Every tensor and optional component is independently validated for dtype, shape, rank, device, and compatible batch geometry; semantic identity and resident accounting include every retained component exactly once. Serialization, cache lookup, persistence, restart, plugin projection, stale handles, cancellation, OOM, and rollback preserve the complete bundle or publish nothing. Sampler tests prove masks and batch indices affect execution through the canonical owner, while repository scans find no second latent dictionary, tensor, workspace, persistence, cache, or sampling-state owner.",
         dependency,
@@ -19873,14 +19902,22 @@ def existing_task_annotations() -> dict[str, dict[str, str | bool]]:
             "comfy-parity-native-scheduler-",
             "comfy-parity-native-latent-",
         ))
-        if "POST-WORKSPACE-CONSOLIDATION" in evidence:
+        post_workspace_evidence = (
+            "POST-WORKSPACE-CONSOLIDATION" in evidence
+            or (
+                identifier == "comfy-parity-native-latent-bundle-foundation"
+                and "TASK370 NATIVE LATENT BUNDLE FOUNDATION 2026-08-22 MERGED TREE PASS"
+                in evidence
+            )
+        )
+        if post_workspace_evidence:
             evidence = evidence.replace(
                 "STALE PRE-WORKSPACE-CONSOLIDATION EVIDENCE; independent revalidation required after canonical workspace migration. ",
                 "",
             )
         workspace_reopened = (
             workspace_affected
-            and "POST-WORKSPACE-CONSOLIDATION" not in evidence
+            and not post_workspace_evidence
         )
         if workspace_reopened and match.group(1).lower() == "x" and evidence:
             if "STALE PRE-WORKSPACE-CONSOLIDATION EVIDENCE" not in evidence:

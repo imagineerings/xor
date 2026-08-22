@@ -3,9 +3,13 @@ use crate::ImageTensor;
 use crate::{DType, DeviceId, Tensor, TensorDescriptor, TensorError, ViewAccess};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, mem};
 use thiserror::Error;
 
 pub const NATIVE_TENSOR_PROJECTION_SCHEMA_VERSION: u16 = 1;
+pub const NATIVE_LATENT_BUNDLE_PROJECTION_SCHEMA_VERSION: u16 = 1;
+const MAX_LATENT_SAMPLE_RATE: u32 = 768_000;
+const MAX_LATENT_DOWNSCALE_RATIO: u32 = 65_536;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -290,6 +294,1148 @@ impl NativeTensorPayload {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeLatentType {
+    Audio,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeLatentMetadata {
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    latent_type: Option<NativeLatentType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sample_rate: Option<u32>,
+    #[serde(
+        rename = "downscale_ratio_spacial",
+        skip_serializing_if = "Option::is_none"
+    )]
+    spatial_downscale_ratio: Option<u32>,
+    #[serde(
+        rename = "downscale_ratio_temporal",
+        skip_serializing_if = "Option::is_none"
+    )]
+    temporal_downscale_ratio: Option<u32>,
+}
+
+impl NativeLatentMetadata {
+    pub fn checked(
+        latent_type: Option<NativeLatentType>,
+        sample_rate: Option<u32>,
+        spatial_downscale_ratio: Option<u32>,
+        temporal_downscale_ratio: Option<u32>,
+    ) -> Result<Self, NativeLatentBundleError> {
+        let metadata = Self {
+            latent_type,
+            sample_rate,
+            spatial_downscale_ratio,
+            temporal_downscale_ratio,
+        };
+        metadata.validate()?;
+        Ok(metadata)
+    }
+
+    pub const fn latent_type(&self) -> Option<NativeLatentType> {
+        self.latent_type
+    }
+
+    pub const fn sample_rate(&self) -> Option<u32> {
+        self.sample_rate
+    }
+
+    pub const fn spatial_downscale_ratio(&self) -> Option<u32> {
+        self.spatial_downscale_ratio
+    }
+
+    pub const fn temporal_downscale_ratio(&self) -> Option<u32> {
+        self.temporal_downscale_ratio
+    }
+
+    fn without_downscale_ratios(&self) -> Self {
+        Self {
+            latent_type: self.latent_type,
+            sample_rate: self.sample_rate,
+            spatial_downscale_ratio: None,
+            temporal_downscale_ratio: None,
+        }
+    }
+
+    fn validate(&self) -> Result<(), NativeLatentBundleError> {
+        if self
+            .sample_rate
+            .is_some_and(|value| value == 0 || value > MAX_LATENT_SAMPLE_RATE)
+        {
+            return Err(NativeLatentBundleError::InvalidMetadata("sample_rate"));
+        }
+        for (field, value) in [
+            ("downscale_ratio_spacial", self.spatial_downscale_ratio),
+            ("downscale_ratio_temporal", self.temporal_downscale_ratio),
+        ] {
+            if value.is_some_and(|value| value == 0 || value > MAX_LATENT_DOWNSCALE_RATIO) {
+                return Err(NativeLatentBundleError::InvalidMetadata(field));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum NativeLatentSamples {
+    Tensor(Tensor),
+    AudioVideo { video: Tensor, audio: Tensor },
+}
+
+impl NativeLatentSamples {
+    pub fn tensor(&self) -> Option<&Tensor> {
+        match self {
+            Self::Tensor(tensor) => Some(tensor),
+            Self::AudioVideo { .. } => None,
+        }
+    }
+
+    pub fn audio_video(&self) -> Option<(&Tensor, &Tensor)> {
+        match self {
+            Self::Tensor(_) => None,
+            Self::AudioVideo { video, audio } => Some((video, audio)),
+        }
+    }
+
+    fn tensors(&self) -> [&Tensor; 2] {
+        match self {
+            Self::Tensor(tensor) => [tensor, tensor],
+            Self::AudioVideo { video, audio } => [video, audio],
+        }
+    }
+
+    fn is_nested(&self) -> bool {
+        matches!(self, Self::AudioVideo { .. })
+    }
+
+    fn batch_size(&self) -> Result<u64, NativeLatentBundleError> {
+        let [first, second] = self.tensors();
+        let first_batch = first
+            .descriptor()
+            .shape()
+            .first()
+            .copied()
+            .ok_or(NativeLatentBundleError::InvalidSamplesShape)?;
+        if self.is_nested() && second.descriptor().shape().first().copied() != Some(first_batch) {
+            return Err(NativeLatentBundleError::NestedBatchMismatch);
+        }
+        Ok(first_batch)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum NativeLatentNoiseMask {
+    Tensor(Tensor),
+    AudioVideo { video: Tensor, audio: Tensor },
+}
+
+impl NativeLatentNoiseMask {
+    pub fn tensor(&self) -> Option<&Tensor> {
+        match self {
+            Self::Tensor(tensor) => Some(tensor),
+            Self::AudioVideo { .. } => None,
+        }
+    }
+
+    pub fn audio_video(&self) -> Option<(&Tensor, &Tensor)> {
+        match self {
+            Self::Tensor(_) => None,
+            Self::AudioVideo { video, audio } => Some((video, audio)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeLatentTensorProjection {
+    descriptor: TensorDescriptor,
+    content_digest: String,
+    resident_bytes: u64,
+}
+
+impl NativeLatentTensorProjection {
+    pub fn descriptor(&self) -> &TensorDescriptor {
+        &self.descriptor
+    }
+
+    pub fn content_digest(&self) -> &str {
+        &self.content_digest
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    fn validate(&self, ranks: &[usize]) -> Result<(), NativeLatentBundleError> {
+        validate_latent_tensor_descriptor(&self.descriptor, ranks)?;
+        if !valid_lower_sha256(&self.content_digest) {
+            return Err(NativeLatentBundleError::InvalidContentDigest);
+        }
+        if self.resident_bytes < self.descriptor.minimum_backing_byte_length()? {
+            return Err(NativeLatentBundleError::ResidentBytesTooSmall);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NativeLatentSamplesProjection {
+    Tensor {
+        tensor: NativeLatentTensorProjection,
+    },
+    AudioVideo {
+        video: NativeLatentTensorProjection,
+        audio: NativeLatentTensorProjection,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum NativeLatentNoiseMaskProjection {
+    Tensor {
+        tensor: NativeLatentTensorProjection,
+    },
+    AudioVideo {
+        video: NativeLatentTensorProjection,
+        audio: NativeLatentTensorProjection,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct NativeLatentBundleProjection {
+    schema_version: u16,
+    samples: NativeLatentSamplesProjection,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    noise_mask: Option<NativeLatentNoiseMaskProjection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    batch_indices: Option<Vec<u64>>,
+    metadata: NativeLatentMetadata,
+    semantic_digest_sha256: String,
+    resident_bytes: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeLatentBundleProjectionWire {
+    schema_version: u16,
+    samples: NativeLatentSamplesProjection,
+    noise_mask: Option<NativeLatentNoiseMaskProjection>,
+    batch_indices: Option<Vec<u64>>,
+    metadata: NativeLatentMetadata,
+    semantic_digest_sha256: String,
+    resident_bytes: u64,
+}
+
+impl NativeLatentBundleProjection {
+    pub const fn schema_version(&self) -> u16 {
+        self.schema_version
+    }
+
+    pub fn samples(&self) -> &NativeLatentSamplesProjection {
+        &self.samples
+    }
+
+    pub fn noise_mask(&self) -> Option<&NativeLatentNoiseMaskProjection> {
+        self.noise_mask.as_ref()
+    }
+
+    pub fn batch_indices(&self) -> Option<&[u64]> {
+        self.batch_indices.as_deref()
+    }
+
+    pub fn metadata(&self) -> &NativeLatentMetadata {
+        &self.metadata
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        &self.semantic_digest_sha256
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+
+    fn validate(&self) -> Result<(), NativeLatentBundleError> {
+        if self.schema_version != NATIVE_LATENT_BUNDLE_PROJECTION_SCHEMA_VERSION {
+            return Err(NativeLatentBundleError::UnsupportedSchemaVersion {
+                actual: self.schema_version,
+            });
+        }
+        validate_samples_projection(&self.samples)?;
+        if let Some(mask) = &self.noise_mask {
+            validate_mask_projection(mask)?;
+            validate_projection_structure(&self.samples, mask)?;
+        }
+        self.metadata.validate()?;
+        if !valid_lower_sha256(&self.semantic_digest_sha256) {
+            return Err(NativeLatentBundleError::InvalidContentDigest);
+        }
+        Ok(())
+    }
+}
+
+impl TryFrom<NativeLatentBundleProjectionWire> for NativeLatentBundleProjection {
+    type Error = NativeLatentBundleError;
+
+    fn try_from(wire: NativeLatentBundleProjectionWire) -> Result<Self, Self::Error> {
+        let projection = Self {
+            schema_version: wire.schema_version,
+            samples: wire.samples,
+            noise_mask: wire.noise_mask,
+            batch_indices: wire.batch_indices,
+            metadata: wire.metadata,
+            semantic_digest_sha256: wire.semantic_digest_sha256,
+            resident_bytes: wire.resident_bytes,
+        };
+        projection.validate()?;
+        Ok(projection)
+    }
+}
+
+impl<'de> Deserialize<'de> for NativeLatentBundleProjection {
+    fn deserialize<DeserializerType>(
+        deserializer: DeserializerType,
+    ) -> Result<Self, DeserializerType::Error>
+    where
+        DeserializerType: Deserializer<'de>,
+    {
+        let wire = NativeLatentBundleProjectionWire::deserialize(deserializer)?;
+        Self::try_from(wire).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeLatentTensorResidentAllocation {
+    storage_id: crate::StorageId,
+    resident_bytes: u64,
+}
+
+impl NativeLatentTensorResidentAllocation {
+    pub const fn storage_id(&self) -> crate::StorageId {
+        self.storage_id
+    }
+
+    pub const fn resident_bytes(&self) -> u64 {
+        self.resident_bytes
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeLatentResidentParts {
+    owned_bytes: u64,
+    tensor_allocations: Vec<NativeLatentTensorResidentAllocation>,
+}
+
+impl NativeLatentResidentParts {
+    pub const fn owned_bytes(&self) -> u64 {
+        self.owned_bytes
+    }
+
+    pub fn tensor_allocations(&self) -> &[NativeLatentTensorResidentAllocation] {
+        &self.tensor_allocations
+    }
+
+    pub fn resident_bytes(&self) -> Result<u64, NativeLatentBundleError> {
+        self.tensor_allocations
+            .iter()
+            .try_fold(self.owned_bytes, |total, allocation| {
+                total
+                    .checked_add(allocation.resident_bytes)
+                    .ok_or(NativeLatentBundleError::ResidentBytesOverflow)
+            })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeLatentMetadataRetention {
+    Preserve,
+    DropDownscaleRatios,
+}
+
+#[derive(Clone, Debug)]
+pub struct NativeLatentBundle {
+    samples: NativeLatentSamples,
+    noise_mask: Option<NativeLatentNoiseMask>,
+    batch_indices: Option<Vec<u64>>,
+    metadata: NativeLatentMetadata,
+    projection: NativeLatentBundleProjection,
+}
+
+impl NativeLatentBundle {
+    pub fn checked(
+        samples: NativeLatentSamples,
+        noise_mask: Option<NativeLatentNoiseMask>,
+        batch_indices: Option<Vec<u64>>,
+        metadata: NativeLatentMetadata,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<Self, NativeLatentBundleError> {
+        context.check()?;
+        validate_samples(&samples, context)?;
+        if let Some(mask) = &noise_mask {
+            validate_mask(&samples, mask, context)?;
+        }
+        metadata.validate()?;
+        let batch_size = samples.batch_size()?;
+        if let Some(indices) = &batch_indices {
+            if u64::try_from(indices.len()).map_err(|_| TensorError::ShapeOverflow)? != batch_size {
+                return Err(NativeLatentBundleError::BatchIndexLengthMismatch);
+            }
+        }
+        context.check()?;
+        let mut bundle = Self {
+            samples,
+            noise_mask,
+            batch_indices,
+            metadata,
+            projection: NativeLatentBundleProjection {
+                schema_version: NATIVE_LATENT_BUNDLE_PROJECTION_SCHEMA_VERSION,
+                samples: NativeLatentSamplesProjection::Tensor {
+                    tensor: empty_latent_tensor_projection()?,
+                },
+                noise_mask: None,
+                batch_indices: None,
+                metadata: NativeLatentMetadata::default(),
+                semantic_digest_sha256: String::new(),
+                resident_bytes: 0,
+            },
+        };
+        bundle.projection = bundle.project(context)?;
+        context.check()?;
+        Ok(bundle)
+    }
+
+    pub fn single(
+        samples: Tensor,
+        noise_mask: Option<Tensor>,
+        batch_indices: Option<Vec<u64>>,
+        metadata: NativeLatentMetadata,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<Self, NativeLatentBundleError> {
+        Self::checked(
+            NativeLatentSamples::Tensor(samples),
+            noise_mask.map(NativeLatentNoiseMask::Tensor),
+            batch_indices,
+            metadata,
+            context,
+        )
+    }
+
+    pub fn audio_video(
+        video: Tensor,
+        audio: Tensor,
+        video_mask: Option<Tensor>,
+        audio_mask: Option<Tensor>,
+        batch_indices: Option<Vec<u64>>,
+        metadata: NativeLatentMetadata,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<Self, NativeLatentBundleError> {
+        let noise_mask = match (video_mask, audio_mask) {
+            (None, None) => None,
+            (Some(video), Some(audio)) => Some(NativeLatentNoiseMask::AudioVideo { video, audio }),
+            _ => return Err(NativeLatentBundleError::IncompleteNestedNoiseMask),
+        };
+        Self::checked(
+            NativeLatentSamples::AudioVideo { video, audio },
+            noise_mask,
+            batch_indices,
+            metadata,
+            context,
+        )
+    }
+
+    pub fn samples(&self) -> &NativeLatentSamples {
+        &self.samples
+    }
+
+    pub fn noise_mask(&self) -> Option<&NativeLatentNoiseMask> {
+        self.noise_mask.as_ref()
+    }
+
+    pub fn batch_indices(&self) -> Option<&[u64]> {
+        self.batch_indices.as_deref()
+    }
+
+    pub fn metadata(&self) -> &NativeLatentMetadata {
+        &self.metadata
+    }
+
+    pub fn projection(&self) -> &NativeLatentBundleProjection {
+        &self.projection
+    }
+
+    pub fn semantic_digest_sha256(&self) -> &str {
+        self.projection.semantic_digest_sha256()
+    }
+
+    pub fn resident_parts(&self) -> Result<NativeLatentResidentParts, NativeLatentBundleError> {
+        let mut storages = BTreeMap::new();
+        for tensor in latent_bundle_tensors(&self.samples, self.noise_mask.as_ref()) {
+            let storage_id = tensor.storage_id();
+            let resident_bytes = tensor.storage_byte_len();
+            if let Some(existing) = storages.insert(storage_id.get(), (storage_id, resident_bytes))
+                && existing.1 != resident_bytes
+            {
+                return Err(NativeLatentBundleError::ResidentAllocationChanged);
+            }
+        }
+        let owned_bytes = u64::try_from(mem::size_of::<Self>())
+            .map_err(|_| NativeLatentBundleError::ResidentBytesOverflow)?
+            .checked_add(
+                u64::try_from(self.batch_indices.as_ref().map_or(0, Vec::len))
+                    .map_err(|_| NativeLatentBundleError::ResidentBytesOverflow)?
+                    .checked_mul(
+                        u64::try_from(mem::size_of::<u64>())
+                            .map_err(|_| NativeLatentBundleError::ResidentBytesOverflow)?,
+                    )
+                    .ok_or(NativeLatentBundleError::ResidentBytesOverflow)?,
+            )
+            .ok_or(NativeLatentBundleError::ResidentBytesOverflow)?;
+        let parts = NativeLatentResidentParts {
+            owned_bytes,
+            tensor_allocations: storages
+                .into_values()
+                .map(
+                    |(storage_id, resident_bytes)| NativeLatentTensorResidentAllocation {
+                        storage_id,
+                        resident_bytes,
+                    },
+                )
+                .collect(),
+        };
+        parts.resident_bytes()?;
+        Ok(parts)
+    }
+
+    pub fn validate(
+        &self,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<(), NativeLatentBundleError> {
+        context.check()?;
+        validate_samples(&self.samples, context)?;
+        if let Some(mask) = &self.noise_mask {
+            validate_mask(&self.samples, mask, context)?;
+        }
+        self.metadata.validate()?;
+        if let Some(indices) = &self.batch_indices
+            && u64::try_from(indices.len()).map_err(|_| TensorError::ShapeOverflow)?
+                != self.samples.batch_size()?
+        {
+            return Err(NativeLatentBundleError::BatchIndexLengthMismatch);
+        }
+        if self.project(context)? != self.projection {
+            return Err(NativeLatentBundleError::ProjectionChanged);
+        }
+        Ok(())
+    }
+
+    pub fn validate_retained(&self) -> Result<(), NativeLatentBundleError> {
+        validate_samples_retained(&self.samples)?;
+        if let Some(mask) = &self.noise_mask {
+            validate_mask_retained(&self.samples, mask)?;
+        }
+        self.metadata.validate()?;
+        if let Some(indices) = &self.batch_indices
+            && u64::try_from(indices.len()).map_err(|_| TensorError::ShapeOverflow)?
+                != self.samples.batch_size()?
+        {
+            return Err(NativeLatentBundleError::BatchIndexLengthMismatch);
+        }
+        let samples = project_samples_retained(&self.samples)?;
+        let noise_mask = self
+            .noise_mask
+            .as_ref()
+            .map(project_mask_retained)
+            .transpose()?;
+        let semantic_digest_sha256 = latent_bundle_digest_retained(
+            &self.samples,
+            self.noise_mask.as_ref(),
+            self.batch_indices.as_deref(),
+            &self.metadata,
+        )?;
+        let resident_bytes = self.resident_parts()?.resident_bytes()?;
+        let projection = NativeLatentBundleProjection {
+            schema_version: NATIVE_LATENT_BUNDLE_PROJECTION_SCHEMA_VERSION,
+            samples,
+            noise_mask,
+            batch_indices: self.batch_indices.clone(),
+            metadata: self.metadata.clone(),
+            semantic_digest_sha256,
+            resident_bytes,
+        };
+        projection.validate()?;
+        if projection != self.projection {
+            return Err(NativeLatentBundleError::ProjectionChanged);
+        }
+        Ok(())
+    }
+
+    pub fn replaced_samples(
+        &self,
+        samples: NativeLatentSamples,
+        retention: NativeLatentMetadataRetention,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<Self, NativeLatentBundleError> {
+        let metadata = match retention {
+            NativeLatentMetadataRetention::Preserve => self.metadata.clone(),
+            NativeLatentMetadataRetention::DropDownscaleRatios => {
+                self.metadata.without_downscale_ratios()
+            }
+        };
+        Self::checked(
+            samples,
+            self.noise_mask.clone(),
+            self.batch_indices.clone(),
+            metadata,
+            context,
+        )
+    }
+
+    fn project(
+        &self,
+        context: &crate::ExecutionContext<'_>,
+    ) -> Result<NativeLatentBundleProjection, NativeLatentBundleError> {
+        let samples = project_samples(&self.samples, context)?;
+        let noise_mask = self
+            .noise_mask
+            .as_ref()
+            .map(|mask| project_mask(mask, context))
+            .transpose()?;
+        let resident_bytes = self.resident_parts()?.resident_bytes()?;
+        let semantic_digest_sha256 = latent_bundle_digest(
+            &self.samples,
+            self.noise_mask.as_ref(),
+            self.batch_indices.as_deref(),
+            &self.metadata,
+            context,
+        )?;
+        let projection = NativeLatentBundleProjection {
+            schema_version: NATIVE_LATENT_BUNDLE_PROJECTION_SCHEMA_VERSION,
+            samples,
+            noise_mask,
+            batch_indices: self.batch_indices.clone(),
+            metadata: self.metadata.clone(),
+            semantic_digest_sha256,
+            resident_bytes,
+        };
+        projection.validate()?;
+        Ok(projection)
+    }
+}
+
+fn empty_latent_tensor_projection() -> Result<NativeLatentTensorProjection, NativeLatentBundleError>
+{
+    Ok(NativeLatentTensorProjection {
+        descriptor: TensorDescriptor::contiguous(
+            vec![1, 1, 1],
+            DType::F32,
+            DeviceId::CPU,
+            crate::StreamId::DEFAULT,
+        )?,
+        content_digest: "0".repeat(64),
+        resident_bytes: 0,
+    })
+}
+
+fn valid_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_latent_tensor_descriptor(
+    descriptor: &TensorDescriptor,
+    ranks: &[usize],
+) -> Result<(), NativeLatentBundleError> {
+    if descriptor.device() != DeviceId::CPU || descriptor.dtype() != DType::F32 {
+        return Err(NativeLatentBundleError::UnsupportedTensorPlacement);
+    }
+    if !descriptor.is_contiguous()? {
+        return Err(NativeLatentBundleError::NonContiguousTensor);
+    }
+    if !ranks.contains(&descriptor.rank()) || descriptor.shape().contains(&0) {
+        return Err(NativeLatentBundleError::InvalidSamplesShape);
+    }
+    Ok(())
+}
+
+fn validate_samples(
+    samples: &NativeLatentSamples,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<(), NativeLatentBundleError> {
+    match samples {
+        NativeLatentSamples::Tensor(tensor) => {
+            context.check()?;
+            validate_latent_tensor_descriptor(tensor.descriptor(), &[3, 4, 5])?;
+        }
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            context.check()?;
+            validate_latent_tensor_descriptor(video.descriptor(), &[5])?;
+            context.check()?;
+            validate_latent_tensor_descriptor(audio.descriptor(), &[3])?;
+            if video.descriptor().shape().first() != audio.descriptor().shape().first() {
+                return Err(NativeLatentBundleError::NestedBatchMismatch);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_samples_retained(samples: &NativeLatentSamples) -> Result<(), NativeLatentBundleError> {
+    match samples {
+        NativeLatentSamples::Tensor(tensor) => {
+            validate_latent_tensor_descriptor(tensor.descriptor(), &[3, 4, 5])?;
+        }
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            validate_latent_tensor_descriptor(video.descriptor(), &[5])?;
+            validate_latent_tensor_descriptor(audio.descriptor(), &[3])?;
+            if video.descriptor().shape().first() != audio.descriptor().shape().first() {
+                return Err(NativeLatentBundleError::NestedBatchMismatch);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_mask(
+    samples: &NativeLatentSamples,
+    mask: &NativeLatentNoiseMask,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<(), NativeLatentBundleError> {
+    match (samples, mask) {
+        (NativeLatentSamples::Tensor(samples), NativeLatentNoiseMask::Tensor(mask)) => {
+            context.check()?;
+            validate_latent_tensor_descriptor(mask.descriptor(), &[3, 4, 5])?;
+            validate_mask_geometry(samples.descriptor(), mask.descriptor())?;
+        }
+        (
+            NativeLatentSamples::AudioVideo { video, audio },
+            NativeLatentNoiseMask::AudioVideo {
+                video: video_mask,
+                audio: audio_mask,
+            },
+        ) => {
+            context.check()?;
+            validate_latent_tensor_descriptor(video_mask.descriptor(), &[5])?;
+            validate_mask_geometry(video.descriptor(), video_mask.descriptor())?;
+            context.check()?;
+            validate_latent_tensor_descriptor(audio_mask.descriptor(), &[3])?;
+            validate_mask_geometry(audio.descriptor(), audio_mask.descriptor())?;
+        }
+        _ => return Err(NativeLatentBundleError::NoiseMaskStructureMismatch),
+    }
+    Ok(())
+}
+
+fn validate_mask_retained(
+    samples: &NativeLatentSamples,
+    mask: &NativeLatentNoiseMask,
+) -> Result<(), NativeLatentBundleError> {
+    match (samples, mask) {
+        (NativeLatentSamples::Tensor(samples), NativeLatentNoiseMask::Tensor(mask)) => {
+            validate_latent_tensor_descriptor(mask.descriptor(), &[3, 4, 5])?;
+            validate_mask_geometry(samples.descriptor(), mask.descriptor())?;
+        }
+        (
+            NativeLatentSamples::AudioVideo { video, audio },
+            NativeLatentNoiseMask::AudioVideo {
+                video: video_mask,
+                audio: audio_mask,
+            },
+        ) => {
+            validate_latent_tensor_descriptor(video_mask.descriptor(), &[5])?;
+            validate_mask_geometry(video.descriptor(), video_mask.descriptor())?;
+            validate_latent_tensor_descriptor(audio_mask.descriptor(), &[3])?;
+            validate_mask_geometry(audio.descriptor(), audio_mask.descriptor())?;
+        }
+        _ => return Err(NativeLatentBundleError::NoiseMaskStructureMismatch),
+    }
+    Ok(())
+}
+
+fn validate_mask_geometry(
+    samples: &TensorDescriptor,
+    mask: &TensorDescriptor,
+) -> Result<(), NativeLatentBundleError> {
+    if samples.rank() != mask.rank() {
+        return Err(NativeLatentBundleError::NoiseMaskGeometryMismatch);
+    }
+    for (index, (sample, mask)) in samples.shape().iter().zip(mask.shape()).enumerate() {
+        let compatible = if index == 0 {
+            *mask == 1 || mask == sample
+        } else {
+            *mask == 1 || mask == sample
+        };
+        if !compatible {
+            return Err(NativeLatentBundleError::NoiseMaskGeometryMismatch);
+        }
+    }
+    Ok(())
+}
+
+fn project_latent_tensor(
+    tensor: &Tensor,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<NativeLatentTensorProjection, NativeLatentBundleError> {
+    context.check()?;
+    let descriptor = tensor.descriptor().clone();
+    let content_digest = latent_tensor_digest(&descriptor, tensor.contiguous_bytes()?)?;
+    Ok(NativeLatentTensorProjection {
+        descriptor,
+        content_digest,
+        resident_bytes: tensor.storage_byte_len(),
+    })
+}
+
+fn project_samples(
+    samples: &NativeLatentSamples,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<NativeLatentSamplesProjection, NativeLatentBundleError> {
+    Ok(match samples {
+        NativeLatentSamples::Tensor(tensor) => NativeLatentSamplesProjection::Tensor {
+            tensor: project_latent_tensor(tensor, context)?,
+        },
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            NativeLatentSamplesProjection::AudioVideo {
+                video: project_latent_tensor(video, context)?,
+                audio: project_latent_tensor(audio, context)?,
+            }
+        }
+    })
+}
+
+fn project_samples_retained(
+    samples: &NativeLatentSamples,
+) -> Result<NativeLatentSamplesProjection, NativeLatentBundleError> {
+    Ok(match samples {
+        NativeLatentSamples::Tensor(tensor) => NativeLatentSamplesProjection::Tensor {
+            tensor: project_latent_tensor_retained(tensor)?,
+        },
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            NativeLatentSamplesProjection::AudioVideo {
+                video: project_latent_tensor_retained(video)?,
+                audio: project_latent_tensor_retained(audio)?,
+            }
+        }
+    })
+}
+
+fn project_mask(
+    mask: &NativeLatentNoiseMask,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<NativeLatentNoiseMaskProjection, NativeLatentBundleError> {
+    Ok(match mask {
+        NativeLatentNoiseMask::Tensor(tensor) => NativeLatentNoiseMaskProjection::Tensor {
+            tensor: project_latent_tensor(tensor, context)?,
+        },
+        NativeLatentNoiseMask::AudioVideo { video, audio } => {
+            NativeLatentNoiseMaskProjection::AudioVideo {
+                video: project_latent_tensor(video, context)?,
+                audio: project_latent_tensor(audio, context)?,
+            }
+        }
+    })
+}
+
+fn project_mask_retained(
+    mask: &NativeLatentNoiseMask,
+) -> Result<NativeLatentNoiseMaskProjection, NativeLatentBundleError> {
+    Ok(match mask {
+        NativeLatentNoiseMask::Tensor(tensor) => NativeLatentNoiseMaskProjection::Tensor {
+            tensor: project_latent_tensor_retained(tensor)?,
+        },
+        NativeLatentNoiseMask::AudioVideo { video, audio } => {
+            NativeLatentNoiseMaskProjection::AudioVideo {
+                video: project_latent_tensor_retained(video)?,
+                audio: project_latent_tensor_retained(audio)?,
+            }
+        }
+    })
+}
+
+fn project_latent_tensor_retained(
+    tensor: &Tensor,
+) -> Result<NativeLatentTensorProjection, NativeLatentBundleError> {
+    let descriptor = tensor.descriptor().clone();
+    let content_digest = latent_tensor_digest(&descriptor, tensor.contiguous_bytes()?)?;
+    Ok(NativeLatentTensorProjection {
+        descriptor,
+        content_digest,
+        resident_bytes: tensor.storage_byte_len(),
+    })
+}
+
+fn validate_samples_projection(
+    samples: &NativeLatentSamplesProjection,
+) -> Result<(), NativeLatentBundleError> {
+    match samples {
+        NativeLatentSamplesProjection::Tensor { tensor } => tensor.validate(&[3, 4, 5]),
+        NativeLatentSamplesProjection::AudioVideo { video, audio } => {
+            video.validate(&[5])?;
+            audio.validate(&[3])?;
+            if video.descriptor.shape().first() != audio.descriptor.shape().first() {
+                return Err(NativeLatentBundleError::NestedBatchMismatch);
+            }
+            Ok(())
+        }
+    }
+}
+
+fn validate_mask_projection(
+    mask: &NativeLatentNoiseMaskProjection,
+) -> Result<(), NativeLatentBundleError> {
+    match mask {
+        NativeLatentNoiseMaskProjection::Tensor { tensor } => tensor.validate(&[3, 4, 5]),
+        NativeLatentNoiseMaskProjection::AudioVideo { video, audio } => {
+            video.validate(&[5])?;
+            audio.validate(&[3])
+        }
+    }
+}
+
+fn validate_projection_structure(
+    samples: &NativeLatentSamplesProjection,
+    mask: &NativeLatentNoiseMaskProjection,
+) -> Result<(), NativeLatentBundleError> {
+    match (samples, mask) {
+        (
+            NativeLatentSamplesProjection::Tensor { tensor: samples },
+            NativeLatentNoiseMaskProjection::Tensor { tensor: mask },
+        ) => validate_mask_geometry(&samples.descriptor, &mask.descriptor),
+        (
+            NativeLatentSamplesProjection::AudioVideo { video, audio },
+            NativeLatentNoiseMaskProjection::AudioVideo {
+                video: video_mask,
+                audio: audio_mask,
+            },
+        ) => {
+            validate_mask_geometry(&video.descriptor, &video_mask.descriptor)?;
+            validate_mask_geometry(&audio.descriptor, &audio_mask.descriptor)
+        }
+        _ => Err(NativeLatentBundleError::NoiseMaskStructureMismatch),
+    }
+}
+
+fn latent_bundle_tensors<'a>(
+    samples: &'a NativeLatentSamples,
+    mask: Option<&'a NativeLatentNoiseMask>,
+) -> Vec<&'a Tensor> {
+    let mut tensors = match samples {
+        NativeLatentSamples::Tensor(tensor) => vec![tensor],
+        NativeLatentSamples::AudioVideo { video, audio } => vec![video, audio],
+    };
+    match mask {
+        Some(NativeLatentNoiseMask::Tensor(tensor)) => tensors.push(tensor),
+        Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
+            tensors.push(video);
+            tensors.push(audio);
+        }
+        None => {}
+    }
+    tensors
+}
+
+fn latent_tensor_digest(
+    descriptor: &TensorDescriptor,
+    bytes: &[u8],
+) -> Result<String, NativeLatentBundleError> {
+    let expected = descriptor.byte_len()?;
+    let actual = u64::try_from(bytes.len()).map_err(|_| TensorError::ShapeOverflow)?;
+    if expected != actual {
+        return Err(NativeLatentBundleError::ContentByteLength { expected, actual });
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed.comfy.native-latent-tensor.semantic.v1");
+    hasher.update(serde_json::to_vec(&descriptor.dtype())?);
+    hasher.update(
+        u64::try_from(descriptor.rank())
+            .map_err(|_| TensorError::ShapeOverflow)?
+            .to_le_bytes(),
+    );
+    for dimension in descriptor.shape() {
+        hasher.update(dimension.to_le_bytes());
+    }
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn latent_bundle_digest(
+    samples: &NativeLatentSamples,
+    mask: Option<&NativeLatentNoiseMask>,
+    batch_indices: Option<&[u64]>,
+    metadata: &NativeLatentMetadata,
+    context: &crate::ExecutionContext<'_>,
+) -> Result<String, NativeLatentBundleError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed.comfy.native-latent-bundle.semantic.v1");
+    match samples {
+        NativeLatentSamples::Tensor(tensor) => {
+            hasher.update([1]);
+            context.check()?;
+            hasher.update(latent_tensor_digest(
+                tensor.descriptor(),
+                tensor.contiguous_bytes()?,
+            )?);
+        }
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            hasher.update([2]);
+            for tensor in [video, audio] {
+                context.check()?;
+                hasher.update(latent_tensor_digest(
+                    tensor.descriptor(),
+                    tensor.contiguous_bytes()?,
+                )?);
+            }
+        }
+    }
+    match mask {
+        None => hasher.update([0]),
+        Some(NativeLatentNoiseMask::Tensor(tensor)) => {
+            hasher.update([1]);
+            context.check()?;
+            hasher.update(latent_tensor_digest(
+                tensor.descriptor(),
+                tensor.contiguous_bytes()?,
+            )?);
+        }
+        Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
+            hasher.update([2]);
+            for tensor in [video, audio] {
+                context.check()?;
+                hasher.update(latent_tensor_digest(
+                    tensor.descriptor(),
+                    tensor.contiguous_bytes()?,
+                )?);
+            }
+        }
+    }
+    match batch_indices {
+        None => hasher.update([0]),
+        Some(indices) => {
+            hasher.update([1]);
+            hasher.update(
+                u64::try_from(indices.len())
+                    .map_err(|_| TensorError::ShapeOverflow)?
+                    .to_le_bytes(),
+            );
+            for index in indices {
+                hasher.update(index.to_le_bytes());
+            }
+        }
+    }
+    hasher.update(serde_json::to_vec(metadata)?);
+    context.check()?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn latent_bundle_digest_retained(
+    samples: &NativeLatentSamples,
+    mask: Option<&NativeLatentNoiseMask>,
+    batch_indices: Option<&[u64]>,
+    metadata: &NativeLatentMetadata,
+) -> Result<String, NativeLatentBundleError> {
+    let mut hasher = Sha256::new();
+    hasher.update(b"zed.comfy.native-latent-bundle.semantic.v1");
+    match samples {
+        NativeLatentSamples::Tensor(tensor) => {
+            hasher.update([1]);
+            hasher.update(latent_tensor_digest(
+                tensor.descriptor(),
+                tensor.contiguous_bytes()?,
+            )?);
+        }
+        NativeLatentSamples::AudioVideo { video, audio } => {
+            hasher.update([2]);
+            for tensor in [video, audio] {
+                hasher.update(latent_tensor_digest(
+                    tensor.descriptor(),
+                    tensor.contiguous_bytes()?,
+                )?);
+            }
+        }
+    }
+    match mask {
+        None => hasher.update([0]),
+        Some(NativeLatentNoiseMask::Tensor(tensor)) => {
+            hasher.update([1]);
+            hasher.update(latent_tensor_digest(
+                tensor.descriptor(),
+                tensor.contiguous_bytes()?,
+            )?);
+        }
+        Some(NativeLatentNoiseMask::AudioVideo { video, audio }) => {
+            hasher.update([2]);
+            for tensor in [video, audio] {
+                hasher.update(latent_tensor_digest(
+                    tensor.descriptor(),
+                    tensor.contiguous_bytes()?,
+                )?);
+            }
+        }
+    }
+    match batch_indices {
+        None => hasher.update([0]),
+        Some(indices) => {
+            hasher.update([1]);
+            hasher.update(
+                u64::try_from(indices.len())
+                    .map_err(|_| TensorError::ShapeOverflow)?
+                    .to_le_bytes(),
+            );
+            for index in indices {
+                hasher.update(index.to_le_bytes());
+            }
+        }
+    }
+    hasher.update(serde_json::to_vec(metadata)?);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+#[derive(Debug, Error)]
+pub enum NativeLatentBundleError {
+    #[error(transparent)]
+    Tensor(#[from] TensorError),
+    #[error("native latent projection encoding failed: {0}")]
+    Encoding(#[from] serde_json::Error),
+    #[error("native latent projection schema version {actual} is unsupported")]
+    UnsupportedSchemaVersion { actual: u16 },
+    #[error("native latent tensor placement must be contiguous CPU F32")]
+    UnsupportedTensorPlacement,
+    #[error("native latent tensor must be contiguous")]
+    NonContiguousTensor,
+    #[error("native latent samples must be a nonempty rank-three, rank-four, or rank-five tensor")]
+    InvalidSamplesShape,
+    #[error("native nested audio/video latent components must share a batch dimension")]
+    NestedBatchMismatch,
+    #[error("native latent noise-mask structure does not match its samples")]
+    NoiseMaskStructureMismatch,
+    #[error("native nested latent noise masks must contain both video and audio components")]
+    IncompleteNestedNoiseMask,
+    #[error("native latent noise-mask geometry is not broadcast-compatible with its samples")]
+    NoiseMaskGeometryMismatch,
+    #[error("native latent batch-index length does not match its sample batch")]
+    BatchIndexLengthMismatch,
+    #[error("native latent metadata field `{0}` is out of bounds")]
+    InvalidMetadata(&'static str),
+    #[error("native latent digest must be 64 lowercase hexadecimal characters")]
+    InvalidContentDigest,
+    #[error("native latent resident byte projection is smaller than its tensor descriptor")]
+    ResidentBytesTooSmall,
+    #[error("native latent content requires {expected} bytes, got {actual}")]
+    ContentByteLength { expected: u64, actual: u64 },
+    #[error("native latent resident byte count overflowed")]
+    ResidentBytesOverflow,
+    #[error("native latent resident allocation projection changed")]
+    ResidentAllocationChanged,
+    #[error("native latent projection no longer matches its retained payload")]
+    ProjectionChanged,
+}
+
 pub fn native_tensor_digest(
     role: NativeTensorRole,
     descriptor: &TensorDescriptor,
@@ -428,6 +1574,178 @@ mod tests {
                 TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
             let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
             Ok(NativeTensorPayload::from_tensor(role, tensor)?)
+        })
+    }
+
+    fn upload_tensor(
+        backend: &crate::CpuBackend,
+        context: &ExecutionContext<'_>,
+        shape: Vec<u64>,
+        values: &[f32],
+    ) -> Result<Tensor, Box<dyn Error>> {
+        let descriptor =
+            TensorDescriptor::contiguous(shape, DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
+        let (tensor, _) = backend.upload_f32(descriptor, values, context)?;
+        Ok(tensor)
+    }
+
+    #[test]
+    fn latent_bundle_preserves_ranks_masks_batch_indices_and_exact_metadata_wire_names()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            for shape in [vec![2, 1, 3], vec![2, 1, 2, 3], vec![2, 1, 2, 2, 3]] {
+                let count = shape.iter().copied().product::<u64>();
+                let values = (0..usize::try_from(count)?)
+                    .map(|index| index as f32)
+                    .collect::<Vec<_>>();
+                let samples = upload_tensor(backend, context, shape.clone(), &values)?;
+                let mask_shape = shape
+                    .iter()
+                    .enumerate()
+                    .map(|(index, dimension)| if index == 0 { 1 } else { *dimension })
+                    .collect::<Vec<_>>();
+                let mask_count = mask_shape.iter().copied().product::<u64>();
+                let mask = upload_tensor(
+                    backend,
+                    context,
+                    mask_shape,
+                    &vec![1.0; usize::try_from(mask_count)?],
+                )?;
+                let metadata = NativeLatentMetadata::checked(
+                    Some(NativeLatentType::Audio),
+                    Some(48_000),
+                    Some(8),
+                    Some(4),
+                )?;
+                let bundle = NativeLatentBundle::single(
+                    samples,
+                    Some(mask),
+                    Some(vec![7, 7]),
+                    metadata,
+                    context,
+                )?;
+                bundle.validate(context)?;
+                bundle.validate_retained()?;
+                assert_eq!(bundle.batch_indices(), Some([7, 7].as_slice()));
+                let encoded = serde_json::to_value(bundle.projection())?;
+                assert_eq!(encoded["metadata"]["type"], json!("audio"));
+                assert_eq!(encoded["metadata"]["sample_rate"], json!(48_000));
+                assert_eq!(encoded["metadata"]["downscale_ratio_spacial"], json!(8));
+                assert_eq!(encoded["metadata"]["downscale_ratio_temporal"], json!(4));
+                assert!(encoded["metadata"].get("spatial_downscale_ratio").is_none());
+                let decoded: NativeLatentBundleProjection = serde_json::from_value(encoded)?;
+                assert_eq!(&decoded, bundle.projection());
+            }
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn nested_audio_video_latents_are_ordered_and_alias_residency_is_counted_once()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let video = upload_tensor(backend, context, vec![1, 1, 2, 1, 2], &[1.0; 4])?;
+            let audio = upload_tensor(backend, context, vec![1, 1, 3], &[2.0; 3])?;
+            let bundle = NativeLatentBundle::audio_video(
+                video.clone(),
+                audio.clone(),
+                Some(video),
+                Some(audio),
+                Some(vec![3]),
+                NativeLatentMetadata::default(),
+                context,
+            )?;
+            let (retained_video, retained_audio) = bundle
+                .samples()
+                .audio_video()
+                .ok_or("nested samples are missing")?;
+            assert_eq!(retained_video.descriptor().shape(), &[1, 1, 2, 1, 2]);
+            assert_eq!(retained_audio.descriptor().shape(), &[1, 1, 3]);
+            assert_eq!(bundle.resident_parts()?.tensor_allocations().len(), 2);
+            bundle.validate_retained()?;
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn latent_bundle_rejects_invalid_geometry_metadata_and_cancellation()
+    -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let samples = upload_tensor(backend, context, vec![2, 1, 2, 2], &[0.0; 8])?;
+            let bad_mask = upload_tensor(backend, context, vec![2, 1, 3, 2], &[1.0; 12])?;
+            assert!(matches!(
+                NativeLatentBundle::single(
+                    samples.clone(),
+                    Some(bad_mask),
+                    None,
+                    NativeLatentMetadata::default(),
+                    context,
+                ),
+                Err(NativeLatentBundleError::NoiseMaskGeometryMismatch)
+            ));
+            assert!(matches!(
+                NativeLatentBundle::single(
+                    samples.clone(),
+                    None,
+                    Some(vec![0]),
+                    NativeLatentMetadata::default(),
+                    context,
+                ),
+                Err(NativeLatentBundleError::BatchIndexLengthMismatch)
+            ));
+            assert!(matches!(
+                NativeLatentMetadata::checked(None, Some(0), None, None),
+                Err(NativeLatentBundleError::InvalidMetadata("sample_rate"))
+            ));
+
+            context.cancellation.cancel();
+            assert!(matches!(
+                NativeLatentBundle::single(
+                    samples,
+                    None,
+                    None,
+                    NativeLatentMetadata::default(),
+                    context,
+                ),
+                Err(NativeLatentBundleError::Tensor(TensorError::Cancelled))
+            ));
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn sampler_sample_replacement_drops_only_downscale_metadata() -> Result<(), Box<dyn Error>> {
+        with_context(|backend, context| {
+            let samples = upload_tensor(backend, context, vec![1, 1, 1, 2], &[1.0, 2.0])?;
+            let mask = upload_tensor(backend, context, vec![1, 1, 1, 2], &[0.0, 1.0])?;
+            let bundle = NativeLatentBundle::single(
+                samples,
+                Some(mask),
+                Some(vec![9]),
+                NativeLatentMetadata::checked(
+                    Some(NativeLatentType::Audio),
+                    Some(44_100),
+                    Some(8),
+                    Some(4),
+                )?,
+                context,
+            )?;
+            let replacement = upload_tensor(backend, context, vec![1, 1, 1, 2], &[3.0, 4.0])?;
+            let replaced = bundle.replaced_samples(
+                NativeLatentSamples::Tensor(replacement),
+                NativeLatentMetadataRetention::DropDownscaleRatios,
+                context,
+            )?;
+            assert_eq!(
+                replaced.metadata().latent_type(),
+                Some(NativeLatentType::Audio)
+            );
+            assert_eq!(replaced.metadata().sample_rate(), Some(44_100));
+            assert_eq!(replaced.metadata().spatial_downscale_ratio(), None);
+            assert_eq!(replaced.metadata().temporal_downscale_ratio(), None);
+            assert_eq!(replaced.batch_indices(), Some([9].as_slice()));
+            assert!(replaced.noise_mask().is_some());
+            Ok(())
         })
     }
 
@@ -576,7 +1894,7 @@ mod tests {
             TensorDescriptor::contiguous(vec![2], DType::F32, DeviceId::CPU, StreamId::DEFAULT)?;
         assert_eq!(
             native_tensor_digest(NativeTensorRole::Latent, &descriptor, &[0; 8])?,
-            "91c18e0daf9452e16386af89697cc7043c1e8cdf086adb6b5d272e31cb4fdf4d"
+            "21469c6bc170dac513a10652e55babec9b58f4f834ce468ecafafe791efccdea"
         );
         assert!(matches!(
             native_tensor_digest(NativeTensorRole::Latent, &descriptor, &[0; 4]),
