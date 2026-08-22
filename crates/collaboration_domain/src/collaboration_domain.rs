@@ -15,6 +15,7 @@ pub mod profile;
 pub mod provenance;
 pub mod reaction;
 pub mod read_state;
+pub mod reminder;
 pub mod scheduled_message;
 pub mod tenant;
 pub mod thread;
@@ -96,6 +97,12 @@ pub use reaction::{
 pub use read_state::{
     ManualUnreadRegister, ManualUnreadState, OwnerReadStateReplica, ReadContextId, ReadState,
     ReadStateCompleteness, ReadStateError, ReadStateScope,
+};
+pub use reminder::{
+    OwnerReminderReplica, Reminder, ReminderCommandOutcome, ReminderContent, ReminderDismissal,
+    ReminderDueOutcome, ReminderError, ReminderHandled, ReminderHandledReason, ReminderHead,
+    ReminderId, ReminderLifecycle, ReminderRecordFields, ReminderRetention, ReminderScope,
+    ReminderTarget, ReminderTargetStatus,
 };
 pub use scheduled_message::{
     DueClaim, ScheduleCommandOutcome, ScheduleError, ScheduleMutation, ScheduleMutationKind,
