@@ -11,6 +11,7 @@ use workspace::{
 };
 
 use crate::{
+    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
     collaborative_live_thread_statuses,
     collaborative_navigation::{CollaborativeNavigationBadge, CollaborativeNavigationRow},
 };
@@ -118,6 +119,7 @@ pub(crate) struct CollaborativeTasks {
 
 impl CollaborativeTasks {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
+        observe_collaborative_awareness(cx);
         if let Some(thread_store) = ThreadMetadataStore::try_global(cx) {
             cx.observe(&thread_store, |_, _, cx| cx.notify()).detach();
         }
@@ -181,7 +183,8 @@ pub(super) fn activate_thread_target(
                 multi_workspace
                     .read(cx)
                     .workspaces_for_project_group(&project_group, cx)
-                    .and_then(|workspaces| workspaces.into_iter().next())
+                    .into_iter()
+                    .next()
             })
     }
     .ok_or_else(|| SharedString::from("The thread's project is no longer open"))?;
@@ -256,6 +259,7 @@ impl Render for CollaborativeTasks {
                 })
                 .children(rows.into_iter().map(|row| {
                     let metadata = row.metadata.clone();
+                    let awareness = render_collaborative_awareness(&row.navigation, cx);
                     h_flex()
                         .id(SharedString::from(format!(
                             "collaborative-thread-target-{}",
@@ -275,6 +279,7 @@ impl Render for CollaborativeTasks {
                                 .size(LabelSize::XSmall)
                                 .color(Color::Muted),
                         )
+                        .when_some(awareness, |this, awareness| this.child(awareness))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.activate(metadata.clone(), window, cx);
                         }))

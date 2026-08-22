@@ -8,7 +8,10 @@ use workspace::{
     collaborative_navigation::{CollaborativeNavigationError, CollaborativeNavigationTarget},
 };
 
-use crate::collaborative_navigation::{CollaborativeNavigationRow, CollaborativeNavigationRowId};
+use crate::{
+    collaborative_awareness::{observe_collaborative_awareness, render_collaborative_awareness},
+    collaborative_navigation::{CollaborativeNavigationRow, CollaborativeNavigationRowId},
+};
 
 #[derive(Clone, Debug)]
 struct CollaborativeProjectSource {
@@ -87,6 +90,7 @@ pub(crate) struct CollaborativeProjects {
 
 impl CollaborativeProjects {
     pub(crate) fn new(multi_workspace: WeakEntity<MultiWorkspace>, cx: &mut Context<Self>) -> Self {
+        observe_collaborative_awareness(cx);
         if let Some(multi_workspace) = multi_workspace.upgrade() {
             cx.observe(&multi_workspace, |_, _, cx| cx.notify())
                 .detach();
@@ -295,6 +299,7 @@ fn render_project_group(
     group: CollaborativeProjectGroupProjection,
     cx: &mut Context<CollaborativeProjects>,
 ) -> AnyElement {
+    let awareness = render_collaborative_awareness(&group.project, cx);
     let Some(project_target) = CollaborativeProjects::target(&group.project) else {
         return unavailable_projects("Project target is unavailable");
     };
@@ -313,6 +318,7 @@ fn render_project_group(
                         .weight(FontWeight::MEDIUM)
                         .truncate(),
                 )
+                .when_some(awareness, |this, awareness| this.child(awareness))
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.activate(project_target.clone(), window, cx);
                 })),
@@ -337,6 +343,7 @@ fn render_project_child(
     row: CollaborativeNavigationRow,
     cx: &mut Context<CollaborativeProjects>,
 ) -> AnyElement {
+    let awareness = render_collaborative_awareness(&row, cx);
     let Some(target) = CollaborativeProjects::target(&row) else {
         return unavailable_projects(format!("{kind} target is unavailable"));
     };
@@ -353,6 +360,7 @@ fn render_project_child(
                 .size(LabelSize::XSmall)
                 .truncate(),
         )
+        .when_some(awareness, |this, awareness| this.child(awareness))
         .on_click(cx.listener(move |this, _, window, cx| {
             this.activate(target.clone(), window, cx);
         }))
