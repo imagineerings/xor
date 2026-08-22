@@ -1883,7 +1883,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
 
 ## Milestone 4 — projects, Git and review collaboration
 
-- [ ] 24. Bind Zed projects and repositories to NIP-MP metadata
+- [x] 24. Bind Zed projects and repositories to NIP-MP metadata
 
   - [x] 24.1. Define signed project-group metadata
     - Model NIP-MP project identity, visibility and repository coordinates without local filesystem authority.
@@ -1918,7 +1918,7 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Discovered contradiction (2026-08-22): the planned unversioned `collaboration_projects.sql` path is incompatible with the crate's SQLx reversible migration source, which requires a unique numeric version plus paired `.up.sql` and `.down.sql` files; proving real DDL and rollback also requires a focused migration test target not listed in the planned writes. The signed NIP-MP head is global canonical metadata, but its community association is a tenant-local projection, so the schema retains signed source/version provenance and binding history without copying Zed-owned local project, worktree, remote or filesystem state._
     - _Evidence: 2026-08-22 — added reversible tenant-fenced tables for immutable signed project-group versions and independently versioned repository/channel bindings. Current-row indexes and explicit active/deleted tombstones preserve replacement and deletion history; exact group-version foreign keys bind each projection to its signed source, and repository owner keys remain independent from project signer keys. A focused PostgreSQL 14 run applied the channel prerequisite and project migration, exercised least-privilege forced RLS isolation, stored a cross-owner NIP-34 coordinate, replaced the signed project head, retired both bindings into current deletion tombstones and rolled all project tables down; all 3 tests passed. The focused target also passed without a database for deterministic schema/checksum coverage. Dependency, inventory, canonical specification, Rust 2024 formatting and diff-hygiene gates passed. The broader filtered Collab test command remains blocked by a pre-existing duplicate `test_rejoining_channel_after_stale_connection_cleanup_connects_livekit` definition, and warning-denied Clippy was stopped when its unrelated full application graph reduced free disk to 1.5 GB; neither blocker produced a task-local diagnostic._
 
-  - [ ] 24.4. Integrate project and channel navigation bindings
+  - [x] 24.4. Integrate project and channel navigation bindings
     - Resolve signed project/channel bindings into existing native project and collaborative navigation entities.
     - _Requirements: 4.3, 10.1_
     - _Capability IDs: CAP-010, CAP-018, CAP-036_
@@ -1926,8 +1926,10 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/sidebar/src/collaborative_projects.rs, crates/project/src/collaboration_repository.rs_
     - _Writes: crates/project/src/collaboration_navigation.rs_
     - _Validation: navigation tests cover missing local clone, multiple worktrees and archived group_
+    - _Discovered contradiction (2026-08-22): `workspace` already depends on `project`, so importing `workspace::CollaborativeNavigationTarget` into the planned project adapter would create a dependency cycle and a second navigation owner. The stable integration seam is the existing native values those targets consume: `ProjectGroupKey`, repository work directories, `WorktreeId` plus path and canonical community/channel IDs. Compiling and proving the new public adapter also requires project module registration and a focused integration fixture beyond the single planned write file. Workspace remains the sole owner of navigation mutation/history persistence, while this adapter only resolves current signed/persisted bindings against live native entities._
+    - _Evidence: 2026-08-22 — added a deterministic read-only project navigation resolver that rejects archived groups, unexpected/duplicate repository bindings and mismatched channel bindings before producing a target. Signed repository coordinates preserve their independent owners and resolve through stable common-Git-directory identity to every matching live checkout; an absent or stale local binding remains an explicit unavailable member. Exact active channel bindings project to canonical community/channel IDs, while absent or inactive channels produce no broken link. Three focused GPUI integration fixtures passed for a stale binding whose clone is missing, a main checkout plus an open linked worktree resolving to two native repository/worktree targets and one active channel, and an archived group that cannot produce navigation. `./script/clippy -p project` passed release all-target/all-feature warning-denied checks; dependency, inventory, specification, formatting and diff gates are recorded in the enclosing checkpoint commit._
 
-  - [ ] 24.5. Prove grouping never grants Git authority
+  - [x] 24.5. Prove grouping never grants Git authority
     - Add negative integration tests for push, filesystem and external-host operations by project signers.
     - _Requirements: 6.2, 10.1, 20.3_
     - _Capability IDs: CAP-018, CAP-019, CAP-044_
@@ -1935,10 +1937,12 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: crates/project/src/collaboration_*.rs, crates/git/**_
     - _Writes: crates/project/tests/project_group_permissions.rs_
     - _Validation: `cargo test -p project project_group_permissions` denies every authority not separately granted_
+    - _Discovered contradiction (2026-08-22): directly invoking native `GitStore::push`, filesystem writes or an HTTP client in a negative grouping test would exercise the already-authorized local Zed owners and could not attribute the operation to the NIP-MP signer. The security property is instead that no signer-derived grouping/navigation value is a capability handle for any of those owners. The regression therefore combines compile-time negative trait assertions against the canonical Git, filesystem and HTTP interfaces with a cross-owner runtime snapshot proving resolution itself performs no file or remote mutation; it adds no parallel authorization policy or test-only denial shim._
+    - _Evidence: 2026-08-22 — added a dedicated integration target that statically rejects `GitRepository`, `Fs` and `HttpClient` implementation on every public project-group, repository, local-repository, worktree and channel navigation target. A runtime fixture signs a project with a key distinct from the member repository owner, resolves the cross-owner binding and proves the protected file bytes and configured external origin remain unchanged. The exact planned command passed 2/2, and `./script/clippy -p project` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
 - [ ] 25. Consolidate NIP-34 forge and Git signing/authentication
 
-  - [ ] 25.1. Implement NIP-34 repository and ref codecs
+  - [x] 25.1. Implement NIP-34 repository and ref codecs
     - Encode and validate repository announcements, state, refs and status events under ADR-003.
     - _Requirements: 5.1, 10.2_
     - _Capability IDs: CAP-019_
@@ -1946,6 +1950,8 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Reads: .agents/specs/collaborative-workspace/decisions/adr-003-git-authority.md, projects/buzz/crates/buzz-core/src/git.rs_
     - _Writes: crates/nostr_compat/src/nip34_repository.rs_
     - _Validation: golden fixtures round-trip refs, clone URLs, maintainers and malformed coordinates_
+    - _Discovered contradiction (2026-08-22): the approved Buzz read path `projects/buzz/crates/buzz-core/src/git.rs` does not exist. The registered Git kind constants remain in `buzz-core/src/kind.rs`, while the actual repository announcement, coordinate and status builders plus their validation fixtures live in `buzz-sdk/src/builders.rs`; Buzz has no repository-state builder. The port therefore reads those actual sources and the canonical NIP-34 grammar without changing the task's approved ownership or introducing a second Git/ref authority._
+    - _Evidence: 2026-08-22 — added a pure `nostr_compat` codec for kind-30617 repository announcements, exact kind-30617 coordinates and subordinate references, kind-30618 repository ref state and kinds 1630–1633 status events. Frozen vectors round-trip multi-value web/clone/relay tags, maintainers, SHA-1 refs, symbolic HEAD, opaque future tags, repository/status coordinates and applied/merged references; negative vectors reject malformed coordinates, unsafe refs and status-only metadata on the wrong kind. The full crate suite passed 59 unit and four integration tests, and `./script/clippy -p nostr_compat` passed release all-target/all-feature warning-denied checks. Dependency, inventory, canonical specification, formatting and diff-hygiene gates are recorded in the enclosing checkpoint commit._
 
   - [ ] 25.2. Implement NIP-34 patch, PR and issue codecs
     - Encode and validate patches, pull requests, issues, comments and status references.
