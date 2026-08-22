@@ -12,6 +12,7 @@ pub mod migration;
 pub mod nostr;
 pub mod presence;
 pub mod pubsub;
+pub mod push;
 pub mod rpc;
 pub mod search;
 pub mod services;

@@ -1781,14 +1781,16 @@ ADR-001 through ADR-006 were accepted on 2026-08-14. The leaves below remain dep
     - _Writes: test-results/collaborative-workspace/search-push-plan.md_
     - _Validation: approved load command meets bounded queue/freshness budgets and records recovery evidence_
 
-  - [ ] 22.13. Implement push-lease and wake-outbox persistence
+  - [x] 22.13. Implement push-lease and wake-outbox persistence
     - Read/write encrypted leases and consume idempotent wake jobs under canonical device authority.
     - _Requirements: 9.5, 17.2_
     - _Capability IDs: CAP-005, CAP-016_
     - _Depends on: 22.7_
-    - _Reads: crates/collab/migrations/collaboration_push.sql, crates/collaboration_domain/src/push_lease.rs_
-    - _Writes: crates/collab/src/push/outbox.rs_
-    - _Validation: repository tests cover replacement, revoke, crash retry, duplicate wake and tenant isolation_
+    - _Reads: crates/collab/migrations/20260822000200_collaboration_push.up.sql, crates/collaboration_domain/src/push_lease.rs_
+    - _Writes: .agents/specs/collaborative-workspace/{design,tasks}.md, crates/collab/src/{lib.rs,push.rs,push/outbox.rs}, crates/collab/tests/collaboration_push_outbox.rs_
+    - _Validation: `cargo test -p collab --test collaboration_push_outbox -- --nocapture` covers replacement, revoke, crash retry, duplicate wake and tenant isolation_
+    - _Discovered contradiction (2026-08-22): Task 22.7 correctly replaced the planned unversioned migration path with the crate's timestamped reversible SQLx pair, and the planned single nested Rust file cannot compile or expose its repository without crate/module registration or run the required repository suite without an integration target. The narrow correction reads the canonical timestamped schema and adds only those registrations plus one focused test. Provider contact, raw endpoint grants, matching policy, retry scheduling and APNs payload construction remain with later gateway leaves._
+    - _Evidence: 2026-08-22 — added a PostgreSQL-only push repository that installs transaction-local tenant RLS and defensively rejects foreign typed inputs or rows. Effective lease upserts require strictly newer safe generations, round-trip active authority through bounded encrypted capability/subscription envelopes and a custody key ID, and atomically persist revocation tombstones with retained active expiry and no device secrets. Wake admission selects through the exact current enabled lease generation, endpoint generation, capability digest and expiry; an exact stored identity returns a duplicate while key collisions and unavailable authority fail closed. Bounded `SKIP LOCKED` claims rejoin current device authority, reclaim pending or expired leased rows, increment attempts and fence terminal completion by the current unexpired claim. Five focused tests passed for replacement/encrypted read/stale suppression, revoke/secret clearing, crash recovery and completion, duplicate enqueue and pre-write plus defensive-read tenant isolation. The collab library check and focused warning-denied Clippy passed; formatting, diff, dependency, inventory and specification gates are recorded in the checkpoint validation. The required all-target release Clippy wrapper remains blocked before this leaf by the pre-existing unused `EmptyView` and `AppContext` imports in `crates/language_model/src/fake_provider.rs`. Commit: enclosing checkpoint commit, reported after creation._
 
 - [ ] 23. Port inbox, pulse, forum, custom emoji and feedback
 
